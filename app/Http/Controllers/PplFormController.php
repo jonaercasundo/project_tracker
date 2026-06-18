@@ -8,39 +8,55 @@ use Illuminate\Support\Facades\DB;
 
 class PplFormController extends Controller
 {
-    public function index(Request $request)
-    {
-        $query = PplForm::query();
+public function index(Request $request)
+{
+    $query = PplForm::query();
 
-        // Allowed sortable columns (DB-safe)
-        $allowedSorts = [
-            'id',
-            'project_code',
-            'lot_number',
-            'project_title',
-            'project_id_no',
-            'region',
-            'bid_opening',
-            'abc',
-            'bidder',
-        ];
+    // ===============================
+    // SEARCH
+    // ===============================
+    if ($request->filled('search')) {
+        $search = $request->search;
 
-        // Get request values
-        $sortBy = $request->get('sort_by');
-        $sortOrder = $request->get('sort_order');
-
-        // Default values
-        $sortBy = in_array($sortBy, $allowedSorts) ? $sortBy : 'id';
-        $sortOrder = $sortOrder === 'asc' ? 'asc' : 'desc';
-
-        // Apply sorting
-        $query->orderBy($sortBy, $sortOrder);
-
-        // Pagination (keeps filters + sorting)
-        $data = $query->paginate(10)->withQueryString();
-
-        return view('finance.ppl_forms.index', compact('data'));
+        $query->where(function ($q) use ($search) {
+            $q->where('project_code', 'like', "%{$search}%")
+              ->orWhere('project_title', 'like', "%{$search}%")
+              ->orWhere('project_id_no', 'like', "%{$search}%")
+              ->orWhere('region', 'like', "%{$search}%")
+              ->orWhere('bidder', 'like', "%{$search}%");
+        });
     }
+
+    // ===============================
+    // SORTING (SAFE)
+    // ===============================
+    $allowedSorts = [
+        'id',
+        'project_code',
+        'lot_number',
+        'project_title',
+        'project_id_no',
+        'region',
+        'bid_opening',
+        'abc',
+        'bidder',
+    ];
+
+    $sortBy = $request->get('sort_by', 'id');
+    $sortOrder = $request->get('sort_order', 'desc');
+
+    $sortBy = in_array($sortBy, $allowedSorts) ? $sortBy : 'id';
+    $sortOrder = $sortOrder === 'asc' ? 'asc' : 'desc';
+
+    $query->orderBy($sortBy, $sortOrder);
+
+    // ===============================
+    // PAGINATION
+    // ===============================
+    $data = $query->paginate(10)->withQueryString();
+
+    return view('finance.ppl_forms.index', compact('data'));
+}
 
     public function create()
     {

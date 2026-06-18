@@ -225,7 +225,7 @@
         </div>
 
         <div class="text-[10px] text-slate-500 truncate pt-1 border-t border-slate-100">
-            Bidder: {{ $row->bidder }}
+            Forex: {{ $row->forex ?? 'N/A' }}
         </div>
 
         @if($row->forex)

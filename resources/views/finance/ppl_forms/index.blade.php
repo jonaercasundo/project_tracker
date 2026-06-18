@@ -164,17 +164,17 @@
                                         </div>
 
                                         <div class="flex justify-between">
-                                            <span class="text-slate-400">NOA</span>
+                                            <span class="text-slate-400">NOA (# OF MONTHS FROM BID OPENING)</span>
                                             <span>{{ $row->noa_months ?? 0 }} mo</span>
                                         </div>
 
                                         <div class="flex justify-between">
-                                            <span class="text-slate-400">NTP</span>
+                                            <span class="text-slate-400">NTP (# OF MONTHS FROM NOA)</span>
                                             <span>{{ $row->ntp_months ?? 0 }} mo</span>
                                         </div>
 
                                         <div class="flex justify-between">
-                                            <span class="text-slate-400">DELIVERY</span>
+                                            <span class="text-slate-400">DELIVERY (# OF DAYS AFTER PRODUCTION)</span>
                                             <span>{{ $row->delivery_days ?? 0 }} days</span>
                                         </div>
                                     </div>
@@ -193,14 +193,14 @@
                                         </div>
 
                                         <div class="flex justify-between">
-                                            <span class="text-slate-400">Downpayment</span>
+                                            <span class="text-slate-400">FACTORY DOWNPAYMENT</span>
                                             <span>₱{{ number_format($row->factory_downpayment ?? 0, 2) }}</span>
                                         </div>
                                     </div>
 
                                     {{-- RIGHT --}}
                                     <div class="space-y-2">
-                                        <div class="text-slate-400 font-semibold uppercase text-[10px]">Location</div>
+                                        <div class="text-slate-400 font-semibold uppercase text-[10px]">LOCATION</div>
 
                                         <div class="flex justify-between">
                                             <span class="text-slate-400">WAREHOUSE</span>
@@ -208,12 +208,12 @@
                                         </div>
 
                                         <div class="flex justify-between">
-                                            <span class="text-slate-400">AREA</span>
+                                            <span class="text-slate-400">WAREHOUSE AREA SQM</span>
                                             <span>{{ $row->warehouse_area_sqm ?? '—' }}</span>
                                         </div>
 
                                         <div class="flex justify-between">
-                                            <span class="text-slate-400">OPEX</span>
+                                            <span class="text-slate-400">OPEX (NET SALES)</span>
                                             <span>% {{ number_format($row->opex_net_sales ?? 0, 2) }}</span>
                                         </div>
                                     </div>

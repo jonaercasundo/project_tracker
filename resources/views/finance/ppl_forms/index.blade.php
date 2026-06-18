@@ -210,7 +210,7 @@
     <div class="space-y-2">
 
         <div class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
-            ABC
+            FINANCIAL SUMMARY
         </div>
 
         <div class="text-2xl font-bold text-slate-900">

@@ -136,7 +136,7 @@
                                     </div>
 
                                     <div class="flex gap-2 shrink-0">
-                                        <a href="{{ route('ppl.show', $row->id) }}"
+                                        <a href="{{ route('ppl_forms.show', $row->id) }}">
                                         class="px-3 py-1 text-[11px] font-semibold bg-white border rounded-lg hover:bg-slate-50">
                                             View
                                         </a>

@@ -218,9 +218,9 @@
         </div>
 
         <div class="flex justify-between items-center">
-            <span class="text-slate-400">LCB</span>
+            <span class="text-slate-400">LCB (ABC)</span>
             <span class="text-emerald-700 font-bold">
-                ₱{{ number_format($row->lcb_abc ?? 0, 2) }}
+                %{{ number_format($row->lcb_abc ?? 0, 2) }}
             </span>
         </div>
 

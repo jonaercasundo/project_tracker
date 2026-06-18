@@ -130,7 +130,7 @@
                                         </div>
 
                                         <div class="mt-1 text-[10px] text-slate-500">
-                                            📍 {{ $row->region }}
+                                            📍 REGION: {{ $row->region }}
                                         </div>
 
                                     </div>

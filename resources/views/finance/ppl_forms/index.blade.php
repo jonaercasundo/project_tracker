@@ -174,95 +174,120 @@
                                 {{-- DIVIDER --}}
                                 <div class="my-3 border-t border-slate-200"></div>
 
-                                {{-- ================= DETAIL GRID ================= --}}
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px]">
+{{-- ================= DETAIL GRID (REFINED LAYOUT) ================= --}}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-[11px]">
 
-                                    {{-- TIMELINE --}}
-                                    <div class="space-y-1">
-                                        <div class="text-slate-400 font-semibold uppercase text-[10px]">Timeline</div>
+    {{-- ================= LEFT: TIMELINE ================= --}}
+    <div class="space-y-2">
+        <div class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
+            Timeline
+        </div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">Bid</span>
-                                            <span class="text-slate-700 font-medium">{{ $row->bid_opening }}</span>
-                                        </div>
+        <div class="flex justify-between">
+            <span class="text-slate-400">Bid Opening</span>
+            <span class="text-slate-700 font-medium">{{ $row->bid_opening }}</span>
+        </div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">NOA</span>
-                                            <span class="text-slate-700">{{ $row->noa_months ?? 0 }} mo</span>
-                                        </div>
+        <div class="flex justify-between">
+            <span class="text-slate-400">NOA</span>
+            <span class="text-slate-700">{{ $row->noa_months ?? 0 }} mo</span>
+        </div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">NTP</span>
-                                            <span class="text-slate-700">{{ $row->ntp_months ?? 0 }} mo</span>
-                                        </div>
+        <div class="flex justify-between">
+            <span class="text-slate-400">NTP</span>
+            <span class="text-slate-700">{{ $row->ntp_months ?? 0 }} mo</span>
+        </div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">Lead</span>
-                                            <span class="text-indigo-600 font-semibold">
-                                                {{ $row->production_lead_time ?? 0 }} days
-                                            </span>
-                                        </div>
-                                    </div>
+        <div class="flex justify-between pt-1 border-t border-slate-100">
+            <span class="text-slate-400">Lead Time</span>
+            <span class="text-indigo-600 font-semibold">
+                {{ $row->production_lead_time ?? 0 }} days
+            </span>
+        </div>
+    </div>
 
-                                    {{-- FINANCIAL --}}
-                                    <div class="space-y-1">
-                                        <div class="text-slate-400 font-semibold uppercase text-[10px]">Financial</div>
+    {{-- ================= CENTER: FINANCIAL (HIGHLIGHTED) ================= --}}
+    <div class="space-y-2">
 
-                                        <div class="text-slate-900 font-bold">
-                                            ₱{{ number_format($row->abc ?? 0, 2) }}
-                                        </div>
+        <div class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
+            Financial Summary
+        </div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">LCB</span>
-                                            <span class="text-emerald-700 font-semibold">
-                                                ₱{{ number_format($row->lcb_abc ?? 0, 2) }}
-                                            </span>
-                                        </div>
+        <div class="text-2xl font-bold text-slate-900">
+            ₱{{ number_format($row->abc ?? 0, 2) }}
+        </div>
 
-                                        <div class="text-[10px] text-slate-500 truncate">
-                                            {{ $row->bidder }}
-                                        </div>
-                                    </div>
+        <div class="flex justify-between items-center">
+            <span class="text-slate-400">LCB</span>
+            <span class="text-emerald-700 font-bold">
+                ₱{{ number_format($row->lcb_abc ?? 0, 2) }}
+            </span>
+        </div>
 
-                                    {{-- MILESTONES --}}
-                                    <div class="space-y-1">
-                                        <div class="text-slate-400 font-semibold uppercase text-[10px]">Milestones</div>
+        <div class="text-[10px] text-slate-500 truncate pt-1 border-t border-slate-100">
+            Bidder: {{ $row->bidder }}
+        </div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">NTP</span>
-                                            <span>{{ $row->ntp_date ?? '—' }}</span>
-                                        </div>
+        @if($row->forex)
+            <div class="text-[10px] text-slate-400">
+                FX: {{ $row->forex }}
+            </div>
+        @endif
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">Factory</span>
-                                            <span>{{ $row->factory_delivery ?? '—' }}</span>
-                                        </div>
+    </div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">Drop</span>
-                                            <span class="text-blue-600">
-                                                {{ $row->first_delivery_date ?? '—' }}
-                                            </span>
-                                        </div>
+    {{-- ================= RIGHT: MILESTONES ================= --}}
+    <div class="space-y-2">
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">Collect</span>
-                                            <span>{{ $row->collection_date ?? '—' }}</span>
-                                        </div>
-                                    </div>
+        <div class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
+            Milestones
+        </div>
 
-                                    {{-- META / IDENTIFIERS --}}
-                                    <div class="space-y-1">
-                                        <div class="text-slate-400 font-semibold uppercase text-[10px]">Reference</div>
+        <div class="flex justify-between">
+            <span class="text-slate-400">NTP Date</span>
+            <span>{{ $row->ntp_date ?? '—' }}</span>
+        </div>
 
-                                        <div class="text-[10px] text-slate-600">
-                                            <div>Project ID: <span class="font-mono">{{ $row->project_id_no }}</span></div>
-                                            <div>Lot: <span class="font-mono">{{ $row->lot_number }}</span></div>
-                                            <div>Region: {{ $row->region }}</div>
-                                        </div>
-                                    </div>
+        <div class="flex justify-between">
+            <span class="text-slate-400">Factory</span>
+            <span>{{ $row->factory_delivery ?? '—' }}</span>
+        </div>
 
-                                </div>
+        <div class="flex justify-between">
+            <span class="text-slate-400">First Drop</span>
+            <span class="text-blue-600">
+                {{ $row->first_delivery_date ?? '—' }}
+            </span>
+        </div>
+
+        <div class="flex justify-between">
+            <span class="text-slate-400">Collection</span>
+            <span>{{ $row->collection_date ?? '—' }}</span>
+        </div>
+
+    </div>
+
+</div>
+
+{{-- ================= BOTTOM: REFERENCE BAR ================= --}}
+<div class="mt-4 pt-3 border-t border-slate-200 text-[10px] text-slate-500 flex flex-wrap gap-4">
+
+    <div>
+        Project ID:
+        <span class="font-mono text-slate-700">{{ $row->project_id_no }}</span>
+    </div>
+
+    <div>
+        Lot:
+        <span class="font-mono text-slate-700">{{ $row->lot_number }}</span>
+    </div>
+
+    <div>
+        Region:
+        <span class="text-slate-700">{{ $row->region }}</span>
+    </div>
+
+</div>
 
                             </td>
                         </tr>

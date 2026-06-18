@@ -122,7 +122,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
 
-            <form method="POST" action="{{ route('roleaccess.destroy') }}">
+            <form method="POST" action="{{ route('roleaccess.destroy', $user->user_id) }}">
                 @csrf
                 @method('DELETE')
 

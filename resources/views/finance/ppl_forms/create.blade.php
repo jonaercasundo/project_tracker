@@ -11,7 +11,7 @@
         </p>
     </div>
 
-    <form method="POST" action="{{ route('ppl-forms.store') }}">
+    <form method="POST" action="{{ route('ppl_forms.store') }}">
         @csrf
 
         <div class="space-y-6">

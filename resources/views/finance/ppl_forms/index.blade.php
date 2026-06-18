@@ -199,7 +199,7 @@
         </div>
 
         <div class="flex justify-between pt-1 border-t border-slate-100">
-            <span class="text-slate-400">Lead Time</span>
+            <span class="text-slate-400">Production Lead Time</span>
             <span class="text-indigo-600 font-semibold">
                 {{ $row->production_lead_time ?? 0 }} days
             </span>
@@ -210,7 +210,7 @@
     <div class="space-y-2">
 
         <div class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
-            Financial Summary
+            ABC
         </div>
 
         <div class="text-2xl font-bold text-slate-900">

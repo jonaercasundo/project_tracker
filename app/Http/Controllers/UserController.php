@@ -19,6 +19,7 @@ class UserController extends Controller
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
+            'username'    => $request->username ?? strtolower(explode(' ', $request->name)[0]) . rand(100, 999),
             'employee_id' => $request->employee_id,
             'department' => $request->department,
             'position' => $request->position,

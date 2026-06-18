@@ -74,7 +74,7 @@
 
                 {{-- Context Evaluation Controls --}}
                 <div class="flex items-center gap-3 w-full lg:w-auto lg:ml-auto justify-end">
-                    @if(request()->hasAny(['search', 'sort_by']))
+                    @if(request()->hasAny(['search', 'sort']))
                         <a href="{{ request()->url() }}" class="w-full lg:w-auto text-center px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors duration-150">
                             Clear Filters
                         </a>
@@ -105,7 +105,7 @@
                     @endphp
                     <thead class="bg-slate-50 border-b border-slate-200/60 text-[11px] uppercase font-bold tracking-wider text-slate-400">
                         <tr>
-                            <th scope="col" class="px-6 py-4">
+                            <th class="px-6 py-4">
                                 <a href="{{ sortUrl('project_title') }}" class="hover:text-blue-600 transition flex items-center gap-1.5">
                                     Project Title
                                     <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -114,7 +114,7 @@
                                 </a>
                             </th>
 
-                            <th scope="col" class="px-6 py-4">
+                            <th class="px-6 py-4">
                                 <a href="{{ sortUrl('bid_opening') }}" class="hover:text-blue-600 transition flex items-center gap-1.5">
                                     Production Timelines
                                     <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -123,7 +123,7 @@
                                 </a>
                             </th>
 
-                            <th scope="col" class="px-6 py-4">
+                            <th class="px-6 py-4">
                                 <a href="{{ sortUrl('abc') }}" class="hover:text-blue-600 transition flex items-center gap-1.5">
                                     Financial Status Summary
                                     <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -132,7 +132,7 @@
                                 </a>
                             </th>
 
-                            <th scope="col" class="px-6 py-4">
+                            <th class="px-6 py-4">
                                 <a href="{{ sortUrl('ntp_date') }}" class="hover:text-blue-600 transition flex items-center gap-1.5">
                                     Milestone Benchmarks
                                     <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -141,158 +141,201 @@
                                 </a>
                             </th>
 
-                            <th scope="col" class="px-6 py-4 text-right">System Interventions</th>
+                            <th class="px-6 py-4 text-right">System Interventions</th>
                         </tr>
                     </thead>
 
                     <tbody class="divide-y divide-slate-100">
-                        @forelse($data as $row)
-                        <tr class="hover:bg-slate-50/60 transition duration-150 group items-start">
-                            
-                            {{-- COLUMN 1: PROJECT IDENTITY --}}
-                            <td class="px-6 py-4 max-w-sm">
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
-                                        {{ $row->project_code }}
-                                    </span>
-                                    <span class="text-[10px] text-slate-400 font-mono">
-                                        UID {{ $row->project_id_no }} • LOT {{ $row->lot_number }}
-                                    </span>
-                                </div>
 
-                                <div class="mt-1.5 text-sm font-bold text-slate-900 leading-snug">
-                                    {{ $row->project_title }}
-                                </div>
+@forelse($data as $row)
+<tr class="hover:bg-slate-50/60 transition group">
 
-                                <div class="mt-1 text-[10px] text-slate-500 flex flex-wrap gap-2.5 items-center">
-                                    <span>📍 {{ $row->region }}</span>
-                                    <span class="text-slate-300">•</span>
-                                    <span class="truncate max-w-[150px]" title="{{ $row->bidder }}">{{ $row->bidder }}</span>
-                                    @if($row->forex)
-                                        <span class="text-slate-300">•</span>
-                                        <span class="bg-slate-100 px-1 rounded font-mono text-slate-600 text-[9px]">FX {{ $row->forex }}</span>
-                                    @endif
-                                </div>
-                            </td>
+    <td colspan="4" class="px-5 py-4">
 
-                            {{-- COLUMN 2: TIMELINES --}}
-                            <td class="px-6 py-4 text-[11px] whitespace-nowrap">
-                                <div class="space-y-1 min-w-[140px]">
-                                    <div class="flex justify-between gap-4">
-                                        <span class="text-slate-400">Bid Opening</span>
-                                        <span class="text-slate-700 font-medium text-right">{{ $row->bid_opening }}</span>
-                                    </div>
-                                    <div class="flex justify-between gap-4">
-                                        <span class="text-slate-400">NOA Duration</span>
-                                        <span class="text-slate-700 font-medium text-right">{{ $row->noa_months ?? 0 }} mo</span>
-                                    </div>
-                                    <div class="flex justify-between gap-4">
-                                        <span class="text-slate-400">NTP Duration</span>
-                                        <span class="text-slate-700 font-medium text-right">{{ $row->ntp_months ?? 0 }} mo</span>
-                                    </div>
-                                    <div class="flex justify-between gap-4 pt-0.5 border-t border-dashed border-slate-100">
-                                        <span class="text-slate-400 font-semibold">Total Lead Time</span>
-                                        <span class="text-indigo-600 font-bold text-right">{{ $row->production_lead_time ?? 0 }} days</span>
-                                    </div>
-                                </div>
-                            </td>
+        {{-- ================= HEADER (PROJECT IDENTITY) ================= --}}
+        <div class="flex items-start justify-between gap-4">
 
-                            {{-- COLUMN 3: FINANCIAL DATA --}}
-                            <td class="px-6 py-4 text-[11px] whitespace-nowrap">
-                                <div class="space-y-1">
-                                    <div class="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">ABC Allocation</div>
-                                    <div class="text-sm font-bold text-slate-900">
-                                        ₱{{ number_format($row->abc ?? 0, 2) }}
-                                    </div>
-                                    <div class="flex items-center gap-1.5 pt-0.5">
-                                        <span class="text-slate-400">LCB:</span>
-                                        <span class="text-emerald-700 font-bold">
-                                            ₱{{ number_format($row->lcb_abc ?? 0, 2) }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </td>
+            <div class="flex-1">
 
-                            {{-- COLUMN 4: MILESTONES --}}
-                            <td class="px-6 py-4 text-[11px] whitespace-nowrap">
-                                <div class="space-y-1 min-w-[130px]">
-                                    <div class="flex justify-between gap-3">
-                                        <span class="text-slate-400">NTP Issued</span>
-                                        <span class="text-slate-700 font-medium">{{ $row->ntp_date ?? '—' }}</span>
-                                    </div>
-                                    <div class="flex justify-between gap-3">
-                                        <span class="text-slate-400">Factory Del.</span>
-                                        <span class="text-slate-700 font-medium">{{ $row->factory_delivery ?? '—' }}</span>
-                                    </div>
-                                    <div class="flex justify-between gap-3">
-                                        <span class="text-slate-400">Drop Target</span>
-                                        <span class="text-blue-600 font-semibold">{{ $row->first_delivery_date ?? '—' }}</span>
-                                    </div>
-                                    <div class="flex justify-between gap-3">
-                                        <span class="text-slate-400">Collection</span>
-                                        <span class="text-slate-700 font-medium">{{ $row->collection_date ?? '—' }}</span>
-                                    </div>
-                                </div>
-                            </td>
+                <div class="flex items-center gap-2 flex-wrap">
 
-                            {{-- COLUMN 5: SYSTEM INTERVENTIONS (ACTIONS) --}}
-                            <td class="px-6 py-4 text-right whitespace-nowrap">
-                                <div class="flex items-center justify-end gap-2">
-                                    <a href="/ppl-forms/{{ $row->id }}"
-                                       class="px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-sm">
-                                        View
-                                    </a>
-                                    <a href="/ppl-forms/{{ $row->id }}/edit"
-                                       class="px-2.5 py-1.5 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100 rounded-lg hover:bg-amber-100 transition shadow-sm">
-                                        Edit
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="5" class="text-center py-20 bg-slate-50/30">
-                                <div class="flex flex-col items-center max-w-sm mx-auto">
-                                    <div class="p-3 bg-slate-100 text-slate-400 rounded-full mb-3">
-                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25m-2.25-2.25l-2.25 2.25m2.25-2.25l2.25-2.25M3.75 5.25h16.5A2.25 2.25 0 0122 7.5v.75m-19.5 0v-.75A2.25 2.25 0 013.75 5.25z" />
-                                        </svg>
-                                    </div>
-                                    <h3 class="text-sm font-bold text-slate-900">
-                                        No Active PPL Ledgers Located
-                                    </h3>
-                                    <p class="text-xs text-slate-400 mt-1 max-w-[280px]">
-                                        No matching records found. Try adjusting parameters or executing a fresh document import ledger cycle.
-                                    </p>
-                                </div>
-                            </td>
-                        </tr>
-                        @endforelse
-                    </tbody>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
+                        {{ $row->project_code }}
+                    </span>
+
+                    <span class="text-[10px] text-slate-400 font-mono">
+                        UID {{ $row->project_id_no }} • LOT {{ $row->lot_number }}
+                    </span>
+
+                </div>
+
+                <div class="mt-1 text-sm font-bold text-slate-900 leading-snug">
+                    {{ $row->project_title }}
+                </div>
+
+                <div class="mt-1 text-[10px] text-slate-500 flex flex-wrap gap-3">
+                    <span>📍 {{ $row->region }}</span>
+                    <span>• {{ $row->bidder }}</span>
+                    @if($row->forex)
+                        <span>• FX {{ $row->forex }}</span>
+                    @endif
+                </div>
+
+            </div>
+
+            {{-- ACTIONS --}}
+            <div class="flex gap-2 shrink-0">
+
+                <a href="/ppl-forms/{{ $row->id }}"
+                   class="px-3 py-1 text-[11px] font-semibold bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
+                    View
+                </a>
+
+                <a href="/ppl-forms/{{ $row->id }}/edit"
+                   class="px-3 py-1 text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 rounded-lg hover:bg-amber-100">
+                    Edit
+                </a>
+
+            </div>
+
+        </div>
+
+        {{-- DIVIDER --}}
+        <div class="my-3 border-t border-slate-200"></div>
+
+        {{-- ================= DETAIL GRID ================= --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px]">
+
+            {{-- TIMELINE --}}
+            <div class="space-y-1">
+                <div class="text-slate-400 font-semibold uppercase text-[10px]">Timeline</div>
+
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Bid</span>
+                    <span class="text-slate-700 font-medium">{{ $row->bid_opening }}</span>
+                </div>
+
+                <div class="flex justify-between">
+                    <span class="text-slate-400">NOA</span>
+                    <span class="text-slate-700">{{ $row->noa_months ?? 0 }} mo</span>
+                </div>
+
+                <div class="flex justify-between">
+                    <span class="text-slate-400">NTP</span>
+                    <span class="text-slate-700">{{ $row->ntp_months ?? 0 }} mo</span>
+                </div>
+
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Lead</span>
+                    <span class="text-indigo-600 font-semibold">
+                        {{ $row->production_lead_time ?? 0 }} days
+                    </span>
+                </div>
+            </div>
+
+            {{-- FINANCIAL --}}
+            <div class="space-y-1">
+                <div class="text-slate-400 font-semibold uppercase text-[10px]">Financial</div>
+
+                <div class="text-slate-900 font-bold">
+                    ₱{{ number_format($row->abc ?? 0, 2) }}
+                </div>
+
+                <div class="flex justify-between">
+                    <span class="text-slate-400">LCB</span>
+                    <span class="text-emerald-700 font-semibold">
+                        ₱{{ number_format($row->lcb_abc ?? 0, 2) }}
+                    </span>
+                </div>
+
+                <div class="text-[10px] text-slate-500 truncate">
+                    {{ $row->bidder }}
+                </div>
+            </div>
+
+            {{-- MILESTONES --}}
+            <div class="space-y-1">
+                <div class="text-slate-400 font-semibold uppercase text-[10px]">Milestones</div>
+
+                <div class="flex justify-between">
+                    <span class="text-slate-400">NTP</span>
+                    <span>{{ $row->ntp_date ?? '—' }}</span>
+                </div>
+
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Factory</span>
+                    <span>{{ $row->factory_delivery ?? '—' }}</span>
+                </div>
+
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Drop</span>
+                    <span class="text-blue-600">
+                        {{ $row->first_delivery_date ?? '—' }}
+                    </span>
+                </div>
+
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Collect</span>
+                    <span>{{ $row->collection_date ?? '—' }}</span>
+                </div>
+            </div>
+
+            {{-- META / IDENTIFIERS --}}
+            <div class="space-y-1">
+                <div class="text-slate-400 font-semibold uppercase text-[10px]">Reference</div>
+
+                <div class="text-[10px] text-slate-600">
+                    <div>Project ID: <span class="font-mono">{{ $row->project_id_no }}</span></div>
+                    <div>Lot: <span class="font-mono">{{ $row->lot_number }}</span></div>
+                    <div>Region: {{ $row->region }}</div>
+                </div>
+            </div>
+
+        </div>
+
+    </td>
+</tr>
+
+@empty
+<tr>
+    <td class="text-center py-24 bg-slate-50/30">
+        <div class="flex flex-col items-center max-w-sm mx-auto">
+            <h3 class="text-sm font-bold text-slate-900">
+                No Active PPL Ledgers Located
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+                No matching records found. Try adjusting filters or importing data.
+            </p>
+        </div>
+    </td>
+</tr>
+@endforelse
+
+</tbody>
                 </table>
             </div>
 
-            {{-- MASTER SEGMENT PAGINATION BAR --}}
-            @if ($data->hasPages())
-                <div class="px-6 py-4 border-t border-slate-200 bg-white flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    
-                    {{-- Left info --}}
-                    <div class="text-sm text-slate-600">
-                        Showing 
-                        <span class="font-semibold text-slate-900">{{ $data->firstItem() }}</span> 
-                        to 
-                        <span class="font-semibold text-slate-900">{{ $data->lastItem() }}</span> 
-                        of 
-                        <span class="font-semibold text-slate-900">{{ $data->total() }}</span> 
-                        results
-                    </div>
+{{-- MASTER SEGMENT PAGINATION BAR --}}
+@if ($data->hasPages())
+    <div class="px-6 py-4 border-t border-slate-200 bg-white flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        
+        {{-- Left info: Swapped to item counts for better UX --}}
+        <div class="text-sm text-slate-600">
+            Showing 
+            <span class="font-semibold text-slate-900">{{ $data->firstItem() }}</span> 
+            to 
+            <span class="font-semibold text-slate-900">{{ $data->lastItem() }}</span> 
+            of 
+            <span class="font-semibold text-slate-900">{{ $data->total() }}</span> 
+            results
+        </div>
 
-                    {{-- Pagination links wrapper --}}
-                    <div class="flex items-center separator-clean">
-                        {{ $data->appends(request()->query())->links('pagination::tailwind') }}
-                    </div>
-                </div>
-            @endif
+        {{-- Pagination links wrapper --}}
+        <div class="flex items-center separator-clean">
+            {{ $data->appends(request()->query())->links('pagination::tailwind') }}
+        </div>
+    </div>
+@endif
         </div>
 
     </div>

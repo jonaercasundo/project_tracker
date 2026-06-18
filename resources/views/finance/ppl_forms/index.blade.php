@@ -89,150 +89,149 @@
         {{-- MASTER ARCHIVAL LEDGER DATA MATRIX --}}
         <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left border-collapse">
-                    <thead class="bg-slate-50 border-b border-slate-200/60 text-[11px] uppercase font-bold tracking-wider text-slate-400">
-                        <tr>
-                            <th class="px-6 py-4">
-                                Project Ledger
-                            </th>
-                            <th class="px-6 py-4 text-right">
-                                Actions
-                            </th>
-                        </tr>
-                    </thead>
+                <table class="w-full text-sm border-collapse">
+    <thead class="bg-slate-50 text-[11px] uppercase text-slate-400">
+        <tr>
+            <th class="px-6 py-4">Project</th>
+            <th class="px-6 py-4">ABC</th>
+            <th class="px-6 py-4">Region</th>
+            <th class="px-6 py-4 text-right">Action</th>
+        </tr>
+    </thead>
 
-                    <tbody class="divide-y divide-slate-100">
+    <tbody class="divide-y divide-slate-100">
 
-                        @forelse($data as $row)
+        @foreach($data as $row)
 
-                        <tr class="hover:bg-slate-50/60 transition group">
-                            <td colspan="2" class="px-5 py-4">
+        {{-- ================= SUMMARY ROW ================= --}}
+        <tr class="hover:bg-slate-50 cursor-pointer"
+            onclick="toggleRow('{{ $row->id }}')">
 
-                                {{-- ================= HEADER ================= --}}
-                                <div class="flex items-start justify-between gap-4">
+            <td class="px-6 py-4">
+                <div class="font-bold text-slate-900">
+                    {{ $row->project_title }}
+                </div>
+                <div class="text-[10px] text-slate-400">
+                    {{ $row->project_code }} • LOT {{ $row->lot_number }}
+                </div>
+            </td>
 
-                                    <div class="flex-1">
+            <td class="px-6 py-4 font-bold text-slate-900">
+                ₱{{ number_format($row->abc ?? 0, 2) }}
+            </td>
 
-                                        <div class="flex items-center gap-2 flex-wrap">
+            <td class="px-6 py-4 text-slate-500">
+                {{ $row->region }}
+            </td>
 
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
-                                                {{ $row->project_code }}
-                                            </span>
+            <td class="px-6 py-4 text-right">
+                <a href="/ppl-forms/{{ $row->id }}"
+                   class="text-blue-600 text-xs font-bold">
+                    View
+                </a>
+            </td>
+        </tr>
 
-                                            <span class="text-[10px] text-slate-400 font-mono">
-                                                UID {{ $row->project_id_no }} • LOT {{ $row->lot_number }}
-                                            </span>
+        {{-- ================= EXPAND ROW ================= --}}
+        <tr id="expand-{{ $row->id }}" class="hidden bg-slate-50/40">
+            <td colspan="4" class="px-6 py-6">
 
-                                        </div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 text-[11px]">
 
-                                        <div class="mt-1 text-sm font-bold text-slate-900">
-                                            {{ $row->project_title }}
-                                        </div>
+                    {{-- ================= IDENTITY ================= --}}
+                    <div class="space-y-2">
+                        <div class="font-bold text-slate-400 uppercase text-[10px]">Identity</div>
 
-                                        <div class="mt-1 text-[10px] text-slate-500">
-                                            📍 {{ $row->region }}
-                                        </div>
+                        <div>PROJECT CODE: {{ $row->project_code }}</div>
+                        <div>LOT #: {{ $row->lot_number }}</div>
+                        <div>PROJECT ID: {{ $row->project_id_no }}</div>
+                        <div>REGION: {{ $row->region }}</div>
+                        <div>BIDDER: {{ $row->bidder ?? '—' }}</div>
+                        <div>SIGNATORY: {{ $row->authorized_signatory ?? '—' }}</div>
+                    </div>
 
-                                    </div>
+                    {{-- ================= TIMELINE ================= --}}
+                    <div class="space-y-2">
+                        <div class="font-bold text-slate-400 uppercase text-[10px]">Timeline</div>
 
-                                    <div class="flex gap-2 shrink-0">
-                                        <a href="/ppl-forms/{{ $row->id }}"
-                                        class="px-3 py-1 text-[11px] font-semibold bg-white border rounded-lg hover:bg-slate-50">
-                                            View
-                                        </a>
+                        <div>BID OPENING: {{ $row->bid_opening }}</div>
+                        <div>NOA: {{ $row->noa_months ?? 0 }} mo</div>
+                        <div>NTP: {{ $row->ntp_months ?? 0 }} mo</div>
+                        <div>DELIVERY: {{ $row->delivery_days ?? 0 }} days</div>
+                        <div>PRODUCTION: {{ $row->production_lead_time ?? 0 }}</div>
+                        <div>COLLECTION: {{ $row->collection_period ?? 0 }}</div>
+                        <div>DELIVERY PERIOD: {{ $row->delivery_period ?? 0 }}</div>
+                        <div>NTP DATE: {{ $row->ntp_date ?? '—' }}</div>
+                        <div>COLLECTION DATE: {{ $row->collection_date ?? '—' }}</div>
+                        <div>END DATE: {{ $row->end_date ?? '—' }}</div>
+                    </div>
 
-                                        <a href="/ppl-forms/{{ $row->id }}/edit"
-                                        class="px-3 py-1 text-[11px] font-semibold bg-amber-50 text-amber-700 border rounded-lg hover:bg-amber-100">
-                                            Edit
-                                        </a>
-                                    </div>
+                    {{-- ================= FINANCIAL ================= --}}
+                    <div class="space-y-2">
+                        <div class="font-bold text-slate-400 uppercase text-[10px]">Financial</div>
 
-                                </div>
+                        <div>ABC: ₱{{ number_format($row->abc ?? 0, 2) }}</div>
+                        <div>LCB: %{{ number_format($row->lcb_abc ?? 0, 2) }}</div>
+                        <div>FOREX: {{ $row->forex ?? '-' }}</div>
+                        <div>DOWNPAYMENT: ₱{{ number_format($row->factory_downpayment ?? 0, 2) }}</div>
 
-                                <div class="my-3 border-t border-slate-200"></div>
+                        <div>PF1: %{{ number_format($row->pf1_contract_amt ?? 0, 2) }}</div>
+                        <div>PF2: %{{ number_format($row->pf2_contract_amt ?? 0, 2) }}</div>
+                        <div>PF3: %{{ number_format($row->pf3_contract_amt ?? 0, 2) }}</div>
 
-                                {{-- ================= GRID ================= --}}
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-[11px]">
+                        <div>LL COM: %{{ number_format($row->ll_com_factory_cost ?? 0, 2) }}</div>
+                        <div>INTEREST + DST: %{{ number_format($row->interest_rate_dst ?? 0, 2) }}</div>
 
-                                    {{-- LEFT --}}
-                                    <div class="space-y-2">
-                                        <div class="text-slate-400 font-semibold uppercase text-[10px]">Timeline</div>
+                        <div>FULL PAYMENT: %{{ number_format($row->full_payment_after_delivery ?? 0, 2) }}</div>
+                    </div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">BID OPENING</span>
-                                            <span>{{ $row->bid_opening }}</span>
-                                        </div>
+                    {{-- ================= LOGISTICS ================= --}}
+                    <div class="space-y-2">
+                        <div class="font-bold text-slate-400 uppercase text-[10px]">Logistics</div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">NOA</span>
-                                            <span>{{ $row->noa_months ?? 0 }} mo</span>
-                                        </div>
+                        <div>WAREHOUSE: {{ $row->warehouse_location ?? '—' }}</div>
+                        <div>AREA: {{ $row->warehouse_area_sqm ?? '—' }}</div>
+                        <div>CONTAINER: {{ $row->shipping_brokerage ?? '—' }}</div>
+                        <div>RATE: {{ $row->rate_per_container ?? '—' }}</div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">NTP</span>
-                                            <span>{{ $row->ntp_months ?? 0 }} mo</span>
-                                        </div>
+                        <div>LOGISTICS: %{{ number_format($row->logistics_abc ?? 0, 2) }}</div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">DELIVERY</span>
-                                            <span>{{ $row->delivery_days ?? 0 }} days</span>
-                                        </div>
-                                    </div>
+                        <div>RENT/SQM: {{ $row->warehouse_rental_per_sqm ?? '—' }}</div>
+                        <div>RENT MONTHS: {{ $row->warehouse_rental_no_of_months ?? '—' }}</div>
 
-                                    {{-- CENTER --}}
-                                    <div class="space-y-2">
-                                        <div class="text-slate-400 font-semibold uppercase text-[10px]">Financial</div>
+                        <div>OTHER EXPENSES: ₱{{ number_format($row->other_expenses_contract_amt ?? 0, 2) }}</div>
+                    </div>
 
-                                        <div class="text-2xl font-bold">
-                                            ₱{{ number_format($row->abc ?? 0, 2) }}
-                                        </div>
+                    {{-- ================= OPERATIONS & TAX ================= --}}
+                    <div class="space-y-2">
+                        <div class="font-bold text-slate-400 uppercase text-[10px]">Operations & Tax</div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">LCB</span>
-                                            <span class="text-emerald-700 font-bold">%{{ number_format($row->lcb_abc ?? 0, 2) }}</span>
-                                        </div>
+                        <div>MANPOWER: %{{ number_format($row->manpower_abc ?? 0, 2) }}</div>
+                        <div>ASSEMBLY: %{{ number_format($row->assembly_abc ?? 0, 2) }}</div>
+                        <div>R&D: %{{ number_format($row->rnd_abc ?? 0, 2) }}</div>
+                        <div>FACILITATION: %{{ number_format($row->facilitation_abc ?? 0, 2) }}</div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">Downpayment</span>
-                                            <span>₱{{ number_format($row->factory_downpayment ?? 0, 2) }}</span>
-                                        </div>
-                                    </div>
+                        <div>OPEX: %{{ number_format($row->opex_net_sales ?? 0, 2) }}</div>
 
-                                    {{-- RIGHT --}}
-                                    <div class="space-y-2">
-                                        <div class="text-slate-400 font-semibold uppercase text-[10px]">Location</div>
+                        <div>INCOME TAX: {{ $row->income_tax_net_sales ?? 0 }}</div>
+                        <div>INCENTIVE: {{ $row->incentive_net_profit ?? 0 }}</div>
+                        <div>IMPORT VAT: {{ $row->importation_vat_cogs ?? 0 }}</div>
+                        <div>OUTPUT VAT: {{ $row->output_vat ?? 0 }}</div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">Warehouse</span>
-                                            <span>{{ $row->warehouse_location ?? '—' }}</span>
-                                        </div>
+                        <div>HOLD-OUT: {{ $row->hold_out ?? 0 }}</div>
+                        <div>RETENTION: {{ $row->retention ?? 0 }}</div>
+                        <div>BUSINESS CYCLE: {{ $row->business_cycle ?? '—' }}</div>
+                    </div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">Area</span>
-                                            <span>{{ $row->warehouse_area_sqm ?? '—' }}</span>
-                                        </div>
+                </div>
 
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-400">OPEX</span>
-                                            <span>% {{ number_format($row->opex_net_sales ?? 0, 2) }}</span>
-                                        </div>
-                                    </div>
+            </td>
+        </tr>
 
-                                </div>
+        @endforeach
 
-                            </td>
-                        </tr>
-
-                        @empty
-                        <tr>
-                            <td colspan="2" class="text-center py-20 text-slate-400">
-                                No records found
-                            </td>
-                        </tr>
-                        @endforelse
-
-                    </tbody>
-                </table>
+    </tbody>
+</table>
             </div>
 
             {{-- MASTER SEGMENT PAGINATION BAR --}}

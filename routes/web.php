@@ -95,7 +95,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/ppl-forms', [PplFormController::class, 'index'])->name('ppl_forms.index');;
         Route::get('/ppl-forms/create', [PplFormController::class, 'create'])->name('ppl_forms.create');
         Route::post('/ppl-forms/store', [PplFormController::class, 'store'])->name('ppl_forms.store');
-
+        Route::get('/ppl-forms/{id}', [PplFormController::class, 'show'])->name('ppl.show');
         Route::post('/ppl-forms/import', [PplFormController::class, 'import'])->name('ppl_forms.import');
         Route::get('/dashboard', function () {
             return view('finance.dashboard');

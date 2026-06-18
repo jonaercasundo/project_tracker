@@ -144,5 +144,11 @@ public function index(Request $request)
 
         return (float) str_replace([',', ' '], '', $value);
     }
+    public function show($id)
+    {
+        $data = PplForm::findOrFail($id);
+
+        return view('finance.ppl_forms.show', compact('data'));
+    }
 
 }

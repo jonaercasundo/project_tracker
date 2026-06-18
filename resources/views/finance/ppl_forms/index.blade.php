@@ -117,64 +117,7 @@
                         </tr>
                     </thead>
 
-                    <tbody class="divide-y divide-slate-100">
-                        @forelse($data as $row)
-                        <tr class="hover:bg-slate-50/60 transition group">
-
-                            <td colspan="4" class="px-5 py-4">
-
-                                {{-- ================= HEADER (PROJECT IDENTITY) ================= --}}
-                                <div class="flex items-start justify-between gap-4">
-
-                                    <div class="flex-1">
-
-                                        <div class="flex items-center gap-2 flex-wrap">
-
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
-                                                {{ $row->project_code }}
-                                            </span>
-
-                                            <span class="text-[10px] text-slate-400 font-mono">
-                                                UID {{ $row->project_id_no }} • LOT {{ $row->lot_number }}
-                                            </span>
-
-                                        </div>
-
-                                        <div class="mt-1 text-sm font-bold text-slate-900 leading-snug">
-                                            {{ $row->project_title }}
-                                        </div>
-
-                                        <div class="mt-1 text-[10px] text-slate-500 flex flex-wrap gap-3">
-                                            <span>📍 {{ $row->region }}</span>
-                                            <span>• {{ $row->bidder }}</span>
-                                            @if($row->forex)
-                                                <span>• FX {{ $row->forex }}</span>
-                                            @endif
-                                        </div>
-
-                                    </div>
-
-                                    {{-- ACTIONS --}}
-                                    <div class="flex gap-2 shrink-0">
-
-                                        <a href="/ppl-forms/{{ $row->id }}"
-                                        class="px-3 py-1 text-[11px] font-semibold bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
-                                            View
-                                        </a>
-
-                                        <a href="/ppl-forms/{{ $row->id }}/edit"
-                                        class="px-3 py-1 text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 rounded-lg hover:bg-amber-100">
-                                            Edit
-                                        </a>
-
-                                    </div>
-
-                                </div>
-
-                                {{-- DIVIDER --}}
-                                <div class="my-3 border-t border-slate-200"></div>
-
-{{-- ================= DETAIL GRID (REFINED LAYOUT) ================= --}}
+                    {{-- ================= DETAIL GRID (REFINED LAYOUT) ================= --}}
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-[11px]">
 
     {{-- ================= LEFT: TIMELINE ================= --}}
@@ -184,31 +127,63 @@
         </div>
 
         <div class="flex justify-between">
-            <span class="text-slate-400">Bid Opening</span>
+            <span class="text-slate-400">BID OPENING</span>
             <span class="text-slate-700 font-medium">{{ $row->bid_opening }}</span>
         </div>
 
         <div class="flex justify-between">
-            <span class="text-slate-400">NOA</span>
+            <span class="text-slate-400">NOA (# OF MONTHS FROM BID OPENING)</span>
             <span class="text-slate-700">{{ $row->noa_months ?? 0 }} mo</span>
         </div>
 
         <div class="flex justify-between">
-            <span class="text-slate-400">NTP</span>
+            <span class="text-slate-400">NTP (# OF MONTHS FROM NOA)</span>
             <span class="text-slate-700">{{ $row->ntp_months ?? 0 }} mo</span>
         </div>
 
+        <div class="flex justify-between">
+            <span class="text-slate-400">DELIVERY (# OF DAYS AFTER PRODUCTION)</span>
+            <span class="text-slate-700">{{ $row->delivery_days ?? 0 }} days</span>
+        </div>
+
         <div class="flex justify-between pt-1 border-t border-slate-100">
-            <span class="text-slate-400">Production Lead Time</span>
-            <span class="text-indigo-600 font-semibold">
-                {{ $row->production_lead_time ?? 0 }} days
-            </span>
+            <span class="text-slate-400">PRODUCTION LEAD TIME</span>
+            <span class="text-indigo-600 font-semibold">{{ $row->production_lead_time ?? 0 }} days</span>
+        </div>
+
+        <div class="flex justify-between pt-1 border-t border-slate-100">
+            <span class="text-slate-400">COLLECTION PERIOD</span>
+            <span class="text-indigo-600 font-semibold">{{ $row->collection_period ?? 0 }}</span>
+        </div>
+
+        <div class="flex justify-between pt-1 border-t border-slate-100">
+            <span class="text-slate-400">DELIVERY PERIOD</span>
+            <span class="text-indigo-600 font-semibold">{{ $row->delivery_period ?? 0 }}</span>
+        </div>
+
+        <div class="flex justify-between pt-1 border-t border-slate-100">
+            <span class="text-slate-400">NTP DATE</span>
+            <span class="text-indigo-600 font-semibold">{{ $row->ntp_date ?? '—' }}</span>
+        </div>
+
+        <div class="flex justify-between pt-1 border-t border-slate-100">
+            <span class="text-slate-400">COLLECTION DATE</span>
+            <span class="text-indigo-600 font-semibold">{{ $row->collection_date ?? '—' }}</span>
+        </div>
+
+        <div class="flex justify-between pt-1 border-t border-slate-100">
+            <span class="text-slate-400">BIDDER</span>
+            <span class="text-indigo-600 font-semibold">{{ $row->bidder ?? '—' }}</span>
+        </div>
+
+        <div class="flex justify-between pt-1 border-t border-slate-100">
+            <span class="text-slate-400">AUTHORIZED SIGNATORY</span>
+            <span class="text-indigo-600 font-semibold">{{ $row->authorized_signatory ?? '—' }}</span>
         </div>
     </div>
 
-    {{-- ================= CENTER: FINANCIAL (HIGHLIGHTED) ================= --}}
+    {{-- ================= CENTER: FINANCIAL ================= --}}
     <div class="space-y-2">
-
         <div class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
             FINANCIAL SUMMARY
         </div>
@@ -217,121 +192,88 @@
             ₱{{ number_format($row->abc ?? 0, 2) }}
         </div>
 
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between">
             <span class="text-slate-400">LCB (ABC)</span>
-            <span class="text-emerald-700 font-bold">
-                %{{ number_format($row->lcb_abc ?? 0, 2) }}
-            </span>
+            <span class="text-emerald-700 font-bold">%{{ number_format($row->lcb_abc ?? 0, 2) }}</span>
         </div>
 
-        <div class="text-[10px] text-slate-500 truncate pt-1 border-t border-slate-100">
-            Forex: {{ $row->forex ?? 'N/A' }}
+        <div class="text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+            Forex: {{ $row->forex ?? '-' }}
         </div>
 
-        @if($row->forex)
-            <div class="text-[10px] text-slate-400">
-                FX: {{ $row->forex }}
-            </div>
-        @endif
-
+        <div class="flex justify-between">
+            <span class="text-slate-400">FACTORY DOWNPAYMENT</span>
+            <span class="text-emerald-700 font-bold">₱{{ number_format($row->factory_downpayment ?? 0, 2) }}</span>
+        </div>
     </div>
 
-    {{-- ================= RIGHT: MILESTONES ================= --}}
+    {{-- ================= RIGHT: LOCATION ================= --}}
     <div class="space-y-2">
-
         <div class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
-            Milestones
+            LOCATION & LOGISTICS
         </div>
 
         <div class="flex justify-between">
-            <span class="text-slate-400">NTP Date</span>
-            <span>{{ $row->ntp_date ?? '—' }}</span>
+            <span class="text-slate-400">WAREHOUSE LOCATION</span>
+            <span>{{ $row->warehouse_location ?? '—' }}</span>
         </div>
 
         <div class="flex justify-between">
-            <span class="text-slate-400">Factory Delivery</span>
-            <span>{{ $row->factory_delivery ?? '—' }}</span>
+            <span class="text-slate-400">WAREHOUSE AREA (SQM)</span>
+            <span>{{ $row->warehouse_area_sqm ?? '—' }}</span>
         </div>
 
         <div class="flex justify-between">
-            <span class="text-slate-400">First Delivery Date</span>
-            <span class="text-blue-600">
-                {{ $row->first_delivery_date ?? '—' }}
-            </span>
+            <span class="text-slate-400">RATE PER CONTAINER</span>
+            <span class="text-blue-600">{{ $row->rate_per_container ?? '—' }}</span>
         </div>
 
         <div class="flex justify-between">
-            <span class="text-slate-400">Collection Date</span>
-            <span>{{ $row->collection_date ?? '—' }}</span>
+            <span class="text-slate-400">WAREHOUSE RENTAL (PER SQM)</span>
+            <span>{{ $row->warehouse_rental_per_sqm ?? '—' }}</span>
         </div>
 
+        <div class="flex justify-between">
+            <span class="text-slate-400">WAREHOUSE RENTAL (MONTHS)</span>
+            <span>{{ $row->warehouse_rental_no_of_months ?? '—' }}</span>
+        </div>
+
+        <div class="flex justify-between">
+            <span class="text-slate-400">OTHER EXPENSES</span>
+            <span>₱{{ number_format($row->other_expenses_contract_amt ?? 0, 2) }}</span>
+        </div>
+
+        <div class="flex justify-between pt-2 border-t border-slate-100">
+            <span class="text-slate-400">OPEX (NET SALES)</span>
+            <span>% {{ number_format($row->opex_net_sales ?? 0, 2) }}</span>
+        </div>
     </div>
 
 </div>
-
-{{-- ================= BOTTOM: REFERENCE BAR ================= --}}
-<div class="mt-4 pt-3 border-t border-slate-200 text-[10px] text-slate-500 flex flex-wrap gap-4">
-
-    <div>
-        Project ID:
-        <span class="font-mono text-slate-700">{{ $row->project_id_no }}</span>
-    </div>
-
-    <div>
-        Lot:
-        <span class="font-mono text-slate-700">{{ $row->lot_number }}</span>
-    </div>
-
-    <div>
-        Region:
-        <span class="text-slate-700">{{ $row->region }}</span>
-    </div>
-
-</div>
-
-                            </td>
-                        </tr>
-
-                        @empty
-                        <tr>
-                            <td class="text-center py-24 bg-slate-50/30">
-                                <div class="flex flex-col items-center max-w-sm mx-auto">
-                                    <h3 class="text-sm font-bold text-slate-900">
-                                        No Active PPL Ledgers Located
-                                    </h3>
-                                    <p class="text-xs text-slate-400 mt-1">
-                                        No matching records found. Try adjusting filters or importing data.
-                                    </p>
-                                </div>
-                            </td>
-                        </tr>
-                        @endforelse
-
-                    </tbody>
                 </table>
             </div>
 
-{{-- MASTER SEGMENT PAGINATION BAR --}}
-@if ($data->hasPages())
-    <div class="px-6 py-4 border-t border-slate-200 bg-white flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        
-        {{-- Left info: Swapped to item counts for better UX --}}
-        <div class="text-sm text-slate-600">
-            Showing 
-            <span class="font-semibold text-slate-900">{{ $data->firstItem() }}</span> 
-            to 
-            <span class="font-semibold text-slate-900">{{ $data->lastItem() }}</span> 
-            of 
-            <span class="font-semibold text-slate-900">{{ $data->total() }}</span> 
-            results
-        </div>
+            {{-- MASTER SEGMENT PAGINATION BAR --}}
+            @if ($data->hasPages())
+                <div class="px-6 py-4 border-t border-slate-200 bg-white flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    
+                    {{-- Left info: Swapped to item counts for better UX --}}
+                    <div class="text-sm text-slate-600">
+                        Showing 
+                        <span class="font-semibold text-slate-900">{{ $data->firstItem() }}</span> 
+                        to 
+                        <span class="font-semibold text-slate-900">{{ $data->lastItem() }}</span> 
+                        of 
+                        <span class="font-semibold text-slate-900">{{ $data->total() }}</span> 
+                        results
+                    </div>
 
-        {{-- Pagination links wrapper --}}
-        <div class="flex items-center separator-clean">
-            {{ $data->appends(request()->query())->links('pagination::tailwind') }}
-        </div>
-    </div>
-@endif
+                    {{-- Pagination links wrapper --}}
+                    <div class="flex items-center separator-clean">
+                        {{ $data->appends(request()->query())->links('pagination::tailwind') }}
+                    </div>
+                </div>
+            @endif
         </div>
 
     </div>

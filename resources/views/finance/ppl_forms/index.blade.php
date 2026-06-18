@@ -146,163 +146,114 @@
                     </thead>
 
                     <tbody class="divide-y divide-slate-100">
-                        @forelse($data as $row)
-                            <tr class="hover:bg-slate-50/60 transition group">
 
-                        {{-- CORE --}}
-                        <td class="px-5 py-3 align-top max-w-xs">
-                            <div class="flex flex-col gap-1">
+@forelse($data as $row)
+<tr class="hover:bg-slate-50/60 transition group">
 
-                                <span class="inline-flex w-fit items-center px-2 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
-                                    {{ $row->project_code }}
-                                </span>
+    <td colspan="4" class="px-5 py-4">
 
-                                <div class="text-sm font-semibold text-slate-900 leading-snug line-clamp-2"
-                                    title="{{ e($row->project_title) }}">
-                                    {{ $row->project_title }}
-                                </div>
+        {{-- HEADER ROW (MAIN IDENTITY) --}}
+        <div class="flex items-start justify-between gap-4">
 
-                                <div class="text-[10px] text-slate-400 flex flex-wrap gap-2">
-                                    <span>UID: <span class="font-mono text-slate-600">{{ $row->project_id_no }}</span></span>
-                                    <span class="text-slate-200">|</span>
-                                    <span>LOT: <span class="font-mono text-slate-600">{{ $row->lot_number }}</span></span>
-                                </div>
+            {{-- LEFT: CORE IDENTITY --}}
+            <div class="flex-1">
 
-                                <div class="text-[10px] text-slate-500 flex items-center gap-1">
-                                    <span>📍</span>
-                                    {{ $row->region }}
-                                </div>
+                <div class="flex items-center gap-2 flex-wrap">
 
-                            </div>
-                        </td>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
+                        {{ $row->project_code }}
+                    </span>
 
-                        {{-- TIMELINE --}}
-                        <td class="px-5 py-3 align-top text-[11px]">
-                            <div class="flex flex-col gap-1 text-slate-600">
+                    <span class="text-[10px] text-slate-400 font-mono">
+                        UID {{ $row->project_id_no }} • LOT {{ $row->lot_number }}
+                    </span>
 
-                                <div class="flex justify-between">
-                                    <span class="text-slate-400">Bid</span>
-                                    <span class="text-slate-700 font-medium">{{ $row->bid_opening }}</span>
-                                </div>
+                </div>
 
-                                <div class="flex justify-between">
-                                    <span class="text-slate-400">NOA</span>
-                                    <span class="bg-slate-100 px-1.5 rounded text-slate-700">
-                                        {{ $row->noa_months ?? 0 }} mo
-                                    </span>
-                                </div>
+                {{-- PROJECT TITLE (MAIN FOCUS) --}}
+                <div class="mt-1 text-sm font-bold text-slate-900 leading-snug">
+                    {{ $row->project_title }}
+                </div>
 
-                                <div class="flex justify-between">
-                                    <span class="text-slate-400">NTP</span>
-                                    <span class="bg-slate-100 px-1.5 rounded text-slate-700">
-                                        {{ $row->ntp_months ?? 0 }} mo
-                                    </span>
-                                </div>
+                {{-- META LINE --}}
+                <div class="mt-1 text-[10px] text-slate-500 flex flex-wrap gap-3">
+                    <span>📍 {{ $row->region }}</span>
+                    <span>• {{ $row->bidder }}</span>
+                </div>
 
-                                <div class="flex justify-between">
-                                    <span class="text-slate-400">Lead</span>
-                                    <span class="text-indigo-600 font-semibold">
-                                        {{ $row->production_lead_time ?? 0 }}d
-                                    </span>
-                                </div>
+            </div>
 
-                            </div>
-                        </td>
+            {{-- RIGHT: ACTIONS --}}
+            <div class="flex gap-2 shrink-0">
 
-                        {{-- FINANCIAL --}}
-                        <td class="px-5 py-3 align-top">
-                            <div class="flex flex-col gap-1">
+                <a href="/ppl-forms/{{ $row->id }}"
+                   class="px-3 py-1 text-[11px] font-semibold bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
+                    View
+                </a>
 
-                                <div class="text-sm font-semibold text-slate-900">
-                                    ₱{{ number_format($row->abc ?? 0, 2) }}
-                                </div>
+                <a href="/ppl-forms/{{ $row->id }}/edit"
+                   class="px-3 py-1 text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 rounded-lg hover:bg-amber-100">
+                    Edit
+                </a>
 
-                                <div class="text-[11px] flex items-center gap-2">
-                                    <span class="text-slate-400">LCB</span>
-                                    <span class="bg-emerald-50 text-emerald-700 px-1.5 rounded border border-emerald-100">
-                                        ₱{{ number_format($row->lcb_abc ?? 0, 2) }}
-                                    </span>
-                                </div>
+            </div>
 
-                                <div class="text-[10px] text-slate-500 truncate max-w-[180px]"
-                                    title="{{ e($row->bidder) }}">
-                                    {{ $row->bidder }}
-                                </div>
+        </div>
 
-                                @if($row->forex)
-                                    <div class="text-[10px] text-slate-400">
-                                        FX: {{ $row->forex }}
-                                    </div>
-                                @endif
+        {{-- DIVIDER LINE (your "------" effect) --}}
+        <div class="my-3 border-t border-slate-200"></div>
 
-                            </div>
-                        </td>
+        {{-- DETAIL ROW (SECONDARY INFO GRID) --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px] text-slate-600">
 
-                        {{-- MILESTONES --}}
-                        <td class="px-5 py-3 align-top text-[11px]">
-                            <div class="flex flex-col gap-1 text-slate-600">
+            <div>
+                <div class="text-slate-400">Bid Opening</div>
+                <div class="font-medium text-slate-700">{{ $row->bid_opening }}</div>
+            </div>
 
-                                <div class="flex justify-between">
-                                    <span class="text-slate-400">NTP</span>
-                                    <span>{{ $row->ntp_date ?? '—' }}</span>
-                                </div>
+            <div>
+                <div class="text-slate-400">ABC</div>
+                <div class="font-semibold text-slate-900">
+                    ₱{{ number_format($row->abc ?? 0, 2) }}
+                </div>
+            </div>
 
-                                <div class="flex justify-between">
-                                    <span class="text-slate-400">Factory</span>
-                                    <span>{{ $row->factory_delivery ?? '—' }}</span>
-                                </div>
+            <div>
+                <div class="text-slate-400">NOA / NTP</div>
+                <div>{{ $row->noa_months ?? 0 }} mo / {{ $row->ntp_months ?? 0 }} mo</div>
+            </div>
 
-                                <div class="flex justify-between">
-                                    <span class="text-slate-400">Drop</span>
-                                    <span class="text-blue-600">
-                                        {{ $row->first_delivery_date ?? '—' }}
-                                    </span>
-                                </div>
+            <div>
+                <div class="text-slate-400">Lead Time</div>
+                <div class="text-indigo-600 font-semibold">
+                    {{ $row->production_lead_time ?? 0 }} days
+                </div>
+            </div>
 
-                                <div class="flex justify-between">
-                                    <span class="text-slate-400">Collect</span>
-                                    <span>{{ $row->collection_date ?? '—' }}</span>
-                                </div>
+        </div>
 
-                            </div>
-                        </td>
+    </td>
+</tr>
 
-                        {{-- ACTIONS --}}
-                        <td class="px-5 py-3 align-top text-right">
-                            <div class="inline-flex rounded-lg overflow-hidden border border-slate-200 text-[11px]">
+@empty
+<tr>
+    <td class="text-center py-24 bg-slate-50/30">
 
-                                <a href="/ppl-forms/{{ $row->id }}"
-                                class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold border-r">
-                                    View
-                                </a>
+        <div class="flex flex-col items-center max-w-sm mx-auto">
+            <h3 class="text-sm font-bold text-slate-900">
+                No Active PPL Ledgers Located
+            </h3>
 
-                                <a href="/ppl-forms/{{ $row->id }}/edit"
-                                class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold">
-                                    Modify
-                                </a>
+            <p class="text-xs text-slate-400 mt-1">
+                No matching records found. Try adjusting filters or importing data.
+            </p>
+        </div>
 
-                            </div>
-                        </td>
+    </td>
+</tr>
+@endforelse
 
-                    </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center py-24 bg-slate-50/30">
-                                    <div class="flex flex-col items-center max-w-sm mx-auto">
-
-                                        <h3 class="text-sm font-bold text-slate-900">
-                                            No Active PPL Ledgers Located
-                                        </h3>
-
-                                        <p class="text-xs text-slate-400 mt-1">
-                                            No matching records found. Try adjusting filters or importing data.
-                                        </p>
-
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
+</tbody>
                 </table>
             </div>
 

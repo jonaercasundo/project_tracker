@@ -249,19 +249,19 @@
         </div>
 
         <div class="flex justify-between">
-            <span class="text-slate-400">Factory</span>
+            <span class="text-slate-400">Factory Delivery</span>
             <span>{{ $row->factory_delivery ?? '—' }}</span>
         </div>
 
         <div class="flex justify-between">
-            <span class="text-slate-400">First Drop</span>
+            <span class="text-slate-400">First Delivery Date</span>
             <span class="text-blue-600">
                 {{ $row->first_delivery_date ?? '—' }}
             </span>
         </div>
 
         <div class="flex justify-between">
-            <span class="text-slate-400">Collection</span>
+            <span class="text-slate-400">Collection Date</span>
             <span>{{ $row->collection_date ?? '—' }}</span>
         </div>
 

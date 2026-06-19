@@ -11,7 +11,9 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasRoles;
-
+    protected $primaryKey = 'user_id';
+    public $incrementing = true;
+    protected $keyType = 'int';
     /**
      * The attributes that are mass assignable.
      *
@@ -23,7 +25,6 @@ class User extends Authenticatable
         'employee_id',
         'department',
         'position',
-        'role',
         'password',
     ];
 

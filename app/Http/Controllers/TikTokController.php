@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
+use App\Models\PinterestTrend;
 
 class TikTokController extends Controller
 {
@@ -16,7 +17,7 @@ class TikTokController extends Controller
         $country  = $request->input('country', '');
 
         if (empty($apiToken)) {
-            return view('tiktok.index', [
+            return view('socialMediaScraper.tiktok', [
                 'items'    => [],
                 'error'    => 'API token is not configured.',
                 'hashtags' => $hashtags,
@@ -39,7 +40,7 @@ class TikTokController extends Controller
                 'status' => $runResponse->status(),
                 'body'   => $runResponse->body(),
             ]);
-            return view('tiktok.index', [
+            return view('socialMediaScraper.tiktok', [
                 'items'    => [],
                 'error'    => 'Failed to start scraper. Please try again.',
                 'hashtags' => $hashtags,
@@ -131,11 +132,26 @@ class TikTokController extends Controller
                    . 'Try a broader hashtag like #homedecor or #interiordesign.';
         }
 
-        return view('tiktok.index', [
+        return view('socialMediaScraper.tiktok', [
             'items'    => $items,
             'error'    => $error,
             'hashtags' => $hashtags,
             'country'  => $country,
+        ]);
+    }
+        public function fetchHomePinterestTrends(Request $request)
+    {
+        $keywords = $request->input('keywords', ['homedecor']);
+
+        $items = PinterestTrend::whereIn('keyword', $keywords)
+            ->orderByDesc('score')
+            ->limit(50)
+            ->get();
+
+        return view('socialMediaScraper.pinterest', [
+            'items' => $items,
+            'keywords' => $keywords,
+            'error' => $items->isEmpty() ? 'No cached trends yet. Wait for next sync.' : null,
         ]);
     }
 }

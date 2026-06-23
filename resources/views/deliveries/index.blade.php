@@ -213,41 +213,67 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
+    const region = document.getElementById('region');
+    const division = document.getElementById('division');
+    const municipality = document.getElementById('municipality');
+    const project = document.getElementById('project');
+    const lot = document.getElementById('lot');
+    const year = document.getElementById('year');
+
+    // ======================
+    // INITIAL STATE (LOCK ALL DEPENDENTS)
+    // ======================
+    division.disabled = true;
+    municipality.disabled = true;
+    lot.disabled = true;
+
     // ======================
     // REGION → DIVISION
     // ======================
-    document.getElementById('region').addEventListener('change', function () {
-        let region = this.value;
+    region.addEventListener('change', function () {
 
-        fetch(`/api/divisions?region=${region}`)
+        let regionVal = this.value;
+
+        division.innerHTML = '<option value="">Division</option>';
+        municipality.innerHTML = '<option value="">Municipality</option>';
+
+        municipality.disabled = true;
+
+        if (!regionVal) {
+            division.disabled = true;
+            return;
+        }
+
+        fetch(`/api/divisions?region=${regionVal}`)
             .then(res => res.json())
             .then(data => {
-                let division = document.getElementById('division');
-                division.innerHTML = '<option value="">Division</option>';
-
                 data.forEach(d => {
                     division.innerHTML += `<option value="${d.division_id}">${d.division_name}</option>`;
                 });
 
                 division.disabled = false;
-                document.getElementById('municipality').disabled = true;
             });
     });
 
     // ======================
     // DIVISION → MUNICIPALITY
     // ======================
-    document.getElementById('division').addEventListener('change', function () {
-        let division = this.value;
+    division.addEventListener('change', function () {
 
-        fetch(`/api/municipalities?division=${division}`)
+        let divisionVal = this.value;
+
+        municipality.innerHTML = '<option value="">Municipality</option>';
+
+        if (!divisionVal) {
+            municipality.disabled = true;
+            return;
+        }
+
+        fetch(`/api/municipalities?division=${divisionVal}`)
             .then(res => res.json())
             .then(data => {
-                let municipality = document.getElementById('municipality');
-                municipality.innerHTML = '<option value="">Municipality</option>';
-
                 data.forEach(m => {
-                   municipality.innerHTML += `<option value="${m.municipality_id}">${m.municipality_name}</option>`;
+                    municipality.innerHTML += `<option value="${m.municipality_id}">${m.municipality_name}</option>`;
                 });
 
                 municipality.disabled = false;
@@ -257,30 +283,37 @@ document.addEventListener('DOMContentLoaded', function () {
     // ======================
     // PROJECT → LOT
     // ======================
-    document.getElementById('project').addEventListener('change', function () {
-        let project = this.value;
+    project.addEventListener('change', function () {
 
-        let lot = document.getElementById('lot');
+        let projectVal = this.value;
+
         lot.innerHTML = '<option value="">Lot</option>';
 
-        if (!project) return;
+        if (!projectVal) {
+            lot.disabled = true;
+            return;
+        }
 
-        fetch(`/api/lots?project=${project}`)
+        fetch(`/api/lots?project=${projectVal}`)
             .then(res => res.json())
             .then(data => {
                 data.forEach(l => {
                     lot.innerHTML += `<option value="${l.lot_id}">${l.lot_name}</option>`;
                 });
+
+                lot.disabled = false;
             });
     });
 
     // ======================
-    // YEAR → PROJECT
+    // YEAR → RESET PROJECT + LOT
     // ======================
-    document.getElementById('year').addEventListener('change', function () {
-        // reset dependent filters if year changes
-        document.getElementById('project').value = '';
-        document.getElementById('lot').innerHTML = '<option value="">Lot</option>';
+    year.addEventListener('change', function () {
+
+        project.value = '';
+        lot.innerHTML = '<option value="">Lot</option>';
+
+        lot.disabled = true;
     });
 
 });

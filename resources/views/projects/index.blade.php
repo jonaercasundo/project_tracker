@@ -260,7 +260,7 @@
 
                         {{-- Action Buttons --}}
                         <td class="py-4 px-6 text-right whitespace-nowrap">
-                            <a href="{{ route('project.show', $project) }}"
+                            <a href="{{ route('projects.show', $project) }}"
                                class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 rounded-xl border border-slate-200/60 hover:border-blue-200 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm">
                                 <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path>

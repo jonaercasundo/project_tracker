@@ -83,7 +83,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::post('/projects/filter', [ProjectController::class, 'filter'])
             ->name('projects.filter');
-        Route::get('/projects/{project}', [ProjectController::class, 'show'])
+        Route::get('/projects/{project:project_id}', [ProjectController::class, 'show'])
         ->name('projects.show');
     });
 

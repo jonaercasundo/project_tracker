@@ -152,6 +152,5 @@
 
         </div>
     </div>
-
 </div>
 </x-project_app-layout>

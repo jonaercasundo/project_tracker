@@ -54,9 +54,9 @@
             class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
             <option value="">Region</option>
             @foreach($regions as $r)
-                <option value="{{ $r->region_id }}"
-                    @selected(request('region') == $r->region_id)>
-                    {{ $r->region_name }}
+                <option value="{{ $r->region }}"
+                    @selected(request('region') == $r->region)>
+                    {{ $r->region }}
                 </option>
             @endforeach
         </select>
@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 municipality.innerHTML = '<option value="">Municipality</option>';
 
                 data.forEach(m => {
-                    municipality.innerHTML += `<option value="${m.municipality_id}">${m.municipality_name}</option>`;
+                    municipality.innerHTML += `<option value="${m.municipality}">${m.municipality}</option>`;
                 });
 
                 municipality.disabled = false;

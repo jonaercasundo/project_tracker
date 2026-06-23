@@ -24,7 +24,6 @@ class LocationController extends Controller
             ->where('region', $request->region)
             ->select('division')
             ->distinct()
-            ->orderBy('division')
             ->get();
     }
 
@@ -35,7 +34,6 @@ class LocationController extends Controller
             ->where('division', $request->division)
             ->select('municipality')
             ->distinct()
-            ->orderBy('municipality')
             ->get();
     }
 }

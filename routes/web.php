@@ -90,7 +90,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('projects.show');
 
 
-        Route::get('/deliveries/tracking', [DeliveryController::class, 'globalTracking'])
+        Route::get('/deliveries/tracking', [DeliveryController::class, 'index'])
     ->name('deliveries.tracking');
     });
 

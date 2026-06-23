@@ -10,70 +10,76 @@
             <button class="btn btn-primary">Import</button>
         </div>
     </div>
-<table class="table table-bordered">
 
-<thead class="table-dark">
-<tr>
-    <th></th>
-    <th>Delivery Details</th>
-    <th>Items</th>
-    <th>Actions</th>
-</tr>
-</thead>
+    <table class="table table-bordered">
 
-<tbody>
+        <thead class="table-dark">
+        <tr>
+            <th></th>
+            <th>Delivery Details</th>
+            <th>Items</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
 
-@foreach($grouped_deliveries as $dr_group)
+        <tbody>
 
-<tr class="table-secondary fw-bold">
-    <td colspan="1">
-        <input type="checkbox"
-               class="form-check-input dr-checkbox"
-               value="{{ $dr_group['dr_no'] }}"
-               data-school-id="{{ $dr_group['school_id'] }}">
-    </td>
+        @foreach($grouped_deliveries as $dr_group)
 
-    <td colspan="2">
-        DR No: {{ $dr_group['dr_no'] }}
-        — Project: {{ $dr_group['project_name'] }}
-        — School: {{ $dr_group['school_name'] }}
-    </td>
+            <tr class="table-secondary fw-bold">
+                <td colspan="1">
+                    <input type="checkbox"
+                           class="form-check-input dr-checkbox"
+                           value="{{ $dr_group['dr_no'] }}"
+                           data-school-id="{{ $dr_group['school_id'] }}">
+                </td>
 
-    <td>
-        <button class="btn btn-secondary btn-sm" onclick="generateARs()">QR</button>
-        <button class="btn btn-secondary btn-sm" onclick="generateLabels()">Label</button>
-    </td>
-</tr>
+                <td colspan="2">
+                    DR No: {{ $dr_group['dr_no'] }}
+                    — Project: {{ $dr_group['project_name'] }}
+                    — School: {{ $dr_group['school_name'] }}
+                </td>
 
-@foreach($dr_group['deliveries'] as $d)
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick="generateARs()">QR</button>
+                    <button class="btn btn-secondary btn-sm" onclick="generateLabels()">Label</button>
+                </td>
+            </tr>
 
-<tr>
-    <td></td>
+            @foreach($dr_group['deliveries'] as $d)
 
-    <td>
-        LOT {{ $d->lot_name }}
-        @if($d->keystage_num)
-            Keystage {{ $d->keystage_num }} {{ $d->description }}
-        @endif
-    </td>
+                <tr>
+                    <td></td>
 
-    <td>
-        {!! $d->items_contents ?? '<em>No items</em>' !!}
-    </td>
+                    <td>
+                        LOT {{ $d->lot_name }}
+                        @if($d->keystage_num)
+                            Keystage {{ $d->keystage_num }} {{ $d->description }}
+                        @endif
+                    </td>
 
-    <td>
-        @if(auth()->user()->hasAnyRole(['Super Admin','Office Admin','Office Coordinator','Warehouse Admin']))
-            <button class="btn btn-warning btn-sm">Edit</button>
-        @endif
+                    <td>
+                        {!! $d->items_contents ?? '<em>No items</em>' !!}
+                    </td>
 
-        <a class="btn btn-info btn-sm"
-           href="{{ url('deliveries_details/'.$d->dr_no) }}">
-            View
-        </a>
-    </td>
-</tr>
+                    <td>
+                        @if(auth()->user()->hasAnyRole(['Super Admin','Office Admin','Office Coordinator','Warehouse Admin']))
+                            <button class="btn btn-warning btn-sm">Edit</button>
+                        @endif
 
-@endforeach
+                        <a class="btn btn-info btn-sm"
+                           href="{{ url('deliveries_details/'.$d->dr_no) }}">
+                            View
+                        </a>
+                    </td>
+                </tr>
 
-</tbody>
-</table>
+            @endforeach
+
+        @endforeach
+
+        </tbody>
+    </table>
+
+</div>
+</x-app-layout>

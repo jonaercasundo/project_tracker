@@ -61,13 +61,12 @@
         {{-- REGION --}}
         <select name="region" id="region"
             class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
-            <option value="">Region</option>
-            @foreach($regions as $r)
-                <option value="{{ $r->region_id }}"
-                    @selected(request('region') == $r->region_id)>
-                    {{ $r->region_name }}
-                </option>
-            @endforeach
+                @foreach($regions as $r)
+                    <option value="{{ $r->region }}"
+                        @selected(request('region') == $r->region)>
+                        {{ $r->region }}
+                    </option>
+                @endforeach
         </select>
 
         {{-- DIVISION --}}

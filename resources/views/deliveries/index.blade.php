@@ -360,6 +360,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // region
                 region.value = data.region || '';
+                region.dispatchEvent(new Event('change'));
 
                 // reload division
                 if (data.region) {
@@ -378,7 +379,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                             division.value = data.division || '';
                             division.disabled = false;
-
+                            division.dispatchEvent(new Event('change'));
                             if (data.division) {
                                 fetch(`/api/municipalities?division=${data.division}`)
                                     .then(res => res.json())

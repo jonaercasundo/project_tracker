@@ -226,6 +226,8 @@ document.addEventListener('DOMContentLoaded', function () {
     division.disabled = true;
     municipality.disabled = true;
     lot.disabled = true;
+    project.disabled = true;
+    region.disabled = true;
 
     // ======================
     // REGION → DIVISION
@@ -262,7 +264,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         let divisionVal = this.value;
 
-        municipality.innerHTML = '<option value="">Municipality</option>';
+        municipality.innerHTML = '<option value="">municipality</option>';
+        region.innerHTML = '<option value="">region</option>';
 
         if (!divisionVal) {
             municipality.disabled = true;
@@ -288,6 +291,9 @@ document.addEventListener('DOMContentLoaded', function () {
         let projectVal = this.value;
 
         lot.innerHTML = '<option value="">Lot</option>';
+        division.innerHTML = '<option value="">Division</option>';
+        municipality.innerHTML = '<option value="">municipality</option>';
+        region.innerHTML = '<option value="">region</option>';
 
         if (!projectVal) {
             lot.disabled = true;
@@ -310,10 +316,19 @@ document.addEventListener('DOMContentLoaded', function () {
     // ======================
     year.addEventListener('change', function () {
 
-        project.value = '';
+        
         lot.innerHTML = '<option value="">Lot</option>';
+        division.innerHTML = '<option value="">Division</option>';
+        municipality.innerHTML = '<option value="">municipality</option>';
+        project.innerHTML = '<option value="">project</option>';
+        region.innerHTML = '<option value="">region</option>';
 
+        division.disabled = true;
+        municipality.disabled = true;
         lot.disabled = true;
+        project.disabled = true;
+        region.disabled = true;
+
     });
 
 });

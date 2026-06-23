@@ -227,28 +227,28 @@ document.addEventListener('DOMContentLoaded', function () {
     municipality.disabled = true;
     lot.disabled = true;
 
-    // NOTE: project & region MUST NOT be disabled initially
-    // because user needs to start from them
+    let requestToken = 0; // prevent race conditions
 
     // ======================
     // REGION → DIVISION
     // ======================
     region.addEventListener('change', function () {
 
+        let token = ++requestToken;
         let regionVal = this.value;
 
         division.innerHTML = '<option value="">Division</option>';
         municipality.innerHTML = '<option value="">Municipality</option>';
+        division.disabled = true;
         municipality.disabled = true;
 
-        if (!regionVal) {
-            division.disabled = true;
-            return;
-        }
+        if (!regionVal) return;
 
         fetch(`/api/divisions?region=${regionVal}`)
             .then(res => res.json())
             .then(data => {
+
+                if (token !== requestToken) return;
 
                 data.forEach(d => {
                     division.innerHTML += `
@@ -269,11 +269,9 @@ document.addEventListener('DOMContentLoaded', function () {
         let divisionVal = this.value;
 
         municipality.innerHTML = '<option value="">Municipality</option>';
+        municipality.disabled = true;
 
-        if (!divisionVal) {
-            municipality.disabled = true;
-            return;
-        }
+        if (!divisionVal) return;
 
         fetch(`/api/municipalities?division=${divisionVal}`)
             .then(res => res.json())
@@ -291,7 +289,41 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // ======================
-    // LOT → AUTO FILL PROJECT + LOCATION
+    // PROJECT → LOT
+    // ======================
+    project.addEventListener('change', function () {
+
+        let projectVal = this.value;
+
+        lot.innerHTML = '<option value="">Lot</option>';
+        lot.disabled = true;
+
+        // reset dependent location
+        region.value = '';
+        division.innerHTML = '<option value="">Division</option>';
+        municipality.innerHTML = '<option value="">Municipality</option>';
+        division.disabled = true;
+        municipality.disabled = true;
+
+        if (!projectVal) return;
+
+        fetch(`/api/lots?project=${projectVal}`)
+            .then(res => res.json())
+            .then(data => {
+
+                data.forEach(l => {
+                    lot.innerHTML += `
+                        <option value="${l.lot_id}">
+                            ${l.lot_name}
+                        </option>`;
+                });
+
+                lot.disabled = false;
+            });
+    });
+
+    // ======================
+    // LOT → AUTO FILL EVERYTHING
     // ======================
     lot.addEventListener('change', function () {
 
@@ -305,25 +337,39 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (!data) return;
 
-                // ======================
-                // SET PROJECT
-                // ======================
+                // set project FIRST (important)
                 project.value = data.project_id;
 
-                // ======================
-                // SET REGION / DIVISION / MUNICIPALITY
-                // ======================
+                // reload lots for that project (sync state)
+                fetch(`/api/lots?project=${data.project_id}`)
+                    .then(res => res.json())
+                    .then(lots => {
+
+                        lot.innerHTML = '<option value="">Lot</option>';
+
+                        lots.forEach(l => {
+                            lot.innerHTML += `
+                                <option value="${l.lot_id}">
+                                    ${l.lot_name}
+                                </option>`;
+                        });
+
+                        lot.value = data.lot_id;
+                        lot.disabled = false;
+                    });
+
+                // region
                 region.value = data.region || '';
 
-                // trigger dependent loads
+                // reload division
                 if (data.region) {
                     fetch(`/api/divisions?region=${data.region}`)
                         .then(res => res.json())
-                        .then(divisions => {
+                        .then(divs => {
 
                             division.innerHTML = '<option value="">Division</option>';
 
-                            divisions.forEach(d => {
+                            divs.forEach(d => {
                                 division.innerHTML += `
                                     <option value="${d.division_id}">
                                         ${d.division_name}
@@ -355,43 +401,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
     });
-    // ======================
-    // PROJECT → LOT
-    // ======================
-    project.addEventListener('change', function () {
-
-        let projectVal = this.value;
-
-        lot.innerHTML = '<option value="">Lot</option>';
-
-        if (!projectVal) {
-            lot.disabled = true;
-            return;
-        }
-
-        fetch(`/api/lots?project=${projectVal}`)
-            .then(res => res.json())
-            .then(data => {
-
-                data.forEach(l => {
-                    lot.innerHTML += `
-                        <option value="${l.lot_id}">
-                            ${l.lot_name}
-                        </option>`;
-                });
-
-                lot.disabled = false;
-            });
-    });
 
     // ======================
-    // YEAR → RESET FILTERS (SAFE)
+    // YEAR → RESET
     // ======================
     year.addEventListener('change', function () {
 
-        // reset only dependent filters
         project.value = '';
         lot.innerHTML = '<option value="">Lot</option>';
+
+        region.value = '';
         division.innerHTML = '<option value="">Division</option>';
         municipality.innerHTML = '<option value="">Municipality</option>';
 

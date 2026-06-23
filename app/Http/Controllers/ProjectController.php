@@ -87,4 +87,8 @@ class ProjectController extends Controller
             $query->orderBy('project_id')->get()
         );
     }
+    public function show(Project $project)
+    {
+        return view('projects.show', compact('project'));
+    }
 }

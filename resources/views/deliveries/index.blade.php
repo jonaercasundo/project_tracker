@@ -319,14 +319,12 @@ document.addEventListener('DOMContentLoaded', function () {
         
         lot.innerHTML = '<option value="">Lot</option>';
         division.innerHTML = '<option value="">Division</option>';
-        municipality.innerHTML = '<option value="">municipality</option>';
-        project.innerHTML = '<option value="">project</option>';
-        region.innerHTML = '<option value="">region</option>';
+        municipality.innerHTML = '<option value="">Municipality</option>';
+        region.innerHTML = '<option value="">Region</option>';
 
         division.disabled = true;
         municipality.disabled = true;
         lot.disabled = true;
-        project.disabled = true;
         region.disabled = true;
 
     });

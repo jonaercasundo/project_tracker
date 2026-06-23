@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -8,32 +9,34 @@ use Illuminate\Support\Facades\Hash;
 class UserController extends Controller
 {
     public function store(Request $request)
-{
-    $request->validate([
-        'name' => 'required|string',
-        'email' => 'required|email|unique:users,email',
-        'password' => 'required|min:6',
-        'role' => 'required|exists:roles,name',
-    ]);
+    {
+        $request->validate([
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6',
+            'role' => 'required|exists:roles,name',
+        ]);
 
-    $username = $request->username 
-        ?? strtolower(str_replace(' ', '.', $request->name)) . rand(100, 999);
+        // Always guarantee username exists
+        $username = $request->username 
+            ?? strtolower(str_replace(' ', '.', trim($request->name))) . rand(100, 999);
 
-    $user = User::create([
-        'name' => $request->name,
-        'email' => $request->email,
-        'username' => $username,
-        'employee_id' => $request->employee_id,
-        'department' => $request->department,
-        'position' => $request->position,
-        'password' => bcrypt($request->password),
-    ]);
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'username' => $username,
+            'employee_id' => $request->employee_id ?? null,
+            'department' => $request->department ?? null,
+            'position' => $request->position ?? null,
+            'password' => Hash::make($request->password),
+        ]);
 
-    // Spatie only (source of truth)
-    $user->assignRole($request->role);
+        // Spatie role assignment (single source of truth)
+        $user->assignRole($request->role);
 
-    return back()->with('success', 'User created successfully.');
-}
+        return back()->with('success', 'User created successfully.');
+    }
+
     public function update(Request $request)
     {
         $request->validate([
@@ -43,12 +46,8 @@ class UserController extends Controller
 
         $user = User::findOrFail($request->user_id);
 
-        // Spatie update
+        // Sync roles properly (Spatie handles everything)
         $user->syncRoles([$request->role]);
-
-        // optional mirror column
-        $user->role = $request->role;
-        $user->save();
 
         return back()->with('success', 'Role updated successfully.');
     }

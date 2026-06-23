@@ -255,6 +255,26 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // ======================
+    // PROJECT → LOT
+    // ======================
+    document.getElementById('project').addEventListener('change', function () {
+        let project = this.value;
+
+        let lot = document.getElementById('lot');
+        lot.innerHTML = '<option value="">Lot</option>';
+
+        if (!project) return;
+
+        fetch(`/api/lots?project=${project}`)
+            .then(res => res.json())
+            .then(data => {
+                data.forEach(l => {
+                    lot.innerHTML += `<option value="${l.lot_id}">${l.lot_name}</option>`;
+                });
+            });
+    });
+
+    // ======================
     // YEAR → PROJECT
     // ======================
     document.getElementById('year').addEventListener('change', function () {

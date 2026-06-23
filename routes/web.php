@@ -12,6 +12,8 @@ use App\Http\Controllers\PplFormController;
 use App\Http\Controllers\TikTokController;
 use App\Http\Controllers\LocationController;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -92,10 +94,17 @@ Route::middleware(['auth'])->group(function () {
 
 
         Route::get('/deliveries/tracking', [DeliveryController::class, 'index'])
-    ->name('deliveries.tracking');
+        ->name('deliveries.tracking');
         Route::get('/api/regions', [LocationController::class, 'regions']);
         Route::get('/api/divisions', [LocationController::class, 'divisions']);
         Route::get('/api/municipalities', [LocationController::class, 'municipalities']);
+        Route::get('/api/lots', function (Request $request) {
+            return DB::table('lot')
+                ->where('project_id', $request->project)
+                ->select('lot_id', 'lot_name')
+                ->orderBy('lot_name')
+                ->get();
+        });
     });
 
     /*

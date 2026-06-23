@@ -89,9 +89,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/projects/{project:project_id}', [ProjectController::class, 'show'])
         ->name('projects.show');
 
-        
-        Route::get('/projects/{project}/deliveries/tracking', [DeliveryController::class, 'tracking'])
-        ->name('deliveries.tracking');
+
+        Route::get('/deliveries/tracking', [DeliveryController::class, 'globalTracking'])
+    ->name('deliveries.tracking.global');
     });
 
     /*

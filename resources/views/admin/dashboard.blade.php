@@ -314,7 +314,6 @@
                                                 
                                                 <form method="POST" action="{{ route('roleaccess.update') }}" class="space-y-4">
                                                     @csrf
-                                                    @method('PATCH')
                                                     <input type="hidden" name="user_id" value="{{ $user->id }}">
                                                     
                                                     <div>

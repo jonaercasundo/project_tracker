@@ -326,6 +326,7 @@ document.addEventListener('DOMContentLoaded', function () {
         municipality.disabled = true;
         lot.disabled = true;
         region.disabled = true;
+        project.disabled = false;
 
     });
 

@@ -28,28 +28,89 @@
 
     </div>
 
-    {{-- FILTERS --}}
-    <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+{{-- FILTERS --}}
+<div class="bg-white/70 backdrop-blur-sm border border-slate-200/70 rounded-2xl p-4 shadow-sm">
 
-        <input type="text"
-               name="search"
-               value="{{ request('search') }}"
-               placeholder="Search DR, project, school, lot..."
-               class="px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
 
+        {{-- YEAR --}}
+        <select name="year"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500">
+            <option value="">Year</option>
+            <option value="2026" @selected(request('year')=='2026')>2026</option>
+            <option value="2025" @selected(request('year')=='2025')>2025</option>
+        </select>
+
+        {{-- PROJECT --}}
+        <select name="project"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500">
+            <option value="">Project</option>
+            @foreach($projects ?? [] as $project)
+                <option value="{{ $project->project_id }}"
+                    @selected(request('project') == $project->project_id)>
+                    {{ \Illuminate\Support\Str::limit($project->project_name, 35) }}
+                </option>
+            @endforeach
+        </select>
+
+        {{-- STATUS --}}
         <select name="status"
                 class="px-3 py-2 rounded-xl border border-slate-200 text-sm">
-            <option value="">All Status</option>
+            <option value="">Status</option>
             <option value="Pending" @selected(request('status')=='Pending')>Pending</option>
             <option value="Accepted" @selected(request('status')=='Accepted')>Accepted</option>
             <option value="Delivered" @selected(request('status')=='Delivered')>Delivered</option>
         </select>
 
-        <button class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl">
+        {{-- LOT --}}
+        <select name="lot"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-sm">
+            <option value="">Lot</option>
+            @for($i=1;$i<=20;$i++)
+                <option value="{{ $i }}" @selected(request('lot')==$i)>
+                    {{ $i }}
+                </option>
+            @endfor
+        </select>
+
+        {{-- KEYSTAGE --}}
+        <select name="keystage"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-sm">
+            <option value="">Keystage</option>
+            @for($i=1;$i<=6;$i++)
+                <option value="{{ $i }}" @selected(request('keystage')==$i)>
+                    KS {{ $i }}
+                </option>
+            @endfor
+        </select>
+
+        {{-- REGION (placeholder like your old system) --}}
+        <select name="region"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-sm">
+            <option value="">Region</option>
+            <option value="NCR">NCR</option>
+            <option value="Region III">Region III</option>
+            <option value="Region IV-A">Region IV-A</option>
+        </select>
+
+    </div>
+
+    {{-- ACTION ROW --}}
+    <div class="flex justify-end mt-3 gap-2">
+
+        <a href="{{ url()->current() }}"
+           class="px-4 py-2 text-xs font-bold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200">
+            Reset
+        </a>
+
+        <button type="submit"
+                class="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700">
             Apply Filters
         </button>
 
-    </form>
+    </div>
+
+</div>
 
     {{-- EMPTY STATE (MOVED CORRECTLY) --}}
     @if(empty($grouped_deliveries))

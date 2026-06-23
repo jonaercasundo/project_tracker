@@ -91,7 +91,7 @@ Route::middleware(['auth'])->group(function () {
 
 
         Route::get('/deliveries/tracking', [DeliveryController::class, 'globalTracking'])
-    ->name('deliveries.tracking.global');
+    ->name('deliveries.tracking');
     });
 
     /*

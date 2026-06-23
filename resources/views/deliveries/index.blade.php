@@ -30,7 +30,16 @@
       class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
 
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-
+        {{-- YEAR --}}
+        <select name="year" id="year"
+            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
+            <option value="">Year</option>
+            @foreach($years as $y)
+                <option value="{{ $y }}" @selected(request('year') == $y)>
+                    {{ $y }}
+                </option>
+            @endforeach
+        </select>
         {{-- PROJECT --}}
         <select name="project" id="project"
             class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
@@ -54,9 +63,9 @@
             class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
             <option value="">Region</option>
             @foreach($regions as $r)
-                <option value="{{ $r->region }}"
-                    @selected(request('region') == $r->region)>
-                    {{ $r->region }}
+                <option value="{{ $r->region_id }}"
+                    @selected(request('region') == $r->region_id)>
+                    {{ $r->region_name }}
                 </option>
             @endforeach
         </select>
@@ -239,7 +248,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 municipality.innerHTML = '<option value="">Municipality</option>';
 
                 data.forEach(m => {
-                    municipality.innerHTML += `<option value="${m.municipality}">${m.municipality}</option>`;
+                   municipality.innerHTML += `<option value="${m.municipality_id}">${m.municipality_name}</option>`;
                 });
 
                 municipality.disabled = false;
@@ -250,13 +259,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // YEAR → PROJECT
     // ======================
     document.getElementById('year').addEventListener('change', function () {
-        let year = this.value;
-
-        document.querySelectorAll('#project option').forEach(opt => {
-            if (!opt.value) return;
-            opt.style.display = (!year || opt.dataset.year == year) ? '' : 'none';
-        });
-
+        // reset dependent filters if year changes
+        document.getElementById('project').value = '';
         document.getElementById('lot').innerHTML = '<option value="">Lot</option>';
     });
 

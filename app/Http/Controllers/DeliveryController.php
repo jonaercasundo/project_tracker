@@ -35,6 +35,11 @@ class DeliveryController extends Controller
                   ->orWhere('l.lot_name', 'like', "%{$search}%");
             });
         }
+        $years = DB::table('deliveries')
+            ->selectRaw('YEAR(delivery_date) as year')
+            ->distinct()
+            ->orderBy('year', 'desc')
+            ->pluck('year');
 
         // =========================
         // FILTERS
@@ -65,7 +70,9 @@ class DeliveryController extends Controller
         if ($request->filled('municipality')) {
             $baseQuery->where('s.municipality', $request->municipality);
         }
-
+        if ($request->filled('year')) {
+            $baseQuery->whereYear('d.delivery_date', $request->year);
+        }
         // =========================
         // TOTAL
         // =========================
@@ -137,6 +144,7 @@ class DeliveryController extends Controller
             'grouped_deliveries' => $grouped,
             'projects' => $projects,
             'regions' => $regions,
+            'years' => $years,
             'page' => $page,
             'total_pages' => $total_pages,
             'total_rows' => $total_rows

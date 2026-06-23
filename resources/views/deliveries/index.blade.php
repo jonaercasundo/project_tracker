@@ -221,13 +221,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const year = document.getElementById('year');
 
     // ======================
-    // INITIAL STATE (LOCK ALL DEPENDENTS)
+    // INITIAL STATE
     // ======================
     division.disabled = true;
     municipality.disabled = true;
     lot.disabled = true;
-    project.disabled = true;
-    region.disabled = true;
+
+    // NOTE: project & region MUST NOT be disabled initially
+    // because user needs to start from them
 
     // ======================
     // REGION → DIVISION
@@ -238,7 +239,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         division.innerHTML = '<option value="">Division</option>';
         municipality.innerHTML = '<option value="">Municipality</option>';
-
         municipality.disabled = true;
 
         if (!regionVal) {
@@ -249,8 +249,12 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch(`/api/divisions?region=${regionVal}`)
             .then(res => res.json())
             .then(data => {
+
                 data.forEach(d => {
-                    division.innerHTML += `<option value="${d.division_id}">${d.division_name}</option>`;
+                    division.innerHTML += `
+                        <option value="${d.division_id}">
+                            ${d.division_name}
+                        </option>`;
                 });
 
                 division.disabled = false;
@@ -264,8 +268,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         let divisionVal = this.value;
 
-        municipality.innerHTML = '<option value="">municipality</option>';
-        region.innerHTML = '<option value="">region</option>';
+        municipality.innerHTML = '<option value="">Municipality</option>';
 
         if (!divisionVal) {
             municipality.disabled = true;
@@ -275,8 +278,12 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch(`/api/municipalities?division=${divisionVal}`)
             .then(res => res.json())
             .then(data => {
+
                 data.forEach(m => {
-                    municipality.innerHTML += `<option value="${m.municipality_id}">${m.municipality_name}</option>`;
+                    municipality.innerHTML += `
+                        <option value="${m.municipality_id}">
+                            ${m.municipality_name}
+                        </option>`;
                 });
 
                 municipality.disabled = false;
@@ -291,9 +298,6 @@ document.addEventListener('DOMContentLoaded', function () {
         let projectVal = this.value;
 
         lot.innerHTML = '<option value="">Lot</option>';
-        division.innerHTML = '<option value="">Division</option>';
-        municipality.innerHTML = '<option value="">municipality</option>';
-        region.innerHTML = '<option value="">region</option>';
 
         if (!projectVal) {
             lot.disabled = true;
@@ -303,8 +307,12 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch(`/api/lots?project=${projectVal}`)
             .then(res => res.json())
             .then(data => {
+
                 data.forEach(l => {
-                    lot.innerHTML += `<option value="${l.lot_id}">${l.lot_name}</option>`;
+                    lot.innerHTML += `
+                        <option value="${l.lot_id}">
+                            ${l.lot_name}
+                        </option>`;
                 });
 
                 lot.disabled = false;
@@ -312,22 +320,19 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // ======================
-    // YEAR → RESET PROJECT + LOT
+    // YEAR → RESET FILTERS (SAFE)
     // ======================
     year.addEventListener('change', function () {
 
-        
+        // reset only dependent filters
+        project.value = '';
         lot.innerHTML = '<option value="">Lot</option>';
         division.innerHTML = '<option value="">Division</option>';
         municipality.innerHTML = '<option value="">Municipality</option>';
-        region.innerHTML = '<option value="">Region</option>';
 
         division.disabled = true;
         municipality.disabled = true;
         lot.disabled = true;
-        region.disabled = true;
-        project.disabled = false;
-
     });
 
 });

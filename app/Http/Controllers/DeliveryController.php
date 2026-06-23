@@ -20,10 +20,7 @@ class DeliveryController extends Controller
             ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
             ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
             ->join('projects as p', 'p.project_id', '=', 'd.project_id')
-            ->join('school as s', 's.school_id', '=', 'd.school_id')
-            ->leftJoin('region as r', 'r.region_id', '=', 's.region_id')
-            ->leftJoin('division as dv', 'dv.division_id', '=', 's.division_id')
-            ->leftJoin('municipality as m', 'm.municipality_id', '=', 's.municipality_id');
+            ->join('school as s', 's.school_id', '=', 'd.school_id');
 
         // =========================
         // SEARCH
@@ -33,62 +30,50 @@ class DeliveryController extends Controller
 
             $baseQuery->where(function ($q) use ($search) {
                 $q->where('d.dr_no', 'like', "%{$search}%")
-                ->orWhere('p.project_name', 'like', "%{$search}%")
-                ->orWhere('s.school_name', 'like', "%{$search}%")
-                ->orWhere('l.lot_name', 'like', "%{$search}%");
+                  ->orWhere('p.project_name', 'like', "%{$search}%")
+                  ->orWhere('s.school_name', 'like', "%{$search}%")
+                  ->orWhere('l.lot_name', 'like', "%{$search}%");
             });
         }
 
         // =========================
-        // STATUS FILTER
+        // FILTERS
         // =========================
         if ($request->filled('status')) {
             $baseQuery->where('d.status', $request->status);
         }
 
-        // =========================
-        // PROJECT FILTER
-        // =========================
         if ($request->filled('project')) {
             $baseQuery->where('d.project_id', $request->project);
         }
 
-        // =========================
-        // LOT FILTER
-        // =========================
         if ($request->filled('lot')) {
             $baseQuery->where('d.lot_id', $request->lot);
         }
 
         // =========================
-        // REGION FILTER
+        // LOCATION FILTERS (BASED ON SCHOOL TABLE)
         // =========================
         if ($request->filled('region')) {
-            $baseQuery->where('s.region_id', $request->region);
+            $baseQuery->where('s.region', $request->region);
         }
 
-        // =========================
-        // DIVISION FILTER
-        // =========================
         if ($request->filled('division')) {
-            $baseQuery->where('s.division_id', $request->division);
+            $baseQuery->where('s.division', $request->division);
         }
 
-        // =========================
-        // MUNICIPALITY FILTER
-        // =========================
         if ($request->filled('municipality')) {
-            $baseQuery->where('s.municipality_id', $request->municipality);
+            $baseQuery->where('s.municipality', $request->municipality);
         }
 
         // =========================
-        // TOTAL (after filters)
+        // TOTAL
         // =========================
         $total_rows = (clone $baseQuery)->count();
         $total_pages = (int) ceil($total_rows / $limit);
 
         // =========================
-        // DATA FETCH
+        // DATA
         // =========================
         $deliveries = $baseQuery
             ->select(
@@ -96,12 +81,12 @@ class DeliveryController extends Controller
                 'p.project_name',
                 's.school_name',
                 's.address',
+                's.region',
+                's.division',
+                's.municipality',
                 'k.keystage_num',
                 'k.description',
-                'l.lot_name',
-                'r.region_name',
-                'dv.division_name',
-                'm.municipality_name'
+                'l.lot_name'
             )
             ->orderBy('d.status')
             ->orderBy('d.delivery_date')
@@ -125,9 +110,9 @@ class DeliveryController extends Controller
                     'school_id' => $row->school_id,
                     'school_name' => $row->school_name,
                     'address' => $row->address,
-                    'region_name' => $row->region_name,
-                    'division_name' => $row->division_name,
-                    'municipality_name' => $row->municipality_name,
+                    'region' => $row->region,
+                    'division' => $row->division,
+                    'municipality' => $row->municipality,
                     'delivery_date' => $row->delivery_date,
                     'status' => $row->status,
                     'deliveries' => []
@@ -138,10 +123,15 @@ class DeliveryController extends Controller
         }
 
         // =========================
-        // DROPDOWNS DATA
+        // DROPDOWNS (FROM SCHOOL TABLE)
         // =========================
         $projects = DB::table('projects')->get();
-        $regions = DB::table('region')->orderBy('region_name')->get();
+
+        $regions = DB::table('school')
+            ->select('region')
+            ->distinct()
+            ->orderBy('region')
+            ->get();
 
         return view('deliveries.index', [
             'grouped_deliveries' => $grouped,

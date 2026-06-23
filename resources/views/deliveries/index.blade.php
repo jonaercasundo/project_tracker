@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-project_app-layout>
 <div class="space-y-6">
 
     <div class="flex justify-between">
@@ -82,4 +82,4 @@
     </table>
 
 </div>
-</x-app-layout>
+</x-project_app-layout>

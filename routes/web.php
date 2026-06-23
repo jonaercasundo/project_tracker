@@ -10,6 +10,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\PplFormController;
 use App\Http\Controllers\TikTokController;
+use App\Http\Controllers\LocationController;
 use Illuminate\Support\Facades\Http;
 /*
 |--------------------------------------------------------------------------
@@ -92,6 +93,9 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/deliveries/tracking', [DeliveryController::class, 'index'])
     ->name('deliveries.tracking');
+        Route::get('/api/regions', [LocationController::class, 'regions']);
+        Route::get('/api/divisions', [LocationController::class, 'divisions']);
+        Route::get('/api/municipalities', [LocationController::class, 'municipalities']);
     });
 
     /*

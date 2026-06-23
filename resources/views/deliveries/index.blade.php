@@ -25,90 +25,69 @@
             </button>
         </div>
     </div>
+{{-- FILTERS --}}
+<form method="GET" action="{{ url()->current() }}"
+      class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
 
-    {{-- FILTERS --}}
-    <form method="GET" action="{{ url()->current() }}" class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
-        
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
 
-            {{-- YEAR --}}
-            <div class="flex flex-col gap-1">
-                <select name="year" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">
-                    <option value="">Year</option>
-                    <option value="2026" @selected(request('year') == '2026')>2026</option>
-                    <option value="2025" @selected(request('year') == '2025')>2025</option>
-                </select>
-            </div>
+        {{-- PROJECT --}}
+        <select name="project" id="project"
+            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
+            <option value="">Project</option>
+            @foreach($projects as $project)
+                <option value="{{ $project->project_id }}"
+                    @selected(request('project') == $project->project_id)>
+                    {{ \Illuminate\Support\Str::limit($project->project_name, 40) }}
+                </option>
+            @endforeach
+        </select>
 
-            {{-- PROJECT --}}
-            <div class="flex flex-col gap-1">
-                <select name="project" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">
-                    <option value="">Project</option>
-                    @foreach($projects ?? [] as $project)
-                        <option value="{{ $project->project_id }}" @selected(request('project') == $project->project_id)>
-                            {{ \Illuminate\Support\Str::limit($project->project_name, 35) }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+        {{-- LOT (depends on project) --}}
+        <select name="lot" id="lot"
+            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
+            <option value="">Lot</option>
+        </select>
 
-            {{-- STATUS --}}
-            <div class="flex flex-col gap-1">
-                <select name="status" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">
-                    <option value="">Status</option>
-                    <option value="Pending" @selected(request('status') == 'Pending')>Pending</option>
-                    <option value="Accepted" @selected(request('status') == 'Accepted')>Accepted</option>
-                    <option value="Delivered" @selected(request('status') == 'Delivered')>Delivered</option>
-                </select>
-            </div>
+        {{-- REGION --}}
+        <select name="region" id="region"
+            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
+            <option value="">Region</option>
+            @foreach($regions as $r)
+                <option value="{{ $r->region_id }}"
+                    @selected(request('region') == $r->region_id)>
+                    {{ $r->region_name }}
+                </option>
+            @endforeach
+        </select>
 
-            {{-- LOT --}}
-            <div class="flex flex-col gap-1">
-                <select name="lot" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">
-                    <option value="">Lot</option>
-                    @for($i = 1; $i <= 20; $i++)
-                        <option value="{{ $i }}" @selected(request('lot') == $i)>
-                            Lot {{ $i }}
-                        </option>
-                    @endfor
-                </select>
-            </div>
+        {{-- DIVISION --}}
+        <select name="division" id="division"
+            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50" disabled>
+            <option value="">Division</option>
+        </select>
 
-            {{-- KEYSTAGE --}}
-            <div class="flex flex-col gap-1">
-                <select name="keystage" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">
-                    <option value="">Keystage</option>
-                    @for($i = 1; $i <= 6; $i++)
-                        <option value="{{ $i }}" @selected(request('keystage') == $i)>
-                            KS {{ $i }}
-                        </option>
-                    @endfor
-                </select>
-            </div>
+        {{-- MUNICIPALITY --}}
+        <select name="municipality" id="municipality"
+            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50" disabled>
+            <option value="">Municipality</option>
+        </select>
 
-            {{-- REGION --}}
-            <div class="flex flex-col gap-1">
-                <select name="region" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">
-                    <option value="">Region</option>
-                    <option value="NCR" @selected(request('region') == 'NCR')>NCR</option>
-                    <option value="Region III" @selected(request('region') == 'Region III')>Region III</option>
-                    <option value="Region IV-A" @selected(request('region') == 'Region IV-A')>Region IV-A</option>
-                </select>
-            </div>
+    </div>
 
-        </div>
+    {{-- ACTION --}}
+    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <a href="{{ url()->current() }}"
+           class="px-4 py-2 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200">
+            Reset
+        </a>
 
-        {{-- ACTION ROW --}}
-        <div class="flex justify-end items-center gap-2 pt-2 border-t border-slate-100">
-            <a href="{{ url()->current() }}" class="px-4 py-2 text-xs font-bold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-center">
-                Reset
-            </a>
-            <button type="submit" class="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition">
-                Apply Filters
-            </button>
-        </div>
+        <button class="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700">
+            Apply Filters
+        </button>
+    </div>
 
-    </form>
+</form>
 
     {{-- CONTENT STATE HANDLERS --}}
     @if(empty($grouped_deliveries))
@@ -223,5 +202,64 @@
     @endif
 
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
 
+    // ======================
+    // REGION → DIVISION
+    // ======================
+    document.getElementById('region').addEventListener('change', function () {
+        let region = this.value;
+
+        fetch(`/api/divisions?region=${region}`)
+            .then(res => res.json())
+            .then(data => {
+                let division = document.getElementById('division');
+                division.innerHTML = '<option value="">Division</option>';
+
+                data.forEach(d => {
+                    division.innerHTML += `<option value="${d.division_id}">${d.division_name}</option>`;
+                });
+
+                division.disabled = false;
+                document.getElementById('municipality').disabled = true;
+            });
+    });
+
+    // ======================
+    // DIVISION → MUNICIPALITY
+    // ======================
+    document.getElementById('division').addEventListener('change', function () {
+        let division = this.value;
+
+        fetch(`/api/municipalities?division=${division}`)
+            .then(res => res.json())
+            .then(data => {
+                let municipality = document.getElementById('municipality');
+                municipality.innerHTML = '<option value="">Municipality</option>';
+
+                data.forEach(m => {
+                    municipality.innerHTML += `<option value="${m.municipality_id}">${m.municipality_name}</option>`;
+                });
+
+                municipality.disabled = false;
+            });
+    });
+
+    // ======================
+    // YEAR → PROJECT
+    // ======================
+    document.getElementById('year').addEventListener('change', function () {
+        let year = this.value;
+
+        document.querySelectorAll('#project option').forEach(opt => {
+            if (!opt.value) return;
+            opt.style.display = (!year || opt.dataset.year == year) ? '' : 'none';
+        });
+
+        document.getElementById('lot').innerHTML = '<option value="">Lot</option>';
+    });
+
+});
+</script>
 </x-project_app-layout>

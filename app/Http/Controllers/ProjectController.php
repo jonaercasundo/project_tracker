@@ -9,25 +9,26 @@ class ProjectController extends Controller
 {
     public function index()
     {
-        $projects = Project::orderBy('project_id')
-            ->paginate(10);
+        $projects = Project::orderBy('project_id')->paginate(10);
 
         $years = Project::selectRaw('YEAR(created_at) year')
             ->distinct()
             ->pluck('year');
 
-        $agencies = Project::distinct()
-            ->pluck('agency');
+        $agencies = Project::distinct()->pluck('agency');
+        $statuses = Project::distinct()->pluck('status');
 
-        $statuses = Project::distinct()
-            ->pluck('status');
+        return view('projects.index', [
+            'projects' => $projects,
+            'years' => $years,
+            'agencies' => $agencies,
+            'statuses' => $statuses,
 
-        return view('projects.index', compact(
-            'projects',
-            'years',
-            'agencies',
-            'statuses'
-        ));
+            // ✅ ADD THESE
+            'totalProjects' => Project::count(),
+            'pendingProjects' => Project::where('status', 'Pending')->count(),
+            'deliveredProjects' => Project::where('status', 'Delivered')->count(),
+        ]);
     }
 
     public function store(Request $request)

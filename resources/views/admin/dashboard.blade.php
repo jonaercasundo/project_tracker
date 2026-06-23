@@ -304,65 +304,64 @@
                                     </td>
                                 </tr>
                             @endforelse
-
-                            @foreach($users as $user)
-
-                            <!-- EDIT MODAL -->
-                            <div x-show="activeModal === 'edit-{{ $user->id }}'"
-                                x-cloak
-                                class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-
-                                <div @click.away="activeModal = null"
-                                    class="bg-white p-6 rounded-2xl w-full max-w-md">
-
-                                    <h2 class="font-bold mb-4">Edit Role</h2>
-
-                                    <form method="POST" action="{{ route('roleaccess.update') }}">
-                                        @csrf
-                                        <input type="hidden" name="user_id" value="{{ $user->id }}">
-
-                                        <select name="role" class="w-full border p-2 rounded">
-                                            @foreach($roles as $role)
-                                                <option value="{{ $role->name }}">
-                                                    {{ $role->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-
-                                        <div class="flex justify-end gap-2 mt-4">
-                                            <button type="button" @click="activeModal = null">Cancel</button>
-                                            <button type="submit">Save</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-
-                            <!-- DELETE MODAL -->
-                            <div x-show="activeModal === 'delete-{{ $user->id }}'"
-                                x-cloak
-                                class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-
-                                <div @click.away="activeModal = null"
-                                    class="bg-white p-6 rounded-2xl w-full max-w-md">
-
-                                    <p>Delete {{ $user->name }}?</p>
-
-                                    <form method="POST" action="{{ url('/users/' . $user->id) }}">
-                                        @csrf
-                                        @method('DELETE')
-
-                                        <div class="flex justify-end gap-2 mt-4">
-                                            <button type="button" @click="activeModal = null">Cancel</button>
-                                            <button class="text-red-600">Delete</button>
-                                        </div>
-                                    </form>
-
-                                </div>
-                            </div>
-
-                            @endforeach
                         </tbody>
                     </table>
+                    @foreach($users as $user)
+
+                        <!-- EDIT MODAL -->
+                        <div x-show="activeModal === 'edit-{{ $user->id }}'"
+                            x-cloak
+                            class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+
+                            <div @click.away="activeModal = null"
+                                class="bg-white p-6 rounded-2xl w-full max-w-md">
+
+                                <h2 class="font-bold mb-4">Edit Role</h2>
+
+                                <form method="POST" action="{{ route('roleaccess.update') }}">
+                                    @csrf
+                                    <input type="hidden" name="user_id" value="{{ $user->id }}">
+
+                                    <select name="role" class="w-full border p-2 rounded">
+                                        @foreach($roles as $role)
+                                            <option value="{{ $role->name }}">
+                                                {{ $role->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+
+                                    <div class="flex justify-end gap-2 mt-4">
+                                        <button type="button" @click="activeModal = null">Cancel</button>
+                                        <button type="submit">Save</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- DELETE MODAL -->
+                        <div x-show="activeModal === 'delete-{{ $user->id }}'"
+                            x-cloak
+                            class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+
+                            <div @click.away="activeModal = null"
+                                class="bg-white p-6 rounded-2xl w-full max-w-md">
+
+                                <p>Delete {{ $user->name }}?</p>
+
+                                <form method="POST" action="{{ url('/users/' . $user->id) }}">
+                                    @csrf
+                                    @method('DELETE')
+
+                                    <div class="flex justify-end gap-2 mt-4">
+                                        <button type="button" @click="activeModal = null">Cancel</button>
+                                        <button class="text-red-600">Delete</button>
+                                    </div>
+                                </form>
+
+                            </div>
+                        </div>
+
+                    @endforeach
                 
                 <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                     <span class="font-medium">Showing 2 profile resources</span>

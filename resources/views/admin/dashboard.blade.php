@@ -391,7 +391,7 @@
                                                     </div>
                                                 </div>
 
-                                                <form method="POST" action="{{ route('users.destroy', ['user' => $user->id]) }}">
+                                                    <form method="POST" action="{{ url('/users/' . $user->id) }}">
                                                     @csrf
                                                     @method('DELETE')
                                                     <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">

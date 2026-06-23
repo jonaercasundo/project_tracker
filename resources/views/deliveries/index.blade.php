@@ -3,7 +3,8 @@
 <div class="space-y-6">
 
     {{-- HEADER --}}
-    <div class="flex items-start justify-between">
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+
         <div>
             <h1 class="text-xl font-extrabold tracking-tight text-slate-900">
                 Deliveries Tracking
@@ -13,7 +14,7 @@
             </p>
         </div>
 
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
             <button class="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
                 Add Delivery
             </button>
@@ -24,7 +25,38 @@
                 Import
             </button>
         </div>
+
     </div>
+
+    {{-- FILTERS --}}
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+        <input type="text"
+               name="search"
+               value="{{ request('search') }}"
+               placeholder="Search DR, project, school, lot..."
+               class="px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500">
+
+        <select name="status"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-sm">
+            <option value="">All Status</option>
+            <option value="Pending" @selected(request('status')=='Pending')>Pending</option>
+            <option value="Accepted" @selected(request('status')=='Accepted')>Accepted</option>
+            <option value="Delivered" @selected(request('status')=='Delivered')>Delivered</option>
+        </select>
+
+        <button class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl">
+            Apply Filters
+        </button>
+
+    </form>
+
+    {{-- EMPTY STATE (MOVED CORRECTLY) --}}
+    @if(empty($grouped_deliveries))
+        <div class="text-center py-14 text-slate-400 bg-white rounded-2xl border border-slate-100">
+            No deliveries found.
+        </div>
+    @else
 
     {{-- CONTENT --}}
     <div class="space-y-5">
@@ -79,7 +111,7 @@
 
                         <div class="px-5 py-4 flex items-start justify-between hover:bg-slate-50 transition">
 
-                            {{-- LEFT CONTENT --}}
+                            {{-- LEFT --}}
                             <div class="space-y-1">
 
                                 <div class="text-sm font-semibold text-slate-800">
@@ -98,7 +130,7 @@
 
                             </div>
 
-                            {{-- RIGHT ACTIONS --}}
+                            {{-- ACTIONS --}}
                             <div class="flex items-center gap-2 shrink-0">
 
                                 @if(auth()->user()->hasAnyRole(['Super Admin','Office Admin','Office Coordinator','Warehouse Admin']))
@@ -125,6 +157,31 @@
         @endforeach
 
     </div>
+
+    {{-- PAGINATION --}}
+    <div class="flex justify-center mt-8 gap-2">
+
+        @if($page > 1)
+            <a href="?page={{ $page - 1 }}&search={{ request('search') }}&status={{ request('status') }}"
+               class="px-3 py-1 rounded-lg border text-sm bg-white hover:bg-slate-50">
+                Prev
+            </a>
+        @endif
+
+        <span class="px-3 py-1 text-sm text-slate-500">
+            Page {{ $page }} / {{ $total_pages }}
+        </span>
+
+        @if($page < $total_pages)
+            <a href="?page={{ $page + 1 }}&search={{ request('search') }}&status={{ request('status') }}"
+               class="px-3 py-1 rounded-lg border text-sm bg-white hover:bg-slate-50">
+                Next
+            </a>
+        @endif
+
+    </div>
+
+    @endif
 
 </div>
 

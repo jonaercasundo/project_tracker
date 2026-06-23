@@ -1,30 +1,41 @@
 <?php
 
 namespace App\Http\Controllers;
-use Illuminate\Support\Facades\DB;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class LocationController extends Controller
 {
+    // REGIONS
     public function regions()
     {
-        return DB::table('region')
-            ->select('region_id', 'region_name')
+        return DB::table('school')
+            ->select('region')
+            ->distinct()
+            ->orderBy('region')
             ->get();
     }
+
+    // DIVISIONS (depends on region)
     public function divisions(Request $request)
     {
-        return DB::table('division')
-            ->where('region_id', $request->region)
-            ->select('division_id', 'division_name')
+        return DB::table('school')
+            ->where('region', $request->region)
+            ->select('division')
+            ->distinct()
+            ->orderBy('division')
             ->get();
     }
+
+    // MUNICIPALITIES (depends on division)
     public function municipalities(Request $request)
     {
-        return DB::table('municipality')
-            ->where('division_id', $request->division)
-            ->select('municipality_id', 'municipality_name')
+        return DB::table('school')
+            ->where('division', $request->division)
+            ->select('municipality')
+            ->distinct()
+            ->orderBy('municipality')
             ->get();
     }
 }

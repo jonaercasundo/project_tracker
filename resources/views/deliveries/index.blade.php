@@ -291,6 +291,71 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // ======================
+    // LOT → AUTO FILL PROJECT + LOCATION
+    // ======================
+    lot.addEventListener('change', function () {
+
+        let lotVal = this.value;
+
+        if (!lotVal) return;
+
+        fetch(`/api/lot-info?lot=${lotVal}`)
+            .then(res => res.json())
+            .then(data => {
+
+                if (!data) return;
+
+                // ======================
+                // SET PROJECT
+                // ======================
+                project.value = data.project_id;
+
+                // ======================
+                // SET REGION / DIVISION / MUNICIPALITY
+                // ======================
+                region.value = data.region || '';
+
+                // trigger dependent loads
+                if (data.region) {
+                    fetch(`/api/divisions?region=${data.region}`)
+                        .then(res => res.json())
+                        .then(divisions => {
+
+                            division.innerHTML = '<option value="">Division</option>';
+
+                            divisions.forEach(d => {
+                                division.innerHTML += `
+                                    <option value="${d.division_id}">
+                                        ${d.division_name}
+                                    </option>`;
+                            });
+
+                            division.value = data.division || '';
+                            division.disabled = false;
+
+                            if (data.division) {
+                                fetch(`/api/municipalities?division=${data.division}`)
+                                    .then(res => res.json())
+                                    .then(muns => {
+
+                                        municipality.innerHTML = '<option value="">Municipality</option>';
+
+                                        muns.forEach(m => {
+                                            municipality.innerHTML += `
+                                                <option value="${m.municipality_id}">
+                                                    ${m.municipality_name}
+                                                </option>`;
+                                        });
+
+                                        municipality.value = data.municipality || '';
+                                        municipality.disabled = false;
+                                    });
+                            }
+                        });
+                }
+            });
+    });
+    // ======================
     // PROJECT → LOT
     // ======================
     project.addEventListener('change', function () {

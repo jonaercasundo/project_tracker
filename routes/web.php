@@ -63,6 +63,7 @@ Route::middleware(['auth'])->group(function () {
         |--------------------------------------------------------------------------
     */
     Route::middleware(['role:user'])->group(function () {
+
         Route::get('/projects/dashboard', function () {
             return view('projects.dashboard', [
                 'totalProjects' => \App\Models\Project::count(),
@@ -70,8 +71,10 @@ Route::middleware(['auth'])->group(function () {
                 'deliveredProjects' => \App\Models\Project::where('status', 'Delivered')->count(),
             ]);
         })->name('projects.dashboard');
+
         Route::get('/projects/{project}/deliveries', [DeliveryController::class, 'index'])
         ->name('deliveries.index');
+
         Route::get('/projects', [ProjectController::class, 'index'])
             ->name('projects.index');
 
@@ -85,6 +88,10 @@ Route::middleware(['auth'])->group(function () {
             ->name('projects.filter');
         Route::get('/projects/{project:project_id}', [ProjectController::class, 'show'])
         ->name('projects.show');
+
+        
+        Route::get('/projects/{project}/deliveries/tracking', [DeliveryController::class, 'tracking'])
+        ->name('deliveries.tracking');
     });
 
     /*

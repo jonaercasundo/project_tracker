@@ -39,21 +39,22 @@
             <span>Project List</span>
         </a>
 
-        <a href="#"
-           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80 transition-all duration-150">
-            <svg class="w-4 h-4 shrink-0 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M16.5 18.75a1.5 1.5 0 000-3 1.5 1.5 0 000 3zm0 0h1.5m-13.5-4.5h16.5M5.625 4.5h11.114a1.13 1.13 0 01.8.326l2.091 2.092a1.13 1.13 0 01.326.8v3.207a1.13 1.13 0 01-.326.8l-2.092 2.091a1.13 1.13 0 01-.8.326H5.625a1.125 1.125 0 01-1.125-1.125V5.625A1.125 1.125 0 015.625 4.5z"></path>
+        <a href="{{ route('deliveries.tracking') }}"
+           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
+           {{ request()->routeIs('deliveries.tracking') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+            @if(request()->routeIs('deliveries.tracking'))
+                <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
+            @endif
+            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('deliveries.tracking') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M16.5 18.75a1.5 1.5 0 000-3 1.5 1.5 0 000 3zm0 0h1.5m-13.5-4.5h16.5M5.625 4.5h11.114a1.13 1.13 0 01.8.326l2.091 2.092a1.13 1.13 0 01.326.8v3.207a1.13 1.13 0 01-.326.8l-2.092 2.091a1.13 1.13 0 01-.8.326H5.625a1.125 1.125 0 01-1.125-1.１２５V5.625A１．１２５ １．１２５ ０ ０１５．６２５ ４．５z"></path>
             </svg>
             <span>Tracking Deliveries</span>
         </a>
 
         <a href="#"
-           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80 transition-all duration-150">
-            <svg class="w-4 h-4 shrink-0 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h2.25A2.25 2.25 0 0022 18.75V16.5M13.5 21V12m4.5 9v-3m-12 3v-6.75a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25A2.25 2.25 0 010 18.75V4.5A2.25 2.25 0 012.25 2.25h13.5A2.25 2.25 0 0118 4.5V12"></path>
-            </svg>
-            <span>Warehouse Inventory</span>
-        </a>
+           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-₁₀₀/₈₀ transition-all duration-₁₅₀">
+            <svg class="w-4 h-4 shrink-0 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="０ ０ ２４ ２４">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M₁₃．₅ ₂₁v₋₇．₅a．₇₅．₇₅ ₀ ₀₁．₇₅₋．₇₅h₃a．₇₅．₇₅ ₀ ₀₁．₇₅．₇₅V₂₁m₋₄．₅ ₀H₂．３６m₁₁．₁４ ₀H₁８m₀ ₀h₂．₂伍A₂．₂伍₂．₂伍 ₀ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴈ">
 
         <a href="#"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80 transition-all duration-150">

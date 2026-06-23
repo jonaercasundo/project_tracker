@@ -359,43 +359,6 @@
                                                 </form>
                                             </div>
                                         </div>
-
-                                        <div x-show="activeModal === 'delete-{{ $user->id }}'" x-cloak 
-                                            class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 text-left font-normal"
-                                            x-transition:enter="transition ease-out duration-200"
-                                            x-transition:enter-start="opacity-0"
-                                            x-transition:enter-end="opacity-100"
-                                            x-transition:leave="transition ease-in duration-150"
-                                            x-transition:leave-start="opacity-100"
-                                            x-transition:leave-end="opacity-0">
-                                            
-                                            <div @click.away="activeModal = null" 
-                                                class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl border border-slate-100"
-                                                x-transition:enter="transition ease-out duration-200"
-                                                x-transition:enter-start="opacity-0 scale-95 translate-y-2"
-                                                x-transition:enter-end="opacity-100 scale-100 translate-y-0">
-                                                
-                                                <h3 class="text-base font-bold text-slate-900 mb-2">Remove Resource Entry</h3>
-                                                <p class="text-xs text-slate-500 leading-relaxed mb-5">
-                                                    Are you sure you want to drop entry rules for <span class="font-semibold text-slate-800">{{ $user->name }}</span>? System history logs will preserve metadata records.
-                                                </p>
-                                                
-                                                <div class="flex justify-end gap-2 border-t border-slate-100 pt-4">
-                                                    <button type="button" @click="activeModal = null" 
-                                                        class="px-4 py-2 text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-200 rounded-xl transition-all">
-                                                        Cancel
-                                                    </button>
-                                                    <form method="POST" action="{{ route('users.destroy', $user) }}">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" 
-                                                            class="px-4 py-2 text-xs font-bold bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl shadow-sm shadow-red-500/10 transition-all">
-                                                            Confirm Revocation
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
                                     </td>
                                 </tr>
                             @empty

@@ -330,7 +330,11 @@
                                             <select name="role" 
                                                 class="w-full text-xs border border-slate-200 rounded-xl p-2.5 bg-white text-slate-800 appearance-none focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all pr-8 cursor-pointer font-medium">
                                                 @foreach($roles as $role)
-                                                    <option value="{{ $role->name }}" {{ $user->hasRole($role->name) ? 'selected' : '' }}>
+                                                    @php
+                                                        $currentRole = $user->roles->first()->name ?? '';
+                                                    @endphp
+
+                                                    <option value="{{ $role->name }}" @selected($currentRole === $role->name)>
                                                         {{ $role->name }}
                                                     </option>
                                                 @endforeach

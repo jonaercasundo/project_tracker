@@ -24,28 +24,34 @@
             @foreach($users as $user)
             <tr>
 
+                {{-- NAME --}}
                 <td>
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center font-bold">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="w-8 h-8 bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold">
                             {{ strtoupper(substr($user->name, 0, 2)) }}
                         </div>
 
                         <div>
-                            <div class="font-semibold">{{ $user->name }}</div>
-                            <div class="text-xs text-gray-500">{{ $user->email }}</div>
+                            <div class="fw-semibold">{{ $user->name }}</div>
                         </div>
                     </div>
                 </td>
 
+                {{-- EMAIL --}}
+                <td>{{ $user->email }}</td>
+
+                {{-- DEPARTMENT --}}
                 <td>{{ $user->department ?? 'N/A' }}</td>
 
+                {{-- ROLE --}}
                 <td>
-                    <span class="text-xs font-bold uppercase">
+                    <span class="fw-bold text-uppercase">
                         {{ $user->role }}
                     </span>
                 </td>
 
-                <td class="text-right">
+                {{-- ACTION --}}
+                <td class="text-end">
 
                     <button class="btn btn-sm btn-primary"
                         data-bs-toggle="modal"
@@ -67,7 +73,7 @@
     </table>
 </div>
 
-{{-- ================= MODALS OUTSIDE TABLE ================= --}}
+{{-- ================= MODALS ================= --}}
 
 @foreach($users as $user)
 
@@ -122,7 +128,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
 
-            <form method="POST" action="{{ route('roleaccess.destroy', $user->user_id) }}">
+            <form method="POST" action="{{ route('roleaccess.destroy', $user->id) }}">
                 @csrf
                 @method('DELETE')
 

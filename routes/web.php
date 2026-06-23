@@ -52,7 +52,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/roleaccess', [RoleAccessPermissionController::class, 'edit'])
             ->name('roleaccess.edit');
 
-        Route::put('/roleaccess/update', [RoleAccessPermissionController::class, 'update'])
+        Route::post('/roleaccess/update', [RoleAccessPermissionController::class, 'update'])
         ->name('roleaccess.update');
         Route::delete('/roleaccess', [RoleAccessPermissionController::class, 'destroy'])
             ->name('roleaccess.destroy');

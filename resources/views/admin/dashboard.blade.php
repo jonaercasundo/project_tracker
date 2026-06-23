@@ -294,118 +294,6 @@
                                                 Remove
                                             </button>
                                         </div>
-
-                                        {{-- EDIT ROLE MODAL --}}
-                                        <div x-show="activeModal === 'edit-{{ $user->id }}'"
-                                            x-cloak
-                                            class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 text-left font-normal"
-                                            x-transition:enter="transition ease-out duration-200"
-                                            x-transition:enter-start="opacity-0"
-                                            x-transition:enter-end="opacity-100"
-                                            x-transition:leave="transition ease-in duration-150"
-                                            x-transition:leave-start="opacity-100"
-                                            x-transition:leave-end="opacity-0">
-
-                                            <div @click.away="activeModal = null"
-                                                class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl border border-slate-100"
-                                                x-transition:enter="transition ease-out duration-200"
-                                                x-transition:enter-start="opacity-0 scale-95 translate-y-2"
-                                                x-transition:enter-end="opacity-100 scale-100 translate-y-0">
-
-                                                <h3 class="text-base font-bold text-slate-900 mb-4">Modify Access Assignment</h3>
-
-                                                <form method="POST" action="{{ route('roleaccess.update') }}" class="space-y-4">
-                                                    @csrf
-                                                    <input type="hidden" name="user_id" value="{{ $user->id }}">
-
-                                                    <div>
-                                                        <label class="block text-xs font-semibold text-slate-500 mb-1">Target Personnel</label>
-                                                        <input type="text" disabled readonly
-                                                            class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-semibold text-slate-700 focus:outline-none select-none"
-                                                            value="{{ $user->name }}">
-                                                    </div>
-
-                                                    <div>
-                                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Assigned Security Matrix Role</label>
-                                                        <div class="relative">
-                                                            <select name="role"
-                                                                class="w-full text-xs border border-slate-200 rounded-xl p-2.5 bg-white text-slate-800 appearance-none focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all pr-8 cursor-pointer font-medium">
-                                                                @php $currentRole = $user->roles->first()->name ?? ''; @endphp
-                                                                @foreach($roles as $role)
-                                                                    <option value="{{ $role->name }}" @selected($currentRole === $role->name)>
-                                                                        {{ $role->name }}
-                                                                    </option>
-                                                                @endforeach
-                                                            </select>
-                                                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
-                                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
-                                                                </svg>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100 mt-4">
-                                                        <button type="button" @click="activeModal = null"
-                                                            class="px-4 py-2 text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-200 rounded-xl transition-all">
-                                                            Cancel
-                                                        </button>
-                                                        <button type="submit"
-                                                            class="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl shadow-sm shadow-blue-500/10 transition-all">
-                                                            Apply Rules
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-
-                                        {{-- DELETE CONFIRM MODAL --}}
-                                        <div x-show="activeModal === 'delete-{{ $user->id }}'"
-                                            x-cloak
-                                            class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 text-left font-normal"
-                                            x-transition:enter="transition ease-out duration-200"
-                                            x-transition:enter-start="opacity-0"
-                                            x-transition:enter-end="opacity-100"
-                                            x-transition:leave="transition ease-in duration-150"
-                                            x-transition:leave-start="opacity-100"
-                                            x-transition:leave-end="opacity-0">
-
-                                            <div @click.away="activeModal = null"
-                                                class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl border border-slate-100"
-                                                x-transition:enter="transition ease-out duration-200"
-                                                x-transition:enter-start="opacity-0 scale-95 translate-y-2"
-                                                x-transition:enter-end="opacity-100 scale-100 translate-y-0">
-
-                                                <div class="flex items-start gap-4 mb-5">
-                                                    <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                                                        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"></path>
-                                                        </svg>
-                                                    </div>
-                                                    <div>
-                                                        <h3 class="text-sm font-bold text-slate-900">Remove User Account</h3>
-                                                        <p class="text-xs text-slate-500 mt-1">
-                                                            You are about to permanently remove <span class="font-semibold text-slate-700">{{ $user->name }}</span>. This action cannot be undone.
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                    <form method="POST" action="{{ url('/users/' . $user->id) }}">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                                                        <button type="button" @click="activeModal = null"
-                                                            class="px-4 py-2 text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-200 rounded-xl transition-all">
-                                                            Cancel
-                                                        </button>
-                                                        <button type="submit"
-                                                            class="px-4 py-2 text-xs font-bold bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl shadow-sm shadow-red-500/10 transition-all">
-                                                            Yes, Remove
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
                                     </td>
                                 </tr>
                             @empty
@@ -417,6 +305,117 @@
                                         <span class="text-xs font-medium text-slate-400">No matching directory records discovered.</span>
                                     </td>
                                 </tr>
+
+                                {{-- MODALS OUTSIDE THE TABLE ROW --}}
+                                {{-- Edit Modal --}}
+                                <div x-show="activeModal === 'edit-{{ $user->id }}'"
+                                    x-cloak
+                                    class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                                    x-transition:enter="transition ease-out duration-200"
+                                    x-transition:enter-start="opacity-0"
+                                    x-transition:enter-end="opacity-100"
+                                    x-transition:leave="transition ease-in duration-150"
+                                    x-transition:leave-start="opacity-100"
+                                    x-transition:leave-end="opacity-0">
+                                    <div @click.away="activeModal = null"
+                                        class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl border border-slate-100"
+                                        x-transition:enter="transition ease-out duration-200"
+                                        x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+                                        x-transition:enter-end="opacity-100 scale-100 translate-y-0">
+
+                                        <h3 class="text-base font-bold text-slate-900 mb-4">Modify Access Assignment</h3>
+
+                                        <form method="POST" action="{{ route('roleaccess.update') }}" class="space-y-4">
+                                            @csrf
+                                            <input type="hidden" name="user_id" value="{{ $user->id }}">
+
+                                            <div>
+                                                <label class="block text-xs font-semibold text-slate-500 mb-1">Target Personnel</label>
+                                                <input type="text" disabled readonly
+                                                    class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-semibold text-slate-700"
+                                                    value="{{ $user->name }}">
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-xs font-semibold text-slate-700 mb-1">Assigned Security Matrix Role</label>
+                                                <div class="relative">
+                                                    <select name="role"
+                                                        class="w-full text-xs border border-slate-200 rounded-xl p-2.5 bg-white text-slate-800 appearance-none focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all pr-8 cursor-pointer font-medium">
+                                                        @php $currentRole = $user->roles->first()->name ?? ''; @endphp
+                                                        @foreach($roles as $role)
+                                                            <option value="{{ $role->name }}" @selected($currentRole === $role->name)>
+                                                                {{ $role->name }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100 mt-4">
+                                                <button type="button" @click="activeModal = null"
+                                                    class="px-4 py-2 text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all">
+                                                    Cancel
+                                                </button>
+                                                <button type="submit"
+                                                    class="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all">
+                                                    Apply Rules
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+
+                                {{-- Delete Modal --}}
+                                <div x-show="activeModal === 'delete-{{ $user->id }}'"
+                                    x-cloak
+                                    class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                                    x-transition:enter="transition ease-out duration-200"
+                                    x-transition:enter-start="opacity-0"
+                                    x-transition:enter-end="opacity-100"
+                                    x-transition:leave="transition ease-in duration-150"
+                                    x-transition:leave-start="opacity-100"
+                                    x-transition:leave-end="opacity-0">
+                                    <div @click.away="activeModal = null"
+                                        class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl border border-slate-100"
+                                        x-transition:enter="transition ease-out duration-200"
+                                        x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+                                        x-transition:enter-end="opacity-100 scale-100 translate-y-0">
+
+                                        <div class="flex items-start gap-4 mb-5">
+                                            <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                                                <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"></path>
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <h3 class="text-sm font-bold text-slate-900">Remove User Account</h3>
+                                                <p class="text-xs text-slate-500 mt-1">
+                                                    You are about to permanently remove <span class="font-semibold text-slate-700">{{ $user->name }}</span>. This action cannot be undone.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <form method="POST" action="{{ url('/users/' . $user->id) }}">
+                                            @csrf
+                                            @method('DELETE')
+                                            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                                                <button type="button" @click="activeModal = null"
+                                                    class="px-4 py-2 text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all">
+                                                    Cancel
+                                                </button>
+                                                <button type="submit"
+                                                    class="px-4 py-2 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all">
+                                                    Yes, Remove
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                             @endforelse
                         </tbody>
                     </table>

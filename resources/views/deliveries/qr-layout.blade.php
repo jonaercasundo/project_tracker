@@ -191,29 +191,9 @@ if (file_exists($logoPath)) {
 
         <tbody>
 
-        @foreach($delivery->packageStatuses as $index => $status)
-
-            <tr>
-
-                <td>
-                    Package {{ $index + 1 }}
-                </td>
-
-                <td align="center">
-
-                    {{ optional($status->package)->length ?? '-' }}
-                    cm ×
-                    {{ optional($status->package)->width ?? '-' }}
-                    cm ×
-                    {{ optional($status->package)->height ?? '-' }}
-                    cm
-
-                </td>
-
-            </tr>
-
-        @endforeach
-
+            @foreach($delivery->packageStatuses as $status)
+                {{ dd($status->package) }}
+            @endforeach
         </tbody>
 
     </table>

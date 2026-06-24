@@ -61,7 +61,7 @@ td,th{
 
 $ar = $delivery->project->arSetting ?? null;
 
-$logoPath = public_path('logo.webp');
+$logoPath = public_path('logo.png');
 
 if(
     $ar &&

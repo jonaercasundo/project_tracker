@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Models;
-
+use App\Models\ARSetting;
 use Illuminate\Database\Eloquent\Model;
 
 class Project extends Model
@@ -16,8 +16,12 @@ class Project extends Model
         'start_date' => 'datetime',
         'end_date' => 'datetime',
     ];
-    public function arSettings()
+    public function arSetting()
     {
-        return $this->hasOne(ARSetting::class, 'project_id', 'project_id');
+        return $this->hasOne(
+            ARSetting::class,
+            'project_id',
+            'project_id'
+        );
     }
 }

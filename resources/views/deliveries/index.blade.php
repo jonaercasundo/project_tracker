@@ -134,7 +134,9 @@
                         </div>
 
                         <div class="flex items-center gap-2 self-end sm:self-auto">
-                            <button type="button" onclick="generateARs()" class="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition">
+                            <button type="button"
+                                onclick="generateQR()"
+                                class="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-white border">
                                 QR
                             </button>
                             <button type="button" onclick="generateLabels()" class="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition">
@@ -421,5 +423,30 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 });
+function generateQR() {
+
+    let ids = [];
+
+    document.querySelectorAll('.dr-checkbox:checked').forEach(cb => {
+        ids.push(cb.value);
+    });
+
+    if (ids.length === 0) {
+        alert("Select at least one DR");
+        return;
+    }
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/deliveries/qr-generate';
+
+    form.innerHTML = `
+        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="ids" value="${ids.join(',')}">
+    `;
+
+    document.body.appendChild(form);
+    form.submit();
+}
 </script>
 </x-project_app-layout>

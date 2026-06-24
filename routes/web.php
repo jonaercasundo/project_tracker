@@ -86,6 +86,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::put('/projects/{project}', [ProjectController::class, 'update'])
             ->name('projects.update');
+        Route::post('/deliveries/qr-generate', [DeliveryController::class, 'generate']);
 
         Route::post('/projects/filter', [ProjectController::class, 'filter'])
             ->name('projects.filter');

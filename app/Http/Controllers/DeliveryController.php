@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-
+use Barryvdh\DomPDF\Facade\Pdf;
+use Endroid\QrCode\Builder\Builder;
+use Endroid\QrCode\Writer\PngWriter;
 class DeliveryController extends Controller
 {
     public function index(Request $request)
@@ -149,5 +151,94 @@ class DeliveryController extends Controller
             'total_pages' => $total_pages,
             'total_rows' => $total_rows
         ]);
+    }
+    public function generate(Request $request)
+    {
+        $ids = collect(explode(',', $request->ids))
+            ->map(fn($id) => trim($id))
+            ->filter(fn($id) => is_numeric($id))
+            ->values();
+
+        if ($ids->isEmpty()) {
+            abort(400, "No DR numbers provided.");
+        }
+
+        $projectId = $request->project_id ?? session('project_id');
+
+        if (!$projectId) {
+            $projectId = DB::table('deliveries')
+                ->where('dr_no', $ids->first())
+                ->orderByDesc('delivery_id')
+                ->value('project_id');
+        }
+
+        if (!$projectId) {
+            abort(400, "Cannot determine project_id.");
+        }
+
+        $html = view('deliveries.qr-layout', [
+            'data' => $this->buildData($ids, $projectId),
+        ])->render();
+
+        $pdf = Pdf::loadHTML($html)
+            ->setPaper('legal', 'portrait');
+
+        return $pdf->stream('deliveries_qr.pdf');
+    }
+    private function buildData($ids, $projectId)
+    {
+        $result = [];
+
+        foreach ($ids as $drNo) {
+
+            $deliveries = DB::table('deliveries as d')
+                ->join('school as s', 's.school_id', '=', 'd.school_id')
+                ->join('projects as p', 'p.project_id', '=', 'd.project_id')
+                ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
+                ->leftJoin('lot as l', 'l.lot_id', '=', DB::raw('COALESCE(k.lot_id, d.lot_id)'))
+                ->where('d.dr_no', $drNo)
+                ->where('d.project_id', $projectId)
+                ->get();
+
+            if ($deliveries->isEmpty()) continue;
+
+            $first = $deliveries->first();
+
+            $qrs = [];
+
+            foreach ($deliveries as $delivery) {
+
+                $packages = DB::table('package_status')
+                    ->where('delivery_id', $delivery->delivery_id)
+                    ->get();
+
+                foreach ($packages as $i => $pkg) {
+
+                    $url = url("/entry?id={$pkg->package_status_id}&delivery_id={$delivery->delivery_id}");
+
+                    $qr = Builder::create()
+                        ->writer(new PngWriter())
+                        ->data($url)
+                        ->size(150)
+                        ->margin(0)
+                        ->build();
+
+                    $qrs[] = [
+                        'label' => "Package " . ($i + 1),
+                        'qr' => $qr->getDataUri(),
+                        'keystage' => $delivery->keystage_num
+                            ? "Keystage {$delivery->keystage_num}"
+                            : null
+                    ];
+                }
+            }
+
+            $result[] = [
+                'first' => $first,
+                'qrs' => $qrs
+            ];
+        }
+
+        return $result;
     }
 }

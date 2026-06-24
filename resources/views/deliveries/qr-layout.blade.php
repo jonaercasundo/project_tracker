@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 
 <style>
-
 @page {
     margin:20mm;
 }
@@ -32,106 +31,101 @@ td,th{
     text-align:center;
     width:50%;
 }
-
 </style>
 </head>
+
 <body>
 
 @foreach($deliveries as $delivery)
 
-<div>
+    {{-- ================= DR INFO ================= --}}
+    <div>
 
-    <h2>
-        DR #{{ $delivery->dr_no }}
-    </h2>
+        <h2>DR #{{ $delivery->dr_no }}</h2>
 
-    <p>
-        <strong>Project:</strong>
-        {{ $delivery->project->project_name ?? '' }}
-    </p>
+        <p>
+            <strong>Project:</strong>
+            {{ optional($delivery->project)->project_name }}
+        </p>
 
-    <p>
-        <strong>School:</strong>
-        {{ $delivery->school->school_name ?? '' }}
-    </p>
+        <p>
+            <strong>School:</strong>
+            {{ optional($delivery->school)->school_name }}
+        </p>
 
-    <table>
+        <table>
 
-        <thead>
-        <tr>
-            <th>Package</th>
-            <th>Dimensions</th>
-        </tr>
-        </thead>
+            <thead>
+                <tr>
+                    <th>Package</th>
+                    <th>Dimensions</th>
+                </tr>
+            </thead>
 
-        <tbody>
+            <tbody>
 
-        @foreach($delivery->packageStatuses as $index => $status)
+            @foreach($delivery->packageStatuses ?? [] as $index => $status)
 
-            <tr>
+                <tr>
+                    <td>Package {{ $index + 1 }}</td>
 
-                <td>
-                    Package {{ $index + 1 }}
-                </td>
-
-                <td>
-                    {{ optional($status->package)->length }}
-                    x
-                    {{ optional($status->package)->width }}
-                    x
-                    {{ optional($status->package)->height }}
-                </td>
-
-            </tr>
-
-        @endforeach
-
-        </tbody>
-
-    </table>
-
-</div>
-
-<div class="page-break"></div>
-
-<div>
-
-    <h2>
-        QR Codes - DR #{{ $delivery->dr_no }}
-    </h2>
-
-    <table>
-
-        @foreach($delivery->packageStatuses->chunk(2) as $chunk)
-
-            <tr>
-
-            @foreach($chunk as $status)
-
-                <td class="qr">
-
-                    <img
-                        src="{{ $qrCodes[$status->package_status_id] }}"
-                        width="150"
-                    >
-
-                    <br>
-
-                    ORD-{{ str_pad($status->package_status_id,5,'0',STR_PAD_LEFT) }}
-
-                </td>
+                    <td>
+                        {{ optional($status->package)->length ?? '-' }}
+                        x
+                        {{ optional($status->package)->width ?? '-' }}
+                        x
+                        {{ optional($status->package)->height ?? '-' }}
+                    </td>
+                </tr>
 
             @endforeach
 
-            </tr>
+            </tbody>
 
-        @endforeach
+        </table>
 
-    </table>
+    </div>
 
-</div>
+    <div class="page-break"></div>
 
-<div class="page-break"></div>
+    {{-- ================= QR CODES ================= --}}
+    <div>
+
+        <h2>QR Codes - DR #{{ $delivery->dr_no }}</h2>
+
+        <table>
+
+            @foreach(($delivery->packageStatuses ?? collect())->chunk(2) as $chunk)
+
+                <tr>
+
+                    @foreach($chunk as $status)
+
+                        <td class="qr">
+
+                            @if(isset($qrCodes[$status->package_status_id]))
+                                <img src="{{ $qrCodes[$status->package_status_id] }}" width="150">
+                            @else
+                                <small>No QR</small>
+                            @endif
+
+                            <br>
+
+                            ORD-{{ str_pad($status->package_status_id, 5, '0', STR_PAD_LEFT) }}
+
+                        </td>
+
+                    @endforeach
+
+                </tr>
+
+            @endforeach
+
+        </table>
+
+    </div>
+
+    <div class="page-break"></div>
 
 @endforeach
 

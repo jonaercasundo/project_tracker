@@ -193,7 +193,7 @@ class DeliveryController extends Controller
             }
         }
 
-        return Pdf::loadView('pdf.deliveries-batch', [
+        return Pdf::loadView('qr-layout', [
             'deliveries' => $deliveries,
             'qrCodes' => $qrCodes,
             'signerName' => auth()->user()?->name ?? 'Authorized Representative'

@@ -188,7 +188,7 @@ class DeliveryController extends Controller
 
         foreach ($deliveries as $delivery) {
 
-            $ar = $delivery->project->arSettings ?? null;
+            $ar = $delivery->project->arSetting ?? null;
 
             $packageCount = $delivery->packageStatuses->count();
             $i = 1;

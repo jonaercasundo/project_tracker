@@ -20,7 +20,7 @@ table{
 
 td,th{
     border:1px solid #000;
-    padding:5px;
+    padding:6px;
 }
 
 .page-break{
@@ -31,109 +31,297 @@ td,th{
     text-align:center;
     width:50%;
 }
+
+.logoimg{
+    max-width:250px;
+    height:80px;
+}
+
+.footer{
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    text-align:center;
+    font-size:10px;
+}
+
+.no-border{
+    border:none !important;
+}
 </style>
+
 </head>
 
 <body>
 
 @foreach($deliveries as $delivery)
 
-    {{-- ================= DR INFO ================= --}}
-    <div>
+@php
 
-        <h2>DR #{{ $delivery->dr_no }}</h2>
+$ar = $delivery->project->arSetting ?? null;
+
+$logoPath = public_path('logo.png');
+
+if (
+    $ar &&
+    !empty($ar->ar_logo) &&
+    file_exists(public_path('uploads/logo/' . $ar->ar_logo))
+) {
+    $logoPath = public_path('uploads/logo/' . $ar->ar_logo);
+}
+
+$logoBase64 = '';
+
+if (file_exists($logoPath)) {
+    $extension = strtolower(pathinfo($logoPath, PATHINFO_EXTENSION));
+
+    $mime = match ($extension) {
+        'png'  => 'image/png',
+        'jpg', 'jpeg' => 'image/jpeg',
+        'gif'  => 'image/gif',
+        default => 'image/png'
+    };
+
+    $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logoPath));
+}
+
+@endphp
+
+{{-- ========================================= --}}
+{{-- PAGE 1 --}}
+{{-- ========================================= --}}
+
+<div>
+
+    <div style="text-align:center;">
+        <img src="{{ $logoPath }}" class="logoimg">
+    </div>
+
+    <div style="text-align:right;">
+        <small>Date: {{ now()->format('Y-M-d') }}</small>
+        <br>
+
+        @if(optional($ar)->display_school_id)
+            <small>
+                AR: {{ $delivery->school_id }}
+            </small>
+        @endif
+    </div>
+
+    <table class="no-border">
+
+        <tr>
+            <td class="no-border" width="120">
+                <strong>Project:</strong>
+            </td>
+
+            <td class="no-border">
+                <strong>
+                    {{ $ar->project_name ?? $delivery->project->project_name ?? '' }}
+                </strong>
+            </td>
+        </tr>
+
+    </table>
+
+    <h3 style="text-align:center;">
+        ACKNOWLEDGEMENT OF RECEIPT OF GOODS
+    </h3>
+
+    <p>
+
+        The undersigned hereby acknowledges the receipt of goods
+        pursuant to Contract No.
+
+        {{ $delivery->lot->contract_no ?? '' }}
+
+        @if(!empty($delivery->lot->lot_name))
+            (LOT {{ $delivery->lot->lot_name }})
+        @endif
+
+        between
+
+        {{ $ar->company ?? '' }}
+
+        and
+
+        {{ $ar->client ?? '' }}.
+
+    </p>
+
+    @if(optional($ar)->display_label)
 
         <p>
-            <strong>Project:</strong>
-            {{ optional($delivery->project)->project_name }}
+
+            <strong>School Name:</strong>
+            {{ $delivery->school->school_name ?? '' }}
+
+            <br>
+
+            <strong>School Address:</strong>
+            {{ $delivery->school->address ?? '' }}
+
+            @if(optional($ar)->display_school_id)
+
+                <br>
+
+                <strong>School ID:</strong>
+                {{ $delivery->school_id }}
+
+            @endif
+
         </p>
 
-        <p>
-            <strong>School:</strong>
-            {{ optional($delivery->school)->school_name }}
-        </p>
+    @endif
 
-        <table>
+    <table>
 
-            <thead>
-                <tr>
-                    <th>Package</th>
-                    <th>Dimensions</th>
-                </tr>
-            </thead>
+        <thead>
+            <tr>
+                <th width="50%">
+                    Package
+                </th>
 
-            <tbody>
+                <th width="50%">
+                    Dimensions
+                </th>
+            </tr>
+        </thead>
 
-            @foreach(($delivery->packageStatuses ?? []) as $index => $status)
+        <tbody>
 
-                <tr>
-                    <td>Package {{ $index + 1 }}</td>
+        @foreach($delivery->packageStatuses as $index => $status)
 
-                    <td>
-                        {{ optional($status->package)->length ?? '-' }}
-                        x
-                        {{ optional($status->package)->width ?? '-' }}
-                        x
-                        {{ optional($status->package)->height ?? '-' }}
+            <tr>
+
+                <td>
+                    Package {{ $index + 1 }}
+                </td>
+
+                <td align="center">
+
+                    {{ optional($status->package)->length ?? '-' }}
+                    cm ×
+                    {{ optional($status->package)->width ?? '-' }}
+                    cm ×
+                    {{ optional($status->package)->height ?? '-' }}
+                    cm
+
+                </td>
+
+            </tr>
+
+        @endforeach
+
+        </tbody>
+
+    </table>
+
+    <div class="footer">
+
+        <table style="border:none;">
+
+            <tr>
+
+                <td style="border:none;">
+                    Printed Name Over Signature
+                </td>
+
+                <td style="border:none;">
+                    {{ $signerName }}
+                    <br>
+                    {{ $ar->ar_company_footer ?? 'Metro Mobilia Corporation' }}
+                </td>
+
+            </tr>
+
+        </table>
+
+        <small>
+
+            {{ $ar->ar_address_footer ?? '' }}
+
+            <br>
+
+            {{ $ar->ar_contact_footer ?? '' }}
+
+        </small>
+
+    </div>
+
+</div>
+
+<div class="page-break"></div>
+
+{{-- ========================================= --}}
+{{-- PAGE 2 --}}
+{{-- ========================================= --}}
+
+<div>
+
+    <div style="text-align:right;">
+
+        <small>
+            Date: {{ now()->format('Y-M-d') }}
+        </small>
+
+        <br>
+
+        <small>
+            DR: {{ $delivery->dr_no }}
+        </small>
+
+    </div>
+
+    <h3>
+        QR Codes - DR #{{ $delivery->dr_no }}
+    </h3>
+
+    <table>
+
+        @foreach($delivery->packageStatuses->chunk(2) as $chunk)
+
+            <tr>
+
+                @foreach($chunk as $status)
+
+                    <td class="qr">
+
+                        @if(isset($qrCodes[$status->package_status_id]))
+
+                            <img
+                                src="{{ $qrCodes[$status->package_status_id] }}"
+                                width="150"
+                            >
+
+                        @endif
+
+                        <br>
+
+                        Package
+
+                        <br>
+
+                        ORD-{{ str_pad($status->package_status_id,5,'0',STR_PAD_LEFT) }}
+
                     </td>
-                </tr>
 
-            @endforeach
+                @endforeach
 
-            </tbody>
+                @if($chunk->count() == 1)
+                    <td></td>
+                @endif
 
-        </table>
+            </tr>
 
-    </div>
+        @endforeach
 
-    <div class="page-break"></div>
+    </table>
 
-    {{-- ================= QR CODES ================= --}}
-    <div>
+</div>
 
-        <h2>QR Codes - DR #{{ $delivery->dr_no }}</h2>
-
-        <table>
-
-            @php
-                $chunks = array_chunk($delivery->packageStatuses ?? [], 2);
-            @endphp
-
-            @foreach($chunks as $chunk)
-
-                <tr>
-
-                    @foreach($chunk as $status)
-
-                        <td class="qr">
-
-                            @php
-                                $qr = $qrCodes[$status->package_status_id] ?? null;
-                            @endphp
-
-                            @if($qr)
-                                <img src="{{ $qr }}" width="150">
-                            @else
-                                <small>No QR</small>
-                            @endif
-
-                            <br>
-
-                            ORD-{{ str_pad($status->package_status_id, 5, '0', STR_PAD_LEFT) }}
-
-                        </td>
-
-                    @endforeach
-
-                </tr>
-
-            @endforeach
-
-        </table>
-
-    </div>
-
-    <div class="page-break"></div>
+<div class="page-break"></div>
 
 @endforeach
 

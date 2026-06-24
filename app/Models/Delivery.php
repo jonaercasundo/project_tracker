@@ -18,23 +18,28 @@ class Delivery extends Model
 
     protected $guarded = [];
 
-    public function school()
+        public function school()
     {
-        return $this->belongsTo(School::class, 'school_id');
+        return $this->belongsTo(School::class, 'school_id', 'school_id');
     }
 
     public function project()
     {
-        return $this->belongsTo(Project::class, 'project_id');
+        return $this->belongsTo(Project::class, 'project_id', 'project_id');
     }
 
     public function keystage()
     {
-        return $this->belongsTo(Keystage::class, 'keystage_id');
+        return $this->belongsTo(Keystage::class, 'keystage_id', 'keystage_id');
+    }
+
+    public function lot()
+    {
+        return $this->belongsTo(Lot::class, 'lot_id', 'lot_id');
     }
 
     public function packageStatuses()
     {
-        return $this->hasMany(PackageStatus::class, 'delivery_id');
+        return $this->hasMany(PackageStatus::class, 'delivery_id', 'delivery_id');
     }
 }

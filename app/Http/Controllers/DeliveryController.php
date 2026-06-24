@@ -155,75 +155,70 @@ class DeliveryController extends Controller
         ]);
     }
     public function generate(Request $request)
-{
-    // =========================
-    // VALIDATE IDS
-    // =========================
-    $ids = collect(explode(',', $request->ids))
-        ->map(fn($v) => trim($v))
-        ->filter(fn($v) => is_numeric($v) && $v > 0)
-        ->values();
+    {
+        $ids = collect(explode(',', $request->ids))
+            ->map(fn($v) => trim($v))
+            ->filter(fn($v) => is_numeric($v) && $v > 0)
+            ->values();
 
-    if ($ids->isEmpty()) {
-        abort(422, "Invalid DR numbers.");
-    }
+        if ($ids->isEmpty()) {
+            abort(422, "Invalid DR numbers.");
+        }
 
-    // =========================
-    // LOAD DELIVERIES
-    // =========================
-    $deliveries = Delivery::with([
+        // =========================
+        // EAGER LOAD (NO N+1)
+        // =========================
+        $deliveries = Delivery::with([
             'school',
             'project',
             'keystage',
-            'packageStatuses.package'
+            'packageStatuses.package.packageContents.item'
         ])
         ->whereIn('dr_no', $ids)
         ->get();
 
-        // ✅ ADD THIS HERE (IMPORTANT)
-        $deliveries = $deliveries->map(function ($delivery) {
-            $delivery->packageStatuses = $delivery->packageStatuses
-                ->values()
-                ->toArray();
-
-            return $delivery;
-        });
-    // =========================
-    // QR GENERATION (OPTIMIZED)
-    // =========================
-    $qrCodes = [];
-
-    $writer = new PngWriter(); // 🔥 create ONCE (major speed boost)
-
-    foreach ($deliveries as $delivery) {
-
-        $statuses = $delivery->packageStatuses ?? [];
-
-        foreach ($statuses as $status) {
-
-            $url = route('delivery.scan', [
-                'id' => $status->package_status_id,
-                'delivery_id' => $delivery->delivery_id
-            ]);
-
-            $qr = QrCode::create($url)
-                ->setSize(160)
-                ->setMargin(3); // slightly smaller = faster render
-
-            $qrCodes[$status->package_status_id] =
-                $writer->write($qr)->getDataUri();
+        if ($deliveries->isEmpty()) {
+            abort(404, "No deliveries found.");
         }
-    }
 
-    // =========================
-    // PDF OUTPUT
-    // =========================
-    return Pdf::loadView('deliveries.qr-layout', [
+        // =========================
+        // REUSED QR WRITER (FAST)
+        // =========================
+        $writer = new PngWriter();
+        $qrCodes = [];
+
+        foreach ($deliveries as $delivery) {
+
+            $packageCount = $delivery->packageStatuses->count();
+            $i = 1;
+
+            foreach ($delivery->packageStatuses as $status) {
+
+                $url = route('delivery.scan', [
+                    'id' => $status->package_status_id,
+                    'delivery_id' => $delivery->delivery_id
+                ]);
+
+                $qr = QrCode::create($url)
+                    ->setSize(150)
+                    ->setMargin(0);
+
+                $qrCodes[$status->package_status_id] =
+                    $writer->write($qr)->getDataUri();
+
+                // EXACT PHP STYLE LABEL
+                $status->package_label = "Package {$i} of {$packageCount}";
+
+                $i++;
+            }
+        }
+
+        return Pdf::loadView('deliveries.ar-layout', [
             'deliveries' => $deliveries,
             'qrCodes' => $qrCodes,
             'signerName' => auth()->user()?->name ?? 'Authorized Representative'
         ])
         ->setPaper('legal', 'portrait')
         ->stream('deliveries-batch.pdf');
-}
+    }
 }

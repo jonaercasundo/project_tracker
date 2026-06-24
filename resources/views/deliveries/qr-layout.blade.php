@@ -64,7 +64,7 @@ td,th{
 
             <tbody>
 
-            @foreach($delivery->packageStatuses ?? [] as $index => $status)
+            @foreach(($delivery->packageStatuses ?? []) as $index => $status)
 
                 <tr>
                     <td>Package {{ $index + 1 }}</td>
@@ -95,7 +95,11 @@ td,th{
 
         <table>
 
-            @foreach(($delivery->packageStatuses ?? collect())->chunk(2) as $chunk)
+            @php
+                $chunks = array_chunk($delivery->packageStatuses ?? [], 2);
+            @endphp
+
+            @foreach($chunks as $chunk)
 
                 <tr>
 
@@ -103,8 +107,12 @@ td,th{
 
                         <td class="qr">
 
-                            @if(isset($qrCodes[$status->package_status_id]))
-                                <img src="{{ $qrCodes[$status->package_status_id] }}" width="150">
+                            @php
+                                $qr = $qrCodes[$status->package_status_id] ?? null;
+                            @endphp
+
+                            @if($qr)
+                                <img src="{{ $qr }}" width="150">
                             @else
                                 <small>No QR</small>
                             @endif

@@ -9,7 +9,6 @@ class Project extends Model
     protected $primaryKey = 'project_id';
     protected $table = 'projects';
     public $incrementing = true;
-
     protected $keyType = 'int';
 
     protected $casts = [
@@ -24,4 +23,5 @@ class Project extends Model
             'project_id'
         );
     }
+    
 }

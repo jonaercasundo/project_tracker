@@ -7,7 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 class ARSetting extends Model
 {
     protected $table = 'AR_settings';
-    protected $primaryKey = 'id';
+
+    protected $primaryKey = 'setting_id';
+
+    public $incrementing = true;
+
+    protected $keyType = 'int';
 
     public $timestamps = false;
 

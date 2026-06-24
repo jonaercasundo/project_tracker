@@ -96,6 +96,10 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/deliveries/tracking', [DeliveryController::class, 'index'])
         ->name('deliveries.tracking');
+        
+        Route::get('/deliveries/pdf', [DeliveryController::class, 'generate'])
+        ->name('deliveries.pdf');
+
         Route::get('/api/regions', [LocationController::class, 'regions']);
         Route::get('/api/divisions', [LocationController::class, 'divisions']);
         Route::get('/api/municipalities', [LocationController::class, 'municipalities']);

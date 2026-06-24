@@ -174,29 +174,64 @@ if (file_exists($logoPath)) {
         </p>
 
     @endif
+        <p>
+        Delivery ID: {{ $delivery->delivery_id }}<br>
+        Package Status Count: {{ $delivery->packageStatuses->count() }}
+        </p>
+        <table>
 
-    <table>
+            <thead>
+                <tr>
+                    <th width="50%">Package</th>
+                    <th width="50%">Dimensions</th>
+                </tr>
+            </thead>
 
-        <thead>
-            <tr>
-                <th width="50%">
-                    Package
-                </th>
+            <tbody>
 
-                <th width="50%">
-                    Dimensions
-                </th>
-            </tr>
-        </thead>
+            @forelse($delivery->packageStatuses as $index => $status)
 
-        <tbody>
+                <tr>
+                    <td>
+                        Package {{ $index + 1 }}
+                    </td>
 
-            @foreach($delivery->packageStatuses as $status)
-                {{ dd($status->package) }}
-            @endforeach
-        </tbody>
+                    <td align="center">
 
-    </table>
+                        @if($status->package)
+
+                            {{ $status->package->length ?? '-' }}
+                            cm ×
+                            {{ $status->package->width ?? '-' }}
+                            cm ×
+                            {{ $status->package->height ?? '-' }}
+                            cm
+
+                        @else
+
+                            Package Not Found
+                            (Package ID: {{ $status->package_id }})
+
+                        @endif
+
+                    </td>
+                </tr>
+
+            @empty
+
+                <tr>
+                    <td colspan="2" align="center">
+                        No Package Status Found
+                        <br>
+                        Delivery ID: {{ $delivery->delivery_id }}
+                    </td>
+                </tr>
+
+            @endforelse
+
+            </tbody>
+
+        </table>
 
     <div class="footer">
 

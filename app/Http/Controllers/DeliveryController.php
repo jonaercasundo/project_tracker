@@ -180,6 +180,14 @@ class DeliveryController extends Controller
         ->whereIn('dr_no', $ids)
         ->get();
 
+        // ✅ ADD THIS HERE (IMPORTANT)
+        $deliveries = $deliveries->map(function ($delivery) {
+            $delivery->packageStatuses = $delivery->packageStatuses
+                ->values()
+                ->toArray();
+
+            return $delivery;
+        });
     // =========================
     // QR GENERATION (OPTIMIZED)
     // =========================

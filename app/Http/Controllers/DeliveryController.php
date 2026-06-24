@@ -154,51 +154,51 @@ class DeliveryController extends Controller
             'total_rows' => $total_rows
         ]);
     }
-public function generate(Request $request)
-{
-    $ids = collect(explode(',', $request->ids))
-        ->filter()
-        ->map(fn ($v) => trim($v))
-        ->values();
+    public function generate(Request $request)
+    {
+        $ids = collect(explode(',', $request->ids))
+            ->filter()
+            ->map(fn ($v) => trim($v))
+            ->values();
 
-    $deliveries = Delivery::with([
-        'school',
-        'project',
-        'keystage',
-        'packageStatuses.package'
-    ])
-    ->whereIn('dr_no', $ids)
-    ->get();
+        $deliveries = Delivery::with([
+            'school',
+            'project',
+            'keystage',
+            'packageStatuses.package'
+        ])
+        ->whereIn('dr_no', $ids)
+        ->get();
 
-    $qrCodes = [];
+        $qrCodes = [];
 
-    foreach ($deliveries as $delivery) {
+        foreach ($deliveries as $delivery) {
 
-        foreach ($delivery->packageStatuses as $status) {
+            foreach ($delivery->packageStatuses as $status) {
 
-            $url = route('delivery.scan', [
-                'id' => $status->package_status_id,
-                'delivery_id' => $delivery->delivery_id
-            ]);
+                $url = route('delivery.scan', [
+                    'id' => $status->package_status_id,
+                    'delivery_id' => $delivery->delivery_id
+                ]);
 
-            // QR (Endroid v5)
-            $qr = QrCode::create($url)
-                ->setSize(160)
-                ->setMargin(5);
+                // QR (Endroid v5)
+                $qr = QrCode::create($url)
+                    ->setSize(160)
+                    ->setMargin(5);
 
-            $writer = new PngWriter();
-            $result = $writer->write($qr);
+                $writer = new PngWriter();
+                $result = $writer->write($qr);
 
-            $qrCodes[$status->package_status_id] = $result->getDataUri();
+                $qrCodes[$status->package_status_id] = $result->getDataUri();
+            }
         }
-    }
 
-    return Pdf::loadView('pdf.deliveries-batch', [
-        'deliveries' => $deliveries,
-        'qrCodes' => $qrCodes,
-        'signerName' => auth()->user()?->name ?? 'Authorized Representative'
-    ])
-    ->setPaper('legal', 'portrait')
-    ->stream('deliveries-batch.pdf');
-}
+        return Pdf::loadView('pdf.deliveries-batch', [
+            'deliveries' => $deliveries,
+            'qrCodes' => $qrCodes,
+            'signerName' => auth()->user()?->name ?? 'Authorized Representative'
+        ])
+        ->setPaper('legal', 'portrait')
+        ->stream('deliveries-batch.pdf');
+    }
 }

@@ -173,9 +173,7 @@ class DeliveryController extends Controller
             'project.arSetting',
             'lot',
             'keystage',
-            'packageStatuses' => function ($q) {
-                $q->with('package');
-            }
+            'keystage.packages',
         ])
         ->whereIn('dr_no', $ids)
         ->orderBy('dr_no')

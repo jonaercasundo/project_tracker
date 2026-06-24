@@ -1,13 +1,12 @@
 <?php
 
 namespace App\Models;
-
+use App\Models\Package;
 use Illuminate\Database\Eloquent\Model;
 
 class Keystage extends Model
 {
     protected $table = 'keystage';
-
     protected $primaryKey = 'keystage_id';
 
     public $timestamps = false;
@@ -32,5 +31,13 @@ class Keystage extends Model
     public function deliveries()
     {
         return $this->hasMany(Delivery::class, 'keystage_id', 'keystage_id');
+    }
+    public function packages()
+    {
+        return $this->hasMany(
+            Package::class,
+            'keystage_id',
+            'keystage_id'
+        );
     }
 }

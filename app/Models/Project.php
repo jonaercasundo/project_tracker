@@ -16,4 +16,8 @@ class Project extends Model
         'start_date' => 'datetime',
         'end_date' => 'datetime',
     ];
+    public function arSettings()
+    {
+        return $this->hasOne(ArSetting::class, 'project_id', 'project_id');
+    }
 }

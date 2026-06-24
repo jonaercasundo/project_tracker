@@ -170,12 +170,11 @@ class DeliveryController extends Controller
         // =========================
         $deliveries = Delivery::with([
             'school',
-            'project',
+            'project.arSetting',
+            'lot',
             'keystage',
-            'packageStatuses.package.packageContents.item'
-        ])
-        ->whereIn('dr_no', $ids)
-        ->get();
+            'packageStatuses.package'
+        ])->whereIn('dr_no', $ids)->get();
 
         if ($deliveries->isEmpty()) {
             abort(404, "No deliveries found.");
@@ -188,6 +187,8 @@ class DeliveryController extends Controller
         $qrCodes = [];
 
         foreach ($deliveries as $delivery) {
+
+            $ar = $delivery->project->arSettings ?? null;
 
             $packageCount = $delivery->packageStatuses->count();
             $i = 1;
@@ -206,11 +207,13 @@ class DeliveryController extends Controller
                 $qrCodes[$status->package_status_id] =
                     $writer->write($qr)->getDataUri();
 
-                // EXACT PHP STYLE LABEL
                 $status->package_label = "Package {$i} of {$packageCount}";
 
                 $i++;
             }
+
+            // attach AR config to delivery (LIKE PHP VERSION)
+            $delivery->ar = $ar;
         }
 
         return Pdf::loadView('deliveries.ar-layout', [

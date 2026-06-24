@@ -173,8 +173,13 @@ class DeliveryController extends Controller
             'project.arSetting',
             'lot',
             'keystage',
-            'packageStatuses.package'
-        ])->whereIn('dr_no', $ids)->get();
+            'packageStatuses' => function ($q) {
+                $q->with('package');
+            }
+        ])
+        ->whereIn('dr_no', $ids)
+        ->orderBy('dr_no')
+        ->get();
 
         if ($deliveries->isEmpty()) {
             abort(404, "No deliveries found.");

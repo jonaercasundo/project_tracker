@@ -314,5 +314,124 @@ class DeliveryController extends Controller
         ->setPaper('legal', 'portrait')
         ->stream('deliveries-batch.pdf');
     }
+public function generateLabels(Request $request)
+{
+    ini_set('memory_limit', '1024M');
+    set_time_limit(0);
 
+    $projectId = $request->project_id;
+
+    $arSettings = ArSetting::where('project_id', $projectId)->first();
+
+    $showSchoolID     = (bool) ($arSettings?->label_school_id ?? false);
+    $showMunicipality = (bool) ($arSettings?->label_municipality ?? false);
+    $showDivision     = (bool) ($arSettings?->label_division ?? false);
+    $showRegion       = (bool) ($arSettings?->label_region ?? false);
+
+    $rows = DB::table('schools_project as sp')
+        ->leftJoin('school as s', 's.school_id', '=', 'sp.school_id')
+        ->leftJoin('deliveries as d', function ($join) {
+            $join->on('d.project_id', '=', 'sp.project_id')
+                 ->on('d.school_id', '=', 'sp.school_id');
+        })
+        ->leftJoin('lot as l', 'l.lot_id', '=', 'd.lot_id')
+        ->leftJoin('package_status as ps', 'ps.delivery_id', '=', 'd.delivery_id')
+        ->leftJoin('package as p', 'p.package_id', '=', 'ps.package_id')
+        ->leftJoin('package_content as pc', 'pc.package_id', '=', 'p.package_id')
+        ->leftJoin('item as i', 'i.item_id', '=', 'pc.item_id')
+
+        ->where('sp.project_id', $projectId)
+
+        ->select([
+            's.school_id',
+            's.school_name',
+            's.municipality',
+            's.division',
+            's.region',
+            'sp.batch_id',
+            'l.lot_name',
+            'i.item_name',
+            'i.unit',
+
+            DB::raw('SUM(COALESCE(pc.qty,1) * COALESCE(d.package_qty,1)) as total_qty')
+        ])
+
+        ->groupBy(
+            's.school_id',
+            's.school_name',
+            's.municipality',
+            's.division',
+            's.region',
+            'sp.batch_id',
+            'l.lot_name',
+            'i.item_name',
+            'i.unit'
+        )
+
+        ->orderBy('s.school_name')
+        ->orderBy('sp.batch_id')
+        ->orderBy('l.lot_name')
+        ->orderBy('i.item_name')
+
+        ->get();
+
+    if ($rows->isEmpty()) {
+        abort(404, 'No data found.');
+    }
+
+    $data = [];
+
+    foreach ($rows as $row) {
+
+        $sid = $row->school_id;
+        $lot = $row->lot_name;
+
+        if (!isset($data[$sid])) {
+
+            $data[$sid] = [
+                'info' => [
+                    'school_name'  => $row->school_name,
+                    'school_id'    => $row->school_id,
+                    'municipality' => $row->municipality,
+                    'division'     => $row->division,
+                    'region'       => $row->region,
+                ],
+                'lots' => []
+            ];
+        }
+
+        if (!isset($data[$sid]['lots'][$lot])) {
+            $data[$sid]['lots'][$lot] = [];
+        }
+
+        $key = $row->item_name;
+
+        if (isset($data[$sid]['lots'][$lot][$key])) {
+
+            $data[$sid]['lots'][$lot][$key]['qty']
+                += (int) $row->total_qty;
+
+        } else {
+
+            $data[$sid]['lots'][$lot][$key] = [
+                'item_name' => $row->item_name,
+                'qty'       => (int) $row->total_qty,
+                'unit'      => $row->unit,
+            ];
+        }
+    }
+
+    return Pdf::loadView(
+        'deliveries.label-layout',
+        [
+            'data' => $data,
+            'showSchoolID' => $showSchoolID,
+            'showMunicipality' => $showMunicipality,
+            'showDivision' => $showDivision,
+            'showRegion' => $showRegion,
+        ]
+    )
+    ->setPaper('a4', 'portrait')
+    ->stream('Packing_List_' . now()->format('Ymd_His') . '.pdf');
+}
 }

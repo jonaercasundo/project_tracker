@@ -122,6 +122,7 @@ class DeliveryController extends Controller
             if (!isset($grouped[$dr])) {
                 $grouped[$dr] = [
                     'dr_no' => $dr,
+                    'delivery_id' => $row->delivery_id,
                     'project_id' => $row->project_id,
                     'project_name' => $row->project_name,
                     'school_id' => $row->school_id,

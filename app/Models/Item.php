@@ -13,4 +13,8 @@ class Item extends Model
     public $timestamps = false; // set true if you have created_at and updated_at
 
     protected $guarded = [];
+    public function packageContent()
+    {
+        return $this->hasOne(PackageContent::class, 'item_id', 'item_id');
+    }
 }

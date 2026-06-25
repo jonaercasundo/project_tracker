@@ -6,5 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class PackageContent extends Model
 {
-    //
+    protected $table = 'package_content';
+
+    public function package()
+    {
+        return $this->belongsTo(Package::class, 'package_id', 'package_id');
+    }
 }

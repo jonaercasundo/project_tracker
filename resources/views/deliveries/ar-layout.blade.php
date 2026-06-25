@@ -184,6 +184,7 @@ if (file_exists($logoPath)) {
         @endphp
         @php
             $package = $delivery->package;
+            $package = $item?->packageContent?->package;
         @endphp
         <table>
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
@@ -204,6 +205,17 @@ if (file_exists($logoPath)) {
                             {{ $package?->length }} × {{ $package?->width }} × {{ $package?->height }}
                             <hr style="margin:3px 0;">
                             {{ $delivery->package_qty }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="w-1/2">
+                            {{ $delivery->items->second()?->item_name }}
+                        </td>
+
+                        <td align="center">
+                            {{ $package?->length }} × {{ $package?->width }} × {{ $package?->height }}
+                            <hr style="margin:3px 0;">
+                            {{ $delivery->qty_teachers_manual }}
                         </td>
                     </tr>
                 </tbody>

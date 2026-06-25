@@ -198,6 +198,9 @@ if (file_exists($logoPath)) {
                         </td>
 
                         <td align="center">
+                            {{ $delivery->items->first()?->dimension }}
+                            <br>
+                            Qty: {{ $delivery->items->first()?->qty }}
                         </td>
                     </tr>
                 </tbody>

@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function () {
         let projectVal = this.value;
 
         lot.innerHTML = '<option value="">Lot</option>';
-        lot.disabled = true;
+        lot.disabled = false;
 
         // reset dependent location
         region.value = '';

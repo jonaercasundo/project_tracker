@@ -160,16 +160,6 @@ td,th{
 
             <strong>School Address:</strong>
             {{ $delivery->school->address ?? '' }}
-
-            @if(optional($ar)->display_school_id)
-
-                <br>
-
-                <strong>School ID:</strong>
-                {{ $delivery->school_id }}
-
-            @endif
-
         </p>
 
     @endif

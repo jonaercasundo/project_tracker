@@ -191,6 +191,47 @@ if (file_exists($logoPath)) {
                         </th>
                     </tr>
                 </thead>
+                <tbody>
+                    @forelse($delivery->packageStatuses as $index => $status)
+                    <tr>
+                        <td>
+                            {{ $delivery->items->first()?->item_name }}
+                        </td>
+
+                        <td align="center">
+
+                            @if($status->package)
+
+                                {{ $status->package->length ?? '-' }}
+                                cm ×
+                                {{ $status->package->width ?? '-' }}
+                                cm ×
+                                {{ $status->package->height ?? '-' }}
+                                cm
+
+                            @else
+
+                                Package Not Found
+                                (Package ID: {{ $status->package_id }})
+
+                            @endif
+
+                        </td>
+                    </tr>
+
+                    @empty
+
+                        <tr>
+                            <td colspan="2" align="center">
+                                No Package Status Found
+                                <br>
+                                Delivery ID: {{ $delivery->delivery_id }}
+                            </td>
+                        </tr>
+
+                    @endforelse
+
+                </tbody>
             @endif
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')
                 <thead>
@@ -200,9 +241,8 @@ if (file_exists($logoPath)) {
                         </th>
                     </tr>
                 </thead>
-            @endif
             <tbody>
-            @forelse($delivery->packageStatuses as $index => $status)
+                @forelse($delivery->packageStatuses as $index => $status)
                 <tr>
                     <td>
                         Package {{ $index + 1 }}
@@ -229,19 +269,20 @@ if (file_exists($logoPath)) {
                     </td>
                 </tr>
 
-            @empty
+                @empty
 
-                <tr>
-                    <td colspan="2" align="center">
-                        No Package Status Found
-                        <br>
-                        Delivery ID: {{ $delivery->delivery_id }}
-                    </td>
-                </tr>
+                    <tr>
+                        <td colspan="2" align="center">
+                            No Package Status Found
+                            <br>
+                            Delivery ID: {{ $delivery->delivery_id }}
+                        </td>
+                    </tr>
 
-            @endforelse
+                @endforelse
 
             </tbody>
+            @endif
 
         </table>
 

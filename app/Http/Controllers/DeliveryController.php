@@ -328,7 +328,17 @@ public function generateLabels(Request $request)
         ->whereIn('delivery_id', $ids)
         ->value('project_id');
 
-    dd($projectId);
+    dd([
+    'projectId' => $projectId,
+
+    'schools_project_count' => DB::table('schools_project')
+        ->where('project_id', $projectId)
+        ->count(),
+
+    'deliveries_count' => DB::table('deliveries')
+            ->where('project_id', $projectId)
+            ->count(),
+    ]);
 
     $arSettings = ARSetting::where('project_id', $projectId)->first();
 

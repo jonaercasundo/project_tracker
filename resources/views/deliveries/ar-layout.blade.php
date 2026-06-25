@@ -198,88 +198,41 @@ if (file_exists($logoPath)) {
                 </thead>
 
                 <tbody>
-
-                <tr>
-                    <td class="w-1/2">
-                        {{ $firstItem?->item_name }}
-                    </td>
-
-                    <td align="center">
-                        @php
-                            $package1 = $firstItem?->packageContent?->package;
-                        @endphp
-
-                        {{ $package1?->length }} × {{ $package1?->width }} × {{ $package1?->height }}
-
-                        <hr style="margin:3px 0;">
-
-                        {{ $delivery->package_qty }}
-                    </td>
-                </tr>
-
-                <tr>
-                    <td class="w-1/2">
-                        {{ $secondItem?->item_name }}
-                    </td>
-
-                    <td align="center">
-                        @php
-                            $package2 = $secondItem?->packageContent?->package;
-                        @endphp
-
-                        {{ $package2?->length }} × {{ $package2?->width }} × {{ $package2?->height }}
-
-                        <hr style="margin:3px 0;">
-
-                        {{ $delivery->qty_teachers_manual }}
-                    </td>
-                </tr>
-
-                </tbody>
-
-                @endif
-            
-                <tbody>
-                @forelse($delivery->packageStatuses as $index => $status)
-                <tr>
-                    <td>
-                        Package {{ $index + 1 }}
-                    </td>
-
-                    <td align="center">
-
-                        @if($status->package)
-
-                            {{ $status->package->length ?? '-' }}
-                            cm ×
-                            {{ $status->package->width ?? '-' }}
-                            cm ×
-                            {{ $status->package->height ?? '-' }}
-                            cm
-
-                        @else
-
-                            Package Not Found
-                            (Package ID: {{ $status->package_id }})
-
-                        @endif
-
-                    </td>
-                </tr>
-
-                @empty
-
                     <tr>
-                        <td colspan="2" align="center">
-                            No Package Status Found
-                            <br>
-                            Delivery ID: {{ $delivery->delivery_id }}
+                        <td class="w-1/2">
+                            {{ $firstItem?->item_name }}
+                        </td>
+
+                        <td align="center">
+                            @php
+                                $package1 = $firstItem?->packageContent?->package;
+                            @endphp
+
+                            {{ $package1?->length }} × {{ $package1?->width }} × {{ $package1?->height }}
+
+                            <hr style="margin:3px 0;">
+
+                            {{ $delivery->package_qty }}
                         </td>
                     </tr>
+                    <tr>
+                        <td class="w-1/2">
+                            {{ $secondItem?->item_name }}
+                        </td>
 
-                @endforelse
+                        <td align="center">
+                            @php
+                                $package2 = $secondItem?->packageContent?->package;
+                            @endphp
 
-                </tbody>
+                            {{ $package2?->length }} × {{ $package2?->width }} × {{ $package2?->height }}
+
+                            <hr style="margin:3px 0;">
+
+                            {{ $delivery->qty_teachers_manual }}
+                        </td>
+                    </tr>
+                </tbody>       
             @endif
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')
 
@@ -290,38 +243,32 @@ if (file_exists($logoPath)) {
                         </th>
                     </tr>
                 </thead>
-
                 <tbody>
+                    @forelse($delivery->packageStatuses as $index => $status)
+                        <tr>
+                            <td>Package {{ $index + 1 }}</td>
 
-                @forelse($delivery->packageStatuses as $index => $status)
+                            <td align="center">
+                                @php
+                                    $pkg = $status->package;
+                                @endphp
 
-                <tr>
-                    <td>Package {{ $index + 1 }}</td>
-
-                    <td align="center">
-                        @php
-                            $pkg = $status->package;
-                        @endphp
-
-                        @if($pkg)
-                            {{ $pkg->length }} × {{ $pkg->width }} × {{ $pkg->height }}
-                        @else
-                            Package Not Found (ID: {{ $status->package_id }})
-                        @endif
-                    </td>
-                </tr>
-
-                @empty
-                <tr>
-                    <td colspan="2" align="center">
-                        No Package Status Found<br>
-                        Delivery ID: {{ $delivery->delivery_id }}
-                    </td>
-                </tr>
-                @endforelse
-
+                                @if($pkg)
+                                    {{ $pkg->length }} × {{ $pkg->width }} × {{ $pkg->height }}
+                                @else
+                                    Package Not Found (ID: {{ $status->package_id }})
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="2" align="center">
+                                No Package Status Found<br>
+                                Delivery ID: {{ $delivery->delivery_id }}
+                            </td>
+                        </tr>
+                    @endforelse
                 </tbody>
-
             @endif
         </table>
 

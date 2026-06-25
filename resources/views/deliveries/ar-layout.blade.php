@@ -170,22 +170,8 @@ td,th{
             $secondItem = $delivery->items[1] ?? null;
             $thirdItem = $delivery->items[2] ?? null;
             $fourthItem = $delivery->items[3] ?? null;
-
-            $items = $delivery->items ?? [];
-
-            $manualLabel = collect([
-                $items[0]->item_name ?? null,
-                $items[1]->item_name ?? null,
-                $items[2]->item_name ?? null,
-                $items[3]->item_name ?? null,
-            ])->filter()->implode(', ');
-
-            $schoolPrefix = implode('-', array_slice(explode('-', $delivery->school_id), 0, 2));
-
-            $status->package_label =
-                $status->package_label
-            ?? ($manualLabel ? "{$schoolPrefix} - {$manualLabel}" : 'Unknown Item');
         @endphp
+        
         <table>
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
                 <thead>
@@ -336,7 +322,14 @@ td,th{
         </small>
 
     </div>
+    @php
+        $prefix = implode('-', array_slice(explode('-', $delivery->school_id), 0, 2));
 
+        $firstItem = $delivery->items[0] ?? null;
+        $secondItem = $delivery->items[1] ?? null;
+        $thirdItem = $delivery->items[2] ?? null;
+        $fourthItem = $delivery->items[3] ?? null;
+    @endphp
     <table>
 
         @foreach($delivery->packageStatuses->chunk(2) as $chunk)
@@ -357,7 +350,17 @@ td,th{
                         @endif
 
                         <br>
-                        {{ $status->package_label }}
+                        @php
+                            $package = $status->package;
+
+                            $items = $package?->packageContent?->map(fn($pc) => $pc->item->item_name ?? null)->filter();
+
+                            $label = $items->isNotEmpty()
+                                ? $items->implode(', ')
+                                : 'Unknown Item';
+                        @endphp
+
+                        {{ $label }}
 
                     </td>
 

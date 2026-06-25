@@ -170,6 +170,21 @@ td,th{
             $secondItem = $delivery->items[1] ?? null;
             $thirdItem = $delivery->items[2] ?? null;
             $fourthItem = $delivery->items[3] ?? null;
+
+            $items = $delivery->items ?? [];
+
+            $manualLabel = collect([
+                $items[0]->item_name ?? null,
+                $items[1]->item_name ?? null,
+                $items[2]->item_name ?? null,
+                $items[3]->item_name ?? null,
+            ])->filter()->implode(', ');
+
+            $schoolPrefix = implode('-', array_slice(explode('-', $delivery->school_id), 0, 2));
+
+            $status->package_label =
+                $status->package_label
+            ?? ($manualLabel ? "{$schoolPrefix} - {$manualLabel}" : 'Unknown Item');
         @endphp
         <table>
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
@@ -311,7 +326,7 @@ td,th{
     <div style="text-align:right;">
 
         <small>
-            Date: {{ now()->format('Y-M-d') }}
+            Date: June 29, 2026
         </small>
 
         <br>
@@ -342,7 +357,7 @@ td,th{
                         @endif
 
                         <br>
-                        {{ $status->package_label ?? 'Unknown Item' }}
+                        {{ $status->package_label }}
 
                     </td>
 

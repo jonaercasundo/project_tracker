@@ -228,9 +228,6 @@ class DeliveryController extends Controller
             }
             // attach AR config to delivery (LIKE PHP VERSION)
             $delivery->ar = $ar;
-            dd([
-    'ids_received' => $ids
-]);
         }
 
         return Pdf::loadView('deliveries.ar-layout', [

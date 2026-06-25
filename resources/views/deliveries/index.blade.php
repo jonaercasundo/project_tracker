@@ -120,7 +120,7 @@
                         <div class="flex items-center gap-3">
                             <input type="checkbox"
                                    class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dr-checkbox"
-                                   value="{{ $dr_group['dr_no'] }}"
+                                   value="{{ $delivery->delivery_id }}"
                                    data-school-id="{{ $dr_group['school_id'] }}">
 
                             <div>

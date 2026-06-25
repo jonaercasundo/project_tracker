@@ -14,6 +14,10 @@
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
+            <label class="flex items-center gap-2 px-3 py-2 bg-white border rounded-xl text-xs font-semibold">
+                <input type="checkbox" id="select-all-drs">
+                Select All
+            </label>
             <button type="button" class="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition">
                 Add Delivery
             </button>
@@ -96,21 +100,7 @@
     </div>
 
 </form>
-<form action="{{ route('deliveries.batch-qr') }}" method="GET" target="_blank">
-    <input type="number"
-           name="dr_from"
-           placeholder="DR From"
-           required>
 
-    <input type="number"
-           name="dr_to"
-           placeholder="DR To"
-           required>
-
-    <button type="submit" class="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-white border">
-        Generate Batch AR
-    </button>
-</form>
     {{-- CONTENT STATE HANDLERS --}}
     @if(empty($grouped_deliveries))
         <div class="text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200 shadow-sm">
@@ -433,5 +423,35 @@ function generateQR() {
 
     window.open(url, '_blank');
 }
+document.addEventListener('DOMContentLoaded', function () {
+
+    const selectAll = document.getElementById('select-all-drs');
+
+    if (selectAll) {
+
+        selectAll.addEventListener('change', function () {
+
+            document.querySelectorAll('.dr-checkbox').forEach(cb => {
+                cb.checked = this.checked;
+            });
+
+        });
+
+        document.querySelectorAll('.dr-checkbox').forEach(cb => {
+
+            cb.addEventListener('change', function () {
+
+                const total = document.querySelectorAll('.dr-checkbox').length;
+                const checked = document.querySelectorAll('.dr-checkbox:checked').length;
+
+                selectAll.checked = total === checked;
+
+            });
+
+        });
+
+    }
+
+});
 </script>
 </x-project_app-layout>

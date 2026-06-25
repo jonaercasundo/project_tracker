@@ -316,6 +316,8 @@ class DeliveryController extends Controller
     }
     public function batchQr(Request $request)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(0);
         $request->validate([
             'dr_from' => 'required|integer',
             'dr_to'   => 'required|integer',

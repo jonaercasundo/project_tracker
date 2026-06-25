@@ -233,13 +233,6 @@ class DeliveryController extends Controller
             // attach AR config to delivery (LIKE PHP VERSION)
             $delivery->ar = $ar;
         }
-        dd([
-            'package_status_count' => $deliveries->first()->packageStatuses->count(),
-            'qr_count' => count($qrCodes),
-            'sample_qr' => reset($qrCodes),
-            $deliveries->first()->delivery_id,
-            $deliveries->first()->dr_no
-        ]);
 
         return Pdf::loadView('deliveries.ar-layout', [
             'deliveries' => $deliveries,

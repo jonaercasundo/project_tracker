@@ -181,7 +181,7 @@ if (file_exists($logoPath)) {
             @if($delivery->items->isNotEmpty())
                 <thead>
                     <tr>
-                        <th colspan="2">
+                        <th colspan="2" style="text-align: left;">
                             {{ $delivery->items->first()->item_name }}
                         </th>
                     </tr>

@@ -178,17 +178,11 @@ if (file_exists($logoPath)) {
         Delivery ID: {{ $delivery->delivery_id }}<br>
         </p>
         <table>
-            @php
-                $lot = explode('-', $delivery->school_id)[1] ?? null;
-            @endphp
-
-            @if($delivery->items->isNotEmpty())
+            @if($delivery->items->isNotEmpty() && str_contains($delivery->school_id, 'TX-LOT12'))
                 <thead>
                     <tr>
                         <th colspan="2" style="text-align: left;">
-                            @if(str_contains($delivery->school_id, 'TX-LOT12'))
-                                {{ $delivery->items->first()?->item_name }}
-                            @endif
+                            {{ $delivery->items->first()?->item_name }}
                         </th>
                     </tr>
                 </thead>

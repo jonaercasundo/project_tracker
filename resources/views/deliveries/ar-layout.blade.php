@@ -177,32 +177,22 @@ if (file_exists($logoPath)) {
         <p>
         Delivery ID: {{ $delivery->delivery_id }}<br>
         </p>
-
+        @php
+            $prefix = implode('-', array_slice(explode('-', $delivery->school_id), 0, 2));
+            $firstItem = $delivery->items->first();
+            $itemsCount = $delivery->items->count();
+        @endphp
         <table>
-            School ID: {{ $delivery->school_id }}<br>
-
-Prefix:
-{{ implode('-', array_slice(explode('-', $delivery->school_id), 0, 2)) }}<br>
-
-Items Count:
-{{ $delivery->items->count() }}<br>
-
-First Item:
-{{ $delivery->items->first()?->item_name }}
-            @if(
-                $delivery->items->isNotEmpty() &&
-                implode('-', array_slice(explode('-', $delivery->school_id), 0, 2)) === 'TX-LOT12'
-            )
+            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')
                 <thead>
                     <tr>
                         <th colspan="2" style="text-align: left;">
-                            {{ $delivery->items->first()?->item_name }}
+                            {{ $firstItem?->item_name }}
                         </th>
                     </tr>
                 </thead>
             @endif
             <tbody>
-
             @forelse($delivery->packageStatuses as $index => $status)
                 <tr>
                     <td>

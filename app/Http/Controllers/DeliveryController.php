@@ -250,7 +250,7 @@ class DeliveryController extends Controller
 
             $itemName = $items->first()->item_name ?? 'Unknown Item';
 
-            $isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
+            $delivery->isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
 
             $subject = $isMakabansa ? 'Makabansa' : 'Filipino';
 

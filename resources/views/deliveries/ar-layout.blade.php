@@ -197,7 +197,7 @@ td,th{
                                 $package1 = $firstItem?->packageContent?->package;
                             @endphp
 
-                            {{ $package1?->length }} × {{ $package1?->width }} × {{ $package1?->height }}
+                             {{ $package1?->width }} × {{ $package1?->height }} × {{ $package1?->length }}
 
                             <hr style="margin:3px 0;">
 
@@ -214,7 +214,7 @@ td,th{
                                 $package2 = $secondItem?->packageContent?->package;
                             @endphp
 
-                            {{ $package2?->length }} × {{ $package2?->width }} × {{ $package2?->height }}
+                            {{ $package2?->width }} × {{ $package2?->height }} × {{ $package2?->length }}
 
                             <hr style="margin:3px 0;">
 
@@ -243,7 +243,7 @@ td,th{
                                 $package1 = $thirdItem?->packageContent?->package;
                             @endphp
 
-                            {{ $package1?->length }} × {{ $package1?->width }} × {{ $package1?->height }}
+                            {{ $package1?->width }} × {{ $package1?->height }} × {{ $package1?->length }}
 
                             <hr style="margin:3px 0;">
 
@@ -260,7 +260,7 @@ td,th{
                                 $package2 = $fourthItem?->packageContent?->package;
                             @endphp
 
-                            {{ $package2?->length }} × {{ $package2?->width }} × {{ $package2?->height }}
+                            {{ $package2?->width }} × {{ $package2?->height }} × {{ $package2?->length }}
 
                             <hr style="margin:3px 0;">
 

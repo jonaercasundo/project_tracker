@@ -208,7 +208,11 @@ class DeliveryController extends Controller
 
                 $ar = $delivery->project->arSetting ?? null;
 
-                $statuses = $delivery->packageStatuses->values();
+                $statuses = $delivery->packageStatuses ?? collect();
+
+                if ($statuses->isEmpty()) {
+                    continue;
+                }
 
                 $i = 1;
                 $packageCount = $statuses->count();
@@ -228,12 +232,13 @@ class DeliveryController extends Controller
                     $qrCodes[$status->package_status_id] =
                         'data:image/png;base64,' . base64_encode($result->getString());
 
-                    // ================= ITEMS =================
-                    $items = $status->package?->packageContent?->map(fn($pc) => $pc->item);
+                    // ================= SAFE ITEMS =================
+                    $items = optional($status->package)
+                        ->packageContent
+                        ?->map(fn($pc) => $pc->item)
+                        ?? collect();
 
-                    $itemNames = $items?->pluck('item_name')
-                        ->filter()
-                        ->values();
+                    $itemNames = $items->pluck('item_name')->filter();
 
                     // ================= LABEL =================
                     if ($itemNames->isEmpty()) {

@@ -180,7 +180,9 @@ class DeliveryController extends Controller
         ])
         ->whereIn('dr_no', $ids)
         ->orderBy('dr_no')
+        ->limit(2)
         ->get();
+
 
         if ($deliveries->isEmpty()) {
             abort(404, "No deliveries found.");

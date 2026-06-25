@@ -103,7 +103,7 @@ td,th{
 
         @if(optional($ar)->display_school_id)
             <small>
-                AR: {{ $delivery->school_id }}
+                AR: {{ preg_replace('/^TX-LOT\d+-/', '', $delivery->school_id) }}
             </small>
         @endif
     </div>
@@ -163,11 +163,6 @@ td,th{
         </p>
 
     @endif
-        <p>
-        Delivery ID: {{ $delivery->delivery_id }}<br>
-        </p>
-
-
         @php
             $prefix = implode('-', array_slice(explode('-', $delivery->school_id), 0, 2));
 

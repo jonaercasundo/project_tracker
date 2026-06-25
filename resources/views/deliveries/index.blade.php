@@ -163,7 +163,7 @@
                                     </div>
 
                                     <div class="text-xs text-slate-500 leading-relaxed">
-                                        {{ collect($d->items ?? [])->pluck('item_name')->filter()->implode(', ') ?: 'No items available' }}
+                                        {{ collect($d['items_list'] ?? [])->implode(', ') ?: 'No items available' }}
                                     </div>
                                 </div>
 

@@ -17,150 +17,181 @@ use Endroid\QrCode\Writer\PngWriter;
 use App\Models\PackageStatus;
 class DeliveryController extends Controller
 {
-    public function index(Request $request)
-    {
-        $limit = 10;
-        $page = max(1, (int) $request->get('page', 1));
-        $offset = ($page - 1) * $limit;
+   public function index(Request $request)
+{
+    $limit = 10;
+    $page = max(1, (int) $request->get('page', 1));
+    $offset = ($page - 1) * $limit;
 
-        // =========================
-        // BASE QUERY
-        // =========================
-        $baseQuery = DB::table('deliveries as d')
-            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
-            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
-            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
-            ->join('school as s', 's.school_id', '=', 'd.school_id');
+    // =========================
+    // BASE QUERY
+    // =========================
+    $baseQuery = DB::table('deliveries as d')
+        ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
+        ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
+        ->join('projects as p', 'p.project_id', '=', 'd.project_id')
+        ->join('school as s', 's.school_id', '=', 'd.school_id')
 
-        // =========================
-        // SEARCH
-        // =========================
-        if ($request->filled('search')) {
-            $search = $request->search;
+        // ✅ JOIN ITEMS FLOW
+        ->leftJoin('package_status as ps', 'ps.delivery_id', '=', 'd.delivery_id')
+        ->leftJoin('package as pk', 'pk.package_id', '=', 'ps.package_id')
+        ->leftJoin('package_content as pc', 'pc.package_id', '=', 'pk.package_id')
+        ->leftJoin('item as i', 'i.item_id', '=', 'pc.item_id');
 
-            $baseQuery->where(function ($q) use ($search) {
-                $q->where('d.dr_no', 'like', "%{$search}%")
-                  ->orWhere('p.project_name', 'like', "%{$search}%")
-                  ->orWhere('s.school_name', 'like', "%{$search}%")
-                  ->orWhere('l.lot_name', 'like', "%{$search}%");
-            });
-        }
-        $years = DB::table('deliveries')
-            ->selectRaw('YEAR(delivery_date) as year')
-            ->distinct()
-            ->orderBy('year', 'desc')
-            ->pluck('year');
+    // =========================
+    // SEARCH
+    // =========================
+    if ($request->filled('search')) {
+        $search = $request->search;
 
-        // =========================
-        // FILTERS
-        // =========================
-        if ($request->filled('status')) {
-            $baseQuery->where('d.status', $request->status);
-        }
-
-        if ($request->filled('project')) {
-            $baseQuery->where('d.project_id', $request->project);
-        }
-
-        if ($request->filled('lot')) {
-            $baseQuery->where('d.lot_id', $request->lot);
-        }
-
-        // =========================
-        // LOCATION FILTERS (BASED ON SCHOOL TABLE)
-        // =========================
-        if ($request->filled('region')) {
-            $baseQuery->where('s.region', $request->region);
-        }
-
-        if ($request->filled('division')) {
-            $baseQuery->where('s.division', $request->division);
-        }
-
-        if ($request->filled('municipality')) {
-            $baseQuery->where('s.municipality', $request->municipality);
-        }
-        if ($request->filled('year')) {
-            $baseQuery->whereYear('d.delivery_date', $request->year);
-        }
-        // =========================
-        // TOTAL
-        // =========================
-        $total_rows = (clone $baseQuery)->count();
-        $total_pages = (int) ceil($total_rows / $limit);
-
-        // =========================
-        // DATA
-        // =========================
-        $deliveries = $baseQuery
-            ->select(
-                'd.*',
-                'p.project_name',
-                's.school_name',
-                's.address',
-                's.region',
-                's.division',
-                's.municipality',
-                'k.keystage_num',
-                'k.description',
-                'l.lot_name'
-            )
-            ->orderBy('d.status')
-            ->orderBy('d.delivery_date')
-            ->limit($limit)
-            ->offset($offset)
-            ->get();
-
-        // =========================
-        // GROUP BY DR
-        // =========================
-        $grouped = [];
-
-        foreach ($deliveries as $row) {
-            $dr = $row->dr_no;
-
-            if (!isset($grouped[$dr])) {
-                $grouped[$dr] = [
-                    'dr_no' => $dr,
-                    'delivery_id' => $row->delivery_id,
-                    'project_id' => $row->project_id,
-                    'project_name' => $row->project_name,
-                    'school_id' => $row->school_id,
-                    'school_name' => $row->school_name,
-                    'address' => $row->address,
-                    'region' => $row->region,
-                    'division' => $row->division,
-                    'municipality' => $row->municipality,
-                    'delivery_date' => $row->delivery_date,
-                    'status' => $row->status,
-                    'deliveries' => []
-                ];
-            }
-
-            $grouped[$dr]['deliveries'][] = $row;
-        }
-
-        // =========================
-        // DROPDOWNS (FROM SCHOOL TABLE)
-        // =========================
-        $projects = DB::table('projects')->get();
-
-        $regions = DB::table('school')
-            ->select('region')
-            ->distinct()
-            ->orderBy('region')
-            ->get();
-
-        return view('deliveries.index', [
-            'grouped_deliveries' => $grouped,
-            'projects' => $projects,
-            'regions' => $regions,
-            'years' => $years,
-            'page' => $page,
-            'total_pages' => $total_pages,
-            'total_rows' => $total_rows
-        ]);
+        $baseQuery->where(function ($q) use ($search) {
+            $q->where('d.dr_no', 'like', "%{$search}%")
+              ->orWhere('p.project_name', 'like', "%{$search}%")
+              ->orWhere('s.school_name', 'like', "%{$search}%")
+              ->orWhere('l.lot_name', 'like', "%{$search}%");
+        });
     }
+
+    // =========================
+    // YEARS
+    // =========================
+    $years = DB::table('deliveries')
+        ->selectRaw('YEAR(delivery_date) as year')
+        ->distinct()
+        ->orderBy('year', 'desc')
+        ->pluck('year');
+
+    // =========================
+    // FILTERS
+    // =========================
+    if ($request->filled('status')) {
+        $baseQuery->where('d.status', $request->status);
+    }
+
+    if ($request->filled('project')) {
+        $baseQuery->where('d.project_id', $request->project);
+    }
+
+    if ($request->filled('lot')) {
+        $baseQuery->where('d.lot_id', $request->lot);
+    }
+
+    if ($request->filled('region')) {
+        $baseQuery->where('s.region', $request->region);
+    }
+
+    if ($request->filled('division')) {
+        $baseQuery->where('s.division', $request->division);
+    }
+
+    if ($request->filled('municipality')) {
+        $baseQuery->where('s.municipality', $request->municipality);
+    }
+
+    if ($request->filled('year')) {
+        $baseQuery->whereYear('d.delivery_date', $request->year);
+    }
+
+    // =========================
+    // TOTAL
+    // =========================
+    $total_rows = (clone $baseQuery)->distinct()->count('d.delivery_id');
+    $total_pages = (int) ceil($total_rows / $limit);
+
+    // =========================
+    // DATA
+    // =========================
+    $rows = $baseQuery
+        ->select(
+            'd.delivery_id',
+            'd.dr_no',
+            'd.delivery_date',
+            'd.status',
+            'd.school_id',
+            'd.project_id',
+
+            'p.project_name',
+            's.school_name',
+            's.address',
+            's.region',
+            's.division',
+            's.municipality',
+            'k.keystage_num',
+            'k.description',
+            'l.lot_name',
+
+            // item
+            'i.item_name'
+        )
+        ->orderBy('d.status')
+        ->orderBy('d.delivery_date')
+        ->limit($limit)
+        ->offset($offset)
+        ->get();
+
+    // =========================
+    // GROUP BY DR + BUILD ITEMS
+    // =========================
+    $grouped = [];
+
+    foreach ($rows as $row) {
+
+        $dr = $row->dr_no;
+
+        if (!isset($grouped[$dr])) {
+            $grouped[$dr] = [
+                'dr_no' => $dr,
+                'delivery_id' => $row->delivery_id,
+                'project_id' => $row->project_id,
+                'project_name' => $row->project_name,
+                'school_id' => $row->school_id,
+                'school_name' => $row->school_name,
+                'address' => $row->address,
+                'region' => $row->region,
+                'division' => $row->division,
+                'municipality' => $row->municipality,
+                'delivery_date' => $row->delivery_date,
+                'status' => $row->status,
+                'deliveries' => [],
+                'items_list' => [] // ✅ IMPORTANT
+            ];
+        }
+
+        // push row
+        $grouped[$dr]['deliveries'][] = $row;
+
+        // collect item
+        if (!empty($row->item_name)) {
+            $grouped[$dr]['items_list'][] = $row->item_name;
+        }
+    }
+
+    // cleanup unique items
+    foreach ($grouped as &$g) {
+        $g['items_list'] = array_values(array_unique(array_filter($g['items_list'])));
+    }
+
+    // =========================
+    // DROPDOWNS
+    // =========================
+    $projects = DB::table('projects')->get();
+
+    $regions = DB::table('school')
+        ->select('region')
+        ->distinct()
+        ->orderBy('region')
+        ->get();
+
+    return view('deliveries.index', [
+        'grouped_deliveries' => $grouped,
+        'projects' => $projects,
+        'regions' => $regions,
+        'years' => $years,
+        'page' => $page,
+        'total_pages' => $total_pages,
+        'total_rows' => $total_rows
+    ]);
+}
     public function generate(Request $request)
     {
 

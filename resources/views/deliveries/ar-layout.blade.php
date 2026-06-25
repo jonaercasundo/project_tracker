@@ -182,6 +182,9 @@ if (file_exists($logoPath)) {
             $firstItem = $delivery->items->first();
             $itemsCount = $delivery->items->count();
         @endphp
+        @php
+            $package = $delivery->package;
+        @endphp
         <table>
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
                 <thead>

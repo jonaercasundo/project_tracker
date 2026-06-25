@@ -189,11 +189,15 @@ class DeliveryController extends Controller
         ->orderBy('dr_no')
         ->get();
 
-dd([
-    'package_status_count' => $deliveries->first()->packageStatuses->count(),
-    'qr_count' => count($qrCodes),
-    'sample_qr' => reset($qrCodes),
-]);
+dd(
+    $deliveries->map(function ($d) {
+        return [
+            'delivery_id' => $d->delivery_id,
+            'school_id' => $d->school_id,
+            'package_status_count' => $d->packageStatuses->count(),
+        ];
+    })
+);
 
         if ($deliveries->isEmpty()) {
             abort(404, "No deliveries found.");

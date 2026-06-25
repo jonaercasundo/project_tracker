@@ -177,8 +177,12 @@ if (file_exists($logoPath)) {
         <p>
         Delivery ID: {{ $delivery->delivery_id }}<br>
         </p>
+
         <table>
-            @if($delivery->items->isNotEmpty() && str_contains($delivery->school_id, 'TX-LOT12'))
+            @if(
+                $delivery->items->isNotEmpty() &&
+                implode('-', array_slice(explode('-', $delivery->school_id), 0, 2)) === 'TX-LOT12'
+            )
                 <thead>
                     <tr>
                         <th colspan="2" style="text-align: left;">

@@ -186,9 +186,17 @@ class DeliveryController extends Controller
         ])
         ->whereIn('dr_no', $ids)
         ->orderBy('dr_no')
-        ->limit(1)
         ->get();
 
+dd(
+    $deliveries->map(function ($d) {
+        return [
+            'delivery_id' => $d->delivery_id,
+            'school_id' => $d->school_id,
+            'package_status_count' => $d->packageStatuses->count(),
+        ];
+    })
+);
 
         if ($deliveries->isEmpty()) {
             abort(404, "No deliveries found.");

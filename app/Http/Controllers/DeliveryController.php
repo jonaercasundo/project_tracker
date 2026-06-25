@@ -122,7 +122,6 @@ class DeliveryController extends Controller
             if (!isset($grouped[$dr])) {
                 $grouped[$dr] = [
                     'dr_no' => $dr,
-                    'delivery_id' => $row->delivery_id,
                     'project_id' => $row->project_id,
                     'project_name' => $row->project_name,
                     'school_id' => $row->school_id,
@@ -185,9 +184,8 @@ class DeliveryController extends Controller
             'package',
             'packageStatuses',
             'items.packageContent.package',
-            'packageStatuses.package.packageContent.item',
         ])
-        ->whereIn('delivery_id', $ids)
+        ->whereIn('dr_no', $ids)
         ->orderBy('dr_no')
         ->get();
 
@@ -209,45 +207,27 @@ class DeliveryController extends Controller
             $i = 1;
 
             foreach ($delivery->packageStatuses as $status) {
+
                 $url = "https://mmc.metro-ltd.com/entry.php?id="
                     . $status->package_status_id
                     . "&delivery_id="
                     . $delivery->delivery_id;
 
                 $qrCode = new QrCode($url);
+
                 $writer = new PngWriter();
+
                 $result = $writer->write($qrCode);
 
                 $qrCodes[$status->package_status_id] =
                     'data:image/png;base64,' . base64_encode($result->getString());
 
-                // ✅ GET ALL ITEMS IN PACKAGE
-                $items = $status->package?->packageContent
-                    ?->map(fn($pc) => $pc->item)
-                    ->filter();
+                $status->package_label = "Package {$i} of {$packageCount}";
 
-                // fallback safety
-                if (!$items || $items->isEmpty()) {
-                    $status->package_label = 'Unknown Item';
-                    continue;
-                }
-
-                // ✅ SUBJECT (Makabansa / Filipino)
-                $isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
-                $subject = $isMakabansa ? 'Makabansa' : 'Filipino';
-
-                // ✅ TYPE (Teacher / Textbook)
-                $isTeacherManual = $items->contains(function ($item) {
-                    return str_contains(strtolower($item->item_name), 'teacher');
-                });
-
-                $type = $isTeacherManual ? "Teacher's Manual" : "Textbook";
-
-                // ✅ FINAL LABEL
-                $status->package_label = "{$subject} {$type}";
+                $i++;
             }
             // attach AR config to delivery (LIKE PHP VERSION)
-             $delivery->ar = $delivery->project->arSetting ?? null;
+            $delivery->ar = $ar;
         }
 
         return Pdf::loadView('deliveries.ar-layout', [

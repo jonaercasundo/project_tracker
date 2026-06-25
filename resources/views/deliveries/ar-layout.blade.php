@@ -193,7 +193,7 @@ if (file_exists($logoPath)) {
                 </thead>
                 <tbody>
                     <tr>
-                        <td>
+                        <td class="w-1/2">
                             {{ $delivery->items->first()?->item_name }}
                         </td>
 

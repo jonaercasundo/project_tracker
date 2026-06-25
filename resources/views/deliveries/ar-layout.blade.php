@@ -179,8 +179,9 @@ if (file_exists($logoPath)) {
         </p>
         @php
             $prefix = implode('-', array_slice(explode('-', $delivery->school_id), 0, 2));
-            $firstItem = $delivery->items->first();
-            $itemsCount = $delivery->items->count();
+
+            $firstItem = $delivery->items[0] ?? null;
+            $secondItem = $delivery->items[1] ?? null;
         @endphp
         @php
             $package = $delivery->package;
@@ -195,40 +196,50 @@ if (file_exists($logoPath)) {
                         </th>
                     </tr>
                 </thead>
+
                 <tbody>
-                    <tr>
-                        <td class="w-1/2">
-                            {{ $delivery->items->first()?->item_name }}
-                        </td>
 
-                        <td align="center">
-                            {{ $package?->length }} × {{ $package?->width }} × {{ $package?->height }}
-                            <hr style="margin:3px 0;">
-                            {{ $delivery->package_qty }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="w-1/2">
-                            {{ $delivery->items->second()?->item_name }}
-                        </td>
+                <tr>
+                    <td class="w-1/2">
+                        {{ $firstItem?->item_name }}
+                    </td>
 
-                        <td align="center">
-                            {{ $package?->length }} × {{ $package?->width }} × {{ $package?->height }}
-                            <hr style="margin:3px 0;">
-                            {{ $delivery->qty_teachers_manual }}
-                        </td>
-                    </tr>
+                    <td align="center">
+                        @php
+                            $package1 = $firstItem?->packageContent?->package;
+                        @endphp
+
+                        {{ $package1?->length }} × {{ $package1?->width }} × {{ $package1?->height }}
+
+                        <hr style="margin:3px 0;">
+
+                        {{ $delivery->package_qty }}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="w-1/2">
+                        {{ $secondItem?->item_name }}
+                    </td>
+
+                    <td align="center">
+                        @php
+                            $package2 = $secondItem?->packageContent?->package;
+                        @endphp
+
+                        {{ $package2?->length }} × {{ $package2?->width }} × {{ $package2?->height }}
+
+                        <hr style="margin:3px 0;">
+
+                        {{ $delivery->qty_teachers_manual }}
+                    </td>
+                </tr>
+
                 </tbody>
-            @endif
-            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')
-                <thead>
-                    <tr>
-                        <th colspan="2" style="text-align: left;">
-                            Grade 2 Filipino
-                        </th>
-                    </tr>
-                </thead>
-            <tbody>
+
+                @endif
+            
+                <tbody>
                 @forelse($delivery->packageStatuses as $index => $status)
                 <tr>
                     <td>
@@ -268,9 +279,50 @@ if (file_exists($logoPath)) {
 
                 @endforelse
 
-            </tbody>
+                </tbody>
             @endif
+            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')
 
+                <thead>
+                    <tr>
+                        <th colspan="2" style="text-align: left;">
+                            Grade 2 Filipino
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                @forelse($delivery->packageStatuses as $index => $status)
+
+                <tr>
+                    <td>Package {{ $index + 1 }}</td>
+
+                    <td align="center">
+                        @php
+                            $pkg = $status->package;
+                        @endphp
+
+                        @if($pkg)
+                            {{ $pkg->length }} × {{ $pkg->width }} × {{ $pkg->height }}
+                        @else
+                            Package Not Found (ID: {{ $status->package_id }})
+                        @endif
+                    </td>
+                </tr>
+
+                @empty
+                <tr>
+                    <td colspan="2" align="center">
+                        No Package Status Found<br>
+                        Delivery ID: {{ $delivery->delivery_id }}
+                    </td>
+                </tr>
+                @endforelse
+
+                </tbody>
+
+            @endif
         </table>
 
     <div class="footer">

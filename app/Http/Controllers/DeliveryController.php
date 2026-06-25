@@ -319,6 +319,7 @@ public function generateLabels(Request $request)
 {
     ini_set('memory_limit', '1024M');
     set_time_limit(0);
+    dd($request->all());
 
     $projectId = $request->project_id;
 

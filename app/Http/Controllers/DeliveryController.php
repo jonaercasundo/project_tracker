@@ -6,13 +6,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Writer\PngWriter;
 use App\Models\Delivery;
 use Illuminate\Support\Facades\Auth;
 
 use Endroid\QrCode\Encoding\Encoding;
 use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelLow;
 use Endroid\QrCode\RoundBlockSizeMode\RoundBlockSizeMode;
+use Endroid\QrCode\Builder\Builder;
+use Endroid\QrCode\Writer\PngWriter;
 class DeliveryController extends Controller
 {
     public function index(Request $request)
@@ -208,17 +209,19 @@ class DeliveryController extends Controller
 
             foreach ($delivery->packageStatuses as $status) {
 
-                $url = route('delivery.scan', [
-                    'id' => $status->package_status_id,
-                    'delivery_id' => $delivery->delivery_id
-                ]);
+                $url = "https://mmc.metro-ltd.com/entry.php?id="
+                    . $status->package_status_id
+                    . "&delivery_id="
+                    . $delivery->delivery_id;
 
-                $qr = QrCode::create($url)
-                    ->setSize(150)
-                    ->setMargin(0);
+                $result = Builder::create()
+                    ->writer(new PngWriter())
+                    ->data($url)
+                    ->size(150)
+                    ->margin(0)
+                    ->build();
 
-                $qrCodes[$status->package_status_id] =
-                    $writer->write($qr)->getDataUri();
+                $qrCodes[$status->package_status_id] = $result->getDataUri();
 
                 $status->package_label = "Package {$i} of {$packageCount}";
 
@@ -228,6 +231,11 @@ class DeliveryController extends Controller
             // attach AR config to delivery (LIKE PHP VERSION)
             $delivery->ar = $ar;
         }
+        dd([
+            'package_status_count' => $deliveries->first()->packageStatuses->count(),
+            'qr_count' => count($qrCodes),
+            'sample_qr' => reset($qrCodes),
+        ]);
 
         return Pdf::loadView('deliveries.ar-layout', [
             'deliveries' => $deliveries,

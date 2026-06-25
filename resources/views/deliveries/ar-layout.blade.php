@@ -98,7 +98,7 @@ td,th{
     </div>
 
     <div style="text-align:right;">
-        <small>Date: {{ now()->format('Y-M-d') }}</small>
+        <small>Date: June 29, 2026</small>
         <br>
 
         @if(optional($ar)->display_school_id)

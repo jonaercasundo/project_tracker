@@ -213,14 +213,14 @@ class DeliveryController extends Controller
                     . "&delivery_id="
                     . $delivery->delivery_id;
 
-                $result = Builder::create()
-                    ->writer(new PngWriter())
-                    ->data($url)
-                    ->size(150)
-                    ->margin(0)
-                    ->build();
+                $qrCode = new QrCode($url);
 
-                $qrCodes[$status->package_status_id] = $result->getDataUri();
+                $writer = new PngWriter();
+
+                $result = $writer->write($qrCode);
+
+                $qrCodes[$status->package_status_id] =
+                    'data:image/png;base64,' . base64_encode($result->getString());
 
                 $status->package_label = "Package {$i} of {$packageCount}";
 

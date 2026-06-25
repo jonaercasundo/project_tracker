@@ -208,7 +208,34 @@ class DeliveryController extends Controller
             $packageCount = $delivery->packageStatuses->count();
             $i = 1;
 
-            
+            foreach ($delivery->packageStatuses as $status) {
+
+                $url = "https://mmc.metro-ltd.com/entry.php?id="
+                    . $status->package_status_id
+                    . "&delivery_id="
+                    . $delivery->delivery_id;
+
+                $qrCode = new QrCode($url);
+
+                $writer = new PngWriter();
+
+                $result = $writer->write($qrCode);
+
+                $qrCodes[$status->package_status_id] =
+                    'data:image/png;base64,' . base64_encode($result->getString());
+
+                    // ✅ PUT IT HERE
+                    $itemName = optional(
+                        $status->package
+                            ->packageContent
+                            ->first()
+                            ->item
+                    )->item_name ?? 'Unknown Item';
+
+                    $status->package_label = $itemName;
+
+                $i++;
+            }
             // attach AR config to delivery (LIKE PHP VERSION)
             $delivery->ar = $ar;
         }

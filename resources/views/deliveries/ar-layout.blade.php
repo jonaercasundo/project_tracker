@@ -173,7 +173,7 @@ td,th{
         @endphp
         
         <table>
-            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
+            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')
                 <thead>
                     <tr>
                         <th colspan="2" style="text-align: left;">
@@ -219,7 +219,7 @@ td,th{
                     </tr>
                 </tbody>       
             @endif
-            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')
+            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
                 <thead>
                     <tr>
                         <th colspan="2" style="text-align: left;">

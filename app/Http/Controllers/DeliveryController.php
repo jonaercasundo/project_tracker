@@ -241,7 +241,6 @@ class DeliveryController extends Controller
                     } else {
                         $status->qr_label = $itemNames->implode(', ');
                     }
-
                     $i++;
                 }
 

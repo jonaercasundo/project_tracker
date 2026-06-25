@@ -184,9 +184,6 @@ if (file_exists($logoPath)) {
             $secondItem = $delivery->items[1] ?? null;
         @endphp
         @php
-            $package = $delivery->package;
-            $package = $items?->packageContent?->package;
-        @endphp
         <table>
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
                 <thead>

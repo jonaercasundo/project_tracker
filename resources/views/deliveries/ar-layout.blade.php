@@ -181,8 +181,7 @@ if (file_exists($logoPath)) {
 
             <thead>
                 <tr>
-                    <th width="50%"></th>
-                    <th width="50%"></th>
+                    <th colspan="2" class="cols-2"></th>
                 </tr>
             </thead>
 

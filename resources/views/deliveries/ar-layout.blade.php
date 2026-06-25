@@ -330,9 +330,6 @@ td,th{
         $thirdItem = $delivery->items[2] ?? null;
         $fourthItem = $delivery->items[3] ?? null;
     @endphp
-    @php
-        $isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
-    @endphp
     <table>
 
         @foreach($delivery->packageStatuses->chunk(2) as $chunk)

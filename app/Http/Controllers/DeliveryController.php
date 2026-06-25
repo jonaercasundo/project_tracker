@@ -203,51 +203,65 @@ class DeliveryController extends Controller
 
         foreach ($deliveries as $delivery) {
 
-            $ar = $delivery->project->arSetting ?? null;
+        $ar = $delivery->project->arSetting ?? null;
 
-            $packageCount = $delivery->packageStatuses->count();
-            $i = 1;
+        // reset index per delivery
+        $statuses = $delivery->packageStatuses->values();
 
-            foreach ($delivery->packageStatuses as $status) {
-                $url = "https://mmc.metro-ltd.com/entry.php?id="
-                    . $status->package_status_id
-                    . "&delivery_id="
-                    . $delivery->delivery_id;
+        $labels = [];
 
-                $qrCode = new QrCode($url);
-                $writer = new PngWriter();
-                $result = $writer->write($qrCode);
+        $isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
 
-                $qrCodes[$status->package_status_id] =
-                    'data:image/png;base64,' . base64_encode($result->getString());
+        if ($isMakabansa) {
+            $labels = [
+                'Makabansa Textbook',
+                "Makabansa Teacher's Manual",
+            ];
+        } else {
+            $labels = [
+                'Filipino Textbook',
+                "Filipino Teacher's Manual",
+            ];
+        }
 
-                // ✅ GET ALL ITEMS IN PACKAGE
-                $items = $status->package?->packageContent
-                    ?->map(fn($pc) => $pc->item)
-                    ->filter();
+        foreach ($statuses as $status) {
 
-                // fallback safety
-                if (!$items || $items->isEmpty()) {
-                    $status->package_label = 'Unknown Item';
-                    continue;
-                }
+            $url = "https://mmc.metro-ltd.com/entry.php?id="
+                . $status->package_status_id
+                . "&delivery_id="
+                . $delivery->delivery_id;
 
-                // ✅ SUBJECT (Makabansa / Filipino)
-                $isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
-                $subject = $isMakabansa ? 'Makabansa' : 'Filipino';
+            $result = (new PngWriter())->write(
+                new QrCode($url)
+            );
 
-                // ✅ TYPE (Teacher / Textbook)
-                $isTeacherManual = $items->contains(function ($item) {
-                    return str_contains(strtolower($item->item_name), 'teacher');
-                });
+            $qrCodes[$status->package_status_id] =
+                'data:image/png;base64,' . base64_encode($result->getString());
 
-                $type = $isTeacherManual ? "Teacher's Manual" : "Textbook";
+            // ================= REAL SOURCE OF TRUTH =================
+            $items = $status->package?->packageContent
+                ?->map(fn($pc) => $pc->item)
+                ->filter();
 
-                // ✅ FINAL LABEL
-                $status->package_label = "{$subject} {$type}";
+            if ($items->isEmpty()) {
+                $status->qr_label = 'Unknown Item';
+                continue;
             }
-            // attach AR config to delivery (LIKE PHP VERSION)
-             $delivery->ar = $delivery->project->arSetting ?? null;
+
+            $itemName = $items->first()->item_name ?? 'Unknown Item';
+
+            $isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
+
+            $subject = $isMakabansa ? 'Makabansa' : 'Filipino';
+
+            $isTeacher = str_contains(strtolower($itemName), 'teacher');
+
+            $type = $isTeacher ? "Teacher's Manual" : "Textbook";
+
+            $status->qr_label = "{$subject} {$type}";
+        }
+
+        $delivery->ar = $ar;
         }
 
         return Pdf::loadView('deliveries.ar-layout', [

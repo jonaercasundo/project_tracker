@@ -180,7 +180,7 @@ class DeliveryController extends Controller
         ])
         ->whereIn('dr_no', $ids)
         ->orderBy('dr_no')
-        ->limit(2)
+        ->limit(1)
         ->get();
 
 

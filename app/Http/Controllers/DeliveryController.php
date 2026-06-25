@@ -359,7 +359,7 @@ class DeliveryController extends Controller
         }
 
         $pdf = Pdf::loadView(
-            'pdf.ar-layout',
+            'deliveries.ar-layout',
             [
                 'deliveries' => $deliveries,
                 'qrCodes' => $qrCodes,

@@ -183,7 +183,7 @@ if (file_exists($logoPath)) {
             $itemsCount = $delivery->items->count();
         @endphp
         <table>
-            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')
+            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
                 <thead>
                     <tr>
                         <th colspan="2" style="text-align: left;">

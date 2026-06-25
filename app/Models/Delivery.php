@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Keystage;
 use App\Models\PackageStatus;
 use App\Models\Item;
+use App\Models\Package;
 
 class Delivery extends Model
 {
@@ -19,6 +20,14 @@ class Delivery extends Model
 
     protected $guarded = [];
 
+    public function package()
+    {
+        return $this->hasOne(
+            Package::class,
+            'lot_id',   // package.lot_id
+            'lot_id'    // deliveries.lot_id
+        );
+    }
     public function school()
     {
         return $this->belongsTo(School::class, 'school_id', 'school_id');

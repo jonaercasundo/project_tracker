@@ -198,10 +198,10 @@ if (file_exists($logoPath)) {
                         </td>
 
                         <td align="center">
-                            {{ $delivery->items->first()?->dimension }}
-                            {{ dd($delivery->items->first()->toArray()) }}
-                            <br><hr style="margin:3px 0;">
-                            {{ $delivery->items->first()?->qty }}
+                            dd(
+                                $deliveries->first()->lot_id,
+                                $deliveries->first()->package
+                            );
                         </td>
                     </tr>
                 </tbody>

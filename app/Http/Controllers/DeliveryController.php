@@ -175,6 +175,7 @@ class DeliveryController extends Controller
             'keystage',
             'keystage.packages',
             'items',
+            'package',
         ])
         ->whereIn('dr_no', $ids)
         ->orderBy('dr_no')

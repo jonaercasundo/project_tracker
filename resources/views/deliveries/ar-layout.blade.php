@@ -198,10 +198,12 @@ if (file_exists($logoPath)) {
                         </td>
 
                         <td align="center">
-                            dd(
-                                $deliveries->first()->lot_id,
-                                $deliveries->first()->package
-                            );
+                            @php
+                                dd(
+                                    $delivery->lot_id,
+                                    $delivery->package
+                                );
+                            @endphp
                         </td>
                     </tr>
                 </tbody>

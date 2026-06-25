@@ -178,11 +178,17 @@ if (file_exists($logoPath)) {
         Delivery ID: {{ $delivery->delivery_id }}<br>
         </p>
         <table>
+            @php
+                $lot = explode('-', $delivery->school_id)[1] ?? null;
+            @endphp
+
             @if($delivery->items->isNotEmpty())
                 <thead>
                     <tr>
                         <th colspan="2" style="text-align: left;">
-                            {{ $delivery->items->first()->item_name }}
+                            @if($lot === 'LOT12')
+                                {{ $delivery->items->first()?->item_name }}
+                            @endif
                         </th>
                     </tr>
                 </thead>

@@ -189,16 +189,6 @@ class DeliveryController extends Controller
         ->orderBy('dr_no')
         ->get();
 
-dd(
-    $deliveries->map(function ($d) {
-        return [
-            'delivery_id' => $d->delivery_id,
-            'school_id' => $d->school_id,
-            'package_status_count' => $d->packageStatuses->count(),
-        ];
-    })
-);
-
         if ($deliveries->isEmpty()) {
             abort(404, "No deliveries found.");
         }
@@ -236,7 +226,10 @@ dd(
 
                 $i++;
             }
-
+            dd([
+                'qr_count' => count($qrCodes),
+                'keys' => array_keys($qrCodes),
+            ]);
             // attach AR config to delivery (LIKE PHP VERSION)
             $delivery->ar = $ar;
         }

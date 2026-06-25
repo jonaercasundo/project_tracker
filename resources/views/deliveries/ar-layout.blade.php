@@ -217,16 +217,6 @@ if (file_exists($logoPath)) {
 
                         </td>
                     </tr>
-
-                    @empty
-
-                        <tr>
-                            <td colspan="2" align="center">
-                                No Package Status Found
-                                <br>
-                                Delivery ID: {{ $delivery->delivery_id }}
-                            </td>
-                        </tr>
                 </tbody>
             @endif
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')

@@ -178,11 +178,7 @@ class DeliveryController extends Controller
         ->whereIn('dr_no', $ids)
         ->orderBy('dr_no')
         ->get();
-        dd(
-            $deliveries->first()->school_id,
-            $deliveries->first()->school,
-            $deliveries->first()->school?->school_name
-        );
+        dd($deliveries->first()->toArray());
 
         if ($deliveries->isEmpty()) {
             abort(404, "No deliveries found.");

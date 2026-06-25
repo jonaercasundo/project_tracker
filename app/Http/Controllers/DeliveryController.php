@@ -185,7 +185,7 @@ class DeliveryController extends Controller
             'packageStatuses',
             'items.packageContent.package',
         ])
-        ->whereIn('dr_no', $ids)
+        ->whereIn('delivery_id', $ids)
         ->orderBy('dr_no')
         ->get();
 
@@ -228,6 +228,9 @@ class DeliveryController extends Controller
             }
             // attach AR config to delivery (LIKE PHP VERSION)
             $delivery->ar = $ar;
+            dd([
+    'ids_received' => $ids
+]);
         }
 
         return Pdf::loadView('deliveries.ar-layout', [

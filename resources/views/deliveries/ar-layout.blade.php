@@ -184,6 +184,8 @@ if (file_exists($logoPath)) {
 
             $firstItem = $delivery->items[0] ?? null;
             $secondItem = $delivery->items[1] ?? null;
+            $thirdItem = $delivery->items[0] ?? null;
+            $fourthItem = $delivery->items[1] ?? null;
         @endphp
         <table>
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
@@ -244,12 +246,12 @@ if (file_exists($logoPath)) {
                 <tbody>
                     <tr>
                         <td class="w-1/2">
-                            {{ $firstItem?->item_name }}
+                            {{ $thirdtItem?->item_name }}
                         </td>
 
                         <td align="center">
                             @php
-                                $package1 = $firstItem?->packageContent?->package;
+                                $package1 = $thirdtItem?->packageContent?->package;
                             @endphp
 
                             {{ $package1?->length }} × {{ $package1?->width }} × {{ $package1?->height }}
@@ -261,12 +263,12 @@ if (file_exists($logoPath)) {
                     </tr>
                     <tr>
                         <td class="w-1/2">
-                            {{ $secondItem?->item_name }}
+                            {{ $fourthItem?->item_name }}
                         </td>
 
                         <td align="center">
                             @php
-                                $package2 = $secondItem?->packageContent?->package;
+                                $package2 = $fourthItem?->packageContent?->package;
                             @endphp
 
                             {{ $package2?->length }} × {{ $package2?->width }} × {{ $package2?->height }}

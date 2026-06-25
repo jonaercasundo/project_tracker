@@ -178,13 +178,15 @@ if (file_exists($logoPath)) {
         Delivery ID: {{ $delivery->delivery_id }}<br>
         </p>
         <table>
-            @foreach($delivery->items as $item)
+            @if($delivery->items->isNotEmpty())
                 <thead>
                     <tr>
-                        <th colspan="2" class="cols-2">{{ $item->item_name }}</th>
+                        <th colspan="2">
+                            {{ $delivery->items->first()->item_name }}
+                        </th>
                     </tr>
                 </thead>
-            @endforeach
+            @endif
             <tbody>
 
             @forelse($delivery->packageStatuses as $index => $status)

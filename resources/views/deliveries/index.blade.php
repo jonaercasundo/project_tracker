@@ -96,7 +96,21 @@
     </div>
 
 </form>
+<form action="{{ route('deliveries.batch-qr') }}" method="GET" target="_blank">
+    <input type="number"
+           name="dr_from"
+           placeholder="DR From"
+           required>
 
+    <input type="number"
+           name="dr_to"
+           placeholder="DR To"
+           required>
+
+    <button type="submit">
+        Generate Batch AR
+    </button>
+</form>
     {{-- CONTENT STATE HANDLERS --}}
     @if(empty($grouped_deliveries))
         <div class="text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200 shadow-sm">

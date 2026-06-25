@@ -126,6 +126,8 @@ Route::middleware(['auth'])->group(function () {
                 )
                 ->first();
         });
+        Route::get('/deliveries/batch-qr', [DeliveryController::class, 'batchQr'])
+    ->name('deliveries.batch-qr');
     });
 
     /*

@@ -190,8 +190,9 @@ class DeliveryController extends Controller
         ->get();
 
 dd([
-    'package_status_total' => PackageStatus::count(),
-    'first_record' => PackageStatus::first(),
+    'database' => DB::connection()->getDatabaseName(),
+    'package_status_count' => DB::table('package_status')->count(),
+    'deliveries_count' => DB::table('deliveries')->count(),
 ]);
 
         if ($deliveries->isEmpty()) {

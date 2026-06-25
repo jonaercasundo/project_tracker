@@ -208,16 +208,20 @@ foreach ($deliveries as $delivery) {
 
     $delivery->ar = $delivery->project->arSetting ?? null;
 
-    // ALWAYS regenerate (NO reliance on lazy relation)
-    $statuses = PackageStatus::with('package.packageContent.item')
-        ->where('delivery_id', $delivery->delivery_id)
-        ->get();
+    // ALWAYS rebuild clean from DB
+    $statuses = PackageStatus::with([
+        'package.packageContent.item'
+    ])
+    ->where('delivery_id', $delivery->delivery_id)
+    ->get();
 
     $delivery->setRelation('packageStatuses', $statuses);
 
     // ❗ DO NOT skip delivery
     foreach ($statuses as $status) {
-
+        if (!$status->package_status_id) {
+            continue;
+        }
         // ================= QR =================
         $url = "https://mmc.metro-ltd.com/entry.php?id="
             . $status->package_status_id

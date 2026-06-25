@@ -246,12 +246,12 @@ if (file_exists($logoPath)) {
                 <tbody>
                     <tr>
                         <td class="w-1/2">
-                            {{ $thirdtItem?->item_name }}
+                            {{ $thirdItem?->item_name }}
                         </td>
 
                         <td align="center">
                             @php
-                                $package1 = $thirdtItem?->packageContent?->package;
+                                $package1 = $thirdItem?->packageContent?->package;
                             @endphp
 
                             {{ $package1?->length }} × {{ $package1?->width }} × {{ $package1?->height }}

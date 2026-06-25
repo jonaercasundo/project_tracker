@@ -453,5 +453,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 });
+
+</script>
+<script>
+function generateLabels() {
+
+    let ids = [];
+
+    document.querySelectorAll('.dr-checkbox:checked').forEach(cb => {
+        ids.push(cb.value);
+    });
+
+    if (ids.length === 0) {
+        alert("Select at least one DR");
+        return;
+    }
+
+    const url = `/deliveries/labels?ids=${ids.join(',')}`;
+
+    window.open(url, '_blank');
+}
 </script>
 </x-project_app-layout>

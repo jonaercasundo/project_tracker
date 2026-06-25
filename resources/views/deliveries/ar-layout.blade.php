@@ -198,12 +198,9 @@ if (file_exists($logoPath)) {
                         </td>
 
                         <td align="center">
-                            @php
-                                dd(
-                                    $delivery->lot_id,
-                                    $delivery->package
-                                );
-                            @endphp
+                            {{ $package?->length }} × {{ $package?->width }} × {{ $package?->height }}
+                            <hr style="margin:3px 0;">
+                            {{ $delivery->package_qty }}
                         </td>
                     </tr>
                 </tbody>

@@ -180,11 +180,11 @@ if (file_exists($logoPath)) {
         <thead>
             <tr>
                 <th width="50%">
-                    Package
+                    
                 </th>
 
                 <th width="50%">
-                    Dimensions
+                    
                 </th>
             </tr>
         </thead>

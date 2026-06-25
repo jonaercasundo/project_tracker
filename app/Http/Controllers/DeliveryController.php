@@ -9,6 +9,10 @@ use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
 use App\Models\Delivery;
 use Illuminate\Support\Facades\Auth;
+
+use Endroid\QrCode\Encoding\Encoding;
+use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelLow;
+use Endroid\QrCode\RoundBlockSizeMode\RoundBlockSizeMode;
 class DeliveryController extends Controller
 {
     public function index(Request $request)
@@ -176,6 +180,7 @@ class DeliveryController extends Controller
             'keystage.packages',
             'items',
             'package',
+            'packageStatuses',
             'items.packageContent.package',
         ])
         ->whereIn('dr_no', $ids)

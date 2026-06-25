@@ -204,53 +204,43 @@ class DeliveryController extends Controller
 
      
 
-            foreach ($deliveries as $delivery) {
+foreach ($deliveries as $delivery) {
 
-                $ar = $delivery->project->arSetting ?? null;
+    $delivery->ar = $delivery->project->arSetting ?? null;
 
-                $statuses = $delivery->packageStatuses ?? collect();
+    // ALWAYS regenerate (NO reliance on lazy relation)
+    $statuses = PackageStatus::with('package.packageContent.item')
+        ->where('delivery_id', $delivery->delivery_id)
+        ->get();
 
-                if ($statuses->isEmpty()) {
-                    continue;
-                }
+    $delivery->setRelation('packageStatuses', $statuses);
 
-                $i = 1;
-                $packageCount = $statuses->count();
+    // ❗ DO NOT skip delivery
+    foreach ($statuses as $status) {
 
-                foreach ($statuses as $status) {
+        // ================= QR =================
+        $url = "https://mmc.metro-ltd.com/entry.php?id="
+            . $status->package_status_id
+            . "&delivery_id="
+            . $delivery->delivery_id;
 
-                    // ================= QR CODE =================
-                    $url = "https://mmc.metro-ltd.com/entry.php?id="
-                        . $status->package_status_id
-                        . "&delivery_id="
-                        . $delivery->delivery_id;
+        $result = (new PngWriter())
+            ->write(new QrCode($url));
 
-                    $qrCode = new QrCode($url);
-                    $writer = new PngWriter();
-                    $result = $writer->write($qrCode);
+        $qrCodes[$status->package_status_id] =
+            'data:image/png;base64,' . base64_encode($result->getString());
 
-                    $qrCodes[$status->package_status_id] =
-                        'data:image/png;base64,' . base64_encode($result->getString());
+        // ================= ITEMS (FIXED) =================
+        $items = $status->package?->packageContent?->pluck('item') ?? collect();
 
-                    // ================= SAFE ITEMS =================
-                    $items = optional($status->package)
-                        ->packageContent
-                        ?->map(fn($pc) => $pc->item)
-                        ?? collect();
+        $itemNames = $items->pluck('item_name')->filter();
 
-                    $itemNames = $items->pluck('item_name')->filter();
-
-                    // ================= LABEL =================
-                    if ($itemNames->isEmpty()) {
-                        $status->qr_label = 'Unknown Item';
-                    } else {
-                        $status->qr_label = $itemNames->implode(', ');
-                    }
-                    $i++;
-                }
-
-                $delivery->ar = $ar;
-            }
+        // ================= LABEL =================
+        $status->qr_label = $itemNames->isNotEmpty()
+            ? $itemNames->implode(', ')
+            : 'Unknown Item';
+    }
+}
 
         return Pdf::loadView('deliveries.ar-layout', [
             'deliveries' => $deliveries,

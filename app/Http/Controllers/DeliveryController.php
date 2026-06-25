@@ -163,6 +163,7 @@ class DeliveryController extends Controller
     }
     public function generate(Request $request)
     {
+        
         $ids = collect(explode(',', $request->ids))
             ->map(fn($v) => trim($v))
             ->filter(fn($v) => is_numeric($v) && $v > 0)
@@ -202,7 +203,26 @@ class DeliveryController extends Controller
         $qrCodes = [];
 
         foreach ($deliveries as $delivery) {
+                // 🔴 AUTO-HEAL: if no package_status exists
+            if ($delivery->packageStatuses->isEmpty()) {
 
+                $packageIds = DB::table('package')
+                    ->where('lot_id', $delivery->lot_id)
+                    ->pluck('package_id');
+
+                foreach ($packageIds as $packageId) {
+
+                    DB::table('package_status')->insert([
+                        'delivery_id' => $delivery->delivery_id,
+                        'package_id' => $packageId,
+                        'status' => 'pending',
+                        'remarks' => null,
+                    ]);
+                }
+
+                // reload relationship AFTER insert
+                $delivery->load('packageStatuses.package.packageContent.item');
+            }
         $ar = $delivery->project->arSetting ?? null;
 
         // reset index per delivery

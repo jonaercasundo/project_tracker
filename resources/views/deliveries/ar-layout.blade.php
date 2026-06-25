@@ -192,6 +192,15 @@ if (file_exists($logoPath)) {
                     </tr>
                 </thead>
             @endif
+            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
+                <thead>
+                    <tr>
+                        <th colspan="2" style="text-align: left;">
+                            Grade 2 Filipino
+                        </th>
+                    </tr>
+                </thead>
+            @endif
             <tbody>
             @forelse($delivery->packageStatuses as $index => $status)
                 <tr>

@@ -319,11 +319,10 @@ public function generateLabels(Request $request)
 {
     ini_set('memory_limit', '1024M');
     set_time_limit(0);
-    dd($request->all());
 
     $projectId = $request->project_id;
 
-    $arSettings = ArSetting::where('project_id', $projectId)->first();
+    $arSettings = ARSetting::where('project_id', $projectId)->first();
 
     $showSchoolID     = (bool) ($arSettings?->label_school_id ?? false);
     $showMunicipality = (bool) ($arSettings?->label_municipality ?? false);

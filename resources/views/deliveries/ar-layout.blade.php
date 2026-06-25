@@ -176,14 +176,13 @@ if (file_exists($logoPath)) {
     @endif
         <p>
         Delivery ID: {{ $delivery->delivery_id }}<br>
-        Package Status Count: {{ $delivery->packageStatuses->count() }}
         </p>
         <table>
 
             <thead>
                 <tr>
-                    <th width="50%">Package</th>
-                    <th width="50%">Dimensions</th>
+                    <th width="50%"></th>
+                    <th width="50%"></th>
                 </tr>
             </thead>
 

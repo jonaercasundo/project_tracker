@@ -192,7 +192,7 @@ if (file_exists($logoPath)) {
                     </tr>
                 </thead>
             @endif
-            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
+            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')
                 <thead>
                     <tr>
                         <th colspan="2" style="text-align: left;">

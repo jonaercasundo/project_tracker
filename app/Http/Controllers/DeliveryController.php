@@ -174,6 +174,7 @@ class DeliveryController extends Controller
             'lot',
             'keystage',
             'keystage.packages',
+            'items',
         ])
         ->whereIn('dr_no', $ids)
         ->orderBy('dr_no')

@@ -7,6 +7,7 @@ use App\Models\School;
 use App\Models\Project;
 use App\Models\Keystage;
 use App\Models\PackageStatus;
+use App\Models\Item;
 
 class Delivery extends Model
 {
@@ -41,5 +42,13 @@ class Delivery extends Model
     public function packageStatuses()
     {
         return $this->hasMany(PackageStatus::class, 'delivery_id', 'delivery_id');
+    }
+    public function items()
+    {
+        return $this->hasMany(
+            Item::class,
+            'project_id', // foreign key in item table
+            'project_id'  // local key in deliveries table
+        );
     }
 }

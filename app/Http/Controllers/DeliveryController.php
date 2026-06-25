@@ -325,7 +325,11 @@ public function generateLabels(Request $request)
     ->map(fn ($id) => (int) trim($id))
     ->filter();
 
-    dd($ids->all());
+    dd(
+        DB::table('deliveries')
+            ->whereIn('delivery_id', $ids)
+            ->first()
+    );
 
     $arSettings = ARSetting::where('project_id', $projectId)->first();
 

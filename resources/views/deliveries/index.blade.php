@@ -71,13 +71,13 @@
 
         {{-- DIVISION --}}
         <select name="division" id="division"
-            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50" disabled>
+            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
             <option value="">Division</option>
         </select>
 
         {{-- MUNICIPALITY --}}
         <select name="municipality" id="municipality"
-            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50" disabled>
+            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
             <option value="">Municipality</option>
         </select>
 
@@ -225,9 +225,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ======================
     // INITIAL STATE
     // ======================
-    division.disabled = true;
-    municipality.disabled = true;
-    lot.disabled = false;
+   
 
     let requestToken = 0; // prevent race conditions
 
@@ -241,8 +239,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         division.innerHTML = '<option value="">Division</option>';
         municipality.innerHTML = '<option value="">Municipality</option>';
-        division.disabled = true;
-        municipality.disabled = true;
+
 
         if (!regionVal) return;
 
@@ -259,7 +256,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         </option>`;
                 });
 
-                division.disabled = false;
             });
     });
 
@@ -271,7 +267,6 @@ document.addEventListener('DOMContentLoaded', function () {
         let divisionVal = this.value;
 
         municipality.innerHTML = '<option value="">Municipality</option>';
-        municipality.disabled = true;
 
         if (!divisionVal) return;
 
@@ -285,8 +280,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             ${m.municipality_name}
                         </option>`;
                 });
-
-                municipality.disabled = false;
             });
     });
 
@@ -298,14 +291,6 @@ document.addEventListener('DOMContentLoaded', function () {
         let projectVal = this.value;
 
         lot.innerHTML = '<option value="">Lot</option>';
-        lot.disabled = false;
-
-        // reset dependent location
-        region.value = '';
-        division.innerHTML = '<option value="">Division</option>';
-        municipality.innerHTML = '<option value="">Municipality</option>';
-        division.disabled = true;
-        municipality.disabled = true;
 
         if (!projectVal) return;
 
@@ -320,7 +305,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         </option>`;
                 });
 
-                lot.disabled = false;
+                
             });
     });
 
@@ -357,7 +342,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         });
 
                         lot.value = data.lot_id;
-                        lot.disabled = false;
+                      
                     });
 
                 // region
@@ -380,7 +365,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             });
 
                             division.value = data.division || '';
-                            division.disabled = false;
                             division.dispatchEvent(new Event('change'));
                             if (data.division) {
                                 fetch(`/api/municipalities?division=${data.division}`)
@@ -397,7 +381,6 @@ document.addEventListener('DOMContentLoaded', function () {
                                         });
 
                                         municipality.value = data.municipality || '';
-                                        municipality.disabled = false;
                                     });
                             }
                         });
@@ -416,10 +399,6 @@ document.addEventListener('DOMContentLoaded', function () {
         region.value = '';
         division.innerHTML = '<option value="">Division</option>';
         municipality.innerHTML = '<option value="">Municipality</option>';
-
-        division.disabled = true;
-        municipality.disabled = true;
-        lot.disabled = false;
     });
 
 });

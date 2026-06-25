@@ -14,6 +14,7 @@ use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelLow;
 use Endroid\QrCode\RoundBlockSizeMode\RoundBlockSizeMode;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\PngWriter;
+use App\Models\PackageStatus;
 class DeliveryController extends Controller
 {
     public function index(Request $request)
@@ -188,15 +189,10 @@ class DeliveryController extends Controller
         ->orderBy('dr_no')
         ->get();
 
-dd(
-    $deliveries->map(function ($d) {
-        return [
-            'delivery_id' => $d->delivery_id,
-            'school_id' => $d->school_id,
-            'package_status_count' => $d->packageStatuses->count(),
-        ];
-    })
-);
+dd([
+    'package_status_total' => PackageStatus::count(),
+    'first_record' => PackageStatus::first(),
+]);
 
         if ($deliveries->isEmpty()) {
             abort(404, "No deliveries found.");

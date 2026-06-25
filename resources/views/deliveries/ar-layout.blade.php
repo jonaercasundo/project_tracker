@@ -198,23 +198,6 @@ if (file_exists($logoPath)) {
                         </td>
 
                         <td align="center">
-
-                            @if($status->package)
-
-                                {{ $status->package->length ?? '-' }}
-                                cm ×
-                                {{ $status->package->width ?? '-' }}
-                                cm ×
-                                {{ $status->package->height ?? '-' }}
-                                cm
-
-                            @else
-
-                                Package Not Found
-                                (Package ID: {{ $status->package_id }})
-
-                            @endif
-
                         </td>
                     </tr>
                 </tbody>

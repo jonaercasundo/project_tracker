@@ -163,7 +163,7 @@ class DeliveryController extends Controller
     }
     public function generate(Request $request)
     {
-        
+
         $ids = collect(explode(',', $request->ids))
             ->map(fn($v) => trim($v))
             ->filter(fn($v) => is_numeric($v) && $v > 0)
@@ -205,7 +205,38 @@ class DeliveryController extends Controller
      
 
 foreach ($deliveries as $delivery) {
+        if ($delivery->packageStatuses->isEmpty()) {
 
+            // 1. Get package IDs safely
+            $packageIds = DB::table('package')
+                ->where('lot_id', $delivery->lot_id)
+                ->pluck('package_id');
+
+            foreach ($packageIds as $packageId) {
+
+                // 2. Prevent duplicate insert
+                $exists = DB::table('package_status')
+                    ->where('delivery_id', $delivery->delivery_id)
+                    ->where('package_id', $packageId)
+                    ->exists();
+
+                if (!$exists) {
+                    DB::table('package_status')->insert([
+                        'delivery_id' => $delivery->delivery_id,
+                        'package_id' => $packageId,
+                        'status' => 'pending',
+                        'remarks' => null,
+                    ]);
+                }
+            }
+
+            // 3. FORCE reload relationship (important)
+            $delivery->unsetRelation('packageStatuses');
+
+            $delivery->load([
+                'packageStatuses.package.packageContent.item'
+            ]);
+        }
     $delivery->ar = $delivery->project->arSetting ?? null;
 
     // ALWAYS rebuild clean from DB
@@ -243,8 +274,6 @@ foreach ($deliveries as $delivery) {
         $status->qr_label = $itemNames->isNotEmpty()
             ? $itemNames->implode(', ')
             : 'Unknown Item';
-
-        $status->save();
     }
 }
 

@@ -186,7 +186,7 @@ if (file_exists($logoPath)) {
                 <thead>
                     <tr>
                         <th colspan="2" style="text-align: left;">
-                            @if($lot === 'LOT12')
+                            @if(str_contains($delivery->school_id, 'TX-LOT12'))
                                 {{ $delivery->items->first()?->item_name }}
                             @endif
                         </th>

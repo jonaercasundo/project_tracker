@@ -177,13 +177,14 @@ if (file_exists($logoPath)) {
         <p>
         Delivery ID: {{ $delivery->delivery_id }}<br>
         </p>
+
+        
         @php
             $prefix = implode('-', array_slice(explode('-', $delivery->school_id), 0, 2));
 
             $firstItem = $delivery->items[0] ?? null;
             $secondItem = $delivery->items[1] ?? null;
         @endphp
-        @php
         <table>
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
                 <thead>

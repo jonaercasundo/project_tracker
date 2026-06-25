@@ -368,5 +368,6 @@ td,th{
 </div>
 @endforeach
 
+<div class="page-break"></div>
 </body>
 </html>

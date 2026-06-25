@@ -216,25 +216,36 @@ class DeliveryController extends Controller
                     . $delivery->delivery_id;
 
                 $qrCode = new QrCode($url);
-
                 $writer = new PngWriter();
-
                 $result = $writer->write($qrCode);
 
                 $qrCodes[$status->package_status_id] =
                     'data:image/png;base64,' . base64_encode($result->getString());
 
-                    // ✅ PUT IT HERE
-                    $itemName = optional(
-                        $status->package
-                            ->packageContent
-                            ->first()
-                            ->item
-                    )->item_name ?? 'Unknown Item';
+                // ✅ GET ALL ITEMS IN PACKAGE
+                $items = $status->package?->packageContent
+                    ?->map(fn($pc) => $pc->item)
+                    ->filter();
 
-                    $status->package_label = $itemName;
+                // fallback safety
+                if (!$items || $items->isEmpty()) {
+                    $status->package_label = 'Unknown Item';
+                    continue;
+                }
 
-                $i++;
+                // ✅ SUBJECT (Makabansa / Filipino)
+                $isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
+                $subject = $isMakabansa ? 'Makabansa' : 'Filipino';
+
+                // ✅ TYPE (Teacher / Textbook)
+                $isTeacherManual = $items->contains(function ($item) {
+                    return str_contains(strtolower($item->item_name), 'teacher');
+                });
+
+                $type = $isTeacherManual ? "Teacher's Manual" : "Textbook";
+
+                // ✅ FINAL LABEL
+                $status->package_label = "{$subject} {$type}";
             }
             // attach AR config to delivery (LIKE PHP VERSION)
             $delivery->ar = $ar;

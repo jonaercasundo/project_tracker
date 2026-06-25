@@ -330,16 +330,33 @@ td,th{
         $thirdItem = $delivery->items[2] ?? null;
         $fourthItem = $delivery->items[3] ?? null;
     @endphp
+    @php
+        $isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
+    @endphp
     <table>
 
         @foreach($delivery->packageStatuses->chunk(2) as $chunk)
 
             <tr>
 
+
                 @foreach($chunk as $status)
+                    @php
+                        $package = $status->package;
 
+                        $items = $package?->packageContent?->map(fn($pc) => $pc->item)->filter();
+
+                        $isTeacherManual = $items->contains(function ($item) {
+                            return str_contains(strtolower($item->item_name), 'teacher');
+                        });
+
+                        $subject = $isMakabansa ? 'Makabansa' : 'Filipino';
+
+                        $type = $isTeacherManual ? "Teacher's Manual" : "Textbook";
+
+                        $label = "{$subject} {$type}";
+                    @endphp
                     <td class="qr">
-
                         @if(isset($qrCodes[$status->package_status_id]))
 
                             <img
@@ -350,18 +367,8 @@ td,th{
                         @endif
 
                         <br>
-                        @php
-                            $package = $status->package;
-
-                            $items = $package?->packageContent?->map(fn($pc) => $pc->item->item_name ?? null)->filter();
-
-                            $label = $items->isNotEmpty()
-                                ? $items->implode(', ')
-                                : 'Unknown Item';
-                        @endphp
-
-                        {{ $label }}
-
+                            {{ $status->qr_label ?? 'Unknown Item' }}
+                            
                     </td>
 
                 @endforeach

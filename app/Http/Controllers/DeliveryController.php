@@ -209,7 +209,6 @@ class DeliveryController extends Controller
             $i = 1;
 
             foreach ($delivery->packageStatuses as $status) {
-dd($status->package->packageContent->first()->item);
                 $url = "https://mmc.metro-ltd.com/entry.php?id="
                     . $status->package_status_id
                     . "&delivery_id="
@@ -248,7 +247,7 @@ dd($status->package->packageContent->first()->item);
                 $status->package_label = "{$subject} {$type}";
             }
             // attach AR config to delivery (LIKE PHP VERSION)
-            $delivery->ar = $ar;
+             $delivery->ar = $delivery->project->arSetting ?? null;
         }
 
         return Pdf::loadView('deliveries.ar-layout', [

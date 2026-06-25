@@ -383,9 +383,6 @@ td,th{
     </table>
 
 </div>
-
-<div class="page-break"></div>
-
 @endforeach
 
 </body>

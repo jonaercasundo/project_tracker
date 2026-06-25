@@ -202,87 +202,51 @@ class DeliveryController extends Controller
         $writer = new PngWriter();
         $qrCodes = [];
 
-        foreach ($deliveries as $delivery) {
-                // 🔴 AUTO-HEAL: if no package_status exists
-            if ($delivery->packageStatuses->isEmpty()) {
+     
 
-                $packageIds = DB::table('package')
-                    ->where('lot_id', $delivery->lot_id)
-                    ->pluck('package_id');
+            foreach ($deliveries as $delivery) {
 
-                foreach ($packageIds as $packageId) {
+                $ar = $delivery->project->arSetting ?? null;
 
-                    DB::table('package_status')->insert([
-                        'delivery_id' => $delivery->delivery_id,
-                        'package_id' => $packageId,
-                        'status' => 'pending',
-                        'remarks' => null,
-                    ]);
+                $statuses = $delivery->packageStatuses->values();
+
+                $i = 1;
+                $packageCount = $statuses->count();
+
+                foreach ($statuses as $status) {
+
+                    // ================= QR CODE =================
+                    $url = "https://mmc.metro-ltd.com/entry.php?id="
+                        . $status->package_status_id
+                        . "&delivery_id="
+                        . $delivery->delivery_id;
+
+                    $qrCode = new QrCode($url);
+                    $writer = new PngWriter();
+                    $result = $writer->write($qrCode);
+
+                    $qrCodes[$status->package_status_id] =
+                        'data:image/png;base64,' . base64_encode($result->getString());
+
+                    // ================= ITEMS =================
+                    $items = $status->package?->packageContent?->map(fn($pc) => $pc->item);
+
+                    $itemNames = $items?->pluck('item_name')
+                        ->filter()
+                        ->values();
+
+                    // ================= LABEL =================
+                    if ($itemNames->isEmpty()) {
+                        $status->qr_label = 'Unknown Item';
+                    } else {
+                        $status->qr_label = $itemNames->implode(', ');
+                    }
+
+                    $i++;
                 }
 
-                // reload relationship AFTER insert
-                $delivery->load('packageStatuses.package.packageContent.item');
+                $delivery->ar = $ar;
             }
-        $ar = $delivery->project->arSetting ?? null;
-
-        // reset index per delivery
-        $statuses = $delivery->packageStatuses->values();
-
-        $labels = [];
-
-        $isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
-
-        if ($isMakabansa) {
-            $labels = [
-                'Makabansa Textbook',
-                "Makabansa Teacher's Manual",
-            ];
-        } else {
-            $labels = [
-                'Filipino Textbook',
-                "Filipino Teacher's Manual",
-            ];
-        }
-
-        foreach ($statuses as $status) {
-
-            $url = "https://mmc.metro-ltd.com/entry.php?id="
-                . $status->package_status_id
-                . "&delivery_id="
-                . $delivery->delivery_id;
-
-            $result = (new PngWriter())->write(
-                new QrCode($url)
-            );
-
-            $qrCodes[$status->package_status_id] =
-                'data:image/png;base64,' . base64_encode($result->getString());
-
-            // ================= REAL SOURCE OF TRUTH =================
-            $items = $status->package?->packageContent
-                ?->map(fn($pc) => $pc->item)
-                ->filter();
-
-            if ($items->isEmpty()) {
-                $status->qr_label = 'Unknown Item';
-                continue;
-            }
-
-            $itemName = $items->first()->item_name ?? 'Unknown Item';
-
-            $delivery->isMakabansa = ($delivery->lot->lot_name ?? '') === 'LOT13';
-
-            $subject = $isMakabansa ? 'Makabansa' : 'Filipino';
-
-            $isTeacher = str_contains(strtolower($itemName), 'teacher');
-
-            $type = $isTeacher ? "Teacher's Manual" : "Textbook";
-
-            $status->qr_label = "{$subject} {$type}";
-        }
-
-        $delivery->ar = $ar;
-        }
 
         return Pdf::loadView('deliveries.ar-layout', [
             'deliveries' => $deliveries,

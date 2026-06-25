@@ -192,7 +192,6 @@ if (file_exists($logoPath)) {
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($delivery->packageStatuses as $index => $status)
                     <tr>
                         <td>
                             {{ $delivery->items->first()?->item_name }}
@@ -228,9 +227,6 @@ if (file_exists($logoPath)) {
                                 Delivery ID: {{ $delivery->delivery_id }}
                             </td>
                         </tr>
-
-                    @endforelse
-
                 </tbody>
             @endif
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')

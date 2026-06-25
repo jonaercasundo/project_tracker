@@ -184,8 +184,8 @@ if (file_exists($logoPath)) {
 
             $firstItem = $delivery->items[0] ?? null;
             $secondItem = $delivery->items[1] ?? null;
-            $thirdItem = $delivery->items[0] ?? null;
-            $fourthItem = $delivery->items[1] ?? null;
+            $thirdItem = $delivery->items[2] ?? null;
+            $fourthItem = $delivery->items[3] ?? null;
         @endphp
         <table>
             @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')

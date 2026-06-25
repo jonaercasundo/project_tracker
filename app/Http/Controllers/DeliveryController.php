@@ -8,7 +8,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\QrCode;
 use App\Models\Delivery;
 use Illuminate\Support\Facades\Auth;
-
+use App\Models\ARSetting;
+use App\Http\Controllers\ArSettingController;
 use Endroid\QrCode\Encoding\Encoding;
 use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelLow;
 use Endroid\QrCode\RoundBlockSizeMode\RoundBlockSizeMode;

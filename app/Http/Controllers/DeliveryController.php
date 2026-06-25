@@ -226,10 +226,6 @@ class DeliveryController extends Controller
 
                 $i++;
             }
-            dd([
-                'qr_count' => count($qrCodes),
-                'keys' => array_keys($qrCodes),
-            ]);
             // attach AR config to delivery (LIKE PHP VERSION)
             $delivery->ar = $ar;
         }

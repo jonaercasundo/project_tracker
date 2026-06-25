@@ -200,82 +200,80 @@ class DeliveryController extends Controller
         // REUSED QR WRITER (FAST)
         // =========================
         $writer = new PngWriter();
-        $qrCodes = [];
+        $qrCodes = []; 
 
-     
+        foreach ($deliveries as $delivery) {
+                if ($delivery->packageStatuses->isEmpty()) {
 
-foreach ($deliveries as $delivery) {
-        if ($delivery->packageStatuses->isEmpty()) {
+                    // 1. Get package IDs safely
+                    $packageIds = DB::table('package')
+                        ->where('lot_id', $delivery->lot_id)
+                        ->pluck('package_id');
 
-            // 1. Get package IDs safely
-            $packageIds = DB::table('package')
-                ->where('lot_id', $delivery->lot_id)
-                ->pluck('package_id');
+                    foreach ($packageIds as $packageId) {
 
-            foreach ($packageIds as $packageId) {
+                        // 2. Prevent duplicate insert
+                        $exists = DB::table('package_status')
+                            ->where('delivery_id', $delivery->delivery_id)
+                            ->where('package_id', $packageId)
+                            ->exists();
 
-                // 2. Prevent duplicate insert
-                $exists = DB::table('package_status')
-                    ->where('delivery_id', $delivery->delivery_id)
-                    ->where('package_id', $packageId)
-                    ->exists();
+                        if (!$exists) {
+                            DB::table('package_status')->insert([
+                                'delivery_id' => $delivery->delivery_id,
+                                'package_id' => $packageId,
+                                'status' => 'pending',
+                                'remarks' => null,
+                            ]);
+                        }
+                    }
 
-                if (!$exists) {
-                    DB::table('package_status')->insert([
-                        'delivery_id' => $delivery->delivery_id,
-                        'package_id' => $packageId,
-                        'status' => 'pending',
-                        'remarks' => null,
+                    // 3. FORCE reload relationship (important)
+                    $delivery->unsetRelation('packageStatuses');
+
+                    $delivery->load([
+                        'packageStatuses.package.packageContent.item'
                     ]);
                 }
+            $delivery->ar = $delivery->project->arSetting ?? null;
+
+            // ALWAYS rebuild clean from DB
+            $statuses = PackageStatus::with([
+                'package.packageContent.item'
+            ])
+            ->where('delivery_id', $delivery->delivery_id)
+            ->get();
+
+            $delivery->setRelation('packageStatuses', $statuses);
+
+            // ❗ DO NOT skip delivery
+            foreach ($statuses as $status) {
+                if (!$status->package_status_id) {
+                    continue;
+                }
+                // ================= QR =================
+                $url = "https://mmc.metro-ltd.com/entry.php?id="
+                    . $status->package_status_id
+                    . "&delivery_id="
+                    . $delivery->delivery_id;
+
+                $result = (new PngWriter())
+                    ->write(new QrCode($url));
+
+                $qrCodes[$status->package_status_id] =
+                    'data:image/png;base64,' . base64_encode($result->getString());
+
+                // ================= ITEMS (FIXED) =================
+                $items = $status->package?->packageContent?->pluck('item') ?? collect();
+
+                $itemNames = $items->pluck('item_name')->filter();
+
+                // ================= LABEL =================
+                $status->qr_label = $itemNames->isNotEmpty()
+                    ? $itemNames->implode(', ')
+                    : 'Unknown Item';
             }
-
-            // 3. FORCE reload relationship (important)
-            $delivery->unsetRelation('packageStatuses');
-
-            $delivery->load([
-                'packageStatuses.package.packageContent.item'
-            ]);
         }
-    $delivery->ar = $delivery->project->arSetting ?? null;
-
-    // ALWAYS rebuild clean from DB
-    $statuses = PackageStatus::with([
-        'package.packageContent.item'
-    ])
-    ->where('delivery_id', $delivery->delivery_id)
-    ->get();
-
-    $delivery->setRelation('packageStatuses', $statuses);
-
-    // ❗ DO NOT skip delivery
-    foreach ($statuses as $status) {
-        if (!$status->package_status_id) {
-            continue;
-        }
-        // ================= QR =================
-        $url = "https://mmc.metro-ltd.com/entry.php?id="
-            . $status->package_status_id
-            . "&delivery_id="
-            . $delivery->delivery_id;
-
-        $result = (new PngWriter())
-            ->write(new QrCode($url));
-
-        $qrCodes[$status->package_status_id] =
-            'data:image/png;base64,' . base64_encode($result->getString());
-
-        // ================= ITEMS (FIXED) =================
-        $items = $status->package?->packageContent?->pluck('item') ?? collect();
-
-        $itemNames = $items->pluck('item_name')->filter();
-
-        // ================= LABEL =================
-        $status->qr_label = $itemNames->isNotEmpty()
-            ? $itemNames->implode(', ')
-            : 'Unknown Item';
-    }
-}
 
         return Pdf::loadView('deliveries.ar-layout', [
             'deliveries' => $deliveries,

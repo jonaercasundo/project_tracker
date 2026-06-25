@@ -163,7 +163,7 @@
                                     </div>
 
                                     <div class="text-xs text-slate-500 leading-relaxed">
-                                        {!! $d->items_contents ?? '<span class="text-slate-400 italic">No items available</span>' !!}
+                                        {{ $d->items?->pluck('item_name')->filter()->implode(', ') ?: 'No items available' }}
                                     </div>
                                 </div>
 

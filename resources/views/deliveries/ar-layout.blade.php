@@ -187,7 +187,7 @@ if (file_exists($logoPath)) {
                 <thead>
                     <tr>
                         <th colspan="2" style="text-align: left;">
-                            GRADE 2 {{ $firstItem?->item_name }}
+                            Grade 2 Makabansa
                         </th>
                     </tr>
                 </thead>

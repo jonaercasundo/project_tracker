@@ -235,6 +235,8 @@ class DeliveryController extends Controller
             'package_status_count' => $deliveries->first()->packageStatuses->count(),
             'qr_count' => count($qrCodes),
             'sample_qr' => reset($qrCodes),
+            $deliveries->first()->delivery_id,
+            $deliveries->first()->dr_no
         ]);
 
         return Pdf::loadView('deliveries.ar-layout', [

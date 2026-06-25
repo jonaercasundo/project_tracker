@@ -436,17 +436,9 @@ function generateQR() {
         return;
     }
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/deliveries/qr-generate';
+    const url = `/deliveries/pdf?ids=${ids.join(',')}`;
 
-    form.innerHTML = `
-        <input type="hidden" name="_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="ids" value="${ids.join(',')}">
-    `;
-
-    document.body.appendChild(form);
-    form.submit();
+    window.open(url, '_blank');
 }
 </script>
 </x-project_app-layout>

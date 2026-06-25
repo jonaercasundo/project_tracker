@@ -56,37 +56,36 @@ td,th{
 <body>
 
 @foreach($deliveries as $delivery)
+    @php
 
-@php
+        $ar = $delivery->project->arSetting ?? null;
 
-$ar = $delivery->project->arSetting ?? null;
+        $logoPath = public_path('logo.png');
 
-$logoPath = public_path('logo.png');
+        if (
+            $ar &&
+            !empty($ar->ar_logo) &&
+            file_exists(public_path('uploads/logo/' . $ar->ar_logo))
+        ) {
+            $logoPath = public_path('uploads/logo/' . $ar->ar_logo);
+        }
 
-if (
-    $ar &&
-    !empty($ar->ar_logo) &&
-    file_exists(public_path('uploads/logo/' . $ar->ar_logo))
-) {
-    $logoPath = public_path('uploads/logo/' . $ar->ar_logo);
-}
+        $logoBase64 = '';
 
-$logoBase64 = '';
+        if (file_exists($logoPath)) {
+            $extension = strtolower(pathinfo($logoPath, PATHINFO_EXTENSION));
 
-if (file_exists($logoPath)) {
-    $extension = strtolower(pathinfo($logoPath, PATHINFO_EXTENSION));
+            $mime = match ($extension) {
+                'png'  => 'image/png',
+                'jpg', 'jpeg' => 'image/jpeg',
+                'gif'  => 'image/gif',
+                default => 'image/png'
+            };
 
-    $mime = match ($extension) {
-        'png'  => 'image/png',
-        'jpg', 'jpeg' => 'image/jpeg',
-        'gif'  => 'image/gif',
-        default => 'image/png'
-    };
+            $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logoPath));
+        }
 
-    $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logoPath));
-}
-
-@endphp
+    @endphp
 
 {{-- ========================================= --}}
 {{-- PAGE 1 --}}

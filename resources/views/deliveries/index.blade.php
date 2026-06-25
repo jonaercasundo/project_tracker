@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ======================
     division.disabled = true;
     municipality.disabled = true;
-    lot.disabled = true;
+    lot.disabled = false;
 
     let requestToken = 0; // prevent race conditions
 
@@ -419,7 +419,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         division.disabled = true;
         municipality.disabled = true;
-        lot.disabled = true;
+        lot.disabled = false;
     });
 
 });

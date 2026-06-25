@@ -243,6 +243,8 @@ foreach ($deliveries as $delivery) {
         $status->qr_label = $itemNames->isNotEmpty()
             ? $itemNames->implode(', ')
             : 'Unknown Item';
+
+        $status->save();
     }
 }
 

@@ -315,20 +315,30 @@ class DeliveryController extends Controller
         ->setPaper('legal', 'portrait')
         ->stream('deliveries-batch.pdf');
     }
-public function generateLabels(Request $request)
+   public function generateLabels(Request $request)
 {
     ini_set('memory_limit', '1024M');
     set_time_limit(0);
 
     $ids = collect(explode(',', $request->ids))
-        ->map(fn ($id) => (int) trim($id))
-        ->filter();
+        ->map(fn($id) => (int) trim($id))
+        ->filter()
+        ->values();
 
+    if ($ids->isEmpty()) {
+        abort(422, 'No deliveries selected.');
+    }
+
+    // Get project ID from selected deliveries
     $projectId = DB::table('deliveries')
         ->whereIn('delivery_id', $ids)
         ->value('project_id');
 
+    if (!$projectId) {
+        abort(404, 'Project not found.');
+    }
 
+    // Get AR Settings
     $arSettings = ARSetting::where('project_id', $projectId)->first();
 
     $showSchoolID     = (bool) ($arSettings?->label_school_id ?? false);
@@ -336,12 +346,16 @@ public function generateLabels(Request $request)
     $showDivision     = (bool) ($arSettings?->label_division ?? false);
     $showRegion       = (bool) ($arSettings?->label_region ?? false);
 
+    // Fetch label data
     $rows = DB::table('schools_project as sp')
         ->leftJoin('school as s', 's.school_id', '=', 'sp.school_id')
-        ->leftJoin('deliveries as d', function ($join) {
+
+        ->leftJoin('deliveries as d', function ($join) use ($ids) {
             $join->on('d.project_id', '=', 'sp.project_id')
-                 ->on('d.school_id', '=', 'sp.school_id');
+                 ->on('d.school_id', '=', 'sp.school_id')
+                 ->whereIn('d.delivery_id', $ids);
         })
+
         ->leftJoin('lot as l', 'l.lot_id', '=', 'd.lot_id')
         ->leftJoin('package_status as ps', 'ps.delivery_id', '=', 'd.delivery_id')
         ->leftJoin('package as p', 'p.package_id', '=', 'ps.package_id')
@@ -360,8 +374,7 @@ public function generateLabels(Request $request)
             'l.lot_name',
             'i.item_name',
             'i.unit',
-
-            DB::raw('SUM(COALESCE(pc.qty,1) * COALESCE(d.package_qty,1)) as total_qty')
+            DB::raw('SUM(COALESCE(pc.qty,1) * COALESCE(d.package_qty,1)) AS total_qty')
         ])
 
         ->groupBy(
@@ -387,6 +400,7 @@ public function generateLabels(Request $request)
         abort(404, 'No data found.');
     }
 
+    // Build data structure
     $data = [];
 
     foreach ($rows as $row) {
@@ -416,8 +430,7 @@ public function generateLabels(Request $request)
 
         if (isset($data[$sid]['lots'][$lot][$key])) {
 
-            $data[$sid]['lots'][$lot][$key]['qty']
-                += (int) $row->total_qty;
+            $data[$sid]['lots'][$lot][$key]['qty'] += (int) $row->total_qty;
 
         } else {
 
@@ -433,10 +446,10 @@ public function generateLabels(Request $request)
         'deliveries.label-layout',
         [
             'data' => $data,
-            'showSchoolID' => $showSchoolID,
+            'showSchoolID'     => $showSchoolID,
             'showMunicipality' => $showMunicipality,
-            'showDivision' => $showDivision,
-            'showRegion' => $showRegion,
+            'showDivision'     => $showDivision,
+            'showRegion'       => $showRegion,
         ]
     )
     ->setPaper('a4', 'portrait')

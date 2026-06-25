@@ -322,10 +322,6 @@ td,th{
 
     </div>
 
-    <h3>
-        QR Codes - DR #{{ $delivery->dr_no }}
-    </h3>
-
     <table>
 
         @foreach($delivery->packageStatuses->chunk(2) as $chunk)
@@ -346,12 +342,7 @@ td,th{
                         @endif
 
                         <br>
-
-                        Package
-
-                        <br>
-
-                        ORD-{{ str_pad($status->package_status_id,5,'0',STR_PAD_LEFT) }}
+                        {{ $status->package_label ?? 'Unknown Item' }}
 
                     </td>
 

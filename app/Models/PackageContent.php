@@ -12,4 +12,8 @@ class PackageContent extends Model
     {
         return $this->belongsTo(Package::class, 'package_id', 'package_id');
     }
+    public function item()
+    {
+        return $this->belongsTo(Item::class, 'item_id');
+    }
 }

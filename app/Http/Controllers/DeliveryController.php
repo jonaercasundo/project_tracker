@@ -185,6 +185,7 @@ class DeliveryController extends Controller
             'package',
             'packageStatuses',
             'items.packageContent.package',
+            'packageStatuses.package.packageContent.item',
         ])
         ->whereIn('delivery_id', $ids)
         ->orderBy('dr_no')
@@ -223,7 +224,15 @@ class DeliveryController extends Controller
                 $qrCodes[$status->package_status_id] =
                     'data:image/png;base64,' . base64_encode($result->getString());
 
-                $status->package_label = "Package {$i} of {$packageCount}";
+                    // ✅ PUT IT HERE
+                    $itemName = optional(
+                        $status->package
+                            ->packageContent
+                            ->first()
+                            ->item
+                    )->item_name ?? 'Unknown Item';
+
+                    $status->package_label = $itemName;
 
                 $i++;
             }

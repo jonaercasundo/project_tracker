@@ -315,8 +315,11 @@ class DeliveryController extends Controller
         ->setPaper('legal', 'portrait')
         ->stream('deliveries-batch.pdf');
     }
-   public function generateLabels(Request $request)
+  public function generateLabels(Request $request)
 {
+    ini_set('memory_limit', '1024M');
+    set_time_limit(0);
+
     $ids = collect(explode(',', $request->ids))
         ->map(fn($id) => (int) trim($id))
         ->filter()
@@ -326,16 +329,22 @@ class DeliveryController extends Controller
         abort(422, 'No deliveries selected.');
     }
 
-    // Get project ID from selected deliveries
-    $projectId = DB::table('deliveries')
-        ->whereIn('delivery_id', $ids)
-        ->value('project_id');
+    $deliveries = Delivery::with([
+        'school',
+        'project.arSetting',
+        'lot',
+        'packageStatuses.package.packageContent.item',
+    ])
+    ->whereIn('delivery_id', $ids)
+    ->orderBy('school_id')
+    ->get();
 
-    if (!$projectId) {
-        abort(404, 'Project not found.');
+    if ($deliveries->isEmpty()) {
+        abort(404, 'No deliveries found.');
     }
 
-    // Get AR Settings
+    $projectId = $deliveries->first()->project_id;
+
     $arSettings = ARSetting::where('project_id', $projectId)->first();
 
     $showSchoolID     = (bool) ($arSettings?->label_school_id ?? false);
@@ -343,77 +352,28 @@ class DeliveryController extends Controller
     $showDivision     = (bool) ($arSettings?->label_division ?? false);
     $showRegion       = (bool) ($arSettings?->label_region ?? false);
 
-    // Fetch label data
-    $rows = DB::table('schools_project as sp')
-        ->leftJoin('school as s', 's.school_id', '=', 'sp.school_id')
-
-        ->leftJoin('deliveries as d', function ($join) use ($ids) {
-            $join->on('d.project_id', '=', 'sp.project_id')
-                 ->on('d.school_id', '=', 'sp.school_id')
-                 ->whereIn('d.delivery_id', $ids);
-        })
-
-        ->leftJoin('lot as l', 'l.lot_id', '=', 'd.lot_id')
-        ->leftJoin('package_status as ps', 'ps.delivery_id', '=', 'd.delivery_id')
-        ->leftJoin('package as p', 'p.package_id', '=', 'ps.package_id')
-        ->leftJoin('package_content as pc', 'pc.package_id', '=', 'p.package_id')
-        ->leftJoin('item as i', 'i.item_id', '=', 'pc.item_id')
-
-        ->where('sp.project_id', $projectId)
-
-        ->select([
-            's.school_id',
-            's.school_name',
-            's.municipality',
-            's.division',
-            's.region',
-            'sp.batch_id',
-            'l.lot_name',
-            'i.item_name',
-            'i.unit',
-            DB::raw('SUM(COALESCE(pc.qty,1) * COALESCE(d.package_qty,1)) AS total_qty')
-        ])
-
-        ->groupBy(
-            's.school_id',
-            's.school_name',
-            's.municipality',
-            's.division',
-            's.region',
-            'sp.batch_id',
-            'l.lot_name',
-            'i.item_name',
-            'i.unit'
-        )
-
-        ->orderBy('s.school_name')
-        ->orderBy('sp.batch_id')
-        ->orderBy('l.lot_name')
-        ->orderBy('i.item_name')
-
-        ->get();
-
-    if ($rows->isEmpty()) {
-        abort(404, 'No data found.');
-    }
-
-    // Build data structure
     $data = [];
 
-    foreach ($rows as $row) {
+    foreach ($deliveries as $delivery) {
 
-        $sid = $row->school_id;
-        $lot = $row->lot_name;
+        $school = $delivery->school;
+
+        if (!$school) {
+            continue;
+        }
+
+        $sid = $school->school_id;
+        $lot = $delivery->lot?->lot_name ?? 'NO LOT';
 
         if (!isset($data[$sid])) {
 
             $data[$sid] = [
                 'info' => [
-                    'school_name'  => $row->school_name,
-                    'school_id'    => $row->school_id,
-                    'municipality' => $row->municipality,
-                    'division'     => $row->division,
-                    'region'       => $row->region,
+                    'school_name'  => $school->school_name,
+                    'school_id'    => $school->school_id,
+                    'municipality' => $school->municipality,
+                    'division'     => $school->division,
+                    'region'       => $school->region,
                 ],
                 'lots' => []
             ];
@@ -423,31 +383,51 @@ class DeliveryController extends Controller
             $data[$sid]['lots'][$lot] = [];
         }
 
-        $key = $row->item_name;
+        foreach ($delivery->packageStatuses as $status) {
 
-        if (isset($data[$sid]['lots'][$lot][$key])) {
+            if (!$status->package) {
+                continue;
+            }
 
-            $data[$sid]['lots'][$lot][$key]['qty'] += (int) $row->total_qty;
+            foreach ($status->package->packageContent as $content) {
 
-        } else {
+                if (!$content->item) {
+                    continue;
+                }
 
-            $data[$sid]['lots'][$lot][$key] = [
-                'item_name' => $row->item_name,
-                'qty'       => (int) $row->total_qty,
-                'unit'      => $row->unit,
-            ];
+                $itemName = $content->item->item_name;
+
+                if (!$itemName) {
+                    continue;
+                }
+
+                $qty = (int) ($content->qty ?? 1) * (int) ($delivery->package_qty ?? 1);
+
+                if (isset($data[$sid]['lots'][$lot][$itemName])) {
+
+                    $data[$sid]['lots'][$lot][$itemName]['qty'] += $qty;
+
+                } else {
+
+                    $data[$sid]['lots'][$lot][$itemName] = [
+                        'item_name' => $itemName,
+                        'qty'       => $qty,
+                        'unit'      => $content->item->unit,
+                    ];
+                }
+            }
         }
     }
+
     return Pdf::loadView(
         'deliveries.label-layout',
         [
-            'data' => $data,
-            'showSchoolID'     => $showSchoolID,
-            'showMunicipality' => $showMunicipality,
-            'showDivision'     => $showDivision,
-            'showRegion'       => $showRegion,
+            'data'               => $data,
+            'showSchoolID'       => $showSchoolID,
+            'showMunicipality'   => $showMunicipality,
+            'showDivision'       => $showDivision,
+            'showRegion'         => $showRegion,
         ]
-        
     )
     ->setPaper('a4', 'portrait')
     ->stream('Packing_List_' . now()->format('Ymd_His') . '.pdf');

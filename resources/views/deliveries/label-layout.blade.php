@@ -127,7 +127,7 @@ td {
                     </td>
 
                     <td style="text-align:center;">
-                        {{ number_format($item['qty_teachers_manual']) }}
+                        {{ $item['teacher'] }}
                     </td>
 
                 </tr>

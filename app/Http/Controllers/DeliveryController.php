@@ -441,7 +441,7 @@ class DeliveryController extends Controller
             ];
         }
     }
-
+dd('Start');
     return Pdf::loadView(
         'deliveries.label-layout',
         [
@@ -451,6 +451,7 @@ class DeliveryController extends Controller
             'showDivision'     => $showDivision,
             'showRegion'       => $showRegion,
         ]
+        
     )
     ->setPaper('a4', 'portrait')
     ->stream('Packing_List_' . now()->format('Ymd_His') . '.pdf');

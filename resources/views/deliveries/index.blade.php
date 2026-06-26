@@ -14,10 +14,6 @@
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
-            <label class="flex items-center gap-2 px-3 py-2 bg-white border rounded-xl text-xs font-semibold">
-                <input type="checkbox" id="select-all-drs">
-                Select All
-            </label>
             <button type="button" class="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition">
                 Add Delivery
             </button>
@@ -100,7 +96,10 @@
     </div>
 
 </form>
-
+            <label class="flex items-center gap-2 px-3 py-2 bg-white border rounded-xl text-xs font-semibold">
+                <input type="checkbox" id="select-all-drs">
+                Select All
+            </label>
     {{-- CONTENT STATE HANDLERS --}}
     @if(empty($grouped_deliveries))
         <div class="text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200 shadow-sm">

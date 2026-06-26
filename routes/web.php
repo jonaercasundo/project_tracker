@@ -128,7 +128,7 @@ Route::middleware(['auth'])->group(function () {
         });
         Route::get('/deliveries/batch-qr', [DeliveryController::class, 'batchQr'])
         ->name('deliveries.batch-qr');
-        Route::get('/deliveries/labels', [DeliveryController::class, 'generateLabels'])
+        Route::post('/deliveries/labels', [DeliveryController::class, 'generateLabels'])
         ->name('deliveries.labels');
     });
 

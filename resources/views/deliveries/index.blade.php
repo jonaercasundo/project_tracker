@@ -458,20 +458,39 @@ document.addEventListener('DOMContentLoaded', function () {
 <script>
 function generateLabels() {
 
-    let ids = [];
+    const ids = [];
 
     document.querySelectorAll('.dr-checkbox:checked').forEach(cb => {
         ids.push(cb.value);
     });
 
     if (ids.length === 0) {
-        alert("Select at least one DR");
+        alert('Select at least one DR');
         return;
     }
 
-    const url = `/deliveries/labels?ids=${ids.join(',')}`;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/deliveries/labels';
+    form.target = '_blank';
 
-    window.open(url, '_blank');
+    // CSRF
+    const csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = '_token';
+    csrf.value = '{{ csrf_token() }}';
+    form.appendChild(csrf);
+
+    // IDs
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'ids';
+    input.value = ids.join(',');
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
 }
 </script>
 </x-project_app-layout>

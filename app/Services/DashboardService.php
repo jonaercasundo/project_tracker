@@ -9,7 +9,7 @@ class DashboardService
     public static function route(User $user): string
     {
         $map = [
-            'user' => 'deliveries.index',
+            'user' => 'projects.dashboard',
             'finance'       => 'finance.dashboard',
             'Administrator'       => 'admin.dashboard',
         ];

@@ -197,7 +197,7 @@ td,th{
 
                             <hr style="margin:3px 0;">
 
-                            {{ $delivery->package_qty }}
+                            {{ $delivery->package_qty }} <p> Copies</p>
                         </td>
                     </tr>
                     <tr>
@@ -214,7 +214,7 @@ td,th{
 
                             <hr style="margin:3px 0;">
 
-                            {{ $delivery->qty_teachers_manual }}
+                            {{ $delivery->qty_teachers_manual }}<p> Copies</p>
                         </td>
                     </tr>
                 </tbody>       
@@ -243,7 +243,7 @@ td,th{
 
                             <hr style="margin:3px 0;">
 
-                            {{ $delivery->package_qty }}
+                            {{ $delivery->package_qty }}<p> Copies</p>
                         </td>
                     </tr>
                     <tr>
@@ -260,7 +260,7 @@ td,th{
 
                             <hr style="margin:3px 0;">
 
-                            {{ $delivery->qty_teachers_manual }}
+                            {{ $delivery->qty_teachers_manual }}<p> Copies</p>
                         </td>
                     </tr>
                 </tbody>       

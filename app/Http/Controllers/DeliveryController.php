@@ -317,6 +317,8 @@ class DeliveryController extends Controller
     }
    public function generateLabels(Request $request)
 {
+    
+    dd('Start');
     ini_set('memory_limit', '1024M');
     set_time_limit(0);
 
@@ -441,7 +443,6 @@ class DeliveryController extends Controller
             ];
         }
     }
-dd('Start');
     return Pdf::loadView(
         'deliveries.label-layout',
         [

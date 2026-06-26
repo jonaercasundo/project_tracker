@@ -317,9 +317,6 @@ class DeliveryController extends Controller
     }
    public function generateLabels(Request $request)
 {
-    ini_set('memory_limit', '1024M');
-    set_time_limit(0);
-
     $ids = collect(explode(',', $request->ids))
         ->map(fn($id) => (int) trim($id))
         ->filter()

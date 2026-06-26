@@ -63,15 +63,6 @@ td {
             </td>
         </tr>
 
-        @if($showSchoolID)
-            <tr>
-                <td><strong>School ID</strong></td>
-                <td colspan="3">
-                    {{ $info['school_id'] }}
-                </td>
-            </tr>
-        @endif
-
         @if($showDivision)
             <tr>
                 <td><strong>Division</strong></td>

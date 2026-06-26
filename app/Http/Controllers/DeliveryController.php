@@ -402,7 +402,17 @@ class DeliveryController extends Controller
                     continue;
                 }
 
-                $qty = (int) ($content->qty ?? 1) * (int) ($delivery->package_qty ?? 1);
+                $itemName = $content->item->item_name;
+
+                $isTeacherManual =
+                    str_contains(strtolower($itemName), 'teacher') ||
+                    str_contains(strtolower($itemName), 'manual');
+
+                if ($isTeacherManual) {
+                    $qty = (int) $delivery->qty_teachers_manual;
+                } else {
+                    $qty = (int) ($content->qty ?? 1) * (int) ($delivery->package_qty ?? 1);
+                }
 
                 if (isset($data[$sid]['lots'][$lot][$itemName])) {
 

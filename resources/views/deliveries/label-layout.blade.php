@@ -72,15 +72,6 @@ td {
             </tr>
         @endif
 
-        @if($showMunicipality)
-            <tr>
-                <td><strong>Municipality</strong></td>
-                <td colspan="3">
-                    {{ $info['municipality'] }}
-                </td>
-            </tr>
-        @endif
-
         @if($showDivision)
             <tr>
                 <td><strong>Division</strong></td>

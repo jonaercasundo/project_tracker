@@ -127,7 +127,7 @@ td {
                     </td>
 
                     <td style="text-align:center;">
-                        {{ $item['teacher'] }}
+                        {{ $item['unit'] }}
                     </td>
 
                 </tr>

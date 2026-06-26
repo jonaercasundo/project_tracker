@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\models\Package;
+use App\Models\Package;
 
 class PackageStatus extends Model
 {

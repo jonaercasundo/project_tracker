@@ -8,7 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
-
+use App\Services\DashboardService;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -34,7 +34,7 @@ class AuthenticatedSessionController extends Controller
         elseif ($user->hasRole('finance')) {
             return redirect()->route('finance.dashboard');
         }
-        return redirect()->route('dashboard');
+        return redirect()->intended(route('dashboard', absolute: false));
     }
 
     public function destroy(Request $request): RedirectResponse

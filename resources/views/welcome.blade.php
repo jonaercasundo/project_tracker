@@ -37,7 +37,8 @@
 
         <div>
             @auth
-                <a href="/dashboard" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-semibold text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors duration-200">
+                <a href="{{ \App\Services\DashboardService::route(auth()->user()) }}"
+                class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-semibold text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors duration-200">
                     Go to Dashboard
                 </a>
             @else
@@ -69,8 +70,9 @@
 
             <div class="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4">
                 @auth
-                    <a href="/dashboard" class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-600/20 hover:shadow-blue-600/30 hover:-translate-y-0.5 transition-all duration-200">
-                        Open Dashboard
+                    <a href="{{ \App\Services\DashboardService::route(auth()->user()) }}"
+                    class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-semibold text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors duration-200">
+                        Go to Dashboard
                     </a>
                 @else
                     <a href="/register" class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-600/20 hover:shadow-blue-600/30 hover:-translate-y-0.5 transition-all duration-200">

@@ -374,6 +374,7 @@ class DeliveryController extends Controller
                     'municipality' => $school->municipality,
                     'division'     => $school->division,
                     'region'       => $school->region,
+                    'qty_teachers_manual'  => $delivery->qty_teachers_manual,
                 ],
                 'lots' => []
             ];
@@ -413,6 +414,7 @@ class DeliveryController extends Controller
                         'item_name' => $itemName,
                         'qty'       => $qty,
                         'unit'      => $content->item->unit,
+                        'qty_teachers_manual' => $delivery->qty_teachers_manual ?? 0,
                     ];
                 }
             }
@@ -427,6 +429,7 @@ class DeliveryController extends Controller
             'showMunicipality'   => $showMunicipality,
             'showDivision'       => $showDivision,
             'showRegion'         => $showRegion,
+            
         ]
     )
     ->setPaper('a4', 'portrait')

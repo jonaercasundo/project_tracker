@@ -21,26 +21,31 @@ class UserController extends Controller
         $username = $request->username 
             ?? strtolower(str_replace(' ', '.', trim($request->name))) . rand(100, 999);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'username' => $username,
-            'employee_id' => $request->employee_id ?? null,
-            'department' => $request->department ?? null,
-            'position' => $request->position ?? null,
-            'password' => Hash::make($request->password),
-        ]);
+        try {
 
-        // Spatie role assignment (single source of truth)
-        $user->assignRole($request->role);
+            $user = User::create([
+                'name'        => $request->name,
+                'email'       => $request->email,
+                'username'    => $request->email,
+                'employee_id' => $request->employee_id,
+                'department'  => $request->department,
+                'position'    => $request->position,
+                'role'        => $request->role,
+                'password'    => Hash::make($request->password),
+            ]);
+            $user->assignRole($request->role);
 
-        return back()->with('success', 'User created successfully.');
+            return back()->with('success', 'User created successfully.');
+
+        } catch (\Exception $e) {
+            dd($e->getMessage(), $e->getTraceAsString());
+        }
     }
 
     public function update(Request $request)
     {
         $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'user_id' => 'required|exists:users,user_id',
             'role' => 'required|exists:roles,name',
         ]);
 
@@ -50,5 +55,15 @@ class UserController extends Controller
         $user->syncRoles([$request->role]);
 
         return back()->with('success', 'Role updated successfully.');
+    }
+    public function destroy($id)
+    {
+        $user = User::findOrFail($id);
+
+        $user->delete();
+
+        return redirect()
+            ->route('admin.dashboard')
+            ->with('success', 'User deleted successfully.');
     }
 }

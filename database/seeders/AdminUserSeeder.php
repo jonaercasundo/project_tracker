@@ -17,8 +17,9 @@ class AdminUserSeeder extends Seeder
                 'employee_id' => '26-0518',
                 'password' => Hash::make('@Hanabi16'),
                 'position' => 'IT',
-                'department' => 'IT',
                 'role' => 'admin',
+                'department' => 'IT',
+                'username' => 'jcasundo.sedge@gmail.com',
             ]
         );
 

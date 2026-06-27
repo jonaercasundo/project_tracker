@@ -14,6 +14,7 @@ use App\Http\Controllers\LocationController;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\BiddingController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -159,6 +160,31 @@ Route::middleware(['auth'])->group(function () {
             return view('finance.dashboard');
         })->name('finance.dashboard');
 
+        /*
+            |--------------------------------------------------------------------------
+            | Change Profile
+            |--------------------------------------------------------------------------
+        */
+        Route::get('/bidding', [BiddingController::class, 'index'])
+        ->name('bidding.index');
+
+        Route::get('/bidding/create', [BiddingController::class, 'create'])
+            ->name('bidding.create');
+
+        Route::post('/bidding', [BiddingController::class, 'store'])
+            ->name('bidding.store');
+
+        Route::get('/bidding/{bidding}', [BiddingController::class, 'show'])
+            ->name('bidding.show');
+
+        Route::get('/bidding/{bidding}/edit', [BiddingController::class, 'edit'])
+            ->name('bidding.edit');
+
+        Route::put('/bidding/{bidding}', [BiddingController::class, 'update'])
+            ->name('bidding.update');
+
+        Route::delete('/bidding/{bidding}', [BiddingController::class, 'destroy'])
+            ->name('bidding.destroy');
     });
     /*
         |--------------------------------------------------------------------------
@@ -180,4 +206,20 @@ Route::get('/pinterest/trends', [TikTokController::class, 'fetchHomePinterestTre
     ->name('pinterest.trends');
 Route::get('/google/trends', [TikTokController::class, 'fetchHomeGoogleTrends'])
     ->name('google.trends');
+
+
+
+    Route::prefix('api')->group(function () {
+
+    Route::get('/countries', [LocationController::class, 'countries']);
+
+    Route::get('/regions', [LocationController::class, 'regions']);
+
+    Route::get('/provinces', [LocationController::class, 'provinces']);
+
+    Route::get('/cities', [LocationController::class, 'cities']);
+
+    Route::get('/barangays', [LocationController::class, 'barangays']);
+
+});
 require __DIR__.'/auth.php';

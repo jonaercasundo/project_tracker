@@ -23,6 +23,7 @@ return new class extends Migration
 
         // Modify existing role enum to add new values
         DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM(
+            'admin',
             'Super Admin',
             'Warehouse Admin',
             'Warehouse Coordinator',

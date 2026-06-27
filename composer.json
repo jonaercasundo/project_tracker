@@ -10,6 +10,7 @@
         "endroid/qr-code": "^6.0",
         "laravel/framework": "^11.0",
         "laravel/tinker": "^2.9",
+        "maatwebsite/excel": "^1.1",
         "phpoffice/phpspreadsheet": "^5.8",
         "spatie/laravel-permission": "^6.25"
     },

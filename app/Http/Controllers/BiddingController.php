@@ -51,59 +51,68 @@ class BiddingController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-
             'project_name' => 'required|string|max:255',
             'project_id' => 'required|string|max:255',
-            'procuring_entity' => 'nullable|string|max:255',
 
+            'lots' => 'required|array|min:1',
+            'lots.*.lot_no' => 'required|string|max:50',
+
+            'lots.*.items' => 'nullable|array',
+            'lots.*.items.*.item_description' => 'nullable|string',
         ]);
 
         DB::transaction(function () use ($request) {
 
             $project = ProjectInformation::create([
-
                 'project_name' => $request->project_name,
                 'project_id' => $request->project_id,
                 'procuring_entity' => $request->procuring_entity,
                 'approved_budget_contract_abc' => $request->approved_budget_contract_abc,
-                'lot_no' => $request->lot_no,
                 'delivery_period' => $request->delivery_period,
-                'country' => $request->country,
-                'region' => $this->psgcName($request->region),
-                'province' => $this->psgcName($request->province),
-                'city_municipality' => $this->psgcName($request->city),
-                'barangay' => $this->psgcName($request->barangay),
-                'delivery_address' => $request->address,
                 'date_of_bid_opening' => $request->date_of_bid_opening,
-                'notes_special_condition' => $request->notes_special_condition,
                 'prepared_by' => $request->prepared_by,
                 'prepared_date' => $request->prepared_date,
                 'verified_by' => $request->verified_by,
                 'status' => $request->status ?? 'Draft',
-
             ]);
 
-            foreach ($request->items ?? [] as $item) {
+            foreach ($request->lots as $lotData) {
 
-                if (empty($item['item_description'])) {
-                    continue;
-                }
-
-                $project->items()->create([
-
-                    'item_no' => $item['item_no'],
-                    'item_description' => $item['item_description'],
-                    'unit' => $item['unit'],
-                    'quantity' => $item['quantity'],
-                    'unit_cost' => $item['unit_cost'],
-                    'total_amount' => $item['total_amount'],
-                    'brand' => $item['brand'],
-                    'remarks' => $item['remarks'],
-
+                $lot = $project->lots()->create([
+                    'lot_no'                  => $lotData['lot_no'],
+                    'country' => $lotData['country_code'] == 'PH'
+                        ? 'Philippines'
+                        : $lotData['country_code'],
+                    'region' => $this->psgcName($lotData['region_code'] ?? null),
+                    'province' => $this->psgcName($lotData['province_code'] ?? null),
+                    'city_municipality' => $this->psgcName($lotData['city_code'] ?? null),
+                    'barangay' => $this->psgcName($lotData['barangay_code'] ?? null),
+                    'delivery_address' => $lotData['delivery_address'] ?? null,
                 ]);
-            }
-        });
 
+                foreach ($lotData['items'] ?? [] as $index => $item) {
+
+                    if (empty($item['item_description'])) {
+                        continue;
+                    }
+                    $quantity = (float)($item['quantity'] ?? 0);
+                    $unitCost = (float)str_replace(',', '', $item['unit_cost'] ?? 0);
+                    $total_amount = (float)str_replace(',', '', $item['total_amount'] ?? 0);
+                    $lot->items()->create([
+                        'item_no'          => $index + 1,
+                        'item_description' => $item['item_description'],
+                        'unit'             => $item['unit'],
+                        'quantity'         => $quantity,
+                        'unit_cost'        => $unitCost,
+                        'total_amount'     => $total_amount,
+                        'brand'            => $item['brand'],
+                        'remarks'          => $item['remarks'],
+                    ]);
+                }
+            }
+
+        });
+        
         return redirect()
             ->route('bidding.index')
             ->with('success', 'Bidding document created successfully.');
@@ -143,7 +152,7 @@ class BiddingController extends Controller
                 'project_name' => $request->project_name,
                 'project_id' => $request->project_id,
                 'procuring_entity' => $request->procuring_entity,
-                'approved_budget_contract_abc' => $request->approved_budget_contract_abc,
+                'approved_budget_contract_abc' => str_replace(',', '', $request->approved_budget_contract_abc),
                 'lot_no' => $request->lot_no,
                 'delivery_period' => $request->delivery_period,
                 'country' => $request->country,
@@ -168,7 +177,7 @@ class BiddingController extends Controller
                 if (empty($item['item_description'])) {
                     continue;
                 }
-
+                $total = (float)($item['quantity'] ?? 0) * (float)($item['unit_cost'] ?? 0);
                 $bidding->items()->create([
 
                     'item_no' => $item['item_no'],
@@ -176,7 +185,7 @@ class BiddingController extends Controller
                     'unit' => $item['unit'],
                     'quantity' => $item['quantity'],
                     'unit_cost' => $item['unit_cost'],
-                    'total_amount' => $item['total_amount'],
+                    'total_amount' => $total,
                     'brand' => $item['brand'],
                     'remarks' => $item['remarks'],
 

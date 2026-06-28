@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\ProjectLot;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProjectInformation extends Model
 {
@@ -32,5 +34,9 @@ class ProjectInformation extends Model
     public function items()
     {
         return $this->hasMany(ProjectItem::class, 'project_information_id');
+    }
+    public function lots(): HasMany
+    {
+        return $this->hasMany(ProjectLot::class, 'project_id');
     }
 }

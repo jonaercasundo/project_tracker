@@ -11,8 +11,8 @@ return new class extends Migration
         Schema::create('project_items', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('project_information_id')
-                ->constrained('project_information')
+            $table->foreignId('lot_id')
+                ->constrained('lots')
                 ->cascadeOnDelete();
 
             $table->integer('item_no');
@@ -32,6 +32,9 @@ return new class extends Migration
             $table->text('remarks')->nullable();
 
             $table->timestamps();
+
+            // Prevent duplicate item numbers within the same lot
+            $table->unique(['lot_id', 'item_no']);
         });
     }
 

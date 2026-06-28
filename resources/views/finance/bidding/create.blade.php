@@ -40,19 +40,8 @@
 
         @csrf
 
-        @include('finance.bidding.partials._form')
-        @push('scripts')
-            <script>
-            function autoResize(el) {
-                el.style.height = 'auto';
-                el.style.height = el.scrollHeight + 'px';
-            }
+        @include('finance.bidding.partials._forms')
 
-            document.addEventListener('DOMContentLoaded', function () {
-                document.querySelectorAll('.description').forEach(autoResize);
-            });
-            </script>
-@endpush
     </form>
 <script>
 

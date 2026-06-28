@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProjectItem extends Model
 {
@@ -18,8 +19,8 @@ class ProjectItem extends Model
         'remarks',
     ];
 
-    public function project()
+    public function lot(): BelongsTo
     {
-         return $this->belongsTo(ProjectInformation::class, 'project_information_id');
+        return $this->belongsTo(ProjectLot::class, 'lot_id');
     }
 }

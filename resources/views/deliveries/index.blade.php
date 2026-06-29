@@ -25,77 +25,8 @@
             </button>
         </div>
     </div>
-{{-- FILTERS --}}
-<form method="GET" action="{{ url()->current() }}"
-      class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        {{-- YEAR --}}
-        <select name="year" id="year"
-            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
-            <option value="">Year</option>
-            @foreach($years as $y)
-                <option value="{{ $y }}" @selected(request('year') == $y)>
-                    {{ $y }}
-                </option>
-            @endforeach
-        </select>
-        {{-- PROJECT --}}
-        <select name="project" id="project"
-            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
-            <option value="">Project</option>
-            @foreach($projects as $project)
-                <option value="{{ $project->project_id }}"
-                    @selected(request('project') == $project->project_id)>
-                    {{ \Illuminate\Support\Str::limit($project->project_name, 40) }}
-                </option>
-            @endforeach
-        </select>
-
-        {{-- LOT (depends on project) --}}
-        <select name="lot" id="lot"
-            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
-            <option value="">Lot</option>
-        </select>
-
-        {{-- REGION --}}
-        <select name="region" id="region"
-            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
-                @foreach($regions as $r)
-                    <option value="{{ $r->region }}"
-                        @selected(request('region') == $r->region)>
-                        {{ $r->region }}
-                    </option>
-                @endforeach
-        </select>
-
-        {{-- DIVISION --}}
-        <select name="division" id="division"
-            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
-            <option value="">Division</option>
-        </select>
-
-        {{-- MUNICIPALITY --}}
-        <select name="municipality" id="municipality"
-            class="px-3 py-2 rounded-xl border text-sm bg-slate-50/50">
-            <option value="">Municipality</option>
-        </select>
-
-    </div>
-
-    {{-- ACTION --}}
-    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-        <a href="{{ url()->current() }}"
-           class="px-4 py-2 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200">
-            Reset
-        </a>
-
-        <button class="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700">
-            Apply Filters
-        </button>
-    </div>
-
-</form>
+            {{-- FILTERS --}}
+            @include('deliveries.partials._filters')
             <label class="flex items-center gap-2 px-3 py-2 bg-white border rounded-xl text-xs font-semibold">
                 <input type="checkbox" id="select-all-drs">
                 Select All
@@ -404,54 +335,54 @@ document.addEventListener('DOMContentLoaded', function () {
         municipality.innerHTML = '<option value="">Municipality</option>';
     });
 
-});
-function generateQR() {
-
-    let ids = [];
-
-    document.querySelectorAll('.dr-checkbox:checked').forEach(cb => {
-        ids.push(cb.value);
     });
+    function generateQR() {
 
-    if (ids.length === 0) {
-        alert("Select at least one DR");
-        return;
+        let ids = [];
+
+        document.querySelectorAll('.dr-checkbox:checked').forEach(cb => {
+            ids.push(cb.value);
+        });
+
+        if (ids.length === 0) {
+            alert("Select at least one DR");
+            return;
+        }
+
+        const url = `/deliveries/pdf?ids=${ids.join(',')}`;
+
+        window.open(url, '_blank');
     }
+    document.addEventListener('DOMContentLoaded', function () {
 
-    const url = `/deliveries/pdf?ids=${ids.join(',')}`;
+        const selectAll = document.getElementById('select-all-drs');
 
-    window.open(url, '_blank');
-}
-document.addEventListener('DOMContentLoaded', function () {
+        if (selectAll) {
 
-    const selectAll = document.getElementById('select-all-drs');
+            selectAll.addEventListener('change', function () {
 
-    if (selectAll) {
+                document.querySelectorAll('.dr-checkbox').forEach(cb => {
+                    cb.checked = this.checked;
+                });
 
-        selectAll.addEventListener('change', function () {
+            });
 
             document.querySelectorAll('.dr-checkbox').forEach(cb => {
-                cb.checked = this.checked;
-            });
 
-        });
+                cb.addEventListener('change', function () {
 
-        document.querySelectorAll('.dr-checkbox').forEach(cb => {
+                    const total = document.querySelectorAll('.dr-checkbox').length;
+                    const checked = document.querySelectorAll('.dr-checkbox:checked').length;
 
-            cb.addEventListener('change', function () {
+                    selectAll.checked = total === checked;
 
-                const total = document.querySelectorAll('.dr-checkbox').length;
-                const checked = document.querySelectorAll('.dr-checkbox:checked').length;
-
-                selectAll.checked = total === checked;
+                });
 
             });
 
-        });
+        }
 
-    }
-
-});
+    });
 
 </script>
 <script>

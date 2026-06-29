@@ -114,7 +114,8 @@ Route::middleware(['auth'])->group(function () {
             |--------------------------------------------------------------------------
         */
 
-        Route::get('/entry/{id}', [DeliveryController::class, 'entry'])->name('entry.page');
+        Route::get('/entry/{id}/{delivery_id}', [DeliveryController::class, 'entry'])
+        ->name('entry.page');
         Route::get('/scan/{id}', [DeliveryController::class, 'scan'])->name('scan.page');
         Route::get('/entry/{id}/{delivery_id}', [EntryController::class, 'show'])
             ->name('entry.show');

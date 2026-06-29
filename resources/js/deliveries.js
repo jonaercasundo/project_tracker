@@ -79,6 +79,8 @@
             fillSelect(division, [], '', '', 'All Divisions');
             fillSelect(municipality, [], '', '', 'All Municipalities');
             console.log('REGIONS:', regions);
+            console.log('PROJECT:', project.value);
+            console.log('LOT:', lot.value);
         });
 
         // =========================

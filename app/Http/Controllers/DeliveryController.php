@@ -20,7 +20,11 @@ class DeliveryController extends Controller
 {
    public function index(Request $request)
 {
-    $limit = 10;
+    $limit = (int) $request->input('per_page', 10);
+
+    if (!in_array($limit, [10, 20, 30, 50, 100])) {
+        $limit = 10;
+    }
     $page = max(1, (int) $request->get('page', 1));
     $offset = ($page - 1) * $limit;
 
@@ -179,6 +183,8 @@ class DeliveryController extends Controller
 
     $regions = DB::table('school')
         ->select('region')
+        ->whereNotNull('region')
+        ->where('region', '<>', '')
         ->distinct()
         ->orderBy('region')
         ->get();

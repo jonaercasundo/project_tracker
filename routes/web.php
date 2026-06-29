@@ -108,22 +108,33 @@ Route::middleware(['auth'])->group(function () {
                 ->orderBy('lot_name')
                 ->get();
         });
-        Route::get('/api/lot-info', function (Request $request) {
+Route::get('/api/lot-info', function (Request $request) {
 
-            return DB::table('lot as l')
-                ->join('projects as p', 'p.project_id', '=', 'l.project_id')
-                ->leftJoin('school as s', 's.project_id', '=', 'p.project_id')
-                ->where('l.lot_id', $request->lot)
-                ->select(
-                    'l.lot_id',
-                    'l.project_id',
-                    'p.project_name',
-                    's.region',
-                    's.division',
-                    's.municipality'
-                )
-                ->first();
-        });
+    try {
+
+        $lot = DB::table('lot as l')
+            ->join('projects as p', 'p.project_id', '=', 'l.project_id')
+            ->leftJoin('school as s', 's.project_id', '=', 'p.project_id')
+            ->where('l.lot_id', $request->lot)
+            ->select(
+                'l.lot_id',
+                'l.project_id',
+                'p.project_name',
+                's.region',
+                's.division',
+                's.municipality'
+            )
+            ->first();
+
+        return response()->json($lot);
+
+    } catch (\Throwable $e) {
+
+        return response()->json([
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
         Route::get('/deliveries/batch-qr', [DeliveryController::class, 'batchQr'])
         ->name('deliveries.batch-qr');
         Route::post('/deliveries/labels', [DeliveryController::class, 'generateLabels'])

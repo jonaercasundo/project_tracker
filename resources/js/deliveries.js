@@ -5,6 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const region = document.getElementById('region');
     const division = document.getElementById('division');
     const municipality = document.getElementById('municipality');
+    const year = document.getElementById('year');
+
+    if (!project) return;
 
     function fillSelect(select, data, valueField, textField, placeholder) {
 
@@ -16,56 +19,60 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${row[textField]}
                 </option>`;
         });
-
     }
 
-    // -----------------------
-    // Project -> Lots + Regions
-    // -----------------------
+    // -------------------------
+    // PROJECT -> LOTS + REGIONS
+    // -------------------------
     project.addEventListener('change', async () => {
 
         fillSelect(lot, [], '', '', 'Loading...');
         fillSelect(region, [], '', '', 'Loading...');
-        fillSelect(division, [], '', '', 'Division');
-        fillSelect(municipality, [], '', '', 'Municipality');
+        fillSelect(division, [], '', '', 'All Divisions');
+        fillSelect(municipality, [], '', '', 'All Municipalities');
 
-        let lots = await fetch(`/api/filter/lots?project=${project.value}`);
-        lots = await lots.json();
+        if (!project.value) return;
+
+        let response = await fetch(`/filter/lots?project=${project.value}`);
+        let lots = await response.json();
 
         fillSelect(lot, lots, 'lot_id', 'lot_name', 'All Lots');
 
-        let regions = await fetch(`/api/filter/regions?project=${project.value}`);
-        regions = await regions.json();
+        response = await fetch(`/filter/regions?project=${project.value}`);
+        let regions = await response.json();
 
         fillSelect(region, regions, 'region', 'region', 'All Regions');
 
     });
 
-    // -----------------------
-    // Lot -> Regions
-    // -----------------------
+    // -------------------------
+    // LOT -> REGIONS
+    // -------------------------
     lot.addEventListener('change', async () => {
 
-        let regions = await fetch(
-            `/api/filter/regions?project=${project.value}&lot=${lot.value}`
+        let response = await fetch(
+            `/filter/regions?project=${project.value}&lot=${lot.value}`
         );
 
-        regions = await regions.json();
+        let regions = await response.json();
 
         fillSelect(region, regions, 'region', 'region', 'All Regions');
 
+        fillSelect(division, [], '', '', 'All Divisions');
+        fillSelect(municipality, [], '', '', 'All Municipalities');
+
     });
 
-    // -----------------------
-    // Region -> Divisions
-    // -----------------------
+    // -------------------------
+    // REGION -> DIVISIONS
+    // -------------------------
     region.addEventListener('change', async () => {
 
-        let divisions = await fetch(
-            `/api/filter/divisions?project=${project.value}&lot=${lot.value}&region=${region.value}`
+        let response = await fetch(
+            `/filter/divisions?project=${project.value}&lot=${lot.value}&region=${region.value}`
         );
 
-        divisions = await divisions.json();
+        let divisions = await response.json();
 
         fillSelect(
             division,
@@ -75,18 +82,20 @@ document.addEventListener('DOMContentLoaded', () => {
             'All Divisions'
         );
 
+        fillSelect(municipality, [], '', '', 'All Municipalities');
+
     });
 
-    // -----------------------
-    // Division -> Municipality
-    // -----------------------
+    // -------------------------
+    // DIVISION -> MUNICIPALITIES
+    // -------------------------
     division.addEventListener('change', async () => {
 
-        let municipalities = await fetch(
-            `/api/filter/municipalities?project=${project.value}&lot=${lot.value}&region=${region.value}&division=${division.value}`
+        let response = await fetch(
+            `/filter/municipalities?project=${project.value}&lot=${lot.value}&region=${region.value}&division=${division.value}`
         );
 
-        municipalities = await municipalities.json();
+        let municipalities = await response.json();
 
         fillSelect(
             municipality,
@@ -98,4 +107,105 @@ document.addEventListener('DOMContentLoaded', () => {
 
     });
 
+    // -------------------------
+    // YEAR RESET
+    // -------------------------
+    year?.addEventListener('change', () => {
+
+        project.value = '';
+
+        fillSelect(lot, [], '', '', 'All Lots');
+        fillSelect(region, [], '', '', 'All Regions');
+        fillSelect(division, [], '', '', 'All Divisions');
+        fillSelect(municipality, [], '', '', 'All Municipalities');
+
+    });
+
 });
+
+function generateQR() {
+
+    const ids = [];
+
+    document.querySelectorAll('.dr-checkbox:checked').forEach(cb => {
+        ids.push(cb.value);
+    });
+
+    if (!ids.length) {
+        alert('Select at least one DR');
+        return;
+    }
+
+    window.open(`/deliveries/pdf?ids=${ids.join(',')}`, '_blank');
+
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    const selectAll = document.getElementById('select-all-drs');
+
+    if (!selectAll) return;
+
+    selectAll.addEventListener('change', function () {
+
+        document.querySelectorAll('.dr-checkbox').forEach(cb => {
+            cb.checked = this.checked;
+        });
+
+    });
+
+    document.querySelectorAll('.dr-checkbox').forEach(cb => {
+
+        cb.addEventListener('change', () => {
+
+            const total = document.querySelectorAll('.dr-checkbox').length;
+            const checked = document.querySelectorAll('.dr-checkbox:checked').length;
+
+            selectAll.checked = total === checked;
+
+        });
+
+    });
+
+});
+
+function generateLabels() {
+
+    const ids = [];
+
+    document.querySelectorAll('.dr-checkbox:checked').forEach(cb => {
+        ids.push(cb.value);
+    });
+
+    if (!ids.length) {
+        alert('Select at least one DR');
+        return;
+    }
+
+    const token = document.querySelector('meta[name="csrf-token"]').content;
+
+    const form = document.createElement('form');
+
+    form.method = 'POST';
+    form.action = '/deliveries/labels';
+    form.target = '_blank';
+
+    const csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = '_token';
+    csrf.value = token;
+
+    form.appendChild(csrf);
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'ids';
+    input.value = ids.join(',');
+
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+
+}

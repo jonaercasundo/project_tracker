@@ -181,7 +181,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/bidding/create', [BiddingController::class, 'create'])
             ->name('bidding.create');
-
+        Route::get('deliveries/labels', [DeliveryController::class, 'generateLabels']);
         Route::post('/bidding', [BiddingController::class, 'store'])
             ->name('bidding.store');
 

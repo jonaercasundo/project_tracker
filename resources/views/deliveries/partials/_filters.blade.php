@@ -110,12 +110,13 @@
                 Lot
             </label>
 
-            <select id="lot"
-                    name="lot"
-                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
-
+            <select id="lot" name="lot" ...>
                 <option value="">All Lots</option>
-
+                @foreach($lots as $l)
+                    <option value="{{ $l->lot_id }}" @selected(request('lot') == $l->lot_id)>
+                        {{ $l->lot_name }}
+                    </option>
+                @endforeach
             </select>
         </div>
 

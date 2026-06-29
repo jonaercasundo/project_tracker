@@ -192,3 +192,43 @@ window.generateLabels = function () {
     form.submit();
     form.remove();
 };
+// Add this at the bottom of your DOMContentLoaded block
+
+async function restoreFilters() {
+    const params = new URLSearchParams(window.location.search);
+
+    const projectVal   = params.get('project');
+    const lotVal       = params.get('lot');
+    const regionVal    = params.get('region');
+    const divisionVal  = params.get('division');
+
+    if (!projectVal) return;
+
+    // Restore lots
+    const lots = await fetchData(`/filter/lots?project=${encodeURIComponent(projectVal)}`);
+    fillSelect(lot, lots, 'lot_id', 'lot_name', 'All Lots');
+    lot.value = lotVal ?? '';
+
+    if (!lotVal) return;
+
+    // Restore regions
+    const regions = await fetchData(`/filter/regions?project=${encodeURIComponent(projectVal)}&lot=${encodeURIComponent(lotVal)}`);
+    fillSelect(region, regions, 'region', 'region', 'All Regions');
+    region.value = regionVal ?? '';
+
+    if (!regionVal) return;
+
+    // Restore divisions
+    const divisions = await fetchData(`/filter/divisions?project=${encodeURIComponent(projectVal)}&lot=${encodeURIComponent(lotVal)}&region=${encodeURIComponent(regionVal)}`);
+    fillSelect(division, divisions, 'division', 'division', 'All Divisions');
+    division.value = divisionVal ?? '';
+
+    if (!divisionVal) return;
+
+    // Restore municipalities
+    const municipalities = await fetchData(`/filter/municipalities?project=${encodeURIComponent(projectVal)}&lot=${encodeURIComponent(lotVal)}&region=${encodeURIComponent(regionVal)}&division=${encodeURIComponent(divisionVal)}`);
+    fillSelect(municipality, municipalities, 'municipality', 'municipality', 'All Municipalities');
+    municipality.value = params.get('municipality') ?? '';
+}
+
+restoreFilters();

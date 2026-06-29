@@ -260,6 +260,10 @@ public function getMunicipalities(Request $request)
     // DROPDOWNS
     // =========================
     $projects = DB::table('projects')->get();
+    // ADD THIS HERE
+    $lots = $request->filled('project')
+        ? DB::table('lot')->where('project_id', $request->project)->orderBy('lot_name')->get()
+        : collect();
 
     return view('deliveries.index', [
         'grouped_deliveries' => $grouped,
@@ -269,6 +273,7 @@ public function getMunicipalities(Request $request)
         'total_pages' => $total_pages,
         'total_rows' => $total_rows,
         'regions' => collect(), // empty initially
+        'lots' => $lots,  // ADD THIS TOO
     ]);
 }
     public function generate(Request $request)

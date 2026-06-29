@@ -188,8 +188,7 @@ class DeliveryController extends Controller
                 'l.lot_name',
                 'i.item_name'
             )
-            ->orderBy('d.status')
-            ->orderBy('d.delivery_date')
+            ->orderBy('d.dr_no', 'asc')
             ->get();
 
         // =========================

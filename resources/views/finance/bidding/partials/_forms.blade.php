@@ -503,7 +503,7 @@
             </div>
 
             <div class="bf-field">
-                <label class="bf-label" style="font-size:8.5px;"><i class="ti ti-coin"></i> Approved Budget for the Contract (ABC)</label>
+                <label class="bf-label" style="font-size:8.5px;"><i class="ti ti-coin"></i> Approved Budget for the Contracts (ABC)</label>
                 <div class=" flex items-center gap-2">
                     <span class="text-slate-600 font-medium">₱</span>
                         <input

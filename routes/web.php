@@ -226,4 +226,5 @@ Route::get('/google/trends', [TikTokController::class, 'fetchHomeGoogleTrends'])
     Route::get('/barangays', [LocationController::class, 'barangays']);
 
 });
+Route::get('/entry', [EntryController::class, 'index']);
 require __DIR__.'/auth.php';

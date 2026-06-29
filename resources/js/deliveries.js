@@ -55,37 +55,54 @@
         // LOT CHANGE
         // =========================
         lot?.addEventListener('change', async () => {
-            if (!project.value || !lot.value) return;
 
-            const regions = await fetchData(`/filter/regions?project=${encodeURIComponent(project.value)}&lot=${encodeURIComponent(lot.value)}`);
+            if (!project?.value) {
+                console.warn('Project not selected');
+                return;
+            }
+
+            if (!lot?.value) return;
+
+            const regions = await fetchData(
+                `/filter/regions?project=${encodeURIComponent(project.value)}&lot=${encodeURIComponent(lot.value)}`
+            );
+
             fillSelect(region, regions, 'region', 'region', 'All Regions');
-            fillSelect(division, [], '', '', 'All Divisions');
-            fillSelect(municipality, [], '', '', 'All Municipalities');
         });
 
         // =========================
         // REGION CHANGE
         // =========================
         region?.addEventListener('change', async () => {
+
+            if (!project?.value || !lot?.value) {
+                console.warn('Missing project or lot');
+                return;
+            }
+
             const divisions = await fetchData(
                 `/filter/divisions?project=${encodeURIComponent(project.value)}`
                 + `&lot=${encodeURIComponent(lot.value)}`
                 + `&region=${encodeURIComponent(region.value)}`
             );
+
             fillSelect(division, divisions, 'division', 'division', 'All Divisions');
-            fillSelect(municipality, [], '', '', 'All Municipalities');
         });
 
         // =========================
         // DIVISION CHANGE
         // =========================
         division?.addEventListener('change', async () => {
+
+            if (!project?.value || !lot?.value || !region?.value) return;
+
             const municipalities = await fetchData(
                 `/filter/municipalities?project=${encodeURIComponent(project.value)}`
                 + `&lot=${encodeURIComponent(lot.value)}`
                 + `&region=${encodeURIComponent(region.value)}`
                 + `&division=${encodeURIComponent(division.value)}`
             );
+
             fillSelect(municipality, municipalities, 'municipality', 'municipality', 'All Municipalities');
         });
 

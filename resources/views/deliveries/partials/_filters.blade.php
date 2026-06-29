@@ -1,8 +1,5 @@
 
-<form method="GET"
-      action="{{ url()->current() }}"
-      class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-5">
-
+<form method="GET" action="{{ url()->current() }}" id="filter-form" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-5">
     {{-- SEARCH --}}
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
 
@@ -57,7 +54,7 @@
     <hr class="border-slate-200">
 
     {{-- FILTERS --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div id="filter-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
 
         {{-- Year --}}
         <div>

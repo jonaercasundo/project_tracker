@@ -70,17 +70,18 @@
         // =========================
         lot?.addEventListener('change', async () => {
 
+            if (!project.value || !lot.value) {
+                console.warn('Missing project or lot');
+                return;
+            }
+
             const url = `/filter/regions?project=${encodeURIComponent(project.value)}&lot=${encodeURIComponent(lot.value)}`;
 
             const regions = await fetchData(url);
 
-            fillSelect(region, regions, 'region', 'region', 'All Regions');
-
-            fillSelect(division, [], '', '', 'All Divisions');
-            fillSelect(municipality, [], '', '', 'All Municipalities');
             console.log('REGIONS:', regions);
-            console.log('PROJECT:', project.value);
-            console.log('LOT:', lot.value);
+
+            fillSelect(region, regions, 'region', 'region', 'All Regions');
         });
 
         // =========================

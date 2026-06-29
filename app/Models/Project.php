@@ -23,5 +23,9 @@ class Project extends Model
             'project_id'
         );
     }
+    public function items()
+    {
+        return $this->hasMany(\App\Models\New\Item::class, 'project_id', 'project_id');
+    }
     
 }

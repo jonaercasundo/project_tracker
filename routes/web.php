@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\BiddingController;
+use App\Http\Controllers\ItemController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -94,7 +95,18 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/projects/{project:project_id}', [ProjectController::class, 'show'])
         ->name('projects.show');
 
-
+        /*
+            |--------------------------------------------------------------------------
+            | ITEMS
+            |--------------------------------------------------------------------------
+        */
+        Route::get('/items', [ItemController::class, 'index'])
+                ->name('item.index');
+        /*
+            |--------------------------------------------------------------------------
+            | DELIVERIES
+            |--------------------------------------------------------------------------
+        */
         Route::get('/deliveries/tracking', [DeliveryController::class, 'index'])
         ->name('deliveries.tracking');
         

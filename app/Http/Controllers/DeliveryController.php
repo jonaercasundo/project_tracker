@@ -349,10 +349,11 @@ class DeliveryController extends Controller
             foreach ($statuses as $status) {
                 if (!$status->package_status_id) continue;
 
-                $url = route('entry.show', [
-                    'id' => $status->package_status_id,
-                    'delivery_id' => $delivery->delivery_id
-                ]);
+                $url = sprintf(
+                    'https://mmc.metro-ltd.com/entry.php?id=%s&delivery_id=%s',
+                    $status->package_status_id,
+                    $delivery->delivery_id
+                );
                 $result = (new PngWriter())->write(new QrCode($url));
 
                 $qrCodes[$status->package_status_id] =

@@ -100,39 +100,20 @@ Route::middleware(['auth'])->group(function () {
         
         Route::get('/deliveries/pdf', [DeliveryController::class, 'generate'])
         ->name('deliveries.pdf');
-Route::get('/api/lot-info', function (Request $request) {
 
-    try {
-
-        $lot = DB::table('lot as l')
-            ->join('projects as p', 'p.project_id', '=', 'l.project_id')
-            ->leftJoin('deliveries as d', 'd.lot_id', '=', 'l.lot_id')
-            ->leftJoin('school as s', 's.school_id', '=', 'd.school_id')
-            ->where('l.lot_id', $request->lot)
-            ->select(
-                'l.lot_id',
-                'l.project_id',
-                'p.project_name',
-                's.region',
-                's.division',
-                's.municipality'
-            )
-            ->distinct()
-            ->get();
-
-        return response()->json($lot);
-
-    } catch (\Throwable $e) {
-
-        return response()->json([
-            'error' => $e->getMessage()
-        ], 500);
-    }
-});
+        Route::get('/api/lots', function (Request $request) {
+            return DB::table('lot')
+                ->where('project_id', $request->project)
+                ->select('lot_id', 'lot_name')
+                ->orderBy('lot_name')
+                ->get();
+        });
+        
         Route::get('/deliveries/batch-qr', [DeliveryController::class, 'batchQr'])
         ->name('deliveries.batch-qr');
         Route::post('/deliveries/labels', [DeliveryController::class, 'generateLabels'])
         ->name('deliveries.labels');
+
         Route::get('/filter/lots', [DeliveryController::class, 'getLots']);
         Route::get('/filter/regions', [DeliveryController::class, 'getRegions']);
         Route::get('/filter/divisions', [DeliveryController::class, 'getDivisions']);

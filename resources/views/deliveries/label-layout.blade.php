@@ -83,18 +83,11 @@ td {
 
         @foreach($school['lots'] as $lotName => $items)
 
-                @php
-                    $items = array_values($items ?? []);
-
-                    // FILTER invalid rows
-                    $items = array_filter($items, function($item) {
-                        return is_array($item) && !empty($item['item_name']);
-                    });
-
-                    $itemCount = count($items);
-
-                    if ($itemCount === 0) continue;
-                @endphp
+            @php
+                $items = array_values($items);
+                $itemCount = count($items);
+                $first = true;
+            @endphp
 
             @foreach($items as $item)
 

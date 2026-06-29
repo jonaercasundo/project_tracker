@@ -97,26 +97,6 @@ public function getMunicipalities(Request $request)
         ->orderBy('s.municipality')
         ->get();
 }
-
-    public function regions(Request $request)
-{
-    $query = DB::table('deliveries as d')
-        ->join('school as s', 's.school_id', '=', 'd.school_id')
-        ->select('s.region')
-        ->distinct();
-
-    if ($request->filled('project')) {
-        $query->where('d.project_id', $request->project);
-    }
-
-    if ($request->filled('lot')) {
-        $query->where('d.lot_id', $request->lot);
-    }
-
-    return $query
-        ->orderBy('s.region')
-        ->get();
-}
    public function index(Request $request)
 {
     $limit = (int) $request->input('per_page', 10);

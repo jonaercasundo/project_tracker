@@ -101,9 +101,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/deliveries/pdf', [DeliveryController::class, 'generate'])
         ->name('deliveries.pdf');
 
-        Route::get('/api/regions', [LocationController::class, 'regions']);
-        Route::get('/api/divisions', [LocationController::class, 'divisions']);
-        Route::get('/api/municipalities', [LocationController::class, 'municipalities']);
         Route::get('/api/lots', function (Request $request) {
             return DB::table('lot')
                 ->where('project_id', $request->project)
@@ -131,7 +128,6 @@ Route::middleware(['auth'])->group(function () {
         ->name('deliveries.batch-qr');
         Route::post('/deliveries/labels', [DeliveryController::class, 'generateLabels'])
         ->name('deliveries.labels');
-        Route::get('/regions', [DeliveryController::class, 'regions']);
         Route::get('/filter/lots', [DeliveryController::class, 'getLots']);
         Route::get('/filter/regions', [DeliveryController::class, 'getRegions']);
         Route::get('/filter/divisions', [DeliveryController::class, 'getDivisions']);

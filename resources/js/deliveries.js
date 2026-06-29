@@ -52,7 +52,7 @@
         project?.addEventListener('change', async () => {
 
             fillSelect(lot, [], '', '', 'Loading...');
-            fillSelect(region, [], '', '', 'Loading...');
+            fillSelect(region, [], '', '', 'All Regions');
             fillSelect(division, [], '', '', 'All Divisions');
             fillSelect(municipality, [], '', '', 'All Municipalities');
 
@@ -60,13 +60,9 @@
 
             const projectVal = encodeURIComponent(project.value);
 
-            const [lots, regions] = await Promise.all([
-                fetchData(`/filter/lots?project=${projectVal}`),
-                fetchData(`/filter/regions?project=${projectVal}`)
-            ]);
+            const lots = await fetchData(`/filter/lots?project=${projectVal}`);
 
             fillSelect(lot, lots, 'lot_id', 'lot_name', 'All Lots');
-            fillSelect(region, regions, 'region', 'region', 'All Regions');
         });
 
         // =========================
@@ -82,6 +78,7 @@
 
             fillSelect(division, [], '', '', 'All Divisions');
             fillSelect(municipality, [], '', '', 'All Municipalities');
+            console.log('REGIONS:', regions);
         });
 
         // =========================

@@ -32,7 +32,7 @@ public function getRegions(Request $request)
 {
     $query = DB::table('deliveries as d')
         ->join('school as s', 's.school_id', '=', 'd.school_id')
-        ->select('s.region')
+        ->select('s.region as region')
         ->whereNotNull('s.region');
 
     if ($request->filled('project')) {
@@ -44,7 +44,7 @@ public function getRegions(Request $request)
     }
 
     return $query
-        ->groupBy('s.region')
+        ->distinct()
         ->orderBy('s.region')
         ->get();
 }

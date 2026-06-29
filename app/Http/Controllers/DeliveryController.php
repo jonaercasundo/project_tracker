@@ -330,7 +330,7 @@ class DeliveryController extends Controller
             foreach ($statuses as $status) {
                 if (!$status->package_status_id) continue;
 
-                $url = config('app.url') . '/entry.php?id='
+                $url = 'https://mmc.metro-ltd.com/entry.php?id='
                     . $status->package_status_id
                     . '&delivery_id='
                     . $delivery->delivery_id;

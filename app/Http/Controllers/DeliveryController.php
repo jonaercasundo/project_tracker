@@ -332,7 +332,8 @@ class DeliveryController extends Controller
                     . $status->package_status_id
                     . '&delivery_id='
                     . $delivery->delivery_id;
-
+                dd($url);
+                
                 $result = (new PngWriter())->write(new QrCode($url));
 
                 $qrCodes[$status->package_status_id] =

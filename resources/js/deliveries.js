@@ -123,49 +123,54 @@
         // RESTORE FILTERS ON RELOAD  ← MUST BE INSIDE HERE
         // =========================
         async function restoreFilters() {
-            const f = window.FILTER_DEFAULTS ?? {};
 
-            const projectVal      = f.project;
-            const lotVal          = f.lot;
-            const regionVal       = f.region;
-            const divisionVal     = f.division;
-            const municipalityVal = f.municipality;
+    const params = new URLSearchParams(window.location.search);
 
-            if (!projectVal) return;
+    const projectVal      = params.get('project') || '';
+    const lotVal          = params.get('lot') || '';
+    const regionVal       = params.get('region') || '';
+    const divisionVal     = params.get('division') || '';
+    const municipalityVal = params.get('municipality') || '';
 
-            project.value = projectVal;
+    // Project and lot are already rendered by Blade @selected
+    // so we just need to make sure the DOM values match
+    if (project) project.value = projectVal;
+    if (lot) lot.value = lotVal;
 
-            const lots = await fetchData(`/filter/lots?project=${encodeURIComponent(projectVal)}`);
-            fillSelect(lot, lots, 'lot_id', 'lot_name', 'All Lots');
-            lot.value = lotVal ?? '';
+    if (!projectVal || !lotVal) return;
 
-            if (!lotVal) return;
+    // Restore regions
+    const regions = await fetchData(
+        `/filter/regions?project=${encodeURIComponent(projectVal)}&lot=${encodeURIComponent(lotVal)}`
+    );
+    fillSelect(region, regions, 'region', 'region', 'All Regions');
+    region.value = regionVal;
 
-            const regions = await fetchData(`/filter/regions?project=${encodeURIComponent(projectVal)}&lot=${encodeURIComponent(lotVal)}`);
-            fillSelect(region, regions, 'region', 'region', 'All Regions');
-            region.value = regionVal ?? '';
+    if (!regionVal) return;
 
-            if (!regionVal) return;
+    // Restore divisions
+    const divisions = await fetchData(
+        `/filter/divisions`
+        + `?project=${encodeURIComponent(projectVal)}`
+        + `&lot=${encodeURIComponent(lotVal)}`
+        + `&region=${encodeURIComponent(regionVal)}`
+    );
+    fillSelect(division, divisions, 'division', 'division', 'All Divisions');
+    division.value = divisionVal;
 
-            const divisions = await fetchData(
-                `/filter/divisions?project=${encodeURIComponent(projectVal)}`
-                + `&lot=${encodeURIComponent(lotVal)}`
-                + `&region=${encodeURIComponent(regionVal)}`
-            );
-            fillSelect(division, divisions, 'division', 'division', 'All Divisions');
-            division.value = divisionVal ?? '';
+    if (!divisionVal) return;
 
-            if (!divisionVal) return;
-
-            const municipalities = await fetchData(
-                `/filter/municipalities?project=${encodeURIComponent(projectVal)}`
-                + `&lot=${encodeURIComponent(lotVal)}`
-                + `&region=${encodeURIComponent(regionVal)}`
-                + `&division=${encodeURIComponent(divisionVal)}`
-            );
-            fillSelect(municipality, municipalities, 'municipality', 'municipality', 'All Municipalities');
-            municipality.value = municipalityVal ?? '';
-        }
+    // Restore municipalities
+    const municipalities = await fetchData(
+        `/filter/municipalities`
+        + `?project=${encodeURIComponent(projectVal)}`
+        + `&lot=${encodeURIComponent(lotVal)}`
+        + `&region=${encodeURIComponent(regionVal)}`
+        + `&division=${encodeURIComponent(divisionVal)}`
+    );
+    fillSelect(municipality, municipalities, 'municipality', 'municipality', 'All Municipalities');
+    municipality.value = municipalityVal;
+}
 
         restoreFilters(); // ← called here, inside DOMContentLoaded, so DOM vars are in scope
 

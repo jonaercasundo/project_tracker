@@ -1,13 +1,4 @@
-{{-- resources/views/deliveries/_filter.blade.php --}}
-<script>
-    window.FILTER_DEFAULTS = {
-        project: "{{ request('project') }}",
-        lot:     "{{ request('lot') }}",
-        region:  "{{ request('region') }}",
-        division: "{{ request('division') }}",
-        municipality: "{{ request('municipality') }}",
-    };
-</script>
+
 <form method="GET"
       action="{{ url()->current() }}"
       class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-5">
@@ -118,7 +109,7 @@
                 Lot
             </label>
 
-            <select id="lot" name="lot" ...>
+            <select id="lot" name="lot" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
                 <option value="">All Lots</option>
                 @foreach($lots as $l)
                     <option value="{{ $l->lot_id }}" @selected(request('lot') == $l->lot_id)>

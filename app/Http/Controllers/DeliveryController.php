@@ -151,8 +151,7 @@ class DeliveryController extends Controller
         $deliveryIds = (clone $baseQuery)
             ->select('d.delivery_id')
             ->distinct()
-            ->orderBy('d.status')
-            ->orderBy('d.delivery_date')
+            ->orderBy('d.dr_no', 'asc')
             ->limit($limit)
             ->offset($offset)
             ->pluck('d.delivery_id');
@@ -330,7 +329,7 @@ class DeliveryController extends Controller
             foreach ($statuses as $status) {
                 if (!$status->package_status_id) continue;
 
-                $url = 'https://'
+                $url = 'https://mmc.metro-ltd.com/entry.php?id='
                     . $status->package_status_id
                     . '&delivery_id='
                     . $delivery->delivery_id;

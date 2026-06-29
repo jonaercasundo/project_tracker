@@ -31,9 +31,9 @@ class DeliveryController extends Controller
 public function getRegions(Request $request)
 {
     $query = DB::table('deliveries as d')
-        ->leftJoin('school as s', 's.school_id', '=', 'd.school_id')
+        ->join('school as s', 's.school_id', '=', 'd.school_id')
         ->select('s.region')
-        ->distinct();
+        ->whereNotNull('s.region');
 
     if ($request->filled('project')) {
         $query->where('d.project_id', $request->project);
@@ -44,6 +44,7 @@ public function getRegions(Request $request)
     }
 
     return $query
+        ->groupBy('s.region')
         ->orderBy('s.region')
         ->get();
 }

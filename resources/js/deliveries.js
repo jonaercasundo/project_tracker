@@ -1,3 +1,10 @@
+
+import Alpine from 'alpinejs';
+import './bootstrap';
+window.Alpine = Alpine;
+
+Alpine.start();
+
 document.addEventListener('DOMContentLoaded', () => {
 
     const project = document.getElementById('project');
@@ -188,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const checked = document.querySelectorAll('.dr-checkbox:checked').length;
 
             selectAll.checked = total === checked;
-                    
+
         });
 
     });

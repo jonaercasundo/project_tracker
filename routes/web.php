@@ -114,7 +114,8 @@ Route::get('/api/lot-info', function (Request $request) {
 
         $lot = DB::table('lot as l')
             ->join('projects as p', 'p.project_id', '=', 'l.project_id')
-            ->leftJoin('school as s', 's.project_id', '=', 'p.project_id')
+            ->leftJoin('deliveries as d', 'd.lot_id', '=', 'l.lot_id')
+            ->leftJoin('school as s', 's.school_id', '=', 'd.school_id')
             ->where('l.lot_id', $request->lot)
             ->select(
                 'l.lot_id',
@@ -124,7 +125,8 @@ Route::get('/api/lot-info', function (Request $request) {
                 's.division',
                 's.municipality'
             )
-            ->first();
+            ->distinct()
+            ->get();
 
         return response()->json($lot);
 

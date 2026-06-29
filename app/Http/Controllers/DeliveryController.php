@@ -403,7 +403,27 @@ class DeliveryController extends Controller
         ->get();
 
         if ($deliveries->isEmpty()) abort(404, 'No deliveries found.');
+        $deliveries = Delivery::whereIn('delivery_id', $ids)->get();
 
+        foreach ($deliveries as $delivery) {
+
+            $packageIds = DB::table('package')
+                ->where('lot_id', $delivery->lot_id)
+                ->pluck('package_id');
+
+            foreach ($packageIds as $packageId) {
+
+                DB::table('package_status')->updateOrInsert(
+                    [
+                        'delivery_id' => $delivery->delivery_id,
+                        'package_id'  => $packageId,
+                    ],
+                    [
+                        'status' => 'pending'
+                    ]
+                );
+            }
+        }
         $projectId  = $deliveries->first()->project_id;
         $arSettings = ARSetting::where('project_id', $projectId)->first();
 

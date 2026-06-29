@@ -7,23 +7,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const municipality = document.getElementById('municipality');
     const year = document.getElementById('year');
 
+    const selectAll = document.getElementById('select-all-drs');
+
     if (!project) return;
 
     function fillSelect(select, data, valueField, textField, placeholder) {
+        const options = [`<option value="">${placeholder}</option>`];
 
-        select.innerHTML = `<option value="">${placeholder}</option>`;
+        for (const row of data) {
+            options.push(
+                `<option value="${row[valueField]}">${row[textField]}</option>`
+            );
+        }
 
-        data.forEach(row => {
-            select.innerHTML += `
-                <option value="${row[valueField]}">
-                    ${row[textField]}
-                </option>`;
-        });
+        select.innerHTML = options.join('');
     }
 
-    // -------------------------
-    // PROJECT -> LOTS + REGIONS
-    // -------------------------
+    async function fetchData(url) {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('Network error');
+            return await res.json();
+        } catch (err) {
+            console.error(err);
+            return [];
+        }
+    }
+
+    // PROJECT -> LOT + REGION
     project.addEventListener('change', async () => {
 
         fillSelect(lot, [], '', '', 'Loading...');
@@ -33,83 +44,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!project.value) return;
 
-        let response = await fetch(`/filter/lots?project=${project.value}`);
-        let lots = await response.json();
+        const projectVal = encodeURIComponent(project.value);
 
+        const lots = await fetchData(`/filter/lots?project=${projectVal}`);
         fillSelect(lot, lots, 'lot_id', 'lot_name', 'All Lots');
 
-        response = await fetch(`/filter/regions?project=${project.value}`);
-        let regions = await response.json();
-
+        const regions = await fetchData(`/filter/regions?project=${projectVal}`);
         fillSelect(region, regions, 'region', 'region', 'All Regions');
-
     });
 
-    // -------------------------
-    // LOT -> REGIONS
-    // -------------------------
+    // LOT -> REGION
     lot.addEventListener('change', async () => {
 
-        let response = await fetch(
-            `/filter/regions?project=${project.value}&lot=${lot.value}`
-        );
+        const projectVal = encodeURIComponent(project.value);
+        const lotVal = encodeURIComponent(lot.value);
 
-        let regions = await response.json();
+        const regions = await fetchData(
+            `/filter/regions?project=${projectVal}&lot=${lotVal}`
+        );
 
         fillSelect(region, regions, 'region', 'region', 'All Regions');
 
         fillSelect(division, [], '', '', 'All Divisions');
         fillSelect(municipality, [], '', '', 'All Municipalities');
-
     });
 
-    // -------------------------
-    // REGION -> DIVISIONS
-    // -------------------------
+    // REGION -> DIVISION
     region.addEventListener('change', async () => {
 
-        let response = await fetch(
-            `/filter/divisions?project=${project.value}&lot=${lot.value}&region=${region.value}`
-        );
+        const url =
+            `/filter/divisions?project=${encodeURIComponent(project.value)}`
+            + `&lot=${encodeURIComponent(lot.value)}`
+            + `&region=${encodeURIComponent(region.value)}`;
 
-        let divisions = await response.json();
+        const divisions = await fetchData(url);
 
-        fillSelect(
-            division,
-            divisions,
-            'division',
-            'division',
-            'All Divisions'
-        );
+        fillSelect(division, divisions, 'division', 'division', 'All Divisions');
 
         fillSelect(municipality, [], '', '', 'All Municipalities');
-
     });
 
-    // -------------------------
-    // DIVISION -> MUNICIPALITIES
-    // -------------------------
+    // DIVISION -> MUNICIPALITY
     division.addEventListener('change', async () => {
 
-        let response = await fetch(
-            `/filter/municipalities?project=${project.value}&lot=${lot.value}&region=${region.value}&division=${division.value}`
-        );
+        const url =
+            `/filter/municipalities?project=${encodeURIComponent(project.value)}`
+            + `&lot=${encodeURIComponent(lot.value)}`
+            + `&region=${encodeURIComponent(region.value)}`
+            + `&division=${encodeURIComponent(division.value)}`;
 
-        let municipalities = await response.json();
+        const municipalities = await fetchData(url);
 
-        fillSelect(
-            municipality,
-            municipalities,
-            'municipality',
-            'municipality',
-            'All Municipalities'
-        );
-
+        fillSelect(municipality, municipalities, 'municipality', 'municipality', 'All Municipalities');
     });
 
-    // -------------------------
     // YEAR RESET
-    // -------------------------
     year?.addEventListener('change', () => {
 
         project.value = '';
@@ -118,10 +107,63 @@ document.addEventListener('DOMContentLoaded', () => {
         fillSelect(region, [], '', '', 'All Regions');
         fillSelect(division, [], '', '', 'All Divisions');
         fillSelect(municipality, [], '', '', 'All Municipalities');
-
     });
 
+    // SELECT ALL DRs
+    if (selectAll) {
+        selectAll.addEventListener('change', function () {
+
+            const checkboxes = document.querySelectorAll('.dr-checkbox');
+            checkboxes.forEach(cb => cb.checked = this.checked);
+        });
+
+        document.querySelectorAll('.dr-checkbox').forEach(cb => {
+            cb.addEventListener('change', () => {
+
+                const checkboxes = document.querySelectorAll('.dr-checkbox');
+                const checked = document.querySelectorAll('.dr-checkbox:checked');
+
+                selectAll.checked = checkboxes.length === checked.length;
+            });
+        });
+    }
 });
+
+// ---------------- QR ----------------
+function generateQR() {
+
+    const ids = Array.from(document.querySelectorAll('.dr-checkbox:checked'))
+        .map(cb => cb.value);
+
+    if (!ids.length) return alert('Select at least one DR');
+
+    window.open(`/deliveries/pdf?ids=${ids.join(',')}`, '_blank');
+}
+
+// ---------------- Labels (POST form) ----------------
+function generateLabels() {
+
+    const ids = Array.from(document.querySelectorAll('.dr-checkbox:checked'))
+        .map(cb => cb.value);
+
+    if (!ids.length) return alert('Select at least one DR');
+
+    const token = document.querySelector('meta[name="csrf-token"]').content;
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/deliveries/labels';
+    form.target = '_blank';
+
+    form.innerHTML = `
+        <input type="hidden" name="_token" value="${token}">
+        <input type="hidden" name="ids" value="${ids.join(',')}">
+    `;
+
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+}
 
 function generateQR() {
 

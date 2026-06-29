@@ -165,22 +165,6 @@ function generateLabels() {
     form.remove();
 }
 
-function generateQR() {
-
-    const ids = [];
-
-    document.querySelectorAll('.dr-checkbox:checked').forEach(cb => {
-        ids.push(cb.value);
-    });
-
-    if (!ids.length) {
-        alert('Select at least one DR');
-        return;
-    }
-
-    window.open(`/deliveries/pdf?ids=${ids.join(',')}`, '_blank');
-
-}
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -210,44 +194,3 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 });
-
-function generateLabels() {
-
-    const ids = [];
-
-    document.querySelectorAll('.dr-checkbox:checked').forEach(cb => {
-        ids.push(cb.value);
-    });
-
-    if (!ids.length) {
-        alert('Select at least one DR');
-        return;
-    }
-
-    const token = document.querySelector('meta[name="csrf-token"]').content;
-
-    const form = document.createElement('form');
-
-    form.method = 'POST';
-    form.action = '/deliveries/labels';
-    form.target = '_blank';
-
-    const csrf = document.createElement('input');
-    csrf.type = 'hidden';
-    csrf.name = '_token';
-    csrf.value = token;
-
-    form.appendChild(csrf);
-
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'ids';
-    input.value = ids.join(',');
-
-    form.appendChild(input);
-
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-
-}

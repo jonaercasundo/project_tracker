@@ -349,7 +349,7 @@ class DeliveryController extends Controller
             foreach ($statuses as $status) {
                 if (!$status->package_status_id) continue;
 
-                $url = route('entry.page', [
+                $url = route('entry.show', [
                     'id' => $status->package_status_id,
                     'delivery_id' => $delivery->delivery_id
                 ]);

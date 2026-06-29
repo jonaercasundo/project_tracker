@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const checked = document.querySelectorAll('.dr-checkbox:checked').length;
 
             selectAll.checked = total === checked;
-
+                    
         });
 
     });

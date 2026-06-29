@@ -18,6 +18,105 @@ use Endroid\QrCode\Writer\PngWriter;
 use App\Models\PackageStatus;
 class DeliveryController extends Controller
 {
+    public function getLots(Request $request)
+{
+    return DB::table('lot')
+        ->where('project_id', $request->project)
+        ->orderBy('lot_name')
+        ->get([
+            'lot_id',
+            'lot_name'
+        ]);
+}
+public function getRegions(Request $request)
+{
+    $query = DB::table('deliveries as d')
+        ->join('school as s', 's.school_id', '=', 'd.school_id')
+        ->select('s.region')
+        ->distinct();
+
+    if ($request->filled('project')) {
+        $query->where('d.project_id', $request->project);
+    }
+
+    if ($request->filled('lot')) {
+        $query->where('d.lot_id', $request->lot);
+    }
+
+    return $query
+        ->orderBy('s.region')
+        ->get();
+}
+public function getDivisions(Request $request)
+{
+    $query = DB::table('deliveries as d')
+        ->join('school as s', 's.school_id', '=', 'd.school_id')
+        ->select('s.division')
+        ->distinct();
+
+    if ($request->filled('project')) {
+        $query->where('d.project_id', $request->project);
+    }
+
+    if ($request->filled('lot')) {
+        $query->where('d.lot_id', $request->lot);
+    }
+
+    if ($request->filled('region')) {
+        $query->where('s.region', $request->region);
+    }
+
+    return $query
+        ->orderBy('s.division')
+        ->get();
+}
+public function getMunicipalities(Request $request)
+{
+    $query = DB::table('deliveries as d')
+        ->join('school as s', 's.school_id', '=', 'd.school_id')
+        ->select('s.municipality')
+        ->distinct();
+
+    if ($request->filled('project')) {
+        $query->where('d.project_id', $request->project);
+    }
+
+    if ($request->filled('lot')) {
+        $query->where('d.lot_id', $request->lot);
+    }
+
+    if ($request->filled('region')) {
+        $query->where('s.region', $request->region);
+    }
+
+    if ($request->filled('division')) {
+        $query->where('s.division', $request->division);
+    }
+
+    return $query
+        ->orderBy('s.municipality')
+        ->get();
+}
+
+    public function regions(Request $request)
+{
+    $query = DB::table('deliveries as d')
+        ->join('school as s', 's.school_id', '=', 'd.school_id')
+        ->select('s.region')
+        ->distinct();
+
+    if ($request->filled('project')) {
+        $query->where('d.project_id', $request->project);
+    }
+
+    if ($request->filled('lot')) {
+        $query->where('d.lot_id', $request->lot);
+    }
+
+    return $query
+        ->orderBy('s.region')
+        ->get();
+}
    public function index(Request $request)
 {
     $limit = (int) $request->input('per_page', 10);
@@ -181,22 +280,14 @@ class DeliveryController extends Controller
     // =========================
     $projects = DB::table('projects')->get();
 
-    $regions = DB::table('school')
-        ->select('region')
-        ->whereNotNull('region')
-        ->where('region', '<>', '')
-        ->distinct()
-        ->orderBy('region')
-        ->get();
-
     return view('deliveries.index', [
         'grouped_deliveries' => $grouped,
         'projects' => $projects,
-        'regions' => $regions,
         'years' => $years,
         'page' => $page,
         'total_pages' => $total_pages,
-        'total_rows' => $total_rows
+        'total_rows' => $total_rows,
+        'regions' => collect(), // empty initially
     ]);
 }
     public function generate(Request $request)

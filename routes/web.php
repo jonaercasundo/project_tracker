@@ -131,6 +131,11 @@ Route::middleware(['auth'])->group(function () {
         ->name('deliveries.batch-qr');
         Route::post('/deliveries/labels', [DeliveryController::class, 'generateLabels'])
         ->name('deliveries.labels');
+        Route::get('/regions', [DeliveryController::class, 'regions']);
+        Route::get('/filter/lots', [DeliveryController::class, 'getLots']);
+        Route::get('/filter/regions', [DeliveryController::class, 'getRegions']);
+        Route::get('/filter/divisions', [DeliveryController::class, 'getDivisions']);
+        Route::get('/filter/municipalities', [DeliveryController::class, 'getMunicipalities']);
     });
 
     /*

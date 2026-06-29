@@ -45,7 +45,7 @@
 
                 @foreach([10,20,30,50,100] as $size)
                     <option value="{{ $size }}"
-                        @selected(request('per_page',20)==$size)>
+                        @selected(request('per_page',10)==$size)>
                         {{ $size }} Records
                     </option>
                 @endforeach
@@ -131,13 +131,6 @@
 
                 <option value="">All Regions</option>
 
-                @foreach($regions as $region)
-                    <option value="{{ $region->region }}"
-                        @selected(request('region')==$region->region)>
-                        {{ $region->region }}
-                    </option>
-                @endforeach
-
             </select>
         </div>
 
@@ -173,21 +166,17 @@
 
     </div>
 
-    {{-- BUTTONS --}}
-    <div class="flex justify-between items-center border-t border-slate-200 pt-4">
+    {{-- ACTION BUTTONS --}}
+    <div class="flex items-center justify-between border-t border-slate-200 pt-4">
 
         <a href="{{ url()->current() }}"
-           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-semibold">
-
+           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-semibold transition">
             Reset
-
         </a>
 
         <button type="submit"
-                class="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm">
-
+                class="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm transition">
             Apply Filters
-
         </button>
 
     </div>

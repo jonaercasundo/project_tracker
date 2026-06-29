@@ -57,8 +57,14 @@
             @if(request()->routeIs('items.index'))
                 <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
             @endif
-            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('items.index') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M16.5 18.75a1.5 1.5 0 000-3 1.5 1.5 0 000 3zm0 0h1.5m-13.5-4.5h16.5M5.625 4.5h11.114a1.13 1.13 0 01.8.326l2.091 2.092a1.13 1.13 0 01.326.8v3.207a1.13 1.13 0 01-.326.8l-2.092 2.091a1.13 1.13 0 01-.8.326H5.625a1.125 1.125 0 01-1.125-1.１２５V5.625A１．１２５ １．１２５ ０ ０１５．６２５ ４．５z"></path>
+            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('item.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2">
+                <path stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M9 5.25A2.25 2.25 0 0111.25 3h1.5A2.25 2.25 0 0115 5.25V6h2.25A2.25 2.25 0 0119.5 8.25v10.5A2.25 2.25 0 0117.25 21H6.75A2.25 2.25 0 014.5 18.75V8.25A2.25 2.25 0 016.75 6H9v-.75zM8.25 10.5h7.5m-7.5 3h7.5m-7.5 3h4.5"/>
             </svg>
             <span>Item list</span>
         </a>

@@ -100,14 +100,6 @@ Route::middleware(['auth'])->group(function () {
         
         Route::get('/deliveries/pdf', [DeliveryController::class, 'generate'])
         ->name('deliveries.pdf');
-
-        Route::get('/api/lots', function (Request $request) {
-            return DB::table('lot')
-                ->where('project_id', $request->project)
-                ->select('lot_id', 'lot_name')
-                ->orderBy('lot_name')
-                ->get();
-        });
 Route::get('/api/lot-info', function (Request $request) {
 
     try {

@@ -14,7 +14,9 @@
         const division     = container.querySelector('#division');
         const municipality = container.querySelector('#municipality');
         const year         = container.querySelector('#year');
-        const selectAll    = container.querySelector('#select-all-drs');
+        
+        // This checkbox is OUTSIDE #filter-container
+        const selectAll = document.getElementById('select-all-drs');
 
         function fillSelect(select, data, valueField, textField, placeholder) {
             if (!select) return;
@@ -121,19 +123,27 @@
         // SELECT ALL DRs
         // =========================
         selectAll?.addEventListener('change', function () {
-            container.querySelectorAll('.dr-checkbox')
-                .forEach(cb => cb.checked = this.checked);
+
+            document.querySelectorAll('.dr-checkbox').forEach(cb => {
+                cb.checked = this.checked;
+            });
+
         });
 
-        container.querySelectorAll('.dr-checkbox').forEach(cb => {
+        document.querySelectorAll('.dr-checkbox').forEach(cb => {
+
             cb.addEventListener('change', () => {
-                const all     = container.querySelectorAll('.dr-checkbox').length;
-                const checked = container.querySelectorAll('.dr-checkbox:checked').length;
+
+                const all = document.querySelectorAll('.dr-checkbox').length;
+                const checked = document.querySelectorAll('.dr-checkbox:checked').length;
+
                 if (selectAll) {
-                    selectAll.checked       = all === checked;
+                    selectAll.checked = all === checked;
                     selectAll.indeterminate = checked > 0 && checked < all;
                 }
+
             });
+
         });
 
         // =========================

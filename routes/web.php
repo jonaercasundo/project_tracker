@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\BiddingController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\EntryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -112,6 +113,12 @@ Route::middleware(['auth'])->group(function () {
             | DELIVERIES
             |--------------------------------------------------------------------------
         */
+
+        Route::get('/entry/{id}', [DeliveryController::class, 'entry'])->name('entry.page');
+        Route::get('/scan/{id}', [DeliveryController::class, 'scan'])->name('scan.page');
+        Route::get('/entry/{id}/{delivery_id}', [EntryController::class, 'show'])
+            ->name('entry.show');
+
         Route::get('/deliveries/tracking', [DeliveryController::class, 'index'])
         ->name('deliveries.tracking');
         
@@ -226,5 +233,4 @@ Route::get('/google/trends', [TikTokController::class, 'fetchHomeGoogleTrends'])
     Route::get('/barangays', [LocationController::class, 'barangays']);
 
 });
-Route::get('/entry', [EntryController::class, 'index']);
 require __DIR__.'/auth.php';

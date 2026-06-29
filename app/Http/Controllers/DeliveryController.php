@@ -13,6 +13,27 @@ use App\Models\PackageStatus;
 
 class DeliveryController extends Controller
 {
+
+
+    public function entry(Request $request, $id)
+    {
+        $delivery_id = $request->query('delivery_id');
+
+        return view('deliveries.partials.entry', [
+            'id' => $id,
+            'delivery_id' => $delivery_id,
+        ]);
+    }
+    public function scan(Request $request, $id)
+    {
+        $delivery_id = $request->query('delivery_id');
+
+        // Load your scan logic here (migrated from scan.php)
+        return view('deliveries.partials.scan', [
+            'id' => $id,
+            'delivery_id' => $delivery_id,
+        ]);
+    }
     // =========================
     // FILTER ENDPOINTS
     // =========================
@@ -328,10 +349,10 @@ class DeliveryController extends Controller
             foreach ($statuses as $status) {
                 if (!$status->package_status_id) continue;
 
-                $url = 'https://mmc.metro-ltd.com/entry.php?id='
-                    . $status->package_status_id
-                    . '&delivery_id='
-                    . $delivery->delivery_id;
+                $url = route('entry.page', [
+                    'id' => $status->package_status_id,
+                    'delivery_id' => $delivery->delivery_id
+                ]);
                 $result = (new PngWriter())->write(new QrCode($url));
 
                 $qrCodes[$status->package_status_id] =

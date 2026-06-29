@@ -109,7 +109,7 @@ td {
                     </td>
 
                     <td style="text-align:center;">
-                        <p> Copies</p>
+                        Copies
                     </td>
 
                 </tr>

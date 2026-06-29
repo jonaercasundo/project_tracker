@@ -1,5 +1,13 @@
 {{-- resources/views/deliveries/_filter.blade.php --}}
-
+<script>
+    window.FILTER_DEFAULTS = {
+        project: "{{ request('project') }}",
+        lot:     "{{ request('lot') }}",
+        region:  "{{ request('region') }}",
+        division: "{{ request('division') }}",
+        municipality: "{{ request('municipality') }}",
+    };
+</script>
 <form method="GET"
       action="{{ url()->current() }}"
       class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-5">

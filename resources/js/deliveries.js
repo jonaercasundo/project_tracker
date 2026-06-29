@@ -1,13 +1,13 @@
-
-
 (() => {
 
     document.addEventListener('DOMContentLoaded', () => {
 
-        const container = document.querySelector('#filter-container'); 
-        // 👉 IMPORTANT: wrap your filter UI inside this div
-
+        const container = document.querySelector('#filter-container');
         if (!container) return;
+
+        // Prevent double init (VERY IMPORTANT in Vite / Blade partials)
+        if (window.__FILTER_INIT__) return;
+        window.__FILTER_INIT__ = true;
 
         const project = container.querySelector('#project');
         const lot = container.querySelector('#lot');
@@ -16,12 +16,6 @@
         const municipality = container.querySelector('#municipality');
         const year = container.querySelector('#year');
         const selectAll = container.querySelector('#select-all-drs');
-
-        if (!project) return;
-
-        // Prevent double init
-        if (container.dataset.init === "1") return;
-        container.dataset.init = "1";
 
         function fillSelect(select, data, valueField, textField, placeholder) {
             if (!select) return;
@@ -44,8 +38,8 @@
                 });
 
                 if (!res.ok) throw new Error('Network error');
-
                 return await res.json();
+
             } catch (err) {
                 console.error('Fetch error:', err);
                 return [];
@@ -136,7 +130,7 @@
         });
 
         // =========================
-        // SELECT ALL DRs
+        // SELECT ALL DRs (FIXED - SINGLE SOURCE ONLY)
         // =========================
         selectAll?.addEventListener('change', function () {
 
@@ -159,8 +153,12 @@
 
 })();
 
-// ---------------- QR ----------------
-function generateQR() {
+
+// ======================================================
+// SAFE GLOBAL ACTIONS (NO CONFLICT VERSION)
+// ======================================================
+
+window.generateQR = function () {
 
     const ids = Array.from(document.querySelectorAll('.dr-checkbox:checked'))
         .map(cb => cb.value);
@@ -168,10 +166,10 @@ function generateQR() {
     if (!ids.length) return alert('Select at least one DR');
 
     window.open(`/deliveries/pdf?ids=${ids.join(',')}`, '_blank');
-}
+};
 
-// ---------------- Labels (POST form) ----------------
-function generateLabels() {
+
+window.generateLabels = function () {
 
     const ids = Array.from(document.querySelectorAll('.dr-checkbox:checked'))
         .map(cb => cb.value);
@@ -193,34 +191,4 @@ function generateLabels() {
     document.body.appendChild(form);
     form.submit();
     form.remove();
-}
-
-
-document.addEventListener('DOMContentLoaded', () => {
-
-    const selectAll = document.getElementById('select-all-drs');
-
-    if (!selectAll) return;
-
-    selectAll.addEventListener('change', function () {
-
-        document.querySelectorAll('.dr-checkbox').forEach(cb => {
-            cb.checked = this.checked;
-        });
-
-    });
-
-    document.querySelectorAll('.dr-checkbox').forEach(cb => {
-
-        cb.addEventListener('change', () => {
-
-            const total = document.querySelectorAll('.dr-checkbox').length;
-            const checked = document.querySelectorAll('.dr-checkbox:checked').length;
-
-            selectAll.checked = total === checked;
-
-        });
-
-    });
-
-});
+};

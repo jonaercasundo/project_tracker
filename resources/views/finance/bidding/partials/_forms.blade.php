@@ -226,7 +226,7 @@
         display: grid;
         min-width:1300px;   /* adjust as needed */
         grid-template-columns:  
-            3fr   /* Item */
+            3.5fr   /* Item */
             .5fr    /* Unit */
             .8fr    /* Qty */
             1fr     /* Unit Cost */

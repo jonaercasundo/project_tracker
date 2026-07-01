@@ -28,6 +28,7 @@
                 value="{{ $catalogItem->description }}"
                 data-unit="{{ $catalogItem->unit }}"
                 data-price="{{ $catalogItem->price }}"
+                data-brand="{{ $catalogItem->brand }}"
                 {{ $desc == $catalogItem->description ? 'selected' : '' }}>
                 {{ $catalogItem->item_name }}
             </option>

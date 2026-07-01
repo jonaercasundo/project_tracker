@@ -223,9 +223,18 @@
     }
     .bf-items-head, 
     .bf-item-row{
-        min-width: 0; /* VERY IMPORTANT */
         display: grid;
-        grid-template-columns: var(--bf-cols);
+        min-width:1300px;   /* adjust as needed */
+        grid-template-columns:  
+            3fr   /* Item */
+            .5fr    /* Unit */
+            .8fr    /* Qty */
+            1fr     /* Unit Cost */
+            1fr     /* Amount */
+            1fr     /* Brand and Specs */
+            1fr     /* Remarks */
+            50px;   /* Delete */
+            ;
         padding: 5px 8px;
         background: #f3f4f6;
         border-bottom: 1px solid #e5e7eb;

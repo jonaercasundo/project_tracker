@@ -17,7 +17,7 @@
 
     {{-- Item Description --}}
     <select
-        class="item-select flex-[2] min-w-[180px] text-sm rounded-lg border-slate-200 py-1.5
+        class="item-select text-sm rounded-lg border-slate-200 py-1.5
                focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
         name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]">
 

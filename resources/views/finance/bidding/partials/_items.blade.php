@@ -14,7 +14,6 @@
 @endphp
 
 <div class="bf-item-row">
-@dd($items);
 <select
     name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]"
     class="w-full rounded-md border-gray-300">

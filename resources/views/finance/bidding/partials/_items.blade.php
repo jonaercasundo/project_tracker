@@ -56,19 +56,22 @@
         min="0">
 
     {{-- Unit Cost --}}
-    <div class="relative w-28">
-        <span class="text-slate-400 text-xs">₱</span>
-        <input
-            type="number"
-            class="unit-cost w-full text-sm rounded-lg border-slate-200 py-1.5 pl-10 pr-2
-                   placeholder:text-slate-400
-                   focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
-            step="0.01"
-            name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit_cost]"
-            value="{{ $unitCost }}"
-            placeholder="0.00"
-            min="0" readonly>
-    </div>
+<div class="flex items-center gap-2 w-28">
+    <span class="text-slate-400 text-xs">₱</span>
+
+    <input
+        type="number"
+        class="unit-cost w-full text-sm rounded-lg border-slate-200 py-1.5 px-2
+               placeholder:text-slate-400
+               focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
+        step="0.01"
+        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit_cost]"
+        value="{{ $unitCost }}"
+        placeholder="0.00"
+        min="0"
+        readonly
+    >
+</div>
 
     {{-- Amount (computed, readonly) --}}
     <div class="relative w-28">

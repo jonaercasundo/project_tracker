@@ -9,10 +9,9 @@ class Item extends Model
 {
     use HasFactory;
 
-    protected $table = 'items';
+    protected $table = 'project_items';
 
     protected $fillable = [
-        'item_id',
         'code_prefix',
         'item_name',
         'description',

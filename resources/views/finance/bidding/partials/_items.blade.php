@@ -16,18 +16,19 @@
 <div class="bf-item-row">
 @dd($items);
     <select
-        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]"
-        class="w-full rounded-md border-gray-300">
-        <option value="">Select Item</option>
+    name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]"
+    class="w-full rounded-md border-gray-300">
 
-        @foreach ($items as $item)
-            <option
-                value="{{ $item['description'] }}"
-                {{ $desc == $item['description'] ? 'selected' : '' }}>
-                {{ $item['item_name'] }}
-            </option>
-        @endforeach
-    </select>
+    <option value="">Select Item</option>
+
+    @foreach ($catalogItems as $catalogItem)
+        <option
+            value="{{ $catalogItem->description }}"
+            {{ $desc == $catalogItem->description ? 'selected' : '' }}>
+            {{ $catalogItem->item_name }}
+        </option>
+    @endforeach
+</select>
 
     <input type="text"
            name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit]"

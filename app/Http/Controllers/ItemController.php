@@ -11,52 +11,31 @@ class ItemController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+   public function index(Request $request)
     {
-        $query = Item::query()
-            ->leftJoin('projects', 'projects.project_id', '=', 'project_items.project_id')
-            ->select(
-                'project_items.*',
-                'projects.project_name'
-            );
+        $query = Item::query();
 
-        // Search
         if ($request->filled('search')) {
 
             $search = $request->search;
 
             $query->where(function ($q) use ($search) {
-                $q->where('items.item_id', 'like', "%{$search}%")
-                    ->orWhere('items.item_name', 'like', "%{$search}%")
-                    ->orWhere('items.code_prefix', 'like', "%{$search}%")
-                    ->orWhere('projects.project_name', 'like', "%{$search}%");
+                $q->where('item_id', 'like', "%{$search}%")
+                ->orWhere('item_name', 'like', "%{$search}%")
+                ->orWhere('code_prefix', 'like', "%{$search}%");
             });
         }
 
-        // Project Filter
-        if ($request->filled('project')) {
-            $query->where('items.project_id', $request->project);
-        }
-
-        // Active Filter
         if ($request->filled('active')) {
-            $query->where('items.active', $request->active);
+            $query->where('active', $request->active);
         }
 
         $items = $query
-            ->orderByDesc('items.created_at')
+            ->orderByDesc('created_at')
             ->paginate(15)
             ->withQueryString();
 
-        $projects = DB::table('projects')
-            ->where('status', 'Active')
-            ->orderBy('project_name')
-            ->get();
-
-        return view('operation.index', compact(
-            'items',
-            'projects'
-        ));
+        return view('operation.index', compact('items'));
     }
 
     /**

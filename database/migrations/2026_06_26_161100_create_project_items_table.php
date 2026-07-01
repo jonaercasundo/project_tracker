@@ -12,20 +12,21 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('lot_id')
+                ->nullable()
                 ->constrained('lots')
                 ->cascadeOnDelete();
 
-            $table->integer('item_no');
+            $table->integer('item_no')->nullable();
 
-            $table->text('item_description');
+            $table->text('item_description')->nullable();
 
-            $table->string('unit', 50);
+            $table->string('unit', 50)->nullable();
 
-            $table->decimal('quantity', 15, 2);
+            $table->decimal('quantity', 15, 2)->nullable();
 
-            $table->decimal('unit_cost', 15, 2);
+            $table->decimal('unit_cost', 15, 2)->nullable();
 
-            $table->decimal('total_amount', 15, 2);
+            $table->decimal('total_amount', 15, 2)->nullable();
 
             $table->string('brand')->nullable();
 

@@ -3,6 +3,8 @@
 use App\Models\User;
 
 it('stores a bidding document when the abc value is blank', function () {
+    $this->withoutMiddleware();
+
     $user = User::factory()->create([
         'username' => 'tester',
         'role' => 'admin',

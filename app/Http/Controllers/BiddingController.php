@@ -10,6 +10,33 @@ use App\Models\New\Item;
 
 class BiddingController extends Controller
 {
+    private function normalizeAmount($value): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+
+        return (float) str_replace([',', ' '], '', trim((string) $value));
+    }
+
+    private function normalizeText($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return trim((string) $value);
+    }
+
+    private function normalizeDate($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (string) $value;
+    }
+
     public function index(Request $request)
     {
         $query = ProjectInformation::query();
@@ -69,16 +96,16 @@ class BiddingController extends Controller
         DB::transaction(function () use ($request) {
 
             $project = ProjectInformation::create([
-                'project_name' => $request->project_name,
-                'project_id' => $request->project_id,
-                'procuring_entity' => $request->procuring_entity,
-                'approved_budget_contract_abc' => $request->approved_budget_contract_abc,
-                'delivery_period' => $request->delivery_period,
-                'date_of_bid_opening' => $request->date_of_bid_opening,
-                'prepared_by' => $request->prepared_by,
-                'prepared_date' => $request->prepared_date,
-                'verified_by' => $request->verified_by,
-                'status' => $request->status ?? 'Draft',
+                'project_name' => $this->normalizeText($request->input('project_name')),
+                'project_id' => $this->normalizeText($request->input('project_id')),
+                'procuring_entity' => $this->normalizeText($request->input('procuring_entity')),
+                'approved_budget_contract_abc' => $this->normalizeAmount($request->input('approved_budget_contract_abc')),
+                'delivery_period' => $this->normalizeText($request->input('delivery_period')),
+                'date_of_bid_opening' => $this->normalizeDate($request->input('date_of_bid_opening')),
+                'prepared_by' => $this->normalizeText($request->input('prepared_by')),
+                'prepared_date' => $this->normalizeDate($request->input('prepared_date')),
+                'verified_by' => $this->normalizeText($request->input('verified_by')),
+                'status' => $request->input('status') ?? 'Draft',
             ]);
 
             foreach ($request->lots as $lotData) {
@@ -100,21 +127,19 @@ class BiddingController extends Controller
                     if (empty($item['item_description'])) {
                         continue;
                     }
-                    $quantity = (float)($item['quantity'] ?? 0);
-                    $unitCost = (float)str_replace(',', '', $item['unit_cost'] ?? 0);
-                    $quantity = (float)($item['quantity'] ?? 0);
-                    $unitCost = (float)($item['unit_cost'] ?? 0);
+                    $quantity = $this->normalizeAmount($item['quantity'] ?? null);
+                    $unitCost = $this->normalizeAmount($item['unit_cost'] ?? null);
+                    $totalAmount = $this->normalizeAmount($item['total_amount'] ?? ($quantity * $unitCost));
 
-                    $total_amount = $quantity * $unitCost;
                     $lot->items()->create([
                         'item_no'          => $index + 1,
-                        'item_description' => $item['item_description'],
-                        'unit'             => $item['unit'],
+                        'item_description' => $this->normalizeText($item['item_description'] ?? null),
+                        'unit'             => $this->normalizeText($item['unit'] ?? null),
                         'quantity'         => $quantity,
                         'unit_cost'        => $unitCost,
-                        'total_amount'     => $total_amount,
-                        'brand'            => $item['brand'],
-                        'remarks'          => $item['remarks'],
+                        'total_amount'     => $totalAmount,
+                        'brand'            => $this->normalizeText($item['brand'] ?? null),
+                        'remarks'          => $this->normalizeText($item['remarks'] ?? null),
                     ]);
                 }
             }
@@ -157,24 +182,24 @@ class BiddingController extends Controller
 
             $bidding->update([
 
-                'project_name' => $request->project_name,
-                'project_id' => $request->project_id,
-                'procuring_entity' => $request->procuring_entity,
-                'approved_budget_contract_abc' => str_replace(',', '', $request->approved_budget_contract_abc),
-                'lot_no' => $request->lot_no,
-                'delivery_period' => $request->delivery_period,
-                'country' => $request->country,
-                'region' => $request->region,
-                'province' => $request->province,
-                'city_municipality' => $request->city_municipality,
-                'barangay' => $request->barangay,
-                'delivery_address' => $request->address,
-                'date_of_bid_opening' => $request->date_of_bid_opening,
-                'notes_special_condition' => $request->notes_special_condition,
-                'prepared_by' => $request->prepared_by,
-                'prepared_date' => $request->prepared_date,
-                'verified_by' => $request->verified_by,
-                'status' => $request->status,
+                'project_name' => $this->normalizeText($request->input('project_name')),
+                'project_id' => $this->normalizeText($request->input('project_id')),
+                'procuring_entity' => $this->normalizeText($request->input('procuring_entity')),
+                'approved_budget_contract_abc' => $this->normalizeAmount($request->input('approved_budget_contract_abc')),
+                'lot_no' => $this->normalizeText($request->input('lot_no')),
+                'delivery_period' => $this->normalizeText($request->input('delivery_period')),
+                'country' => $this->normalizeText($request->input('country')),
+                'region' => $this->normalizeText($request->input('region')),
+                'province' => $this->normalizeText($request->input('province')),
+                'city_municipality' => $this->normalizeText($request->input('city_municipality')),
+                'barangay' => $this->normalizeText($request->input('barangay')),
+                'delivery_address' => $this->normalizeText($request->input('address') ?? $request->input('delivery_address')),
+                'date_of_bid_opening' => $this->normalizeDate($request->input('date_of_bid_opening')),
+                'notes_special_condition' => $this->normalizeText($request->input('notes_special_condition')),
+                'prepared_by' => $this->normalizeText($request->input('prepared_by')),
+                'prepared_date' => $this->normalizeDate($request->input('prepared_date')),
+                'verified_by' => $this->normalizeText($request->input('verified_by')),
+                'status' => $request->input('status'),
 
             ]);
 

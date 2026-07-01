@@ -15,25 +15,27 @@
 
 <div class="bf-item-row flex flex-wrap items-center gap-2 py-2">
 
-    {{-- Item Description --}}
-    <select
-        class="item-select text-sm rounded-lg border-slate-200 py-1.5
-               focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
-        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]">
+        {{-- Item Description --}}
+        <select
+            class="item-select text-sm rounded-lg border-slate-200 py-1.5
+                focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
+            name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]">
 
-        <option value="" selected>Select Item</option>
-
-        @foreach ($catalogItems as $catalogItem)
-            <option
-                value="{{ $catalogItem->description }}"
-                data-unit="{{ $catalogItem->unit }}"
-                data-price="{{ $catalogItem->price }}"
-                data-brand="{{ $catalogItem->brand }}"
-                {{ $desc == $catalogItem->description ? 'selected' : '' }}>
-                {{ $catalogItem->item_name }}
+            <option value="" {{ empty($desc) ? 'selected' : '' }}>
+                Select Item
             </option>
-        @endforeach
-    </select>
+
+            @foreach ($catalogItems as $catalogItem)
+                <option
+                    value="{{ $catalogItem->description }}"
+                    data-unit="{{ $catalogItem->unit }}"
+                    data-price="{{ $catalogItem->price }}"
+                    data-brand="{{ $catalogItem->brand }}"
+                    {{ isset($desc) && $desc == $catalogItem->description ? 'selected' : '' }}>
+                    {{ $catalogItem->item_name }}
+                </option>
+            @endforeach
+        </select>
 
     {{-- Unit --}}
     <input

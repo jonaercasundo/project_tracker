@@ -329,3 +329,23 @@ async function loadBarangays(citySelect) {
         resetSelect(barangay, 'Select barangay');
     }
 }
+document.addEventListener('change', function (e) {
+
+    if (!e.target.classList.contains('item-select')) {
+        return;
+    }
+
+    const option = e.target.selectedOptions[0];
+
+    const row = e.target.closest('.bf-item-row');
+
+    if (!row) return;
+
+    row.querySelector('.unit-input').value =
+        option.dataset.unit || '';
+
+    row.querySelector('.unit-cost').value =
+        option.dataset.price || '';
+
+    computeLotTotal(row.closest('.bf-lot'));
+});

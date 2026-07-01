@@ -14,25 +14,28 @@
 @endphp
 
 <div class="bf-item-row">
-<select
-    name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]"
-    class="w-full rounded-md border-gray-300">
+    <select
+        class="item-select w-full rounded-md border-gray-300"
+        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]">
 
-    <option value="">Select Item</option>
+        <option value="">Select Item</option>
 
-    @foreach ($catalogItems as $catalogItem)
-        <option
-            value="{{ $catalogItem->description }}"
-            {{ $desc == $catalogItem->description ? 'selected' : '' }}>
-            {{ $catalogItem->item_name }}
-        </option>
-    @endforeach
-</select>
+        @foreach ($catalogItems as $catalogItem)
+            <option
+                value="{{ $catalogItem->description }}"
+                data-unit="{{ $catalogItem->unit }}"
+                data-price="{{ $catalogItem->price }}">
+                {{ $catalogItem->item_name }}
+            </option>
+        @endforeach
+    </select>
 
-    <input type="text"
-           name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit]"
-           value="{{ $unit }}"
-           placeholder="laptop">
+    <input
+        type="text"
+        class="unit-input"
+        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit]"
+        value="{{ $unit }}"
+        placeholder="Unit">
 
     <input type="number"
            class="qty"
@@ -41,13 +44,14 @@
            placeholder="0"
            min="0">
 
-        <input type="number"
-           class="unit-cost"
-           step="0.01"
-           name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit_cost]"
-           value="{{ $unitCost }}"
-           placeholder="0.00"
-           min="0">
+        <input
+            type="number"
+            class="unit-cost"
+            step="0.01"
+            name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit_cost]"
+            value="{{ $unitCost }}"
+            placeholder="0.00"
+            min="0">
         <input
             type="text"
             class="item-amount"

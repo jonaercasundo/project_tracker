@@ -255,8 +255,8 @@
             2fr   /* Item */
             .5fr    /* Unit */
             .8fr    /* Qty */
-            .8fr     /* Unit Cost */
-            .8fr     /* Amount */
+            1fr     /* Unit Cost */
+            1fr     /* Amount */
             1fr     /* Brand and Specs */
             1fr     /* Remarks */
             50px;   /* Delete */

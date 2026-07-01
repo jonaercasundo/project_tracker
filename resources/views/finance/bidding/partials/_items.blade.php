@@ -57,7 +57,7 @@
 
     {{-- Unit Cost --}}
     <div class="relative w-28">
-        <span class="absolute ">₱</span>
+        <span class="inset-y-0 left-2.5 flex items-center text-slate-400 text-xs">₱</span>
         <input
             type="number"
             class="unit-cost w-full text-sm rounded-lg border-slate-200 py-1.5 pl-10 pr-2

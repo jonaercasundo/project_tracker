@@ -6,8 +6,8 @@
 
 let lotCount = document.querySelectorAll('.bf-lot').length;
 
+console.log('bidding.js loaded');
 document.addEventListener('change', function (e) {
-    console.log('bidding-form.js loaded');
     if (!e.target.matches('.item-select')) return;
 
     const select = e.target;

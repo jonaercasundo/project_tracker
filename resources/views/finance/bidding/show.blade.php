@@ -122,10 +122,6 @@
                         <span class="text-[11px] font-medium text-slate-400 whitespace-nowrap">Procuring Entity / Agency</span>
                         <span class="text-[12px] font-medium text-slate-600 text-right">{{ $project->procuring_entity }}</span>
                     </div>
-                    <div class="flex items-center justify-between px-5 py-3">
-                        <span class="text-[11px] font-medium text-slate-400">Lot No.</span>
-                        <span class="text-[12px] font-medium text-slate-600">{{ $project->lot_no }}</span>
-                    </div>
                 </div>
 
                 {{-- Right column --}}
@@ -144,37 +140,6 @@
                     </div>
                 </div>
 
-            </div>
-        </div>
-
-        {{-- ================= DELIVERY LOCATION ================= --}}
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="px-5 py-3.5 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2.5">
-                <div class="w-6 h-6 rounded-md bg-emerald-50 flex items-center justify-center">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                </div>
-                <h2 class="text-[12.5px] font-semibold text-slate-800">Delivery Location</h2>
-            </div>
-
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-px bg-slate-100">
-                @foreach([
-                    ['label' => 'Country',            'value' => $project->country],
-                    ['label' => 'Region',             'value' => $project->region],
-                    ['label' => 'Province',           'value' => $project->province],
-                    ['label' => 'City',               'value' => $project->city_municipality],
-                    ['label' => 'Barangay',           'value' => $project->barangay],
-                    ['label' => 'Address',            'value' => $project->delivery_address],
-                ] as $loc)
-                <div class="bg-white px-5 py-4">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">{{ $loc['label'] }}</p>
-                    <p class="text-[12.5px] font-medium text-slate-700 mt-1">{{ $loc['value'] ?: '—' }}</p>
-                </div>
-                @endforeach
             </div>
         </div>
 

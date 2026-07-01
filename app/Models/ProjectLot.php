@@ -33,7 +33,7 @@ class ProjectLot extends Model
     /**
      * Items under this lot
      */
-    public function items(): HasMany
+    public function items()
     {
         return $this->hasMany(ProjectItem::class, 'lot_id');
     }

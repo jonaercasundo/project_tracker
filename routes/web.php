@@ -207,14 +207,13 @@ Route::middleware(['auth'])->group(function () {
         ->name('profile.update');
 
     Route::delete('/profile', [ProfileController::class, 'destroy'])
-        ->name('profile.destroy');
-});
-Route::get('/tiktok/trends', [TikTokController::class, 'fetchHomeDecorTrends'])
-    ->name('tiktok.trends');
-Route::get('/pinterest/trends', [TikTokController::class, 'fetchHomePinterestTrends'])
-    ->name('pinterest.trends');
-Route::get('/google/trends', [TikTokController::class, 'fetchHomeGoogleTrends'])
-    ->name('google.trends');
+        ->name('profile.destroy');});
+    Route::get('/tiktok/trends', [TikTokController::class, 'fetchHomeDecorTrends'])
+        ->name('tiktok.trends');
+    Route::get('/pinterest/trends', [TikTokController::class, 'fetchHomePinterestTrends'])
+        ->name('pinterest.trends');
+    Route::get('/google/trends', [TikTokController::class, 'fetchHomeGoogleTrends'])
+        ->name('google.trends');
 
 
 

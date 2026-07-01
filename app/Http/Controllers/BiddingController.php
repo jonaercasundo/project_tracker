@@ -134,13 +134,13 @@ class BiddingController extends Controller
 
     public function edit(ProjectInformation $bidding)
     {
-        $bidding->load('items');
+        $bidding->load('lots.items');
 
         return view('finance.bidding.edit', [
             'project' => $bidding
         ]);
     }
-
+    
     public function update(Request $request, ProjectInformation $bidding)
     {
         $request->validate([

@@ -157,7 +157,7 @@
                 </div>
 
                 <h2 class="text-[12.5px] font-semibold text-slate-800">
-                    Lot {{ $lot->lot_no ?? '—' }} - {{ $lot->lot_name ?? 'Untitled Lot' }}
+                    {{ $lot->lot_no ?? '—' }} - {{ $lot->lot_name ?? 'Untitled Lot' }}
                 </h2>
             </div>
 

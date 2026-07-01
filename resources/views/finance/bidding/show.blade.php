@@ -142,85 +142,122 @@
 
             </div>
         </div>
+{{-- ================= LOTS + ITEMS ================= --}}
+@forelse($project->lots as $lot)
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-4">
 
-        {{-- ================= ITEMS ================= --}}
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="px-5 py-3.5 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-6 h-6 rounded-md bg-violet-50 flex items-center justify-center">
-                        <svg class="w-3.5 h-3.5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                        </svg>
-                    </div>
-                    <h2 class="text-[12.5px] font-semibold text-slate-800">Project Items</h2>
+        {{-- LOT HEADER --}}
+        <div class="px-5 py-3.5 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-6 h-6 rounded-md bg-violet-50 flex items-center justify-center">
+                    <svg class="w-3.5 h-3.5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M3 7h18M3 12h18M3 17h18"/>
+                    </svg>
                 </div>
-                <span class="text-[11px] text-slate-400 font-medium">
-                    {{ $project->items->count() }} {{ Str::plural('item', $project->items->count()) }}
-                </span>
+
+                <h2 class="text-[12.5px] font-semibold text-slate-800">
+                    Lot {{ $lot->lot_no ?? '—' }} - {{ $lot->lot_name ?? 'Untitled Lot' }}
+                </h2>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full border-collapse text-left">
-                    <thead>
-                        <tr class="bg-slate-50/80 border-b border-slate-100 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                            <th class="px-4 py-2.5 w-16 text-center">Item No.</th>
-                            <th class="px-4 py-2.5">Item Description</th>
-                            <th class="px-4 py-2.5 w-16">Unit</th>
-                            <th class="px-4 py-2.5 w-20 text-right">Quantity</th>
-                            <th class="px-4 py-2.5 w-32 text-right">Unit Cost (PHP)</th>
-                            <th class="px-4 py-2.5 w-36 text-right">Total Amount (PHP)</th>
-                            <th class="px-4 py-2.5 w-28">Brand / Specs</th>
-                            <th class="px-4 py-2.5 w-32">Remarks</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-50 text-slate-600">
-                    @forelse($project->items as $item)
-                        <tr class="hover:bg-slate-50/50 transition-colors">
-                            <td class="px-4 py-3 text-center">
-                                <span class="inline-flex items-center justify-center w-6 h-6 rounded-md
-                                             bg-slate-100 text-slate-500 text-[11px] font-semibold">
-                                    {{ $item->item_no }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-[12px] font-semibold text-slate-800">{{ $item->item_description }}</td>
-                            <td class="px-4 py-3 text-[11.5px] text-slate-500">{{ $item->unit }}</td>
-                            <td class="px-4 py-3 text-right text-[12px] font-medium text-slate-700">{{ number_format($item->quantity) }}</td>
-                            <td class="px-4 py-3 text-right text-[12px] font-medium text-slate-700 font-mono tabular-nums">
-                                ₱{{ number_format($item->unit_cost, 2) }}
-                            </td>
-                            <td class="px-4 py-3 text-right text-[12px] font-bold text-slate-900 font-mono tabular-nums">
-                                ₱{{ number_format($item->total_amount, 2) }}
-                            </td>
-                            <td class="px-4 py-3 text-[11.5px] text-slate-500">{{ $item->brand ?: '—' }}</td>
-                            <td class="px-4 py-3 text-[11.5px] text-slate-400">{{ $item->remarks ?: '—' }}</td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="py-14 text-center">
-                                <svg class="w-8 h-8 mx-auto text-slate-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                                </svg>
-                                <p class="text-[12px] font-medium text-slate-400">No items available.</p>
-                            </td>
-                        </tr>
-                    @endforelse
-                    </tbody>
-                    <tfoot>
-                        <tr class="bg-slate-50/60 border-t border-slate-200">
-                            <td colspan="5" class="px-4 py-3.5 text-right text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                TOTAL ABC
-                            </td>
-                            <td class="px-4 py-3.5 text-right font-bold text-blue-700 text-[15px] font-mono tabular-nums">
-                                ₱{{ number_format($project->items->sum('total_amount'), 2) }}
-                            </td>
-                            <td colspan="2"></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+            <span class="text-[11px] text-slate-400 font-medium">
+                {{ $lot->items->count() }} {{ Str::plural('item', $lot->items->count()) }}
+            </span>
         </div>
+
+        {{-- ITEMS TABLE --}}
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left">
+
+                <thead>
+                    <tr class="bg-slate-50/80 border-b border-slate-100 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                        <th class="px-4 py-2.5 w-16 text-center">Item No.</th>
+                        <th class="px-4 py-2.5">Item Description</th>
+                        <th class="px-4 py-2.5 w-16">Unit</th>
+                        <th class="px-4 py-2.5 w-20 text-right">Quantity</th>
+                        <th class="px-4 py-2.5 w-32 text-right">Unit Cost (PHP)</th>
+                        <th class="px-4 py-2.5 w-36 text-right">Total Amount</th>
+                        <th class="px-4 py-2.5 w-28">Brand / Specs</th>
+                        <th class="px-4 py-2.5 w-32">Remarks</th>
+                    </tr>
+                </thead>
+
+                <tbody class="divide-y divide-slate-50 text-slate-600">
+
+                @forelse($lot->items as $item)
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+
+                        <td class="px-4 py-3 text-center">
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-md
+                                         bg-slate-100 text-slate-500 text-[11px] font-semibold">
+                                {{ $item->item_no }}
+                            </span>
+                        </td>
+
+                        <td class="px-4 py-3 text-[12px] font-semibold text-slate-800">
+                            {{ $item->item_description }}
+                        </td>
+
+                        <td class="px-4 py-3 text-[11.5px] text-slate-500">
+                            {{ $item->unit }}
+                        </td>
+
+                        <td class="px-4 py-3 text-right text-[12px] font-medium text-slate-700">
+                            {{ number_format($item->quantity) }}
+                        </td>
+
+                        <td class="px-4 py-3 text-right text-[12px] font-mono text-slate-700 tabular-nums">
+                            ₱{{ number_format($item->unit_cost, 2) }}
+                        </td>
+
+                        <td class="px-4 py-3 text-right text-[12px] font-bold text-slate-900 font-mono tabular-nums">
+                            ₱{{ number_format($item->total_amount, 2) }}
+                        </td>
+
+                        <td class="px-4 py-3 text-[11.5px] text-slate-500">
+                            {{ $item->brand ?: '—' }}
+                        </td>
+
+                        <td class="px-4 py-3 text-[11.5px] text-slate-400">
+                            {{ $item->remarks ?: '—' }}
+                        </td>
+
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="8" class="py-10 text-center text-slate-400 text-[12px]">
+                            No items in this lot.
+                        </td>
+                    </tr>
+                @endforelse
+
+                </tbody>
+
+                {{-- LOT TOTAL --}}
+                <tfoot>
+                    <tr class="bg-slate-50/60 border-t border-slate-200">
+                        <td colspan="5" class="px-4 py-3.5 text-right text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            Lot Total
+                        </td>
+                        <td class="px-4 py-3.5 text-right font-bold text-blue-700 text-[14px] font-mono tabular-nums">
+                            ₱{{ number_format($lot->items->sum('total_amount'), 2) }}
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+
+            </table>
+        </div>
+    </div>
+
+@empty
+
+    <div class="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400 text-[12px]">
+        No lots available.
+    </div>
+
+@endforelse
 
         {{-- ================= NOTES / SPECIAL CONDITIONS ================= --}}
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

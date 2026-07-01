@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\New\Item;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+
 class ItemController extends Controller
 {
     /**
@@ -13,7 +14,7 @@ class ItemController extends Controller
     public function index(Request $request)
     {
         $query = Item::query()
-            ->leftJoin('projects', 'projects.project_id', '=', 'items.project_id')
+            ->leftJoin('projects', 'projects.id', '=', 'items.project_id')
             ->select(
                 'items.*',
                 'projects.project_name'
@@ -25,12 +26,10 @@ class ItemController extends Controller
             $search = $request->search;
 
             $query->where(function ($q) use ($search) {
-
                 $q->where('items.item_id', 'like', "%{$search}%")
-                ->orWhere('items.item_name', 'like', "%{$search}%")
-                ->orWhere('items.code_prefix', 'like', "%{$search}%")
-                ->orWhere('projects.project_name', 'like', "%{$search}%");
-
+                    ->orWhere('items.item_name', 'like', "%{$search}%")
+                    ->orWhere('items.code_prefix', 'like', "%{$search}%")
+                    ->orWhere('projects.project_name', 'like', "%{$search}%");
             });
         }
 
@@ -45,11 +44,12 @@ class ItemController extends Controller
         }
 
         $items = $query
-            ->orderBy('items.created_at', 'desc')
+            ->orderByDesc('items.created_at')
             ->paginate(15)
             ->withQueryString();
 
         $projects = DB::table('projects')
+            ->where('status', 'Active')
             ->orderBy('project_name')
             ->get();
 
@@ -64,15 +64,40 @@ class ItemController extends Controller
      */
     public function create()
     {
-        //
+        $projects = DB::table('projects')
+            ->where('status', 'Active')
+            ->orderBy('project_name')
+            ->get();
+
+        return view('operation.create', compact('projects'));
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store a newly created resource.
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'project_id' => ['required', 'exists:projects,id'],
+            'item_name'  => ['required', 'string', 'max:255'],
+            'code_prefix'=> ['required', 'string', 'max:20', 'unique:items,code_prefix'],
+            'active'     => ['required', 'boolean'],
+        ]);
+
+        DB::transaction(function () use ($validated) {
+
+            Item::create([
+                'project_id' => $validated['project_id'],
+                'item_name'  => $validated['item_name'],
+                'code_prefix'=> strtoupper($validated['code_prefix']),
+                'active'     => $validated['active'],
+            ]);
+
+        });
+
+        return redirect()
+            ->route('items.index')
+            ->with('success', 'Item created successfully.');
     }
 
     /**
@@ -80,7 +105,9 @@ class ItemController extends Controller
      */
     public function show(Item $item)
     {
-        //
+        $item->loadMissing('project');
+
+        return view('operation.show', compact('item'));
     }
 
     /**
@@ -88,22 +115,56 @@ class ItemController extends Controller
      */
     public function edit(Item $item)
     {
-        //
+        $projects = DB::table('projects')
+            ->where('status', 'Active')
+            ->orderBy('project_name')
+            ->get();
+
+        return view('operation.edit', compact(
+            'item',
+            'projects'
+        ));
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update the specified resource.
      */
     public function update(Request $request, Item $item)
     {
-        //
+        $validated = $request->validate([
+            'project_id' => ['required', 'exists:projects,id'],
+            'item_name'  => ['required', 'string', 'max:255'],
+            'code_prefix'=> ['required', 'string', 'max:20', 'unique:items,code_prefix,' . $item->id],
+            'active'     => ['required', 'boolean'],
+        ]);
+
+        DB::transaction(function () use ($validated, $item) {
+
+            $item->update([
+                'project_id' => $validated['project_id'],
+                'item_name'  => $validated['item_name'],
+                'code_prefix'=> strtoupper($validated['code_prefix']),
+                'active'     => $validated['active'],
+            ]);
+
+        });
+
+        return redirect()
+            ->route('items.index')
+            ->with('success', 'Item updated successfully.');
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Remove the specified resource.
      */
     public function destroy(Item $item)
     {
-        //
+        DB::transaction(function () use ($item) {
+            $item->delete();
+        });
+
+        return redirect()
+            ->route('items.index')
+            ->with('success', 'Item deleted successfully.');
     }
 }

@@ -62,6 +62,6 @@ class Item extends Model
 
     public function project()
     {
-        return $this->belongsTo(\App\Models\Project::class, 'project_id', 'project_id');
+        return $this->belongsTo(\App\Models\Project::class, 'project_id', 'id');
     }
 }

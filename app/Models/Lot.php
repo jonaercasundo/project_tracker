@@ -39,4 +39,8 @@ class Lot extends Model
             'lot_id'
         );
     }
+    public function items()
+    {
+        return $this->hasMany(ProjectItem::class, 'lot_id');
+    }
 }

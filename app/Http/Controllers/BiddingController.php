@@ -125,7 +125,7 @@ class BiddingController extends Controller
 
     public function show(ProjectInformation $bidding)
     {
-        $bidding->load('items');
+        $bidding->load('lots.items');
 
         return view('finance.bidding.show', [
             'project' => $bidding
@@ -175,7 +175,9 @@ class BiddingController extends Controller
 
             ]);
 
-            $bidding->items()->delete();
+            foreach ($bidding->lots as $lot) {
+                $lot->items()->delete();
+            }
 
             foreach ($request->items ?? [] as $item) {
 
@@ -183,18 +185,39 @@ class BiddingController extends Controller
                     continue;
                 }
                 $total = (float)($item['quantity'] ?? 0) * (float)($item['unit_cost'] ?? 0);
-                $bidding->items()->create([
+                foreach ($request->lots as $lotIndex => $lotData) {
 
-                    'item_no' => $item['item_no'],
-                    'item_description' => $item['item_description'],
-                    'unit' => $item['unit'],
-                    'quantity' => $item['quantity'],
-                    'unit_cost' => $item['unit_cost'],
-                    'total_amount' => $total,
-                    'brand' => $item['brand'],
-                    'remarks' => $item['remarks'],
+                    $lot = $bidding->lots()->updateOrCreate(
+                        ['lot_no' => $lotData['lot_no']],
+                        [
+                            'country' => $lotData['country_code'] == 'PH' ? 'Philippines' : $lotData['country_code'],
+                            'region' => $this->psgcName($lotData['region_code'] ?? null),
+                            'province' => $this->psgcName($lotData['province_code'] ?? null),
+                            'city_municipality' => $this->psgcName($lotData['city_code'] ?? null),
+                            'barangay' => $this->psgcName($lotData['barangay_code'] ?? null),
+                            'delivery_address' => $lotData['delivery_address'] ?? null,
+                        ]
+                    );
 
-                ]);
+                    // reset items per lot
+                    $lot->items()->delete();
+
+                    foreach ($lotData['items'] ?? [] as $index => $item) {
+
+                        if (empty($item['item_description'])) continue;
+
+                        $lot->items()->create([
+                            'item_no' => $index + 1,
+                            'item_description' => $item['item_description'],
+                            'unit' => $item['unit'],
+                            'quantity' => (float) $item['quantity'],
+                            'unit_cost' => (float) str_replace(',', '', $item['unit_cost']),
+                            'total_amount' => (float) str_replace(',', '', $item['total_amount']),
+                            'brand' => $item['brand'] ?? null,
+                            'remarks' => $item['remarks'] ?? null,
+                        ]);
+                    }
+                }
             }
 
         });

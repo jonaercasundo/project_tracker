@@ -27,5 +27,8 @@ class Project extends Model
     {
         return $this->hasMany(\App\Models\New\Item::class, 'project_id', 'project_id');
     }
-    
+    public function lots()
+    {
+        return $this->hasMany(ProjectLot::class, 'project_id');
+    }
 }

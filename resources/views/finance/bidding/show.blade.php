@@ -142,7 +142,7 @@
 
             </div>
         </div>
-        {{ dd($project->lots) }}
+        
         {{-- ================= LOTS + ITEMS ================= --}}
         @forelse($project->lots as $lot)
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-4">

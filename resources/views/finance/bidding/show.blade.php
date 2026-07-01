@@ -187,6 +187,7 @@
                         <tbody class="divide-y divide-slate-50 text-slate-600">
 
                         @forelse($lot->items as $item)
+                        @php dd($lot->items); @endphp
                             <tr class="hover:bg-slate-50/50 transition-colors">
 
                                 <td class="px-4 py-3 text-center">

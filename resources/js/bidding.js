@@ -5,6 +5,31 @@
  */
 
 let lotCount = document.querySelectorAll('.bf-lot').length;
+
+document.addEventListener('change', function (e) {
+    console.log('bidding-form.js loaded');
+    if (!e.target.matches('.item-select')) return;
+
+    const select = e.target;
+    const option = select.options[select.selectedIndex];
+
+    if (!option) return;
+
+    const row = select.closest('.bf-item-row');
+    if (!row) return;
+
+    const unitInput = row.querySelector('.unit-input');
+    const costInput = row.querySelector('.unit-cost');
+
+    if (unitInput) {
+        unitInput.value = option.dataset.unit || '';
+    }
+
+    if (costInput) {
+        costInput.value = option.dataset.price || '';
+        costInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+});
 /* ── Add Lot ──────────────────────────────────────────────────── */
 document.getElementById('addLot')?.addEventListener('click', () => {
     const template = document.getElementById('lot-template');
@@ -329,27 +354,3 @@ async function loadBarangays(citySelect) {
         resetSelect(barangay, 'Select barangay');
     }
 }
-document.addEventListener('change', function (e) {
-
-    if (!e.target.matches('.item-select')) return;
-
-    const select = e.target;
-    const option = select.options[select.selectedIndex];
-
-    if (!option) return;
-
-    const row = select.closest('.bf-item-row');
-    if (!row) return;
-
-    const unitInput = row.querySelector('.unit-input');
-    const costInput = row.querySelector('.unit-cost');
-
-    if (unitInput) {
-        unitInput.value = option.dataset.unit || '';
-    }
-
-    if (costInput) {
-        costInput.value = option.dataset.price || '';
-        costInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-});

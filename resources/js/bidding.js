@@ -6,29 +6,18 @@
 
 let lotCount = document.querySelectorAll('.bf-lot').length;
 
-console.log('bidding.js loaded');
 document.addEventListener('change', function (e) {
+
+    console.log('Change detected');
+
     if (!e.target.matches('.item-select')) return;
 
-    const select = e.target;
-    const option = select.options[select.selectedIndex];
+    console.log('Item Select');
 
-    if (!option) return;
+    const option = e.target.selectedOptions[0];
 
-    const row = select.closest('.bf-item-row');
-    if (!row) return;
+    console.log(option.dataset);
 
-    const unitInput = row.querySelector('.unit-input');
-    const costInput = row.querySelector('.unit-cost');
-
-    if (unitInput) {
-        unitInput.value = option.dataset.unit || '';
-    }
-
-    if (costInput) {
-        costInput.value = option.dataset.price || '';
-        costInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
 });
 /* ── Add Lot ──────────────────────────────────────────────────── */
 document.getElementById('addLot')?.addEventListener('click', () => {
@@ -202,18 +191,31 @@ document.addEventListener('DOMContentLoaded', () => {
  * ---------------------------------------------------------- */
  
 function resetSelect(select, placeholder) {
+
+    if (!select) return;
+
     select.innerHTML = `<option value="">${placeholder}</option>`;
     select.disabled = true;
 }
  
 function setLoading(select) {
-    select.innerHTML = '<option value="">Loading…</option>';
+
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Loading...</option>';
     select.disabled = true;
 }
  
 function populate(select, items, placeholder) {
+
+    if (!select) return;
+
     select.innerHTML = `<option value="">${placeholder}</option>`;
-    items.forEach(({ name, code }) => select.add(new Option(name, code)));
+
+    items.forEach(({ name, code }) => {
+        select.add(new Option(name, code));
+    });
+
     select.disabled = false;
 }
  

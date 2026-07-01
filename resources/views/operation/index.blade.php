@@ -11,7 +11,7 @@
             </h1>
 
             <p class="text-sm text-slate-500 mt-0.5">
-                Manage all inventory items used in projects.
+               Manage your master inventory items.
             </p>
         </div>
 
@@ -30,36 +30,17 @@
     <form method="GET"
           class="bg-white rounded-xl border border-slate-200 p-4">
 
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
 
             <div class="lg:col-span-2">
                 <input
                     type="text"
                     name="search"
                     value="{{ request('search') }}"
-                    placeholder="Search item ID or name..."
+                    placeholder="Search by Item ID, Classification, or Item Name..."
                     class="w-full rounded-lg border-slate-200 text-sm py-2
                            placeholder:text-slate-400
                            focus:ring-1 focus:ring-slate-400 focus:border-slate-400">
-            </div>
-
-            <div>
-                <select
-                    name="project"
-                    class="w-full rounded-lg border-slate-200 text-sm py-2
-                           focus:ring-1 focus:ring-slate-400 focus:border-slate-400">
-
-                    <option value="">All Projects</option>
-
-                    @foreach($projects as $project)
-                        <option
-                            value="{{ $project->project_id }}"
-                            @selected(request('project') == $project->project_id)>
-                            {{ $project->project_name }}
-                        </option>
-                    @endforeach
-
-                </select>
             </div>
 
             <div>
@@ -106,7 +87,6 @@
                     <th class="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Item ID</th>
                     <th class="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Class</th>
                     <th class="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Item Name</th>
-                    <th class="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Project</th>
                     <th class="px-5 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Unit</th>
                     <th class="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">Price</th>
                     <th class="px-5 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Status</th>
@@ -134,9 +114,6 @@
                             {{ $item->item_name }}
                         </td>
 
-                        <td class="px-5 py-3.5 text-slate-500">
-                            {{ $item->project_name ?? '—' }}
-                        </td>
 
                         <td class="px-5 py-3.5 text-center text-slate-500">
                             {{ $item->unit ?: '—' }}
@@ -203,7 +180,7 @@
                 @empty
 
                     <tr>
-                        <td colspan="8" class="text-center py-16">
+                        <td colspan="7" class="text-center py-16">
                             <svg class="w-10 h-10 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                       d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0l-2 2H6l-2-2"/>

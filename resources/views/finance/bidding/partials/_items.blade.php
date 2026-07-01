@@ -21,7 +21,7 @@
                focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
         name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]">
 
-        <option value="">Select Item</option>
+        <option value="" selected>Select Item</option>
 
         @foreach ($catalogItems as $catalogItem)
             <option
@@ -29,7 +29,8 @@
                 data-unit="{{ $catalogItem->unit }}"
                 data-price="{{ $catalogItem->price }}"
                 data-brand="{{ $catalogItem->brand }}"
-                 {{ $catalogItem->item_name }}
+                {{ $desc == $catalogItem->description ? 'selected' : '' }}>
+                {{ $catalogItem->item_name }}
             </option>
         @endforeach
     </select>

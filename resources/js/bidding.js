@@ -331,21 +331,25 @@ async function loadBarangays(citySelect) {
 }
 document.addEventListener('change', function (e) {
 
-    if (!e.target.classList.contains('item-select')) {
-        return;
-    }
+    if (!e.target.matches('.item-select')) return;
 
-    const option = e.target.selectedOptions[0];
+    const select = e.target;
+    const option = select.options[select.selectedIndex];
 
-    const row = e.target.closest('.bf-item-row');
+    if (!option) return;
 
+    const row = select.closest('.bf-item-row');
     if (!row) return;
 
-    row.querySelector('.unit-input').value =
-        option.dataset.unit || '';
+    const unitInput = row.querySelector('.unit-input');
+    const costInput = row.querySelector('.unit-cost');
 
-    row.querySelector('.unit-cost').value =
-        option.dataset.price || '';
+    if (unitInput) {
+        unitInput.value = option.dataset.unit || '';
+    }
 
-    computeLotTotal(row.closest('.bf-lot'));
+    if (costInput) {
+        costInput.value = option.dataset.price || '';
+        costInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
 });

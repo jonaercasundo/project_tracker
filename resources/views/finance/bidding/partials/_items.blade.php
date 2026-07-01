@@ -24,7 +24,8 @@
             <option
                 value="{{ $catalogItem->description }}"
                 data-unit="{{ $catalogItem->unit }}"
-                data-price="{{ $catalogItem->price }}">
+                data-price="{{ $catalogItem->price }}"
+                {{ $desc == $catalogItem->description ? 'selected' : '' }}>
                 {{ $catalogItem->item_name }}
             </option>
         @endforeach

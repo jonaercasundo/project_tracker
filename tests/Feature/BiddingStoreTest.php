@@ -13,7 +13,7 @@ it('stores a bidding document when the abc value is blank', function () {
     $response = $this->actingAs($user)->post(route('bidding.store'), [
         'project_name' => 'Sample Bidding Project',
         'project_id' => 'BID-TEST-001',
-        'procuring_entity' => 'Test Agency',
+        'procuring_entity' => '',
         'approved_budget_contract_abc' => '',
         'delivery_period' => '30',
         'date_of_bid_opening' => '2026-08-01',

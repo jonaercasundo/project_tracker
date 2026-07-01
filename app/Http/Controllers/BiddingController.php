@@ -19,10 +19,10 @@ class BiddingController extends Controller
         return (float) str_replace([',', ' '], '', trim((string) $value));
     }
 
-    private function normalizeText($value): ?string
+    private function normalizeText($value): string
     {
         if ($value === null || $value === '') {
-            return null;
+            return '';
         }
 
         return trim((string) $value);

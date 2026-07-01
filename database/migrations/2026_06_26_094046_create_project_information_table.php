@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('project_id')->unique();
             $table->string('project_name');
 
-            $table->string('procuring_entity');
+            $table->string('procuring_entity')->default('');
 
             $table->decimal('approved_budget_contract_abc', 15, 2);
 

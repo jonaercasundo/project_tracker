@@ -5,20 +5,6 @@
  */
 
 let lotCount = document.querySelectorAll('.bf-lot').length;
-
-document.addEventListener('change', function (e) {
-
-    console.log('Change detected');
-
-    if (!e.target.matches('.item-select')) return;
-
-    console.log('Item Select');
-
-    const option = e.target.selectedOptions[0];
-
-    console.log(option.dataset);
-
-});
 /* ── Add Lot ──────────────────────────────────────────────────── */
 document.getElementById('addLot')?.addEventListener('click', () => {
     const template = document.getElementById('lot-template');
@@ -191,31 +177,18 @@ document.addEventListener('DOMContentLoaded', () => {
  * ---------------------------------------------------------- */
  
 function resetSelect(select, placeholder) {
-
-    if (!select) return;
-
     select.innerHTML = `<option value="">${placeholder}</option>`;
     select.disabled = true;
 }
  
 function setLoading(select) {
-
-    if (!select) return;
-
-    select.innerHTML = '<option value="">Loading...</option>';
+    select.innerHTML = '<option value="">Loading…</option>';
     select.disabled = true;
 }
  
 function populate(select, items, placeholder) {
-
-    if (!select) return;
-
     select.innerHTML = `<option value="">${placeholder}</option>`;
-
-    items.forEach(({ name, code }) => {
-        select.add(new Option(name, code));
-    });
-
+    items.forEach(({ name, code }) => select.add(new Option(name, code)));
     select.disabled = false;
 }
  
@@ -356,3 +329,27 @@ async function loadBarangays(citySelect) {
         resetSelect(barangay, 'Select barangay');
     }
 }
+document.addEventListener('change', function (e) {
+    console.log('bidding.js loaded');
+    if (!e.target.matches('.item-select')) return;
+
+    const select = e.target;
+    const option = select.options[select.selectedIndex];
+
+    if (!option) return;
+
+    const row = select.closest('.bf-item-row');
+    if (!row) return;
+
+    const unitInput = row.querySelector('.unit-input');
+    const costInput = row.querySelector('.unit-cost');
+
+    if (unitInput) {
+        unitInput.value = option.dataset.unit || '';
+    }
+
+    if (costInput) {
+        costInput.value = option.dataset.price || '';
+        costInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+});

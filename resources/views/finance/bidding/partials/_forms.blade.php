@@ -253,7 +253,7 @@
         display: grid;
         grid-template-columns:  
             2fr   /* Item */
-            1.5fr    /* Unit */
+            .5fr    /* Unit */
             .8fr    /* Qty */
             1fr     /* Unit Cost */
             1fr     /* Amount */

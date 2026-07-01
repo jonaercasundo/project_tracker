@@ -102,7 +102,10 @@ class BiddingController extends Controller
                     }
                     $quantity = (float)($item['quantity'] ?? 0);
                     $unitCost = (float)str_replace(',', '', $item['unit_cost'] ?? 0);
-                    $total_amount = (float)str_replace(',', '', $item['total_amount'] ?? 0);
+                    $quantity = (float)($item['quantity'] ?? 0);
+                    $unitCost = (float)($item['unit_cost'] ?? 0);
+
+                    $total_amount = $quantity * $unitCost;
                     $lot->items()->create([
                         'item_no'          => $index + 1,
                         'item_description' => $item['item_description'],
@@ -140,7 +143,7 @@ class BiddingController extends Controller
             'project' => $bidding
         ]);
     }
-    
+
     public function update(Request $request, ProjectInformation $bidding)
     {
         $request->validate([

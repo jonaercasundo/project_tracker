@@ -6,6 +6,7 @@ use App\Models\ProjectInformation;
 use App\Models\ProjectItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Models\New\Item;
 
 class BiddingController extends Controller
 {
@@ -40,7 +41,11 @@ class BiddingController extends Controller
 
     public function create()
     {
-        return view('finance.bidding.create');
+        $catalogItems = Item::where('active', 1)
+            ->orderBy('item_name')
+            ->get();
+
+        return view('finance.bidding.create', compact('catalogItems'));
     }
     private function psgcName($code)
     {

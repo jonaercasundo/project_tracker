@@ -25,14 +25,11 @@ class ProjectLot extends Model
     /**
      * Parent Project
      */
-    public function project(): BelongsTo
+    public function project()
     {
         return $this->belongsTo(ProjectInformation::class, 'project_id');
     }
 
-    /**
-     * Items under this lot
-     */
     public function items()
     {
         return $this->hasMany(ProjectItem::class, 'lot_id');

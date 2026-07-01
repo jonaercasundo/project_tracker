@@ -19,7 +19,7 @@ class ProjectItem extends Model
         'remarks',
     ];
 
-        public function lot()
+    public function lot()
     {
         return $this->belongsTo(ProjectLot::class, 'lot_id');
     }

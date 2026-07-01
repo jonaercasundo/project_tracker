@@ -35,7 +35,7 @@ class ProjectInformation extends Model
     {
         return $this->hasMany(ProjectItem::class, 'lot_id');
     }
-    public function lots(): HasMany
+    public function lots()
     {
         return $this->hasMany(ProjectLot::class, 'project_id');
     }

@@ -14,7 +14,7 @@ class ItemController extends Controller
     public function index(Request $request)
     {
         $query = Item::query()
-            ->leftJoin('projects', 'projects.id', '=', 'items.project_id')
+            ->leftJoin('projects', 'projects.project_id', '=', 'items.project_id')
             ->select(
                 'items.*',
                 'projects.project_name'

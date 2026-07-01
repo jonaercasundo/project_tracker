@@ -15,10 +15,19 @@
 
 <div class="bf-item-row">
 
-    <input type="text"
-           name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]"
-           value="{{ $desc }}"
-           placeholder="Description">
+    <select
+        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]"
+        class="w-full rounded-md border-gray-300">
+        <option value="">Select Item</option>
+
+        @foreach ($items as $item)
+            <option
+                value="{{ $item->description }}"
+                {{ $desc == $item->description ? 'selected' : '' }}>
+                {{ $item->item_name }}
+            </option>
+        @endforeach
+    </select>
 
     <input type="text"
            name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit]"

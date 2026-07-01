@@ -22,9 +22,9 @@
 
         @foreach ($items as $item)
             <option
-                value="{{ $item->description }}"
-                {{ $desc == $item->description ? 'selected' : '' }}>
-                {{ $item->item_name }}
+                value="{{ $item['description'] }}"
+                {{ $desc == $item['description'] ? 'selected' : '' }}>
+                {{ $item['item_name'] }}
             </option>
         @endforeach
     </select>

@@ -302,19 +302,7 @@ td,th{
 </div>
 <div>
 
-    <div style="text-align:right;">
 
-        <small>
-            Date: June 29, 2026
-        </small>
-
-        <br>
-
-        <small>
-            DR: {{ $delivery->dr_no }}
-        </small>
-
-    </div>
     @php
         $prefix = implode('-', array_slice(explode('-', $delivery->school_id), 0, 2));
 

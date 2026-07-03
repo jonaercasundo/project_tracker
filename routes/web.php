@@ -18,6 +18,7 @@ use App\Http\Controllers\BiddingController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\EntryController;
 use App\Http\Controllers\SchoolImportController;
+use App\Http\Controllers\ActionCrawlerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -230,15 +231,15 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('api')->group(function () {
 
-    Route::get('/countries', [LocationController::class, 'countries']);
+        Route::get('/countries', [LocationController::class, 'countries']);
 
-    Route::get('/regions', [LocationController::class, 'regions']);
+        Route::get('/regions', [LocationController::class, 'regions']);
 
-    Route::get('/provinces', [LocationController::class, 'provinces']);
+        Route::get('/provinces', [LocationController::class, 'provinces']);
 
-    Route::get('/cities', [LocationController::class, 'cities']);
+        Route::get('/cities', [LocationController::class, 'cities']);
 
-    Route::get('/barangays', [LocationController::class, 'barangays']);
-
-});
+        Route::get('/barangays', [LocationController::class, 'barangays']);
+    });
+    Route::get('/crawl', [ActionCrawlerController::class, 'crawl']);
 require __DIR__.'/auth.php';

@@ -43,49 +43,39 @@ class ItemController extends Controller
      */
     public function create()
     {
-        $projects = DB::table('projects')
-            ->where('status', 'Active')
-            ->orderBy('project_name')
-            ->get();
-
-        return view('operation.create', compact('projects'));
+        return view('operation.create');
     }
 
     /**
      * Store a newly created resource.
      */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'project_id' => ['required', 'exists:projects,id'],
-            'item_name'  => ['required', 'string', 'max:255'],
-            'code_prefix'=> ['required', 'string', 'max:20', 'unique:items,code_prefix'],
-            'active'     => ['required', 'boolean'],
-        ]);
+   public function store(Request $request)
+{
+    $validated = $request->validate([
+        'item_name'       => ['required', 'string', 'max:255'],
+        'code_prefix'     => ['required', 'string', 'max:20'],
+        'unit'            => ['nullable', 'string', 'max:50'],
+        'description'     => ['nullable', 'string'],
+        'price'           => ['nullable', 'numeric'],
+        'supplier_price'  => ['nullable', 'numeric'],
+        'active'          => ['nullable', 'boolean'],
+    ]);
 
-        DB::transaction(function () use ($validated) {
+    $validated['active'] = $request->boolean('active');
+    $validated['code_prefix'] = strtoupper($validated['code_prefix']);
 
-            Item::create([
-                'project_id' => $validated['project_id'],
-                'item_name'  => $validated['item_name'],
-                'code_prefix'=> strtoupper($validated['code_prefix']),
-                'active'     => $validated['active'],
-            ]);
+    Item::create($validated);
 
-        });
-
-        return redirect()
-            ->route('items.index')
-            ->with('success', 'Item created successfully.');
-    }
+    return redirect()
+        ->route('items.index')
+        ->with('success', 'Item created successfully.');
+}
 
     /**
      * Display the specified resource.
      */
     public function show(Item $item)
     {
-        $item->loadMissing('project');
-
         return view('operation.show', compact('item'));
     }
 
@@ -94,15 +84,7 @@ class ItemController extends Controller
      */
     public function edit(Item $item)
     {
-        $projects = DB::table('projects')
-            ->where('status', 'Active')
-            ->orderBy('project_name')
-            ->get();
-
-        return view('operation.edit', compact(
-            'item',
-            'projects'
-        ));
+        return view('operation.edit', compact('item'));
     }
 
     /**
@@ -111,27 +93,24 @@ class ItemController extends Controller
     public function update(Request $request, Item $item)
     {
         $validated = $request->validate([
-            'project_id' => ['required', 'exists:projects,id'],
-            'item_name'  => ['required', 'string', 'max:255'],
-            'code_prefix'=> ['required', 'string', 'max:20', 'unique:items,code_prefix,' . $item->id],
-            'active'     => ['required', 'boolean'],
+            'item_name'       => ['required', 'string', 'max:255'],
+            'code_prefix'     => ['required', 'string', 'max:20'],
+            'unit'            => ['nullable', 'string', 'max:50'],
+            'description'     => ['nullable', 'string'],
+            'price'           => ['nullable', 'numeric'],
+            'supplier_price'  => ['nullable', 'numeric'],
+            'active'          => ['nullable', 'boolean'],
         ]);
 
-        DB::transaction(function () use ($validated, $item) {
+        $validated['active'] = $request->boolean('active');
+        $validated['code_prefix'] = strtoupper($validated['code_prefix']);
 
-            $item->update([
-                'project_id' => $validated['project_id'],
-                'item_name'  => $validated['item_name'],
-                'code_prefix'=> strtoupper($validated['code_prefix']),
-                'active'     => $validated['active'],
-            ]);
-
-        });
+        $item->update($validated);
 
         return redirect()
             ->route('items.index')
             ->with('success', 'Item updated successfully.');
-    }
+}
 
     /**
      * Remove the specified resource.

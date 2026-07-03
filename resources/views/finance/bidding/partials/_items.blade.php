@@ -5,7 +5,10 @@
 
 @php
     $itemData = is_array($item) ? $item : $item->toArray();
-    $desc     = old("lots.{$lotIndex}.items.{$itemIndex}.item_description", $itemData['item_description'] ?? '');
+    $desc = old(
+        "lots.{$lotIndex}.items.{$itemIndex}.description",
+        $itemData['description'] ?? ''
+    );
     $unit     = old("lots.{$lotIndex}.items.{$itemIndex}.unit",             $itemData['unit'] ?? '');
     $qty      = old("lots.{$lotIndex}.items.{$itemIndex}.quantity",         $itemData['quantity'] ?? '');
     $unitCost = old("lots.{$lotIndex}.items.{$itemIndex}.unit_cost",        $itemData['unit_cost'] ?? '');
@@ -30,7 +33,7 @@
                     value="{{ $catalogItem->description }}"
                     data-unit="{{ $catalogItem->unit }}"
                     data-price="{{ $catalogItem->price }}"
-                    data-brand="{{ $catalogItem->brand }}"
+                    data-description="{{ $catalogItem->description }}"
                     {{ isset($desc) && $desc == $catalogItem->description ? 'selected' : '' }}>
                     {{ $catalogItem->item_name }}
                 </option>
@@ -88,15 +91,15 @@
             readonly>
     </div>
 
-    {{-- Brand --}}
     <input
         type="text"
-        class="w-28 text-sm rounded-lg border-slate-200 py-1.5 px-2.5
-               placeholder:text-slate-400
-               focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
-        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][brand]"
-        value="{{ $brand }}"
-        placeholder="Brand">
+        class="item-description w-28 text-sm rounded-lg border-slate-200 py-1.5 px-2.5
+            placeholder:text-slate-400
+            focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
+        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][description]"
+        value="{{ $desc }}"
+        placeholder="Description"
+        readonly>
 
     {{-- Remarks --}}
     <input

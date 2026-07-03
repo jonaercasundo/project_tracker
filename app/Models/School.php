@@ -8,8 +8,6 @@ class School extends Model
 {
     protected $table = 'school';
 
-    protected $primaryKey = 'school_id';
-
     public $incrementing = false;
 
     protected $keyType = 'string';
@@ -17,6 +15,7 @@ class School extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'school_id',
         'school_name',
         'address',
         'contact_person',

@@ -300,13 +300,6 @@ td,th{
     </div>
 
 </div>
-
-<div class="page-break"></div>
-
-{{-- ========================================= --}}
-{{-- PAGE 2 --}}
-{{-- ========================================= --}}
-
 <div>
 
     <div style="text-align:right;">
@@ -366,6 +359,7 @@ td,th{
     </table>
 
 </div>
+
 <div class="page-break"></div>
 @endforeach
 

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ProjectItem extends Model
 {
     protected $fillable = [
-        'project_information_id',
+        'lot_id',
         'item_no',
         'item_description',
         'unit',

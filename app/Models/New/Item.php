@@ -15,7 +15,6 @@ class Item extends Model
         'code_prefix',
         'item_name',
         'description',
-        'project_id',
         'unit',
         'price',
         'supplier_price',

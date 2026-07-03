@@ -69,10 +69,39 @@
             <span>Item list</span>
         </a>
 
+        <a href="{{ route('school.index') }}"
+        class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
+        {{ request()->routeIs('school.index') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+
+            @if(request()->routeIs('school.index'))
+                <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
+            @endif
+
+        <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('school.index') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2">
+
+            <path stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M19.5 14.25v4.125A2.625 2.625 0 0116.875 21H7.125A2.625 2.625 0 014.5 18.375V5.625A2.625 2.625 0 017.125 3h6.22a2.625 2.625 0 011.856.769l3.03 3.03a2.625 2.625 0 01.769 1.856V9.75"/>
+
+            <path stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 10.5v6m0 0l-2.25-2.25M12 16.5l2.25-2.25"/>
+
+        </svg>
+
+            <span>Automated PDF Data Population</span>
+
+        </a>
+
         <a href="#"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-₁₀₀/₈₀ transition-all duration-₁₅₀">
-            <svg class="w-4 h-4 shrink-0 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="０ ０ ２４ ２４">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M₁₃．₅ ₂₁v₋₇．₅a．₇₅．₇₅ ₀ ₀₁．₇₅₋．₇₅h₃a．₇₅．₇₅ ₀ ₀₁．₇₅．₇₅V₂₁m₋₄．₅ ₀H₂．３６m₁₁．₁４ ₀H₁８m₀ ₀h₂．₂伍A₂．₂伍₂．₂伍 ₀ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴈ">
+            <svg class="w-4 h-4 shrink-0 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 ₂₁v₋₇．₅a．₇₅．₇₅ ₀ ₀₁．₇₅₋．₇₅h₃a．₇₅．₇₅ ₀ ₀₁．₇₅．₇₅V₂₁m₋₄．₅ ₀H₂．３６m₁₁．₁４ ₀H₁８m₀ ₀h₂．₂伍A₂．₂伍₂．₂伍 ₀ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴏ ᴈ">
 
         <a href="#"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80 transition-all duration-150">

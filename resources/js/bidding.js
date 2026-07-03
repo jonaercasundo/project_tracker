@@ -330,7 +330,7 @@ async function loadBarangays(citySelect) {
     }
 }
 document.addEventListener('change', function (e) {
-    console.log('bidding.js loaded');
+
     if (!e.target.matches('.item-select')) return;
 
     const select = e.target;
@@ -343,7 +343,7 @@ document.addEventListener('change', function (e) {
 
     const unitInput = row.querySelector('.unit-input');
     const costInput = row.querySelector('.unit-cost');
-    const brandInput = row.querySelector('.unit-brand');
+    const descriptionInput = row.querySelector('.item-description');
 
     if (unitInput) {
         unitInput.value = option.dataset.unit || '';
@@ -354,7 +354,8 @@ document.addEventListener('change', function (e) {
         costInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    if (brandInput) {
-        brandInput.value = option.dataset.brand || '';
+    if (descriptionInput) {
+        descriptionInput.value = option.dataset.description || '';
     }
+
 });

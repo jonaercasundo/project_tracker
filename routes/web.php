@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\BiddingController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\EntryController;
+use App\Http\Controllers\SchoolImportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -96,7 +97,17 @@ Route::middleware(['auth'])->group(function () {
             ->name('projects.filter');
         Route::get('/projects/{project:project_id}', [ProjectController::class, 'show'])
         ->name('projects.show');
+        /*
+            |--------------------------------------------------------------------------
+            | Allocation List Import
+            |--------------------------------------------------------------------------
+        */
 
+        Route::get('/school/import', [SchoolImportController::class, 'index'])->name('school.index');
+        Route::post('/school/preview', [SchoolImportController::class, 'preview'])->name('school.preview');
+        Route::post('/school/save', [SchoolImportController::class, 'import'])->name('school.import');
+        Route::get('/test-python', [SchoolImportController::class, 'testPython']);
+        Route::get('/extract-schools', [SchoolImportController::class, 'extractSchools']);
         /*
             |--------------------------------------------------------------------------
             | ITEMS

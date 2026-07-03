@@ -122,26 +122,7 @@ class BiddingController extends Controller
                     'delivery_address' => $lotData['delivery_address'] ?? null,
                 ]);
 
-                foreach ($lotData['items'] ?? [] as $index => $item) {
-
-                    if (empty($item['item_description'])) {
-                        continue;
-                    }
-                    $quantity = $this->normalizeAmount($item['quantity'] ?? null);
-                    $unitCost = $this->normalizeAmount($item['unit_cost'] ?? null);
-                    $totalAmount = $this->normalizeAmount($item['total_amount'] ?? ($quantity * $unitCost));
-
-                    $lot->items()->create([
-                        'item_no'          => $index + 1,
-                        'item_description' => $this->normalizeText($item['item_description'] ?? null),
-                        'unit'             => $this->normalizeText($item['unit'] ?? null),
-                        'quantity'         => $quantity,
-                        'unit_cost'        => $unitCost,
-                        'total_amount'     => $totalAmount,
-                        'brand'            => $this->normalizeText($item['brand'] ?? null),
-                        'remarks'          => $this->normalizeText($item['remarks'] ?? null),
-                    ]);
-                }
+                dd($lotData);
             }
 
         });

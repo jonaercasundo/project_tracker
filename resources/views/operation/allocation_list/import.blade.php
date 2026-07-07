@@ -112,7 +112,50 @@
             {{-- Preview Card --}}
             <div id="previewCard"
                  class="hidden bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden transition-all duration-300">
-                <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+                {{-- Project Information --}}
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                    {{-- Project No --}}
+                    <div class="space-y-2">
+                        <label for="project_no" class="block text-sm font-semibold text-slate-800">
+                            Project No.
+                        </label>
+                        <input
+                            type="text"
+                            id="project_no"
+                            name="project_no"
+                            class="block w-full px-4 py-3 rounded-xl border border-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-slate-50/50"
+                            placeholder="e.g. PRJ-001">
+                    </div>
+
+                    {{-- Project --}}
+                    <div class="space-y-2">
+                        <label for="project" class="block text-sm font-semibold text-slate-800">
+                            Project
+                        </label>
+                        <input
+                            type="text"
+                            id="project"
+                            name="project"
+                            class="block w-full px-4 py-3 rounded-xl border border-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-slate-50/50"
+                            placeholder="Project Name">
+                    </div>
+
+                    {{-- Total Contract Price --}}
+                    <div class="space-y-2">
+                        <label for="total_contract_price" class="block text-sm font-semibold text-slate-800">
+                            Total Contract Price
+                        </label>
+                        <input
+                            type="number"
+                            id="total_contract_price"
+                            name="total_contract_price"
+                            class="block w-full px-4 py-3 rounded-xl border border-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-slate-50/50"
+                            placeholder="₱ 0.00">
+                    </div>
+
+                </div>
+                 <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
                     <h2 class="text-md font-bold text-slate-800 tracking-tight flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
                         Preview Extracted Schools

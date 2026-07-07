@@ -65,26 +65,6 @@
                     <form id="importForm" class="space-y-6" onsubmit="event.preventDefault();">
                         @csrf
 
-                        {{-- URL Input --}}
-                        <div class="space-y-2">
-                            <label for="pdf_url" class="block text-sm font-semibold text-slate-800">
-                                DepEd Allocation List PDF URL
-                            </label>
-                            <div class="relative rounded-xl">
-                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-                                    </svg>
-                                </div>
-                                <input
-                                    type="url"
-                                    id="pdf_url"
-                                    name="url"
-                                    class="block w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500/25 focus:border-slate-500 text-sm transition-all bg-slate-50/50"
-                                    placeholder="https://www.deped.gov.ph/wp-content/uploads/....pdf">
-                            </div>
-                        </div>
-
                         {{-- Divider --}}
                         <div class="relative flex py-1 items-center">
                             <div class="flex-grow border-t border-slate-200"></div>

@@ -22,40 +22,6 @@
                     Back to Schools
                 </a>
             </div>
-
-            {{-- Stepper --}}
-            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-6 sm:px-10 py-5">
-                <ol id="stepper" class="flex items-center justify-between">
-                    <li class="step-item flex-1 flex items-center" data-step="1">
-                        <div class="flex items-center gap-3">
-                            <span class="step-dot flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border-2 transition-all duration-300">1</span>
-                            <span class="step-label text-sm font-semibold transition-colors duration-300 hidden sm:inline">Provide source</span>
-                        </div>
-                        <span class="step-line flex-1 h-[2px] mx-3 sm:mx-4 rounded-full transition-colors duration-500"></span>
-                    </li>
-                    <li class="step-item flex-1 flex items-center" data-step="2">
-                        <div class="flex items-center gap-3">
-                            <span class="step-dot flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border-2 transition-all duration-300">2</span>
-                            <span class="step-label text-sm font-semibold transition-colors duration-300 hidden sm:inline">Analyze PDF</span>
-                        </div>
-                        <span class="step-line flex-1 h-[2px] mx-3 sm:mx-4 rounded-full transition-colors duration-500"></span>
-                    </li>
-                    <li class="step-item flex-1 flex items-center" data-step="3">
-                        <div class="flex items-center gap-3">
-                            <span class="step-dot flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border-2 transition-all duration-300">3</span>
-                            <span class="step-label text-sm font-semibold transition-colors duration-300 hidden sm:inline">Review data</span>
-                        </div>
-                        <span class="step-line flex-1 h-[2px] mx-3 sm:mx-4 rounded-full transition-colors duration-500"></span>
-                    </li>
-                    <li class="flex items-center" data-step="4">
-                        <div class="flex items-center gap-3">
-                            <span class="step-dot flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border-2 transition-all duration-300">4</span>
-                            <span class="step-label text-sm font-semibold transition-colors duration-300 hidden sm:inline">Import</span>
-                        </div>
-                    </li>
-                </ol>
-            </div>
-
             {{-- Inline notification banner --}}
             <div id="banner" class="hidden rounded-xl px-4 py-3.5 text-sm font-medium flex items-start gap-2.5 border"></div>
 
@@ -64,13 +30,6 @@
                 <div class="p-6 sm:p-8">
                     <form id="importForm" class="space-y-6" onsubmit="event.preventDefault();">
                         @csrf
-
-                        {{-- Divider --}}
-                        <div class="relative flex py-1 items-center">
-                            <div class="flex-grow border-t border-slate-200"></div>
-                            <span class="flex-shrink mx-4 text-xs font-bold uppercase tracking-wider text-slate-400 bg-white px-2">or</span>
-                            <div class="flex-grow border-t border-slate-200"></div>
-                        </div>
 
                         {{-- File Input Container --}}
                         <div class="space-y-2">

@@ -12,15 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('school', function (Blueprint $table) {
-            $table->unsignedBigInteger('project_id')
-                  ->nullable()
-                  ->after('school_id');
 
-            // Uncomment if you want a foreign key constraint
+            // project_id already exists
+            // Add foreign key only if it does not exist
+
             $table->foreign('project_id')
-                  ->references('project_id')
-                  ->on('project_information')
-                  ->nullOnDelete();
+                ->references('id')
+                ->on('project_information')
+                ->nullOnDelete();
+
         });
     }
 
@@ -30,10 +30,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('school', function (Blueprint $table) {
-            // Uncomment if you added the foreign key
-            // $table->dropForeign(['project_id']);
 
-            $table->dropColumn('project_id');
+            $table->dropForeign(['project_id']);
+
         });
     }
 };

@@ -72,6 +72,9 @@ public function preview(Request $request)
 public function import(Request $request)
 {
     $request->validate([
+        'project_no' => 'required|string',
+        'project' => 'required|string',
+        'total_contract_price' => 'required|numeric',
         'schools' => 'required|array'
     ]);
 
@@ -83,11 +86,15 @@ public function import(Request $request)
 
         foreach ($request->schools as $row) {
             $insert[] = [
-                'school_id'     => $row['School ID'] ?? null,
-                'school_name'   => $row['School Name'] ?? null,
-                'municipality'  => $row['Municipality'] ?? null,
-                'division'      => $row['Division'] ?? null,
-                'region'        => $row['Region'] ?? null,
+                'project_no'            => $request->project_no,
+                'project'               => $request->project,
+                'total_contract_price'  => $request->total_contract_price,
+
+                'school_id'             => $row['School ID'] ?? null,
+                'school_name'           => $row['School Name'] ?? null,
+                'municipality'          => $row['Municipality'] ?? null,
+                'division'              => $row['Division'] ?? null,
+                'region'                => $row['Region'] ?? null,
             ];
         }
 

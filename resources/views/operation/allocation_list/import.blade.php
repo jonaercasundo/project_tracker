@@ -144,7 +144,7 @@
                     {{-- Total Contract Price --}}
                     <div class="space-y-2">
                         <label for="total_contract_price" class="block text-sm font-semibold text-slate-800">
-                            Total Contract Price
+                            ABC
                         </label>
                         <input
                             type="number"
@@ -312,7 +312,12 @@
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                             'Accept': 'application/json'
                         },
-                        body: JSON.stringify({ schools: extractedSchools })
+                        body: JSON.stringify({
+                            project_no: document.getElementById('project_no').value,
+                            project: document.getElementById('project').value,
+                            total_contract_price: document.getElementById('total_contract_price').value,
+                            schools: extractedSchools
+                        })
                     });
 
                     const result = await response.json();

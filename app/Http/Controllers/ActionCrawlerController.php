@@ -8,7 +8,11 @@ class ActionCrawlerController extends Controller
 {
     public function crawl()
     {
-        $python = base_path('venv/Scripts/python.exe');
+        if (PHP_OS_FAMILY === 'Windows') {
+            $python = base_path('venv\\Scripts\\python.exe');
+        } else {
+            $python = base_path('venv/bin/python');
+        }
         $script = base_path('python/crawler.py');
 
         $process = new Process([$python, $script]);

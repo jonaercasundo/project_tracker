@@ -22,7 +22,11 @@ public function preview(Request $request)
         'pdf_file' => 'required_without:url|nullable|file|mimes:pdf|max:51200',
     ]);
 
-    $python = base_path('venv\\Scripts\\python.exe');
+    if (PHP_OS_FAMILY === 'Windows') {
+        $python = base_path('venv\\Scripts\\python.exe');
+    } else {
+        $python = base_path('venv/bin/python');
+    }
     $script = base_path('python\\extract_schools.py');
 
     $tempPath = null;

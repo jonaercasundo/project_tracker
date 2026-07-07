@@ -62,7 +62,7 @@
             {{-- Import Card --}}
             <div id="sourceCard" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
                 <div class="p-6 sm:p-8">
-                    <form id="importForm" class="space-y-6">
+                    <form id="importForm" class="space-y-6" onsubmit="event.preventDefault();">
                         @csrf
 
                         {{-- URL Input --}}
@@ -128,6 +128,12 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                 </svg>
                                 Analyze PDF
+                            </button>
+                            <button 
+                                type="button" 
+                                id="resetBtn" 
+                                class="hidden inline-flex items-center justify-center px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-all active:scale-[0.98]">
+                                Clear Source
                             </button>
                         </div>
                     </form>
@@ -248,8 +254,8 @@
 
         .step-item.is-complete .step-dot,
         .step-item.is-current .step-dot,
-        li[data-step].is-complete .step-dot,
-        li[data-step].is-current .step-dot {
+        .li-step-complete .step-dot,
+        .li-step-current .step-dot {
             border-color: #14213D;
             background: #14213D;
             color: #fff;
@@ -289,13 +295,16 @@
     <script>
         let extractedSchools = [];
         const analyzeBtn = document.getElementById('analyzeBtn');
+        const resetBtn = document.getElementById('resetBtn');
         const saveBtn = document.getElementById('saveBtn');
+        const urlInput = document.getElementById('pdf_url');
         const fileInput = document.getElementById('pdf_file');
         const fileChosenText = document.getElementById('file-chosen-text');
         const dropZone = document.getElementById('dropZone');
         const banner = document.getElementById('banner');
         const tableFilter = document.getElementById('tableFilter');
         const schoolCountBadge = document.getElementById('schoolCountBadge');
+        const previewCard = document.getElementById('previewCard');
 
         function setStep(n) {
             document.querySelectorAll('#stepper li[data-step]').forEach(function (li) {
@@ -321,28 +330,52 @@
             banner.classList.add('hidden');
         }
 
-        function formatPeso(value) {
-            const num = parseFloat(value);
-            if (isNaN(num)) return '—';
-            return '₱' + num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-
-        // Dynamic file-label update for better UX
-        if (fileInput) {
-            fileInput.addEventListener('change', function () {
-                if (this.files && this.files.length > 0) {
-                    fileChosenText.textContent = 'Selected: ' + this.files[0].name;
-                    fileChosenText.classList.remove('text-slate-400');
-                    fileChosenText.classList.add('text-[#14213D]', 'font-semibold');
-                } else {
+        // Mutual Input Handlers for enhanced UX
+        if (urlInput) {
+            urlInput.addEventListener('input', function() {
+                if (this.value.trim() !== '') {
+                    fileInput.value = '';
                     fileChosenText.textContent = 'PDF documents only, up to 10MB';
-                    fileChosenText.classList.remove('text-[#14213D]', 'font-semibold');
-                    fileChosenText.classList.add('text-slate-400');
+                    fileChosenText.className = 'text-xs text-slate-400';
+                    resetBtn.classList.remove('hidden');
+                } else if (!fileInput.files.length) {
+                    resetBtn.classList.add('hidden');
                 }
             });
         }
 
-        // Drag & drop polish
+        if (fileInput) {
+            fileInput.addEventListener('change', function () {
+                if (this.files && this.files.length > 0) {
+                    urlInput.value = ''; // clear url input if file picked
+                    fileChosenText.textContent = 'Selected: ' + this.files[0].name;
+                    fileChosenText.classList.remove('text-slate-400');
+                    fileChosenText.classList.add('text-[#14213D]', 'font-semibold');
+                    resetBtn.classList.remove('hidden');
+                } else {
+                    fileChosenText.textContent = 'PDF documents only, up to 10MB';
+                    fileChosenText.classList.remove('text-[#14213D]', 'font-semibold');
+                    fileChosenText.classList.add('text-slate-400');
+                    if (!urlInput.value.trim()) resetBtn.classList.add('hidden');
+                }
+            });
+        }
+
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function() {
+                urlInput.value = '';
+                fileInput.value = '';
+                fileChosenText.textContent = 'PDF documents only, up to 10MB';
+                fileChosenText.className = 'text-xs text-slate-400';
+                previewCard.classList.add('hidden');
+                extractedSchools = [];
+                hideBanner();
+                setStep(1);
+                resetBtn.classList.add('hidden');
+            });
+        }
+
+        // Drag & drop configuration
         if (dropZone) {
             ['dragenter', 'dragover'].forEach(function (evt) {
                 dropZone.addEventListener(evt, function (e) {
@@ -395,7 +428,7 @@
 
         if (analyzeBtn) {
             analyzeBtn.addEventListener('click', async function () {
-                const url = document.getElementById('pdf_url').value.trim();
+                const url = urlInput.value.trim();
                 const file = fileInput.files[0];
 
                 hideBanner();
@@ -424,7 +457,7 @@
                         response = await fetch("{{ route('school.preview') }}", {
                             method: 'POST',
                             headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-CSRF-TOKEN': "{{ csrf_token() }}",
                                 'Accept': 'application/json'
                             },
                             body: formData
@@ -434,23 +467,30 @@
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-CSRF-TOKEN': "{{ csrf_token() }}",
                                 'Accept': 'application/json'
                             },
                             body: JSON.stringify({ url: url })
                         });
                     }
 
+                    // Soft-check if Response is JSON or HTML Error Page
+                    const contentType = response.headers.get("content-type");
                     if (!response.ok) {
-                        throw new Error(await response.text());
+                        if (contentType && contentType.indexOf("application/json") !== -1) {
+                            const errJson = await response.json();
+                            throw new Error(errJson.error || 'Server processing error.');
+                        } else {
+                            throw new Error('Server returned an unexpected system error status: ' + response.status);
+                        }
                     }
 
                     extractedSchools = await response.json();
                     renderRows(extractedSchools);
                     schoolCountBadge.textContent = extractedSchools.length;
 
-                    document.getElementById('previewCard').classList.remove('hidden');
-                    document.getElementById('previewCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    previewCard.classList.remove('hidden');
+                    previewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     setStep(3);
                     showBanner('success', 'Found ' + extractedSchools.length + ' school records. Review the details below before importing.');
 
@@ -492,7 +532,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'X-CSRF-TOKEN': "{{ csrf_token() }}",
                             'Accept': 'application/json'
                         },
                         body: JSON.stringify({
@@ -503,12 +543,17 @@
                         })
                     });
 
-                    const result = await response.json();
-
+                    const contentType = response.headers.get("content-type");
                     if (!response.ok) {
-                        throw new Error(result.error || 'Import failed');
+                        if (contentType && contentType.indexOf("application/json") !== -1) {
+                            const result = await response.json();
+                            throw new Error(result.error || 'Import failed');
+                        } else {
+                            throw new Error('Database exception occurred on the server.');
+                        }
                     }
 
+                    const result = await response.json();
                     showBanner('success', 'Imported ' + result.count + ' schools successfully.');
                     saveBtn.innerHTML = `
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -516,6 +561,7 @@
                         </svg>
                         Imported
                     `;
+                    if(resetBtn) resetBtn.classList.add('hidden');
 
                 } catch (err) {
                     console.error(err);

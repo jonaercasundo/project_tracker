@@ -24,10 +24,11 @@ public function preview(Request $request)
 
     if (PHP_OS_FAMILY === 'Windows') {
         $python = base_path('venv\\Scripts\\python.exe');
+        $script = base_path('python\\extract_schools.py');
     } else {
         $python = base_path('venv/bin/python');
+        $script = base_path('python/extract_schools.py');
     }
-    $script = base_path('python\\extract_schools.py');
 
     $tempPath = null;
 

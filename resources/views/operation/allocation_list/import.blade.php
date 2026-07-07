@@ -67,11 +67,11 @@
 
                         {{-- URL Input --}}
                         <div class="space-y-2">
-                            <label for="pdf_url" class="block text-sm font-semibold text-[#14213D]">
+                            <label for="pdf_url" class="block text-sm font-semibold text-slate-800">
                                 DepEd Allocation List PDF URL
                             </label>
                             <div class="relative rounded-xl">
-                                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                     <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
                                     </svg>
@@ -80,7 +80,7 @@
                                     type="url"
                                     id="pdf_url"
                                     name="url"
-                                    class="block w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#14213D]/15 focus:border-[#14213D] text-sm transition-all bg-slate-50/50"
+                                    class="block w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500/25 focus:border-slate-500 text-sm transition-all bg-slate-50/50"
                                     placeholder="https://www.deped.gov.ph/wp-content/uploads/....pdf">
                             </div>
                         </div>
@@ -123,6 +123,7 @@
                             <button
                                 type="button"
                                 id="analyzeBtn"
+                                style="background-color: #14213D;"
                                 class="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-[#14213D] text-white font-semibold text-sm shadow-md shadow-[#14213D]/15 hover:bg-[#1c2d52] transition-all focus:outline-none focus:ring-2 focus:ring-[#14213D] focus:ring-offset-2 active:scale-[0.98]">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>

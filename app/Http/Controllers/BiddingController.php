@@ -90,7 +90,6 @@ class BiddingController extends Controller
             'lots.*.lot_no' => 'required|string|max:50',
 
             'lots.*.items' => 'nullable|array',
-            'lots.*.items.*.item_description' => 'required|string', // changed from nullable
             'lots.*.items.*.quantity' => 'nullable|numeric|min:0',
             'lots.*.items.*.unit' => 'nullable|string|max:50',
             'lots.*.items.*.remarks' => 'nullable|string',

@@ -164,13 +164,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/ppl-forms', [PplFormController::class, 'index'])
             ->name('ppl_forms.index');
 
+        Route::get('/items', [ItemController::class, 'index'])->name('items.index');
+        
         Route::get('/ppl-forms/create', [PplFormController::class, 'create'])
             ->name('ppl_forms.create');
 
         Route::post('/ppl-forms/store', [PplFormController::class, 'store'])
             ->name('ppl_forms.store');
-            
-        Route::get('/items', [ItemController::class, 'index'])->name('items.index');
 
         // ✅ FIXED HERE
         Route::get('/ppl-forms/{id}', [PplFormController::class, 'show'])

@@ -10,7 +10,7 @@
                         Import Schools
                     </h1>
                     <p class="text-sm text-slate-500 mt-1.5 max-w-xl">
-                        Pull school records straight from a DepEd Allocation List — paste a link or drop the PDF in.
+                        PULL SCHOOL RECORDS STRAIGHT FROM A DEPED ALLOCATION LIST — DROP THE PDF IN THE ZONE BELOW.
                     </p>
                 </div>
 
@@ -237,7 +237,6 @@
         const analyzeBtn = document.getElementById('analyzeBtn');
         const resetBtn = document.getElementById('resetBtn');
         const saveBtn = document.getElementById('saveBtn');
-        const urlInput = document.getElementById('pdf_url');
         const fileInput = document.getElementById('pdf_file');
         const fileChosenText = document.getElementById('file-chosen-text');
         const dropZone = document.getElementById('dropZone');
@@ -270,24 +269,9 @@
             banner.classList.add('hidden');
         }
 
-        // Mutual Input Handlers for enhanced UX
-        if (urlInput) {
-            urlInput.addEventListener('input', function() {
-                if (this.value.trim() !== '') {
-                    fileInput.value = '';
-                    fileChosenText.textContent = 'PDF documents only, up to 10MB';
-                    fileChosenText.className = 'text-xs text-slate-400';
-                    resetBtn.classList.remove('hidden');
-                } else if (!fileInput.files.length) {
-                    resetBtn.classList.add('hidden');
-                }
-            });
-        }
-
         if (fileInput) {
             fileInput.addEventListener('change', function () {
                 if (this.files && this.files.length > 0) {
-                    urlInput.value = ''; // clear url input if file picked
                     fileChosenText.textContent = 'Selected: ' + this.files[0].name;
                     fileChosenText.classList.remove('text-slate-400');
                     fileChosenText.classList.add('text-[#14213D]', 'font-semibold');
@@ -303,7 +287,6 @@
 
         if (resetBtn) {
             resetBtn.addEventListener('click', function() {
-                urlInput.value = '';
                 fileInput.value = '';
                 fileChosenText.textContent = 'PDF documents only, up to 10MB';
                 fileChosenText.className = 'text-xs text-slate-400';
@@ -368,15 +351,9 @@
 
         if (analyzeBtn) {
             analyzeBtn.addEventListener('click', async function () {
-                const url = urlInput.value.trim();
                 const file = fileInput.files[0];
 
                 hideBanner();
-
-                if (!url && !file) {
-                    showBanner('error', 'Please enter a PDF URL or choose a file to upload.');
-                    return;
-                }
 
                 setStep(2);
                 analyzeBtn.disabled = true;
@@ -389,39 +366,37 @@
                 `;
 
                 try {
-                    let response;
-                    if (file) {
-                        const formData = new FormData();
-                        formData.append('pdf_file', file);
+                    const formData = new FormData();
+                    formData.append('pdf_file', file);
 
-                        response = await fetch("{{ route('school.preview') }}", {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': "{{ csrf_token() }}",
-                                'Accept': 'application/json'
-                            },
-                            body: formData
-                        });
-                    } else {
-                        response = await fetch("{{ route('school.preview') }}", {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': "{{ csrf_token() }}",
-                                'Accept': 'application/json'
-                            },
-                            body: JSON.stringify({ url: url })
-                        });
-                    }
+                    const response = await fetch("{{ route('school.preview') }}", {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': "{{ csrf_token() }}",
+                            'Accept': 'application/json'
+                        },
+                        body: formData
+                    });                  
 
                     // Soft-check if Response is JSON or HTML Error Page
                     const contentType = response.headers.get("content-type");
+
                     if (!response.ok) {
+                        console.log("HTTP Status:", response.status);
+                        console.log("Content-Type:", contentType);
+
                         if (contentType && contentType.indexOf("application/json") !== -1) {
                             const errJson = await response.json();
-                            throw new Error(errJson.error || 'Server processing error.');
+                            console.log("Server Error Response:", errJson);
+
+                            throw new Error(errJson.error || JSON.stringify(errJson));
                         } else {
-                            throw new Error('Server returned an unexpected system error status: ' + response.status);
+                            const text = await response.text();
+                            console.log("Server Raw Response:", text);
+
+                            throw new Error(
+                                'Server returned an unexpected system error status: ' + response.status
+                            );
                         }
                     }
 

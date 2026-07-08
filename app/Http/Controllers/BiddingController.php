@@ -133,14 +133,14 @@ class BiddingController extends Controller
 
                         $lot->items()->create([
                             'item_no'          => $index + 1,
-                            'item_description' => $itemData['item_description'] ?? null,
-                            'quantity'         => $quantity,
-                            'unit'             => $itemData['unit_of_measure'] ?? null, // <-- changed
-                            'unit_cost'        => $unitCost,
-                            'total_amount'     => ($quantity !== null && $unitCost !== null) // <-- changed
+                            'item_description' => $itemData['item_description'] ?? 'N/A',
+                            'quantity'         => $quantity ?? 0,
+                            'unit'             => $itemData['unit_of_measure'] ?? 'N/A',
+                            'unit_cost'        => $unitCost ?? 0,
+                            'total_amount'     => ($quantity !== null && $unitCost !== null)
                                 ? $quantity * $unitCost
-                                : null,
-                            'remarks'          => $itemData['remarks'] ?? null,
+                                : 0,
+                            'remarks'          => $itemData['remarks'] ?? 'N/A',
                         ]);
                     }
                 }

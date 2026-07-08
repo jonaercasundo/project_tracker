@@ -85,7 +85,7 @@ class BiddingController extends Controller
         $request->validate([
             'project_name' => 'required|string|max:255',
             'project_id' => 'required|string|max:255',
-            'lots.*.items.*.item_no' => 'required|string|max:50',
+
             'lots' => 'required|array|min:1',
             'lots.*.lot_no' => 'required|string|max:50',
 
@@ -123,13 +123,13 @@ class BiddingController extends Controller
                 ]);
                     // Save items for this lot
                 if (!empty($lotData['items'])) {
-                    foreach ($lotData['items'] as $itemData) {
+                    foreach ($lotData['items'] as $index => $itemData) {
 
                         $quantity = $itemData['quantity'] ?? null;
                         $unitCost = $this->normalizeAmount($itemData['unit_cost'] ?? null);
 
                         $lot->items()->create([
-                            'item_no'           => $itemData['item_no'] ?? null,
+                            'item_no'           => $index + 1, // auto: 1, 2, 3...
                             'item_description'  => $itemData['item_description'] ?? null,
                             'quantity'          => $quantity,
                             'unit_of_measure'   => $itemData['unit_of_measure'] ?? null,

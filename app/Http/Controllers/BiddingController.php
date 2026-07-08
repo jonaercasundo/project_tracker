@@ -129,15 +129,15 @@ class BiddingController extends Controller
                         $unitCost = $this->normalizeAmount($itemData['unit_cost'] ?? null);
 
                         $lot->items()->create([
-                            'item_no'           => $index + 1, // auto: 1, 2, 3...
-                            'item_description'  => $itemData['item_description'] ?? null,
-                            'quantity'          => $quantity,
-                            'unit_of_measure'   => $itemData['unit_of_measure'] ?? null,
-                            'unit_cost'         => $unitCost,
-                            'total_cost'        => ($quantity !== null && $unitCost !== null)
+                            'item_no'          => $index + 1,
+                            'item_description' => $itemData['item_description'] ?? null,
+                            'quantity'         => $quantity,
+                            'unit'             => $itemData['unit_of_measure'] ?? null, // <-- changed
+                            'unit_cost'        => $unitCost,
+                            'total_amount'     => ($quantity !== null && $unitCost !== null) // <-- changed
                                 ? $quantity * $unitCost
                                 : null,
-                            'remarks'           => $itemData['remarks'] ?? null,
+                            'remarks'          => $itemData['remarks'] ?? null,
                         ]);
                     }
                 }

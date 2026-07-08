@@ -121,7 +121,26 @@ class BiddingController extends Controller
                     'barangay' => $this->psgcName($lotData['barangay_code'] ?? null),
                     'delivery_address' => $lotData['delivery_address'] ?? null,
                 ]);
+                    // Save items for this lot
+               // Save items belonging to this lot
+                if (!empty($lotData['items'])) {
+                    foreach ($lotData['items'] as $itemData) {
 
+                        $quantity  = $itemData['quantity'] ?? null;
+                        $unitCost  = $this->normalizeAmount($itemData['unit_cost'] ?? null);
+
+                        $lot->items()->create([
+                            'item_description' => $itemData['item_description'] ?? null,
+                            'quantity'          => $quantity,
+                            'unit_of_measure'   => $itemData['unit_of_measure'] ?? null,
+                            'unit_cost'         => $unitCost,
+                            'total_cost'        => ($quantity !== null && $unitCost !== null)
+                                ? $quantity * $unitCost
+                                : null,
+                            'remarks'           => $itemData['remarks'] ?? null,
+                        ]);
+                    }
+                }
             }
 
         });

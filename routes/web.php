@@ -169,6 +169,8 @@ Route::middleware(['auth'])->group(function () {
 
         Route::post('/ppl-forms/store', [PplFormController::class, 'store'])
             ->name('ppl_forms.store');
+            
+        Route::get('/items', [ItemController::class, 'index'])->name('items.index');
 
         // ✅ FIXED HERE
         Route::get('/ppl-forms/{id}', [PplFormController::class, 'show'])

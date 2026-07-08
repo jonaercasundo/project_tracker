@@ -122,7 +122,6 @@ class BiddingController extends Controller
                     'delivery_address' => $lotData['delivery_address'] ?? null,
                 ]);
 
-                dd($lotData);
             }
 
         });

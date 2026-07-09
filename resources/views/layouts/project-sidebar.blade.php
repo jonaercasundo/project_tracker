@@ -53,7 +53,7 @@
 
         <a href="{{ route('items.index') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
-           {{ request()->routeIs('deliveries.tracking') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+           {{ request()->routeIs('items.index') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
             @if(request()->routeIs('items.index'))
                 <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
             @endif
@@ -67,6 +67,24 @@
                     d="M9 5.25A2.25 2.25 0 0111.25 3h1.5A2.25 2.25 0 0115 5.25V6h2.25A2.25 2.25 0 0119.5 8.25v10.5A2.25 2.25 0 0117.25 21H6.75A2.25 2.25 0 014.5 18.75V8.25A2.25 2.25 0 016.75 6H9v-.75zM8.25 10.5h7.5m-7.5 3h7.5m-7.5 3h4.5"/>
             </svg>
             <span>Item list</span>
+        </a>
+
+        <a href="{{ route('inventory.index') }}"
+           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
+           {{ request()->routeIs('inventory.index') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+            @if(request()->routeIs('inventory.index'))
+                <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
+            @endif
+            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('inventory.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2">
+                <path stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M21 8.25L12 3 3 8.25m18 0V15.75L12 21m9-12.75L12 13.5M3 8.25V15.75L12 21m-9-12.75L12 13.5m0 7.5V13.5"/>
+            </svg>
+            <span>Inventory</span>
         </a>
 
         <a href="{{ route('school.index') }}"

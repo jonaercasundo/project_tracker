@@ -75,8 +75,12 @@
                     class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none
                     {{ request()->routeIs('inventory.*') ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
                 <div class="flex items-center gap-3">
-                    <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs('inventory.*') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25L12 3 3 8.25m18 0V15.75L12 21m9-12.75L12 13.5M3 8.25V15.75L12 21m-9-12.75L12 13.5m0 7.5V13.5"/>
+                    <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs('inventory.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600' }}" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor" 
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                     </svg>
                     <span>Inventory</span>
                 </div>
@@ -85,15 +89,14 @@
                 </svg>
             </button>
 
-            <!-- Dropdown Sub Menu -->
             <ul x-show="open" 
                 x-collapse 
                 class="relative mt-1 ml-[1.15rem] pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
                 
                 <li>
                     <a href="{{ route('inventory.index') }}"
-                       class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
-                       {{ request()->routeIs('inventory.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('inventory.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
                         <span class="h-1.5 w-1.5 rounded-full shrink-0 transition-colors {{ request()->routeIs('inventory.index') ? 'bg-blue-600' : 'bg-slate-300' }}"></span>
                         Inventory List
                     </a>
@@ -101,8 +104,8 @@
 
                 <li>
                     <a href="{{ route('inventory.summary') }}"
-                       class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
-                       {{ request()->routeIs('inventory.summary') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('inventory.summary') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
                         <span class="h-1.5 w-1.5 rounded-full shrink-0 transition-colors {{ request()->routeIs('inventory.summary') ? 'bg-blue-600' : 'bg-slate-300' }}"></span>
                         Inventory Summary
                     </a>
@@ -110,8 +113,8 @@
 
                 <li>
                     <a href="{{ route('inventory.history') }}"
-                       class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
-                       {{ request()->routeIs('inventory.history') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('inventory.history') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
                         <span class="h-1.5 w-1.5 rounded-full shrink-0 transition-colors {{ request()->routeIs('inventory.history') ? 'bg-blue-600' : 'bg-slate-300' }}"></span>
                         Inventory History
                     </a>

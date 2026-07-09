@@ -145,182 +145,87 @@
     </form>
 
     {{-- INVENTORY LIST --}}
-    <div class="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-200/60">
+            <table class="min-w-full">
 
-                {{-- TABLE HEADER --}}
-                <thead class="bg-slate-50/70">
-                    <tr>
-                        @php
-                            // Helper to generate sorting URLs (assuming standard Laravel request query sorting)
-                            $sortBy = request('sort_by');
-                            $sortOrder = request('sort_order', 'asc');
-                            $nextOrder = $sortOrder === 'asc' ? 'desc' : 'asc';
-
-                            function getSortUrl($column, $sortBy, $sortOrder, $nextOrder) {
-                                return request()->fullUrlWithQuery([
-                                    'sort_by' => $column,
-                                    'sort_order' => $sortBy === $column ? $nextOrder : 'asc'
-                                ]);
-                            }
-                        @endphp
-
-                        {{-- Sortable Column: Item --}}
-                        <th scope="col" class="px-6 py-3.5 text-left">
-                            <a href="{{ getSortUrl('item_name', $sortBy, $sortOrder, $nextOrder) }}" class="group inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-900 transition-colors">
-                                Item
-                                <span class="text-slate-400 group-hover:text-slate-600 transition">
-                                    @if($sortBy === 'item_name')
-                                        <svg class="h-3 w-3 {{ $sortOrder === 'desc' ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
-                                    @else
-                                        <svg class="h-3 w-3 opacity-0 group-hover:opacity-100 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                                    @endif
-                                </span>
-                            </a>
-                        </th>
-
-                        {{-- Sortable Column: Warehouse --}}
-                        <th scope="col" class="px-6 py-3.5 text-left">
-                            <a href="{{ getSortUrl('warehouse_name', $sortBy, $sortOrder, $nextOrder) }}" class="group inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-900 transition-colors">
-                                Warehouse
-                                <span class="text-slate-400 group-hover:text-slate-600 transition">
-                                    @if($sortBy === 'warehouse_name')
-                                        <svg class="h-3 w-3 {{ $sortOrder === 'desc' ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
-                                    @else
-                                        <svg class="h-3 w-3 opacity-0 group-hover:opacity-100 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                                    @endif
-                                </span>
-                            </a>
-                        </th>
-
-                        {{-- Sortable Column: Quantity --}}
-                        <th scope="col" class="px-6 py-3.5 text-right">
-                            <a href="{{ getSortUrl('qty', $sortBy, $sortOrder, $nextOrder) }}" class="group inline-flex items-center justify-end w-full gap-1.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-900 transition-colors">
-                                Quantity
-                                <span class="text-slate-400 group-hover:text-slate-600 transition">
-                                    @if($sortBy === 'qty')
-                                        <svg class="h-3 w-3 {{ $sortOrder === 'desc' ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
-                                    @else
-                                        <svg class="h-3 w-3 opacity-0 group-hover:opacity-100 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                                    @endif
-                                </span>
-                            </a>
-                        </th>
-
-                        <th scope="col" class="px-6 py-3.5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Unit</th>
-
-                        {{-- Sortable Column: Price --}}
-                        <th scope="col" class="px-6 py-3.5 text-right">
-                            <a href="{{ getSortUrl('price', $sortBy, $sortOrder, $nextOrder) }}" class="group inline-flex items-center justify-end w-full gap-1.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-900 transition-colors">
-                                Price
-                                <span class="text-slate-400 group-hover:text-slate-600 transition">
-                                    @if($sortBy === 'price')
-                                        <svg class="h-3 w-3 {{ $sortOrder === 'desc' ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
-                                    @else
-                                        <svg class="h-3 w-3 opacity-0 group-hover:opacity-100 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                                    @endif
-                                </span>
-                            </a>
-                        </th>
-
-                        {{-- Sortable Column: Supplier Price --}}
-                        <th scope="col" class="px-6 py-3.5 text-right">
-                            <a href="{{ getSortUrl('supplier_price', $sortBy, $sortOrder, $nextOrder) }}" class="group inline-flex items-center justify-end w-full gap-1.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-900 transition-colors">
-                                Supplier Price
-                                <span class="text-slate-400 group-hover:text-slate-600 transition">
-                                    @if($sortBy === 'supplier_price')
-                                        <svg class="h-3 w-3 {{ $sortOrder === 'desc' ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
-                                    @else
-                                        <svg class="h-3 w-3 opacity-0 group-hover:opacity-100 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                                    @endif
-                                </span>
-                            </a>
-                        </th>
-
-                        <th scope="col" class="px-6 py-3.5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                        <th scope="col" class="relative px-6 py-3.5">
-                            <span class="sr-only">Actions</span>
-                        </th>
+                <thead>
+                    <tr class="border-b border-slate-100">
+                        <th class="px-6 py-4 text-left text-[11px] font-medium text-slate-400 tracking-wide">Item</th>
+                        <th class="px-6 py-4 text-left text-[11px] font-medium text-slate-400 tracking-wide">Warehouse</th>
+                        <th class="px-6 py-4 text-right text-[11px] font-medium text-slate-400 tracking-wide">Quantity</th>
+                        <th class="px-6 py-4 text-center text-[11px] font-medium text-slate-400 tracking-wide">Unit</th>
+                        <th class="px-6 py-4 text-right text-[11px] font-medium text-slate-400 tracking-wide">Price</th>
+                        <th class="px-6 py-4 text-right text-[11px] font-medium text-slate-400 tracking-wide">Supplier Price</th>
+                        <th class="px-6 py-4 text-center text-[11px] font-medium text-slate-400 tracking-wide">Status</th>
+                        <th class="px-6 py-4 text-right text-[11px] font-medium text-slate-400 tracking-wide"></th>
                     </tr>
                 </thead>
 
-                {{-- TABLE BODY --}}
-                <tbody class="divide-y divide-slate-100 bg-white">
+                <tbody class="divide-y divide-slate-50">
 
                 @forelse($inventories as $inventory)
 
                     @php
                         $isApproved = $inventory->inventory_status === 'Approved';
                         $badgeClasses = $isApproved
-                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20'
-                            : 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20';
-                        $dotClasses = $isApproved ? 'bg-emerald-500' : 'bg-amber-500';
+                            ? 'bg-emerald-50 text-emerald-600'
+                            : 'bg-amber-50 text-amber-600';
                     @endphp
 
-                    <tr class="group hover:bg-slate-50/50 transition-colors duration-150">
+                    <tr class="group hover:bg-slate-50/60 transition-colors">
 
-                        {{-- Item Column --}}
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center gap-3">
-                                <div class="h-9 w-9 shrink-0 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 flex items-center justify-center group-hover:bg-white transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="h-9 w-9 shrink-0 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center">
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-8.25 4.5-8.25-4.5M20.25 7.5l-8.25-4.5-8.25 4.5M20.25 7.5v9l-8.25 4.5m0-9L3.75 7.5m8.25 4.5v9M3.75 7.5v9l8.25 4.5" />
                                     </svg>
                                 </div>
-                                <div class="min-w-0 flex flex-col">
-                                    <span class="font-medium text-slate-900 text-sm truncate">{{ $inventory->item->item_name }}</span>
-                                    <span class="text-xs text-slate-400 font-mono mt-0.5">{{ $inventory->item->item_id }}</span>
+                                <div class="min-w-0">
+                                    <div class="font-medium text-slate-900 text-sm truncate">{{ $inventory->item->item_name }}</div>
+                                    <div class="text-xs text-slate-400 mt-0.5">{{ $inventory->item->item_id }}</div>
                                 </div>
                             </div>
                         </td>
 
-                        {{-- Warehouse Column --}}
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex flex-col">
-                                <span class="text-sm text-slate-700 font-medium">
-                                    {{ optional($inventory->warehouse)->warehouse_name ?? '—' }}
-                                </span>
-                                <span class="text-xs text-slate-400 font-mono">
-                                    {{ optional($inventory->warehouse)->warehouse_id }}
-                                </span>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-slate-700">
+                                {{ optional($inventory->warehouse)->warehouse_name ?? '—' }}
+                            </div>
+                            <div class="text-xs text-slate-400">
+                                {{ optional($inventory->warehouse)->warehouse_id }}
                             </div>
                         </td>
 
-                        {{-- Qty Column --}}
-                        <td class="px-6 py-4 text-right whitespace-nowrap text-sm font-semibold text-slate-900 tabular-nums">
+                        <td class="px-6 py-4 text-right text-sm font-medium text-slate-900 tabular-nums">
                             {{ number_format($inventory->qty) }}
                         </td>
 
-                        {{-- Unit Column --}}
-                        <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-slate-500 font-medium">
+                        <td class="px-6 py-4 text-center text-sm text-slate-500">
                             {{ $inventory->item->unit }}
                         </td>
 
-                        {{-- Price Column --}}
-                        <td class="px-6 py-4 text-right whitespace-nowrap text-sm font-medium text-slate-700 tabular-nums">
+                        <td class="px-6 py-4 text-right text-sm text-slate-700 tabular-nums">
                             ₱{{ number_format($inventory->item->price, 2) }}
                         </td>
 
-                        {{-- Supplier Price Column --}}
-                        <td class="px-6 py-4 text-right whitespace-nowrap text-sm text-slate-500 tabular-nums">
+                        <td class="px-6 py-4 text-right text-sm text-slate-700 tabular-nums">
                             ₱{{ number_format($inventory->item->supplier_price, 2) }}
                         </td>
 
-                        {{-- Status Column --}}
-                        <td class="px-6 py-4 text-center whitespace-nowrap">
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md {{ $badgeClasses }} text-xs font-semibold tracking-wide">
-                                <span class="h-1.5 w-1.5 rounded-full {{ $dotClasses }}"></span>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-md {{ $badgeClasses }} text-xs font-medium">
                                 {{ $inventory->inventory_status }}
                             </span>
                         </td>
 
-                        {{-- Actions Column --}}
-                        <td class="px-6 py-4 whitespace-nowrap text-right">
-                            <div class="flex justify-end items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        <td class="px-6 py-4">
+                            <div class="flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
                                 <a href="{{ route('inventory.show', $inventory->inventory_id) }}"
-                                    title="View details"
-                                    class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500">
+                                    title="View"
+                                    class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition">
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -328,13 +233,14 @@
                                 </a>
 
                                 <a href="{{ route('inventory.edit', $inventory->inventory_id) }}"
-                                    title="Edit record"
-                                    class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-amber-700 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">
+                                    title="Edit"
+                                    class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition">
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5v4.5a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V8.25A2.25 2.25 0 016 6h4.5" />
                                     </svg>
                                 </a>
+
                             </div>
                         </td>
 
@@ -342,17 +248,16 @@
 
                 @empty
 
-                    {{-- Empty State Row --}}
                     <tr>
-                        <td colspan="8" class="py-24">
-                            <div class="flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-                                <div class="h-12 w-12 rounded-xl bg-slate-50 border border-slate-200/60 text-slate-400 flex items-center justify-center mb-4 shadow-sm">
+                        <td colspan="8" class="py-20">
+                            <div class="flex flex-col items-center justify-center text-center">
+                                <div class="h-11 w-11 rounded-xl bg-slate-50 text-slate-300 flex items-center justify-center mb-3">
                                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V7a2 2 0 00-2-2H6a2 2 0 00-2 2v6m16 0l-2 7H6l-2-7m16 0H4" />
                                     </svg>
                                 </div>
-                                <h3 class="text-sm font-semibold text-slate-900">No inventory records found</h3>
-                                <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Try adjusting your search filters or add a new record to get started.</p>
+                                <p class="text-sm font-medium text-slate-700">No inventory records found</p>
+                                <p class="text-xs text-slate-400 mt-1">Try adjusting your search or filters, or add a new item.</p>
                             </div>
                         </td>
                     </tr>
@@ -360,6 +265,7 @@
                 @endforelse
 
                 </tbody>
+
             </table>
         </div>
     </div>

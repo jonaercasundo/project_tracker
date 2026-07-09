@@ -236,21 +236,27 @@
 {{-- Leaflet map: pinned markers for each delivered location in the Philippines --}}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script id="ph-delivery-data" type="application/json">
+    {!! json_encode(collect($deliveries)->map(function ($d) {
+        return [
+            'name'   => $d['name'],
+            'city'   => $d['city'],
+            'region' => $d['region'],
+            'lat'    => $d['lat'],
+            'lng'    => $d['lng'],
+            'date'   => \Illuminate\Support\Carbon::parse($d['delivered_at'])->format('M d, Y'),
+        ];
+    })->values()) !!}
+</script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         var mapEl = document.getElementById('ph-delivery-map');
-        if (!mapEl || typeof L === 'undefined') return;
+        var dataEl = document.getElementById('ph-delivery-data');
+        if (!mapEl || !dataEl || typeof L === 'undefined') return;
 
-        var deliveries = @json(collect($deliveries)->map(function ($d) {
-            return [
-                'name'  => $d['name'],
-                'city'  => $d['city'],
-                'region'=> $d['region'],
-                'lat'   => $d['lat'],
-                'lng'   => $d['lng'],
-                'date'  => \Illuminate\Support\Carbon::parse($d['delivered_at'])->format('M d, Y'),
-            ];
-        }));
+        var deliveries = JSON.parse(dataEl.textContent);
 
         var map = L.map('ph-delivery-map', { scrollWheelZoom: false }).setView([12.8797, 121.7740], 5.3);
 

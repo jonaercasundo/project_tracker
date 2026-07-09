@@ -41,8 +41,18 @@
                 class="rounded-xl border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500">
 
             <select
+                name="project_id"
                 class="rounded-xl border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500">
-                <option>All Categories</option>
+
+                <option value="">All Projects</option>
+
+                @foreach($projects as $project)
+                    <option value="{{ $project->project_id }}"
+                        {{ request('project_id') == $project->project_id ? 'selected' : '' }}>
+                        {{ $project->project_name }}
+                    </option>
+                @endforeach
+
             </select>
 
             <select

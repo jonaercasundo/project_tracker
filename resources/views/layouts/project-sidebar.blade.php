@@ -69,17 +69,38 @@
             <span>Item list</span>
         </a>
 
-       <li x-data="{ open: {{ request()->routeIs('inventory.*') ? 'true' : 'false' }} }">
+    <li x-data="{ open: {{ request()->routeIs('inventory.*') ? 'true' : 'false' }} }">
 
-    {{-- Inventory Parent --}}
-    <button 
-        @click="open = !open"
-        class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150
-        text-slate-700 hover:bg-slate-50">
+        {{-- Inventory Parent --}}
+        <button
+            @click="open = !open"
+            class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150
+            {{ request()->routeIs('inventory.*')
+                ? 'bg-slate-50 text-slate-900'
+                : 'text-slate-700 hover:bg-slate-50' }}">
 
-        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3">
 
-            <svg class="w-4 h-4 text-slate-500"
+                <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs('inventory.*') ? 'text-blue-600' : 'text-slate-500' }}"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2">
+
+                    <path stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M21 8.25L12 3 3 8.25m18 0V15.75L12 21m9-12.75L12 13.5M3 8.25V15.75L12 21m-9-12.75L12 13.5m0 7.5V13.5"/>
+
+                </svg>
+
+                <span>Inventory</span>
+
+            </div>
+
+            {{-- Arrow --}}
+            <svg
+                class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0"
+                :class="open ? 'rotate-90' : ''"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -87,112 +108,93 @@
 
                 <path stroke-linecap="round"
                     stroke-linejoin="round"
-                    d="M21 8.25L12 3 3 8.25m18 0V15.75L12 21m9-12.75L12 13.5M3 8.25V15.75L12 21m-9-12.75L12 13.5m0 7.5V13.5"/>
+                    d="M9 5l7 7-7 7"/>
 
             </svg>
 
-            <span>Inventory</span>
+        </button>
 
-        </div>
+        {{-- Sub Menu --}}
+        <ul
+            x-show="open"
+            x-collapse
+            class="relative mt-1 ml-[1.15rem] pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
 
+            {{-- Inventory List --}}
+            <li>
+                <a href="{{ route('inventory.index') }}"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('inventory.index')
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
 
-        {{-- Arrow --}}
-        <svg 
-            class="w-4 h-4 text-slate-400 transition-transform duration-200"
-            :class="open ? 'rotate-90' : ''"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2">
+                    <span class="h-1.5 w-1.5 rounded-full shrink-0 transition-colors
+                        {{ request()->routeIs('inventory.index') ? 'bg-blue-600' : 'bg-slate-300' }}"></span>
 
-            <path stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M9 5l7 7-7 7"/>
+                    Inventory List
 
-        </svg>
+                </a>
+            </li>
 
-    </button>
+            {{-- Inventory Summary --}}
+            <li>
+                <a href="{{ route('inventory.summary') }}"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('inventory.summary')
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
 
+                    <span class="h-1.5 w-1.5 rounded-full shrink-0 transition-colors
+                        {{ request()->routeIs('inventory.summary') ? 'bg-blue-600' : 'bg-slate-300' }}"></span>
 
-    {{-- Sub Menu --}}
-    <ul 
-        x-show="open"
-        x-collapse
-        class="mt-1 ml-5 space-y-1">
+                    Inventory Summary
 
+                </a>
+            </li>
 
-        {{-- Inventory List --}}
-        <li>
-            <a href="{{ route('inventory.index') }}"
-                class="flex items-center px-4 py-2 rounded-xl text-xs font-bold transition
-                {{ request()->routeIs('inventory.index') 
-                    ? 'bg-blue-50 text-blue-600' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+            {{-- Inventory History --}}
+            <li>
+                <a href="{{ route('inventory.history') }}"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('inventory.history')
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
 
-                Inventory List
+                    <span class="h-1.5 w-1.5 rounded-full shrink-0 transition-colors
+                        {{ request()->routeIs('inventory.history') ? 'bg-blue-600' : 'bg-slate-300' }}"></span>
 
-            </a>
-        </li>
+                    Inventory History
 
+                </a>
+            </li>
 
-
-        {{-- Inventory Summary --}}
-        <li>
-            <a href="{{ route('inventory.summary') }}"
-                class="flex items-center px-4 py-2 rounded-xl text-xs font-bold transition
-                {{ request()->routeIs('inventory.summary') 
-                    ? 'bg-blue-50 text-blue-600' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-
-                Inventory Summary
-
-            </a>
-        </li>
-
-
-
-        {{-- Inventory History --}}
-        <li>
-            <a href="{{ route('inventory.history') }}"
-                class="flex items-center px-4 py-2 rounded-xl text-xs font-bold transition
-                {{ request()->routeIs('inventory.history') 
-                    ? 'bg-blue-50 text-blue-600' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-
-                Inventory History
-
-            </a>
-        </li>
-
-
-    </ul>
-
-</li>
+        </ul>
+    </li>
 
         <a href="{{ route('school.index') }}"
-        class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
-        {{ request()->routeIs('school.index') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
+            {{ request()->routeIs('school.index') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
 
             @if(request()->routeIs('school.index'))
                 <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
             @endif
 
-        <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('school.index') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2">
+            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('school.index') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2">
 
-            <path stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M19.5 14.25v4.125A2.625 2.625 0 0116.875 21H7.125A2.625 2.625 0 014.5 18.375V5.625A2.625 2.625 0 017.125 3h6.22a2.625 2.625 0 011.856.769l3.03 3.03a2.625 2.625 0 01.769 1.856V9.75"/>
+                <path stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M19.5 14.25v4.125A2.625 2.625 0 0116.875 21H7.125A2.625 2.625 0 014.5 18.375V5.625A2.625 2.625 0 017.125 3h6.22a2.625 2.625 0 011.856.769l3.03 3.03a2.625 2.625 0 01.769 1.856V9.75"/>
 
-            <path stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M12 10.5v6m0 0l-2.25-2.25M12 16.5l2.25-2.25"/>
+                <path stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 10.5v6m0 0l-2.25-2.25M12 16.5l2.25-2.25"/>
 
-        </svg>
+            </svg>
 
             <span>Automated PDF Data Population</span>
 

@@ -134,121 +134,114 @@
     </form>
 
     {{-- INVENTORY LIST --}}
-    <div class="mt-6 space-y-3">
-        @forelse($inventories as $inventory)
+<div class="overflow-x-auto mt-6 bg-white rounded-xl shadow border border-slate-200">
 
-            @php
-                $isApproved = $inventory->inventory_status === 'Approved';
-                $badgeClasses = $isApproved
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50'
-                    : 'bg-amber-50 text-amber-700 border border-amber-200/50';
-                $dotClasses = $isApproved ? 'bg-emerald-500' : 'bg-amber-500';
-            @endphp
+<table class="min-w-full">
 
-            <div class="bg-white border border-slate-100 rounded-xl shadow-[0_2px_8px_-3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)] hover:border-slate-200/80 transition-all duration-200 p-5">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    
-                    <div class="flex items-center gap-3.5 min-w-0">
-                        <div class="h-10 w-10 shrink-0 rounded-lg bg-slate-50 border border-slate-100 text-slate-400 flex items-center justify-center">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-8.25 4.5-8.25-4.5M20.25 7.5l-8.25-4.5-8.25 4.5M20.25 7.5v9l-8.25 4.5m0-9L3.75 7.5m8.25 4.5v9M3.75 7.5v9l8.25 4.5" />
-                            </svg>
-                        </div>
-                        <div class="min-w-0">
-                            <h3 class="text-sm font-semibold text-slate-900 truncate tracking-tight">
-                                {{ $inventory->item->item_name }}
-                            </h3>
-                            <p class="text-[11px] text-slate-400 font-mono mt-0.5">
-                                ID: {{ $inventory->item->item_id }}
-                            </p>
-                        </div>
-                    </div>
+    <thead class="bg-slate-100">
 
-                    <div class="flex items-center gap-2">
+        <tr>
 
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md {{ $badgeClasses }} text-[11px] font-medium tracking-wide whitespace-nowrap">
-                            <span class="h-1.5 w-1.5 rounded-full {{ $dotClasses }}"></span>
-                            {{ $inventory->inventory_status }}
-                        </span>
+            <th class="px-5 py-3 text-left">Item</th>
 
-                        <!-- View -->
-                        <a href="{{ route('inventory.show', $inventory->inventory_id) }}"
-                        class="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition"
-                        title="View">
+            <th class="px-5 py-3 text-center">Quantity</th>
 
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                class="h-4 w-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                stroke-width="1.8">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                        </a>
+            <th class="px-5 py-3 text-center">Unit</th>
 
-                        <!-- Edit -->
-                        <a href="{{ route('inventory.edit', $inventory->inventory_id) }}"
-                        class="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200 transition"
-                        title="Edit">
+            <th class="px-5 py-3 text-center">Price</th>
 
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                class="h-4 w-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                stroke-width="1.8">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M16.862 4.487a2.25 2.25 0 113.182 3.182L8.25 19.462 3 21l1.538-5.25L16.862 4.487z"/>
-                            </svg>
-                        </a>
+            <th class="px-5 py-3 text-center">Supplier Price</th>
 
-                    </div>
+            <th class="px-5 py-3 text-center">Status</th>
+
+            <th class="px-5 py-3 text-center">Action</th>
+
+        </tr>
+
+    </thead>
+
+    <tbody>
+
+    @forelse($inventories as $inventory)
+
+        @php
+            $isApproved = $inventory->inventory_status === 'Approved';
+        @endphp
+
+        <tr class="border-b hover:bg-slate-50">
+
+            <td class="px-5 py-4">
+                <div class="font-semibold">{{ $inventory->item->item_name }}</div>
+                <div class="text-xs text-slate-400">
+                    ID: {{ $inventory->item->item_id }}
+                </div>
+            </td>
+
+            <td class="text-center">
+                {{ number_format($inventory->qty) }}
+            </td>
+
+            <td class="text-center">
+                {{ $inventory->item->unit }}
+            </td>
+
+            <td class="text-center">
+                ₱{{ number_format($inventory->item->price,2) }}
+            </td>
+
+            <td class="text-center">
+                ₱{{ number_format($inventory->item->supplier_price,2) }}
+            </td>
+
+            <td class="text-center">
+
+                @if($isApproved)
+                    <span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs">
+                        Approved
+                    </span>
+                @else
+                    <span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs">
+                        For Approval
+                    </span>
+                @endif
+
+            </td>
+
+            <td class="text-center">
+
+                <div class="flex justify-center gap-2">
+
+                    <a href="{{ route('inventory.show',$inventory->inventory_id) }}"
+                        class="text-blue-600 hover:text-blue-800">
+                        View
+                    </a>
+
+                    <a href="{{ route('inventory.edit',$inventory->inventory_id) }}"
+                        class="text-amber-600 hover:text-amber-800">
+                        Edit
+                    </a>
 
                 </div>
 
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mt-4 pt-4 border-t border-slate-50 text-xs">
-                    <div>
-                        <div class="text-slate-400 font-medium">Quantity</div>
-                        <div class="font-semibold text-slate-800 mt-0.5 tabular-nums text-sm">{{ $inventory->qty }}</div>
-                    </div>
+            </td>
 
-                    <div>
-                        <div class="text-slate-400 font-medium">Unit</div>
-                        <div class="font-semibold text-slate-800 mt-0.5 text-sm">{{ $inventory->item->unit }}</div>
-                    </div>
+        </tr>
 
-                    <div>
-                        <div class="text-slate-400 font-medium">Price</div>
-                        <div class="font-semibold text-slate-900 mt-0.5 tabular-nums text-sm">
-                            ₱{{ number_format($inventory->item->price, 2) }}
-                        </div>
-                    </div>
+    @empty
 
-                    <div>
-                        <div class="text-slate-400 font-medium">Supplier Price</div>
-                        <div class="font-semibold text-slate-500 mt-0.5 tabular-nums text-sm">
-                            ₱{{ number_format($inventory->item->supplier_price, 2) }}
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <tr>
+            <td colspan="7" class="py-10 text-center text-slate-500">
+                No inventory records found.
+            </td>
+        </tr>
 
-        @empty
+    @endforelse
 
-            <div class="bg-white border border-dashed border-slate-200 rounded-xl py-14 flex flex-col items-center justify-center text-center px-4">
-                <div class="h-11 w-11 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center mb-3 border border-slate-100">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V7a2 2 0 00-2-2H6a2 2 0 00-2 2v6m16 0l-2 7H6l-2-7m16 0H4" />
-                    </svg>
-                </div>
-                <p class="text-xs font-semibold text-slate-800">No inventory records found</p>
-                <p class="text-[11px] text-slate-400 mt-1 max-w-xs">Try adjusting your search or filters, or add a new item.</p>
-            </div>
+    </tbody>
 
-        @endforelse
-    </div>
+</table>
+
+</div>
 
     {{-- PAGINATION --}}
     @if(method_exists($inventories, 'links'))

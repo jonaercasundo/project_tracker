@@ -6,23 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class InventoryHistory extends Model
 {
-        protected $table = 'inventory_history';
+    protected $table = 'inventory_history';
 
     protected $primaryKey = 'history_id';
 
     public $timestamps = false;
 
-    protected $fillable = [
-        'inventory_id',
-        'item_id',
-        'warehouse_id',
-        'old_qty',
-        'new_qty',
-        'changed_at',
-        'changed_by',
-        'remarks',
-        'change_type',
-    ];
+    protected $guarded = [];
 
     protected $casts = [
         'changed_at' => 'datetime',

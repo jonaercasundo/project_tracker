@@ -38,7 +38,7 @@
 
                     Add Item
 
-                </a>
+            </a>
 
             <button
                 class="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800 active:bg-slate-950 transition tracking-wide">
@@ -154,6 +154,9 @@
                     <tr>
  
                         <th class="px-5 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Item</th>
+                        <th class="px-5 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                            Warehouse
+                        </th>
  
                         <th class="px-5 py-3.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Quantity</th>
  
@@ -198,7 +201,15 @@
                                 </div>
                             </div>
                         </td>
- 
+                        <td class="px-5 py-4">
+                            <div class="text-sm font-medium text-slate-800">
+                                {{ optional($inventory->warehouse)->warehouse_name ?? '-' }}
+                            </div>
+
+                            <div class="text-xs text-slate-400">
+                                ID: {{ optional($inventory->warehouse)->warehouse_id }}
+                            </div>
+                        </td>
                         <td class="px-5 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">
                             {{ number_format($inventory->qty) }}
                         </td>

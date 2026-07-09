@@ -85,7 +85,7 @@ class InventoryController extends Controller
 
         return view('inventory.summary', compact('inventories'));
     }
-    public function history()
+public function history()
 {
     $histories = InventoryHistory::with([
         'item',

@@ -43,6 +43,8 @@ class InventoryController extends Controller
 
     public function create()
     {
+        dd('create reached');
+
         $items = Item::orderBy('item_name')->get();
 
         $warehouses = Warehouse::orderBy('warehouse_name')->get();
@@ -106,7 +108,7 @@ class InventoryController extends Controller
 
 
             return redirect()
-                ->route('inventory.create')
+                ->route('inventory.index')
                 ->with('success', 'Inventory added successfully.');
 
 

@@ -48,6 +48,14 @@
                         @selected(old('code_prefix', $item->code_prefix ?? '') == 'ICT')>
                         ICT
                     </option>
+                    <option value="TX"
+                        @selected(old('code_prefix', $item->code_prefix ?? '') == 'TX')>
+                        Textbooks
+                    </option>
+                    <option value="TM"
+                        @selected(old('code_prefix', $item->code_prefix ?? '') == 'TM')>
+                        Teacher's Manual
+                    </option>
 
                 </select>
             </div>

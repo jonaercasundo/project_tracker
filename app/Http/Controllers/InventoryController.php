@@ -87,15 +87,7 @@ class InventoryController extends Controller
     }
 public function history()
 {
-    $histories = InventoryHistory::with([
-        'item',
-        'warehouse',
-        'inventory'
-    ])
-    ->orderByDesc('changed_at')
-    ->get();
-
-    dd($histories);
+ dd('history controller reached');
 }
     public function destroy($id)
     {

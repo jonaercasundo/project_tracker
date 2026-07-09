@@ -86,17 +86,17 @@ class InventoryController extends Controller
         return view('inventory.summary', compact('inventories'));
     }
     public function history()
-    {
-        $histories = InventoryHistory::with([
-            'item',
-            'warehouse',
-            'inventory'
-        ])
-        ->orderByDesc('changed_at')
-        ->get();
+{
+    $histories = InventoryHistory::with([
+        'item',
+        'warehouse',
+        'inventory'
+    ])
+    ->orderByDesc('changed_at')
+    ->get();
 
-        return view('inventory.history', compact('histories'));
-    }
+    dd($histories);
+}
     public function destroy($id)
     {
         //

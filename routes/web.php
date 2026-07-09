@@ -164,6 +164,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('inventory.show');
         Route::get('/inventories/{inventory}/edit', [InventoryController::class, 'edit'])
             ->name('inventory.edit');
+        Route::put('/inventories/{inventory}', [InventoryController::class, 'update'])
+            ->name('inventory.update');
     });
 
     /*

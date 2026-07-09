@@ -61,7 +61,20 @@ class InventoryController extends Controller
 
     public function update(Request $request, $id)
     {
-        //
+        $request->validate([
+            'qty' => 'required|integer|min:0',
+            'inventory_status' => 'required'
+        ]);
+
+        $inventory = Inventory::findOrFail($id);
+
+        $inventory->update([
+            'qty' => $request->qty,
+            'inventory_status' => $request->inventory_status,
+        ]);
+
+        return redirect()->route('inventory.index')
+            ->with('success', 'Inventory updated successfully.');
     }
 
     public function destroy($id)

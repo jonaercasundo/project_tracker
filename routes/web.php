@@ -158,7 +158,10 @@ Route::middleware(['auth'])->group(function () {
             | INVENTORIES
             |--------------------------------------------------------------------------
         */
-        Route::resource('inventory', InventoryController::class);
+        Route::get('/inventories', [InventoryController::class, 'index'])
+            ->name('inventory.index');
+        Route::get('/inventories/{inventory}', [InventoryController::class, 'show'])
+            ->name('inventory.show');
     });
 
     /*

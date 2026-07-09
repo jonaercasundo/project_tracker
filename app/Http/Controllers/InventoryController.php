@@ -49,7 +49,8 @@ class InventoryController extends Controller
 
     public function show($id)
     {
-        //
+        $inventory = Inventory::with('item')->findOrFail($id);
+        return view('inventory.show', compact('inventory'));
     }
 
     public function edit($id)

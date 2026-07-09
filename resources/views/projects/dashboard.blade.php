@@ -182,12 +182,15 @@
                         <div class="p-4 border-b">
 
                             <div class="font-semibold text-slate-800">
-                                {{ $delivery->project_name }}
+                                {{ $delivery->region }}
                             </div>
 
                             <div class="text-sm text-slate-500">
-                                {{ $delivery->municipality }},
-                                {{ $delivery->region }}
+                                {{ number_format($delivery->total_deliveries) }} Deliveries
+                            </div>
+
+                            <div class="text-xs text-blue-600">
+                                {{ number_format($delivery->total_projects) }} Projects
                             </div>
 
                             <div class="text-xs text-green-600 font-semibold mt-1 flex items-center gap-1">
@@ -208,7 +211,9 @@
                 </div>
 
             </div>
-
+            <div class="p-4">
+                {{ $deliveries->links() }}
+            </div>
         </div>
 
     </div>
@@ -265,9 +270,9 @@
                     }[c]));
 
                 marker.bindPopup(`
-                    <b>${escapeHtml(item.project_name)}</b><br>
-                    ${escapeHtml(item.municipality)}<br>
-                    ${escapeHtml(item.region)}<br><br>
+                    <b>${escapeHtml(item.region)}</b><br>
+                    ${escapeHtml(item.total_projects)}<br>
+                    ${escapeHtml(item.total_deliveries)}<br><br>
                     <span style="color:green;font-weight:bold;">
                     &#10003; Successfully Delivered
                     </span>

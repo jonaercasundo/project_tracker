@@ -91,9 +91,9 @@
 
             <ul x-show="open" 
                 x-collapse 
-                class="relative mt-1 ml-[1.15rem] pl-3 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
+                class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
                 
-                <li class="pl-2">
+                <li>
                     <a href="{{ route('inventory.index') }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
                     {{ request()->routeIs('inventory.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
@@ -104,7 +104,7 @@
                     </a>
                 </li>
 
-                <li class="pl-2">
+                <li>
                     <a href="{{ route('inventory.summary') }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
                     {{ request()->routeIs('inventory.summary') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
@@ -116,7 +116,7 @@
                     </a>
                 </li>
 
-                <li class="pl-2">
+                <li>
                     <a href="{{ route('inventory.history') }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
                     {{ request()->routeIs('inventory.history') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">

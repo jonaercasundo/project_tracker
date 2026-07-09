@@ -196,7 +196,7 @@
                                     </svg>
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="font-semibold text-slate-900 text-sm truncate">{{ $inventory->item->item_name }}</div>
+                                    <div class="font-semibold text-slate-900 text-sm ">{{ $inventory->item->item_name }}</div>
                                     <div class="text-xs text-slate-400 mt-0.5">ID: {{ $inventory->item->item_id }}</div>
                                 </div>
                             </div>

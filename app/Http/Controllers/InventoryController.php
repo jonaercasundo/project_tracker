@@ -85,16 +85,91 @@ class InventoryController extends Controller
 
         return view('inventory.summary', compact('inventories'));
     }
-public function history()
+public function history(Request $request)
 {
-    $histories = InventoryHistory::with([
+    $query = InventoryHistory::with([
         'item',
         'warehouse'
-    ])
-    ->orderByDesc('changed_at')
-    ->paginate(50);
+    ]);
 
-    return view('inventory.history', compact('histories'));
+    // Search
+    if ($request->filled('search')) {
+
+        $search = $request->search;
+
+        $query->where(function ($q) use ($search) {
+
+            $q->where('changed_by', 'like', "%{$search}%")
+              ->orWhere('remarks', 'like', "%{$search}%")
+              ->orWhereHas('item', function ($item) use ($search) {
+
+                    $item->where('item_name', 'like', "%{$search}%");
+
+              });
+
+        });
+    }
+
+
+    // Change Type Filter
+    if ($request->filled('change_type')) {
+
+        $query->where(
+            'change_type',
+            $request->change_type
+        );
+
+    }
+
+
+    // Warehouse Filter
+    if ($request->filled('warehouse_id')) {
+
+        $query->where(
+            'warehouse_id',
+            $request->warehouse_id
+        );
+
+    }
+
+
+    // Date Filter
+    if ($request->filled('date_from')) {
+
+        $query->whereDate(
+            'changed_at',
+            '>=',
+            $request->date_from
+        );
+
+    }
+
+
+    if ($request->filled('date_to')) {
+
+        $query->whereDate(
+            'changed_at',
+            '<=',
+            $request->date_to
+        );
+
+    }
+
+
+    $histories = $query
+        ->orderByDesc('changed_at')
+        ->paginate(50)
+        ->withQueryString();
+
+
+    $warehouses = \App\Models\Warehouse::orderBy('warehouse_name')
+        ->get();
+
+
+    return view('inventory.history', compact(
+        'histories',
+        'warehouses'
+    ));
 }
     public function destroy($id)
     {

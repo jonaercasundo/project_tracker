@@ -85,10 +85,12 @@ class InventoryController extends Controller
 
         return view('inventory.summary', compact('inventories'));
     }
-public function history()
-{
- dd('history controller reached');
-}
+    public function history()
+    {
+        $histories = InventoryHistory::all();
+
+        dd($histories);
+    }
     public function destroy($id)
     {
         //

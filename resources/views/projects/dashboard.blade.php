@@ -173,46 +173,67 @@
             </div>
 
             {{-- LIST --}}
-            <div class="border-l">
+            <div class="border-l bg-white">
 
-                <div class="overflow-y-auto max-h-[500px]">
+                <div class="overflow-y-auto max-h-[500px] divide-y divide-slate-100">
 
                     @forelse($deliveries as $delivery)
 
-                        <div class="p-4 border-b">
+                        <div class="px-4 py-3 hover:bg-slate-50 transition">
 
-                            <div class="font-semibold text-slate-800">
-                                {{ $delivery->region }}
-                            </div>
+                            <div class="flex items-center justify-between">
 
-                            <div class="text-sm text-slate-500">
-                                {{ number_format($delivery->total_deliveries) }} Deliveries
-                            </div>
+                                <div class="min-w-0">
+                                    <h4 class="text-sm font-semibold text-slate-800 truncate">
+                                        {{ $delivery->region }}
+                                    </h4>
 
-                            <div class="text-xs text-blue-600">
-                                {{ number_format($delivery->total_projects) }} Projects
-                            </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                        {{ number_format($delivery->total_projects) }} Projects
+                                    </p>
+                                </div>
 
-                            <div class="text-xs text-green-600 font-semibold mt-1 flex items-center gap-1">
-                                <span aria-hidden="true">✔</span> Delivered
+                                <div class="text-right">
+
+                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-100">
+                                        {{ number_format($delivery->total_deliveries) }}
+                                    </span>
+
+                                    <p class="text-[10px] text-slate-400 mt-1">
+                                        Delivered
+                                    </p>
+
+                                </div>
+
                             </div>
 
                         </div>
 
                     @empty
 
-                        <div class="p-6 text-center">
-                            <p class="text-sm font-semibold text-slate-500">No deliveries yet</p>
-                            <p class="text-xs text-slate-400 mt-1">Completed deliveries will appear here once recorded.</p>
+                        <div class="flex items-center justify-center h-40">
+
+                            <div class="text-center">
+                                <svg class="mx-auto h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                        d="M20 13V7a2 2 0 00-2-2h-3V3H9v2H6a2 2 0 00-2 2v6m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0H4"/>
+                                </svg>
+
+                                <p class="mt-2 text-sm font-medium text-slate-500">
+                                    No deliveries found
+                                </p>
+
+                                <p class="text-xs text-slate-400">
+                                    Delivered regions will appear here.
+                                </p>
+                            </div>
+
                         </div>
 
                     @endforelse
 
                 </div>
 
-                <div class="p-4">
-                    {{ $deliveries->links() }}
-                </div>
             </div>
         </div>
 

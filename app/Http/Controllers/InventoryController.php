@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 use App\Models\Inventory;
 use App\Models\Project;
+use App\Models\InventoryHistory;
 
 use Illuminate\Http\Request;
 
@@ -76,7 +77,26 @@ class InventoryController extends Controller
         return redirect()->route('inventory.index')
             ->with('success', 'Inventory updated successfully.');
     }
+    public function summary()
+    {
+        $inventories = Inventory::with(['item', 'warehouse'])
+            ->latest()
+            ->get();
 
+        return view('inventory.summary', compact('inventories'));
+    }
+    public function history()
+    {
+        $histories = InventoryHistory::with([
+            'item',
+            'warehouse',
+            'inventory'
+        ])
+        ->orderByDesc('changed_at')
+        ->get();
+
+        return view('inventory.history', compact('histories'));
+    }
     public function destroy($id)
     {
         //

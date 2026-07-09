@@ -168,6 +168,11 @@ Route::middleware(['auth'])->group(function () {
             ->name('inventory.update');
         Route::get('/inventories/{inventory}/show', [InventoryController::class, 'show'])
             ->name('inventory.show');
+        Route::get('/inventory-summary', [InventoryController::class, 'summary'])
+            ->name('inventory.summary');
+
+        Route::get('/inventory-history', [InventoryController::class, 'history'])
+            ->name('inventory.history');
     });
 
     /*

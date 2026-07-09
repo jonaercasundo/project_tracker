@@ -21,6 +21,7 @@ use App\Http\Controllers\SchoolImportController;
 use App\Http\Controllers\ActionCrawlerController;
 use App\Http\Controllers\InventoryController;
 use App\Models\Project;
+use App\Http\Controllers\ProjectDashboardController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -74,32 +75,8 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::middleware(['role:user'])->group(function () {
 
-        Route::get('/projects/dashboard', function () {
-
-            $deliveries = DB::table('deliveries')
-                ->join('projects', 'deliveries.project_id', '=', 'projects.project_id')
-                ->join('logistics_location', 'deliveries.logistics_location_id', '=', 'logistics_location.logistics_location_id')
-                ->where('deliveries.status', 'delivered')
-                ->whereNotNull('logistics_location.latitude')
-                ->whereNotNull('logistics_location.longitude')
-                ->select(
-                    'projects.project_name',
-                    'logistics_location.region',
-                    'logistics_location.latitude',
-                    'logistics_location.longitude'
-                )
-                ->get();
-
-            return view('projects.dashboard', [
-                'totalProjects' => Project::count(),
-                'pendingProjects' => Project::where('status', 'Pending')->count(),
-                'deliveredProjects' => DB::table('deliveries')
-                    ->where('status', 'delivered')
-                    ->count(),
-                'deliveries' => $deliveries,
-            ]);
-
-        })->name('projects.dashboard');
+        Route::get('/projects/dashboard', [ProjectDashboardController::class, 'index'])
+        ->name('projects.dashboard');
 
         Route::get('/projects/{project}/deliveries', [DeliveryController::class, 'index'])
         ->name('deliveries.index');

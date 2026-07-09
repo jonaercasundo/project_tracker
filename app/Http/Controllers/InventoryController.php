@@ -2,19 +2,30 @@
 
 namespace App\Http\Controllers;
 use App\Models\Inventory;
+use App\Models\project;
 
 use Illuminate\Http\Request;
 
 class InventoryController extends Controller
 {
-    public function index()
-    {
-        $inventories = Inventory::with(['item', 'warehouse'])
-            ->orderByDesc('created_at')
-            ->get();
+    public function index(Request $request)
+{
+    $query = Inventory::with('item');
 
-        return view('inventory.index', compact('inventories'));
+    if ($request->filled('project_id')) {
+        $query->whereHas('item', function ($q) use ($request) {
+            $q->where('project_id', $request->project_id);
+        });
     }
+
+    $inventories = $query
+        ->orderByDesc('created_at')
+        ->get();
+
+    $projects = Project::orderBy('project_name')->get();
+
+    return view('inventory.index', compact('inventories', 'projects'));
+}
 
     public function create()
     {

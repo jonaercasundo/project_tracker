@@ -210,9 +210,9 @@
 
                 </div>
 
-            </div>
-            <div class="p-4">
-                {{ $deliveries->links() }}
+                <div class="p-4">
+                    {{ $deliveries->links() }}
+                </div>
             </div>
         </div>
 

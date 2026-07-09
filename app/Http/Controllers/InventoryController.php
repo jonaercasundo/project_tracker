@@ -44,15 +44,6 @@ class InventoryController extends Controller
     public function create()
     {
         dd('create reached');
-
-        $items = Item::orderBy('item_name')->get();
-
-        $warehouses = Warehouse::orderBy('warehouse_name')->get();
-
-        return view('inventory.create', [
-            'items' => $items,
-            'warehouses' => $warehouses
-        ]);
     }
     public function store(Request $request)
     {

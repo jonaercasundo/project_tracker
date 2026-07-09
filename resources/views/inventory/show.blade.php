@@ -161,7 +161,7 @@
                     </label>
 
                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        {{ $inventory->created_at?->format('F d, Y h:i A') }}
+                        {{ \Carbon\Carbon::parse($inventory->created_at)->format('F d, Y h:i A') }}
                     </div>
                 </div>
 
@@ -171,7 +171,7 @@
                     </label>
 
                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        {{ $inventory->updated_at?->format('F d, Y h:i A') }}
+                        {{ \Carbon\Carbon::parse($inventory->updated_at)->format('F d, Y h:i A') }}
                     </div>
                 </div>
 

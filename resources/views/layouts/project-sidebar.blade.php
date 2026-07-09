@@ -69,82 +69,105 @@
             <span>Item list</span>
         </a>
 
+       <li x-data="{ open: {{ request()->routeIs('inventory.*') ? 'true' : 'false' }} }">
+
+    {{-- Inventory Parent --}}
+    <button 
+        @click="open = !open"
+        class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150
+        text-slate-700 hover:bg-slate-50">
+
+        <div class="flex items-center gap-3">
+
+            <svg class="w-4 h-4 text-slate-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2">
+
+                <path stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M21 8.25L12 3 3 8.25m18 0V15.75L12 21m9-12.75L12 13.5M3 8.25V15.75L12 21m-9-12.75L12 13.5m0 7.5V13.5"/>
+
+            </svg>
+
+            <span>Inventory</span>
+
+        </div>
+
+
+        {{-- Arrow --}}
+        <svg 
+            class="w-4 h-4 text-slate-400 transition-transform duration-200"
+            :class="open ? 'rotate-90' : ''"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2">
+
+            <path stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M9 5l7 7-7 7"/>
+
+        </svg>
+
+    </button>
+
+
+    {{-- Sub Menu --}}
+    <ul 
+        x-show="open"
+        x-collapse
+        class="mt-1 ml-5 space-y-1">
+
+
+        {{-- Inventory List --}}
         <li>
+            <a href="{{ route('inventory.index') }}"
+                class="flex items-center px-4 py-2 rounded-xl text-xs font-bold transition
+                {{ request()->routeIs('inventory.index') 
+                    ? 'bg-blue-50 text-blue-600' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
 
-            {{-- Inventory Parent --}}
-            <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700">
-                
-                <svg class="w-4 h-4 text-slate-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2">
-                    <path stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M21 8.25L12 3 3 8.25m18 0V15.75L12 21m9-12.75L12 13.5M3 8.25V15.75L12 21m-9-12.75L12 13.5m0 7.5V13.5"/>
-                </svg>
+                Inventory List
 
-                <span>Inventory</span>
-
-            </div>
-
-            {{-- Inventory Sub Menu --}}
-            <ul class="mt-1 ml-5 space-y-1">
-
-
-                {{-- Inventory List --}}
-                <li>
-                    <a href="{{ route('inventory.index') }}"
-                        class="group flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 relative
-                        {{ request()->routeIs('inventory.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
-
-                        @if(request()->routeIs('inventory.index'))
-                            <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
-                        @endif
-
-                        <span>Inventory List</span>
-
-                    </a>
-                </li>
-
-
-
-                {{-- Inventory Summary --}}
-                <li>
-                    <a href="{{ route('inventory.summary') }}"
-                        class="group flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 relative
-                        {{ request()->routeIs('inventory.summary') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
-
-                        @if(request()->routeIs('inventory.summary'))
-                            <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
-                        @endif
-
-                        <span>Inventory Summary</span>
-
-                    </a>
-                </li>
-
-
-
-                {{-- Inventory History --}}
-                <li>
-                    <a href="{{ route('inventory.history') }}"
-                        class="group flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 relative
-                        {{ request()->routeIs('inventory.history') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
-
-                        @if(request()->routeIs('inventory.history'))
-                            <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
-                        @endif
-
-                        <span>Inventory History</span>
-
-                    </a>
-                </li>
-
-
-            </ul>
-
+            </a>
         </li>
+
+
+
+        {{-- Inventory Summary --}}
+        <li>
+            <a href="{{ route('inventory.summary') }}"
+                class="flex items-center px-4 py-2 rounded-xl text-xs font-bold transition
+                {{ request()->routeIs('inventory.summary') 
+                    ? 'bg-blue-50 text-blue-600' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+
+                Inventory Summary
+
+            </a>
+        </li>
+
+
+
+        {{-- Inventory History --}}
+        <li>
+            <a href="{{ route('inventory.history') }}"
+                class="flex items-center px-4 py-2 rounded-xl text-xs font-bold transition
+                {{ request()->routeIs('inventory.history') 
+                    ? 'bg-blue-50 text-blue-600' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+
+                Inventory History
+
+            </a>
+        </li>
+
+
+    </ul>
+
+</li>
 
         <a href="{{ route('school.index') }}"
         class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden

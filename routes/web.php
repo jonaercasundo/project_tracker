@@ -158,6 +158,8 @@ Route::middleware(['auth'])->group(function () {
             | INVENTORIES
             |--------------------------------------------------------------------------
         */
+        Route::get('/inventories/create', [InventoryController::class, 'create'])
+        ->name('inventory.create');
         Route::get('/inventories', [InventoryController::class, 'index'])
             ->name('inventory.index');
         Route::get('/inventories/{inventory}', [InventoryController::class, 'show'])
@@ -173,8 +175,6 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/inventory-history', [InventoryController::class, 'history'])
             ->name('inventory.history');
-        Route::get('/inventories/create', [InventoryController::class, 'create'])
-        ->name('inventory.create');
     });
 
     /*

@@ -19,6 +19,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\EntryController;
 use App\Http\Controllers\SchoolImportController;
 use App\Http\Controllers\ActionCrawlerController;
+use App\Http\Controllers\InventoryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -152,6 +153,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/filter/regions', [DeliveryController::class, 'getRegions']);
         Route::get('/filter/divisions', [DeliveryController::class, 'getDivisions']);
         Route::get('/filter/municipalities', [DeliveryController::class, 'getMunicipalities']);
+        /*
+            |--------------------------------------------------------------------------
+            | INVENTORIES
+            |--------------------------------------------------------------------------
+        */
+        Route::get('/inventories', [InventoryController::class, 'index'])
+            ->name('inventory.index');
     });
 
     /*

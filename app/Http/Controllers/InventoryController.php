@@ -106,7 +106,7 @@ class InventoryController extends Controller
 
 
             return redirect()
-                ->route('inventory.index')
+                ->route('inventory.create')
                 ->with('success', 'Inventory added successfully.');
 
 

@@ -162,8 +162,6 @@ Route::middleware(['auth'])->group(function () {
         ->name('inventory.create');
         Route::get('/inventories', [InventoryController::class, 'index'])
             ->name('inventory.index');
-        Route::get('/inventories/{inventory}', [InventoryController::class, 'show'])
-            ->name('inventory.show');
         Route::get('/inventories/{inventory}/edit', [InventoryController::class, 'edit'])
             ->name('inventory.edit');
         Route::put('/inventories/{inventory}', [InventoryController::class, 'update'])

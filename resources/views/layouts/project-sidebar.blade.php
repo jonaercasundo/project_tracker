@@ -91,32 +91,39 @@
 
             <ul x-show="open" 
                 x-collapse 
-                class="relative mt-1 ml-[1.15rem] pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
+                class="relative mt-1 ml-[1.15rem] pl-3 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
                 
                 <li>
                     <a href="{{ route('inventory.index') }}"
-                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
                     {{ request()->routeIs('inventory.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-                        <span class="h-1.5 w-1.5 rounded-full shrink-0 transition-colors {{ request()->routeIs('inventory.index') ? 'bg-blue-600' : 'bg-slate-300' }}"></span>
-                        Inventory List
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('inventory.index') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Inventory List</span>
                     </a>
                 </li>
 
                 <li>
                     <a href="{{ route('inventory.summary') }}"
-                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
                     {{ request()->routeIs('inventory.summary') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-                        <span class="h-1.5 w-1.5 rounded-full shrink-0 transition-colors {{ request()->routeIs('inventory.summary') ? 'bg-blue-600' : 'bg-slate-300' }}"></span>
-                        Inventory Summary
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('inventory.summary') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.003 9.003 0 1020.945 13H11V3.055z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                        </svg>
+                        <span>Inventory Summary</span>
                     </a>
                 </li>
 
                 <li>
                     <a href="{{ route('inventory.history') }}"
-                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
                     {{ request()->routeIs('inventory.history') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-                        <span class="h-1.5 w-1.5 rounded-full shrink-0 transition-colors {{ request()->routeIs('inventory.history') ? 'bg-blue-600' : 'bg-slate-300' }}"></span>
-                        Inventory History
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('inventory.history') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Inventory History</span>
                     </a>
                 </li>
             </ul>

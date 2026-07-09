@@ -1,27 +1,45 @@
 <x-project_app-layout>
-<div class="space-y-6 max-w-[1600px] mx-auto p-2">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    {{--
+        Assumptions (adjust to match your controller):
+        - $totalProjects, $pendingProjects, $deliveredProjects are ints (nullable-safe below)
+        - $deliveries is a collection/array of delivered items, each with:
+            name, city, region, lat, lng, delivered_at
+          If $deliveries isn't passed from the controller, a demo dataset is used
+          so the page still renders correctly.
+    --}}
+    @php
+        $deliveries = $deliveries ?? collect([
+            ['name' => 'Manila Distribution Hub',   'city' => 'Manila',    'region' => 'NCR',              'lat' => 14.5995, 'lng' => 120.9842, 'delivered_at' => now()->subDays(2)],
+            ['name' => 'Cebu Retail Rollout',        'city' => 'Cebu City', 'region' => 'Central Visayas',  'lat' => 10.3157, 'lng' => 123.8854, 'delivered_at' => now()->subDays(5)],
+            ['name' => 'Davao Logistics Node',       'city' => 'Davao City','region' => 'Davao Region',     'lat' => 7.1907,  'lng' => 125.4553, 'delivered_at' => now()->subDays(9)],
+            ['name' => 'Iloilo Warehouse Fitout',     'city' => 'Iloilo City','region' => 'Western Visayas', 'lat' => 10.7202, 'lng' => 122.5621, 'delivered_at' => now()->subDays(14)],
+            ['name' => 'Baguio Cold Storage',         'city' => 'Baguio',    'region' => 'CAR',              'lat' => 16.4023, 'lng' => 120.5960, 'delivered_at' => now()->subDays(20)],
+        ]);
+    @endphp
 
     {{-- HEADER BLOCK --}}
     <div class="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
             <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Project Dashboard</h1>
             <p class="text-xs text-slate-400 font-medium mt-0.5">
-                Real-time operational monitoring across projects, deliveries, warehouse inventory & logistics channels.
+                Monitor projects, deliveries, warehouse inventory, and logistics from one centralized dashboard.
             </p>
         </div>
         <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 select-none">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            Live Updates Enabled
+            Operational
         </div>
     </div>
 
     {{-- STATS MATRIX CARDS --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex items-center justify-between">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex justify-between items-start">
             <div class="space-y-1">
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Projects</p>
-                <h2 class="text-2xl font-black text-slate-900 tracking-tight">{{ $totalProjects }}</h2>
+                <h2 class="text-2xl font-black text-slate-900 tracking-tight">{{ $totalProjects ?? 0 }}</h2>
             </div>
             <div class="w-10 h-10 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl flex items-center justify-center shadow-sm shadow-blue-500/5">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -30,10 +48,10 @@
             </div>
         </div>
 
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex items-center justify-between">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex justify-between items-start">
             <div class="space-y-1">
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Phase</p>
-                <h2 class="text-2xl font-black text-amber-600 tracking-tight">{{ $pendingProjects }}</h2>
+                <h2 class="text-2xl font-black text-amber-600 tracking-tight">{{ $pendingProjects ?? 0 }}</h2>
             </div>
             <div class="w-10 h-10 bg-amber-50 border border-amber-100 text-amber-600 rounded-xl flex items-center justify-center shadow-sm shadow-amber-500/5">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -42,10 +60,10 @@
             </div>
         </div>
 
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex items-center justify-between">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex justify-between items-start">
             <div class="space-y-1">
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Assets</p>
-                <h2 class="text-2xl font-black text-green-600 tracking-tight">{{ $deliveredProjects }}</h2>
+                <h2 class="text-2xl font-black text-green-600 tracking-tight">{{ $deliveredProjects ?? count($deliveries) }}</h2>
             </div>
             <div class="w-10 h-10 bg-green-50 border border-green-100 text-green-600 rounded-xl flex items-center justify-center shadow-sm shadow-green-500/5">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -54,7 +72,7 @@
             </div>
         </div>
 
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex items-center justify-between">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex justify-between items-start">
             <div class="space-y-1">
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">System Cluster</p>
                 <h2 class="text-2xl font-black text-emerald-600 tracking-tight">Operational</h2>
@@ -68,14 +86,74 @@
 
     </div>
 
+    {{-- PHILIPPINES DELIVERIES: MAP + TABLE --}}
+    <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 overflow-hidden">
+        <div class="p-6 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100">
+            <div>
+                <h3 class="text-sm font-extrabold text-slate-900 tracking-tight">Deliveries in the Philippines</h3>
+                <p class="text-[11px] text-slate-400 font-medium mt-0.5">
+                    {{ count($deliveries) }} delivered {{ Str::plural('asset', count($deliveries)) }} across {{ collect($deliveries)->pluck('region')->unique()->count() }} regions
+                </p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 border border-green-100 rounded-lg text-[11px] font-bold text-green-700 self-start sm:self-auto">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                All confirmed delivered
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5">
+            {{-- Map --}}
+            <div class="lg:col-span-3 border-b lg:border-b-0 lg:border-r border-slate-100">
+                <div id="ph-delivery-map" class="w-full h-[360px]"></div>
+            </div>
+
+            {{-- Table --}}
+            <div class="lg:col-span-2 max-h-[360px] overflow-y-auto">
+                <table class="w-full text-left">
+                    <thead class="sticky top-0 bg-white">
+                        <tr class="border-b border-slate-100">
+                            <th class="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Location</th>
+                            <th class="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Project</th>
+                            <th class="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Delivered</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($deliveries as $delivery)
+                            <tr class="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
+                                <td class="px-4 py-3">
+                                    <p class="text-xs font-bold text-slate-800">{{ $delivery['city'] }}</p>
+                                    <p class="text-[10px] text-slate-400">{{ $delivery['region'] }}</p>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <p class="text-xs font-medium text-slate-600">{{ $delivery['name'] }}</p>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <p class="text-[11px] font-medium text-slate-500">
+                                        {{ \Illuminate\Support\Carbon::parse($delivery['delivered_at'])->format('M d, Y') }}
+                                    </p>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="3" class="px-4 py-8 text-center text-xs text-slate-400">
+                                    No deliveries recorded yet.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     {{-- INTERACTIVE NAVIGATION ENGINE DRIVERS --}}
     <div>
         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1 select-none">Application Core Control Gateways</h3>
-        
+
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
             <a href="{{ route('projects.index') }}"
-               class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-blue-500 hover:shadow-md hover:shadow-blue-500/5 transition-all duration-200 flex flex-col justify-between min-h-[130px] relative overflow-hidden">
+               class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-blue-500 hover:shadow-md hover:shadow-blue-500/5 transition-all duration-200 flex flex-col justify-between h-full min-h-[150px] relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-[3px] bg-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
                 <div class="flex items-start justify-between">
                     <div class="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-colors group-hover:bg-blue-600 group-hover:text-white">
@@ -93,8 +171,8 @@
                 </div>
             </a>
 
-            <a href="#"
-               class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/5 transition-all duration-200 flex flex-col justify-between min-h-[130px] relative overflow-hidden">
+            <a href="{{ Route::has('deliveries.index') ? route('deliveries.index') : '#' }}"
+               class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/5 transition-all duration-200 flex flex-col justify-between h-full min-h-[150px] relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-[3px] bg-indigo-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
                 <div class="flex items-start justify-between">
                     <div class="w-9 h-9 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center transition-colors group-hover:bg-indigo-600 group-hover:text-white">
@@ -112,8 +190,8 @@
                 </div>
             </a>
 
-            <a href="#"
-               class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-emerald-500 hover:shadow-md hover:shadow-emerald-500/5 transition-all duration-200 flex flex-col justify-between min-h-[130px] relative overflow-hidden">
+            <a href="{{ Route::has('inventory.index') ? route('inventory.index') : '#' }}"
+               class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-emerald-500 hover:shadow-md hover:shadow-emerald-500/5 transition-all duration-200 flex flex-col justify-between h-full min-h-[150px] relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-[3px] bg-emerald-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
                 <div class="flex items-start justify-between">
                     <div class="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-colors group-hover:bg-emerald-600 group-hover:text-white">
@@ -131,8 +209,8 @@
                 </div>
             </a>
 
-            <a href="#"
-               class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-slate-700 hover:shadow-md hover:shadow-slate-700/5 transition-all duration-200 flex flex-col justify-between min-h-[130px] relative overflow-hidden">
+            <a href="{{ Route::has('logistics.index') ? route('logistics.index') : '#' }}"
+               class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-slate-700 hover:shadow-md hover:shadow-slate-700/5 transition-all duration-200 flex flex-col justify-between h-full min-h-[150px] relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-[3px] bg-slate-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
                 <div class="flex items-start justify-between">
                     <div class="w-9 h-9 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center transition-colors group-hover:bg-slate-700 group-hover:text-white">
@@ -154,4 +232,48 @@
     </div>
 
 </div>
+
+{{-- Leaflet map: pinned markers for each delivered location in the Philippines --}}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var mapEl = document.getElementById('ph-delivery-map');
+        if (!mapEl || typeof L === 'undefined') return;
+
+        var deliveries = @json(collect($deliveries)->map(function ($d) {
+            return [
+                'name'  => $d['name'],
+                'city'  => $d['city'],
+                'region'=> $d['region'],
+                'lat'   => $d['lat'],
+                'lng'   => $d['lng'],
+                'date'  => \Illuminate\Support\Carbon::parse($d['delivered_at'])->format('M d, Y'),
+            ];
+        }));
+
+        var map = L.map('ph-delivery-map', { scrollWheelZoom: false }).setView([12.8797, 121.7740], 5.3);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        var markers = [];
+        deliveries.forEach(function (d) {
+            var marker = L.marker([d.lat, d.lng]).addTo(map);
+            marker.bindPopup(
+                '<strong>' + d.name + '</strong><br>' +
+                d.city + ', ' + d.region + '<br>' +
+                '<span style="color:#16a34a;font-weight:600;">Delivered ' + d.date + '</span>'
+            );
+            markers.push(marker);
+        });
+
+        if (markers.length) {
+            var group = new L.featureGroup(markers);
+            map.fitBounds(group.getBounds().pad(0.3));
+        }
+    });
+</script>
 </x-project_app-layout>

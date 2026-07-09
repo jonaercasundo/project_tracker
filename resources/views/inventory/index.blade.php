@@ -164,11 +164,46 @@
                         </div>
                     </div>
 
-                    <div>
+                    <div class="flex items-center gap-2">
+
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md {{ $badgeClasses }} text-[11px] font-medium tracking-wide whitespace-nowrap">
                             <span class="h-1.5 w-1.5 rounded-full {{ $dotClasses }}"></span>
                             {{ $inventory->inventory_status }}
                         </span>
+
+                        <!-- View -->
+                        <a href="{{ route('inventory.show', $inventory->inventory_id) }}"
+                        class="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition"
+                        title="View">
+
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </a>
+
+                        <!-- Edit -->
+                        <a href="{{ route('inventory.edit', $inventory->inventory_id) }}"
+                        class="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200 transition"
+                        title="Edit">
+
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M16.862 4.487a2.25 2.25 0 113.182 3.182L8.25 19.462 3 21l1.538-5.25L16.862 4.487z"/>
+                            </svg>
+                        </a>
+
                     </div>
 
                 </div>

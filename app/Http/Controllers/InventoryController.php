@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 use App\Models\Inventory;
 use App\Models\Project;
 use App\Models\InventoryHistory;
-
+use App\Models\Item;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class InventoryController extends Controller
 {
@@ -40,12 +43,85 @@ class InventoryController extends Controller
 
     public function create()
     {
-        return view('inventory.create');
-    }
+        $items = Item::orderBy('item_name')->get();
 
+        $warehouses = Warehouse::orderBy('warehouse_name')->get();
+
+        return view('inventory.create', [
+            'items' => $items,
+            'warehouses' => $warehouses
+        ]);
+    }
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'item_id' => 'required|exists:item,item_id',
+            'warehouse_id' => 'required|exists:warehouse,warehouse_id',
+            'qty' => 'required|integer|min:0',
+            'inventory_status' => 'required',
+            'remarks' => 'nullable|string|max:255',
+        ]);
+
+
+        DB::beginTransaction();
+
+        try {
+
+            // Create inventory
+            $inventory = Inventory::create([
+
+                'item_id' => $request->item_id,
+
+                'warehouse_id' => $request->warehouse_id,
+
+                'qty' => $request->qty,
+
+                'inventory_status' => $request->inventory_status,
+
+            ]);
+            // Create inventory history
+            InventoryHistory::create([
+
+                'inventory_id' => $inventory->inventory_id,
+
+                'item_id' => $request->item_id,
+
+                'warehouse_id' => $request->warehouse_id,
+
+                'old_qty' => 0,
+
+                'new_qty' => $request->qty,
+
+                'changed_by' => Auth::user()->name ?? 'System',
+
+                'remarks' => $request->remarks,
+
+                'change_type' => 'insert',
+
+            ]);
+
+
+
+            DB::commit();
+
+
+            return redirect()
+                ->route('inventory.index')
+                ->with('success', 'Inventory added successfully.');
+
+
+
+        } catch (\Exception $e) {
+
+
+            DB::rollBack();
+
+
+            return back()
+                ->withInput()
+                ->with('error', $e->getMessage());
+
+        }
     }
 
     public function show($id)

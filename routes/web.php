@@ -173,6 +173,8 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/inventory-history', [InventoryController::class, 'history'])
             ->name('inventory.history');
+        Route::get('/inventories/create', [InventoryController::class, 'create'])
+        ->name('inventory.create');
     });
 
     /*

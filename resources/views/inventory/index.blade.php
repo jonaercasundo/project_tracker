@@ -32,14 +32,20 @@
     </div>
 
     {{-- FILTERS --}}
+<form method="GET" action="{{ route('inventory.index') }}">
     <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
 
+            {{-- Search --}}
             <input
                 type="text"
+                name="search"
+                value="{{ request('search') }}"
                 placeholder="Search item..."
                 class="rounded-xl border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500">
 
+            {{-- Project --}}
             <select
                 name="project_id"
                 class="rounded-xl border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500">
@@ -55,21 +61,45 @@
 
             </select>
 
+            {{-- Inventory Status --}}
             <select
+                name="inventory_status"
                 class="rounded-xl border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500">
-                <option>All Status</option>
-                <option>In Stock</option>
-                <option>Low Stock</option>
-                <option>Out of Stock</option>
+
+                <option value="">All Status</option>
+
+                <option value="For Approval"
+                    {{ request('inventory_status') == 'For Approval' ? 'selected' : '' }}>
+                    For Approval
+                </option>
+
+                <option value="Approved"
+                    {{ request('inventory_status') == 'Approved' ? 'selected' : '' }}>
+                    Approved
+                </option>
+
             </select>
 
-            <button
-                class="rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">
-                Search
-            </button>
+            {{-- Buttons --}}
+            <div class="flex gap-2">
+
+                <button
+                    type="submit"
+                    class="flex-1 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">
+                    Search
+                </button>
+
+                <a href="{{ route('inventory.index') }}"
+                    class="px-4 flex items-center justify-center rounded-xl border border-slate-300 text-sm font-semibold hover:bg-slate-50">
+                    Reset
+                </a>
+
+            </div>
 
         </div>
+
     </div>
+</form>
 
     @forelse($inventories as $inventory)
 

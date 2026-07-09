@@ -17,4 +17,8 @@ class Item extends Model
     {
         return $this->hasOne(PackageContent::class, 'item_id', 'item_id');
     }
+    public function inventories()
+    {
+        return $this->hasMany(Inventory::class, 'item_id', 'item_id');
+    }
 }

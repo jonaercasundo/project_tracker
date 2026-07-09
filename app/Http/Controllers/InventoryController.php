@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use App\Models\Inventory;
 
 use Illuminate\Http\Request;
 
@@ -8,9 +9,11 @@ class InventoryController extends Controller
 {
     public function index()
     {
-        $categories = [];
+        $inventories = Inventory::with(['item', 'warehouse'])
+            ->orderByDesc('created_at')
+            ->get();
 
-        return view('inventory.index', compact('categories'));
+        return view('inventory.index', compact('inventories'));
     }
 
     public function create()

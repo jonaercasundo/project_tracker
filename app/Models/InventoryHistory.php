@@ -24,6 +24,10 @@ class InventoryHistory extends Model
         'change_type',
     ];
 
+    protected $casts = [
+        'changed_at' => 'datetime',
+    ];
+
     public function inventory()
     {
         return $this->belongsTo(Inventory::class, 'inventory_id', 'inventory_id');

@@ -179,30 +179,29 @@
 
                     @forelse($deliveries as $delivery)
 
-                        <div class="px-4 py-3 hover:bg-slate-50 transition">
+                        <div class="group px-3 py-2 hover:bg-slate-50/80 transition-colors duration-150">
 
-                            <div class="flex items-center justify-between">
+                            <div class="flex items-center justify-between gap-2">
 
-                                <div class="min-w-0">
-                                    <h4 class="text-sm font-semibold text-slate-800 truncate">
-                                        {{ $delivery->region }}
-                                    </h4>
-
-                                    <p class="text-[11px] text-slate-500 mt-0.5">
-                                        {{ number_format($delivery->total_projects) }} Projects
-                                    </p>
+                                <div class="min-w-0 flex items-center gap-2">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                                    <div class="min-w-0">
+                                        <h4 class="text-[12px] font-medium text-slate-700 truncate leading-tight">
+                                            {{ $delivery->region }}
+                                        </h4>
+                                        <p class="text-[10px] text-slate-400 leading-tight">
+                                            {{ number_format($delivery->total_projects) }} projects
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div class="text-right">
-
-                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-100">
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    <span class="inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-[1px] text-[10px] font-semibold text-emerald-600 ring-1 ring-inset ring-emerald-100">
                                         {{ number_format($delivery->total_deliveries) }}
                                     </span>
-
-                                    <p class="text-[10px] text-slate-400 mt-1">
-                                        Delivered
-                                    </p>
-
+                                    <span class="text-[9px] uppercase tracking-wide text-slate-300">
+                                        done
+                                    </span>
                                 </div>
 
                             </div>
@@ -211,19 +210,19 @@
 
                     @empty
 
-                        <div class="flex items-center justify-center h-40">
+                        <div class="flex items-center justify-center h-32">
 
                             <div class="text-center">
-                                <svg class="mx-auto h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="mx-auto h-6 w-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                         d="M20 13V7a2 2 0 00-2-2h-3V3H9v2H6a2 2 0 00-2 2v6m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0H4"/>
                                 </svg>
 
-                                <p class="mt-2 text-sm font-medium text-slate-500">
+                                <p class="mt-1.5 text-xs font-medium text-slate-500">
                                     No deliveries found
                                 </p>
 
-                                <p class="text-xs text-slate-400">
+                                <p class="text-[10px] text-slate-400">
                                     Delivered regions will appear here.
                                 </p>
                             </div>

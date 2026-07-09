@@ -88,12 +88,12 @@
                     </svg>
                 </div>
                 <div class="mt-4">
-                    <h4 class="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">Projects Matrix</h4>
+                    <h4 class="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">Projects</h4>
                     <p class="text-[11px] text-slate-400 font-normal mt-0.5">Initialize, monitor development, and review master timelines.</p>
                 </div>
             </a>
 
-            <a href="#"
+            <a href="{{ route('deliveries.index') }}"
                class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/5 transition-all duration-200 flex flex-col justify-between h-full min-h-[150px] relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-[3px] bg-indigo-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
                 <div class="flex items-start justify-between">
@@ -112,7 +112,7 @@
                 </div>
             </a>
 
-            <a href="#"
+            <a href="{{ route('inventory.index') }}"
                class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-emerald-500 hover:shadow-md hover:shadow-emerald-500/5 transition-all duration-200 flex flex-col justify-between h-full min-h-[150px] relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-[3px] bg-emerald-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
                 <div class="flex items-start justify-between">

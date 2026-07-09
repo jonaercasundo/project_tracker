@@ -25,7 +25,8 @@ class ProjectDashboardController extends Controller
                 DB::raw('AVG(mc.latitude) AS latitude'),
                 DB::raw('AVG(mc.longitude) AS longitude')
             )
-            ->orderBy('school.region');
+            ->orderBy('school.region')
+            ->get();
 
         return view('projects.dashboard', [
             'totalProjects'     => Project::count(),

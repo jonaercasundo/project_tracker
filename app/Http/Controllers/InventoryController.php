@@ -77,14 +77,71 @@ class InventoryController extends Controller
         return redirect()->route('inventory.index')
             ->with('success', 'Inventory updated successfully.');
     }
-    public function summary()
-    {
-        $inventories = Inventory::with(['item', 'warehouse'])
-            ->latest()
-            ->get();
+public function summary(Request $request)
+{
+    $query = Inventory::with([
+        'item',
+        'warehouse'
+    ]);
 
-        return view('inventory.summary', compact('inventories'));
+
+    // Search Item
+    if ($request->filled('search')) {
+
+        $search = $request->search;
+
+        $query->whereHas('item', function ($q) use ($search) {
+
+            $q->where('item_name', 'like', "%{$search}%");
+
+        });
+
     }
+
+
+    // Warehouse Filter
+    if ($request->filled('warehouse_id')) {
+
+        $query->where(
+            'warehouse_id',
+            $request->warehouse_id
+        );
+
+    }
+
+
+    // Status Filter
+    if ($request->filled('inventory_status')) {
+
+        $query->where(
+            'inventory_status',
+            $request->inventory_status
+        );
+
+    }
+
+
+    $inventories = $query
+        ->latest()
+        ->paginate(50)
+        ->withQueryString();
+
+
+    $warehouses = \App\Models\Warehouse::orderBy('warehouse_name')
+        ->get();
+
+
+    $statuses = Inventory::select('inventory_status')
+        ->distinct()
+        ->pluck('inventory_status');
+
+
+    return view('inventory.summary', compact(
+        'inventories',
+        'warehouses',
+        'statuses'
+    ));
+}
 public function history(Request $request)
 {
     $query = InventoryHistory::with([

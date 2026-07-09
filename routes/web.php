@@ -20,7 +20,7 @@ use App\Http\Controllers\EntryController;
 use App\Http\Controllers\SchoolImportController;
 use App\Http\Controllers\ActionCrawlerController;
 use App\Http\Controllers\InventoryController;
-
+use App\Models\Project;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -75,11 +75,19 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:user'])->group(function () {
 
         Route::get('/projects/dashboard', function () {
+
+            $deliveries = Project::where('status', 'Delivered')
+                ->whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->get();
+
             return view('projects.dashboard', [
-                'totalProjects' => \App\Models\Project::count(),
-                'pendingProjects' => \App\Models\Project::where('status', 'Pending')->count(),
-                'deliveredProjects' => \App\Models\Project::where('status', 'Delivered')->count(),
+                'totalProjects' => Project::count(),
+                'pendingProjects' => Project::where('status', 'Pending')->count(),
+                'deliveredProjects' => Project::where('status', 'Delivered')->count(),
+                'deliveries' => $deliveries,
             ]);
+
         })->name('projects.dashboard');
 
         Route::get('/projects/{project}/deliveries', [DeliveryController::class, 'index'])

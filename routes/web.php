@@ -76,15 +76,26 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/projects/dashboard', function () {
 
-            $deliveries = Project::where('status', 'Delivered')
-                ->whereNotNull('latitude')
-                ->whereNotNull('longitude')
+            $deliveries = DB::table('deliveries')
+                ->join('projects', 'deliveries.project_id', '=', 'projects.project_id')
+                ->join('logistics_location', 'deliveries.logistics_location_id', '=', 'logistics_location.logistics_location_id')
+                ->where('deliveries.status', 'delivered')
+                ->whereNotNull('logistics_location.latitude')
+                ->whereNotNull('logistics_location.longitude')
+                ->select(
+                    'projects.project_name',
+                    'logistics_location.region',
+                    'logistics_location.latitude',
+                    'logistics_location.longitude'
+                )
                 ->get();
 
             return view('projects.dashboard', [
                 'totalProjects' => Project::count(),
                 'pendingProjects' => Project::where('status', 'Pending')->count(),
-                'deliveredProjects' => Project::where('status', 'Delivered')->count(),
+                'deliveredProjects' => DB::table('deliveries')
+                    ->where('status', 'delivered')
+                    ->count(),
                 'deliveries' => $deliveries,
             ]);
 

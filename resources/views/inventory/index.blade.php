@@ -78,20 +78,6 @@
     <form method="GET" action="{{ route('inventory.index') }}" class="mt-8">
         <div class="bg-slate-50 border border-slate-200/60 rounded-xl p-3">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-
-                {{-- Search --}}
-                <div class="relative">
-                    <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-                    </svg>
-                    <input
-                        type="text"
-                        name="search"
-                        value="{{ request('search') }}"
-                        placeholder="Search items..."
-                        class="w-full pl-9 h-9 text-xs rounded-lg border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition">
-                </div>
-
                 {{-- Project --}}
                 <select
                     name="project_id"
@@ -104,6 +90,18 @@
                         </option>
                     @endforeach
                 </select>
+                {{-- Search --}}
+                <div class="relative">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                    </svg>
+                    <input
+                        type="text"
+                        name="search"
+                        value="{{ request('search') }}"
+                        placeholder="Search items..."
+                        class="w-full pl-9 h-9 text-xs rounded-lg border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition">
+                </div>
 
                 {{-- Inventory Status --}}
                 <select

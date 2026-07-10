@@ -161,7 +161,7 @@
             </h2>
 
             <p class="text-sm text-slate-500">
-                Green markers indicate completed deliveries.
+                Markers indicate completed deliveries.
             </p>
         </div>
 

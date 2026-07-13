@@ -62,7 +62,7 @@
         min="0">
 
     {{-- Unit Cost --}}
-    <div class="flex items-center gap-2 w-28">
+     <div class="flex items-center gap-2 w-28 hidden">
         <span class="text-slate-400 text-xs">₱</span>
 
         <input
@@ -85,7 +85,7 @@
         <input
             type="text"
             class="item-amount w-full text-sm rounded-lg border-slate-200 bg-slate-50 py-1.5 pl-10 pr-2
-                   text-slate-600 cursor-not-allowed"
+                   text-slate-600"
             name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][total_amount]"
             value="0.00"
             >

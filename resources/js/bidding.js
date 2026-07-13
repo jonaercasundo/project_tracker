@@ -134,11 +134,6 @@ function computeLotTotal(lot){
         let amount = parseFloat((amountInput?.value || '0').replace(/,/g, ''));
 
         if (isNaN(amount)) amount = 0;
-
-        amountInput.value = amount.toLocaleString('en-PH', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
         grandTotal += amount;
     });
 

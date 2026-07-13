@@ -512,7 +512,7 @@
                             name="approved_budget_contract_abc"
                             class="bf-input currency"
                             value="{{ old('approved_budget_contract_abc', $project->approved_budget_contract_abc ?? '') }}"
-                            placeholder="0.00"
+                            placeholder="0.00" readonly
                         >
                 </div>
             </div>

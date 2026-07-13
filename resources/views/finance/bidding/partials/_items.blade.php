@@ -11,7 +11,7 @@
     );
     $unit     = old("lots.{$lotIndex}.items.{$itemIndex}.unit",             $itemData['unit'] ?? '');
     $qty      = old("lots.{$lotIndex}.items.{$itemIndex}.quantity",         $itemData['quantity'] ?? '');
-    {{-- $unitCost = old("lots.{$lotIndex}.items.{$itemIndex}.unit_cost", $itemData['unit_cost'] ?? ''); --}}
+    /* $unitCost = old("lots.{$lotIndex}.items.{$itemIndex}.unit_cost", $itemData['unit_cost'] ?? ''); */
     $brand    = old("lots.{$lotIndex}.items.{$itemIndex}.brand",            $itemData['brand'] ?? '');
     $remarks  = old("lots.{$lotIndex}.items.{$itemIndex}.remarks",          $itemData['remarks'] ?? '');
 @endphp

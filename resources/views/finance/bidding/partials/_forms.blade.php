@@ -508,6 +508,7 @@
                     <span class="text-slate-600 font-medium">₱</span>
                         <input
                             type="text"
+                            id="approved_budget_contract_abc"
                             name="approved_budget_contract_abc"
                             class="bf-input currency"
                             value="{{ old('approved_budget_contract_abc', $project->approved_budget_contract_abc ?? '') }}"

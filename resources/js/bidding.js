@@ -127,41 +127,66 @@ function computeLotTotal(lot){
 
     let grandTotal = 0;
 
-    lot.querySelectorAll('.bf-item-row').forEach(row=>{
+    lot.querySelectorAll('.bf-item-row').forEach(row => {
 
-        const qty = parseFloat(row.querySelector('.qty')?.value || 0);
-        const cost = parseFloat(row.querySelector('.unit-cost')?.value || 0);
+        const amountInput = row.querySelector('.item-amount');
 
-        const amount = qty * cost;
+        let amount = parseFloat((amountInput?.value || '0').replace(/,/g, ''));
 
-        row.querySelector('.item-amount').value =
-            amount.toLocaleString('en-PH',{
-                minimumFractionDigits:2,
-                maximumFractionDigits:2
-            });
+        if (isNaN(amount)) amount = 0;
 
+        amountInput.value = amount.toLocaleString('en-PH', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
         grandTotal += amount;
     });
 
     lot.querySelector('.lot-grand-total').textContent =
-        grandTotal.toLocaleString('en-PH',{
-            minimumFractionDigits:2,
-            maximumFractionDigits:2
+        grandTotal.toLocaleString('en-PH', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
         });
+
+    // Update overall ABC
+    computeApprovedBudgetABC();
 
 }
 
-document.addEventListener('input',e=>{
+document.addEventListener('input', e => {
 
-    if(e.target.classList.contains('qty') ||
-       e.target.classList.contains('unit-cost')){
-
+    if (e.target.classList.contains('item-amount')) {
         computeLotTotal(e.target.closest('.bf-lot'));
     }
 
 });
+function computeApprovedBudgetABC() {
 
+    let totalABC = 0;
+
+    document.querySelectorAll('.lot-grand-total').forEach(el => {
+
+        const value = parseFloat(
+            (el.textContent || '0').replace(/,/g, '')
+        );
+
+        if (!isNaN(value)) {
+            totalABC += value;
+        }
+    });
+
+    const abcInput = document.getElementById('approved_budget_contract_abc');
+
+    if (abcInput) {
+        abcInput.value = totalABC.toLocaleString('en-PH', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+}
 document.querySelectorAll('.bf-lot').forEach(computeLotTotal);
+computeApprovedBudgetABC();
 
 
 /* ==========================================================

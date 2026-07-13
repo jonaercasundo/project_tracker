@@ -88,7 +88,7 @@
                    text-slate-600 cursor-not-allowed"
             name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][total_amount]"
             value="0.00"
-            readonly>
+            >
     </div>
 
     <input

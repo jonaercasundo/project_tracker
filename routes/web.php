@@ -19,6 +19,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\EntryController;
 use App\Http\Controllers\SchoolImportController;
 use App\Http\Controllers\ActionCrawlerController;
+use App\Http\Controllers\Finance_Item;
 use App\Http\Controllers\InventoryController;
 use App\Models\Project;
 use App\Http\Controllers\ProjectDashboardController;
@@ -245,13 +246,13 @@ Route::middleware(['auth'])->group(function () {
         ->name('pinterest.trends');
     Route::get('/google/trends', [TikTokController::class, 'fetchHomeGoogleTrends'])
         ->name('google.trends');
-    Route::get('/items', [ItemController::class, 'index'])->name('items.index');
-    Route::get('/items/create', [ItemController::class, 'create'])->name('items.create');
-    Route::post('/items', [ItemController::class, 'store'])->name('items.store');
-    Route::get('/items/{item}/edit', [ItemController::class, 'edit'])->name('items.edit');
-    Route::put('/items/{item}', [ItemController::class, 'update'])->name('items.update');
-    Route::delete('/items/{item}', [ItemController::class, 'destroy'])->name('items.destroy');
-
+        
+    Route::get('finance/items', [Finance_Item::class, 'index'])->name('items.index');
+    Route::get('finance/items/create', [Finance_Item::class, 'create'])->name('items.create');
+    Route::post('finance/items', [Finance_Item::class, 'store'])->name('items.store');
+    Route::get('finance/items/{item}/edit', [Finance_Item::class, 'edit'])->name('items.edit');
+    Route::put('finance/items/{item}', [Finance_Item::class, 'update'])->name('items.update');
+    Route::delete('finance/items/{item}', [Finance_Item::class, 'destroy'])->name('items.destroy');
 
     Route::prefix('api')->group(function () {
 

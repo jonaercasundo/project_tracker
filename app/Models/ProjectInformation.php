@@ -12,6 +12,7 @@ class ProjectInformation extends Model
 
     protected $fillable = [
             'project_id',
+            'project_code',
             'project_name',
             'procuring_entity',
             'approved_budget_contract_abc',

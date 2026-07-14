@@ -86,8 +86,7 @@
             type="text"
             class="item-amount w-full text-sm rounded-lg border-slate-200 bg-slate-50 py-1.5 pl-10 pr-2
                    text-slate-600"
-            name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][total_amount]"
-            value="0.00"
+            name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][total_amount]"          
             >
     </div>
 

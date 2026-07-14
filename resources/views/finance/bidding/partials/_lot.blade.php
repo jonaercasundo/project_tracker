@@ -121,7 +121,6 @@
                 <span>Item description</span>
                 <span>Unit</span>
                 <span>Qty</span>
-                <span>Unit cost (PHP)</span>
                 <span>Total Amount (PHP)</span>
                 <span>Brand / Specs</span>
                 <span>Remarks</span>

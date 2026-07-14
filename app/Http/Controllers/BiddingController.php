@@ -85,7 +85,7 @@ class BiddingController extends Controller
         $request->validate([
             'project_name' => 'required|string|max:255',
             'project_id' => 'required|string|max:255',
-            'project' => 'required|string|max:255',
+            'project_code' => 'required|string|max:255',
 
             'lots' => 'required|array|min:1',
             'lots.*.lot_no' => 'required|string|max:50',
@@ -137,10 +137,7 @@ class BiddingController extends Controller
                             'item_description' => $itemData['item_description'] ?? 'N/A',
                             'quantity'         => $quantity ?? 0,
                             'unit'             => $itemData['unit_of_measure'] ?? 'N/A',
-                            'unit_cost'        => $unitCost ?? 0,
-                            'total_amount'     => ($quantity !== null && $unitCost !== null)
-                                ? $quantity * $unitCost
-                                : 0,
+                            'total_amount' => $itemData['total_amount'] ?? 0,
                             'remarks'          => $itemData['remarks'] ?? 'N/A',
                         ]);
                     }

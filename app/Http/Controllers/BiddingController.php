@@ -85,6 +85,7 @@ class BiddingController extends Controller
         $request->validate([
             'project_name' => 'required|string|max:255',
             'project_id' => 'required|string|max:255',
+            'project' => 'required|string|max:255',
 
             'lots' => 'required|array|min:1',
             'lots.*.lot_no' => 'required|string|max:50',
@@ -99,6 +100,7 @@ class BiddingController extends Controller
 
             $project = ProjectInformation::create([
                 'project_name' => $this->normalizeText($request->input('project_name')),
+                'project' => $this->normalizeText($request->input('project_code')),
                 'project_id' => $this->normalizeText($request->input('project_id')),
                 'procuring_entity' => $this->normalizeText($request->input('procuring_entity')),
                 'approved_budget_contract_abc' => $this->normalizeAmount($request->input('approved_budget_contract_abc')),

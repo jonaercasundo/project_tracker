@@ -363,7 +363,6 @@ document.addEventListener('change', function (e) {
 
     const unitInput = row.querySelector('.unit-input');
     const costInput = row.querySelector('.unit-cost');
-    const descriptionInput = row.querySelector('.item-description');
 
     if (unitInput) {
         unitInput.value = option.dataset.unit || '';
@@ -372,10 +371,6 @@ document.addEventListener('change', function (e) {
     if (costInput) {
         costInput.value = option.dataset.price || '';
         costInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-
-    if (descriptionInput) {
-        descriptionInput.value = option.dataset.description || '';
     }
 
 });

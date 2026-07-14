@@ -541,11 +541,6 @@
                        value="{{ old('date_of_bid_opening', $project->date_of_bid_opening ?? '') }}">
             </div>
 
-        </div>
-
-        {{-- Row 3: Status --}}
-        <div class="bf-body bf-grid-auto">
-
             <div class="bf-field">
                 <label class="bf-label"><i class="ti ti-toggle-right"></i> Status</label>
                 <div class="bf-select-wrap">
@@ -559,7 +554,6 @@
                     </select>
                 </div>
             </div>
-
         </div>
 
     </div>

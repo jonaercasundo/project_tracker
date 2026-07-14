@@ -512,7 +512,7 @@
         </div>
 
         {{-- Row 2: Entity + ABC + Delivery + Bid Opening --}}
-        <div class="bf-body bf-grid-4" style="padding-bottom:0">
+        <div class="bf-body bf-grid-4">
             <div class="bf-field">
                 <label class="bf-label" style="font-size:8.5px;"><i class="ti ti-coin"></i> Approved Budget for the Contract (ABC)</label>
                 <div class=" flex items-center gap-2">
@@ -554,8 +554,8 @@
                     </select>
                 </div>
             </div>
-        </div>
 
+        </div>
     </div>
 
 

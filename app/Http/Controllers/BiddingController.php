@@ -100,7 +100,7 @@ class BiddingController extends Controller
 
             $project = ProjectInformation::create([
                 'project_name' => $this->normalizeText($request->input('project_name')),
-                'project' => $this->normalizeText($request->input('project_code')),
+                'project_code' => $this->normalizeText($request->input('project_code')),
                 'project_id' => $this->normalizeText($request->input('project_id')),
                 'procuring_entity' => $this->normalizeText($request->input('procuring_entity')),
                 'approved_budget_contract_abc' => $this->normalizeAmount($request->input('approved_budget_contract_abc')),

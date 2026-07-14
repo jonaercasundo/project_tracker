@@ -477,7 +477,7 @@
                     <i class="ti ti-hash"></i> Project
                 </label>
 
-                <select class="bf-input" name="project" required>
+                <select class="bf-input" name="project_code" required>
                     <option value="">-- Select Project --</option>
                     <option value="SME">SME</option>
                     <option value="SFP">SFP</option>

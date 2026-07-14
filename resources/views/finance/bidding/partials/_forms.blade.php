@@ -493,7 +493,12 @@
                        value="{{ old('project_id', $project->project_id ?? '') }}"
                        placeholder="Project Code">
             </div>
-
+            <div class="bf-field">
+                <label class="bf-label"><i class="ti ti-building-bank"></i> Procuring entity / Agency</label>
+                <input class="bf-input" type="text" name="procuring_entity"
+                       value="{{ old('procuring_entity', $project->procuring_entity ?? '') }}"
+                       placeholder="Agency or office">
+            </div>
             <div class="bf-field">
                 <label class="bf-label"><i class="ti ti-file-description"></i> Project name</label>
                 <textarea
@@ -508,14 +513,6 @@
 
         {{-- Row 2: Entity + ABC + Delivery + Bid Opening --}}
         <div class="bf-body bf-grid-4" style="padding-bottom:0">
-
-            <div class="bf-field">
-                <label class="bf-label"><i class="ti ti-building-bank"></i> Procuring entity / Agency</label>
-                <input class="bf-input" type="text" name="procuring_entity"
-                       value="{{ old('procuring_entity', $project->procuring_entity ?? '') }}"
-                       placeholder="Agency or office">
-            </div>
-
             <div class="bf-field">
                 <label class="bf-label" style="font-size:8.5px;"><i class="ti ti-coin"></i> Approved Budget for the Contract (ABC)</label>
                 <div class=" flex items-center gap-2">

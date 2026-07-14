@@ -472,12 +472,26 @@
 
         {{-- Row 1: ID + Name --}}
         <div class="bf-body bf-grid-1-3" style="padding-bottom:0">
+            <div class="bf-field">
+                <label class="bf-label">
+                    <i class="ti ti-hash"></i> Project
+                </label>
+
+                <select class="bf-input" name="project" required>
+                    <option value="">-- Select Project --</option>
+                    <option value="SME">SME</option>
+                    <option value="SFP">SFP</option>
+                    <option value="MT">MT</option>
+                    <option value="Textbook">Textbook</option>
+                    <option value="DCP">DCP</option>
+                </select>
+            </div>
 
             <div class="bf-field">
-                <label class="bf-label"><i class="ti ti-hash"></i> Project ID</label>
+                <label class="bf-label"><i class="ti ti-hash"></i> Project Code</label>
                 <input class="bf-input" type="text" name="project_id"
                        value="{{ old('project_id', $project->project_id ?? '') }}"
-                       placeholder="PRJ-2024-001">
+                       placeholder="Project Code">
             </div>
 
             <div class="bf-field">

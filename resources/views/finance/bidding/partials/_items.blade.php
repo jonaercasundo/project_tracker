@@ -72,8 +72,7 @@
                 focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
             step="0.01"
             name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit_cost]"
-            
-            placeholder="0.00"
+            placeholder="0.00" 
             min="0"
             readonly
         >

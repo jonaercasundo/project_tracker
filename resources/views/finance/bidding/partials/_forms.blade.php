@@ -474,7 +474,7 @@
         <div class="bf-body bf-grid-1-3" style="padding-bottom:0">
             <div class="bf-field">
                 <label class="bf-label">
-                    <i class="ti ti-hash"></i> Project
+                    <i class="ti ti-hash"></i> Project Code
                 </label>
 
                 <select class="bf-input" name="project_code" required>
@@ -488,10 +488,10 @@
             </div>
 
             <div class="bf-field">
-                <label class="bf-label"><i class="ti ti-hash"></i> Project Code</label>
+                <label class="bf-label"><i class="ti ti-hash"></i> Project ID No.</label>
                 <input class="bf-input" type="text" name="project_id"
                        value="{{ old('project_id', $project->project_id ?? '') }}"
-                       placeholder="Project Code">
+                       placeholder="Project ID No.">
             </div>
             <div class="bf-field">
                 <label class="bf-label"><i class="ti ti-building-bank"></i> Procuring entity / Agency</label>
@@ -536,11 +536,15 @@
             </div>
 
             <div class="bf-field">
+                <label class="bf-label"><i class="ti ti-calendar-event"></i> Pre-Bid Conference</label>
+                <input class="bf-input" type="date" name="date_of_pre_bid_conference"
+                       value="{{ old('date_of_pre_bid_conference', $project->date_of_pre_bid_conference ?? '') }}">
+            </div>
+            <div class="bf-field">
                 <label class="bf-label"><i class="ti ti-calendar-event"></i> Bid opening</label>
                 <input class="bf-input" type="date" name="date_of_bid_opening"
                        value="{{ old('date_of_bid_opening', $project->date_of_bid_opening ?? '') }}">
             </div>
-
             <div class="bf-field">
                 <label class="bf-label"><i class="ti ti-toggle-right"></i> Status</label>
                 <div class="bf-select-wrap">

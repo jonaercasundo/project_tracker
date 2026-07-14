@@ -32,7 +32,6 @@
                 <option
                     value="{{ $catalogItem->description }}"
                     data-unit="{{ $catalogItem->unit }}"
-                    data-price="{{ $catalogItem->price }}"
                     data-description="{{ $catalogItem->description }}"
                     {{ isset($desc) && $desc == $catalogItem->description ? 'selected' : '' }}>
                     {{ $catalogItem->item_name }}

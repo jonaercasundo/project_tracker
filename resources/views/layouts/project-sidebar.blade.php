@@ -31,14 +31,14 @@
         </a>
 
         <!-- Bidding Docs -->
-        <a href="{{ route('bidding.index') }}"
+        <a href="{{ route('project.bidding.index') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
-           {{ request()->routeIs('bidding.index') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
-            @if(request()->routeIs('bidding.index'))
+           {{ request()->routeIs('project.bidding.index') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+            @if(request()->routeIs('project.bidding.index'))
                 <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
             @endif
-            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('bidding.index') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M16.5 18.75a1.5 1.5 0 000-3 1.5 1.5 0 000 3zm0 0h1.5m-13.5-4.5h16.5M5.625 4.5h11.114a1.13 1.13 0 01.8.326l2.091 2.092a1.13 1.13 0 01.326.8v3.207a1.13 1.13 0 01-.326.8l-2.092 2.091a1.13 1.13 0 01-.8.326H5.625a1.125 1.125 0 01-1.１25-１.１２５V5.625A１.１２５ １.１２５ ０ ０１５．６２５ ４．５z"></path>
+            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('project.bidding.index') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M16.5 18.75a1.5 1.5 0 000-3 1.5 1.5 0 000 3zm0 0h1.5m-13.5-4.5h16.5M5.625 4.5h11.114a1.13 1.１3 ０ ０１．8．326l2．０9１ ２．０9２a１．１３ １．１３ ０ ０１．326．8v3．２０7a１．１３ １．１３ ０ ０１－．326．8l－２．０9２ ２．０9１a１．１３ １．１３ ０ ０１－．8．326H５．６２５a１．１２５ １．１２５ ０ ０１－１．１２５－１．１２５V５．６２５A１．１２５ １．１２５ ０ ０１５％６２５４％５z"></path>
             </svg>
             <span>Bidding Docs</span>
         </a>

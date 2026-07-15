@@ -180,22 +180,22 @@ Route::middleware(['auth'])->group(function () {
         */
 
         Route::get('/bidding', [BiddingController::class, 'index'])
-        ->name('project.bidding.index');
+        ->name('bidding.index');
 
         Route::get('/bidding/create', [BiddingController::class, 'create'])
-            ->name('project.bidding.create');
+            ->name('bidding.create');
         Route::get('deliveries/labels', [DeliveryController::class, 'generateLabels']);
         Route::post('/bidding', [BiddingController::class, 'store'])
-            ->name('project.bidding.store');
+            ->name('bidding.store');
 
         Route::get('/bidding/{bidding}', [BiddingController::class, 'show'])
-            ->name('project.bidding.show');
+            ->name('bidding.show');
 
         Route::get('/bidding/{bidding}/edit', [BiddingController::class, 'edit'])
-            ->name('project.bidding.edit');
+            ->name('bidding.edit');
 
         Route::put('/bidding/{bidding}', [BiddingController::class, 'update'])
-            ->name('project.bidding.update');
+            ->name('bidding.update');
 
         Route::delete('/bidding/{bidding}', [BiddingController::class, 'destroy'])
             ->name('bidding.destroy');

@@ -179,27 +179,25 @@ Route::middleware(['auth'])->group(function () {
             |--------------------------------------------------------------------------
         */
 
-        Route::get('project/bidding', [BiddingController::class, 'index'])
+        Route::get('project/bidding', [BiddingController::class, 'project_index'])
         ->name('project.bidding.index');
 
-        Route::get('project/bidding/create', [BiddingController::class, 'create'])
+        Route::get('project/bidding/create', [BiddingController::class, 'project_create'])
             ->name('project.bidding.create');
 
-        Route::get('deliveries/labels', [DeliveryController::class, 'generateLabels']);
-
-        Route::post('project/bidding', [BiddingController::class, 'store'])
+        Route::post('project/bidding', [BiddingController::class, 'project_store'])
             ->name('project.bidding.store');
 
-        Route::get('project/bidding/{bidding}', [BiddingController::class, 'show'])
+        Route::get('project/bidding/{bidding}', [BiddingController::class, 'project_show'])
             ->name('project.bidding.show');
 
-        Route::get('project/bidding/{bidding}/edit', [BiddingController::class, 'edit'])
+        Route::get('project/bidding/{bidding}/edit', [BiddingController::class, 'project_edit'])
             ->name('project.bidding.edit');
 
-        Route::put('project/bidding/{bidding}', [BiddingController::class, 'update'])
+        Route::put('project/bidding/{bidding}', [BiddingController::class, 'project_update'])
             ->name('project.bidding.update');
 
-        Route::delete('project/bidding/{bidding}', [BiddingController::class, 'destroy'])
+        Route::delete('project/bidding/{bidding}', [BiddingController::class, 'project_destroy'])
             ->name('project.bidding.destroy');
     });
 

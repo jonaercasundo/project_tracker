@@ -89,7 +89,7 @@ class BiddingController extends Controller
 
         $projects = $query
             ->latest()
-            ->paginate(10);
+            ->paginate(20);
 
         return view('operation.bidding.index', compact('projects'));
     }

@@ -591,7 +591,7 @@
             @endphp
 
             @foreach($lots as $index => $lot)
-                @include('finance.bidding.partials._lot', ['index' => $index, 'lot' => $lot])
+                @include('operation.bidding.partials._lot', ['index' => $index, 'lot' => $lot])
             @endforeach
 
         </div>
@@ -601,7 +601,7 @@
     {{-- ── Footer Buttons ───────────────────────────────────────── --}}
     <div class="bf-footer">
 
-        <a href="{{ route('bidding.index') }}" class="bf-btn-cancel">Cancel</a>
+        <a href="{{ route('project.bidding.index') }}" class="bf-btn-cancel">Cancel</a>
 
         <button type="submit" class="bf-btn-save">
             <i class="ti ti-device-floppy" aria-hidden="true"></i>
@@ -616,9 +616,9 @@
 {{-- ── Templates for JS ─────────────────────────────────────────── --}}
 
 <template id="lot-template">
-    @include('finance.bidding.partials._lot', ['index' => '__INDEX__', 'lot' => []])
+    @include('operation.bidding.partials._lot', ['index' => '__INDEX__', 'lot' => []])
 </template>
 
 <template id="item-template">
-    @include('finance.bidding.partials._items', ['lotIndex' => '__LOTINDEX__', 'itemIndex' => '__ITEMINDEX__', 'item' => []])
+    @include('operation.bidding.partials._items', ['lotIndex' => '__LOTINDEX__', 'itemIndex' => '__ITEMINDEX__', 'item' => []])
 </template>

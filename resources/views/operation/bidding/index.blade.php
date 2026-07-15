@@ -14,7 +14,7 @@
 
     <x-slot name="headerActions">
 
-        <a href="{{ route('bidding.create') }}"
+        <a href="{{ route('project.bidding.create') }}"
            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors">
 
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -30,10 +30,10 @@
     <div class="space-y-5">
 
         {{-- Search --}}
-        @include('finance.bidding.partials._search')
+        @include('operation.bidding.partials._search')
 
         {{-- Table --}}
-        @include('finance.bidding.partials._table')
+        @include('operation.bidding.partials._table')
 
     </div>
 

@@ -69,7 +69,7 @@
                             {{-- ACTIONS --}}
                             <div class="flex items-center gap-1 shrink-0">
 
-                                <a href="{{ route('bidding.show',$project->id) }}"
+                                <a href="{{ route('project.bidding.show',$project->id) }}"
                                    title="View"
                                    class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -78,7 +78,7 @@
                                     </svg>
                                 </a>
 
-                                <a href="{{ route('bidding.edit',$project->id) }}"
+                                <a href="{{ route('project.bidding.edit',$project->id) }}"
                                    title="Edit"
                                    class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -87,7 +87,7 @@
                                 </a>
 
                                 <form method="POST"
-                                      action="{{ route('bidding.destroy',$project->id) }}"
+                                      action="{{ route('project.bidding.destroy',$project->id) }}"
                                       onsubmit="return confirm('Delete this bidding project?')">
 
                                     @csrf

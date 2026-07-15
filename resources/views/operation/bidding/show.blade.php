@@ -13,7 +13,7 @@
 
     <x-slot name="headerActions">
         <div class="flex items-center gap-2.5">
-            <a href="{{ route('bidding.index') }}"
+            <a href="{{ route('project.bidding.index') }}"
                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50
                       border border-slate-200 text-xs font-semibold text-slate-600 transition-colors shadow-xs">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -21,7 +21,7 @@
                 </svg>
                 Back
             </a>
-            <a href="{{ route('bidding.edit', $project->id) }}"
+            <a href="{{ route('project.bidding.edit', $project->id) }}"
                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600
                       text-xs font-semibold text-white transition-colors shadow-sm shadow-amber-500/20">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

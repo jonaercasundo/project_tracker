@@ -172,6 +172,33 @@ Route::middleware(['auth'])->group(function () {
             ->name('inventory.history');
         Route::post('/inventory', [InventoryController::class, 'store'])
             ->name('inventory.store');
+
+        /*
+            |--------------------------------------------------------------------------
+            | BIDDING
+            |--------------------------------------------------------------------------
+        */
+
+        Route::get('/bidding', [BiddingController::class, 'index'])
+        ->name('bidding.index');
+
+        Route::get('/bidding/create', [BiddingController::class, 'create'])
+            ->name('bidding.create');
+        Route::get('deliveries/labels', [DeliveryController::class, 'generateLabels']);
+        Route::post('/bidding', [BiddingController::class, 'store'])
+            ->name('bidding.store');
+
+        Route::get('/bidding/{bidding}', [BiddingController::class, 'show'])
+            ->name('bidding.show');
+
+        Route::get('/bidding/{bidding}/edit', [BiddingController::class, 'edit'])
+            ->name('bidding.edit');
+
+        Route::put('/bidding/{bidding}', [BiddingController::class, 'update'])
+            ->name('bidding.update');
+
+        Route::delete('/bidding/{bidding}', [BiddingController::class, 'destroy'])
+            ->name('bidding.destroy');
     });
 
     /*

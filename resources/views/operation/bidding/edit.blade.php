@@ -11,14 +11,14 @@
     </x-slot>
 
     <x-slot name="headerActions">
-        <a href="{{ route('bidding.show', $project->id) }}"
+        <a href="{{ route('project.bidding.show', $project->id) }}"
            class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
             Cancel
         </a>
     </x-slot>
 
     <!-- Form Container -->
-    <form method="POST" action="{{ route('bidding.update', $project->id) }}" class="max-w-5xl mx-auto">
+    <form method="POST" action="{{ route('project.bidding.update', $project->id) }}" class="max-w-5xl mx-auto">
         @csrf
         @method('PUT')
 
@@ -117,7 +117,7 @@
 
                 <div id="items-container" class="space-y-3">
                     @foreach($project->items as $i => $item)
-                        @include('finance.bidding.partials._items', ['i' => $i, 'item' => $item])
+                        @include('operation.bidding.partials._items', ['i' => $i, 'item' => $item])
                     @endforeach
                 </div>
 

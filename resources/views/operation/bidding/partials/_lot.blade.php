@@ -1,6 +1,6 @@
 
 {{-- ============================================================
-     finance/bidding/partials/_lot.blade.php
+     operation/bidding/partials/_lot.blade.php
      Variables: $index (int|string), $lot (array|Model)
      ============================================================ --}}
 
@@ -128,7 +128,7 @@
             </div>
 
             @foreach($items as $itemIndex => $item)
-                @include('finance.bidding.partials._items', [
+                @include('operation.bidding.partials._items', [
                     'lotIndex'  => $index,
                     'itemIndex' => $itemIndex,
                     'item'      => $item,

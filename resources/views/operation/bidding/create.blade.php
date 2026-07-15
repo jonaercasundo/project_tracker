@@ -14,7 +14,7 @@
 
     <x-slot name="headerActions">
 
-        <a href="{{ route('bidding.index') }}"
+        <a href="{{ route('project.bidding.index') }}"
            class="inline-flex items-center px-4 py-2 text-xs font-bold uppercase bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition">
 
             <svg class="w-4 h-4 mr-2"
@@ -35,12 +35,12 @@
 
     </x-slot>
 
-    <form action="{{ route('bidding.store') }}"
+    <form action="{{ route('project.bidding.store') }}"
           method="POST">
 
         @csrf
 
-        @include('finance.bidding.partials._forms')
+        @include('operation.bidding.partials._forms')
 
     </form>
 <script>

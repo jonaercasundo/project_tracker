@@ -14,7 +14,8 @@
     </textarea>
 
 
-    <div class="keystages">
+    <div class="keystages"
+     id="keystages-{{ $lotIndex }}-{{ $addressIndex }}">
 
         @foreach($address['keystages'] ?? [] as $stageIndex => $stage)
 

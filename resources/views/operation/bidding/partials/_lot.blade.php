@@ -115,27 +115,26 @@
         </div>
 
         {{-- Items table --}}
-        <div class="bf-items" id="items-{{ $index }}">
 
-            <div class="bf-items-head">
-                <span>Item description</span>
-                <span>Unit</span>
-                <span>Qty</span>
-                <span>Total Amount (PHP)</span>
-                <span>Brand / Specs</span>
-                <span>Remarks</span>
-                <span></span>
-            </div>
+        <div class="bf-addresses" id="addresses-{{ $index }}">
+            @foreach($lotData['addresses'] ?? [] as $addressIndex => $address)
 
-            @foreach($items as $itemIndex => $item)
-                @include('operation.bidding.partials._items', [
-                    'lotIndex'  => $index,
-                    'itemIndex' => $itemIndex,
-                    'item'      => $item,
+                @include('operation.bidding.partials._address', [
+                    'lotIndex' => $index,
+                    'addressIndex' => $addressIndex,
+                    'address' => $address
                 ])
+
             @endforeach
 
         </div>
+
+
+        <button type="button"
+                class="bf-btn-add-address"
+                onclick="addAddress(this, '{{ $index }}')">
+            Add Delivery Address
+        </button>
         <div class="bf-items-total">
             <span>Total Amount</span>
 

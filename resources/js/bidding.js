@@ -349,6 +349,56 @@ async function loadBarangays(citySelect) {
         resetSelect(barangay, 'Select barangay');
     }
 }
+function addKeystage(button) {
+
+    let lotIndex = button.dataset.lot;
+    let addressIndex = button.dataset.address;
+
+    let container = document.querySelector(
+        `#keystages-${lotIndex}-${addressIndex}`
+    );
+
+
+    if (!container) {
+        console.error("Keystage container not found");
+        return;
+    }
+
+
+    let stageIndex = container.children.length;
+
+
+    let html = `
+        <div class="bf-keystage">
+
+            <input type="text"
+                class="bf-input"
+                name="lots[${lotIndex}][addresses][${addressIndex}][keystages][${stageIndex}][name]"
+                placeholder="Key Stage Name">
+
+
+            <div class="bf-items"
+                 id="items-${lotIndex}-${addressIndex}-${stageIndex}">
+
+            </div>
+
+
+            <button type="button"
+                class="bf-btn-add-item"
+                onclick="addItem(this)">
+                Add Item
+            </button>
+
+        </div>
+    `;
+
+
+    container.insertAdjacentHTML(
+        'beforeend',
+        html
+    );
+
+}
 document.addEventListener('change', function (e) {
 
     if (!e.target.matches('.item-select')) return;

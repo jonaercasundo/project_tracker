@@ -13,11 +13,6 @@ return new class extends Migration
     {
         Schema::table('items', function (Blueprint $table) {
 
-            $table->foreign('keystage_id')
-                ->references('id')
-                ->on('keystages')
-                ->nullOnDelete();
-
             $table->foreign('project_id')
                 ->references('project_id')
                 ->on('project_information')
@@ -31,7 +26,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('items', function (Blueprint $table) {
-            $table->dropForeign(['keystage_id']);
             $table->dropForeign(['project_id']);
         });
     }

@@ -19,7 +19,7 @@ return new class extends Migration
                 ->nullOnDelete();
 
             $table->foreign('project_id')
-                ->references('id')
+                ->references('project_id')
                 ->on('project_information')
                 ->nullOnDelete();
         });

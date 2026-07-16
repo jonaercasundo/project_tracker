@@ -13,19 +13,6 @@ return new class extends Migration
     {
         Schema::table('items', function (Blueprint $table) {
 
-            $table->unsignedBigInteger('delivery_address_id')
-                ->nullable()
-                ->after('description');
-
-            $table->unsignedBigInteger('lot_id')
-                ->nullable()
-                ->after('delivery_address_id');
-
-            $table->unsignedBigInteger('keystage_id')
-                ->nullable()
-                ->after('lot_id');
-
-            // Foreign Keys
             $table->foreign('delivery_address_id')
                 ->references('id')
                 ->on('delivery_address')
@@ -38,7 +25,7 @@ return new class extends Migration
 
             $table->foreign('keystage_id')
                 ->references('id')
-                ->on('job_batches') // Change to 'keystage' if that's your table name
+                ->on('job_batches')
                 ->nullOnDelete();
 
             $table->foreign('project_id')

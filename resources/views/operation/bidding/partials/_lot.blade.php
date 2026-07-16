@@ -133,18 +133,6 @@
                 ₱ <span class="lot-grand-total">0.00</span>
             </strong>
         </div>
-        <button type="button"
-                class="bf-btn-add-address"
-                onclick="addAddress(this, '{{ $index }}')">
-            Add Delivery Address
-        </button>
-        <div class="bf-items-total">
-            <span>Total Amount</span>
-
-            <strong>
-                ₱ <span class="lot-grand-total">0.00</span>
-            </strong>
-        </div>
 
     </div>
 

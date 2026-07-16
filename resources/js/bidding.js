@@ -27,19 +27,17 @@ document.getElementById('addLot')?.addEventListener('click', () => {
     // wire up the "add item" button inside the freshly cloned lot
 
 });
-document.addEventListener('click', function (e) {
+document.addEventListener('click', function(e){
 
-    const btn = e.target.closest('.bf-btn-add-item');
+    const btn = e.target.closest('.bf-btn-add-keystage');
 
-    if (!btn) return;
+    if(!btn) return;
 
-    const lot = btn.closest('.bf-lot');
-
-    addItem(btn, lot.dataset.lotIndex);
+    addKeystage(btn);
 
 });
 /* ── Add Item Row ─────────────────────────────────────────────── */
-function addItem(btn, lotIndex) {
+window.addItem = function(btn, lotIndex) {
     const template = document.getElementById('item-template');
     if (!template) return;
 
@@ -349,7 +347,7 @@ async function loadBarangays(citySelect) {
         resetSelect(barangay, 'Select barangay');
     }
 }
-function addKeystage(button) {
+window.addKeystage = function(button) {
 
     let lotIndex = button.dataset.lot;
     let addressIndex = button.dataset.address;
@@ -378,14 +376,12 @@ function addKeystage(button) {
 
 
             <div class="bf-items"
-                 id="items-${lotIndex}-${addressIndex}-${stageIndex}">
-
+                id="items-${lotIndex}-${addressIndex}-${stageIndex}">
             </div>
 
 
             <button type="button"
-                class="bf-btn-add-item"
-                onclick="addItem(this)">
+                class="bf-btn-add-item">
                 Add Item
             </button>
 
@@ -398,7 +394,7 @@ function addKeystage(button) {
         html
     );
 
-}
+};
 document.addEventListener('change', function (e) {
 
     if (!e.target.matches('.item-select')) return;

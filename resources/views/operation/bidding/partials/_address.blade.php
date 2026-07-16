@@ -31,7 +31,9 @@
 
 
     <button type="button"
-        onclick="addKeystage(this)">
+            class="bf-btn-add-keystage"
+            data-lot="{{ $lotIndex }}"
+            data-address="{{ $addressIndex }}">
         Add Key Stage
     </button>
 

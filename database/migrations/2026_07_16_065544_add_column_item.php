@@ -13,16 +13,6 @@ return new class extends Migration
     {
         Schema::table('items', function (Blueprint $table) {
 
-            $table->foreign('delivery_address_id')
-                ->references('id')
-                ->on('delivery_address')
-                ->nullOnDelete();
-
-            $table->foreign('lot_id')
-                ->references('id')
-                ->on('lots')
-                ->nullOnDelete();
-
             $table->foreign('keystage_id')
                 ->references('id')
                 ->on('keystage')
@@ -41,17 +31,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('items', function (Blueprint $table) {
-
-            $table->dropForeign(['delivery_address_id']);
-            $table->dropForeign(['lot_id']);
             $table->dropForeign(['keystage_id']);
             $table->dropForeign(['project_id']);
-
-            $table->dropColumn([
-                'delivery_address_id',
-                'lot_id',
-                'keystage_id',
-            ]);
         });
     }
 };

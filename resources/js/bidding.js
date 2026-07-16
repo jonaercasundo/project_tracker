@@ -420,3 +420,51 @@ document.addEventListener('change', function (e) {
     }
 
 });
+window.addAddress = function(button, lotIndex) {
+
+    const template = document.getElementById('address-template');
+
+    if (!template) {
+        console.error('Address template not found');
+        return;
+    }
+
+
+    const container = document.querySelector(
+        `#addresses-${lotIndex}`
+    );
+
+
+    if (!container) {
+        console.error('Address container not found');
+        return;
+    }
+
+
+    const addressIndex = container.children.length;
+
+
+    const html = template.innerHTML
+        .replaceAll('__LOTINDEX__', lotIndex)
+        .replaceAll('__ADDRESSINDEX__', addressIndex);
+
+
+    const wrapper = document.createElement('div');
+
+    wrapper.innerHTML = html.trim();
+
+
+    container.appendChild(
+        wrapper.firstElementChild
+    );
+
+};
+document.addEventListener('click', function(e){
+
+    const btn = e.target.closest('.bf-btn-add-keystage');
+
+    if(!btn) return;
+
+    addKeystage(btn);
+
+});

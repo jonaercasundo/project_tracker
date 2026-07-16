@@ -15,7 +15,7 @@ return new class extends Migration
 
             $table->foreign('keystage_id')
                 ->references('id')
-                ->on('keystage')
+                ->on('keystages')
                 ->nullOnDelete();
 
             $table->foreign('project_id')

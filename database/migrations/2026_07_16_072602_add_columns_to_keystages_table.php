@@ -11,14 +11,27 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('keystages', function (Blueprint $table) {
-            $table->unsignedBigInteger('delivery_address_id')->nullable()->after('finished_at');
-            $table->unsignedBigInteger('lot_id')->nullable()->after('delivery_address_id');
-            $table->unsignedBigInteger('project_id')->nullable()->after('lot_id');
-            $table->unsignedInteger('package_no')->nullable()->after('project_id');
-        });
+        Schema::create('keystages', function (Blueprint $table) {
+            $table->id();
 
-        Schema::table('keystages', function (Blueprint $table) {
+            $table->unsignedBigInteger('delivery_address_id')->nullable();
+            $table->unsignedBigInteger('lot_id')->nullable();
+            $table->unsignedBigInteger('project_id')->nullable();
+            $table->unsignedInteger('package_no')->nullable();
+
+            $table->unsignedInteger('total_jobs')->default(0);
+            $table->unsignedInteger('pending_jobs')->default(0);
+            $table->unsignedInteger('failed_jobs')->default(0);
+
+            $table->longText('failed_jobs_ids')->nullable();
+            $table->mediumText('options')->nullable();
+
+            $table->timestamp('cancelled_at')->nullable();
+            $table->timestamp('finished_at')->nullable();
+
+            $table->rememberToken();
+            $table->timestamps();
+
             $table->foreign('delivery_address_id')
                 ->references('id')
                 ->on('delivery_address')
@@ -41,17 +54,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('keystages', function (Blueprint $table) {
-            $table->dropForeign(['delivery_address_id']);
-            $table->dropForeign(['lot_id']);
-            $table->dropForeign(['project_id']);
-
-            $table->dropColumn([
-                'delivery_address_id',
-                'lot_id',
-                'project_id',
-                'package_no',
-            ]);
-        });
+        Schema::dropIfExists('keystages');
     }
 };

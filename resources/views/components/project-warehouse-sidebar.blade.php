@@ -120,7 +120,7 @@
 
                 <li>
 
-                    <a href="{{ route('inventory.index') }}"
+                    <a href="{{ route('warehouse.inventory.index') }}"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
 
                         Inventory List
@@ -131,7 +131,7 @@
 
                 <li>
 
-                    <a href="{{ route('packages.index') }}"
+                    <a href="{{ route('warehouse.packages.index') }}"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
 
                         Packages
@@ -142,7 +142,7 @@
 
                 <li>
 
-                    <a href="{{ route('categories.index') }}"
+                    <a href="{{ route('warehouse.categories.index') }}"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
 
                         Categories
@@ -153,7 +153,7 @@
 
                 <li>
 
-                    <a href="{{ route('inventory.adjustments') }}"
+                    <a href="{{ route('warehouse.adjustments.index') }}"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
 
                         Stock Adjustments
@@ -245,7 +245,7 @@
 
 
         {{-- Reports --}}
-        <a href="{{ route('inventory.history') }}"
+        <a href="{{ route('warehouse.inventory.history') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
 
             📊
@@ -254,7 +254,7 @@
 
         </a>
 
-        <a href="{{ route('inventory.transactions') }}"
+        <a href="{{ route('warehouse.inventory.transactions') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
 
             📑

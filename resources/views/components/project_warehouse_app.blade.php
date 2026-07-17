@@ -49,14 +49,15 @@
     <div class="min-h-screen flex">
 
         {{-- Sidebar --}}
-        <aside class="fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 shadow-sm overflow-y-auto">
+        <aside
+            class="fixed top-0 left-0 z-40 h-screen w-72 bg-white border-r border-slate-200 shadow-sm">
 
             @include('components.project-warehouse-sidebar')
 
         </aside>
 
         {{-- Content --}}
-        <div class="flex-1 ml-72 flex flex-col min-w-0">
+        <div class="flex-1 flex flex-col pl-72 min-h-screen">
 
             @isset($header)
 
@@ -86,9 +87,9 @@
 
             @endisset
 
-            <main class="flex-1">
+            <main class="flex-1 overflow-y-auto overflow-x-hidden">
 
-                <div class="max-w-7xl mx-auto px-6 py-6">
+                <div class="w-full max-w-none px-8 py-6">
 
                     {{ $slot }}
 

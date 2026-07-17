@@ -1,4 +1,4 @@
-<div class="h-full flex flex-col bg-white border-r border-slate-100 select-none">
+<div class="w-72 h-full flex flex-col bg-white border-r border-slate-100 select-none">
 
     {{-- Brand --}}
     <div class="h-16 flex items-center px-6 border-b border-slate-100">
@@ -33,11 +33,11 @@
 
 
     {{-- Navigation --}}
-    <nav class="flex-1 overflow-y-auto p-4 space-y-1">
+    <nav class="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-1">
 
         {{-- Dashboard --}}
         <a href="{{ route('warehouse.dashboard') }}"
-           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
+           class="group flex items-center gap-3 whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
            {{ request()->routeIs('warehouse.dashboard') ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
 
             @if(request()->routeIs('warehouse.dashboard'))
@@ -58,7 +58,7 @@
 
         {{-- Scanner --}}
         <a href="{{ route('warehouse.scanner') }}"
-           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
+           class="group flex items-center gap-3 whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
            {{ request()->routeIs('warehouse.scanner') ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
 
             @if(request()->routeIs('warehouse.scanner'))
@@ -84,11 +84,15 @@
 
         {{-- Inventory --}}
         <div
-            x-data="{ open: {{ request()->routeIs('inventory.*') ? 'true' : 'false' }} }">
+            x-data="{ open: {{ request()->routeIs('warehouse.inventory.*')
+                || request()->routeIs('warehouse.packages.*')
+                || request()->routeIs('warehouse.categories.*')
+                || request()->routeIs('warehouse.adjustments.*')
+                    ? 'true' : 'false' }} ">
 
             <button
                 @click="open=!open"
-                class="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50">
+                class="w-full flex items-center justify-between whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50">
 
                 <div class="flex items-center gap-3">
 
@@ -246,7 +250,7 @@
 
         {{-- Reports --}}
         <a href="{{ route('warehouse.history') }}"
-           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
+           class="group flex items-center gap-3 whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
 
             📊
 
@@ -255,7 +259,7 @@
         </a>
 
         <a href="{{ route('warehouse.transactions') }}"
-           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
+           class="group flex items-center gap-3 whitespace-nowrap  px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
 
             📑
 

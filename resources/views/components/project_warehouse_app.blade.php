@@ -57,13 +57,13 @@
         </aside>
 
         {{-- Content --}}
-        <div class="flex-1 flex flex-col pl-72 min-h-screen">
+        <div class="flex-1 flex flex-col min-h-screen lg:pl-72">
 
             @isset($header)
 
                 <header class="glass-header sticky top-0 z-40 bg-white/75 border-b border-slate-200 dynamic-header py-4">
 
-                    <div class="max-w-7xl mx-auto px-6 flex items-center justify-between">
+                    <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
 
                         <div class="text-lg font-bold text-slate-900">
 
@@ -89,7 +89,7 @@
 
             <main class="flex-1 overflow-y-auto overflow-x-hidden">
 
-                <div class="w-full max-w-none px-8 py-6">
+                <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
 
                     {{ $slot }}
 
@@ -99,7 +99,7 @@
 
             <footer class="border-t border-slate-200 bg-white/40 py-4 text-center text-xs text-slate-400">
 
-                <div class="max-w-7xl mx-auto flex items-center justify-between px-6">
+                <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
 
                     <span>
 

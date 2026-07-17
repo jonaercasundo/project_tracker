@@ -229,4 +229,88 @@
             </div>
         </div>
     </div>
+    @push('scripts')
+<script>
+
+let transactionType = null;
+let scanType = null;
+
+// Elements
+const step1 = document.getElementById('step1');
+const step2 = document.getElementById('step2');
+const step3 = document.getElementById('step3');
+
+const currentMode = document.getElementById('currentMode');
+
+const transactionText = document.getElementById('transactionText');
+const scanTypeText = document.getElementById('scanTypeText');
+
+
+// ================================
+// STEP 1
+// ================================
+
+document.getElementById('btnInventoryIn').addEventListener('click', function () {
+
+    transactionType = 'IN';
+
+    transactionText.textContent = '📥 Inventory In';
+
+    scanTypeText.textContent = '-';
+
+    currentMode.classList.remove('hidden');
+
+    step1.classList.add('hidden');
+
+    step2.classList.remove('hidden');
+
+});
+
+document.getElementById('btnInventoryOut').addEventListener('click', function () {
+
+    transactionType = 'OUT';
+
+    transactionText.textContent = '📤 Inventory Out';
+
+    scanTypeText.textContent = '-';
+
+    currentMode.classList.remove('hidden');
+
+    step1.classList.add('hidden');
+
+    step2.classList.remove('hidden');
+
+});
+
+
+// ================================
+// STEP 2
+// ================================
+
+document.getElementById('btnPackage').addEventListener('click', function () {
+
+    scanType = 'PACKAGE';
+
+    scanTypeText.textContent = '📦 Package';
+
+    step2.classList.add('hidden');
+
+    step3.classList.remove('hidden');
+
+});
+
+document.getElementById('btnItem').addEventListener('click', function () {
+
+    scanType = 'ITEM';
+
+    scanTypeText.textContent = '📄 Individual Item';
+
+    step2.classList.add('hidden');
+
+    step3.classList.remove('hidden');
+
+});
+
+</script>
+@endpush
 </x-project_warehouse_app>

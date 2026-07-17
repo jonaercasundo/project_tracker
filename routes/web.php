@@ -307,7 +307,7 @@ Route::middleware(['auth'])->group(function () {
             ->name('ppl_forms.index');
 
         Route::get('/warehouse_dashboard', function () {
-            return view('warehouse.dashboard');
+            return view('operation.warehouse.dashboard');
         })->name('operation.warehouse.dashboard');
     });
 require __DIR__.'/auth.php';

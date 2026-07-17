@@ -15,7 +15,7 @@
                 </p>
             </div>
 
-            <a href="{{ route('inventory.index') }}"
+            <a href="{{ route('warehouse.inventory.index') }}"
                class="inline-flex items-center px-5 py-2.5 rounded-xl bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300">
 
                 ← Back
@@ -204,28 +204,29 @@
                 Step 3 — Scan QR Code
             </h2>
 
-            <div class="rounded-xl border-2 border-dashed border-slate-300 h-96 flex items-center justify-center">
+            <div class="rounded-xl border-2 border-dashed border-slate-300 p-6">
 
-                <div class="text-center">
+                <div id="reader"
+                    class="w-full h-[500px] rounded-xl overflow-hidden bg-slate-100">
+                </div>
 
-                    <div class="text-7xl">
+                <div id="scanResult"
+                    class="hidden mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
 
-                        📷
+                    <h3 class="font-semibold text-green-700">
 
-                    </div>
+                        Last Scan
 
-                    <p class="mt-4 text-slate-500">
+                    </h3>
 
-                        QR Scanner will appear here
+                    <p id="resultText"
+                    class="mt-2 text-sm text-slate-700">
 
                     </p>
 
                 </div>
 
             </div>
-
         </div>
-
     </div>
-
 </x-project_warehouse_app>

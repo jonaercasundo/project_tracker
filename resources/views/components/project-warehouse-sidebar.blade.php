@@ -231,7 +231,7 @@
                 </li>
 
                 <li>
-                    <a href="{{ route('warehouse.return') }}"
+                    <a href="{{ route('warehouse.returns') }}"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
 
                         Returns
@@ -245,7 +245,7 @@
 
 
         {{-- Reports --}}
-        <a href="{{ route('warehouse.inventory.history') }}"
+        <a href="{{ route('warehouse.history') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
 
             📊
@@ -254,7 +254,7 @@
 
         </a>
 
-        <a href="{{ route('warehouse.inventory.transactions') }}"
+        <a href="{{ route('warehouse.transactions') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
 
             📑

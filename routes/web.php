@@ -294,4 +294,20 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/barangays', [LocationController::class, 'barangays']);
     });
     Route::get('/crawl', [ActionCrawlerController::class, 'crawl']);
+
+
+        /*
+    |--------------------------------------------------------------------------
+    | WAREHOUSE ROUTES
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['role:Warehouse_officer'])->group(function () {
+
+        Route::get('/ppl-forms', [PplFormController::class, 'index'])
+            ->name('ppl_forms.index');
+
+        Route::get('/warehouse_dashboard', function () {
+            return view('warehouse.dashboard');
+        })->name('operation.warehouse.dashboard');
+    });
 require __DIR__.'/auth.php';

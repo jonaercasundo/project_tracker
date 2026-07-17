@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full scroll-smooth">
-
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full scroll-smooth overflow-x-hidden">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -36,7 +35,7 @@
 
 </head>
 
-<body class="antialiased bg-slate-50 text-slate-800 min-h-full relative selection:bg-blue-600 selection:text-white">
+<body class="antialiased bg-slate-50 text-slate-800 min-h-full relative overflow-x-hidden selection:bg-blue-600 selection:text-white">
 
     {{-- Background --}}
     <div class="absolute inset-0 overflow-hidden pointer-events-none -z-50">
@@ -57,7 +56,7 @@
         </aside>
 
         {{-- Content --}}
-        <div class="flex-1 ml-72 flex flex-col">
+        <div class="flex-1 ml-72 flex flex-col min-w-0">
 
             @isset($header)
 

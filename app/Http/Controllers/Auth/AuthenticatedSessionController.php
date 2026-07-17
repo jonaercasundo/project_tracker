@@ -35,7 +35,7 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('finance.dashboard');
         }
         elseif ($user->hasRole('Warehouse_officer')) {
-            return redirect()->route('operation.warehouse.dashboard');
+            return redirect()->route('warehouse.dashboard');
         }
         return redirect()->intended(route('dashboard', absolute: false));
     }

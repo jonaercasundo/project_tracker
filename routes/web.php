@@ -316,19 +316,19 @@ Route::middleware(['auth'])->group(function () {
 
             Route::get('/inventory', function () {
                 return view('operation.warehouse.inventory.index');
-            })->name('inventory');
+            })->name('inventory.index');
 
             Route::get('/packages', function () {
                 return view('operation.warehouse.packages.index');
-            })->name('packages');
+            })->name('packages.index');
 
             Route::get('/categories', function () {
                 return view('operation.warehouse.categories.index');
-            })->name('categories');
+            })->name('categories.index');
 
             Route::get('/adjustments', function () {
                 return view('operation.warehouse.adjustments.index');
-            })->name('adjustments');
+            })->name('adjustments.index');
 
             Route::get('/stock-in', function () {
                 return view('operation.warehouse.stock-in.index');

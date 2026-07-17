@@ -301,13 +301,58 @@ Route::middleware(['auth'])->group(function () {
     | WAREHOUSE ROUTES
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['role:Warehouse_officer'])->group(function () {
+    Route::middleware(['role:Warehouse_officer'])
+        ->prefix('warehouse')
+        ->name('warehouse.')
+        ->group(function () {
 
-        Route::get('/ppl-forms', [PplFormController::class, 'index'])
-            ->name('ppl_forms.index');
+            Route::get('/dashboard', function () {
+                return view('operation.warehouse.dashboard');
+            })->name('dashboard');
 
-        Route::get('/warehouse_dashboard', function () {
-            return view('operation.warehouse.dashboard');
-        })->name('operation.warehouse.dashboard');
+            Route::get('/scanner', function () {
+                return view('operation.warehouse.scanner');
+            })->name('scanner');
+
+            Route::get('/inventory', function () {
+                return view('operation.warehouse.inventory.index');
+            })->name('inventory');
+
+            Route::get('/packages', function () {
+                return view('operation.warehouse.packages.index');
+            })->name('packages');
+
+            Route::get('/categories', function () {
+                return view('operation.warehouse.categories.index');
+            })->name('categories');
+
+            Route::get('/adjustments', function () {
+                return view('operation.warehouse.adjustments.index');
+            })->name('adjustments');
+
+            Route::get('/stock-in', function () {
+                return view('operation.warehouse.stock-in.index');
+            })->name('stock-in');
+
+            Route::get('/stock-out', function () {
+                return view('operation.warehouse.stock-out.index');
+            })->name('stock-out');
+
+            Route::get('/transfer', function () {
+                return view('operation.warehouse.transfer.index');
+            })->name('transfer');
+
+            Route::get('/returns', function () {
+                return view('operation.warehouse.returns.index');
+            })->name('returns');
+
+            Route::get('/history', function () {
+                return view('operation.warehouse.history.index');
+            })->name('history');
+
+            Route::get('/transactions', function () {
+                return view('operation.warehouse.transactions.index');
+            })->name('transactions');
+
     });
 require __DIR__.'/auth.php';

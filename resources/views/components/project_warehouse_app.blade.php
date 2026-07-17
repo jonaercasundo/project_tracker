@@ -52,7 +52,7 @@
         {{-- Sidebar --}}
         <aside class="fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 shadow-sm overflow-y-auto">
 
-            @include('layouts.project-warehouse-sidebar')
+            @include('components.project-warehouse-sidebar')
 
         </aside>
 

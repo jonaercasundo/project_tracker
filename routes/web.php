@@ -307,13 +307,13 @@ Route::middleware(['auth'])->group(function () {
         ->name('warehouse.')
         ->group(function () {
             Route::post('/warehouse/inventory/scan', [WarehouseInventoryController::class, 'scan'])
-                ->name('warehouse.inventory.scan');
+                ->name('inventory.scan');
 
             Route::post('/warehouse/inventory/scan/validate', [WarehouseInventoryController::class, 'validateScan'])
-                ->name('warehouse.inventory.scan.validate');
+                ->name('inventory.scan.validate');
 
             Route::post('/warehouse/inventory/scan/save', [WarehouseInventoryController::class, 'saveScan'])
-                ->name('warehouse.inventory.scan.save');
+                ->name('inventory.scan.save');
             Route::get('/dashboard', function () {
                 return view('operation.warehouse.dashboard');
             })->name('dashboard');

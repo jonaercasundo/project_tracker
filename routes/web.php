@@ -315,7 +315,7 @@ Route::middleware(['auth'])->group(function () {
             })->name('scanner');
 
             Route::get('/inventory', function () {
-                return view('operation.warehouse.inventory.index');
+                return view('operation.warehouse.dashboard');
             })->name('inventory.index');
 
             Route::get('/packages', function () {

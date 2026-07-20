@@ -82,46 +82,62 @@ class WarehouseInventoryController extends Controller
     public function validateScan(Request $request)
     {
         $request->validate([
-            'qr'          => 'required|string',
-            'warehouse_id'=> 'required|integer',
-            'transaction' => 'required|in:IN,OUT',
+            'qr'           => 'required|string',
+            'warehouse_id' => 'required|integer',
+            'transaction'  => 'required|in:IN,OUT',
         ]);
 
         $packageStatusId = $this->extractPackageStatusId($request->qr);
 
         if (!$packageStatusId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid QR code.',
-            ]);
+            return response()->json(['success' => false, 'message' => 'Invalid QR code.']);
         }
 
         $status = PackageStatus::with('package.contents.item')
             ->find($packageStatusId);
 
         if (!$status) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Package not found.',
-            ]);
+            return response()->json(['success' => false, 'message' => 'Package not found.']);
         }
 
         if ($status->status === 'warehouse') {
-            return response()->json([
-                'success' => false,
-                'message' => 'This package has already been scanned.',
-            ]);
+            return response()->json(['success' => false, 'message' => 'This package has already been scanned.']);
         }
 
         $contents = $status->package->contents;
 
+        if ($contents->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'Package has no contents defined.']);
+        }
+
+        $packageName = $status->package->package_num ?? null;
+
+        if (!$packageName) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Package record exists but has no package number assigned.',
+            ]);
+        }
+
+        $isSingleItem = $contents->count() === 1;
+
+        $itemName = $isSingleItem
+            ? ($contents->first()->item->item_name ?? null)
+            : $contents->count() . ' items';
+
+        if ($isSingleItem && !$itemName) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Item record exists but has no name assigned.',
+            ]);
+        }
+
         return response()->json([
             'success'           => true,
-            'package_status_id' => $status->id,
-            'package'           => $status->package->name ?? $status->package->package_number ?? ('#' . $status->package->id),
-            'item'              => $contents->count() > 1
-                ? $contents->count() . ' items'
-                : ($contents->first()->item->name ?? 'Item'),
+            'package_status_id' => $status->package_status_id,
+            'package'           => $packageName,
+            'item'              => $itemName,
+            'item_id'           => $isSingleItem ? $contents->first()->item_id : null,
             'qty'               => $contents->sum('qty'),
         ]);
     }
@@ -209,8 +225,7 @@ class WarehouseInventoryController extends Controller
 
     // ==========================================================
     // Helper: pull package_status_id out of the scanned QR value.
-    // Matches the original dead `processScan()` JS logic — QR
-    // encodes a URL like https://.../?id=123
+    // QR encodes a URL like https://.../?id=123, or a bare numeric ID.
     // ==========================================================
     private function extractPackageStatusId(string $qr): ?int
     {

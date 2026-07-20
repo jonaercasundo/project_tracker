@@ -314,12 +314,8 @@ Route::middleware(['auth'])->group(function () {
 
             Route::post('/warehouse/inventory/scan/save', [WarehouseInventoryController::class, 'saveScan'])
                 ->name('inventory.scan.save');
-            Route::get('/dashboard', function () {
-                return view('operation.warehouse.dashboard');
-            })->name('dashboard');
-
-           Route::get('/scanner', [WarehouseInventoryController::class, 'scanner'])
-            ->name('scanner');
+            Route::get('/dashboard', [WarehouseInventoryController::class, 'scanner'])
+            ->name('dashboard');
 
             Route::get('/inventory', function () {
                 return view('operation.warehouse.dashboard');

@@ -306,8 +306,14 @@ Route::middleware(['auth'])->group(function () {
         ->prefix('warehouse')
         ->name('warehouse.')
         ->group(function () {
-            Route::post('/inventory/scan', [WarehouseInventoryController::class, 'scan'])
-                ->name('inventory.scan');
+            Route::post('/warehouse/inventory/scan', [WarehouseInventoryController::class, 'scan'])
+                ->name('warehouse.inventory.scan');
+
+            Route::post('/warehouse/inventory/scan/validate', [WarehouseInventoryController::class, 'validateScan'])
+                ->name('warehouse.inventory.scan.validate');
+
+            Route::post('/warehouse/inventory/scan/save', [WarehouseInventoryController::class, 'saveScan'])
+                ->name('warehouse.inventory.scan.save');
             Route::get('/dashboard', function () {
                 return view('operation.warehouse.dashboard');
             })->name('dashboard');

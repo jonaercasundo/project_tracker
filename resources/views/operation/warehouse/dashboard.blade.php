@@ -9,7 +9,7 @@
                 <p class="text-sm text-slate-500">Scan packages or individual items for inventory movement.</p>
             </div>
 
-            <a href="{{ route('warehouse.inventory.index') }}"
+            <a href="{{ route('warehouse.dashboard') }}"
                class="inline-flex items-center px-5 py-2.5 rounded-xl bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300">
                 ← Back
             </a>

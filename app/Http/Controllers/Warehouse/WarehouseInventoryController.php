@@ -270,7 +270,7 @@ class WarehouseInventoryController extends Controller
 
                     } else {
 
-                        $status->status = 'dispatch';      // <-- change to your actual status value
+                        $status->status = 'released';      // <-- change to your actual status value
                         $status->remarks = 'Released from Warehouse';
 
                     }

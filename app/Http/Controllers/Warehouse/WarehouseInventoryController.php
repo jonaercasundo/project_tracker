@@ -10,7 +10,7 @@ use App\Models\PackageStatus;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-
+use App\Models\Warehouse;
 class WarehouseInventoryController extends Controller
 {
     // ==========================================================
@@ -73,6 +73,14 @@ class WarehouseInventoryController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Inventory successfully updated.',
+        ]);
+    }
+    public function scanner()
+    {
+        $warehouses = Warehouse::orderBy('warehouse_name')->get();
+
+        return view('warehouse.inventory.scanner', [
+            'warehouses' => $warehouses,
         ]);
     }
 

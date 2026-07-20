@@ -78,8 +78,8 @@ class WarehouseInventoryController extends Controller
     public function scanner()
     {
         $warehouses = Warehouse::orderBy('warehouse_name')->get();
-
-        return view('warehouse.inventory.scanner', [
+        dd($warehouses);
+        return view('operation.warehouse.dashboard', [
             'warehouses' => $warehouses,
         ]);
     }

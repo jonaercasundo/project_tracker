@@ -86,22 +86,29 @@
             </div>
 
             {{-- Live Status --}}
-            <div class="grid grid-cols-4 gap-4">
-                <div class="bg-green-50 rounded-xl p-4 border">
-                    <p class="text-sm text-gray-500">Scanned</p>
-                    <h2 id="totalScanned" class="text-3xl font-bold">0</h2>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Scanned -->
+                <div class="bg-green-50 rounded-xl p-5 border border-green-100 shadow-sm">
+                    <p class="text-sm font-medium text-green-800 mb-1">Scanned</p>
+                    <h2 id="totalScanned" class="text-3xl font-extrabold text-green-600 tracking-tight">0</h2>
                 </div>
-                <div class="bg-blue-50 rounded-xl p-4 border">
-                    <p class="text-sm text-gray-500">Ready to Save</p>
-                    <h2 id="successCount" class="text-3xl font-bold text-blue-600">0</h2>
+
+                <!-- Ready to Save -->
+                <div class="bg-blue-50 rounded-xl p-5 border border-blue-100 shadow-sm">
+                    <p class="text-sm font-medium text-blue-800 mb-1">Ready to Save</p>
+                    <h2 id="successCount" class="text-3xl font-extrabold text-blue-600 tracking-tight">0</h2>
                 </div>
-                <div class="bg-red-50 rounded-xl p-4 border">
-                    <p class="text-sm text-gray-500">Failed</p>
-                    <h2 id="failedCount" class="text-3xl font-bold text-red-600">0</h2>
+
+                <!-- Failed -->
+                <div class="bg-red-50 rounded-xl p-5 border border-red-100 shadow-sm">
+                    <p class="text-sm font-medium text-red-800 mb-1">Failed</p>
+                    <h2 id="failedCount" class="text-3xl font-extrabold text-red-600 tracking-tight">0</h2>
                 </div>
-                <div class="bg-yellow-50 rounded-xl p-4 border">
-                    <p class="text-sm text-gray-500">Duplicate</p>
-                    <h2 id="duplicateCount" class="text-3xl font-bold text-yellow-600">0</h2>
+
+                <!-- Duplicate -->
+                <div class="bg-amber-50 rounded-xl p-5 border border-amber-100 shadow-sm">
+                    <p class="text-sm font-medium text-amber-800 mb-1">Duplicate</p>
+                    <h2 id="duplicateCount" class="text-3xl font-extrabold text-amber-600 tracking-tight">0</h2>
                 </div>
             </div>
 

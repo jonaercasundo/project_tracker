@@ -23,6 +23,7 @@ use App\Http\Controllers\Finance_Item;
 use App\Http\Controllers\InventoryController;
 use App\Models\Project;
 use App\Http\Controllers\ProjectDashboardController;
+use App\Http\Controllers\Warehouse\WarehouseInventoryController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -305,7 +306,8 @@ Route::middleware(['auth'])->group(function () {
         ->prefix('warehouse')
         ->name('warehouse.')
         ->group(function () {
-
+            Route::post('/inventory/scan', [WarehouseInventoryController::class, 'scan'])
+                ->name('inventory.scan');
             Route::get('/dashboard', function () {
                 return view('operation.warehouse.dashboard');
             })->name('dashboard');

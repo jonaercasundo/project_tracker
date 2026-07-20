@@ -14,4 +14,13 @@ class Package extends Model
     {
         return $this->hasMany(PackageContent::class, 'package_id');
     }
+        public function contents()
+    {
+        return $this->hasMany(PackageContent::class, 'package_id', 'package_id');
+    }
+
+    public function statuses()
+    {
+        return $this->hasMany(PackageStatus::class, 'package_id', 'package_id');
+    }
 }

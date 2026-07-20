@@ -211,7 +211,7 @@
         let isProcessing = false; // guards overlapping validate calls
         let isSaving = false;
         let hasSaved = false;     // true once this batch has been persisted
-
+        let scannerEnabled = false;
         // scannedList: raw QR strings we've SUCCESSFULLY validated this session.
         // Only added to on success, so a failed scan can be retried rather than
         // permanently locked out as a false "Duplicate".
@@ -306,21 +306,35 @@
         // ============================================================
         function activateScanner() {
             scannerInput.value = '';
-            scannerInput.focus();
+            scannerEnabled = true;
+            setTimeout(() => {
+                scannerInput.focus();
+            }, 100);
         }
 
-        scannerInput.addEventListener('blur', function () {
-            if (!scannerEnabled) {
-                return;
-            }
+        scannerInput.addEventListener('blur', () => {
+
+            if (!scannerEnabled) return;
 
             setTimeout(() => {
+
+                const active = document.activeElement;
+
                 if (
-                    scannerEnabled &&
-                    document.activeElement !== scannerInput
+                    active &&
+                    (
+                        active.tagName === 'BUTTON' ||
+                        active.tagName === 'A' ||
+                        active.tagName === 'INPUT' ||
+                        active.tagName === 'TEXTAREA' ||
+                        active.tagName === 'SELECT'
+                    )
                 ) {
-                    scannerInput.focus();
+                    return;
                 }
+
+                scannerInput.focus();
+
             }, 50);
 
         });
@@ -591,7 +605,13 @@
         // SAVE TO DATABASE (batch commit)
         // ============================================================
         btnSaveToDb.addEventListener('click', async function () {
-            scannerEnabled = false; // stop autofocus
+            scannerEnabled = false;
+            scannerInput.blur();
+
+            if (stagedItems.length === 0 || isSaving || hasSaved) {
+                scannerEnabled = true;
+                return;
+            }
             if (stagedItems.length === 0 || isSaving || hasSaved) return;
 
             isSaving = true;
@@ -666,7 +686,19 @@
                 btnSaveToDb.disabled = false;
                 btnSaveToDb.textContent = '💾 Save to Database';
             } finally {
+
                 isSaving = false;
+
+                if (!hasSaved) {
+
+                    scannerEnabled = true;
+
+                    setTimeout(() => {
+                        scannerInput.focus();
+                    }, 100);
+
+                }
+
             }
         });
 
@@ -693,7 +725,8 @@
 
             hasSaved = false;
             isSaving = false;
-
+            scannerEnabled = false;
+            scannerInput.blur();
             scanTable.innerHTML = '';
             saveStatusText.textContent = '';
             btnSaveToDb.textContent = '💾 Save to Database';

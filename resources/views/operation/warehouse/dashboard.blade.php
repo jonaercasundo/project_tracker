@@ -198,35 +198,64 @@
 
         {{-- STEP 3 --}}
         <div id="step3"
-            class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            class="hidden space-y-6">
 
-            <h2 class="text-lg font-semibold mb-6">
-                Step 3 — Scan QR Code
-            </h2>
+            {{-- Live Status --}}
+            <div class="grid grid-cols-4 gap-4">
 
-            <div class="space-y-4">
-
-                <input
-                    type="text"
-                    id="scannerInput"
-                    autocomplete="off"
-                    autofocus
-                    spellcheck="false"
-                    class="w-full rounded-xl border-2 border-blue-300 bg-blue-50 p-4 text-lg font-semibold text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    placeholder="Waiting for scanner..."
-                >
-
-                <div
-                    id="scanResult"
-                    class="hidden rounded-xl border border-green-200 bg-green-50 p-4">
-
-                    <h3 class="font-semibold text-green-700">
-                        Last Scan
-                    </h3>
-
-                    <p id="resultText" class="mt-2 text-slate-700"></p>
-
+                <div class="bg-green-50 rounded-xl p-4 border">
+                    <p class="text-sm text-gray-500">Scanned</p>
+                    <h2 id="totalScanned" class="text-3xl font-bold">0</h2>
                 </div>
+
+                <div class="bg-blue-50 rounded-xl p-4 border">
+                    <p class="text-sm text-gray-500">Success</p>
+                    <h2 id="successCount" class="text-3xl font-bold text-blue-600">0</h2>
+                </div>
+
+                <div class="bg-red-50 rounded-xl p-4 border">
+                    <p class="text-sm text-gray-500">Failed</p>
+                    <h2 id="failedCount" class="text-3xl font-bold text-red-600">0</h2>
+                </div>
+
+                <div class="bg-yellow-50 rounded-xl p-4 border">
+                    <p class="text-sm text-gray-500">Duplicate</p>
+                    <h2 id="duplicateCount" class="text-3xl font-bold text-yellow-600">0</h2>
+                </div>
+
+            </div>
+
+            {{-- Hidden Scanner --}}
+            <input
+                id="scannerInput"
+                class="absolute -left-[9999px]"
+                autocomplete="off">
+
+            {{-- Live Table --}}
+            <div class="bg-white rounded-xl border overflow-hidden">
+
+                <table class="min-w-full text-sm">
+
+                    <thead class="bg-slate-100">
+
+                        <tr>
+
+                            <th>#</th>
+                            <th>Package</th>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Status</th>
+                            <th>Time</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="scanTable"
+                        class="divide-y divide-slate-200">
+                    </tbody>
+
+                </table>
 
             </div>
 
@@ -250,6 +279,17 @@ const scanTypeText = document.getElementById('scanTypeText');
 const scannerInput = document.getElementById('scannerInput');
 const scanResult = document.getElementById('scanResult');
 const resultText = document.getElementById('resultText');
+let scannedCount = 0;
+let successCounter = 0;
+let failedCounter = 0;
+let duplicateCounter = 0;
+
+const totalScannedEl = document.getElementById('totalScanned');
+const successCountEl = document.getElementById('successCount');
+const failedCountEl = document.getElementById('failedCount');
+const duplicateCountEl = document.getElementById('duplicateCount');
+const scanTable = document.getElementById('scanTable');
+const scannedList = new Set();
 // ================================
 // STEP 1
 // ================================
@@ -314,54 +354,46 @@ document.getElementById('btnItem').addEventListener('click', function () {
     step3.classList.remove('hidden');
     activateScanner();
 });
-scannerInput.addEventListener('keydown', function (e) {
+scannerInput.addEventListener("keydown", async function(e){
 
-    if (e.key !== 'Enter') {
-        return;
-    }
+    if(e.key !== "Enter") return;
 
     e.preventDefault();
 
     const qr = scannerInput.value.trim();
 
-    if (!qr) {
-        return;
-    }
-
-    processScan(qr);
-
     scannerInput.value = "";
 
+    if(qr=="") return;
+
+    if(scannedList.has(qr)){
+
+        duplicateCounter++;
+
+        updateDashboard();
+
+        scannedCount++;
+
+        duplicateCounter++;
+
+        addRow({
+            package: "-",
+            item: "-",
+            qty: "-",
+            status: "Duplicate"
+        });
+
+        updateDashboard();
+
+        return;
+
+    }
+
+    scannedList.add(qr);
+
+    await saveInventory(qr);
+
 });
-function processScan(qr) {
-
-    scanResult.classList.remove('hidden');
-
-    resultText.innerHTML = `
-        <strong>Transaction:</strong> ${transactionType}<br>
-        <strong>Scan Type:</strong> ${scanType}<br>
-        <strong>QR:</strong> ${qr}
-    `;
-
-    try {
-
-        if (qr.startsWith('http')) {
-
-            const url = new URL(qr);
-
-            resultText.innerHTML += `
-                <hr class="my-3">
-                <strong>ID:</strong> ${url.searchParams.get('id')}<br>
-                <strong>Delivery ID:</strong> ${url.searchParams.get('delivery_id')}
-            `;
-
-        }
-
-    } catch (e) {}
-
-    scannerInput.focus();
-
-}
 function activateScanner() {
 
     scannerInput.value = "";
@@ -378,6 +410,170 @@ scannerInput.addEventListener('blur', function () {
     }, 50);
 
 });
+async function processScan(qr) {
+
+    try {
+
+        const url = new URL(qr);
+
+        const packageStatusId = url.searchParams.get('id');
+
+        if (!packageStatusId) {
+            alert("Invalid QR Code");
+            return;
+        }
+
+        const response = await fetch('/warehouse/inventory/scan', {
+
+            method: 'POST',
+
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            },
+
+            body: JSON.stringify({
+
+                package_status_id: packageStatusId,
+
+                warehouse_id: 1, // replace with selected warehouse later
+
+                transaction: transactionType
+
+            })
+
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            alert(data.message ?? 'Scan failed.');
+
+            return;
+
+        }
+
+        scanResult.classList.remove('hidden');
+
+        resultText.innerHTML = `
+            <strong style="color:green;">✔ ${data.message}</strong><br>
+            Package Status ID: ${packageStatusId}
+        `;
+
+    } catch (e) {
+
+        console.error(e);
+
+        alert('Invalid QR Code');
+
+    }
+
+    scannerInput.value = "";
+
+    scannerInput.focus();
+
+}
+async function saveInventory(qr){
+
+    try{
+
+        const response = await fetch("{{ route('warehouse.inventory.scan') }}",{
+
+            method:"POST",
+
+            headers:{
+                "Content-Type":"application/json",
+                "X-CSRF-TOKEN":"{{ csrf_token() }}"
+            },
+
+            body:JSON.stringify({
+
+                qr:qr,
+                transaction:transactionType,
+                scan_type:scanType
+
+            })
+
+        });
+
+        const result = await response.json();
+
+        scannedCount++;
+
+        if(result.success){
+
+            successCounter++;
+
+            addRow(result);
+
+        }else{
+
+            failedCounter++;
+
+            addRow({
+
+                package:"",
+                item:"",
+                qty:"",
+                status:result.message
+
+            });
+
+        }
+
+        updateDashboard();
+
+    }finally{
+
+        scannerInput.focus();
+
+    }
+
+}
+function updateDashboard(){
+
+    totalScannedEl.textContent = scannedCount;
+    successCountEl.textContent = successCounter;
+    failedCountEl.textContent = failedCounter;
+    duplicateCountEl.textContent = duplicateCounter;
+
+}
+function addRow(data){
+
+const row = `
+<tr class="hover:bg-slate-50">
+
+    <td class="px-4 py-3">${scannedCount}</td>
+
+    <td class="px-4 py-3">${data.package ?? '-'}</td>
+
+    <td class="px-4 py-3">${data.item ?? '-'}</td>
+
+    <td class="px-4 py-3">${data.qty ?? '-'}</td>
+
+    <td class="px-4 py-3">
+
+        <span class="rounded bg-green-100 px-2 py-1 text-green-700">
+
+            ${data.status}
+
+        </span>
+
+    </td>
+
+    <td class="px-4 py-3">
+
+        ${new Date().toLocaleTimeString()}
+
+    </td>
+
+</tr>
+`;
+
+    scanTable.insertAdjacentHTML("afterbegin",row);
+
+}
 </script>
 @endpush
 </x-project_warehouse_app>

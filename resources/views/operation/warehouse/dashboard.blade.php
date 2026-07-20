@@ -310,7 +310,19 @@
         }
 
         scannerInput.addEventListener('blur', function () {
-            setTimeout(() => scannerInput.focus(), 50);
+            if (!scannerEnabled) {
+                return;
+            }
+
+            setTimeout(() => {
+                if (
+                    scannerEnabled &&
+                    document.activeElement !== scannerInput
+                ) {
+                    scannerInput.focus();
+                }
+            }, 50);
+
         });
 
         scannerInput.addEventListener('keydown', async function (e) {
@@ -579,6 +591,7 @@
         // SAVE TO DATABASE (batch commit)
         // ============================================================
         btnSaveToDb.addEventListener('click', async function () {
+            scannerEnabled = false; // stop autofocus
             if (stagedItems.length === 0 || isSaving || hasSaved) return;
 
             isSaving = true;

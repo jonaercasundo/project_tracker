@@ -59,7 +59,7 @@ class WarehouseInventoryController extends Controller
                     'old_qty'      => $oldQty,
                     'new_qty'      => $newQty,
                     'changed_by'   => Auth::user()->name,
-                    'remarks'      => 'Warehouse QR Scan',
+                    'remarks'      => "Inventory {$request->transaction}",
                     'change_type'  => 'update',
                 ]);
             }

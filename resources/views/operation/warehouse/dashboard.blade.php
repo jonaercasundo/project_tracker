@@ -49,12 +49,63 @@
                 </button>
             </div>
         </div>
-
         {{-- STEP 2 --}}
         <div id="step2" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+
             <div class="flex items-center justify-between mb-6">
-                <h2 class="text-lg font-semibold">Step 2 — Select Scan Type</h2>
-                <button type="button" id="btnBackToStep1" class="text-sm text-slate-500 hover:text-slate-700 underline">
+                <h2 class="text-lg font-semibold">
+                    Step 2 — Select Warehouse
+                </h2>
+
+                <button
+                    type="button"
+                    id="btnBackToStep1"
+                    class="text-sm text-slate-500 hover:text-slate-700 underline">
+
+                    ← Change Transaction
+
+                </button>
+            </div>
+
+            <div class="max-w-lg">
+
+                <label class="block text-sm font-medium text-slate-700 mb-2">
+                    Warehouse
+                </label>
+
+                <select
+                    id="warehouseSelect"
+                    class="w-full rounded-xl border border-slate-300 px-4 py-3">
+
+                    <option value="">
+                        -- Select Warehouse --
+                    </option>
+
+                    @foreach($warehouses as $warehouse)
+                        <option value="{{ $warehouse->warehouse_id }}">
+                            {{ $warehouse->warehouse_name }}
+                        </option>
+                    @endforeach
+
+                </select>
+
+                <button
+                    id="btnContinueWarehouse"
+                    type="button"
+                    class="mt-6 px-6 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700">
+
+                    Continue →
+
+                </button>
+
+            </div>
+
+        </div>
+        {{-- STEP 3 --}}
+        <div id="step3" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-semibold">Step 3 — Select Scan Type</h2>
+                <button type="button" id="btnBackToTransaction" class="text-sm text-slate-500 hover:text-slate-700 underline">
                     ← Change transaction
                 </button>
             </div>
@@ -76,8 +127,8 @@
             </div>
         </div>
 
-        {{-- STEP 3 --}}
-        <div id="step3" class="hidden space-y-6">
+        {{-- STEP 4 --}}
+        <div id="step4" class="hidden space-y-6">
 
             {{-- Unsaved warning banner --}}
             <div id="unsavedBanner" class="hidden rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-800 text-sm font-medium">
@@ -228,7 +279,9 @@
         // row with an incrementing qty, without collapsing what actually gets saved.
         const stagedByItemName = new Map();
 
-        const WAREHOUSE_ID = 1; // TODO: replace with the actual selected warehouse
+        let warehouseId = null;
+        const warehouseSelect = document.getElementById('warehouseSelect');
+        const btnContinueWarehouse = document.getElementById('btnContinueWarehouse');
 
         // ============================================================
         // DOM REFS
@@ -236,6 +289,7 @@
         const step1 = document.getElementById('step1');
         const step2 = document.getElementById('step2');
         const step3 = document.getElementById('step3');
+        const step4 = document.getElementById('step4');
 
         const currentMode = document.getElementById('currentMode');
         const transactionText = document.getElementById('transactionText');
@@ -281,28 +335,67 @@
         }
 
         // ============================================================
-        // STEP 2 — Select Scan Type
+        // STEP 2 — Select Warehouse Type
+        // ============================================================
+        btnContinueWarehouse.addEventListener('click', () => {
+
+            if (!warehouseSelect.value) {
+                alert('Please select a warehouse.');
+                warehouseSelect.focus();
+                return;
+            }
+
+            warehouseId = warehouseSelect.value;
+
+            step2.classList.add('hidden');
+            step3.classList.remove('hidden');
+
+        });
+        // ============================================================
+        // STEP 3 — Select Scan Type
         // ============================================================
         document.getElementById('btnBackToStep1').addEventListener('click', () => {
+
             transactionType = null;
+            warehouseId = null;
+
+            warehouseSelect.value = '';
+
             currentMode.classList.add('hidden');
+
             step2.classList.add('hidden');
             step1.classList.remove('hidden');
+
         });
 
         document.getElementById('btnPackage').addEventListener('click', () => selectScanType('PACKAGE', '📦 Package'));
         document.getElementById('btnItem').addEventListener('click', () => selectScanType('ITEM', '📄 Individual Item'));
 
         function selectScanType(type, label) {
-            scanType = type;
-            scanTypeText.textContent = label;
-            step2.classList.add('hidden');
-            step3.classList.remove('hidden');
-            activateScanner();
-        }
 
+            scanType = type;
+
+            scanTypeText.textContent = label;
+
+            step3.classList.add('hidden');
+            step4.classList.remove('hidden');
+
+            activateScanner();
+
+        }
+        document.getElementById('btnBackToTransaction').addEventListener('click', () => {
+
+            warehouseId = null;
+            warehouseSelect.value = '';
+
+            step4.classList.add('hidden');
+            step3.classList.add('hidden');
+            step2.classList.add('hidden');
+            step1.classList.remove('hidden');
+
+        });
         // ============================================================
-        // STEP 3 — Scanning (validate only, no DB write yet)
+        // STEP 4 — Scanning (validate only, no DB write yet)
         // ============================================================
         function activateScanner() {
             scannerInput.value = '';
@@ -387,7 +480,7 @@
                     },
                     body: JSON.stringify({
                         qr: qr,
-                        warehouse_id: WAREHOUSE_ID,
+                        warehouse_id: warehouseId,
                         transaction: transactionType,
                         scan_type: scanType
                     })
@@ -627,7 +720,7 @@
                         'X-CSRF-TOKEN': getCsrfToken()
                     },
                     body: JSON.stringify({
-                        warehouse_id: WAREHOUSE_ID,
+                        warehouse_id: warehouseId,
                         transaction: transactionType,
                         scan_type: scanType,
                         items: stagedItems
@@ -745,7 +838,12 @@
             btnSaveToDb.textContent = '💾 Save to Database';
 
             currentMode.classList.add('hidden');
+            warehouseId = null;
+            warehouseSelect.value = '';
+
+            step4.classList.add('hidden');
             step3.classList.add('hidden');
+            step2.classList.add('hidden');
             step1.classList.remove('hidden');
 
             updateDashboard();

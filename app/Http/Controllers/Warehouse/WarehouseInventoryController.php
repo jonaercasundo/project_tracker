@@ -9,6 +9,7 @@ use App\Models\InventoryHistory;
 use App\Models\PackageStatus;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class WarehouseInventoryController extends Controller
 {
@@ -175,7 +176,13 @@ class WarehouseInventoryController extends Controller
 
                     $status = PackageStatus::with('package.contents')
                         ->findOrFail($item['package_status_id']);
+                    if (!$status->package) {
+                        throw new \Exception('Package not found.');
+                    }
 
+                    if ($status->package->contents->isEmpty()) {
+                        throw new \Exception('Package has no contents.');
+                    }
                     if ($status->status === 'warehouse') {
                         throw new \RuntimeException('Already scanned.');
                     }
@@ -216,9 +223,18 @@ class WarehouseInventoryController extends Controller
                     $results['saved'][] = $item['package_status_id'];
                 });
             } catch (\Throwable $e) {
+
+                \Log::error('Warehouse Scan Error', [
+                    'package_status_id' => $item['package_status_id'],
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+
                 $results['failed'][] = [
                     'package_status_id' => $item['package_status_id'],
-                    'message'           => $e->getMessage(),
+                    'message' => $e->getMessage(),
                 ];
             }
         }

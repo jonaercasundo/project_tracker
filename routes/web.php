@@ -318,9 +318,8 @@ Route::middleware(['auth'])->group(function () {
                 return view('operation.warehouse.dashboard');
             })->name('dashboard');
 
-            Route::get('/scanner', function () {
-                return view('operation.warehouse.scanner');
-            })->name('scanner');
+           Route::get('/scanner', [WarehouseInventoryController::class, 'scanner'])
+            ->name('scanner');
 
             Route::get('/inventory', function () {
                 return view('operation.warehouse.dashboard');

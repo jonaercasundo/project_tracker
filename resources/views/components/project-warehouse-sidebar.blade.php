@@ -56,32 +56,6 @@
         </a>
 
 
-        {{-- Scanner --}}
-        <a href="{{ route('warehouse.scanner') }}"
-           class="group flex items-center gap-3 whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
-           {{ request()->routeIs('warehouse.scanner') ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-
-            @if(request()->routeIs('warehouse.scanner'))
-                <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-emerald-600 rounded-r-md"></div>
-            @endif
-
-            <svg class="w-4 h-4"
-                 fill="none"
-                 stroke="currentColor"
-                 stroke-width="2"
-                 viewBox="0 0 24 24">
-
-                <path stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M9 3H5a2 2 0 00-2 2v4m0 6v4a2 2 0 002 2h4m6 0h4a2 2 0 002-2v-4m0-6V5a2 2 0 00-2-2h-4"/>
-
-            </svg>
-
-            Inventory Scanner
-
-        </a>
-
-
         {{-- Inventory --}}
         <div
             x-data="{ open: {{ request()->routeIs('warehouse.inventory.*')

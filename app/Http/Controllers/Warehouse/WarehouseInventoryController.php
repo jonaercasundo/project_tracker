@@ -159,10 +159,10 @@ class WarehouseInventoryController extends Controller
     public function saveScan(Request $request)
     {
         $request->validate([
-            'warehouse_id'               => 'required|integer',
-            'transaction'                => 'required|in:IN,OUT',
-            'items'                      => 'required|array|min:1',
-            'items.*.package_status_id'  => 'required|integer',
+            'warehouse_id'              => 'required|exists:warehouse,warehouse_id',
+            'transaction'               => 'required|in:IN,OUT',
+            'items'                     => 'required|array|min:1',
+            'items.*.package_status_id' => 'required|integer',
         ]);
 
         $results = [
@@ -224,7 +224,7 @@ class WarehouseInventoryController extends Controller
                 });
             } catch (\Throwable $e) {
 
-                \Log::error('Warehouse Scan Error', [
+                Log::error('Warehouse Scan Error', [
                     'package_status_id' => $item['package_status_id'],
                     'message' => $e->getMessage(),
                     'file' => $e->getFile(),

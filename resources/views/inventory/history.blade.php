@@ -54,6 +54,8 @@
                 <option value="insert" {{ request('change_type') == 'insert' ? 'selected' : '' }}>Insert</option>
                 <option value="update" {{ request('change_type') == 'update' ? 'selected' : '' }}>Update</option>
                 <option value="delete" {{ request('change_type') == 'delete' ? 'selected' : '' }}>Delete</option>
+                <option value="stock_in" {{ request('change_type') == 'stock_in' ? 'selected' : '' }}>Stock In</option>
+                <option value="stock_out" {{ request('change_type') == 'stock_out' ? 'selected' : '' }}>Stock Out</option>
             </select>
 
             {{-- Warehouse --}}
@@ -119,6 +121,8 @@
                         $changeStyles = match($history->change_type) {
                             'insert' => ['bg-emerald-50 text-emerald-700 border border-emerald-200/50', 'bg-emerald-500', 'Insert'],
                             'update' => ['bg-blue-50 text-blue-700 border border-blue-200/50', 'bg-blue-500', 'Update'],
+                            'stock_in' => ['bg-green-50 text-green-700 border border-green-200/50', 'bg-green-500', 'Stock In'],
+                            'stock_out' => ['bg-red-50 text-red-700 border border-red-200/50', 'bg-red-500', 'Stock Out'],
                             default  => ['bg-rose-50 text-rose-700 border border-rose-200/50', 'bg-rose-500', 'Delete'],
                         };
                         $qtyDelta = (int) $history->new_qty - (int) $history->old_qty;

@@ -612,8 +612,6 @@
                 scannerEnabled = true;
                 return;
             }
-            if (stagedItems.length === 0 || isSaving || hasSaved) return;
-
             isSaving = true;
             btnSaveToDb.disabled = true;
             btnSaveToDb.textContent = 'Saving…';
@@ -648,36 +646,51 @@
                     return;
                 }
 
-                if (response.ok && result.success) {
-                    hasSaved = true;
-                    saveStatusText.textContent = `✔ Saved ${stagedItems.length} item(s) to the database.`;
-                    saveStatusText.classList.add('text-green-600', 'font-semibold');
-                    unsavedBanner.classList.add('hidden');
-                    btnSaveToDb.textContent = '✔ Saved';
-                } else {
-                    // Partial failure or full failure: surface saved/failed counts if present.
+                if (response.ok) {
+
                     const savedCount = Array.isArray(result.saved) ? result.saved.length : 0;
                     const failedCount = Array.isArray(result.failed) ? result.failed.length : 0;
 
-                    if (savedCount > 0 || failedCount > 0) {
-                        hasSaved = failedCount === 0;
-                        saveStatusText.textContent = failedCount === 0
-                            ? `✔ Saved ${savedCount} item(s) to the database.`
-                            : `⚠ Saved ${savedCount}, but ${failedCount} failed. Check those items and try again if needed.`;
-                        saveStatusText.classList.add(failedCount === 0 ? 'text-green-600' : 'text-amber-600', 'font-semibold');
-                        if (failedCount === 0) {
-                            unsavedBanner.classList.add('hidden');
-                            btnSaveToDb.textContent = '✔ Saved';
-                        } else {
-                            btnSaveToDb.disabled = false;
-                            btnSaveToDb.textContent = '💾 Save to Database';
-                        }
+                    if (failedCount === 0) {
+
+                        hasSaved = true;
+
+                        saveStatusText.textContent =
+                            `✔ Saved ${savedCount} item(s) to the database.`;
+
+                        saveStatusText.className =
+                            'text-green-600 font-semibold';
+
+                        unsavedBanner.classList.add('hidden');
+
+                        btnSaveToDb.textContent = '✔ Saved';
+
                     } else {
-                        saveStatusText.textContent = `✘ Save failed: ${result.message ?? 'Unknown error'}. Your scans are still staged — try again.`;
-                        saveStatusText.classList.add('text-red-600', 'font-semibold');
+
+                        saveStatusText.textContent =
+                            `⚠ Saved ${savedCount}, Failed ${failedCount}`;
+
+                        saveStatusText.className =
+                            'text-amber-600 font-semibold';
+
                         btnSaveToDb.disabled = false;
                         btnSaveToDb.textContent = '💾 Save to Database';
+
+                        console.table(result.failed);
+
                     }
+
+                } else {
+
+                    saveStatusText.textContent =
+                        result.message ?? 'Unknown error';
+
+                    saveStatusText.className =
+                        'text-red-600 font-semibold';
+
+                    btnSaveToDb.disabled = false;
+                    btnSaveToDb.textContent = '💾 Save to Database';
+
                 }
             } catch (err) {
                 console.error(err);

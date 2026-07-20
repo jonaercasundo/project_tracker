@@ -101,7 +101,15 @@ class WarehouseInventoryController extends Controller
         }
 
         if ($status->status === 'warehouse') {
-            return response()->json(['success' => false, 'message' => 'This package has already been scanned.']);
+
+            return response()->json([
+                'success' => false,
+                'already_scanned' => true,
+                'package_status_id' => $status->package_status_id,
+                'package' => $status->package->package_num,
+                'message' => 'Already received in Warehouse.'
+            ]);
+
         }
 
         $contents = $status->package->contents;

@@ -98,7 +98,7 @@
 
                 <li>
 
-                    <a href="{{ route('warehouse.inventory.index') }}"
+                    <a href="{{ route('warehouse.dashboard') }}"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
 
                         Inventory List

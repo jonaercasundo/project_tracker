@@ -198,35 +198,34 @@
 
         {{-- STEP 3 --}}
         <div id="step3"
-             class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
 
             <h2 class="text-lg font-semibold mb-6">
                 Step 3 — Scan QR Code
             </h2>
 
+            <!-- Hidden input for RUYI Scanner -->
+            <input
+                type="text"
+                id="scannerInput"
+                class="absolute opacity-0 pointer-events-none"
+                autocomplete="off"
+            >
+
             <div class="rounded-xl border-2 border-dashed border-slate-300 p-6">
 
-                <div id="reader"
-                    class="w-full h-[500px] rounded-xl overflow-hidden bg-slate-100">
-                </div>
-
-                <div id="scanResult"
-                    class="hidden mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
-
-                    <h3 class="font-semibold text-green-700">
-
-                        Last Scan
-
+                <div class="text-center py-20">
+                    <h3 class="text-xl font-semibold">
+                        Waiting for Scanner...
                     </h3>
 
-                    <p id="resultText"
-                    class="mt-2 text-sm text-slate-700">
-
+                    <p class="text-slate-500 mt-2">
+                        Scan a QR Code using the RUYI Scanner
                     </p>
-
                 </div>
 
             </div>
+
         </div>
     </div>
     @push('scripts')
@@ -239,6 +238,7 @@ let scanType = null;
 const step1 = document.getElementById('step1');
 const step2 = document.getElementById('step2');
 const step3 = document.getElementById('step3');
+const scannerInput = document.getElementById('scannerInput');
 
 const currentMode = document.getElementById('currentMode');
 
@@ -296,7 +296,7 @@ document.getElementById('btnPackage').addEventListener('click', function () {
     step2.classList.add('hidden');
 
     step3.classList.remove('hidden');
-
+    activateScanner();
 });
 
 document.getElementById('btnItem').addEventListener('click', function () {
@@ -308,9 +308,26 @@ document.getElementById('btnItem').addEventListener('click', function () {
     step2.classList.add('hidden');
 
     step3.classList.remove('hidden');
+    activateScanner();
+});
+function activateScanner() {
+
+    setTimeout(() => {
+
+        scannerInput.focus();
+
+    }, 100);
+
+}
+scannerInput.addEventListener('blur', function () {
+
+    setTimeout(() => {
+
+        scannerInput.focus();
+
+    }, 50);
 
 });
-
 </script>
 @endpush
 </x-project_warehouse_app>

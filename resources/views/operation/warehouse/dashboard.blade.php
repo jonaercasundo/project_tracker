@@ -228,8 +228,14 @@
             {{-- Hidden Scanner --}}
             <input
                 id="scannerInput"
+                type="text"
                 class="absolute -left-[9999px]"
                 autocomplete="off">
+
+            {{-- Scan Result (hidden, used by JS) --}}
+            <div id="scanResult" class="hidden rounded-xl border bg-white p-4 mb-4">
+                <div id="resultText" class="text-sm text-slate-700"></div>
+            </div>
 
             {{-- Live Table --}}
             <div class="bg-white rounded-xl border overflow-hidden">
@@ -354,9 +360,9 @@ document.getElementById('btnItem').addEventListener('click', function () {
     step3.classList.remove('hidden');
     activateScanner();
 });
-scannerInput.addEventListener("keydown", async function(e){
+scannerInput.addEventListener("keydown", async function (e) {
 
-    if(e.key !== "Enter") return;
+    if (e.key !== "Enter") return;
 
     e.preventDefault();
 
@@ -364,16 +370,11 @@ scannerInput.addEventListener("keydown", async function(e){
 
     scannerInput.value = "";
 
-    if(qr=="") return;
+    if (qr == "") return;
 
-    if(scannedList.has(qr)){
-
-        duplicateCounter++;
-
-        updateDashboard();
+    if (scannedList.has(qr)) {
 
         scannedCount++;
-
         duplicateCounter++;
 
         addRow({

@@ -108,17 +108,36 @@ class WarehouseInventoryController extends Controller
             return response()->json(['success' => false, 'message' => 'Package not found.']);
         }
 
-        if ($status->status === 'warehouse') {
+        if ($request->transaction === 'IN') {
 
-            return response()->json([
-                'success' => false,
-                'already_scanned' => true,
-                'package_status_id' => $status->package_status_id,
-                'package' => $status->package->package_num,
-                'message' => 'Already received in Warehouse.'
-            ]);
+            // Stock In: reject if already in warehouse
+            if ($status->status === 'warehouse') {
 
-        }
+                return response()->json([
+                    'success' => false,
+                    'already_scanned' => true,
+                    'package_status_id' => $status->package_status_id,
+                    'package' => $status->package->package_num,
+                    'message' => 'Already received in Warehouse.'
+                ]);
+
+            }
+
+        } else {
+
+            // Stock Out: package must already be in warehouse
+            if ($status->status !== 'warehouse') {
+
+                return response()->json([
+                    'success' => false,
+                    'package_status_id' => $status->package_status_id,
+                    'package' => $status->package->package_num,
+                    'message' => 'Package is not inside the warehouse.'
+                ]);
+
+            }
+
+        }      
 
         $contents = $status->package->contents;
 

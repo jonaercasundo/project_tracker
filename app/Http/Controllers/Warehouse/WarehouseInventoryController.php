@@ -209,8 +209,18 @@ class WarehouseInventoryController extends Controller
                     if ($status->package->contents->isEmpty()) {
                         throw new \Exception('Package has no contents.');
                     }
-                    if ($status->status === 'warehouse') {
-                        throw new \RuntimeException('Already scanned.');
+                    if ($request->transaction === 'IN') {
+
+                        if ($status->status === 'warehouse') {
+                            throw new \RuntimeException('Already received in warehouse.');
+                        }
+
+                    } else {
+
+                        if ($status->status !== 'warehouse') {
+                            throw new \RuntimeException('Package is not inside the warehouse.');
+                        }
+
                     }
 
                     foreach ($status->package->contents as $content) {
@@ -222,10 +232,21 @@ class WarehouseInventoryController extends Controller
 
                         $oldQty = $inventory->exists ? $inventory->qty : 0;
 
-                        $newQty = $request->transaction === 'IN'
-                            ? $oldQty + $content->qty
-                            : max(0, $oldQty - $content->qty);
+                        if ($request->transaction === 'IN') {
 
+                            $newQty = $oldQty + $content->qty;
+
+                        } else {
+
+                            if ($oldQty < $content->qty) {
+                                throw new \RuntimeException(
+                                    "Insufficient stock for item {$content->item_id}."
+                                );
+                            }
+
+                            $newQty = $oldQty - $content->qty;
+
+                        }
                         $inventory->qty = $newQty;
                         $inventory->inventory_status = 'Approved';
                         $inventory->save();
@@ -242,8 +263,18 @@ class WarehouseInventoryController extends Controller
                         ]);
                     }
 
-                    $status->status = 'warehouse';
-                    $status->remarks = 'Scanned by Warehouse';
+                    if ($request->transaction === 'IN') {
+
+                        $status->status = 'warehouse';
+                        $status->remarks = 'Received by Warehouse';
+
+                    } else {
+
+                        $status->status = 'released';      // <-- change to your actual status value
+                        $status->remarks = 'Released from Warehouse';
+
+                    }
+
                     $status->save();
 
                     $results['saved'][] = $item['package_status_id'];

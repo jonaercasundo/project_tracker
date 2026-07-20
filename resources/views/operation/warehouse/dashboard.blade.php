@@ -204,24 +204,28 @@
                 Step 3 — Scan QR Code
             </h2>
 
-            <!-- Hidden input for RUYI Scanner -->
-            <input
-                type="text"
-                id="scannerInput"
-                class="absolute opacity-0 pointer-events-none"
-                autocomplete="off"
-            >
+            <div class="space-y-4">
 
-            <div class="rounded-xl border-2 border-dashed border-slate-300 p-6">
+                <input
+                    type="text"
+                    id="scannerInput"
+                    autocomplete="off"
+                    autofocus
+                    spellcheck="false"
+                    class="w-full rounded-xl border-2 border-blue-300 bg-blue-50 p-4 text-lg font-semibold text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="Waiting for scanner..."
+                >
 
-                <div class="text-center py-20">
-                    <h3 class="text-xl font-semibold">
-                        Waiting for Scanner...
+                <div
+                    id="scanResult"
+                    class="hidden rounded-xl border border-green-200 bg-green-50 p-4">
+
+                    <h3 class="font-semibold text-green-700">
+                        Last Scan
                     </h3>
 
-                    <p class="text-slate-500 mt-2">
-                        Scan a QR Code using the RUYI Scanner
-                    </p>
+                    <p id="resultText" class="mt-2 text-slate-700"></p>
+
                 </div>
 
             </div>
@@ -238,14 +242,14 @@ let scanType = null;
 const step1 = document.getElementById('step1');
 const step2 = document.getElementById('step2');
 const step3 = document.getElementById('step3');
-const scannerInput = document.getElementById('scannerInput');
 
 const currentMode = document.getElementById('currentMode');
 
 const transactionText = document.getElementById('transactionText');
 const scanTypeText = document.getElementById('scanTypeText');
-
-
+const scannerInput = document.getElementById('scannerInput');
+const scanResult = document.getElementById('scanResult');
+const resultText = document.getElementById('resultText');
 // ================================
 // STEP 1
 // ================================
@@ -310,13 +314,59 @@ document.getElementById('btnItem').addEventListener('click', function () {
     step3.classList.remove('hidden');
     activateScanner();
 });
+scannerInput.addEventListener('keydown', function (e) {
+
+    if (e.key !== 'Enter') {
+        return;
+    }
+
+    e.preventDefault();
+
+    const qr = scannerInput.value.trim();
+
+    if (!qr) {
+        return;
+    }
+
+    processScan(qr);
+
+    scannerInput.value = "";
+
+});
+function processScan(qr) {
+
+    scanResult.classList.remove('hidden');
+
+    resultText.innerHTML = `
+        <strong>Transaction:</strong> ${transactionType}<br>
+        <strong>Scan Type:</strong> ${scanType}<br>
+        <strong>QR:</strong> ${qr}
+    `;
+
+    try {
+
+        if (qr.startsWith('http')) {
+
+            const url = new URL(qr);
+
+            resultText.innerHTML += `
+                <hr class="my-3">
+                <strong>ID:</strong> ${url.searchParams.get('id')}<br>
+                <strong>Delivery ID:</strong> ${url.searchParams.get('delivery_id')}
+            `;
+
+        }
+
+    } catch (e) {}
+
+    scannerInput.focus();
+
+}
 function activateScanner() {
 
-    setTimeout(() => {
+    scannerInput.value = "";
 
-        scannerInput.focus();
-
-    }, 100);
+    scannerInput.focus();
 
 }
 scannerInput.addEventListener('blur', function () {

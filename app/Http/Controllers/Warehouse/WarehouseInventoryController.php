@@ -258,8 +258,12 @@ class WarehouseInventoryController extends Controller
                             'old_qty'      => $oldQty,
                             'new_qty'      => $newQty,
                             'changed_by'   => Auth::user()->name,
-                            'remarks'      => 'Warehouse QR Scan (batch)',
-                            'change_type'  => 'update',
+                            'remarks'      => $request->transaction === 'IN'
+                                ? 'Stock In via QR Scanner'
+                                    : 'Stock Out via QR Scanner',
+                            'change_type'  => $request->transaction === 'IN'
+                                ? 'stock_in'
+                                : 'stock_out',
                         ]);
                     }
 

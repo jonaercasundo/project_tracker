@@ -538,7 +538,9 @@
                             package: result.package,
                             item: result.item,
                             qty: scannedQty,
-                            status: 'Stock In'
+                            status: transactionType === 'IN'
+                                ? 'Stock In'
+                                : 'Stock Out'
                         });
 
                         if (isMergeable) {

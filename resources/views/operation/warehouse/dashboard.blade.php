@@ -106,7 +106,7 @@
             </div>
 
             {{-- Hidden Scanner --}}
-            <input id="scannerInput" type="text" class="absolute -left-[9999px]" autocomplete="off">
+            <input id="scannerInput" type="text" class="absolute -left-[9999px]" autocomplete="off" hidden>
 
             {{-- Live Table --}}
             <div class="bg-white rounded-xl border overflow-hidden">

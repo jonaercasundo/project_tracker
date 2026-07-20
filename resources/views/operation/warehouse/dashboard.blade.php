@@ -141,7 +141,34 @@
                     <tbody id="scanTable" class="divide-y divide-slate-200"></tbody>
                 </table>
             </div>
+            <div id="reviewSection"
+                class="hidden bg-white rounded-xl border overflow-hidden mt-6">
 
+                <div class="px-4 py-3 bg-red-50 border-b">
+                    <h3 class="font-bold text-red-700">
+                        Review Required
+                    </h3>
+
+                    <p class="text-sm text-red-600">
+                        These QR codes will NOT be saved.
+                    </p>
+                </div>
+
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-100">
+                        <tr>
+                            <th class="px-4 py-3">Package</th>
+                            <th class="px-4 py-3">Item</th>
+                            <th class="px-4 py-3">Reason</th>
+                            <th class="px-4 py-3">Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="reviewTable"></tbody>
+
+                </table>
+
+            </div>
             {{-- Save controls --}}
             <div class="flex items-center justify-between bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                 <div>
@@ -226,7 +253,10 @@
         const btnNewSession = document.getElementById('btnNewSession');
         const saveHintCount = document.getElementById('saveHintCount');
         const saveStatusText = document.getElementById('saveStatusText');
+        const reviewTable = document.getElementById('reviewTable');
+        const reviewSection = document.getElementById('reviewSection');
 
+        let reviewItems = [];
         function getCsrfToken() {
             return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
         }
@@ -297,7 +327,12 @@
             if (scannedList.has(qr)) {
                 scannedCount++;
                 duplicateCounter++;
-                addRow({ package: '-', item: '-', qty: '-', status: 'Duplicate' });
+                addReviewRow({
+                    package_status_id:null,
+                    package:'-',
+                    item:'-',
+                    reason:'Duplicate QR scanned'
+                });
                 updateDashboard();
                 return;
             }
@@ -339,7 +374,12 @@
                     console.error('Non-JSON response, status:', response.status, response.statusText);
                     scannedCount++;
                     failedCounter++;
-                    addRow({ package: '-', item: '-', qty: '-', status: `Server error (${response.status})` });
+                    addReviewRow({
+                        package_status_id: result.package_status_id,
+                        package: result.package,
+                        item: result.item,
+                        reason: result.message
+                    });
                     updateDashboard();
                     return false;
                 }
@@ -412,7 +452,12 @@
                 console.error(err);
                 scannedCount++;
                 failedCounter++;
-                addRow({ package: '-', item: '-', qty: '-', status: 'Network error' });
+                addReviewRow({
+                    package_status_id: result.package_status_id,
+                    package: result.package,
+                    item: result.item,
+                    reason: result.message
+                });
                 updateDashboard();
                 return false;
             } finally {
@@ -493,7 +538,43 @@
             div.textContent = str;
             return div.innerHTML;
         }
+        function addReviewRow(data) {
 
+            reviewSection.classList.remove('hidden');
+
+            reviewItems.push(data);
+
+            const row = document.createElement('tr');
+
+            row.innerHTML = `
+                <td class="px-4 py-3">${escapeHtml(data.package ?? '-')}</td>
+
+                <td class="px-4 py-3">${escapeHtml(data.item ?? '-')}</td>
+
+                <td class="px-4 py-3 text-red-600 font-semibold">
+                    ${escapeHtml(data.reason)}
+                </td>
+
+                <td class="px-4 py-3">
+
+                    <button
+                        class="remove-review
+                            bg-red-500
+                            text-white
+                            px-3
+                            py-1
+                            rounded"
+                        data-id="${data.package_status_id}">
+
+                        Remove
+
+                    </button>
+
+                </td>
+            `;
+
+            reviewTable.appendChild(row);
+        }
         // ============================================================
         // SAVE TO DATABASE (batch commit)
         // ============================================================

@@ -1,23 +1,19 @@
 <?php
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('delivery_history', function (Blueprint $table) {
 
             $table->id();
 
-            $table->unsignedBigInteger('package_status_id');
+            $table->integer('package_status_id');
 
-            $table->unsignedBigInteger('user_id');
+            $table->integer('user_id');
 
             $table->string('status');
 
@@ -39,16 +35,15 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             $table->foreign('user_id')
-                ->references('id')
-                ->on('users');
+                ->references('user_id')
+                ->on('users')
+                ->cascadeOnDelete();
+
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('delivery_histories');
+        Schema::dropIfExists('delivery_history');
     }
 };

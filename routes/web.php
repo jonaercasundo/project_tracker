@@ -363,4 +363,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/receive-delivery/{packageStatus}',
         [DeliveryReceiveController::class,'store'])
         ->name('delivery.receive.store');
+    Route::get('/delivery-success', function () {
+        return view('operation.delivery.success');
+        })->name('delivery.success');
 require __DIR__.'/auth.php';

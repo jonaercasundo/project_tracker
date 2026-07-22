@@ -195,7 +195,7 @@ class WarehouseInventoryController extends Controller
             'saved'  => [],
             'failed' => [],
         ];
-
+        $inventoryChanges = [];
         foreach ($request->items as $item) {
             try {
                 DB::transaction(function () use ($item, $request, &$results) {

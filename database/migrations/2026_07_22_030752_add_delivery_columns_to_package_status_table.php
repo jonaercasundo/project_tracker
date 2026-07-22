@@ -19,8 +19,6 @@ return new class extends Migration
 
             $table->integer('accuracy')->nullable();
 
-            $table->text('remarks')->nullable();
-
             $table->timestamp('delivered_at')->nullable();
 
             $table->string('receiver_name')->nullable();

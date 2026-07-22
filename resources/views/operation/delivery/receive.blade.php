@@ -219,33 +219,40 @@
         border-radius:12px;
     }
 
-    .action-bar .gps-pill{
-        font-size:.78rem;
-        display:flex;
-        align-items:center;
-        gap:6px;
-        justify-content:center;
-        margin-bottom:8px;
-        color:#6c757d;
-    }
-
-    .gps-dot{
-        width:8px;
-        height:8px;
-        border-radius:50%;
-        background:#dc3545;
-    }
-
-    .gps-dot.ready{
-        background:#198754;
-    }
-
     </style>
 
 </head>
 <body>
 
 <div class="container py-3 px-3">
+
+    {{-- Feedback from the last submission attempt --}}
+
+    @if(session('success'))
+
+        <div class="alert alert-success mb-3" role="alert">
+            {{ session('success') }}
+        </div>
+
+    @endif
+
+    @if($errors->any())
+
+        <div class="alert alert-danger mb-3" role="alert">
+
+            <strong class="d-block mb-1">There was a problem submitting this delivery:</strong>
+
+            <ul class="mb-0 ps-3">
+
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+
+            </ul>
+
+        </div>
+
+    @endif
 
     {{-- HEADER --}}
 
@@ -393,13 +400,13 @@
 
                         <div class="item-meta">
 
-                            <span>Quantity: <strong>{{ $required }}</strong></span>
-                            <span hidden>Available: <strong>{{ $available }}</strong></span>
+                            <span>Required: <strong>{{ $required }}</strong></span>
+                            <span>Available: <strong>{{ $available }}</strong></span>
 
                             @if($ok)
-                                <span hidden class="status-good">✔ Available</span>
+                                <span class="status-good">✔ Available</span>
                             @else
-                                <span hidden class="status-bad">✖ Insufficient</span>
+                                <span class="status-bad">✖ Insufficient</span>
                             @endif
 
                         </div>
@@ -426,22 +433,6 @@
         <input type="hidden" name="latitude" id="latitude">
         <input type="hidden" name="longitude" id="longitude">
         <input type="hidden" name="accuracy" id="accuracy">
-
-        <div class="card mb-3" hidden>
-
-            <div class="card-body">
-
-                <h4 class="section-title">📍 Rider Location</h4>
-
-                <div class="alert alert-info mb-0 py-2 px-3">
-                    <strong>Status:</strong>
-                    <span id="gpsStatus">Waiting for GPS...</span>
-                </div>
-
-            </div>
-
-        </div>
-
 
         <div class="card mb-3">
 
@@ -521,11 +512,6 @@
 
         <div class="action-bar">
 
-            <div class="gps-pill">
-                <span class="gps-dot" id="gpsDot"></span>
-                <span id="gpsPillText">Waiting for GPS...</span>
-            </div>
-
             <button
                 class="btn btn-success btn-lg"
                 id="submitBtn">
@@ -544,55 +530,56 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 
-const gpsDot=document.getElementById('gpsDot');
+const submitBtn=document.getElementById('submitBtn');
 
-const gpsPillText=document.getElementById('gpsPillText');
+const deliveryForm=document.getElementById('deliveryForm');
 
-navigator.geolocation.watchPosition(
+deliveryForm.addEventListener('submit', function(e){
 
-function(position){
+    e.preventDefault();
 
-    let lat=position.coords.latitude;
+    submitBtn.disabled=true;
 
-    let lng=position.coords.longitude;
+    submitBtn.textContent='Getting location...';
 
-    let acc=Math.round(position.coords.accuracy);
+    navigator.geolocation.getCurrentPosition(
 
-    latitude.value=lat;
+        function(position){
 
-    longitude.value=lng;
+            latitude.value=position.coords.latitude;
 
-    accuracy.value=acc;
+            longitude.value=position.coords.longitude;
 
-    gpsStatus.innerHTML="GPS Ready ("+acc+"m accuracy)";
+            accuracy.value=Math.round(position.coords.accuracy);
 
-    gpsDot.classList.add('ready');
+            submitBtn.textContent='Submitting...';
 
-    gpsPillText.innerHTML="GPS ready ("+acc+"m accuracy)";
+            deliveryForm.submit();
 
-},
+        },
 
-function(){
+        function(){
 
-    gpsStatus.innerHTML="Unable to get GPS";
+            // Could not get a location fix - submit anyway, fields stay empty
+            submitBtn.textContent='Submitting...';
 
-    gpsDot.classList.remove('ready');
+            deliveryForm.submit();
 
-    gpsPillText.innerHTML="Unable to get GPS";
+        },
 
-},
+        {
 
-{
+            enableHighAccuracy:true,
 
-enableHighAccuracy:true,
+            timeout:8000,
 
-maximumAge:0,
+            maximumAge:0
 
-timeout:10000
+        }
 
-}
+    );
 
-);
+});
 
 </script>
 <script>

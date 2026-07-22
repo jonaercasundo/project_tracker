@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\PackageStatus;
 use App\Models\Inventory;
-use App\Models\inventoryHistory;
+use App\Models\InventoryHistory;
 use Illuminate\Http\Request;
 use App\Models\DeliveryProof;
-use App\Models\Deliveryhistory;
+use App\Models\DeliveryHistory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 

@@ -1,72 +1,75 @@
-@extends('layouts.app')
+<!DOCTYPE html>
+<html lang="en">
+<head>
 
-@section('title', 'Receive Delivery')
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receive Delivery</title>
 
-@push('styles')
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
-<style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
 
-body{
-    background:#f4f6f9;
-}
+    body{
+        background:#f4f6f9;
+    }
 
-.page-header{
-    background:#0d6efd;
-    color:#fff;
-    border-radius:15px;
-    padding:25px;
-}
+    .page-header{
+        background:#0d6efd;
+        color:#fff;
+        border-radius:15px;
+        padding:25px;
+    }
 
-.card{
-    border:none;
-    border-radius:15px;
-    box-shadow:0 5px 18px rgba(0,0,0,.08);
-}
+    .card{
+        border:none;
+        border-radius:15px;
+        box-shadow:0 5px 18px rgba(0,0,0,.08);
+    }
 
-.table td,
-.table th{
-    vertical-align:middle;
-}
+    .table td,
+    .table th{
+        vertical-align:middle;
+    }
 
-.badge-lg{
-    font-size:.9rem;
-    padding:.55rem .8rem;
-}
+    .badge-lg{
+        font-size:.9rem;
+        padding:.55rem .8rem;
+    }
 
-.status-good{
-    color:#198754;
-    font-weight:600;
-}
+    .status-good{
+        color:#198754;
+        font-weight:600;
+    }
 
-.status-bad{
-    color:#dc3545;
-    font-weight:600;
-}
+    .status-bad{
+        color:#dc3545;
+        font-weight:600;
+    }
 
-.item-icon{
-    width:42px;
-    height:42px;
-    background:#eef4ff;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    border-radius:10px;
-    font-size:20px;
-}
+    .item-icon{
+        width:42px;
+        height:42px;
+        background:#eef4ff;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:10px;
+        font-size:20px;
+    }
 
-.section-title{
-    font-weight:700;
-    margin-bottom:20px;
-}
+    .section-title{
+        font-weight:700;
+        margin-bottom:20px;
+    }
 
-</style>
-@endpush
+    </style>
 
-@section('content')
+</head>
+<body>
 
 <div class="container py-4">
 
@@ -585,8 +588,6 @@ body{
 
 </div>
 
-@endsection
-@push('scripts')
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 
@@ -703,3 +704,6 @@ photos.addEventListener('change',function(){
 });
 
 </script>
+
+</body>
+</html>

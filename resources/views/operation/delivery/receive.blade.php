@@ -405,12 +405,12 @@
                         <div class="item-meta">
 
                             <span>Required: <strong>{{ $required }}</strong></span>
-                            <span>Available: <strong>{{ $available }}</strong></span>
+                            <span hidden>Available: <strong>{{ $available }}</strong></span>
 
                             @if($ok)
-                                <span class="status-good">✔ Available</span>
+                                <span class="status-good" hidden>✔ Available</span>
                             @else
-                                <span class="status-bad">✖ Insufficient</span>
+                                <span class="status-bad" hidden>✖ Insufficient</span>
                             @endif
 
                         </div>
@@ -542,7 +542,7 @@
             <button
                 class="btn btn-success btn-lg"
                 id="submitBtn"
-                disabled>
+                >
 
                 Confirm Delivery
 

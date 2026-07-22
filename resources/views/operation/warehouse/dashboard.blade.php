@@ -230,7 +230,7 @@
                 </div>
 
                 <div class="flex gap-3">
-                    <button type="button" id="btnNewSession"
+                    <button type="button" id="btnNewSession" hidden
                         class="px-5 py-3 rounded-xl bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300">
                         Start New Scan
                     </button>

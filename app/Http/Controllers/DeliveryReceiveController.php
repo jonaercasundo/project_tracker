@@ -256,8 +256,7 @@ class DeliveryReceiveController extends Controller
                 // stands in for "oldest batch first".
                 $remainingToDeduct = $requiredQty;
 
-                $inventoryRows = Inventory::where('warehouse_id', $warehouseId)
-                    ->where('item_id', $item->item_id)
+                $inventoryRows = Inventory::where('item_id', $item->item_id)
                     ->where('inventory_status', 'Approved')
                     ->where('qty', '>', 0)
                     ->orderBy('inventory_id')
@@ -284,7 +283,7 @@ class DeliveryReceiveController extends Controller
 
                         'item_id' => $item->item_id,
 
-                        'warehouse_id' => $warehouseId,
+                        'warehouse_id' => $row->warehouse_id,
 
                         'change_type' => 'delivered',
 

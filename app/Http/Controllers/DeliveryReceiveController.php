@@ -282,7 +282,7 @@ class DeliveryReceiveController extends Controller
                         'warehouse_id' => $row->warehouse_id,
                         'old_qty' => $row->qty + $deductFromRow,
                         'new_qty' => $row->qty,
-                        'change_type' => 'stock_out',
+                        'change_type' => 'delivered',
                         'changed_by' => auth()->user()->name,
                         'remarks' => 'Delivered via DR #' . $delivery->dr_no,
                         'changed_at' => now(),
@@ -301,7 +301,7 @@ class DeliveryReceiveController extends Controller
             DB::commit();
 
             return redirect()
-                ->route('delivery.dashboard')
+                ->route('delivery.receive')
                 ->with('success', 'Package delivered successfully.');
 
         } catch (\Exception $e) {

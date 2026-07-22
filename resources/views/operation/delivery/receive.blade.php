@@ -400,15 +400,7 @@
 
                         <div class="item-meta">
 
-                            <span>Required: <strong>{{ $required }}</strong></span>
-                            <span>Available: <strong>{{ $available }}</strong></span>
-
-                            @if($ok)
-                                <span class="status-good">✔ Available</span>
-                            @else
-                                <span class="status-bad">✖ Insufficient</span>
-                            @endif
-
+                            <span>Quantity: <strong>{{ $required }}</strong></span>
                         </div>
 
                     </div>
@@ -492,14 +484,6 @@
                         class="form-check-input"
                         type="checkbox"
                         id="confirmDelivery">
-
-                    <label
-                        class="form-check-label"
-                        for="confirmDelivery">
-
-                        I confirm that the package has been successfully delivered.
-
-                    </label>
 
                 </div>
 

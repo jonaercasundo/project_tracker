@@ -8,10 +8,6 @@
     <title>Receive Delivery</title>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    />
     <style>
 
     body{
@@ -156,13 +152,6 @@
         gap:6px 14px;
         font-size:.85rem;
         color:#495057;
-    }
-
-    /* --- Maps sized for small screens --- */
-
-    #map, #riderMap{
-        height:clamp(220px, 45vh, 350px);
-        border-radius:12px;
     }
 
     /* --- Big, thumb-friendly confirm checkbox --- */
@@ -405,12 +394,12 @@
                         <div class="item-meta">
 
                             <span>Required: <strong>{{ $required }}</strong></span>
-                            <span hidden>Available: <strong>{{ $available }}</strong></span>
+                            <span>Available: <strong>{{ $available }}</strong></span>
 
                             @if($ok)
-                                <span class="status-good" hidden>✔ Available</span>
+                                <span class="status-good">✔ Available</span>
                             @else
-                                <span class="status-bad" hidden>✖ Insufficient</span>
+                                <span class="status-bad">✖ Insufficient</span>
                             @endif
 
                         </div>
@@ -442,11 +431,9 @@
 
             <div class="card-body">
 
-                <h4 class="section-title">📍 Delivery Location</h4>
+                <h4 class="section-title">📍 Rider Location</h4>
 
-                <div id="map"></div>
-
-                <div class="alert alert-info mt-3 mb-0 py-2 px-3">
+                <div class="alert alert-info mb-0 py-2 px-3">
                     <strong>Status:</strong>
                     <span id="gpsStatus">Waiting for GPS...</span>
                 </div>
@@ -541,8 +528,7 @@
 
             <button
                 class="btn btn-success btn-lg"
-                id="submitBtn"
-                >
+                id="submitBtn">
 
                 Confirm Delivery
 
@@ -552,71 +538,15 @@
 
     </form>
 
-    <div class="card mb-3">
-
-        <div class="card-body">
-
-            <h4 class="section-title">📍 Rider Location (Live)</h4>
-
-            <div id="riderMap"></div>
-
-            <div class="row mt-3 text-center g-2">
-
-                <div class="col-4">
-                    <small class="text-muted d-block">Latitude</small>
-                    <strong id="riderLat">--</strong>
-                </div>
-
-                <div class="col-4">
-                    <small class="text-muted d-block">Longitude</small>
-                    <strong id="riderLng">--</strong>
-                </div>
-
-                <div class="col-4">
-                    <small class="text-muted d-block">Accuracy</small>
-                    <strong id="riderAcc">--</strong>
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
 
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-
-let map = L.map('map').setView([14.5995,120.9842],15);
-
-L.tileLayer(
-'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-{
-    attribution:'© OpenStreetMap'
-}
-).addTo(map);
-
-let marker;
-
-let gpsReady=false;
-
-const submitBtn=document.getElementById('submitBtn');
-
-const confirm=document.getElementById('confirmDelivery');
 
 const gpsDot=document.getElementById('gpsDot');
 
 const gpsPillText=document.getElementById('gpsPillText');
-
-function updateButton(){
-
-    submitBtn.disabled=!(gpsReady && confirm.checked);
-
-}
-
-confirm.addEventListener('change',updateButton);
 
 navigator.geolocation.watchPosition(
 
@@ -627,8 +557,6 @@ function(position){
     let lng=position.coords.longitude;
 
     let acc=Math.round(position.coords.accuracy);
-
-    gpsReady=true;
 
     latitude.value=lat;
 
@@ -642,33 +570,15 @@ function(position){
 
     gpsPillText.innerHTML="GPS ready ("+acc+"m accuracy)";
 
-    if(marker){
-
-        marker.setLatLng([lat,lng]);
-
-    }else{
-
-        marker=L.marker([lat,lng]).addTo(map);
-
-    }
-
-    map.setView([lat,lng],18);
-
-    updateButton();
-
 },
 
 function(){
-
-    gpsReady=false;
 
     gpsStatus.innerHTML="Unable to get GPS";
 
     gpsDot.classList.remove('ready');
 
     gpsPillText.innerHTML="Unable to get GPS";
-
-    updateButton();
 
 },
 
@@ -712,75 +622,6 @@ photos.addEventListener('change',function(){
     });
 
 });
-
-</script>
-<script>
-
-let riderMap = L.map('riderMap').setView([14.5995,120.9842],15);
-
-L.tileLayer(
-'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-{
-    attribution:'© OpenStreetMap'
-}
-).addTo(riderMap);
-
-let riderMarker;
-let riderCircle;
-
-navigator.geolocation.watchPosition(
-
-function(position){
-
-    let lat = position.coords.latitude;
-    let lng = position.coords.longitude;
-    let acc = Math.round(position.coords.accuracy);
-
-    document.getElementById('riderLat').innerText = lat.toFixed(6);
-    document.getElementById('riderLng').innerText = lng.toFixed(6);
-    document.getElementById('riderAcc').innerText = acc + "m";
-
-    if(riderMarker){
-
-        riderMarker.setLatLng([lat,lng]);
-        riderCircle.setLatLng([lat,lng]);
-        riderCircle.setRadius(acc);
-
-    }else{
-
-        riderMarker = L.marker([lat,lng]).addTo(riderMap)
-            .bindPopup("Rider's current location");
-
-        riderCircle = L.circle([lat,lng],{
-            radius: acc,
-            color:'#0d6efd',
-            fillColor:'#0d6efd',
-            fillOpacity:0.15
-        }).addTo(riderMap);
-
-    }
-
-    riderMap.setView([lat,lng],17);
-
-},
-
-function(){
-
-    document.getElementById('riderLat').innerText = "Unavailable";
-    document.getElementById('riderLng').innerText = "Unavailable";
-    document.getElementById('riderAcc').innerText = "--";
-
-},
-
-{
-
-enableHighAccuracy:true,
-maximumAge:0,
-timeout:10000
-
-}
-
-);
 
 </script>
 </body>

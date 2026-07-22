@@ -13,9 +13,6 @@ return new class extends Migration
     {
         Schema::table('package_status', function (Blueprint $table) {
 
-            $table->decimal('latitude',10,7)->nullable();
-
-            $table->decimal('longitude',10,7)->nullable();
 
             $table->integer('accuracy')->nullable();
 

@@ -276,25 +276,16 @@ class DeliveryReceiveController extends Controller
 
                     $remainingToDeduct -= $deductFromRow;
 
-                    // One history row per batch touched, so inventory_id stays accurate
                     InventoryHistory::create([
-
                         'inventory_id' => $row->inventory_id,
-
                         'item_id' => $item->item_id,
-
                         'warehouse_id' => $row->warehouse_id,
-
-                        'change_type' => 'delivered',
-
-                        'quantity' => $deductFromRow,
-
+                        'old_qty' => $row->qty + $deductFromRow,
+                        'new_qty' => $row->qty,
+                        'change_type' => 'stock_out',
                         'changed_by' => auth()->user()->name,
-
                         'remarks' => 'Delivered via DR #' . $delivery->dr_no,
-
                         'changed_at' => now(),
-
                     ]);
                 }
 

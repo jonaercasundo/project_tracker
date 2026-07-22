@@ -474,24 +474,6 @@
         </div>
 
 
-        <div class="card mb-3">
-
-            <div class="card-body">
-
-                <div class="confirm-row">
-
-                    <input
-                        class="form-check-input"
-                        type="checkbox"
-                        id="confirmDelivery">
-
-                </div>
-
-            </div>
-
-        </div>
-
-
         {{-- Fixed action bar keeps the submit button reachable while scrolling --}}
 
         <div class="action-bar">

@@ -301,7 +301,7 @@ class DeliveryReceiveController extends Controller
             DB::commit();
 
             return redirect()
-                ->route('delivery.receive')
+                ->route('delivery.success')
                 ->with('success', 'Package delivered successfully.');
 
         } catch (\Exception $e) {

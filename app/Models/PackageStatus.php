@@ -29,4 +29,12 @@ class PackageStatus extends Model
     {
         return $this->belongsTo(Delivery::class, 'delivery_id', 'delivery_id');
     }
+    public function proofs()
+    {
+        return $this->hasMany(
+            DeliveryProof::class,
+            'package_status_id',
+            'package_status_id'
+        );
+    }
 }

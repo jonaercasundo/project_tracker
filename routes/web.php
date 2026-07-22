@@ -24,6 +24,8 @@ use App\Http\Controllers\InventoryController;
 use App\Models\Project;
 use App\Http\Controllers\ProjectDashboardController;
 use App\Http\Controllers\Warehouse\WarehouseInventoryController;
+use App\Http\Controllers\DeliveryReceiveController;
+
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -354,4 +356,11 @@ Route::middleware(['auth'])->group(function () {
             })->name('transactions');
 
     });
+
+    Route::get('/receive-delivery/{packageStatus}', [DeliveryReceiveController::class, 'show'])
+    ->name('delivery.receive');
+
+    Route::post('/receive-delivery/{packageStatus}',
+        [DeliveryReceiveController::class,'store'])
+        ->name('delivery.receive.store');
 require __DIR__.'/auth.php';

@@ -15,8 +15,11 @@ return new class extends Migration
 
             $table->id();
 
-            $table->foreignId('package_status_id')
-                ->constrained('package_status','package_status_id')
+            $table->integer('package_status_id');
+
+            $table->foreign('package_status_id')
+                ->references('package_status_id')
+                ->on('package_status')
                 ->cascadeOnDelete();
 
             $table->string('photo');

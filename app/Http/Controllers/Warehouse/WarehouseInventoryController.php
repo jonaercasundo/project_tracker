@@ -182,131 +182,221 @@ class WarehouseInventoryController extends Controller
     // Re-validates each package server-side before writing, so a
     // stale client-side staged list can't corrupt inventory.
     // ==========================================================
-    public function saveScan(Request $request)
-    {
-        $request->validate([
-            'warehouse_id'              => 'required|exists:warehouse,warehouse_id',
-            'transaction'               => 'required|in:IN,OUT',
-            'items'                     => 'required|array|min:1',
-            'items.*.package_status_id' => 'required|integer',
-        ]);
+public function saveScan(Request $request)
+{
+    $request->validate([
+        'warehouse_id'              => 'required|exists:warehouse,warehouse_id',
+        'transaction'               => 'required|in:IN,OUT',
+        'items'                     => 'required|array|min:1',
+        'items.*.package_status_id' => 'required|integer',
+    ]);
 
-        $results = [
-            'saved'  => [],
-            'failed' => [],
-        ];
-        $inventoryChanges = [];
-        foreach ($request->items as $item) {
-            try {
-                DB::transaction(function () use ($item, $request, &$results) {
+    $batchNo = 'BATCH-' . now()->format('YmdHis');
 
-                    $status = PackageStatus::with('package.contents')
-                        ->findOrFail($item['package_status_id']);
-                    if (!$status->package) {
-                        throw new \Exception('Package not found.');
+    $results = [
+        'saved'  => [],
+        'failed' => [],
+    ];
+
+    foreach ($request->items as $item) {
+
+        try {
+
+            DB::transaction(function () use (
+                $item,
+                $request,
+                &$results,
+                $batchNo
+            ) {
+
+                $status = PackageStatus::with('package.contents')
+                    ->findOrFail($item['package_status_id']);
+
+
+                if (!$status->package) {
+                    throw new \Exception('Package not found.');
+                }
+
+
+                if ($status->package->contents->isEmpty()) {
+                    throw new \Exception('Package has no contents.');
+                }
+
+
+                if ($request->transaction === 'IN') {
+
+                    if ($status->status === 'warehouse') {
+                        throw new \RuntimeException(
+                            'Already received in warehouse.'
+                        );
                     }
 
-                    if ($status->package->contents->isEmpty()) {
-                        throw new \Exception('Package has no contents.');
+                } else {
+
+                    if ($status->status !== 'warehouse') {
+                        throw new \RuntimeException(
+                            'Package is not inside warehouse.'
+                        );
                     }
+                }
+
+
+                foreach ($status->package->contents as $content) {
+
+
+                    $inventory = Inventory::firstOrNew([
+                        'warehouse_id' => $request->warehouse_id,
+                        'item_id'      => $content->item_id,
+                    ]);
+
+
+                    $oldQty = $inventory->exists 
+                        ? $inventory->qty 
+                        : 0;
+
+
                     if ($request->transaction === 'IN') {
 
-                        if ($status->status === 'warehouse') {
-                            throw new \RuntimeException('Already received in warehouse.');
-                        }
+                        $newQty = $oldQty + $content->qty;
 
                     } else {
 
-                        if ($status->status !== 'warehouse') {
-                            throw new \RuntimeException('Package is not inside the warehouse.');
+
+                        if ($oldQty < $content->qty) {
+
+                            throw new \RuntimeException(
+                                "Insufficient stock for item {$content->item_id}"
+                            );
+
                         }
 
+                        $newQty = $oldQty - $content->qty;
                     }
 
-                    foreach ($status->package->contents as $content) {
 
-                        $inventory = Inventory::firstOrNew([
-                            'warehouse_id' => $request->warehouse_id,
-                            'item_id'      => $content->item_id,
-                        ]);
 
-                        $oldQty = $inventory->exists ? $inventory->qty : 0;
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Prevent duplicate history from Model Observer
+                    |--------------------------------------------------------------------------
+                    */
 
-                        if ($request->transaction === 'IN') {
+                    $inventory->withoutEvents(function () use (
+                        $inventory,
+                        $newQty
+                    ) {
 
-                            $newQty = $oldQty + $content->qty;
-
-                        } else {
-
-                            if ($oldQty < $content->qty) {
-                                throw new \RuntimeException(
-                                    "Insufficient stock for item {$content->item_id}."
-                                );
-                            }
-
-                            $newQty = $oldQty - $content->qty;
-
-                        }
                         $inventory->qty = $newQty;
                         $inventory->inventory_status = 'Approved';
                         $inventory->save();
 
-                        InventoryHistory::create([
-                            'inventory_id' => $inventory->inventory_id,
-                            'item_id'      => $content->item_id,
-                            'warehouse_id' => $request->warehouse_id,
-                            'old_qty'      => $oldQty,
-                            'new_qty'      => $newQty,
-                            'changed_by'   => Auth::user()->name,
-                            'remarks'      => $request->transaction === 'IN'
-                                ? 'Stock In via QR Scanner'
-                                    : 'Stock Out via QR Scanner',
-                            'change_type'  => $request->transaction === 'IN'
-                                ? 'stock_in'
-                                : 'stock_out',
-                        ]);
-                    }
+                    });
 
-                    if ($request->transaction === 'IN') {
 
-                        $status->status = 'warehouse';
-                        $status->remarks = 'Received by Warehouse';
 
-                    } else {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Single Batch History Record
+                    |--------------------------------------------------------------------------
+                    */
 
-                        $status->status = 'released';      // <-- change to your actual status value
-                        $status->remarks = 'Released from Warehouse';
+                    InventoryHistory::create([
 
-                    }
+                        'batch_no'     => $batchNo,
 
-                    $status->save();
+                        'inventory_id' => $inventory->inventory_id,
 
-                    $results['saved'][] = $item['package_status_id'];
-                });
-            } catch (\Throwable $e) {
+                        'item_id'      => $content->item_id,
 
-                Log::error('Warehouse Scan Error', [
-                    'package_status_id' => $item['package_status_id'],
-                    'message' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
+                        'warehouse_id' => $request->warehouse_id,
 
-                $results['failed'][] = [
-                    'package_status_id' => $item['package_status_id'],
-                    'message' => $e->getMessage(),
-                ];
-            }
+                        'old_qty'      => $oldQty,
+
+                        'new_qty'      => $newQty,
+
+                        'changed_by'   => Auth::user()->name,
+
+
+                        'remarks' => $request->transaction === 'IN'
+                            ? 'Stock In via QR Scanner'
+                            : 'Stock Out via QR Scanner',
+
+
+                        'change_type' => $request->transaction === 'IN'
+                            ? 'stock_in'
+                            : 'stock_out',
+
+                    ]);
+
+                }
+
+
+
+                if ($request->transaction === 'IN') {
+
+                    $status->status = 'warehouse';
+                    $status->remarks = 'Received by Warehouse';
+
+                } else {
+
+                    $status->status = 'released';
+                    $status->remarks = 'Released from Warehouse';
+
+                }
+
+
+                $status->save();
+
+
+                $results['saved'][] = $item['package_status_id'];
+
+            });
+
+
+        } catch (\Throwable $e) {
+
+
+            Log::error('Warehouse Scan Error', [
+
+                'package_status_id' => $item['package_status_id'],
+
+                'message' => $e->getMessage(),
+
+                'line' => $e->getLine(),
+
+            ]);
+
+
+            $results['failed'][] = [
+
+                'package_status_id' => $item['package_status_id'],
+
+                'message' => $e->getMessage(),
+
+            ];
+
         }
 
-        return response()->json([
-            'success' => count($results['failed']) === 0,
-            'message' => count($results['saved']) . ' saved, ' . count($results['failed']) . ' failed.',
-            'saved'   => $results['saved'],
-            'failed'  => $results['failed'],
-        ]);
     }
+
+
+    return response()->json([
+
+        'success' => count($results['failed']) === 0,
+
+        'message' => count($results['saved']) .
+            ' saved, ' .
+            count($results['failed']) .
+            ' failed.',
+
+        'batch_no' => $batchNo,
+
+        'saved'   => $results['saved'],
+
+        'failed'  => $results['failed'],
+
+    ]);
+}
 
     // ==========================================================
     // Helper: pull package_status_id out of the scanned QR value.

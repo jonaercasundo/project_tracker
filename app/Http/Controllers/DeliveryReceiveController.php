@@ -220,6 +220,7 @@ public function store(Request $request, $packageStatusId)
         }
 
         $packageStatus->save();
+
         DeliveryHistory::create([
 
             'package_status_id' => $packageStatus->package_status_id,
@@ -236,9 +237,10 @@ public function store(Request $request, $packageStatusId)
 
             'accuracy' => $request->accuracy,
 
-            'distance_from_school' => round($distance,2)
+            'distance_from_school' => round($distance, 2)
 
         ]);
+
         /*
         |--------------------------------------------------------------------------
         | Upload Delivery Photos
@@ -262,12 +264,99 @@ public function store(Request $request, $packageStatusId)
 
         /*
         |--------------------------------------------------------------------------
-        | TODO (Next Part)
+        | Inventory Deduction + Inventory History
         |--------------------------------------------------------------------------
-        | Inventory Deduction
-        | Inventory History
-        | Delivery History
+        | For every item in this package's packing list, deduct the delivered
+        | quantity from the receiving warehouse's approved inventory (oldest
+        | batch first) and log each batch touched in inventory_history with
+        | change_type = 'delivered'.
         */
+
+        $warehouseId = auth()->user()->warehouse_id ?? null;
+
+        $delivery = $packageStatus->delivery;
+
+        $multiplier = 1;
+
+        if (!empty($delivery->package_type)) {
+            preg_match('/\d+/', $delivery->package_type, $matches);
+
+            if (!empty($matches)) {
+                $multiplier = (int) $matches[0];
+            }
+        }
+
+        foreach ($packageStatus->package->contents as $content) {
+
+            $item = $content->item;
+
+            $requiredQty = $this->getRequiredQty(
+                strtolower($item->item_name),
+                $delivery,
+                $content->qty,
+                $multiplier
+            );
+
+            if ($requiredQty <= 0) {
+                continue;
+            }
+
+            // Deduct from approved inventory, oldest batches first (FIFO).
+            // Inventory has no timestamps, so inventory_id (auto-increment)
+            // stands in for "oldest batch first".
+            $remainingToDeduct = $requiredQty;
+
+            $inventoryRows = Inventory::where('warehouse_id', $warehouseId)
+                ->where('item_id', $item->item_id)
+                ->where('inventory_status', 'Approved')
+                ->where('qty', '>', 0)
+                ->orderBy('inventory_id')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($inventoryRows as $row) {
+
+                if ($remainingToDeduct <= 0) {
+                    break;
+                }
+
+                $deductFromRow = min($row->qty, $remainingToDeduct);
+
+                $row->qty -= $deductFromRow;
+                $row->save();
+
+                $remainingToDeduct -= $deductFromRow;
+
+                // One history row per batch touched, so inventory_id stays accurate
+                InventoryHistory::create([
+
+                    'inventory_id' => $row->inventory_id,
+
+                    'item_id' => $item->item_id,
+
+                    'warehouse_id' => $warehouseId,
+
+                    'change_type' => 'delivered',
+
+                    'quantity' => $deductFromRow,
+
+                    'changed_by' => auth()->user()->name,
+
+                    'remarks' => 'Delivered via DR #' . $delivery->dr_no,
+
+                    'changed_at' => now(),
+
+                ]);
+            }
+
+            if ($remainingToDeduct > 0) {
+
+                throw new \Exception(
+                    "Insufficient approved inventory for {$item->item_name} to complete this delivery."
+                );
+
+            }
+        }
 
         DB::commit();
 
@@ -284,24 +373,24 @@ public function store(Request $request, $packageStatusId)
         ]);
     }
 }
-private function calculateDistance($lat1, $lon1, $lat2, $lon2)
-{
-    $earthRadius = 6371000;
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $earthRadius = 6371000;
 
-    $dLat = deg2rad($lat2 - $lat1);
-    $dLon = deg2rad($lon2 - $lon1);
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
 
-    $a = sin($dLat / 2) * sin($dLat / 2)
-        + cos(deg2rad($lat1))
-        * cos(deg2rad($lat2))
-        * sin($dLon / 2)
-        * sin($dLon / 2);
+        $a = sin($dLat / 2) * sin($dLat / 2)
+            + cos(deg2rad($lat1))
+            * cos(deg2rad($lat2))
+            * sin($dLon / 2)
+            * sin($dLon / 2);
 
-    $c = 2 * atan2(
-        sqrt($a),
-        sqrt(1 - $a)
-    );
+        $c = 2 * atan2(
+            sqrt($a),
+            sqrt(1 - $a)
+        );
 
-    return $earthRadius * $c;
-}
+        return $earthRadius * $c;
+    }
 }

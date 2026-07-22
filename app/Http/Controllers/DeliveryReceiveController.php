@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PackageStatus;
 use App\Models\Inventory;
+use App\Models\inventoryHistory;
 use Illuminate\Http\Request;
 use App\Models\DeliveryProof;
 use App\Models\Deliveryhistory;
@@ -127,7 +128,7 @@ public function store(Request $request, $packageStatusId)
     | Prevent Duplicate Delivery
     |--------------------------------------------------------------------------
     */
-    if ($packageStatus->status === 'Delivered') {
+    if ($packageStatus->status === 'delivered') {
         return back()->withErrors([
             'delivery' => 'This package has already been delivered.'
         ]);
@@ -202,7 +203,7 @@ public function store(Request $request, $packageStatusId)
 
     try {
 
-        $packageStatus->status = 'Delivered';
+        $packageStatus->status = 'delivered';
         $packageStatus->latitude = $request->latitude;
         $packageStatus->longitude = $request->longitude;
         $packageStatus->accuracy = $request->accuracy;

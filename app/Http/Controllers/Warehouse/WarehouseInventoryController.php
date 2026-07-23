@@ -186,7 +186,11 @@ public function saveScan(Request $request)
 
 
                 foreach ($status->package->contents as $content) {
-
+                    Log::info('PACKAGE CONTENT', [
+                        'package_status_id' => $item['package_status_id'],
+                        'item_id'           => $content->item_id,
+                        'qty'               => $content->qty,
+                    ]);
 
                     $inventory = Inventory::firstOrNew([
                         'warehouse_id' => $request->warehouse_id,

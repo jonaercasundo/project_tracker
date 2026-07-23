@@ -216,48 +216,13 @@ if ($request->hasFile('photos')) {
 | Inventory History (Delivered Audit Only)
 |--------------------------------------------------------------------------
 | Delivery does NOT deduct inventory.
-| It only records the delivery event.
+| It only inserts a Delivered record into inventory_history.
 |--------------------------------------------------------------------------
 */
 
-$warehouseId = Auth::user()->warehouse_id;
 $batchNo = 'DEL-' . now()->format('YmdHis') . '-' . $packageStatus->package_status_id;
 
-foreach ($packageStatus->package->contents as $content) {
-
-    $item = $content->item;
-
-    $inventoryRecord = Inventory::where('warehouse_id', $warehouseId)
-        ->where('item_id', $item->item_id)
-        ->where('inventory_status', 'Approved')
-        ->latest('inventory_id')
-        ->first();
-
-    // Skip if no inventory exists for this item
-    if (!$inventoryRecord) {
-
-        Log::warning('No inventory record found.', [
-            'warehouse_id' => $warehouseId,
-            'item_id'      => $item->item_id,
-            'package'      => $packageStatus->package_status_id,
-        ]);
-
-        continue;
-    }
-
-    InventoryHistory::create([
-        'inventory_id' => $inventoryRecord->inventory_id,
-        'item_id'      => $item->item_id,
-        'warehouse_id' => $warehouseId,
-        'old_qty'      => $inventoryRecord->qty,
-        'new_qty'      => $inventoryRecord->qty,
-        'batch_no'     => $batchNo,
-        'change_type'  => 'delivered',
-        'changed_by'   => Auth::user()->name,
-        'remarks'      => 'Delivered via DR #' . $packageStatus->delivery->dr_no,
-        'changed_at'   => now(),
-    ]);
-}
+dd($packageStatus->package->contents);
             DB::commit();
 
             return redirect()
@@ -268,11 +233,11 @@ foreach ($packageStatus->package->contents as $content) {
 
             DB::rollBack();
 
-            Log::error($e);
+            Log::error($e->getMessage());
+            Log::error($e->getTraceAsString());
 
-            return back()->withErrors([
-                'error' => $e->getMessage()
-            ]);
+            dd($e->getMessage());
+
         }
     }
 }

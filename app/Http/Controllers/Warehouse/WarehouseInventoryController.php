@@ -127,6 +127,7 @@ class WarehouseInventoryController extends Controller
     // ==========================================================
 public function saveScan(Request $request)
 {
+    Log::info('SAVE REQUEST', $request->all());
     $request->validate([
         'warehouse_id'              => 'required|exists:warehouse,warehouse_id',
         'transaction'               => 'required|in:IN,OUT',

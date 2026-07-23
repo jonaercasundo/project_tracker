@@ -50,7 +50,7 @@
                         class="w-full rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500">
 
                         <option value="">
-                            Select Item
+                            Select Items
                         </option>
 
 

@@ -156,19 +156,29 @@
                             {{ optional($history->warehouse)->warehouse_name }}
                         </td>
 
-                        {{-- Qty Change --}}
+                        @php
+                            $qtyDelta = $history->qty_change;
+                            $deltaSign = $qtyDelta > 0 ? '+' : '';
+                            $deltaClass = $qtyDelta > 0
+                                ? 'text-emerald-600'
+                                : ($qtyDelta < 0 ? 'text-red-600' : 'text-slate-500');
+                        @endphp
+
                         <td class="px-5 py-3.5 whitespace-nowrap">
                             <div class="flex items-center justify-center gap-2 text-xs tabular-nums">
                                 <span class="text-slate-400 font-normal">{{ $history->old_qty }}</span>
+
                                 <svg class="h-3 w-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                                 </svg>
+
                                 <span class="font-semibold text-slate-800">{{ $history->new_qty }}</span>
-                                <span class="text-[11px] {{ $deltaClass }} ml-0.5">
+
+                                <span class="text-[11px] {{ $deltaClass }}">
                                     ({{ $deltaSign }}{{ $qtyDelta }})
                                 </span>
                             </div>
-                        </td>
+                        </td>                       
 
                         {{-- Change Badge --}}
                         <td class="px-5 py-3.5 text-center whitespace-nowrap">

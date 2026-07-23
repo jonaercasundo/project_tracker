@@ -10,7 +10,9 @@ use App\Models\DeliveryProof;
 use App\Models\DeliveryHistory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Auth\AuthManager;
 class DeliveryReceiveController extends Controller
 {
     public function show(Request $request, $packageStatusId)
@@ -46,7 +48,7 @@ class DeliveryReceiveController extends Controller
         */
 
         // Replace this if warehouse_id comes from another source
-        $warehouseId = auth()->user()->warehouse_id ?? null;
+        $warehouseId = Auth::user()->warehouse_id ?? null;
 
         $inventory = [];
 
@@ -165,10 +167,10 @@ class DeliveryReceiveController extends Controller
             $packageStatus->accuracy = $request->accuracy;
             $packageStatus->remarks = $request->remarks;
             $packageStatus->delivered_at = now();
-            $packageStatus->receiver_name = auth()->user()->name;
+            $packageStatus->receiver_name = Auth::user()->name;
 
             if (isset($packageStatus->delivered_by)) {
-                $packageStatus->delivered_by = auth()->id();
+                $packageStatus->delivered_by = Auth::user()->user_id;
             }
 
             $packageStatus->save();
@@ -177,7 +179,7 @@ class DeliveryReceiveController extends Controller
 
                 'package_status_id' => $packageStatus->package_status_id,
 
-                'user_id' => auth()->id(),
+                'user_id' => Auth::user()->user_id,
 
                 'status' => 'delivered',
 
@@ -191,113 +193,71 @@ class DeliveryReceiveController extends Controller
 
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Upload Delivery Photos
-            |--------------------------------------------------------------------------
-            */
-            if ($request->hasFile('photos')) {
+/*
+|--------------------------------------------------------------------------
+| Upload Delivery Photos
+|--------------------------------------------------------------------------
+*/
+if ($request->hasFile('photos')) {
 
-                foreach ($request->file('photos') as $photo) {
+    foreach ($request->file('photos') as $photo) {
 
-                    $path = $photo->store(
-                        'delivery-proofs',
-                        'public'
-                    );
+        $path = $photo->store('delivery-proofs', 'public');
 
-                    DeliveryProof::create([
-                        'package_status_id' => $packageStatus->package_status_id,
-                        'photo'             => $path,
-                    ]);
-                }
-            }
+        DeliveryProof::create([
+            'package_status_id' => $packageStatus->package_status_id,
+            'photo'             => $path,
+        ]);
+    }
+}
 
-            /*
-            |--------------------------------------------------------------------------
-            | Inventory Deduction + Inventory History
-            |--------------------------------------------------------------------------
-            | For every item in this package's packing list, deduct the delivered
-            | quantity from the receiving warehouse's approved inventory (oldest
-            | batch first) and log each batch touched in inventory_history with
-            | change_type = 'delivered'.
-            */
+/*
+|--------------------------------------------------------------------------
+| Inventory History (Delivered Audit Only)
+|--------------------------------------------------------------------------
+| Delivery does NOT deduct inventory.
+| It only records the delivery event.
+|--------------------------------------------------------------------------
+*/
 
-            $warehouseId = auth()->user()->warehouse_id ?? null;
+$warehouseId = Auth::user()->warehouse_id;
+$batchNo = 'DEL-' . now()->format('YmdHis') . '-' . $packageStatus->package_status_id;
 
-            $delivery = $packageStatus->delivery;
+foreach ($packageStatus->package->contents as $content) {
 
-            $multiplier = 1;
+    $item = $content->item;
 
-            if (!empty($delivery->package_type)) {
-                preg_match('/\d+/', $delivery->package_type, $matches);
+    $inventoryRecord = Inventory::where('warehouse_id', $warehouseId)
+        ->where('item_id', $item->item_id)
+        ->where('inventory_status', 'Approved')
+        ->latest('inventory_id')
+        ->first();
 
-                if (!empty($matches)) {
-                    $multiplier = (int) $matches[0];
-                }
-            }
+    // Skip if no inventory exists for this item
+    if (!$inventoryRecord) {
 
-            foreach ($packageStatus->package->contents as $content) {
+        Log::warning('No inventory record found.', [
+            'warehouse_id' => $warehouseId,
+            'item_id'      => $item->item_id,
+            'package'      => $packageStatus->package_status_id,
+        ]);
 
-                $item = $content->item;
+        continue;
+    }
 
-                $requiredQty = $this->getRequiredQty(
-                    strtolower($item->item_name),
-                    $delivery,
-                    $content->qty,
-                    $multiplier
-                );
-
-                if ($requiredQty <= 0) {
-                    continue;
-                }
-
-                // Deduct from approved inventory, oldest batches first (FIFO).
-                // Inventory has no timestamps, so inventory_id (auto-increment)
-                // stands in for "oldest batch first".
-                $remainingToDeduct = $requiredQty;
-
-                $inventoryRows = Inventory::where('item_id', $item->item_id)
-                    ->where('inventory_status', 'Approved')
-                    ->where('qty', '>', 0)
-                    ->orderBy('inventory_id')
-                    ->lockForUpdate()
-                    ->get();
-
-                foreach ($inventoryRows as $row) {
-
-                    if ($remainingToDeduct <= 0) {
-                        break;
-                    }
-
-                    $deductFromRow = min($row->qty, $remainingToDeduct);
-
-                    $row->qty -= $deductFromRow;
-                    $row->save();
-
-                    $remainingToDeduct -= $deductFromRow;
-
-                    InventoryHistory::create([
-                        'inventory_id' => $row->inventory_id,
-                        'item_id' => $item->item_id,
-                        'warehouse_id' => $row->warehouse_id,
-                        'old_qty' => $row->qty + $deductFromRow,
-                        'new_qty' => $row->qty,
-                        'change_type' => 'delivered',
-                        'changed_by' => auth()->user()->name,
-                        'remarks' => 'Delivered via DR #' . $delivery->dr_no,
-                        'changed_at' => now(),
-                    ]);
-                }
-
-                if ($remainingToDeduct > 0) {
-
-                    throw new \Exception(
-                        "Insufficient approved inventory for {$item->item_name} to complete this delivery."
-                    );
-
-                }
-            }
-
+    InventoryHistory::create([
+        'inventory_id' => $inventoryRecord->inventory_id,
+        'item_id'      => $item->item_id,
+        'warehouse_id' => $warehouseId,
+        'old_qty'      => $inventoryRecord->qty,
+        'new_qty'      => $inventoryRecord->qty,
+        'batch_no'     => $batchNo,
+        'change_type'  => 'delivered',
+        'changed_by'   => Auth::user()->name,
+        'remarks'      => 'Delivered via DR #' . $packageStatus->delivery->dr_no,
+        'changed_at'   => now(),
+    ]);
+}
             DB::commit();
 
             return redirect()
@@ -307,6 +267,8 @@ class DeliveryReceiveController extends Controller
         } catch (\Exception $e) {
 
             DB::rollBack();
+
+            Log::error($e);
 
             return back()->withErrors([
                 'error' => $e->getMessage()

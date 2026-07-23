@@ -99,57 +99,40 @@
                     </select>
                 </div>
             </div>
-            {{-- Delivery Address --}}
-            <div class="bf-field mt-3">
-                <label class="bf-label" for="delivery_address_{{ $index }}">
-                    <i class="ti ti-home"></i> Address
-                </label>
-
-                <textarea
-                    id="delivery_address_{{ $index }}"
-                    name="lots[{{ $index }}][delivery_address]"
-                    class="bf-input auto-expand"
-                    rows="2"
-                    placeholder="House No., Street, Subdivision, Landmark, etc.">{{ old("lots.$index.delivery_address", $lotData['delivery_address'] ?? '') }}</textarea>
-            </div>
         </div>
 
         {{-- Items table --}}
-        <div class="bf-items" id="items-{{ $index }}">
 
-            <div class="bf-items-head">
-                <span>Item description</span>
-                <span>Unit</span>
-                <span>Qty</span>
-                <span>Total Amount (PHP)</span>
-                <span>Brand / Specs</span>
-                <span>Remarks</span>
-                <span></span>
-            </div>
+        <div class="bf-addresses" id="addresses-{{ $index }}">
 
-            @foreach($items as $itemIndex => $item)
-                @include('operation.bidding.partials._items', [
-                    'lotIndex'  => $index,
-                    'itemIndex' => $itemIndex,
-                    'item'      => $item,
+            @foreach($lotData['addresses'] ?? [[]] as $addressIndex => $address)
+
+                @include('operation.bidding.partials._address', [
+                    'lotIndex' => $index,
+                    'addressIndex' => $addressIndex,
+                    'address' => $address
                 ])
+
             @endforeach
 
         </div>
+
+
+        <button type="button"
+                class="bf-btn-add-address"
+                onclick="addAddress(this, '{{ $index }}')">
+            <i class="ti ti-map-pin-plus"></i>
+            Add Delivery Address
+        </button>
+
+
         <div class="bf-items-total">
-            <span>Total Amount</span>
+            <span>Lot Total Amount</span>
 
             <strong>
                 ₱ <span class="lot-grand-total">0.00</span>
             </strong>
         </div>
-        {{-- Add item --}}
-        <button type="button"
-                class="bf-btn-add-item"
-                onclick="addItem(this, '{{ $index }}')">
-            <i class="ti ti-row-insert-bottom" aria-hidden="true"></i>
-            Add item
-        </button>
 
     </div>
 

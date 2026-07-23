@@ -27,19 +27,17 @@ document.getElementById('addLot')?.addEventListener('click', () => {
     // wire up the "add item" button inside the freshly cloned lot
 
 });
-document.addEventListener('click', function (e) {
+document.addEventListener('click', function(e){
 
-    const btn = e.target.closest('.bf-btn-add-item');
+    const btn = e.target.closest('.bf-btn-add-keystage');
 
-    if (!btn) return;
+    if(!btn) return;
 
-    const lot = btn.closest('.bf-lot');
-
-    addItem(btn, lot.dataset.lotIndex);
+    addKeystage(btn);
 
 });
 /* ── Add Item Row ─────────────────────────────────────────────── */
-function addItem(btn, lotIndex) {
+window.addItem = function(btn, lotIndex) {
     const template = document.getElementById('item-template');
     if (!template) return;
 
@@ -349,6 +347,54 @@ async function loadBarangays(citySelect) {
         resetSelect(barangay, 'Select barangay');
     }
 }
+window.addKeystage = function(button) {
+
+    let lotIndex = button.dataset.lot;
+    let addressIndex = button.dataset.address;
+
+    let container = document.querySelector(
+        `#keystages-${lotIndex}-${addressIndex}`
+    );
+
+
+    if (!container) {
+        console.error("Keystage container not found");
+        return;
+    }
+
+
+    let stageIndex = container.children.length;
+
+
+    let html = `
+        <div class="bf-keystage">
+
+            <input type="text"
+                class="bf-input"
+                name="lots[${lotIndex}][addresses][${addressIndex}][keystages][${stageIndex}][name]"
+                placeholder="Key Stage Name">
+
+
+            <div class="bf-items"
+                id="items-${lotIndex}-${addressIndex}-${stageIndex}">
+            </div>
+
+
+            <button type="button"
+                class="bf-btn-add-item">
+                Add Item
+            </button>
+
+        </div>
+    `;
+
+
+    container.insertAdjacentHTML(
+        'beforeend',
+        html
+    );
+
+};
 document.addEventListener('change', function (e) {
 
     if (!e.target.matches('.item-select')) return;
@@ -372,5 +418,53 @@ document.addEventListener('change', function (e) {
         costInput.value = option.dataset.price || '';
         costInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
+
+});
+window.addAddress = function(button, lotIndex) {
+
+    const template = document.getElementById('address-template');
+
+    if (!template) {
+        console.error('Address template not found');
+        return;
+    }
+
+
+    const container = document.querySelector(
+        `#addresses-${lotIndex}`
+    );
+
+
+    if (!container) {
+        console.error('Address container not found');
+        return;
+    }
+
+
+    const addressIndex = container.children.length;
+
+
+    const html = template.innerHTML
+        .replaceAll('__LOTINDEX__', lotIndex)
+        .replaceAll('__ADDRESSINDEX__', addressIndex);
+
+
+    const wrapper = document.createElement('div');
+
+    wrapper.innerHTML = html.trim();
+
+
+    container.appendChild(
+        wrapper.firstElementChild
+    );
+
+};
+document.addEventListener('click', function(e){
+
+    const btn = e.target.closest('.bf-btn-add-keystage');
+
+    if(!btn) return;
+
+    addKeystage(btn);
 
 });

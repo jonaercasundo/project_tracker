@@ -317,7 +317,6 @@ td,th{
 
             <tr>
 
-
                 @foreach($chunk as $status)
                     <td class="qr">
                         @if(isset($qrCodes[$status->package_status_id]))

@@ -54,6 +54,8 @@
                 <option value="insert" {{ request('change_type') == 'insert' ? 'selected' : '' }}>Insert</option>
                 <option value="update" {{ request('change_type') == 'update' ? 'selected' : '' }}>Update</option>
                 <option value="delete" {{ request('change_type') == 'delete' ? 'selected' : '' }}>Delete</option>
+                <option value="stock_in" {{ request('change_type') == 'stock_in' ? 'selected' : '' }}>Stock In</option>
+                <option value="stock_out" {{ request('change_type') == 'stock_out' ? 'selected' : '' }}>Stock Out</option>
             </select>
 
             {{-- Warehouse --}}
@@ -104,6 +106,7 @@
                 <thead class="bg-slate-50/70 backdrop-blur sticky top-0 z-10 border-b border-slate-100">
                     <tr>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date</th>
+                        <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Batch No.</th>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Item</th>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Warehouse</th>
                         <th class="px-5 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">Qty Change</th>
@@ -119,6 +122,9 @@
                         $changeStyles = match($history->change_type) {
                             'insert' => ['bg-emerald-50 text-emerald-700 border border-emerald-200/50', 'bg-emerald-500', 'Insert'],
                             'update' => ['bg-blue-50 text-blue-700 border border-blue-200/50', 'bg-blue-500', 'Update'],
+                            'stock_in' => ['bg-green-50 text-green-700 border border-green-200/50', 'bg-green-500', 'Stock In'],
+                            'stock_out' => ['bg-red-50 text-red-700 border border-red-200/50', 'bg-red-500', 'Stock Out'],
+                            'delivered' => ['bg-purple-50 text-purple-700 border border-purple-200/50', 'bg-purple-500', 'Delivered'],
                             default  => ['bg-rose-50 text-rose-700 border border-rose-200/50', 'bg-rose-500', 'Delete'],
                         };
                         $qtyDelta = (int) $history->new_qty - (int) $history->old_qty;
@@ -134,6 +140,11 @@
                                 {{ \Carbon\Carbon::parse($history->changed_at)->format('h:i A') }}
                             </span>
                         </td>
+                        {{-- batch no --}}
+                        <td class="px-5 py-3.5 text-xs text-slate-700 whitespace-nowrap">
+                            <span class="font-medium">{{ $history->batch_no ?? 'Individual' }}</span>
+                        </td>
+                        </td>
 
                         {{-- Item --}}
                         <td class="px-5 py-3.5 text-xs font-semibold text-slate-900 tracking-tight">
@@ -145,19 +156,29 @@
                             {{ optional($history->warehouse)->warehouse_name }}
                         </td>
 
-                        {{-- Qty Change --}}
+                        @php
+                            $qtyDelta = $history->qty_change;
+                            $deltaSign = $qtyDelta > 0 ? '+' : '';
+                            $deltaClass = $qtyDelta > 0
+                                ? 'text-emerald-600'
+                                : ($qtyDelta < 0 ? 'text-red-600' : 'text-slate-500');
+                        @endphp
+
                         <td class="px-5 py-3.5 whitespace-nowrap">
                             <div class="flex items-center justify-center gap-2 text-xs tabular-nums">
                                 <span class="text-slate-400 font-normal">{{ $history->old_qty }}</span>
+
                                 <svg class="h-3 w-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                                 </svg>
+
                                 <span class="font-semibold text-slate-800">{{ $history->new_qty }}</span>
-                                <span class="text-[11px] {{ $deltaClass }} ml-0.5">
+
+                                <span class="text-[11px] {{ $deltaClass }}">
                                     ({{ $deltaSign }}{{ $qtyDelta }})
                                 </span>
                             </div>
-                        </td>
+                        </td>                       
 
                         {{-- Change Badge --}}
                         <td class="px-5 py-3.5 text-center whitespace-nowrap">

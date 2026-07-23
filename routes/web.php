@@ -24,6 +24,8 @@ use App\Http\Controllers\InventoryController;
 use App\Models\Project;
 use App\Http\Controllers\ProjectDashboardController;
 use App\Http\Controllers\ITinventoryController;
+use App\Http\Controllers\Warehouse\WarehouseInventoryController;
+use App\Http\Controllers\DeliveryReceiveController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -316,4 +318,71 @@ Route::middleware(['auth'])->group(function () {
     });
     Route::get('/it.assets/{asset}', [ITinventoryController::class, 'show'])->name('it.asset.show');
 
+    /*
+    |--------------------------------------------------------------------------
+    | WAREHOUSE ROUTES
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['role:Warehouse_officer'])
+        ->prefix('warehouse')
+        ->name('warehouse.')
+        ->group(function () {
+            Route::post('/warehouse/inventory/scan', [WarehouseInventoryController::class, 'scan'])
+                ->name('inventory.scan');
+
+            Route::post('/warehouse/inventory/scan/validate', [WarehouseInventoryController::class, 'validateScan'])
+                ->name('inventory.scan.validate');
+
+            Route::post('/warehouse/inventory/scan/save', [WarehouseInventoryController::class, 'saveScan'])
+                ->name('inventory.scan.save');
+            Route::get('/dashboard', [WarehouseInventoryController::class, 'scanner'])
+            ->name('dashboard');
+            
+            Route::get('/packages', function () {
+                return view('operation.warehouse.packages.index');
+            })->name('packages.index');
+
+            Route::get('/categories', function () {
+                return view('operation.warehouse.categories.index');
+            })->name('categories.index');
+
+            Route::get('/adjustments', function () {
+                return view('operation.warehouse.adjustments.index');
+            })->name('adjustments.index');
+
+            Route::get('/stock-in', function () {
+                return view('operation.warehouse.stock-in.index');
+            })->name('stock-in');
+
+            Route::get('/stock-out', function () {
+                return view('operation.warehouse.stock-out.index');
+            })->name('stock-out');
+
+            Route::get('/transfer', function () {
+                return view('operation.warehouse.transfer.index');
+            })->name('transfer');
+
+            Route::get('/returns', function () {
+                return view('operation.warehouse.returns.index');
+            })->name('returns');
+
+            Route::get('/history', function () {
+                return view('operation.warehouse.history.index');
+            })->name('history');
+
+            Route::get('/transactions', function () {
+                return view('operation.warehouse.transactions.index');
+            })->name('transactions');
+
+    });
+
+    Route::get('/receive-delivery/{packageStatus}', [DeliveryReceiveController::class, 'show'])
+    ->name('delivery.receive');
+
+    Route::post('/receive-delivery/{packageStatus}',
+        [DeliveryReceiveController::class,'store'])
+        ->name('delivery.receive.store');
+    Route::get('/delivery-success', function () {
+        return view('operation.delivery.success');
+        })->name('delivery.success');
 require __DIR__.'/auth.php';

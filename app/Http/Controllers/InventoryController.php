@@ -221,22 +221,22 @@ public function summary(Request $request)
 public function history(Request $request)
 {
     $query = InventoryHistory::query()
-        ->select([
-            DB::raw('IFNULL(batch_no, CONCAT("IND-", id)) as batch_key'),
-            DB::raw('MAX(id) as id'),
-            DB::raw('MAX(batch_no) as batch_no'),
-            DB::raw('MAX(item_id) as item_id'),
-            DB::raw('MAX(warehouse_id) as warehouse_id'),
-            DB::raw('MAX(change_type) as change_type'),
-            DB::raw('MAX(changed_by) as changed_by'),
-            DB::raw('MAX(remarks) as remarks'),
-            DB::raw('MAX(changed_at) as changed_at'),
-            DB::raw('SUM(quantity_change) as quantity_change'),
-        ])
-        ->with([
-            'item',
-            'warehouse',
-        ]);
+    ->select([
+        DB::raw('IFNULL(batch_no, CONCAT("IND-", history_id)) as batch_key'),
+        DB::raw('MAX(history_id) as history_id'),
+        DB::raw('MAX(batch_no) as batch_no'),
+        DB::raw('MAX(item_id) as item_id'),
+        DB::raw('MAX(warehouse_id) as warehouse_id'),
+        DB::raw('MAX(change_type) as change_type'),
+        DB::raw('MAX(changed_by) as changed_by'),
+        DB::raw('MAX(remarks) as remarks'),
+        DB::raw('MAX(changed_at) as changed_at'),
+
+        DB::raw('MIN(old_qty) as old_qty'),
+        DB::raw('MAX(new_qty) as new_qty'),
+        DB::raw('(MAX(new_qty) - MIN(old_qty)) as qty_change'),
+    ])
+    ->groupBy(DB::raw('IFNULL(batch_no, CONCAT("IND-", history_id))'));
 
     // Search
     if ($request->filled('search')) {

@@ -220,84 +220,64 @@ public function summary(Request $request)
 }
 public function history(Request $request)
 {
-    $query = InventoryHistory::with([
-        'item',
-        'warehouse'
-    ]);
+    $query = InventoryHistory::query()
+        ->select([
+            DB::raw('IFNULL(batch_no, CONCAT("IND-", id)) as batch_key'),
+            DB::raw('MAX(id) as id'),
+            DB::raw('MAX(batch_no) as batch_no'),
+            DB::raw('MAX(item_id) as item_id'),
+            DB::raw('MAX(warehouse_id) as warehouse_id'),
+            DB::raw('MAX(change_type) as change_type'),
+            DB::raw('MAX(changed_by) as changed_by'),
+            DB::raw('MAX(remarks) as remarks'),
+            DB::raw('MAX(changed_at) as changed_at'),
+            DB::raw('SUM(quantity_change) as quantity_change'),
+        ])
+        ->with([
+            'item',
+            'warehouse',
+        ]);
 
     // Search
     if ($request->filled('search')) {
-
         $search = $request->search;
 
         $query->where(function ($q) use ($search) {
-
             $q->where('changed_by', 'like', "%{$search}%")
               ->orWhere('remarks', 'like', "%{$search}%")
               ->orWhereHas('item', function ($item) use ($search) {
-
-                    $item->where('item_name', 'like', "%{$search}%");
-
+                  $item->where('item_name', 'like', "%{$search}%");
               });
-
         });
     }
 
-
-    // Change Type Filter
+    // Change Type
     if ($request->filled('change_type')) {
-
-        $query->where(
-            'change_type',
-            $request->change_type
-        );
-
+        $query->where('change_type', $request->change_type);
     }
 
-
-    // Warehouse Filter
+    // Warehouse
     if ($request->filled('warehouse_id')) {
-
-        $query->where(
-            'warehouse_id',
-            $request->warehouse_id
-        );
-
+        $query->where('warehouse_id', $request->warehouse_id);
     }
 
-
-    // Date Filter
+    // Date From
     if ($request->filled('date_from')) {
-
-        $query->whereDate(
-            'changed_at',
-            '>=',
-            $request->date_from
-        );
-
+        $query->whereDate('changed_at', '>=', $request->date_from);
     }
 
-
+    // Date To
     if ($request->filled('date_to')) {
-
-        $query->whereDate(
-            'changed_at',
-            '<=',
-            $request->date_to
-        );
-
+        $query->whereDate('changed_at', '<=', $request->date_to);
     }
-
 
     $histories = $query
-        ->orderByDesc('changed_at')
+        ->groupBy(DB::raw('IFNULL(batch_no, CONCAT("IND-", id))'))
+        ->orderByDesc(DB::raw('MAX(changed_at)'))
         ->paginate(50)
         ->withQueryString();
 
-
-    $warehouses = \App\Models\Warehouse::orderBy('warehouse_name')
-        ->get();
-
+    $warehouses = Warehouse::orderBy('warehouse_name')->get();
 
     return view('inventory.history', compact(
         'histories',

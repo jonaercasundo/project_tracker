@@ -106,6 +106,7 @@
                 <thead class="bg-slate-50/70 backdrop-blur sticky top-0 z-10 border-b border-slate-100">
                     <tr>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date</th>
+                        <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Batch No.</th>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Item</th>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Warehouse</th>
                         <th class="px-5 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">Qty Change</th>
@@ -138,6 +139,11 @@
                             <span class="block text-[10px] font-mono text-slate-400 mt-0.5">
                                 {{ \Carbon\Carbon::parse($history->changed_at)->format('h:i A') }}
                             </span>
+                        </td>
+                        {{-- batch no --}}
+                        <td class="px-5 py-3.5 text-xs text-slate-700 whitespace-nowrap">
+                            <span class="font-medium">{{ $history->batch_no ?? 'Individual' }}</span>
+                        </td>
                         </td>
 
                         {{-- Item --}}

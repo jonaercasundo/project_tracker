@@ -236,7 +236,11 @@ public function history(Request $request)
         DB::raw('MAX(new_qty) as new_qty'),
         DB::raw('(MAX(new_qty) - MIN(old_qty)) as qty_change'),
     ])
-    ->groupBy(DB::raw('IFNULL(batch_no, CONCAT("IND-", history_id))'));
+    ->groupBy(DB::raw('IFNULL(batch_no, CONCAT("IND-", history_id))'))
+    ->with([
+        'item',
+        'warehouse'
+    ]);
 
     // Search
     if ($request->filled('search')) {
@@ -272,7 +276,6 @@ public function history(Request $request)
     }
 
     $histories = $query
-        ->groupBy(DB::raw('IFNULL(batch_no, CONCAT("IND-", id))'))
         ->orderByDesc(DB::raw('MAX(changed_at)'))
         ->paginate(50)
         ->withQueryString();

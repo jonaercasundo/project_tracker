@@ -10,6 +10,7 @@ use Endroid\QrCode\Writer\PngWriter;
 use App\Models\Delivery;
 use App\Models\ARSetting;
 use App\Models\PackageStatus;
+use Illuminate\Support\Facades\Auth;
 
 class DeliveryController extends Controller
 {
@@ -371,7 +372,7 @@ class DeliveryController extends Controller
         return Pdf::loadView('deliveries.ar-layout', [
             'deliveries' => $deliveries,
             'qrCodes'    => $qrCodes,
-            'signerName' => auth()->user()?->name ?? 'Authorized Representative',
+            'signerName' => Auth::user()?->name ?? 'Authorized Representative',
         ])
         ->setPaper('legal', 'portrait')
         ->stream('deliveries-batch.pdf');

@@ -120,7 +120,8 @@ class DeliveryReceiveController extends Controller
 
 public function store(Request $request, $packageStatusId)
 {
-    $packageStatus = PackageStatus::with('delivery')->findOrFail($packageStatusId);
+    $packageStatus = PackageStatus::with('delivery')
+        ->findOrFail($packageStatusId);
 
     if ($packageStatus->status === 'delivered') {
         return back()->withErrors([
@@ -139,36 +140,43 @@ public function store(Request $request, $packageStatusId)
         $packageStatus->status = 'delivered';
         $packageStatus->remarks = $request->remarks;
         $packageStatus->delivered_at = now();
-        $packageStatus->receiver_name = Auth::user()->name;
 
-        if (isset($packageStatus->delivered_by)) {
-            $packageStatus->delivered_by = Auth::id();
-        }
+        // No Auth dependency
+        $packageStatus->receiver_name = 'Receiver';
+
+        // No Auth dependency
+        $packageStatus->delivered_by = null;
 
         $packageStatus->save();
 
+
         DeliveryHistory::create([
             'package_status_id' => $packageStatus->package_status_id,
-            'user_id'           => Auth::id(),
+            'user_id'           => null,
             'status'            => 'delivered',
             'remarks'           => $request->remarks,
         ]);
+
 
         DB::commit();
 
         return redirect()
             ->route('delivery.success')
-            ->with('success', 'Package delivered successfully.');
+            ->with('success','Package delivered successfully.');
+
 
     } catch (\Exception $e) {
 
         DB::rollBack();
 
-        Log::error($e->getMessage());
-        Log::error($e->getTraceAsString());
+        Log::error('Delivery Receive Failed', [
+            'message'=>$e->getMessage(),
+            'line'=>$e->getLine(),
+            'file'=>$e->getFile(),
+        ]);
 
         return back()->withErrors([
-            'error' => $e->getMessage()
+            'error'=>$e->getMessage()
         ]);
     }
 }

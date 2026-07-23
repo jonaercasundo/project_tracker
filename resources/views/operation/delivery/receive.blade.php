@@ -422,9 +422,6 @@
 
         @csrf
 
-        <input type="hidden" name="latitude" id="latitude">
-        <input type="hidden" name="longitude" id="longitude">
-        <input type="hidden" name="accuracy" id="accuracy">
 
         <div class="card mb-3">
 
@@ -495,58 +492,11 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-
-const submitBtn=document.getElementById('submitBtn');
-
-const deliveryForm=document.getElementById('deliveryForm');
-
-deliveryForm.addEventListener('submit', function(e){
-
-    e.preventDefault();
-
-    submitBtn.disabled=true;
-
-    submitBtn.textContent='Getting location...';
-
-    navigator.geolocation.getCurrentPosition(
-
-        function(position){
-
-            latitude.value=position.coords.latitude;
-
-            longitude.value=position.coords.longitude;
-
-            accuracy.value=Math.round(position.coords.accuracy);
-
-            submitBtn.textContent='Submitting...';
-
-            deliveryForm.submit();
-
-        },
-
-        function(){
-
-            // Could not get a location fix - submit anyway, fields stay empty
-            submitBtn.textContent='Submitting...';
-
-            deliveryForm.submit();
-
-        },
-
-        {
-
-            enableHighAccuracy:true,
-
-            timeout:8000,
-
-            maximumAge:0
-
-        }
-
-    );
-
-});
-
+    document.getElementById('deliveryForm').addEventListener('submit', function () {
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = 'Submitting...';
+    });
 </script>
 <script>
 

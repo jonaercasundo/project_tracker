@@ -118,126 +118,58 @@ class DeliveryReceiveController extends Controller
         return $defaultQty * $multiplier;
     }
 
-    public function store(Request $request, $packageStatusId)
-    {
-        // Load package with school relationship
-        $packageStatus = PackageStatus::with([
-            'delivery.school',
-            'package.contents.item'
-        ])->findOrFail($packageStatusId);
+public function store(Request $request, $packageStatusId)
+{
+    $packageStatus = PackageStatus::with('delivery')->findOrFail($packageStatusId);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Prevent Duplicate Delivery
-        |--------------------------------------------------------------------------
-        */
-        if ($packageStatus->status === 'delivered') {
-            return back()->withErrors([
-                'delivery' => 'This package has already been delivered.'
-            ]);
+    if ($packageStatus->status === 'delivered') {
+        return back()->withErrors([
+            'delivery' => 'This package has already been delivered.'
+        ]);
+    }
+
+    $request->validate([
+        'remarks' => 'nullable|string|max:500',
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+
+        $packageStatus->status = 'delivered';
+        $packageStatus->remarks = $request->remarks;
+        $packageStatus->delivered_at = now();
+        $packageStatus->receiver_name = Auth::user()->name;
+
+        if (isset($packageStatus->delivered_by)) {
+            $packageStatus->delivered_by = Auth::id();
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Validate Request
-        |--------------------------------------------------------------------------
-        | Location fields are captured for the record only - they never
-        | block submission, so they're nullable rather than required.
-        */
-        $request->validate([
-            'latitude'   => 'nullable|numeric',
-            'longitude'  => 'nullable|numeric',
-            'accuracy'   => 'nullable|numeric',
-            'photos.*'   => 'nullable|image|mimes:jpg,jpeg,png|max:10240',
-            'remarks'    => 'nullable|string|max:500',
+        $packageStatus->save();
+
+        DeliveryHistory::create([
+            'package_status_id' => $packageStatus->package_status_id,
+            'user_id'           => Auth::id(),
+            'status'            => 'delivered',
+            'remarks'           => $request->remarks,
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Save Delivery
-        |--------------------------------------------------------------------------
-        */
-        DB::beginTransaction();
+        DB::commit();
 
-        try {
+        return redirect()
+            ->route('delivery.success')
+            ->with('success', 'Package delivered successfully.');
 
-            $packageStatus->status = 'delivered';
-            $packageStatus->latitude = $request->latitude;
-            $packageStatus->longitude = $request->longitude;
-            $packageStatus->accuracy = $request->accuracy;
-            $packageStatus->remarks = $request->remarks;
-            $packageStatus->delivered_at = now();
-            $packageStatus->receiver_name = Auth::user()->name;
+    } catch (\Exception $e) {
 
-            if (isset($packageStatus->delivered_by)) {
-                $packageStatus->delivered_by = Auth::user()->user_id;
-            }
+        DB::rollBack();
 
-            $packageStatus->save();
+        Log::error($e->getMessage());
+        Log::error($e->getTraceAsString());
 
-            DeliveryHistory::create([
-
-                'package_status_id' => $packageStatus->package_status_id,
-
-                'user_id' => Auth::user()->user_id,
-
-                'status' => 'delivered',
-
-                'remarks' => $request->remarks,
-
-                'latitude' => $request->latitude,
-
-                'longitude' => $request->longitude,
-
-                'accuracy' => $request->accuracy,
-
-            ]);
-
-/*
-|--------------------------------------------------------------------------
-| Upload Delivery Photos
-|--------------------------------------------------------------------------
-*/
-if ($request->hasFile('photos')) {
-
-    foreach ($request->file('photos') as $photo) {
-
-        $path = $photo->store('delivery-proofs', 'public');
-
-        DeliveryProof::create([
-            'package_status_id' => $packageStatus->package_status_id,
-            'photo'             => $path,
+        return back()->withErrors([
+            'error' => $e->getMessage()
         ]);
     }
 }
-
-/*
-|--------------------------------------------------------------------------
-| Inventory History (Delivered Audit Only)
-|--------------------------------------------------------------------------
-| Delivery does NOT deduct inventory.
-| It only inserts a Delivered record into inventory_history.
-|--------------------------------------------------------------------------
-*/
-
-$batchNo = 'DEL-' . now()->format('YmdHis') . '-' . $packageStatus->package_status_id;
-
-dd($packageStatus->package->contents);
-            DB::commit();
-
-            return redirect()
-                ->route('delivery.success')
-                ->with('success', 'Package delivered successfully.');
-
-        } catch (\Exception $e) {
-
-            DB::rollBack();
-
-            Log::error($e->getMessage());
-            Log::error($e->getTraceAsString());
-
-            dd($e->getMessage());
-
-        }
-    }
 }

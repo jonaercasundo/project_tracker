@@ -23,6 +23,7 @@ use App\Http\Controllers\Finance_Item;
 use App\Http\Controllers\InventoryController;
 use App\Models\Project;
 use App\Http\Controllers\ProjectDashboardController;
+use App\Http\Controllers\ITinventoryController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -294,4 +295,25 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/barangays', [LocationController::class, 'barangays']);
     });
     Route::get('/crawl', [ActionCrawlerController::class, 'crawl']);
+
+
+        /*
+    |--------------------------------------------------------------------------
+    | ADMIN ROUTES
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['role:IT'])->group(function () {
+        
+        Route::get('/it_dashboard', function () {
+            return view('it.dashboard');
+        })->name('it.dashboard');
+        Route::get('/it.assets/create', [ITinventoryController::class, 'create'])->name('it.asset.create'); 
+        Route::get('/it.assets', [ITinventoryController::class, 'index'])->name('it.asset.index');
+        Route::post('/it.assets', [ITinventoryController::class, 'store'])->name('it.asset.store');        
+        Route::get('/it.assets/{asset}/edit', [ITinventoryController::class, 'edit'])->name('it.asset.edit');
+        Route::put('/it.assets/{asset}', [ITinventoryController::class, 'update'])->name('it.asset.update');
+        Route::delete('/it.assets/{asset}', [ITinventoryController::class, 'destroy'])->name('it.asset.destroy');
+    });
+    Route::get('/it.assets/{asset}', [ITinventoryController::class, 'show'])->name('it.asset.show');
+
 require __DIR__.'/auth.php';

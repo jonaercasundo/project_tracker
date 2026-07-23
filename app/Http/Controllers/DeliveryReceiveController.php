@@ -222,30 +222,7 @@ if ($request->hasFile('photos')) {
 
 $batchNo = 'DEL-' . now()->format('YmdHis') . '-' . $packageStatus->package_status_id;
 
-foreach ($packageStatus->package->contents as $content) {
-
-    // Find any inventory record for this item
-    $inventoryRecord = Inventory::where('item_id', $content->item_id)
-        ->first();
-
-    // Skip if none exists
-    if (!$inventoryRecord) {
-        continue;
-    }
-
-    InventoryHistory::create([
-        'inventory_id' => $inventoryRecord->inventory_id,
-        'item_id'      => $content->item_id,
-        'warehouse_id' => $inventoryRecord->warehouse_id,
-        'old_qty'      => $inventoryRecord->qty,
-        'new_qty'      => $inventoryRecord->qty,
-        'batch_no'     => $batchNo,
-        'change_type'  => 'delivered',
-        'changed_by'   => Auth::user()->name,
-        'remarks'      => 'Delivered via DR #' . $packageStatus->delivery->dr_no,
-        'changed_at'   => now(),
-    ]);
-}
+dd($packageStatus->package->contents);
             DB::commit();
 
             return redirect()

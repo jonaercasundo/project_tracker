@@ -6,11 +6,23 @@
                 <p class="text-sm text-slate-500">Track stock movement, outbound activity, and delivered packages at a glance.</p>
             </div>
             <a href="{{ route('warehouse.stock-out') }}" class="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-                Open Scanner
+                Stock Out Scanner
             </a>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-3">
+        <div class="grid gap-4 md:grid-cols-4">
+            <div class="rounded-2xl border border-violet-100 bg-violet-50 p-5 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-violet-700">Pending</p>
+                        <h2 class="mt-2 text-3xl font-extrabold text-violet-800">{{ $pendingCount ?? 0 }}</h2>
+                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-violet-600">
+                        ⏳
+                    </div>
+                </div>
+            </div>
+
             <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
                 <div class="flex items-center justify-between">
                     <div>

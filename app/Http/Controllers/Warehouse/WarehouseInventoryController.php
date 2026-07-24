@@ -28,11 +28,13 @@ class WarehouseInventoryController extends Controller
 
     public function dashboard()
     {
+        $pendingCount = \App\Models\Project::where('status', 'Pending')->count();
         $stockInCount = InventoryHistory::where('change_type', 'stock_in')->count();
         $stockOutCount = InventoryHistory::where('change_type', 'stock_out')->count();
         $deliveredCount = PackageStatus::where('status', 'delivered')->count();
 
         return view('operation.warehouse.dashboard', compact(
+            'pendingCount',
             'stockInCount',
             'stockOutCount',
             'deliveredCount'

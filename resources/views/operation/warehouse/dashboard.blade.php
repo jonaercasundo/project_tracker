@@ -304,7 +304,7 @@
 
         });
         // ============================================================
-        // STEP 3 — Select Scan Type
+        // STEP 2 — Select Scan Type
         // ============================================================
         document.getElementById('btnBackToStep1').addEventListener('click', () => {
 
@@ -316,8 +316,7 @@
             currentMode.classList.add('hidden');
 
             step2.classList.add('hidden');
-            step1.classList.remove('hidden');
-
+            step3.classList.remove('hidden');
         });
 
         document.getElementById('btnPackage').addEventListener('click', () => selectScanType('PACKAGE', '📦 Package'));

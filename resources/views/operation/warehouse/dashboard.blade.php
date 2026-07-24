@@ -313,6 +313,7 @@
 
             warehouseId = warehouseSelect.value;
 
+            step1.classList.add('hidden');
             step2.classList.remove('hidden');
 
         });

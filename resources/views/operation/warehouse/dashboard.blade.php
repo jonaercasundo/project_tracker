@@ -316,7 +316,8 @@
             currentMode.classList.add('hidden');
 
             step2.classList.add('hidden');
-            step3.classList.remove('hidden');
+            step1.classList.remove('hidden');
+
         });
 
         document.getElementById('btnPackage').addEventListener('click', () => selectScanType('PACKAGE', '📦 Package'));
@@ -325,11 +326,9 @@
         function selectScanType(type, label) {
 
             scanType = type;
-
             scanTypeText.textContent = label;
-
-            step3.classList.add('hidden');
-
+            step2.classList.add('hidden');
+            step3.classList.remove('hidden');
             activateScanner();
 
         }
@@ -344,7 +343,7 @@
 
         });
         // ============================================================
-        // STEP 4 — Scanning (validate only, no DB write yet)
+        // STEP 3 — Scanning (validate only, no DB write yet)
         // ============================================================
         function activateScanner() {
             scannerInput.value = '';

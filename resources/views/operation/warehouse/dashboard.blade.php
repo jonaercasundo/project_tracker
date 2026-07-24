@@ -319,16 +319,6 @@
             activateScanner();
 
         }
-        document.getElementById('btnBackToTransaction').addEventListener('click', () => {
-
-            warehouseId = null;
-            warehouseSelect.value = '';
-
-            step3.classList.add('hidden');
-            step2.classList.add('hidden');
-            step1.classList.remove('hidden');
-
-        });
         // ============================================================
         // STEP 3 — Scanning (validate only, no DB write yet)
         // ============================================================

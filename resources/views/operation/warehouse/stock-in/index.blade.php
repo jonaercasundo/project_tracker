@@ -102,6 +102,50 @@
                             deliverySelect.disabled = false;
                         });
                 });
+
+                deliverySelect.addEventListener('change', function () {
+                    const deliveryId = this.value;
+                    const itemsTable = document.getElementById('itemsTable');
+                    const itemsSection = document.getElementById('itemsSection');
+                    const saveSection = document.getElementById('saveSection');
+
+                    itemsTable.innerHTML = '';
+                    itemsSection.classList.add('hidden');
+                    saveSection.classList.add('hidden');
+
+                    if (!deliveryId) {
+                        return;
+                    }
+
+                    fetch(`{{ route('warehouse.stock-in.items') }}?delivery_id=${deliveryId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (!data.length) {
+                                itemsTable.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-sm text-slate-500">No items found for this delivery.</td></tr>';
+                                itemsSection.classList.remove('hidden');
+                                return;
+                            }
+
+                            data.forEach((item, index) => {
+                                const row = document.createElement('tr');
+                                row.className = 'border-t border-slate-200';
+                                row.innerHTML = `
+                                    <td class="px-4 py-3 font-medium text-slate-800">${item.item_name}</td>
+                                    <td class="px-4 py-3 text-center text-slate-600">${item.qty}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <input type="number" min="0" value="${item.qty}" class="w-24 rounded-xl border border-slate-300 px-3 py-2 text-center text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-600">
+                                        <input type="text" placeholder="Remarks" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+                                    </td>
+                                `;
+                                itemsTable.appendChild(row);
+                            });
+
+                            itemsSection.classList.remove('hidden');
+                            saveSection.classList.remove('hidden');
+                        });
+                });
             });
         </script>
         @endpush
@@ -133,6 +177,7 @@
         <div id="itemsSection" class="hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/60">
             <div class="border-b border-slate-200 px-6 py-4">
                 <h2 class="text-lg font-semibold text-slate-900">Delivery Items</h2>
+                <p class="mt-1 text-sm text-slate-500">Review the package contents and enter the quantity received into the warehouse.</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">

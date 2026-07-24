@@ -81,6 +81,32 @@ class WarehouseInventoryController extends Controller
         return response()->json($deliveries);
     }
 
+    public function getDeliveryItems(Request $request)
+    {
+        $request->validate([
+            'delivery_id' => 'required|integer|exists:deliveries,delivery_id',
+        ]);
+
+        $delivery = Delivery::with(['packageStatuses.package.packageContent.item'])
+            ->findOrFail($request->delivery_id);
+
+        $items = collect();
+
+        foreach ($delivery->packageStatuses as $status) {
+            foreach ($status->package?->packageContent ?? [] as $content) {
+                $itemName = $content->item?->item_name ?? 'Unnamed Item';
+                $items->push([
+                    'package_status_id' => $status->package_status_id,
+                    'item_id' => $content->item_id,
+                    'item_name' => $itemName,
+                    'qty' => (int) ($content->qty ?? 0),
+                ]);
+            }
+        }
+
+        return response()->json($items->values());
+    }
+
     // ==========================================================
     // NEW: validate a single QR — lookup only, NO writes.
     // Used while the user is scanning, before they hit "Save".

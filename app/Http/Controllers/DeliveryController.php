@@ -187,8 +187,11 @@ class DeliveryController extends Controller
             ->join('lot as l',                  'l.lot_id',        '=', 'd.lot_id')
             ->join('projects as p',             'p.project_id',    '=', 'd.project_id')
             ->join('school as s',               's.school_id',     '=', 'd.school_id')
-            ->leftJoin('package_status as ps',  'ps.delivery_id',  '=', 'd.delivery_id')
-            ->leftJoin('package as pk',         'pk.package_id',   '=', 'ps.package_id')
+            ->leftJoin('package as pk', function ($join) {
+                $join->on('pk.keystage_id', '=', 'd.keystage_id')
+                    ->on('pk.lot_id', '=', 'd.lot_id')
+                    ->whereRaw("pk.package_num = CAST(REPLACE(d.package_type, 'C', '') AS UNSIGNED)");
+                })
             ->leftJoin('package_content as pc', 'pc.package_id',   '=', 'pk.package_id')
             ->leftJoin('item as i',             'i.item_id',       '=', 'pc.item_id')
             ->whereIn('d.delivery_id', $deliveryIds)

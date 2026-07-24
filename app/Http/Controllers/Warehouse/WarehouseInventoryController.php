@@ -21,9 +21,22 @@ class WarehouseInventoryController extends Controller
     public function scanner()
     {
         $warehouses = Warehouse::orderBy('warehouse_name')->get();
-        return view('operation.warehouse.dashboard', [
+        return view('operation.warehouse.stock_out', [
             'warehouses' => $warehouses,
         ]);
+    }
+
+    public function dashboard()
+    {
+        $stockInCount = InventoryHistory::where('change_type', 'stock_in')->count();
+        $stockOutCount = InventoryHistory::where('change_type', 'stock_out')->count();
+        $deliveredCount = PackageStatus::where('status', 'delivered')->count();
+
+        return view('operation.warehouse.dashboard', compact(
+            'stockInCount',
+            'stockOutCount',
+            'deliveredCount'
+        ));
     }
 
     // ==========================================================

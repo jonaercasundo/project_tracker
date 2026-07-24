@@ -335,8 +335,12 @@ Route::middleware(['auth'])->group(function () {
 
             Route::post('/warehouse/inventory/scan/save', [WarehouseInventoryController::class, 'saveScan'])
                 ->name('inventory.scan.save');
-            Route::get('/dashboard', [WarehouseInventoryController::class, 'scanner'])
-            ->name('dashboard');
+
+            Route::get('/dashboard', [WarehouseInventoryController::class, 'dashboard'])
+                ->name('dashboard');
+
+            Route::get('/stock-out', [WarehouseInventoryController::class, 'scanner'])
+                ->name('stock-out');
             
             Route::get('/packages', function () {
                 return view('operation.warehouse.packages.index');
@@ -353,10 +357,6 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/stock-in', function () {
                 return view('operation.warehouse.stock-in.index');
             })->name('stock-in');
-
-            Route::get('/stock-out', function () {
-                return view('operation.warehouse.stock-out.index');
-            })->name('stock-out');
 
             Route::get('/transfer', function () {
                 return view('operation.warehouse.transfer.index');

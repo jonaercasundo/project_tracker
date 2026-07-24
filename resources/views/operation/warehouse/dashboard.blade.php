@@ -306,19 +306,6 @@
         // ============================================================
         // STEP 2 — Select Scan Type
         // ============================================================
-        document.getElementById('btnBackToStep1').addEventListener('click', () => {
-
-            transactionType = null;
-            warehouseId = null;
-
-            warehouseSelect.value = '';
-
-            currentMode.classList.add('hidden');
-
-            step2.classList.add('hidden');
-            step1.classList.remove('hidden');
-
-        });
 
         document.getElementById('btnPackage').addEventListener('click', () => selectScanType('PACKAGE', '📦 Package'));
         document.getElementById('btnItem').addEventListener('click', () => selectScanType('ITEM', '📄 Individual Item'));

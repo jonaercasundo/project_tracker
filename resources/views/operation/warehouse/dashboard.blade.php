@@ -95,7 +95,7 @@
             </div>
         </div>
 
-        {{-- STEP 4 --}}
+        {{-- STEP 3 --}}
         <div id="step3" class="hidden space-y-6">
 
             {{-- Unsaved warning banner --}}
@@ -287,21 +287,7 @@
         }
 
         // ============================================================
-        // STEP 1 — Select Transaction
-        // ============================================================
-        document.getElementById('btnInventoryOut').addEventListener('click', () => selectTransaction('OUT', '📤 Stock Out'));
-
-        function selectTransaction(type, label) {
-            transactionType = type;
-            transactionText.textContent = label;
-            scanTypeText.textContent = '-';
-            currentMode.classList.remove('hidden');
-            step1.classList.add('hidden');
-            step2.classList.remove('hidden');
-        }
-
-        // ============================================================
-        // STEP 2 — Select Warehouse Type
+        // STEP 1 — Select Warehouse Type
         // ============================================================
         btnContinueWarehouse.addEventListener('click', () => {
 

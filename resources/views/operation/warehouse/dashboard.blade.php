@@ -31,33 +31,11 @@
 
         {{-- STEP 1 --}}
         <div id="step1" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <h2 class="text-lg font-semibold mb-6">Step 1 — Select Transaction</h2>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <button type="button" id="btnInventoryOut"
-                    class="rounded-2xl border-2 border-red-500 bg-red-50 hover:bg-red-100 transition p-8">
-                    <div class="text-5xl mb-4">📤</div>
-                    <div class="text-2xl font-bold text-red-700">Stock Out</div>
-                    <p class="text-slate-500 mt-2">Minus Quantity</p>
-                </button>
-            </div>
-        </div>
-        {{-- STEP 2 --}}
-        <div id="step2" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
 
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-lg font-semibold">
                     Step 2 — Select Warehouse
                 </h2>
-
-                <button
-                    type="button"
-                    id="btnBackToStep1"
-                    class="text-sm text-slate-500 hover:text-slate-700 underline">
-
-                    ← Change Transaction
-
-                </button>
             </div>
 
             <div class="max-w-lg">
@@ -94,13 +72,10 @@
             </div>
 
         </div>
-        {{-- STEP 3 --}}
-        <div id="step3" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        {{-- STEP 2 --}}
+        <div id="step2" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div class="flex items-center justify-between mb-6">
-                <h2 class="text-lg font-semibold">Step 3 — Select Scan Type</h2>
-                <button type="button" id="btnBackToTransaction" class="text-sm text-slate-500 hover:text-slate-700 underline">
-                    ← Change transaction
-                </button>
+                <h2 class="text-lg font-semibold">Step 2 — Select Scan Type</h2>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -121,7 +96,7 @@
         </div>
 
         {{-- STEP 4 --}}
-        <div id="step4" class="hidden space-y-6">
+        <div id="step3" class="hidden space-y-6">
 
             {{-- Unsaved warning banner --}}
             <div id="unsavedBanner" class="hidden rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-800 text-sm font-medium">
@@ -282,7 +257,6 @@
         const step1 = document.getElementById('step1');
         const step2 = document.getElementById('step2');
         const step3 = document.getElementById('step3');
-        const step4 = document.getElementById('step4');
 
         const currentMode = document.getElementById('currentMode');
         const transactionText = document.getElementById('transactionText');
@@ -370,7 +344,6 @@
             scanTypeText.textContent = label;
 
             step3.classList.add('hidden');
-            step4.classList.remove('hidden');
 
             activateScanner();
 
@@ -380,7 +353,6 @@
             warehouseId = null;
             warehouseSelect.value = '';
 
-            step4.classList.add('hidden');
             step3.classList.add('hidden');
             step2.classList.add('hidden');
             step1.classList.remove('hidden');
@@ -835,7 +807,6 @@
             warehouseId = null;
             warehouseSelect.value = '';
 
-            step4.classList.add('hidden');
             step3.classList.add('hidden');
             step2.classList.add('hidden');
             step1.classList.remove('hidden');

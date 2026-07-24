@@ -354,9 +354,14 @@ Route::middleware(['auth'])->group(function () {
                 return view('operation.warehouse.adjustments.index');
             })->name('adjustments.index');
 
-            Route::get('/stock-in', function () {
-                return view('operation.warehouse.stock-in.index');
-            })->name('stock-in');
+            Route::get('/stock-in', [WarehouseInventoryController::class, 'stockInIndex'])
+                ->name('stock-in');
+
+            Route::get('/stock-in/lots', [WarehouseInventoryController::class, 'getLotsForProject'])
+                ->name('stock-in.lots');
+
+            Route::get('/stock-in/deliveries', [WarehouseInventoryController::class, 'getDeliveriesForLot'])
+                ->name('stock-in.deliveries');
 
             Route::get('/transfer', function () {
                 return view('operation.warehouse.transfer.index');

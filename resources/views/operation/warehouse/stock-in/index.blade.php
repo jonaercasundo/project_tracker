@@ -28,6 +28,9 @@
                     <label class="mb-2 block text-sm font-semibold text-slate-700">Project <span class="text-red-500">*</span></label>
                     <select id="project_id" class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
                         <option value="">-- Select Project --</option>
+                        @foreach($projects as $project)
+                            <option value="{{ $project->project_id }}">{{ $project->project_name }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -46,6 +49,62 @@
                 </div>
             </div>
         </div>
+
+        @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const projectSelect = document.getElementById('project_id');
+                const lotSelect = document.getElementById('lot_id');
+                const deliverySelect = document.getElementById('delivery_id');
+
+                projectSelect.addEventListener('change', function () {
+                    const projectId = this.value;
+                    lotSelect.innerHTML = '<option value="">-- Select Lot --</option>';
+                    deliverySelect.innerHTML = '<option value="">-- Select DR Number --</option>';
+                    lotSelect.disabled = true;
+                    deliverySelect.disabled = true;
+
+                    if (!projectId) {
+                        return;
+                    }
+
+                    fetch(`{{ route('warehouse.stock-in.lots') }}?project_id=${projectId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            data.forEach(lot => {
+                                const option = document.createElement('option');
+                                option.value = lot.lot_id;
+                                option.textContent = lot.lot_name;
+                                lotSelect.appendChild(option);
+                            });
+                            lotSelect.disabled = false;
+                        });
+                });
+
+                lotSelect.addEventListener('change', function () {
+                    const lotId = this.value;
+                    deliverySelect.innerHTML = '<option value="">-- Select DR Number --</option>';
+                    deliverySelect.disabled = true;
+
+                    if (!lotId) {
+                        return;
+                    }
+
+                    fetch(`{{ route('warehouse.stock-in.deliveries') }}?lot_id=${lotId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            data.forEach(delivery => {
+                                const option = document.createElement('option');
+                                option.value = delivery.delivery_id;
+                                option.textContent = `DR-${delivery.delivery_id}`;
+                                deliverySelect.appendChild(option);
+                            });
+                            deliverySelect.disabled = false;
+                        });
+                });
+            });
+        </script>
+        @endpush
 
         <div id="deliveryInfo" class="hidden rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/60">
             <div class="border-b border-slate-200 px-6 py-4">

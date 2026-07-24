@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use App\Models\Inventory;
 use App\Models\InventoryHistory;
 use App\Models\PackageStatus;
+use App\Models\Project;
+use App\Models\Lot;
+use App\Models\Delivery;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,7 +31,7 @@ class WarehouseInventoryController extends Controller
 
     public function dashboard()
     {
-        $pendingCount = \App\Models\Project::where('status', 'Pending')->count();
+        $pendingCount = Project::where('status', 'Pending')->count();
         $stockInCount = InventoryHistory::where('change_type', 'stock_in')->count();
         $stockOutCount = InventoryHistory::where('change_type', 'stock_out')->count();
         $deliveredCount = PackageStatus::where('status', 'delivered')->count();
@@ -39,6 +42,43 @@ class WarehouseInventoryController extends Controller
             'stockOutCount',
             'deliveredCount'
         ));
+    }
+
+    public function stockInIndex()
+    {
+        $projects = Project::select('project_id', 'project_name')
+            ->orderBy('project_name')
+            ->get();
+
+        return view('operation.warehouse.stock-in.index', compact('projects'));
+    }
+
+    public function getLotsForProject(Request $request)
+    {
+        $request->validate([
+            'project_id' => 'required|integer|exists:projects,project_id',
+        ]);
+
+        $lots = Lot::where('project_id', $request->project_id)
+            ->select('lot_id', 'lot_name')
+            ->orderBy('lot_name')
+            ->get();
+
+        return response()->json($lots);
+    }
+
+    public function getDeliveriesForLot(Request $request)
+    {
+        $request->validate([
+            'lot_id' => 'required|integer|exists:lot,lot_id',
+        ]);
+
+        $deliveries = Delivery::where('lot_id', $request->lot_id)
+            ->select('delivery_id')
+            ->orderBy('delivery_id')
+            ->get();
+
+        return response()->json($deliveries);
     }
 
     // ==========================================================

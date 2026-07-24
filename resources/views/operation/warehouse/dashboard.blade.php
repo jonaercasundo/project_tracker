@@ -34,13 +34,6 @@
             <h2 class="text-lg font-semibold mb-6">Step 1 — Select Transaction</h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <button type="button" id="btnInventoryIn"
-                    class="rounded-2xl border-2 border-green-500 bg-green-50 hover:bg-green-100 transition p-8">
-                    <div class="text-5xl mb-4">📥</div>
-                    <div class="text-2xl font-bold text-green-700">Stock In</div>
-                    <p class="text-slate-500 mt-2">Add Quantity</p>
-                </button>
-
                 <button type="button" id="btnInventoryOut"
                     class="rounded-2xl border-2 border-red-500 bg-red-50 hover:bg-red-100 transition p-8">
                     <div class="text-5xl mb-4">📤</div>
@@ -322,7 +315,6 @@
         // ============================================================
         // STEP 1 — Select Transaction
         // ============================================================
-        document.getElementById('btnInventoryIn').addEventListener('click', () => selectTransaction('IN', '📥 Stock In'));
         document.getElementById('btnInventoryOut').addEventListener('click', () => selectTransaction('OUT', '📤 Stock Out'));
 
         function selectTransaction(type, label) {

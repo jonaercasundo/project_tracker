@@ -34,7 +34,7 @@
 
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-lg font-semibold">
-                    Step 2 — Select Warehouse
+                    Step 1 — Select Warehouse
                 </h2>
             </div>
 
@@ -313,8 +313,7 @@
 
             warehouseId = warehouseSelect.value;
 
-            step2.classList.add('hidden');
-            step3.classList.remove('hidden');
+            step2.classList.remove('hidden');
 
         });
         // ============================================================

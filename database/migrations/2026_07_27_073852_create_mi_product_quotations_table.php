@@ -32,11 +32,10 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique([
-                'product_id',
-                'factory_id',
-                'quotation_date'
-            ]);
+            $table->unique(
+                ['product_id', 'factory_id', 'quotation_date'],
+                'uq_prod_factory_date'
+            );
         });
     }
 

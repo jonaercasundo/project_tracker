@@ -1,26 +1,55 @@
 <x-mi_app>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        {{-- Header Section --}}
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-200/80 dark:border-gray-800">
+            <div class="space-y-1">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                        Metroinc Centralized Database
+                    </h1>
+                </div>
+                
+                {{-- Live Status Pill --}}
+                <div class="flex items-center gap-2 pt-1">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/50">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        Connected
+                    </span>
+                    <span class="text-xs text-gray-400 dark:text-gray-500">•</span>
+                    <span class="text-xs font-mono text-gray-500 dark:text-gray-400">
+                        Synced: <time>Just now</time>
+                    </span>
+                </div>
+            </div>
 
-<div class="mb-8 flex justify-between items-center">
-    <div class="flex flex-col">
-        <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Metroinc Centralized Database</h1>
-        <p class="text-xs text-gray-500 mt-1 font-mono">Status: Connected • Last synced: Just now</p>
+            {{-- Action Button --}}
+            <a href="{{ route('mi_app.create') }}" 
+               class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                <span>Add Product</span>
+            </a>
+        </div>
+
+        {{-- Main Content Section --}}
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200/80 dark:border-gray-800 overflow-hidden">
+            
+            {{-- Search & Filters Wrapper --}}
+            <div class="p-5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+                @include('mi_app.designer_module.partials._search')
+            </div>
+
+            {{-- Data Table Wrapper --}}
+            <div class="relative overflow-x-auto">
+                @include('mi_app.designer_module.partials._table')
+            </div>
+            
+        </div>
+
     </div>
-
-    <a href="{{ route('mi_app.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition duration-150">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
-        </svg>
-        Add Products
-    </a>
-</div>
-
-    <div class="space-y-6">
-        {{-- Search & Filters --}}
-        @include('mi_app.designer_module.partials._search')
-
-        {{-- Data Table --}}
-        @include('mi_app.designer_module.partials._table')
-    </div>
-
 </x-mi_app>
-

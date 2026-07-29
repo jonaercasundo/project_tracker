@@ -4,12 +4,14 @@
         {{-- Page Header --}}
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
             <div class="flex items-center gap-4">
-                <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" 
-                        class="h-6 w-6" 
-                        fill="currentColor" 
-                        viewBox="0 0 24 24">
-                        <path d="M12 5c.55 0 1 .45 1 1v5h5c.55 0 1 .45 1 1s-.45 1-1 1h-5v5c0 .55-.45 1-1 1s-1-.45-1-1v-5H6c-.55 0-1-.45-1-1s.45-1 1-1h5V6c0-.55.45-1 1-1z"/>
+                <div class="h-12 w-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                        class="h-6 w-6"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5" />
                     </svg>
                 </div>
                 <div>

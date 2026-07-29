@@ -207,7 +207,7 @@
                                     H × W × L × D
                                 </span>
                             </div>
-                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div class="grid grid-cols-4 sm:grid-cols-4 gap-4">
                                 <div>
                                     <label for="product_height" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Height <span class="text-rose-500">*</span></label>
                                     <div class="relative">
@@ -251,45 +251,45 @@
                                 </div>
                             </div>
                             {{-- Carton Dimensions Panel --}}
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Carton Dimensions</h3>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                            <div>
-                                <label for="carton_height" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Height</label>
-                                <div class="relative">
-                                    <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_height" name="carton_height" value="{{ old('carton_height') }}" placeholder="50"
-                                            class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
-                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Carton Dimensions</h3>
+                            <div class="grid grid-cols-4 sm:grid-cols-4 gap-4">
+                                <div>
+                                    <label for="carton_height" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Height</label>
+                                    <div class="relative">
+                                        <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_height" name="carton_height" value="{{ old('carton_height') }}" placeholder="50"
+                                                class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                    </div>
+                                    @error('carton_height') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                                 </div>
-                                @error('carton_height') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
-                            </div>
-                            <div>
-                                <label for="carton_width" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Width</label>
-                                <div class="relative">
-                                    <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_width" name="carton_width" value="{{ old('carton_width') }}" placeholder="65"
-                                            class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
-                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                <div>
+                                    <label for="carton_width" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Width</label>
+                                    <div class="relative">
+                                        <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_width" name="carton_width" value="{{ old('carton_width') }}" placeholder="65"
+                                                class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                    </div>
+                                    @error('carton_width') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                                 </div>
-                                @error('carton_width') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
-                            </div>
-                            <div>
-                                <label for="carton_length" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Length</label>
-                                <div class="relative">
-                                    <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_length" name="carton_length" value="{{ old('carton_length') }}" placeholder="125"
-                                            class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
-                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                <div>
+                                    <label for="carton_length" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Length</label>
+                                    <div class="relative">
+                                        <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_length" name="carton_length" value="{{ old('carton_length') }}" placeholder="125"
+                                                class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                    </div>
+                                    @error('carton_length') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                                 </div>
-                                @error('carton_length') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
-                            </div>
-                            <div>
-                                <label for="carton_depth" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Depth</label>
-                                <div class="relative">
-                                    <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_depth" name="carton_depth" value="{{ old('carton_depth') }}" placeholder="35"
-                                            class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
-                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                <div>
+                                    <label for="carton_depth" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Depth</label>
+                                    <div class="relative">
+                                        <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_depth" name="carton_depth" value="{{ old('carton_depth') }}" placeholder="35"
+                                                class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                    </div>
+                                    @error('carton_depth') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                                 </div>
-                                @error('carton_depth') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                             </div>
-                        </div>
                         </div>
                     </div>
                 </div>

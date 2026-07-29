@@ -310,78 +310,94 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div>
-                                <label for="purchase_cost" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">Purchase Cost</label>
-                                <div class="relative">
-                                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                                        <span class="text-gray-500 dark:text-gray-400 text-sm font-semibold">₱</span>
+                        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+                            <div class="space-y-4">
+                                <div class="rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/80 dark:bg-gray-900/70 p-5 shadow-sm">
+                                    <div class="flex items-start justify-between gap-3 mb-4">
+                                        <div>
+                                            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Purchase Cost</h3>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Estimated acquisition value for the item.</p>
+                                        </div>
+                                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path d="M10 2.5a.75.75 0 01.75.75v.79a3.75 3.75 0 013.75 3.75V8.5h.25A1.75 1.75 0 0117.5 10.25v1.5a1.75 1.75 0 01-1.75 1.75h-.25v1.25a1.75 1.75 0 01-1.75 1.75H6.25A1.75 1.75 0 014.5 14.75V13.5H4.25A1.75 1.75 0 012.5 11.75v-1.5A1.75 1.75 0 014.25 8.5h.25v-.5a3.75 3.75 0 013.75-3.75V3.25A.75.75 0 0110 2.5zm-2 6v5.5h4V8.5H8zm-1.5 5.5h1.5V8.5H6.5v5.5zm6.5 0h1.5V8.5H13v5.5z" />
+                                            </svg>
+                                        </div>
                                     </div>
-                                    <input type="number" step="0.01" min="0" inputmode="decimal" id="purchase_cost" name="purchase_cost" value="{{ old('purchase_cost') }}" placeholder="0.00"
-                                           class="field w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 pl-8 pr-4 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                                    <div class="relative">
+                                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                                            <span class="text-gray-500 dark:text-gray-400 text-sm font-semibold">₱</span>
+                                        </div>
+                                        <input type="number" step="0.01" min="0" inputmode="decimal" id="purchase_cost" name="purchase_cost" value="{{ old('purchase_cost') }}" placeholder="0.00"
+                                               class="field w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 pl-8 pr-4 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                                    </div>
+                                    @error('purchase_cost') <p class="text-rose-500 text-xs mt-1.5 font-medium">{{ $message }}</p> @enderror
                                 </div>
-                                @error('purchase_cost') <p class="text-rose-500 text-xs mt-1.5 font-medium">{{ $message }}</p> @enderror
+
+                                <div class="rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-slate-50/70 dark:bg-gray-800/40 p-5 shadow-sm">
+                                    <div class="flex items-start justify-between gap-3 mb-4">
+                                        <div>
+                                            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Reference Link</h3>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Optional URL to a product page, spec sheet, or inspiration board.</p>
+                                        </div>
+                                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-5.25-4.5l5.25 5.25m0 0L13.5 10.5m5.25 1.5V3" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <input type="url" name="reference_link" value="{{ old('reference_link') }}" placeholder="https://example.com/product"
+                                           class="field w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                                    @error('reference_link') <p class="text-rose-500 text-xs mt-1.5 font-medium">{{ $message }}</p> @enderror
+                                </div>
                             </div>
 
-                            <div class="md:col-span-2">
-                                <label for="product_file" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">Upload Asset File</label>
+                            <div class="rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-gradient-to-br from-slate-50 to-white dark:from-gray-800/60 dark:to-gray-900/80 p-5 shadow-sm">
+                                <div class="flex items-start justify-between gap-3 mb-4">
+                                    <div>
+                                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Asset Upload</h3>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Drop in a product image or 3D file.</p>
+                                    </div>
+                                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                                        </svg>
+                                    </div>
+                                </div>
 
                                 <div id="dropzone"
-                                     class="group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700/80 hover:border-blue-500 dark:hover:border-blue-500 bg-gray-50/50 dark:bg-gray-800/40 hover:bg-blue-50/30 dark:hover:bg-blue-950/20 p-6 cursor-pointer transition-all">
+                                     class="group relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700/80 hover:border-blue-500 dark:hover:border-blue-500 bg-white/80 dark:bg-gray-900/60 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 p-6 cursor-pointer transition-all min-h-[220px]">
                                     <label for="product_file" class="absolute inset-0 cursor-pointer">
                                         <span class="sr-only">Upload asset file</span>
                                     </label>
 
                                     <div id="dropzone_empty" class="flex flex-col items-center text-center pointer-events-none">
-                                        <div class="h-10 w-10 rounded-xl bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center justify-center shadow-sm border border-gray-100 dark:border-gray-700 mb-2 transition-all">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 stroke-[2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <div class="h-12 w-12 rounded-2xl bg-slate-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center justify-center shadow-sm border border-gray-100 dark:border-gray-700 mb-3 transition-all">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 stroke-[2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
                                             </svg>
                                         </div>
-                                        <span class="text-xs font-semibold text-blue-600 dark:text-blue-400">Click to upload</span>
-                                        <span class="text-xs text-gray-500 dark:text-gray-400"> or drag and drop</span>
-                                        <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Supports PNG, JPG, or 3D files (OBJ, GLTF) &middot; up to 20MB</p>
+                                        <span class="text-sm font-semibold text-blue-600 dark:text-blue-400">Click to upload</span>
+                                        <span class="text-sm text-gray-500 dark:text-gray-400">or drag and drop</span>
+                                        <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-2">PNG, JPG, OBJ, GLTF, or GLB up to 20MB</p>
                                     </div>
 
                                     <div id="dropzone_filled" class="hidden w-full items-center gap-3 pointer-events-none">
-                                        <div id="file_thumb" class="h-12 w-12 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden flex items-center justify-center shrink-0 text-gray-400">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                                        <div id="file_thumb" class="h-14 w-14 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden flex items-center justify-center shrink-0 text-gray-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
                                         </div>
                                         <div class="min-w-0 text-left">
                                             <p id="file_name" class="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate"></p>
                                             <p id="file_size" class="text-[11px] text-gray-400 dark:text-gray-500"></p>
                                         </div>
-                                        <button type="button" id="file_remove" aria-label="Remove file" class="pointer-events-auto ml-auto shrink-0 h-7 w-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors">
+                                        <button type="button" id="file_remove" aria-label="Remove file" class="pointer-events-auto ml-auto shrink-0 h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                         </button>
                                     </div>
 
                                     <input id="product_file" type="file" name="product_file" accept="image/png,image/jpeg,.obj,.gltf,.glb" class="sr-only">
-                            @error('purchase_cost') <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p> @enderror
-
-                            <label class="block text-sm font-medium leading-6 text-slate-900 mb-2">Image Link</label>
-                            <div class="relative rounded-xl shadow-sm">
-                                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4"></div>
-                                <input type="text" name="carton_width" value="{{ old('carton_width') }}"
-                                           class="block w-full rounded-lg border-0 py-2 px-3 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 text-sm transition-all">
-                                    @error('carton_width') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                            </div>
-                        </div>
-
-                        <div class="lg:col-span-1">
-                            <label class="block text-sm font-medium leading-6 text-slate-900 mb-2">Upload Image or 3D File</label>
-                            <label for="product_file" class="group relative flex items-center justify-center gap-3 w-full rounded-xl border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50 hover:bg-blue-50/40 py-5 px-4 cursor-pointer transition-all">
-                                <div class="h-9 w-9 rounded-lg bg-white group-hover:bg-blue-100 flex items-center justify-center shadow-sm transition-all">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5 text-slate-500 group-hover:text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 3a.75.75 0 01.75.75v6.19l2.72-2.72a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-1.06 0l-4-4a.75.75 0 111.06-1.06l2.72 2.72V3.75A.75.75 0 0110 3zM3.5 12.75a.75.75 0 01.75.75v2.5c0 .414.336.75.75.75h10a.75.75 0 00.75-.75v-2.5a.75.75 0 011.5 0v2.5A2.25 2.25 0 0115 18.5H5a2.25 2.25 0 01-2.25-2.25v-2.5a.75.75 0 01.75-.75z" clip-rule="evenodd" />
-                                    </svg>
                                 </div>
-                                <div class="text-sm">
-                                    <span class="font-medium text-blue-600">Click to upload</span>
-                                    <span class="text-slate-500"> or drag and drop</span>
-                                    <p class="text-xs text-slate-400 mt-0.5" id="product_file_name">PNG, JPG, or 3D model files</p>
-                                </div>
-                                @error('product_file') <p class="text-rose-500 text-xs mt-1.5 font-medium">{{ $message }}</p> @enderror
+                                @error('product_file') <p class="text-rose-500 text-xs mt-2 font-medium">{{ $message }}</p> @enderror
                             </div>
                         </div>
                     </div>
@@ -428,6 +444,12 @@
                 from { opacity: 0; transform: translateY(8px); }
                 to { opacity: 1; transform: translateY(0); }
             }
+        }
+        .field {
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.6);
+        }
+        .field:focus {
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
         }
         .field.field-invalid {
             border-color: rgb(244 63 94) !important;

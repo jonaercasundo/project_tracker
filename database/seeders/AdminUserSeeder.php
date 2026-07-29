@@ -34,7 +34,7 @@ class AdminUserSeeder extends Seeder
             [
                 'name' => 'Renzel Jared Y. Bautista',             
                 'employee_id' => 'YOUR_ID',        
-                'password' => Hash::make('password123'), 
+                'password' => bcrypt('password123'), 
                 'position' => 'IT',
                 'role' => 'admin',                    
                 'department' => 'IT',

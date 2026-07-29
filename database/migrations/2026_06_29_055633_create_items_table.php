@@ -23,6 +23,7 @@ return new class extends Migration
             $table->string('item_name');
             $table->text('description')->nullable();
 
+            // The foreign key column (Must be unsignedBigInteger and nullable)
             $table->unsignedBigInteger('project_id')->nullable();
 
             $table->string('unit')->nullable();
@@ -34,8 +35,12 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Optional foreign key if projects.id is an unsignedBigInteger
-            // $table->foreign('project_id')->references('id')->on('projects')->nullOnDelete();
+            // CORRECT FOREIGN KEY DEFINITION
+            // References the standard 'id' column on the project_information table
+            $table->foreign('project_id')
+                  ->references('id')
+                  ->on('project_information')
+                  ->onDelete('set null');
         });
     }
 

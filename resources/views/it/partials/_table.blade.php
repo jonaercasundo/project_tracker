@@ -53,7 +53,7 @@
                                     View
                                 </a>
                                 
-                                <button onclick="downloadSvgAsPng('{{ asset('storage/qrcodes/' . rawurlencode($asset->asset_code) . '.svg') }}', '{{ $asset->asset_code }}')" class="text-slate-500 hover:text-indigo-400 font-bold transition-colors cursor-pointer">
+                                <button onclick="downloadSvgAsPng('{{ asset('storage/qrcodes/' . rawurlencode($asset->asset_code) . '.svg') }}', '{{ $asset->asset_code }}')" class="text-slate-600 hover:text-slate-400 font-bold transition-colors cursor-pointer">
                                     Generate QR
                                 </button>
 

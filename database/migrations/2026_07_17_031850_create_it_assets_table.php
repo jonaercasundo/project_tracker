@@ -17,7 +17,6 @@ return new class extends Migration
             $table->string('asset_name');
             $table->string('category');
             $table->enum('status', ['Available', 'Assigned', 'Repair', 'Disposed'])->default('Available');
-            
             // Optional Fields
             $table->string('brand')->nullable();
             $table->string('model')->nullable();

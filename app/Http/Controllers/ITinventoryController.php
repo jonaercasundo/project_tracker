@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Asset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use SimpleSoftwareIO\QrCode\Facade\QrCode;  
 
 class ITinventoryController extends Controller
 {
@@ -19,7 +20,7 @@ class ITinventoryController extends Controller
                   ->orWhere('category', 'like', '%' . $search . '%');
             });
         }
-        
+
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }

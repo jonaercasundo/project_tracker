@@ -1,10 +1,11 @@
 <x-mi_app>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <div class="rounded-[32px] border border-slate-200/80 bg-gradient-to-br from-slate-50/90 via-white to-slate-100/80 p-6 shadow-[0_30px_80px_-35px_rgba(15,23,42,0.35)] dark:border-slate-800/70 dark:from-slate-900/80 dark:via-slate-900 dark:to-slate-950/80 sm:p-8">
 
         {{-- Page Header --}}
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+        <div class="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-white/70 p-5 shadow-sm backdrop-blur-sm dark:border-slate-800/70 dark:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <div class="flex items-center gap-4">
-                <div class="h-12 w-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 shrink-0">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700 shadow-sm dark:border-slate-700 dark:from-slate-800 dark:to-slate-700 dark:text-slate-100">
                     <svg xmlns="http://www.w3.org/2000/svg"
                         class="h-6 w-6"
                         fill="none"
@@ -15,18 +16,18 @@
                     </svg>
                 </div>
                 <div>
-                    <div class="flex items-center gap-2 text-xs font-medium text-gray-400 dark:text-gray-500 mb-0.5">
-                        <a href="{{ route('mi_app.index') }}" class="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Product Database</a>
+                    <div class="mb-0.5 flex items-center gap-2 text-xs font-medium text-gray-400 dark:text-gray-500">
+                        <a href="{{ route('mi_app.index') }}" class="transition-colors hover:text-gray-600 dark:hover:text-gray-300">Product Database</a>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
                         <span class="text-gray-500 dark:text-gray-400">New Product</span>
                     </div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Create Product</h1>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Fill in the specifications, dimensions, and details for the new product item.</p>
+                    <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Create Product</h1>
+                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Fill in the specifications, dimensions, and details for the new product item.</p>
                 </div>
             </div>
 
             <a href="{{ route('mi_app.index') }}"
-               class="inline-flex items-center gap-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/60 text-gray-700 dark:text-gray-200 text-sm font-semibold py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700/80 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-700 shrink-0">
+               class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:border-gray-700/80 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700/60 dark:hover:text-white dark:focus:ring-gray-700">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 stroke-[2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                 </svg>
@@ -35,11 +36,11 @@
         </div>
 
         {{-- Required fields progress --}}
-        <div class="flex items-center gap-3 -mt-2">
-            <div class="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                <div id="progress_bar" class="h-full bg-blue-500 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+        <div class="-mt-2 flex items-center gap-3">
+            <div class="flex-1 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800/80">
+                <div id="progress_bar" class="h-2 rounded-full bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 transition-all duration-300 ease-out" style="width: 0%"></div>
             </div>
-            <span id="progress_label" class="text-xs font-medium text-gray-400 dark:text-gray-500 shrink-0 tabular-nums">0 / 6 required fields</span>
+            <span id="progress_label" class="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500 tabular-nums">0 / 6 required fields</span>
         </div>
 
         {{-- Main Form Container --}}
@@ -49,7 +50,7 @@
             <div class="space-y-8">
 
                 {{-- SECTION 1: General Information --}}
-                <div class="reveal bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800 shadow-sm overflow-hidden">
+                <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
                     <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
                         <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -146,7 +147,7 @@
                 </div>
 
                 {{-- SECTION 2: Attributes & Product Dimensions --}}
-                <div class="reveal bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800 shadow-sm overflow-hidden">
+                <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
                     <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
                         <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -314,17 +315,17 @@
             </div>
 
             {{-- Form Footer Actions --}}
-            <div class="sticky bottom-4 mt-8 z-10">
-                <div class="flex items-center justify-end gap-3 rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-lg shadow-gray-900/5 px-5 py-4">
-                    <p class="hidden sm:block text-xs text-gray-400 dark:text-gray-500 mr-auto">
+            <div class="sticky bottom-4 z-10 mt-8">
+                <div class="flex items-center justify-end gap-3 rounded-2xl border border-slate-200/80 bg-white/90 px-5 py-4 shadow-[0_20px_60px_-28px_rgba(15,23,42,0.25)] backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/90">
+                    <p class="mr-auto hidden text-xs text-gray-400 dark:text-gray-500 sm:block">
                         <span class="text-rose-500">*</span> Required fields
                     </p>
                     <a href="{{ route('mi_app.index') }}"
-                       class="px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+                       class="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white">
                         Cancel
                     </a>
                     <button type="submit" id="submit_btn"
-                            class="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+                            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-500 hover:to-indigo-500 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
                         <svg id="submit_icon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                         </svg>

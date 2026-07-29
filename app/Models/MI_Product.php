@@ -9,39 +9,87 @@ class MI_Product extends Model
 {
     use HasFactory;
 
-    // Explicitly declare the table name 
     protected $table = 'mi_products';
 
-    // Explicitly declare the primary key (based on your earlier schema)
     protected $primaryKey = 'product_id';
 
-    // Allow these fields to be mass-assigned via your form request
     protected $fillable = [
-        // General Info
+
+        // SKU Information
+        'sku',
+        'item_code',
+
+        // Product Information
         'item_name',
-        'category',
-        'collection',
+        'description',
+
+        // Taxonomy
+        'category_id',
+        'sub_category_id',
+        'product_type_id',
+        'collection_id',
+
+        // Product Details
         'type_of_sample',
         'classification',
         'designed_by',
-        
-        // Attributes & Dimensions
+
+        // Attributes
         'materials',
         'type',
         'color',
+
+        // Product Dimensions
         'product_height',
         'product_width',
         'product_length',
         'product_depth',
-        
-        // Packaging & Cost
+
+        // Packaging Dimensions
         'carton_height',
         'carton_width',
         'carton_length',
         'carton_depth',
+
+        // Costing
         'purchase_cost',
-        
-        // File / Media (This will store the path/filename in the DB)
-        'product_file', 
+
+        // Files
+        'product_file',
+
+        // Status
+        'status',
     ];
+
+    /**
+     * Category
+     */
+    public function category()
+    {
+        return $this->belongsTo(MI_Category::class);
+    }
+
+    /**
+     * Sub Category
+     */
+    public function subCategory()
+    {
+        return $this->belongsTo(MI_SubCategory::class);
+    }
+
+    /**
+     * Product Type
+     */
+    public function productType()
+    {
+        return $this->belongsTo(MI_ProductType::class);
+    }
+
+    /**
+     * Collection
+     */
+    public function collection()
+    {
+        return $this->belongsTo(MI_Collection::class);
+    }
 }

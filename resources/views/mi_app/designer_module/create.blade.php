@@ -207,7 +207,7 @@
                                     H × W × L × D
                                 </span>
                             </div>
-                            <div class="grid grid-cols-4 sm:grid-cols-4 gap-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                                 <div>
                                     <label for="product_height" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Height <span class="text-rose-500">*</span></label>
                                     <div class="relative">
@@ -252,7 +252,7 @@
                             </div>
                             {{-- Carton Dimensions Panel --}}
                             <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Carton Dimensions</h3>
-                            <div class="grid grid-cols-4 sm:grid-cols-4 gap-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                                 <div>
                                     <label for="carton_height" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Height</label>
                                     <div class="relative">

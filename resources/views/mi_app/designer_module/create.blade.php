@@ -312,6 +312,71 @@
                     </div>
                 </div>
 
+                {{-- SECTION 3: Packaging & Media --}}
+                <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
+                    <div class="border-b border-gray-100 bg-gray-50/50 p-6 dark:border-gray-800/80 dark:bg-gray-900/50 flex items-center gap-3">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                            </svg>
+                        </span>
+                        <div>
+                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">Media & Images</h2>
+                            <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">Product photos and linked imagery</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6 p-6 sm:p-8">
+                        {{-- Image Link Input --}}
+                        <div>
+                            <label for="image_link" class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">Product Image Link</label>
+                            <p class="mb-3 text-[11px] text-gray-400 dark:text-gray-500">Provide a direct URL to the product image</p>
+                            <input type="url" id="image_link" name="image_link" value="{{ old('image_link') }}" placeholder="https://example.com/image.jpg"
+                                   class="field w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-gray-700 dark:bg-gray-800/60 dark:text-white">
+                            @error('image_link') <p class="mt-1.5 text-xs font-medium text-rose-500">{{ $message }}</p> @enderror
+                        </div>
+
+                        {{-- File Upload Dropzone --}}
+                        <div>
+                            <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">Upload Product Image</label>
+                            <p class="mb-3 text-[11px] text-gray-400 dark:text-gray-500">Drag and drop your image or click to browse</p>
+                            <div id="dropzone" class="relative cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed border-gray-200 bg-white/50 px-6 py-8 transition-all hover:border-blue-400 hover:bg-blue-50/30 dark:border-gray-700 dark:bg-gray-900/50 dark:hover:border-blue-500 dark:hover:bg-blue-950/20">
+                                {{-- Empty State --}}
+                                <div id="dropzone_empty" class="flex flex-col items-center justify-center gap-3 py-4">
+                                    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 stroke-[1.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33A3 3 0 0116.5 19.5H6.75z" />
+                                        </svg>
+                                    </div>
+                                    <div class="text-center">
+                                        <p class="text-sm font-semibold text-gray-900 dark:text-white">Click to upload or drag and drop</p>
+                                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">PNG, JPG, WebP (max 5MB)</p>
+                                    </div>
+                                </div>
+
+                                {{-- Filled State --}}
+                                <div id="dropzone_filled" class="hidden flex-col gap-4">
+                                    <div class="flex items-center gap-3">
+                                        <div id="file_thumb" class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800 flex items-center justify-center"></div>
+                                        <div class="flex-1 min-w-0">
+                                            <p id="file_name" class="text-sm font-semibold text-gray-900 truncate dark:text-white"></p>
+                                            <p id="file_size" class="text-xs text-gray-400 dark:text-gray-500 mt-0.5"></p>
+                                        </div>
+                                        <button id="file_remove" type="button" class="inline-flex items-center justify-center h-8 w-8 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors dark:hover:bg-red-950/30 dark:hover:text-red-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <input type="file" id="product_file" name="product_file" accept="image/*" class="absolute inset-0 h-full w-full cursor-pointer opacity-0">
+                            </div>
+                            @error('product_file') <p class="mt-1.5 text-xs font-medium text-rose-500">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             {{-- Form Footer Actions --}}

@@ -35,10 +35,6 @@
             </a>
         </div>
 
-        {{-- Required fields progress --}}
-        <div class="-mt-2 flex items-center gap-3">
-      </div>
-
         {{-- Main Form Container --}}
         <form method="POST" action="{{ route('mi_app.store') }}" enctype="multipart/form-data" id="product_form" novalidate>
             @csrf
@@ -378,9 +374,6 @@
             {{-- Form Footer Actions --}}
             <div class="sticky bottom-4 z-10 mt-8">
                 <div class="flex items-center justify-end gap-3 rounded-2xl border border-slate-200/80 bg-white/90 px-5 py-4 shadow-[0_20px_60px_-28px_rgba(15,23,42,0.25)] backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/90">
-                    <p class="mr-auto hidden text-xs text-gray-400 dark:text-gray-500 sm:block">
-                        <span class="text-rose-500">*</span> Required fields
-                    </p>
                     <a href="{{ route('mi_app.index') }}"
                        class="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white">
                         Cancel

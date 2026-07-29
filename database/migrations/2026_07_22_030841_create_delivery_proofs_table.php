@@ -12,20 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('delivery_proofs', function (Blueprint $table) {
-
             $table->id();
-
-            $table->integer('package_status_id');
-
-            $table->foreign('package_status_id')
-                ->references('package_status_id')
-                ->on('package_status')
-                ->cascadeOnDelete();
-
+            
+            // This creates the unsignedBigInteger and the constraint automatically
+            $table->foreignId('package_status_id')
+                  ->constrained('package_status')
+                  ->onDelete('cascade');
+                  
             $table->string('photo');
-
             $table->timestamps();
-
         });
     }
 

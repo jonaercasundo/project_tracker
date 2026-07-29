@@ -1,119 +1,100 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asset Details - {{ $asset->asset_code ?? 'N/A' }}</title>
-    
-    <!-- This ensures your Tailwind CSS still works without the layout component -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-</head>
-<body class="bg-slate-100 antialiased">
-    
-    <div class="p-4 sm:p-8 min-h-screen">
-        {{-- Main Content Card --}}
-        <div class="max-w-5xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="p-6 sm:p-10">
-                
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12">
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Asset Name</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->asset_name ?? 'N/A' }}</span>
-                    </div>
-
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Asset Code</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->asset_code ?? 'N/A' }}</span>
-                    </div>
-
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Status</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->status ?? 'N/A' }}</span>
-                    </div>
-
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Category</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->category ?? 'N/A' }}</span>
-                    </div>
-
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Brand</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->brand ?? 'N/A' }}</span>
-                    </div>
-
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Model</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->model ?? 'N/A' }}</span>
-                    </div>
-
-                    <div class="mb-8 sm:mb-0">
-                        <span class="block text-sm font-medium text-slate-500">Serial Number</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->serial_number ?? 'N/A' }}</span>
-                    </div>
-
-                    <div>
-                        <span class="block text-sm font-medium text-slate-500">Specifications</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->specification ?? 'N/A' }}</span>
-                    </div>
-                </div>
-
-                <hr class="border-slate-100 my-12">
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12">
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Purchase Date</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">
-                            {{ $asset->purchase_date ? \Carbon\Carbon::parse($asset->purchase_date)->format('M d, Y') : 'N/A' }}
-                        </span>
-                    </div>
-
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Purchase Cost</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">
-                            {{ $asset->purchase_cost ? '₱' . number_format($asset->purchase_cost, 2) : 'N/A' }}
-                        </span>
-                    </div>
-
-                    <div class="mb-8 sm:mb-0">
-                        <span class="block text-sm font-medium text-slate-500">Warranty Expiry</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">
-                            {{ $asset->warranty_expiry ? \Carbon\Carbon::parse($asset->warranty_expiry)->format('M d, Y') : 'N/A' }}
-                        </span>
-                    </div>
-                </div>
-
-                <hr class="border-slate-100 my-12">
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12">
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Assigned To</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->assigned_to ?? 'Unassigned' }}</span>
-                    </div>
-
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Department</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">
-                            {{ $asset->department ? str_replace('_', ' ', $asset->department) : 'N/A' }}
-                        </span>
-                    </div>
-
-                    <div class="mb-8 sm:mb-0">
-                        <span class="block text-sm font-medium text-slate-500">Location</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->location ?? 'N/A' }}</span>
-                    </div>
-                </div>
-
-                <hr class="border-slate-100 my-12">
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-                    <div class="mb-8">
-                        <span class="block text-sm font-medium text-slate-500">Asset Accountability Form Created at</span>
-                        <span class="block mt-1 text-base text-slate-900 font-bold">{{ $asset->created_at ?? 'Unassigned' }}</span>
-                    </div>
-                </div>
-                
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Asset Details - {{ $asset->asset_code ?? 'N/A' }}</title>
+        
+        <!-- This ensures your Tailwind CSS still works without the layout component -->
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    </head>
+    <div class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm">
+        <!-- 2-Column Grid Layout -->
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-y-8 gap-x-12">
+            
+            <!-- Asset Info -->
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Asset Name</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->asset_name ?? 'N/A' }}</dd>
             </div>
-        </div>
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Asset Code</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->asset_code ?? 'N/A' }}</dd>
+            </div>
+
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Status</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->status ?? 'N/A' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Category</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->category ?? 'N/A' }}</dd>
+            </div>
+
+            <!-- Hardware Details -->
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Brand</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->brand ?? 'N/A' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Model</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->model ?? 'N/A' }}</dd>
+            </div>
+
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Serial Number</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->serial_number ?? 'N/A' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Specifications</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->specification ?? 'N/A' }}</dd>
+            </div>
+
+            <!-- Purchase & Warranty -->
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Purchase Date</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->purchase_date ?? 'N/A' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Purchase Cost</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->purchase_cost ?? 'N/A' }}</dd>
+            </div>
+
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Warranty Expiry</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->warranty_expiry ?? 'N/A' }}</dd>
+            </div>
+            <!-- Empty column to keep the grid aligned -->
+            <div class="hidden md:block"></div>
+
+            <!-- Horizontal Divider -->
+            <div class="col-span-1 md:col-span-2 border-t border-slate-100 my-2"></div>
+
+            <!-- Assignment Info -->
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Assigned To</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->assigned_to ?? 'N/A' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Department</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ str_replace('_', ' ', $asset->department) ?? 'N/A' }}</dd>
+            </div>
+
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Location</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->location ?? 'N/A' }}</dd>
+            </div>
+            <div class="hidden md:block"></div>
+
+            <!-- Horizontal Divider -->
+            <div class="col-span-1 md:col-span-2 border-t border-slate-100 my-2"></div>
+
+            <!-- Metadata -->
+            <div class="col-span-1 md:col-span-2">
+                <dt class="text-sm font-medium text-slate-500">Asset Accountability Form Created at</dt>
+                <dd class="mt-1 text-base font-bold text-slate-900">{{ $asset->created_at ?? 'N/A' }}</dd>
+            </div>
+
+        </dl>
     </div>
-</body>
-</html>
+    </html>

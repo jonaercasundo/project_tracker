@@ -35,14 +35,6 @@
             </a>
         </div>
 
-        {{-- Required fields progress --}}
-        <div class="-mt-2 flex items-center gap-3">
-            <div class="flex-1 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800/80">
-                <div id="progress_bar" class="h-2 rounded-full bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 transition-all duration-300 ease-out" style="width: 0%"></div>
-            </div>
-            <span id="progress_label" class="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500 tabular-nums">0 / 6 required fields</span>
-        </div>
-
         {{-- Main Form Container --}}
         <form method="POST" action="{{ route('mi_app.store') }}" enctype="multipart/form-data" id="product_form" novalidate>
             @csrf

@@ -147,4 +147,9 @@ class MIAppController extends Controller
         $product = MI_Product::findOrFail($id);
         return view('mi_app.designer_module.show', compact('product'));    
     }
+
+    public function product()
+    {
+        return view('mi_app.designer_module.product');
+    }
 }

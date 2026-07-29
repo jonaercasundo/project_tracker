@@ -358,6 +358,7 @@
 
                                     <input id="product_file" type="file" name="product_file" accept="image/png,image/jpeg,.obj,.gltf,.glb" class="sr-only">
                             @error('purchase_cost') <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p> @enderror
+                            </div>
 
                             <label class="block text-sm font-medium leading-6 text-slate-900 mb-2">Image Link</label>
                             <div class="relative rounded-xl shadow-sm">

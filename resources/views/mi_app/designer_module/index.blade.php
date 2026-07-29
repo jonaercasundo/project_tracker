@@ -1,7 +1,5 @@
 <x-mi_app>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        
-        {{-- Header Section --}}
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-200/80 dark:border-gray-800">
             <div class="space-y-1">
                 <div class="flex items-center gap-3">
@@ -52,4 +50,7 @@
         </div>
 
     </div>
+</x-mi_app> </div>
+
 </x-mi_app>
+

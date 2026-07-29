@@ -250,61 +250,46 @@
                                     @error('product_depth') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- SECTION 3: Packaging & Attachments --}}
-                <div class="reveal bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800 shadow-sm overflow-hidden">
-                    <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                            </svg>
-                        </span>
-                        <div>
-                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">Packaging & Media</h2>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Shipping footprint, cost, and reference file</p>
-                        </div>
-                    </div>
-                        {{-- Carton Dimensions Panel --}}
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Carton Dimensions</h3>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <div>
-                            <label for="carton_height" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Height</label>
-                            <div class="relative">
-                                <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_height" name="carton_height" value="{{ old('carton_height') }}" placeholder="50"
-                                        class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
-                                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                            {{-- Carton Dimensions Panel --}}
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Carton Dimensions</h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div>
+                                <label for="carton_height" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Height</label>
+                                <div class="relative">
+                                    <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_height" name="carton_height" value="{{ old('carton_height') }}" placeholder="50"
+                                            class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                </div>
+                                @error('carton_height') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                             </div>
-                            @error('carton_height') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label for="carton_width" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Width</label>
-                            <div class="relative">
-                                <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_width" name="carton_width" value="{{ old('carton_width') }}" placeholder="65"
-                                        class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
-                                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                            <div>
+                                <label for="carton_width" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Width</label>
+                                <div class="relative">
+                                    <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_width" name="carton_width" value="{{ old('carton_width') }}" placeholder="65"
+                                            class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                </div>
+                                @error('carton_width') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                             </div>
-                            @error('carton_width') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label for="carton_length" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Length</label>
-                            <div class="relative">
-                                <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_length" name="carton_length" value="{{ old('carton_length') }}" placeholder="125"
-                                        class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
-                                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                            <div>
+                                <label for="carton_length" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Length</label>
+                                <div class="relative">
+                                    <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_length" name="carton_length" value="{{ old('carton_length') }}" placeholder="125"
+                                            class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                </div>
+                                @error('carton_length') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                             </div>
-                            @error('carton_length') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label for="carton_depth" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Depth</label>
-                            <div class="relative">
-                                <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_depth" name="carton_depth" value="{{ old('carton_depth') }}" placeholder="35"
-                                        class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
-                                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                            <div>
+                                <label for="carton_depth" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Depth</label>
+                                <div class="relative">
+                                    <input type="number" step="0.1" min="0" inputmode="decimal" id="carton_depth" name="carton_depth" value="{{ old('carton_depth') }}" placeholder="35"
+                                            class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                </div>
+                                @error('carton_depth') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                             </div>
-                            @error('carton_depth') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
+                        </div>
                         </div>
                     </div>
                 </div>

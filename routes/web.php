@@ -26,6 +26,7 @@ use App\Http\Controllers\ProjectDashboardController;
 use App\Http\Controllers\ITinventoryController;
 use App\Http\Controllers\Warehouse\WarehouseInventoryController;
 use App\Http\Controllers\DeliveryReceiveController;
+use App\Http\Controllers\MIAppController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -301,7 +302,7 @@ Route::middleware(['auth'])->group(function () {
 
         /*
     |--------------------------------------------------------------------------
-    | ADMIN ROUTES
+    | ADMIN ROUTES 
     |--------------------------------------------------------------------------
     */
     Route::middleware(['role:IT'])->group(function () {
@@ -393,4 +394,17 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/delivery-success', function () {
         return view('operation.delivery.success');
         })->name('delivery.success');
+    
+/*
+    |--------------------------------------------------------------------------
+    | Jared ROUTES
+    |--------------------------------------------------------------------------
+*/
+
+    Route::get('/mi/designer', function () {
+        return view('mi_app.designer_module.index');
+    })->name('mi_designer');
+    Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
+    Route::get('/mi/designer', [MIAppController::class, 'index'])->name('mi_app.index');
+    Route::post('/mi/store', [MIAppController::class, 'store'])->name('mi_app.store');
 require __DIR__.'/auth.php';

@@ -215,9 +215,17 @@
                                        class="block w-full rounded-xl border-0 py-2.5 pl-8 pr-4 text-slate-900 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 transition-all hover:ring-slate-300">
                             </div>
                             @error('purchase_cost') <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p> @enderror
+
+                            <label class="block text-sm font-medium leading-6 text-slate-900 mb-2">Image Link</label>
+                            <div class="relative rounded-xl shadow-sm">
+                                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4"></div>
+                                <input type="text" name="carton_width" value="{{ old('carton_width') }}"
+                                           class="block w-full rounded-lg border-0 py-2 px-3 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 text-sm transition-all">
+                                    @error('carton_width') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                            </div>
                         </div>
 
-                        <div class="lg:col-span-3">
+                        <div class="lg:col-span-1">
                             <label class="block text-sm font-medium leading-6 text-slate-900 mb-2">Upload Image or 3D File</label>
                             <label for="product_file" class="group relative flex items-center justify-center gap-3 w-full rounded-xl border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50 hover:bg-blue-50/40 py-5 px-4 cursor-pointer transition-all">
                                 <div class="h-9 w-9 rounded-lg bg-white group-hover:bg-blue-100 flex items-center justify-center shadow-sm transition-all">

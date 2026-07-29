@@ -4,8 +4,6 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Asset Details - {{ $asset->asset_code ?? 'N/A' }}</title>
-        
-        <!-- This ensures your Tailwind CSS still works without the layout component -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <div class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm">

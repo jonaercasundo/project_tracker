@@ -35,6 +35,10 @@
             </a>
         </div>
 
+        {{-- Required fields progress --}}
+        <div class="-mt-2 flex items-center gap-3">
+      </div>
+
         {{-- Main Form Container --}}
         <form method="POST" action="{{ route('mi_app.store') }}" enctype="multipart/form-data" id="product_form" novalidate>
             @csrf

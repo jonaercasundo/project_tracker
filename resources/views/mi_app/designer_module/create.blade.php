@@ -194,80 +194,90 @@
                             </div>
                         </div>
 
-                        {{-- Dimensions --}}
+                        {{-- Product Dimensions Panel --}}
                         <div class="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30 p-5">
-
-                            <div class="flex items-center justify-between mb-6">
-                                <h3 class="text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                    Dimensions
-                                </h3>
+                            <div class="flex items-center justify-between gap-4 mb-4">
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Product Dimensions</h3>
+                                <span class="hidden sm:flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-300 dark:text-gray-600" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.3">
+                                        <path d="M6 24 6 10 14 6 26 10 26 24 18 28 6 24Z" stroke-linejoin="round"/>
+                                        <path d="M6 10 18 14 26 10" stroke-linejoin="round"/>
+                                        <path d="M18 14 18 28" stroke-linejoin="round"/>
+                                    </svg>
+                                    H × W × L × D
+                                </span>
                             </div>
-
-                            {{-- Product Dimensions --}}
-                            <div class="mb-8">
-                                <div class="flex items-center gap-2 mb-4">
-                                    <div class="h-9 w-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                        📦
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div>
+                                    <label for="product_height" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Height <span class="text-rose-500">*</span></label>
+                                    <div class="relative">
+                                        <input type="number" step="0.1" min="0" inputmode="decimal" id="product_height" name="product_height" value="{{ old('product_height') }}" placeholder="45" required data-required
+                                               class=" field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
                                     </div>
-                                    <div>
-                                        <h4 class="font-semibold text-gray-800 dark:text-white">
-                                            Product Dimensions
-                                        </h4>
-                                        <p class="text-xs text-gray-500">
-                                            Actual assembled product size
+                                    @error('product_height')
+                                        <p class="flex items-center gap-1 text-rose-500 text-xs mt-1 font-medium">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.75 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                                            {{ $message }}
                                         </p>
-                                    </div>
+                                    @enderror
                                 </div>
-
-                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-                                    Height
-
-                                    Width
-
-                                    Length
-
-                                    Depth
-
+                                <div>
+                                    <label for="product_width" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Width</label>
+                                    <div class="relative">
+                                        <input type="number" step="0.1" min="0" inputmode="decimal" id="product_width" name="product_width" value="{{ old('product_width') }}" placeholder="60"
+                                               class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                    </div>
+                                    @error('product_width') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label for="product_length" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Length</label>
+                                    <div class="relative">
+                                        <input type="number" step="0.1" min="0" inputmode="decimal" id="product_length" name="product_length" value="{{ old('product_length') }}" placeholder="120"
+                                               class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                    </div>
+                                    @error('product_length') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label for="product_depth" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Depth</label>
+                                    <div class="relative">
+                                        <input type="number" step="0.1" min="0" inputmode="decimal" id="product_depth" name="product_depth" value="{{ old('product_depth') }}" placeholder="30"
+                                               class="field w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-3 pr-9 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 outline-none">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">cm</span>
+                                    </div>
+                                    @error('product_depth') <p class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</p> @enderror
                                 </div>
                             </div>
-
-                            {{-- Divider --}}
-                            <div class="border-t border-gray-200 dark:border-gray-700 my-6"></div>
-
-                            {{-- Carton Dimensions --}}
-                            <div>
-
-                                <div class="flex items-center gap-2 mb-4">
-                                    <div class="h-9 w-9 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                                        🚚
-                                    </div>
-                                    <div>
-                                        <h4 class="font-semibold text-gray-800 dark:text-white">
-                                            Carton Dimensions
-                                        </h4>
-                                        <p class="text-xs text-gray-500">
-                                            Packaging / shipping carton size
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-                                    Height
-
-                                    Width
-
-                                    Length
-
-                                    Depth
-
-                                </div>
-
-                            </div>
-
                         </div>
                     </div>
+                </div>
+
+                {{-- SECTION 3: Packaging & Attachments --}}
+                <div class="reveal bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800 shadow-sm overflow-hidden">
+                    <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                            </svg>
+                        </span>
+                        <div>
+                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">Packaging & Media</h2>
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Shipping footprint, cost, and reference file</p>
+                        </div>
+                    </div>
+                        <div class="flex items-center justify-between gap-4 mb-4">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Product Dimensions</h3>
+                            <span class="hidden sm:flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-300 dark:text-gray-600" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.3">
+                                    <path d="M6 24 6 10 14 6 26 10 26 24 18 28 6 24Z" stroke-linejoin="round"/>
+                                    <path d="M6 10 18 14 26 10" stroke-linejoin="round"/>
+                                    <path d="M18 14 18 28" stroke-linejoin="round"/>
+                                </svg>
+                                H × W × L × D
+                            </span>
+                        </div>
                 </div>
 
             </div>

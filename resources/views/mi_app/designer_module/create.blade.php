@@ -5,7 +5,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
             <div class="flex items-center gap-4">
                 <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 stroke-[2.2]" fill="blue" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
                 </div>

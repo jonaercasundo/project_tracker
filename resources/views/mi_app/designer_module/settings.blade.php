@@ -306,7 +306,7 @@
 
                                                 <td class="px-6 py-4">
                                                     <span class="inline-flex rounded-lg bg-blue-50 px-3 py-1 font-mono font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                                        {{ $category->category_code }}-{{ $subCategory->sub_category_code }}-{{ $productType->product_type_code }}-{{ $collection->collection_code }}
+                                                        {{ $category->code }}-{{ $subCategory->code }}-{{ $productType->code }}-{{ $collection->code }}
                                                     </span>
                                                 </td>
 

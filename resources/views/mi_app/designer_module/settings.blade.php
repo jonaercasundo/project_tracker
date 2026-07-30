@@ -311,29 +311,29 @@
                                                 </td>
 
                                                 <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                                                    {{ $category->category_name }}
+                                                    {{ $category->name }}
                                                 </td>
 
                                                 <td class="px-6 py-4">
-                                                    {{ $subCategory->sub_category_name }}
+                                                    {{ $subCategory->name }}
                                                 </td>
 
                                                 <td class="px-6 py-4">
-                                                    {{ $productType->product_type_name }}
+                                                    {{ $productType->name }}
                                                 </td>
 
                                                 <td class="px-6 py-4">
-                                                    {{ $collection->collection_name }}
+                                                    {{ $collection->name }}
                                                 </td>
 
                                                 <td class="px-6 py-4 text-gray-500">
-                                                    {{ $category->category_name }}
+                                                    {{ $category->name }}
                                                     →
-                                                    {{ $subCategory->sub_category_name }}
+                                                    {{ $subCategory->name }}
                                                     →
-                                                    {{ $productType->product_type_name }}
+                                                    {{ $productType->name }}
                                                     →
-                                                    {{ $collection->collection_name }}
+                                                    {{ $collection->name }}
                                                 </td>
 
                                             </tr>

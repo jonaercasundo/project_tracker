@@ -24,7 +24,7 @@ class MI_SubCategory extends Model
         return $this->belongsTo(MI_Category::class, 'category_id');
     }
 
-    public function subSubCategories()
+    public function productTypes()
     {
         return $this->hasMany(MI_ProductType::class, 'sub_category_id');
     }

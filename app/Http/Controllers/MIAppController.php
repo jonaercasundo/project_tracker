@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\MI_Category;
 use App\Models\MI_SubCategory;
 use App\Models\MI_ProductType;
+use App\Models\MI_Collection;
+use App\Models\MI_Material;
+use Illuminate\Support\Facades\DB;
 
 class MIAppController extends Controller
 {
@@ -41,15 +44,156 @@ class MIAppController extends Controller
     public function settings()
     {
         $categories = MI_Category::orderBy('name')->get();
+
         $subCategories = MI_SubCategory::orderBy('name')->get();
-        $subSubCategories = MI_ProductType::orderBy('name')->get();
+
+        $productTypes = MI_ProductType::orderBy('name')->get();
+
+        $collections = MI_Collection::orderBy('name')->get();
+
+        $materials = MI_Material::orderBy('material_name')->get();
 
         return view('mi_app.designer_module.settings', compact(
             'categories',
             'subCategories',
-            'subSubCategories'
+            'productTypes',
+            'collections',
+            'materials'
         ));
     }
+public function setting_store(Request $request)
+{
+    DB::beginTransaction();
+
+    try {
+
+        switch ($request->entity_type) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Category
+            |--------------------------------------------------------------------------
+            */
+            case 'category':
+
+                $request->validate([
+                    'category_name' => 'required|string|max:255|unique:mi_categories,name',
+                ]);
+
+                MI_Category::create([
+                    'code'        => strtoupper(substr($request->category_name, 0, 3)),
+                    'name'        => $request->category_name,
+                    'description' => $request->description,
+                    'is_active'   => true,
+                ]);
+
+                break;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Sub Category
+            |--------------------------------------------------------------------------
+            */
+            case 'sub_category':
+
+                $request->validate([
+                    'category_id'      => 'required|exists:mi_categories,id',
+                    'sub_category_name'=> 'required|string|max:255',
+                ]);
+
+                MI_SubCategory::create([
+                    'category_id' => $request->category_id,
+                    'code'        => strtoupper(substr($request->sub_category_name, 0, 3)),
+                    'name'        => $request->sub_category_name,
+                    'description' => $request->description,
+                    'is_active'   => true,
+                ]);
+
+                break;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Product Type
+            |--------------------------------------------------------------------------
+            */
+            case 'product_type':
+
+                $request->validate([
+                    'sub_category_id' => 'required|exists:mi_sub_categories,id',
+                    'product_type_name' => 'required|string|max:255',
+                ]);
+
+                MI_ProductType::create([
+                    'sub_category_id' => $request->sub_category_id,
+                    'code'            => strtoupper(substr($request->product_type_name, 0, 3)),
+                    'name'            => $request->product_type_name,
+                    'description'     => $request->description,
+                    'is_active'       => true,
+                ]);
+
+                break;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Collection
+            |--------------------------------------------------------------------------
+            */
+            case 'collection':
+
+                $request->validate([
+                    'product_type_id' => 'required|exists:mi_product_types,id',
+                    'collection_name' => 'required|string|max:255',
+                ]);
+
+                MI_Collection::create([
+                    'product_type_id' => $request->product_type_id,
+                    'code'            => strtoupper(substr($request->collection_name, 0, 3)),
+                    'name'            => $request->collection_name,
+                    'description'     => $request->description,
+                    'is_active'       => true,
+                ]);
+
+                break;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Material
+            |--------------------------------------------------------------------------
+            */
+            case 'material':
+
+                $request->validate([
+                    'material_name' => 'required|string|max:255|unique:mi_materials,material_name',
+                ]);
+
+                MI_Material::create([
+                    'material_name' => $request->material_name,
+                    'is_active'     => true,
+                ]);
+
+                break;
+
+            default:
+                return back()->withErrors([
+                    'entity_type' => 'Invalid request.'
+                ]);
+        }
+
+        DB::commit();
+
+        return back()->with('success', 'Record saved successfully.');
+
+    } catch (\Exception $e) {
+
+        DB::rollBack();
+
+        return back()
+            ->withInput()
+            ->withErrors([
+                'error' => $e->getMessage()
+            ]);
+    }
+}
     public function store(Request $request) 
     {
         $validated = $request->validate([

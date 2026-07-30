@@ -97,7 +97,7 @@
                                     <option value="">-- Select Category --</option>
                                     @foreach($categories as $category)
                                         <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
-                                            {{ $category->category_name }}
+                                            {{ $category->name }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -132,7 +132,7 @@
             <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
                 <form method="POST" action="{{ route('mi_app.store') }}" novalidate>
                     @csrf
-                    <input type="hidden" name="entity_type" value="sub_sub_category">
+                    <input type="hidden" name="entity_type" value="product_type">
                     <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
                         <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -155,7 +155,7 @@
                                     class="field w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 pr-10 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
                                     <option value="">-- Select Category --</option>
                                     @foreach($categories as $category)
-                                        <option value="{{ $category->id }}">{{ $category->category_name }}</option>
+                                        <option value="{{ $category->id }}"> {{ $category->code }} - {{ $category->name }}</option>
                                     @endforeach
                                 </select>
                                 <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
@@ -181,10 +181,10 @@
                         </div>
 
                         <div>
-                            <label for="sub_sub_category_name" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="product_type_name" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
                                 Sub Sub Category Name <span class="text-rose-500">*</span>
                             </label>
-                            <input type="text" id="sub_sub_category_name" name="sub_sub_category_name" value="{{ old('sub_sub_category_name') }}" placeholder="e.g. Dining Chairs" required
+                            <input type="text" id="product_type_name" name="product_type_name" value="{{ old('product_type_name') }}" placeholder="e.g. Dining Chairs" required
                                 class="field w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
                         </div>
 
@@ -222,7 +222,7 @@
                                     class="field w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 pr-10 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
                                     <option value="">-- Select Category --</option>
                                     @foreach($categories as $category)
-                                        <option value="{{ $category->id }}">{{ $category->category_name }}</option>
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
                                 </select>
                                 <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
@@ -237,7 +237,7 @@
                                     <option value="">-- Select Category First --</option>
                                     @foreach($subCategories as $subCategory)
                                         <option value="{{ $subCategory->id }}" data-parent="{{ $subCategory->category_id }}" class="hidden">
-                                            {{ $subCategory->sub_category_name }}
+                                            {{ $subCategory->name }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -248,12 +248,12 @@
                         <div>
                             <label for="col_subsubcategory_id" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">Sub Sub Category <span class="text-rose-500">*</span></label>
                             <div class="relative">
-                                <select name="sub_sub_category_id" id="col_subsubcategory_id" required
+                                <select name="product_type_id" id="col_subsubcategory_id" required
                                     class="field w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 pr-10 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
                                     <option value="">-- Select Sub Category First --</option>
-                                    @foreach($subSubCategories as $subSubCategory)
+                                    @foreach($productTypes as $subSubCategory)
                                         <option value="{{ $subSubCategory->id }}" data-parent="{{ $subSubCategory->sub_category_id }}" class="hidden">
-                                            {{ $subSubCategory->sub_sub_category_name }}
+                                            {{ $productType->name }}
                                         </option>
                                     @endforeach
                                 </select>

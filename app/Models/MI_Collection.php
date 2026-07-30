@@ -19,7 +19,7 @@ class MI_Collection extends Model
         'is_active'
     ];
 
-    public function subSubCategory()
+    public function productType()
     {
         return $this->belongsTo(MI_ProductType::class, 'product_type_id');
     }

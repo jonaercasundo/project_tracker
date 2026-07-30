@@ -321,42 +321,6 @@
                 </div>
             </div>
 
-            {{-- SECTION 5: Type of Sample --}}
-            <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
-                <form method="POST" action="{{ route('mi_app.store') }}" novalidate>
-                    @csrf
-                    <input type="hidden" name="entity_type" value="type_of_sample">
-                    <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5M3.75 4.5l7.5 7.5-7.5 7.5" />
-                            </svg>
-                        </span>
-                        <div>
-                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">Type of Sample</h2>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Add a Sample Type (e.g. Swatch, Cutting, Full Piece)</p>
-                        </div>
-                    </div>
-
-                    <div class="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div>
-                            <label for="type_of_sample_name" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                                Type of Sample <span class="text-rose-500">*</span>
-                            </label>
-                            <input type="text" id="type_of_sample_name" name="type_of_sample_name" value="{{ old('type_of_sample_name') }}" placeholder="e.g. Swatch" required
-                                class="field w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
-                            @error('type_of_sample_name')
-                                <p class="flex items-center gap-1 text-rose-500 text-xs mt-1.5 font-medium">{{ $message }}</p>
-                            @enderror
-                        </div>
-                        <div class="flex items-end">
-                            <button type="submit" class="w-full rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold py-2.5 px-4 hover:opacity-90 transition-all">
-                                Add Type of Sample
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
 
             {{-- SECTION 6: Materials --}}
             <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">

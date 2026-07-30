@@ -277,50 +277,50 @@
                     </div>
                 </form>
             </div>
-<table class="min-w-full text-sm">
-    <thead>
-        <tr>
-            <th>Category</th>
-            <th>Sub Category</th>
-            <th>Product Type</th>
-            <th>Collection</th>
-        </tr>
-    </thead>
 
-    <tbody>
-        @foreach($categories as $category)
+            {{-- Hierarchy Overview Table --}}
+            <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
+                <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-white">Taxonomy Structure</h2>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Existing mapping of categories down to collections</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                        <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs text-gray-700 dark:text-gray-300 uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
+                            <tr>
+                                <th scope="col" class="px-6 py-3.5 font-semibold">Category</th>
+                                <th scope="col" class="px-6 py-3.5 font-semibold">Sub Category</th>
+                                <th scope="col" class="px-6 py-3.5 font-semibold">Product Type</th>
+                                <th scope="col" class="px-6 py-3.5 font-semibold">Collection</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                            @foreach($categories as $category)
+                                @foreach($category->subCategories as $subCategory)
+                                    @foreach($subCategory->productTypes as $productType)
+                                        @forelse($productType->collections as $collection)
+                                            <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+                                                <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ $category->name }}</td>
+                                                <td class="px-6 py-4">{{ $subCategory->name }}</td>
+                                                <td class="px-6 py-4">{{ $productType->name }}</td>
+                                                <td class="px-6 py-4">{{ $collection->name }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+                                                <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ $category->name }}</td>
+                                                <td class="px-6 py-4">{{ $subCategory->name }}</td>
+                                                <td class="px-6 py-4">{{ $productType->name }}</td>
+                                                <td class="px-6 py-4 text-gray-400 dark:text-gray-600">-</td>
+                                            </tr>
+                                        @endforelse
+                                    @endforeach
+                                @endforeach
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-            @foreach($category->subCategories as $subCategory)
-
-                @foreach($subCategory->productTypes as $productType)
-
-                    @forelse($productType->collections as $collection)
-
-                        <tr>
-                            <td>{{ $category->name }}</td>
-                            <td>{{ $subCategory->name }}</td>
-                            <td>{{ $productType->name }}</td>
-                            <td>{{ $collection->name }}</td>
-                        </tr>
-
-                    @empty
-
-                        <tr>
-                            <td>{{ $category->name }}</td>
-                            <td>{{ $subCategory->name }}</td>
-                            <td>{{ $productType->name }}</td>
-                            <td>-</td>
-                        </tr>
-
-                    @endforelse
-
-                @endforeach
-
-            @endforeach
-
-        @endforeach
-    </tbody>
-</table>
             {{-- SECTION 5: Type of Sample --}}
             <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
                 <form method="POST" action="{{ route('mi_app.store') }}" novalidate>
@@ -394,6 +394,7 @@
                     </div>
                 </form>
             </div>
+
         </div>
         </div>
     </div>

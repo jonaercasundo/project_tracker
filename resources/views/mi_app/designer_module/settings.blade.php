@@ -97,7 +97,7 @@
                                     <option value="">-- Select Category --</option>
                                     @foreach($categories as $category)
                                         <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
-                                            {{ $category->name }}
+                                            {{ $category->code }} - {{ $category->name }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -237,7 +237,7 @@
                                     <option value="">-- Select Category First --</option>
                                     @foreach($subCategories as $subCategory)
                                         <option value="{{ $subCategory->id }}" data-parent="{{ $subCategory->category_id }}" class="hidden">
-                                            {{ $subCategory->name }}
+                                           {{ $subCategory->sub_category_name }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -251,9 +251,11 @@
                                 <select name="product_type_id" id="col_subsubcategory_id" required
                                     class="field w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 pr-10 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
                                     <option value="">-- Select Sub Category First --</option>
-                                    @foreach($productTypes as $subSubCategory)
-                                        <option value="{{ $subSubCategory->id }}" data-parent="{{ $subSubCategory->sub_category_id }}" class="hidden">
-                                            {{ $productType->name }}
+                                    @foreach($productTypes as $productType)
+                                        <option value="{{ $productType->id }}"
+                                            data-parent="{{ $productType->sub_category_id }}"
+                                            class="hidden">
+                                            {{ $productType->product_type_name }}
                                         </option>
                                     @endforeach
                                 </select>

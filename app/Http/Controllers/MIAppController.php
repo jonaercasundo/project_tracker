@@ -35,7 +35,10 @@ class MIAppController extends Controller
     {
         return view('mi_app.designer_module.create');
     }
-
+    public function settings() 
+    {
+        return view('mi_app.designer_module.settings');
+    }
     public function store(Request $request) 
     {
         $validated = $request->validate([

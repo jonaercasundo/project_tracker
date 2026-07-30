@@ -13,7 +13,6 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-                @forelse ($assets as $asset)
                     <tr class="hover:bg-slate-50 transition-colors">
                         <td class="px-5 py-4 font-medium text-slate-900"></td>
                         <td class="px-5 py-4"></td>

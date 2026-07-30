@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\MI_Product; // Ensure the model is imported
 use Illuminate\Support\Facades\Storage;
+use App\Models\Category;
+use App\Models\SubCategory;
+use App\Models\SubSubCategory;
 
 class MIAppController extends Controller
 {
@@ -35,9 +38,17 @@ class MIAppController extends Controller
     {
         return view('mi_app.designer_module.create');
     }
-    public function settings() 
+    public function settings()
     {
-        return view('mi_app.designer_module.settings');
+        $categories = Category::orderBy('category_name')->get();
+        $subCategories = SubCategory::orderBy('sub_category_name')->get();
+        $subSubCategories = SubSubCategory::orderBy('sub_sub_category_name')->get();
+
+        return view('mi_app.designer_module.settings', compact(
+            'categories',
+            'subCategories',
+            'subSubCategories'
+        ));
     }
     public function store(Request $request) 
     {

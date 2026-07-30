@@ -172,7 +172,7 @@
                                     <option value="">-- Select Category First --</option>
                                     @foreach($subCategories as $subCategory)
                                         <option value="{{ $subCategory->id }}" data-parent="{{ $subCategory->category_id }}" class="hidden">
-                                            {{ $subCategory->sub_category_name }}
+                                            {{ $subCategory->name }}
                                         </option>
                                     @endforeach
                                 </select>

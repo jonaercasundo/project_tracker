@@ -45,7 +45,7 @@ class MIAppController extends Controller
     {
         $categories = MI_Category::orderBy('name')->get();
 
-        $sub_category_name = MI_SubCategory::orderBy('name')->get();
+        $subCategories = MI_SubCategory::orderBy('name')->get();
 
         $productTypes = MI_ProductType::orderBy('name')->get();
 
@@ -55,7 +55,7 @@ class MIAppController extends Controller
 
         return view('mi_app.designer_module.settings', compact(
             'categories',
-            'sub_category_name',
+            'subCategories',
             'productTypes',
             'collections',
             'materials'

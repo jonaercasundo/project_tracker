@@ -298,50 +298,95 @@
                         </thead>
 
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            @foreach($categories as $category)
-                                @foreach($category->subCategories as $subCategory)
-                                    @foreach($subCategory->productTypes as $productType)
-                                        @forelse($productType->collections as $collection)
-                                            <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
+                        @foreach($categories as $category)
 
-                                                <td class="px-6 py-4">
-                                                    <span class="inline-flex rounded-lg bg-blue-50 px-3 py-1 font-mono font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                                        {{ $category->code }}-{{ $subCategory->code }}-{{ $productType->code }}-{{ $collection->code }}
-                                                    </span>
-                                                </td>
+                            {{-- Category only --}}
+                            @if($category->subCategories->isEmpty())
+                                <tr>
+                                    <td class="px-6 py-4">
+                                        {{ $category->code }}
+                                    </td>
+                                    <td class="px-6 py-4">{{ $category->name }}</td>
+                                    <td class="px-6 py-4 text-gray-400">-</td>
+                                    <td class="px-6 py-4 text-gray-400">-</td>
+                                    <td class="px-6 py-4 text-gray-400">-</td>
+                                    <td class="px-6 py-4">
+                                        {{ $category->name }}
+                                    </td>
+                                </tr>
+                            @endif
 
-                                                <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                                                    {{ $category->name }}
-                                                </td>
+                            @foreach($category->subCategories as $subCategory)
 
-                                                <td class="px-6 py-4">
-                                                    {{ $subCategory->name }}
-                                                </td>
+                                {{-- Category + Sub Category --}}
+                                @if($subCategory->productTypes->isEmpty())
+                                    <tr>
+                                        <td class="px-6 py-4">
+                                            {{ $category->code }}-{{ $subCategory->code }}
+                                        </td>
 
-                                                <td class="px-6 py-4">
-                                                    {{ $productType->name }}
-                                                </td>
+                                        <td class="px-6 py-4">{{ $category->name }}</td>
+                                        <td class="px-6 py-4">{{ $subCategory->name }}</td>
+                                        <td class="px-6 py-4 text-gray-400">-</td>
+                                        <td class="px-6 py-4 text-gray-400">-</td>
 
-                                                <td class="px-6 py-4">
-                                                    {{ $collection->name }}
-                                                </td>
+                                        <td class="px-6 py-4">
+                                            {{ $category->name }} →
+                                            {{ $subCategory->name }}
+                                        </td>
+                                    </tr>
+                                @endif
 
-                                                <td class="px-6 py-4 text-gray-500">
-                                                    {{ $category->name }}
-                                                    →
-                                                    {{ $subCategory->name }}
-                                                    →
-                                                    {{ $productType->name }}
-                                                    →
-                                                    {{ $collection->name }}
-                                                </td>
+                                @foreach($subCategory->productTypes as $productType)
 
-                                            </tr>
-                                        @empty
-                                        @endforelse
+                                    {{-- Category + Sub Category + Product Type --}}
+                                    @if($productType->collections->isEmpty())
+                                        <tr>
+                                            <td class="px-6 py-4">
+                                                {{ $category->code }}-{{ $subCategory->code }}-{{ $productType->code }}
+                                            </td>
+
+                                            <td class="px-6 py-4">{{ $category->name }}</td>
+                                            <td class="px-6 py-4">{{ $subCategory->name }}</td>
+                                            <td class="px-6 py-4">{{ $productType->name }}</td>
+                                            <td class="px-6 py-4 text-gray-400">-</td>
+
+                                            <td class="px-6 py-4">
+                                                {{ $category->name }} →
+                                                {{ $subCategory->name }} →
+                                                {{ $productType->name }}
+                                            </td>
+                                        </tr>
+                                    @endif
+
+                                    @foreach($productType->collections as $collection)
+
+                                        {{-- Complete taxonomy --}}
+                                        <tr>
+                                            <td class="px-6 py-4">
+                                                {{ $category->code }}-{{ $subCategory->code }}-{{ $productType->code }}-{{ $collection->code }}
+                                            </td>
+
+                                            <td class="px-6 py-4">{{ $category->name }}</td>
+                                            <td class="px-6 py-4">{{ $subCategory->name }}</td>
+                                            <td class="px-6 py-4">{{ $productType->name }}</td>
+                                            <td class="px-6 py-4">{{ $collection->name }}</td>
+
+                                            <td class="px-6 py-4">
+                                                {{ $category->name }} →
+                                                {{ $subCategory->name }} →
+                                                {{ $productType->name }} →
+                                                {{ $collection->name }}
+                                            </td>
+                                        </tr>
+
                                     @endforeach
+
                                 @endforeach
+
                             @endforeach
+
+                        @endforeach
                         </tbody>
                     </table>
                 </div>

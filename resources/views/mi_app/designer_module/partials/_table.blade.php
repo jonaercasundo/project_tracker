@@ -17,8 +17,6 @@
                         <td class="px-5 py-4 font-medium text-slate-900"></td>
                         <td class="px-5 py-4"></td>
                         <td class="px-5 py-4"></td>
-
-            <tbody class="divide-y divide-slate-100">
             </tbody>
         </table>
     </div>

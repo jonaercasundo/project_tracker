@@ -9,7 +9,7 @@ class MI_SubCategory extends Model
 {
     use HasFactory;
 
-    protected $table = 'MI_sub_categories';
+    protected $table = 'mi_sub_categories';
 
     protected $fillable = [
         'category_id',

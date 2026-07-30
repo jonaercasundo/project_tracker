@@ -277,7 +277,50 @@
                     </div>
                 </form>
             </div>
+<table class="min-w-full text-sm">
+    <thead>
+        <tr>
+            <th>Category</th>
+            <th>Sub Category</th>
+            <th>Product Type</th>
+            <th>Collection</th>
+        </tr>
+    </thead>
 
+    <tbody>
+        @foreach($categories as $category)
+
+            @foreach($category->subCategories as $subCategory)
+
+                @foreach($subCategory->productTypes as $productType)
+
+                    @forelse($productType->collections as $collection)
+
+                        <tr>
+                            <td>{{ $category->name }}</td>
+                            <td>{{ $subCategory->name }}</td>
+                            <td>{{ $productType->name }}</td>
+                            <td>{{ $collection->name }}</td>
+                        </tr>
+
+                    @empty
+
+                        <tr>
+                            <td>{{ $category->name }}</td>
+                            <td>{{ $subCategory->name }}</td>
+                            <td>{{ $productType->name }}</td>
+                            <td>-</td>
+                        </tr>
+
+                    @endforelse
+
+                @endforeach
+
+            @endforeach
+
+        @endforeach
+    </tbody>
+</table>
             {{-- SECTION 5: Type of Sample --}}
             <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
                 <form method="POST" action="{{ route('mi_app.store') }}" novalidate>
@@ -351,7 +394,6 @@
                     </div>
                 </form>
             </div>
-
         </div>
         </div>
     </div>

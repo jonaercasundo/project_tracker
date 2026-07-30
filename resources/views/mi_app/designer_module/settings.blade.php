@@ -286,32 +286,58 @@
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                        <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs text-gray-700 dark:text-gray-300 uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
+                        <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
                             <tr>
-                                <th scope="col" class="px-6 py-3.5 font-semibold">Category</th>
-                                <th scope="col" class="px-6 py-3.5 font-semibold">Sub Category</th>
-                                <th scope="col" class="px-6 py-3.5 font-semibold">Sub Sub Category</th>
-                                <th scope="col" class="px-6 py-3.5 font-semibold">Collection</th>
+                                <th class="px-6 py-3.5 font-semibold">Taxonomy Code</th>
+                                <th class="px-6 py-3.5 font-semibold">Category</th>
+                                <th class="px-6 py-3.5 font-semibold">Sub Category</th>
+                                <th class="px-6 py-3.5 font-semibold">Product Type</th>
+                                <th class="px-6 py-3.5 font-semibold">Collection</th>
+                                <th class="px-6 py-3.5 font-semibold">Hierarchy</th>
                             </tr>
                         </thead>
+
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             @foreach($categories as $category)
                                 @foreach($category->subCategories as $subCategory)
                                     @foreach($subCategory->productTypes as $productType)
                                         @forelse($productType->collections as $collection)
-                                            <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
-                                                <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ $category->name }}</td>
-                                                <td class="px-6 py-4">{{ $subCategory->name }}</td>
-                                                <td class="px-6 py-4">{{ $productType->name }}</td>
-                                                <td class="px-6 py-4">{{ $collection->name }}</td>
+                                            <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
+
+                                                <td class="px-6 py-4">
+                                                    <span class="inline-flex rounded-lg bg-blue-50 px-3 py-1 font-mono font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                                        {{ $category->category_code }}-{{ $subCategory->sub_category_code }}-{{ $productType->product_type_code }}-{{ $collection->collection_code }}
+                                                    </span>
+                                                </td>
+
+                                                <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                                                    {{ $category->category_name }}
+                                                </td>
+
+                                                <td class="px-6 py-4">
+                                                    {{ $subCategory->sub_category_name }}
+                                                </td>
+
+                                                <td class="px-6 py-4">
+                                                    {{ $productType->product_type_name }}
+                                                </td>
+
+                                                <td class="px-6 py-4">
+                                                    {{ $collection->collection_name }}
+                                                </td>
+
+                                                <td class="px-6 py-4 text-gray-500">
+                                                    {{ $category->category_name }}
+                                                    →
+                                                    {{ $subCategory->sub_category_name }}
+                                                    →
+                                                    {{ $productType->product_type_name }}
+                                                    →
+                                                    {{ $collection->collection_name }}
+                                                </td>
+
                                             </tr>
                                         @empty
-                                            <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
-                                                <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ $category->name }}</td>
-                                                <td class="px-6 py-4">{{ $subCategory->name }}</td>
-                                                <td class="px-6 py-4">{{ $productType->name }}</td>
-                                                <td class="px-6 py-4 text-gray-400 dark:text-gray-600">-</td>
-                                            </tr>
                                         @endforelse
                                     @endforeach
                                 @endforeach

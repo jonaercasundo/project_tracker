@@ -40,9 +40,9 @@ class MIAppController extends Controller
     }
     public function settings()
     {
-        $categories = MI_Category::orderBy('category_name')->get();
-        $subCategories = MI_SubCategory::orderBy('sub_category_name')->get();
-        $subSubCategories = MI_ProductType::orderBy('sub_sub_category_name')->get();
+        $categories = MI_Category::orderBy('name')->get();
+        $subCategories = MI_SubCategory::orderBy('name')->get();
+        $subSubCategories = MI_ProductType::orderBy('name')->get();
 
         return view('mi_app.designer_module.settings', compact(
             'categories',

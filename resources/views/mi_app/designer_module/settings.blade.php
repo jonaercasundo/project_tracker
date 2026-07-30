@@ -290,7 +290,7 @@
                             <tr>
                                 <th scope="col" class="px-6 py-3.5 font-semibold">Category</th>
                                 <th scope="col" class="px-6 py-3.5 font-semibold">Sub Category</th>
-                                <th scope="col" class="px-6 py-3.5 font-semibold">Product Type</th>
+                                <th scope="col" class="px-6 py-3.5 font-semibold">Sub Sub Category</th>
                                 <th scope="col" class="px-6 py-3.5 font-semibold">Collection</th>
                             </tr>
                         </thead>

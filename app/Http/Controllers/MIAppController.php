@@ -248,9 +248,13 @@ class MIAppController extends Controller
             'designed_by' => 'nullable|string|max:255',
 
             // Attributes
-            'materials' => 'required|string|max:255',
+            'materials' => 'required|array|min:1',
+            'materials.*' => 'string|max:255',
+
             'type' => 'nullable|string|max:255',
-            'color' => 'nullable|string|max:255',
+
+            'color' => 'nullable|array',
+            'color.*' => 'string|max:255',
 
             // Product Dimensions
             'product_height' => 'nullable|numeric',
@@ -271,10 +275,37 @@ class MIAppController extends Controller
             'product_file' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
         ]);
 
+        /*
+        |--------------------------------------------------------------------------
+        | Save arrays
+        |--------------------------------------------------------------------------
+        */
+
+        $validated['materials'] = !empty($validated['materials'])
+            ? json_encode($validated['materials'])
+            : null;
+
+        $validated['color'] = !empty($validated['color'])
+            ? json_encode($validated['color'])
+            : null;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Upload File
+        |--------------------------------------------------------------------------
+        */
+
         if ($request->hasFile('product_file')) {
-            $validated['product_file'] = $request->file('product_file')
+            $validated['product_file'] = $request
+                ->file('product_file')
                 ->store('product_files', 'public');
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Status
+        |--------------------------------------------------------------------------
+        */
 
         $validated['status'] = 'Active';
 

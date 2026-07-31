@@ -12,57 +12,60 @@ class MI_Product extends Model
     protected $table = 'mi_products';
 
     protected $primaryKey = 'product_id';
-    protected $casts = [
-        'materials' => 'array',
-        'color' => 'array',
-    ];
+
     protected $fillable = [
 
-        // SKU Information
-        'sku',
-        'item_code',
-
-        // Product Information
         'item_name',
         'description',
 
-        // Taxonomy
         'category_id',
         'sub_category_id',
         'product_type_id',
         'collection_id',
 
-        // Product Details
         'type_of_sample',
         'classification',
         'designed_by',
 
-        // Attributes
         'materials',
         'type',
         'color',
 
-        // Product Dimensions
         'product_height',
         'product_width',
         'product_length',
         'product_depth',
 
-        // Packaging Dimensions
         'carton_height',
         'carton_width',
         'carton_length',
         'carton_depth',
 
-        // Costing
         'purchase_cost',
 
-        // Files
-        'gdrive_link',
         'product_file',
 
-        // Status
         'status',
+
+    ];
+
+    protected $casts = [
+
+        'materials' => 'array',
+        'color' => 'array',
+
+        'product_height' => 'decimal:2',
+        'product_width' => 'decimal:2',
+        'product_length' => 'decimal:2',
+        'product_depth' => 'decimal:2',
+
+        'carton_height' => 'decimal:2',
+        'carton_width' => 'decimal:2',
+        'carton_length' => 'decimal:2',
+        'carton_depth' => 'decimal:2',
+
+        'purchase_cost' => 'decimal:2',
+
     ];
 
     /**

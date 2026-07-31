@@ -12,7 +12,10 @@ class MI_Product extends Model
     protected $table = 'mi_products';
 
     protected $primaryKey = 'product_id';
-
+    protected $casts = [
+        'materials' => 'array',
+        'color' => 'array',
+    ];
     protected $fillable = [
 
         // SKU Information
@@ -55,6 +58,7 @@ class MI_Product extends Model
         'purchase_cost',
 
         // Files
+        'gdrive_link',
         'product_file',
 
         // Status

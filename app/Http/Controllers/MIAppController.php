@@ -228,49 +228,61 @@ class MIAppController extends Controller
 
         return $candidate;
     }
-    public function store(Request $request) 
+    public function store(Request $request)
     {
         $validated = $request->validate([
-            // General Info
-            'item_name'      => 'required|string|max:255',
-            'category'       => 'required|string|max:255',
-            'collection'     => 'nullable|string|max:255',
+
+            // Product Information
+            'item_name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+
+            // Taxonomy
+            'category_id' => 'required|integer',
+            'sub_category_id' => 'nullable|integer',
+            'product_type_id' => 'nullable|integer',
+            'collection_id' => 'nullable|integer',
+
+            // Product Details
             'type_of_sample' => 'required|string|max:255',
             'classification' => 'required|string|max:255',
-            'designed_by'    => 'nullable|string|max:255',
-            
-            // Attributes & Dimensions
-            'materials'      => 'required|string|max:255',
-            'type'           => 'nullable|string|max:255',
-            'color'          => 'nullable|string|max:255',
-            'product_height' => 'required|string|max:255',
-            'product_width'  => 'nullable|string|max:255',
-            'product_length' => 'nullable|string|max:255',
-            'product_depth'  => 'nullable|string|max:255',
-            
-            // Packaging & Cost
-            'carton_height'  => 'nullable|string|max:255',
-            'carton_width'   => 'nullable|string|max:255',
-            'carton_length'  => 'nullable|string|max:255',
-            'carton_depth'   => 'nullable|string|max:255',
-            'purchase_cost'  => 'nullable|numeric',
-            
-            // File Upload (Images or 3D files like .obj, .stl) - Max size 20MB
-            'product_file'   => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480', 
+            'designed_by' => 'nullable|string|max:255',
+
+            // Attributes
+            'materials' => 'required|string|max:255',
+            'type' => 'nullable|string|max:255',
+            'color' => 'nullable|string|max:255',
+
+            // Product Dimensions
+            'product_height' => 'nullable|numeric',
+            'product_width' => 'nullable|numeric',
+            'product_length' => 'nullable|numeric',
+            'product_depth' => 'nullable|numeric',
+
+            // Carton Dimensions
+            'carton_height' => 'nullable|numeric',
+            'carton_width' => 'nullable|numeric',
+            'carton_length' => 'nullable|numeric',
+            'carton_depth' => 'nullable|numeric',
+
+            // Cost
+            'purchase_cost' => 'nullable|numeric',
+
+            // File
+            'product_file' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
         ]);
-        
-        // Handle the file upload if a file was attached in the form
+
         if ($request->hasFile('product_file')) {
-            $file = $request->file('product_file');
-            // Stores in storage/app/public/product_files
-            $path = $file->store('product_files', 'public'); 
-            $validated['product_file'] = $path;
+            $validated['product_file'] = $request->file('product_file')
+                ->store('product_files', 'public');
         }
+
+        $validated['status'] = 'Active';
 
         MI_Product::create($validated);
 
-        // NOTE: Make sure to update 'it.asset.index' to your new route name in web.php
-        return redirect()->route('mi_app.index')->with('success', 'Product saved successfully!');
+        return redirect()
+            ->route('mi_app.index')
+            ->with('success', 'Product saved successfully!');
     }
 
     public function edit($id) 

@@ -875,21 +875,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             updateProgress();
 
-            // ---- Color swatch preview ----
-            var colorInput = document.getElementById('color');
-            var colorSwatch = document.getElementById('color_swatch');
-            var namedColors = { black: '#111111', white: '#ffffff', 'matte black': '#1c1c1c', oak: '#c9a066', walnut: '#5c4433', gray: '#9ca3af', grey: '#9ca3af', blue: '#3b82f6', red: '#ef4444', green: '#22c55e', beige: '#e8dfc8' };
-            function updateSwatch() {
-                var val = (colorInput.value || '').trim().toLowerCase();
-                if (!val) { colorSwatch.style.backgroundColor = ''; return; }
-                var css = namedColors[val] || val;
-                var probe = new Option().style;
-                probe.color = '';
-                probe.color = css;
-                colorSwatch.style.backgroundColor = probe.color !== '' ? css : '';
-            }
-            if (colorInput) { colorInput.addEventListener('input', updateSwatch); updateSwatch(); }
-
             // ---- File upload: drag & drop, preview, remove ----
             var dropzone = document.getElementById('dropzone');
             var fileInput = document.getElementById('product_file');

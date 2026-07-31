@@ -507,14 +507,66 @@
                             @enderror
                         </div>
 
-                            <div class="col-span-2">
-                                <label for="color" class="tx-label">Color</label>
-                                <div class="tx-swatch-input">
-                                    <input type="text" id="color" name="color" value="{{ old('color') }}" placeholder="e.g. Matte Black" class="tx-field" style="padding-right: 2.5rem;">
-                                    <span id="color_swatch" aria-hidden="true"></span>
-                                </div>
-                                @error('color') <p class="tx-error">{{ $message }}</p> @enderror
-                            </div>
+                        <div class="col-span-2">
+                            <label for="color" class="tx-label">
+                                Color
+                            </label>
+
+                            <select id="color"
+                                    name="color[]"
+                                    multiple
+                                    class="tx-field">
+
+                                <optgroup label="Basic Colors">
+                                    <option value="Black" {{ in_array('Black', old('color', [])) ? 'selected' : '' }}>Black</option>
+                                    <option value="White" {{ in_array('White', old('color', [])) ? 'selected' : '' }}>White</option>
+                                    <option value="Gray" {{ in_array('Gray', old('color', [])) ? 'selected' : '' }}>Gray</option>
+                                    <option value="Silver" {{ in_array('Silver', old('color', [])) ? 'selected' : '' }}>Silver</option>
+                                    <option value="Gold" {{ in_array('Gold', old('color', [])) ? 'selected' : '' }}>Gold</option>
+                                    <option value="Bronze" {{ in_array('Bronze', old('color', [])) ? 'selected' : '' }}>Bronze</option>
+                                </optgroup>
+
+                                <optgroup label="Wood Finishes">
+                                    <option value="Natural" {{ in_array('Natural', old('color', [])) ? 'selected' : '' }}>Natural</option>
+                                    <option value="Oak" {{ in_array('Oak', old('color', [])) ? 'selected' : '' }}>Oak</option>
+                                    <option value="Walnut" {{ in_array('Walnut', old('color', [])) ? 'selected' : '' }}>Walnut</option>
+                                    <option value="Teak" {{ in_array('Teak', old('color', [])) ? 'selected' : '' }}>Teak</option>
+                                    <option value="Mahogany" {{ in_array('Mahogany', old('color', [])) ? 'selected' : '' }}>Mahogany</option>
+                                    <option value="Espresso" {{ in_array('Espresso', old('color', [])) ? 'selected' : '' }}>Espresso</option>
+                                </optgroup>
+
+                                <optgroup label="Neutral">
+                                    <option value="Beige" {{ in_array('Beige', old('color', [])) ? 'selected' : '' }}>Beige</option>
+                                    <option value="Cream" {{ in_array('Cream', old('color', [])) ? 'selected' : '' }}>Cream</option>
+                                    <option value="Ivory" {{ in_array('Ivory', old('color', [])) ? 'selected' : '' }}>Ivory</option>
+                                    <option value="Taupe" {{ in_array('Taupe', old('color', [])) ? 'selected' : '' }}>Taupe</option>
+                                    <option value="Brown" {{ in_array('Brown', old('color', [])) ? 'selected' : '' }}>Brown</option>
+                                </optgroup>
+
+                                <optgroup label="Accent Colors">
+                                    <option value="Blue" {{ in_array('Blue', old('color', [])) ? 'selected' : '' }}>Blue</option>
+                                    <option value="Green" {{ in_array('Green', old('color', [])) ? 'selected' : '' }}>Green</option>
+                                    <option value="Red" {{ in_array('Red', old('color', [])) ? 'selected' : '' }}>Red</option>
+                                    <option value="Yellow" {{ in_array('Yellow', old('color', [])) ? 'selected' : '' }}>Yellow</option>
+                                    <option value="Orange" {{ in_array('Orange', old('color', [])) ? 'selected' : '' }}>Orange</option>
+                                    <option value="Pink" {{ in_array('Pink', old('color', [])) ? 'selected' : '' }}>Pink</option>
+                                    <option value="Purple" {{ in_array('Purple', old('color', [])) ? 'selected' : '' }}>Purple</option>
+                                </optgroup>
+
+                                <optgroup label="Special Finishes">
+                                    <option value="Matte Black" {{ in_array('Matte Black', old('color', [])) ? 'selected' : '' }}>Matte Black</option>
+                                    <option value="Gloss White" {{ in_array('Gloss White', old('color', [])) ? 'selected' : '' }}>Gloss White</option>
+                                    <option value="Brushed Gold" {{ in_array('Brushed Gold', old('color', [])) ? 'selected' : '' }}>Brushed Gold</option>
+                                    <option value="Rose Gold" {{ in_array('Rose Gold', old('color', [])) ? 'selected' : '' }}>Rose Gold</option>
+                                    <option value="Chrome" {{ in_array('Chrome', old('color', [])) ? 'selected' : '' }}>Chrome</option>
+                                </optgroup>
+
+                            </select>
+
+                            @error('color')
+                                <p class="tx-error">{{ $message }}</p>
+                            @enderror
+                        </div>
                         </div>
 
                         <div>

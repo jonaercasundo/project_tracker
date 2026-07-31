@@ -408,4 +408,5 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/mi/settings', [MIAppController::class, 'settings'])->name('mi_app.settings');
     Route::get('/mi/designer', [MIAppController::class, 'index'])->name('mi_app.index');
     Route::post('/mi/setting_store', [MIAppController::class, 'setting_store'])->name('mi_app.store');
+    Route::post('/mi/store', [MIAppController::class, 'store'])->name('mi_app.store_1');
 require __DIR__.'/auth.php';

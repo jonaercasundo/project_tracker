@@ -2,7 +2,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css" rel="stylesheet">
     <style>
         .tx-console {
             --tx-bg: #F5F6F3;
@@ -418,97 +418,92 @@
                                 Materials <span class="tx-required">*</span>
                             </label>
 
-                            <select id="materials"
-                                    name="materials"
-                                    required
-                                    data-required
-                                    class="tx-field">
-                                <option value="">Select Material</option>
+                            <select
+                                id="materials"
+                                name="materials[]"
+                                multiple
+                                autocomplete="off"
+                                class="tx-field">
 
                                 <optgroup label="Solid Wood">
-                                    <option value="Acacia Wood" {{ old('materials') == 'Acacia Wood' ? 'selected' : '' }}>Acacia Wood</option>
-                                    <option value="Ash Wood" {{ old('materials') == 'Ash Wood' ? 'selected' : '' }}>Ash Wood</option>
-                                    <option value="Beech Wood" {{ old('materials') == 'Beech Wood' ? 'selected' : '' }}>Beech Wood</option>
-                                    <option value="Birch Wood" {{ old('materials') == 'Birch Wood' ? 'selected' : '' }}>Birch Wood</option>
-                                    <option value="Mahogany" {{ old('materials') == 'Mahogany' ? 'selected' : '' }}>Mahogany</option>
-                                    <option value="Mango Wood" {{ old('materials') == 'Mango Wood' ? 'selected' : '' }}>Mango Wood</option>
-                                    <option value="Oak" {{ old('materials') == 'Oak' ? 'selected' : '' }}>Oak</option>
-                                    <option value="Pine" {{ old('materials') == 'Pine' ? 'selected' : '' }}>Pine</option>
-                                    <option value="Rubberwood" {{ old('materials') == 'Rubberwood' ? 'selected' : '' }}>Rubberwood</option>
-                                    <option value="Teak" {{ old('materials') == 'Teak' ? 'selected' : '' }}>Teak</option>
-                                    <option value="Walnut" {{ old('materials') == 'Walnut' ? 'selected' : '' }}>Walnut</option>
+                                    <option value="Acacia Wood" {{ in_array('Acacia Wood', old('materials', [])) ? 'selected' : '' }}>Acacia Wood</option>
+                                    <option value="Ash Wood" {{ in_array('Ash Wood', old('materials', [])) ? 'selected' : '' }}>Ash Wood</option>
+                                    <option value="Beech Wood" {{ in_array('Beech Wood', old('materials', [])) ? 'selected' : '' }}>Beech Wood</option>
+                                    <option value="Birch Wood" {{ in_array('Birch Wood', old('materials', [])) ? 'selected' : '' }}>Birch Wood</option>
+                                    <option value="Mahogany" {{ in_array('Mahogany', old('materials', [])) ? 'selected' : '' }}>Mahogany</option>
+                                    <option value="Mango Wood" {{ in_array('Mango Wood', old('materials', [])) ? 'selected' : '' }}>Mango Wood</option>
+                                    <option value="Oak" {{ in_array('Oak', old('materials', [])) ? 'selected' : '' }}>Oak</option>
+                                    <option value="Pine" {{ in_array('Pine', old('materials', [])) ? 'selected' : '' }}>Pine</option>
+                                    <option value="Rubberwood" {{ in_array('Rubberwood', old('materials', [])) ? 'selected' : '' }}>Rubberwood</option>
+                                    <option value="Teak" {{ in_array('Teak', old('materials', [])) ? 'selected' : '' }}>Teak</option>
+                                    <option value="Walnut" {{ in_array('Walnut', old('materials', [])) ? 'selected' : '' }}>Walnut</option>
                                 </optgroup>
 
                                 <optgroup label="Engineered Wood">
-                                    <option value="MDF" {{ old('materials') == 'MDF' ? 'selected' : '' }}>MDF</option>
-                                    <option value="Particle Board" {{ old('materials') == 'Particle Board' ? 'selected' : '' }}>Particle Board</option>
-                                    <option value="Plywood" {{ old('materials') == 'Plywood' ? 'selected' : '' }}>Plywood</option>
-                                    <option value="HDF" {{ old('materials') == 'HDF' ? 'selected' : '' }}>HDF</option>
-                                    <option value="Melamine Board" {{ old('materials') == 'Melamine Board' ? 'selected' : '' }}>Melamine Board</option>
+                                    <option value="MDF" {{ in_array('MDF', old('materials', [])) ? 'selected' : '' }}>MDF</option>
+                                    <option value="Particle Board" {{ in_array('Particle Board', old('materials', [])) ? 'selected' : '' }}>Particle Board</option>
+                                    <option value="Plywood" {{ in_array('Plywood', old('materials', [])) ? 'selected' : '' }}>Plywood</option>
+                                    <option value="HDF" {{ in_array('HDF', old('materials', [])) ? 'selected' : '' }}>HDF</option>
+                                    <option value="Melamine Board" {{ in_array('Melamine Board', old('materials', [])) ? 'selected' : '' }}>Melamine Board</option>
                                 </optgroup>
 
                                 <optgroup label="Metal">
-                                    <option value="Aluminum" {{ old('materials') == 'Aluminum' ? 'selected' : '' }}>Aluminum</option>
-                                    <option value="Brass" {{ old('materials') == 'Brass' ? 'selected' : '' }}>Brass</option>
-                                    <option value="Cast Iron" {{ old('materials') == 'Cast Iron' ? 'selected' : '' }}>Cast Iron</option>
-                                    <option value="Iron" {{ old('materials') == 'Iron' ? 'selected' : '' }}>Iron</option>
-                                    <option value="Stainless Steel" {{ old('materials') == 'Stainless Steel' ? 'selected' : '' }}>Stainless Steel</option>
-                                    <option value="Steel" {{ old('materials') == 'Steel' ? 'selected' : '' }}>Steel</option>
+                                    <option value="Aluminum" {{ in_array('Aluminum', old('materials', [])) ? 'selected' : '' }}>Aluminum</option>
+                                    <option value="Brass" {{ in_array('Brass', old('materials', [])) ? 'selected' : '' }}>Brass</option>
+                                    <option value="Cast Iron" {{ in_array('Cast Iron', old('materials', [])) ? 'selected' : '' }}>Cast Iron</option>
+                                    <option value="Iron" {{ in_array('Iron', old('materials', [])) ? 'selected' : '' }}>Iron</option>
+                                    <option value="Stainless Steel" {{ in_array('Stainless Steel', old('materials', [])) ? 'selected' : '' }}>Stainless Steel</option>
+                                    <option value="Steel" {{ in_array('Steel', old('materials', [])) ? 'selected' : '' }}>Steel</option>
                                 </optgroup>
 
                                 <optgroup label="Glass & Stone">
-                                    <option value="Clear Glass" {{ old('materials') == 'Clear Glass' ? 'selected' : '' }}>Clear Glass</option>
-                                    <option value="Tempered Glass" {{ old('materials') == 'Tempered Glass' ? 'selected' : '' }}>Tempered Glass</option>
-                                    <option value="Marble" {{ old('materials') == 'Marble' ? 'selected' : '' }}>Marble</option>
-                                    <option value="Granite" {{ old('materials') == 'Granite' ? 'selected' : '' }}>Granite</option>
-                                    <option value="Ceramic" {{ old('materials') == 'Ceramic' ? 'selected' : '' }}>Ceramic</option>
-                                    <option value="Concrete" {{ old('materials') == 'Concrete' ? 'selected' : '' }}>Concrete</option>
+                                    <option value="Clear Glass" {{ in_array('Clear Glass', old('materials', [])) ? 'selected' : '' }}>Clear Glass</option>
+                                    <option value="Tempered Glass" {{ in_array('Tempered Glass', old('materials', [])) ? 'selected' : '' }}>Tempered Glass</option>
+                                    <option value="Marble" {{ in_array('Marble', old('materials', [])) ? 'selected' : '' }}>Marble</option>
+                                    <option value="Granite" {{ in_array('Granite', old('materials', [])) ? 'selected' : '' }}>Granite</option>
+                                    <option value="Ceramic" {{ in_array('Ceramic', old('materials', [])) ? 'selected' : '' }}>Ceramic</option>
+                                    <option value="Concrete" {{ in_array('Concrete', old('materials', [])) ? 'selected' : '' }}>Concrete</option>
                                 </optgroup>
 
                                 <optgroup label="Natural Fibers">
-                                    <option value="Bamboo" {{ old('materials') == 'Bamboo' ? 'selected' : '' }}>Bamboo</option>
-                                    <option value="Cane" {{ old('materials') == 'Cane' ? 'selected' : '' }}>Cane</option>
-                                    <option value="Rattan" {{ old('materials') == 'Rattan' ? 'selected' : '' }}>Rattan</option>
-                                    <option value="Seagrass" {{ old('materials') == 'Seagrass' ? 'selected' : '' }}>Seagrass</option>
-                                    <option value="Water Hyacinth" {{ old('materials') == 'Water Hyacinth' ? 'selected' : '' }}>Water Hyacinth</option>
-                                    <option value="Abaca" {{ old('materials') == 'Abaca' ? 'selected' : '' }}>Abaca</option>
+                                    <option value="Bamboo" {{ in_array('Bamboo', old('materials', [])) ? 'selected' : '' }}>Bamboo</option>
+                                    <option value="Cane" {{ in_array('Cane', old('materials', [])) ? 'selected' : '' }}>Cane</option>
+                                    <option value="Rattan" {{ in_array('Rattan', old('materials', [])) ? 'selected' : '' }}>Rattan</option>
+                                    <option value="Seagrass" {{ in_array('Seagrass', old('materials', [])) ? 'selected' : '' }}>Seagrass</option>
+                                    <option value="Water Hyacinth" {{ in_array('Water Hyacinth', old('materials', [])) ? 'selected' : '' }}>Water Hyacinth</option>
+                                    <option value="Abaca" {{ in_array('Abaca', old('materials', [])) ? 'selected' : '' }}>Abaca</option>
                                 </optgroup>
 
                                 <optgroup label="Fabric & Upholstery">
-                                    <option value="Boucle" {{ old('materials') == 'Boucle' ? 'selected' : '' }}>Boucle</option>
-                                    <option value="Canvas" {{ old('materials') == 'Canvas' ? 'selected' : '' }}>Canvas</option>
-                                    <option value="Cotton" {{ old('materials') == 'Cotton' ? 'selected' : '' }}>Cotton</option>
-                                    <option value="Leather" {{ old('materials') == 'Leather' ? 'selected' : '' }}>Leather</option>
-                                    <option value="PU Leather" {{ old('materials') == 'PU Leather' ? 'selected' : '' }}>PU Leather</option>
-                                    <option value="Linen" {{ old('materials') == 'Linen' ? 'selected' : '' }}>Linen</option>
-                                    <option value="Microfiber" {{ old('materials') == 'Microfiber' ? 'selected' : '' }}>Microfiber</option>
-                                    <option value="Polyester" {{ old('materials') == 'Polyester' ? 'selected' : '' }}>Polyester</option>
-                                    <option value="Velvet" {{ old('materials') == 'Velvet' ? 'selected' : '' }}>Velvet</option>
+                                    <option value="Boucle" {{ in_array('Boucle', old('materials', [])) ? 'selected' : '' }}>Boucle</option>
+                                    <option value="Canvas" {{ in_array('Canvas', old('materials', [])) ? 'selected' : '' }}>Canvas</option>
+                                    <option value="Cotton" {{ in_array('Cotton', old('materials', [])) ? 'selected' : '' }}>Cotton</option>
+                                    <option value="Leather" {{ in_array('Leather', old('materials', [])) ? 'selected' : '' }}>Leather</option>
+                                    <option value="PU Leather" {{ in_array('PU Leather', old('materials', [])) ? 'selected' : '' }}>PU Leather</option>
+                                    <option value="Linen" {{ in_array('Linen', old('materials', [])) ? 'selected' : '' }}>Linen</option>
+                                    <option value="Microfiber" {{ in_array('Microfiber', old('materials', [])) ? 'selected' : '' }}>Microfiber</option>
+                                    <option value="Polyester" {{ in_array('Polyester', old('materials', [])) ? 'selected' : '' }}>Polyester</option>
+                                    <option value="Velvet" {{ in_array('Velvet', old('materials', [])) ? 'selected' : '' }}>Velvet</option>
                                 </optgroup>
 
                                 <optgroup label="Plastic & Synthetic">
-                                    <option value="ABS Plastic" {{ old('materials') == 'ABS Plastic' ? 'selected' : '' }}>ABS Plastic</option>
-                                    <option value="Acrylic" {{ old('materials') == 'Acrylic' ? 'selected' : '' }}>Acrylic</option>
-                                    <option value="Fiberglass" {{ old('materials') == 'Fiberglass' ? 'selected' : '' }}>Fiberglass</option>
-                                    <option value="Polypropylene" {{ old('materials') == 'Polypropylene' ? 'selected' : '' }}>Polypropylene</option>
-                                    <option value="PVC" {{ old('materials') == 'PVC' ? 'selected' : '' }}>PVC</option>
-                                    <option value="Resin" {{ old('materials') == 'Resin' ? 'selected' : '' }}>Resin</option>
+                                    <option value="ABS Plastic" {{ in_array('ABS Plastic', old('materials', [])) ? 'selected' : '' }}>ABS Plastic</option>
+                                    <option value="Acrylic" {{ in_array('Acrylic', old('materials', [])) ? 'selected' : '' }}>Acrylic</option>
+                                    <option value="Fiberglass" {{ in_array('Fiberglass', old('materials', [])) ? 'selected' : '' }}>Fiberglass</option>
+                                    <option value="Polypropylene" {{ in_array('Polypropylene', old('materials', [])) ? 'selected' : '' }}>Polypropylene</option>
+                                    <option value="PVC" {{ in_array('PVC', old('materials', [])) ? 'selected' : '' }}>PVC</option>
+                                    <option value="Resin" {{ in_array('Resin', old('materials', [])) ? 'selected' : '' }}>Resin</option>
                                 </optgroup>
 
                                 <optgroup label="Other">
-                                    <option value="Composite" {{ old('materials') == 'Composite' ? 'selected' : '' }}>Composite</option>
-                                    <option value="Mixed Materials" {{ old('materials') == 'Mixed Materials' ? 'selected' : '' }}>Mixed Materials</option>
+                                    <option value="Composite" {{ in_array('Composite', old('materials', [])) ? 'selected' : '' }}>Composite</option>
+                                    <option value="Mixed Materials" {{ in_array('Mixed Materials', old('materials', [])) ? 'selected' : '' }}>Mixed Materials</option>
                                 </optgroup>
+
                             </select>
 
                             @error('materials')
-                                <p class="tx-error">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.75 16.126zM12 15.75h.007v.008H12v-.008z" />
-                                    </svg>
-                                    {{ $message }}
-                                </p>
+                                <p class="tx-error">{{ $message }}</p>
                             @enderror
                         </div>
 
@@ -711,7 +706,26 @@
 
         </div>
     </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
 
+    new TomSelect('#materials', {
+        plugins: ['remove_button'],
+        create: false,
+        maxItems: null,
+        hideSelected: true,
+        closeAfterSelect: false,
+        placeholder: 'Select one or more materials...',
+        searchField: ['text'],
+        render: {
+            no_results: function(data, escape) {
+                return '<div class="no-results">No material found</div>';
+            }
+        }
+    });
+
+});
+</script>
     <script>
         (function () {
             // ---- Taxonomy cascade: Category -> Sub Category -> Sub Sub Category -> Collection ----
@@ -920,4 +934,5 @@
             });
         })();
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
 </x-mi_app>

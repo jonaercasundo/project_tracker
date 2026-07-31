@@ -19,7 +19,7 @@
                 Back
             </a>
 
-            <a href="{{ route('mi_app.edit', $product->id) }}"
+            <a href="{{ route('mi_app.edit', $product->product_id) }}"
                class="px-5 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
                 Edit Product
             </a>

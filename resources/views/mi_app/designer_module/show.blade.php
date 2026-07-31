@@ -89,11 +89,6 @@
             </div>
 
             <div>
-                <p class="text-xs uppercase text-slate-500">Classification</p>
-                <p>{{ $product->classification ?? '-' }}</p>
-            </div>
-
-            <div>
                 <p class="text-xs uppercase text-slate-500">Designed By</p>
                 <p>{{ $product->designed_by ?? '-' }}</p>
             </div>

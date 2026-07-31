@@ -37,9 +37,19 @@ class MIAppController extends Controller
         return view('mi_app.designer_module.index', compact('products'));
     }
 
-    public function create() 
+    public function create()
     {
-        return view('mi_app.designer_module.create');
+        $categories    = MI_Category::orderBy('name')->get();
+        $subCategories = MI_SubCategory::orderBy('name')->get();
+        $productTypes  = MI_ProductType::orderBy('name')->get();
+        $collections   = MI_Collection::orderBy('name')->get();
+
+        return view('mi_app.designer_module.create', compact(
+            'categories',
+            'subCategories',
+            'productTypes',
+            'collections'
+        ));
     }
     public function settings()
     {
@@ -61,163 +71,163 @@ class MIAppController extends Controller
             'materials'
         ));
     }
-public function setting_store(Request $request)
-{
-    DB::beginTransaction();
+    public function setting_store(Request $request)
+    {
+        DB::beginTransaction();
 
-    try {
+        try {
 
-        switch ($request->entity_type) {
+            switch ($request->entity_type) {
 
-            /*
-            |--------------------------------------------------------------------------
-            | Category
-            |--------------------------------------------------------------------------
-            */
-            case 'category':
+                /*
+                |--------------------------------------------------------------------------
+                | Category
+                |--------------------------------------------------------------------------
+                */
+                case 'category':
 
-                $request->validate([
-                    'category_name' => 'required|string|max:255|unique:mi_categories,name',
-                ]);
+                    $request->validate([
+                        'category_name' => 'required|string|max:255|unique:mi_categories,name',
+                    ]);
 
-                MI_Category::create([
-                    'code'        => $this->generateUniqueCode(MI_Category::class, $request->category_name),
-                    'name'        => $request->category_name,
-                    'description' => $request->description,
-                    'is_active'   => true,
-                ]);
+                    MI_Category::create([
+                        'code'        => $this->generateUniqueCode(MI_Category::class, $request->category_name),
+                        'name'        => $request->category_name,
+                        'description' => $request->description,
+                        'is_active'   => true,
+                    ]);
 
-                break;
+                    break;
 
-            /*
-            |--------------------------------------------------------------------------
-            | Sub Category
-            |--------------------------------------------------------------------------
-            */
-            case 'sub_category':
+                /*
+                |--------------------------------------------------------------------------
+                | Sub Category
+                |--------------------------------------------------------------------------
+                */
+                case 'sub_category':
 
-                $request->validate([
-                    'category_id'      => 'required|exists:mi_categories,id',
-                    'sub_category_name'=> 'required|string|max:255',
-                ]);
+                    $request->validate([
+                        'category_id'      => 'required|exists:mi_categories,id',
+                        'sub_category_name'=> 'required|string|max:255',
+                    ]);
 
-                MI_SubCategory::create([
-                    'category_id' => $request->category_id,
-                    'code'        => $this->generateUniqueCode(MI_SubCategory::class, $request->sub_category_name),
-                    'name'        => $request->sub_category_name,
-                    'description' => $request->description,
-                    'is_active'   => true,
-                ]);
+                    MI_SubCategory::create([
+                        'category_id' => $request->category_id,
+                        'code'        => $this->generateUniqueCode(MI_SubCategory::class, $request->sub_category_name),
+                        'name'        => $request->sub_category_name,
+                        'description' => $request->description,
+                        'is_active'   => true,
+                    ]);
 
-                break;
+                    break;
 
-            /*
-            |--------------------------------------------------------------------------
-            | Product Type
-            |--------------------------------------------------------------------------
-            */
-            case 'product_type':
+                /*
+                |--------------------------------------------------------------------------
+                | Product Type
+                |--------------------------------------------------------------------------
+                */
+                case 'product_type':
 
-                $request->validate([
-                    'sub_category_id' => 'required|exists:mi_sub_categories,id',
-                    'product_type_name' => 'required|string|max:255',
-                ]);
+                    $request->validate([
+                        'sub_category_id' => 'required|exists:mi_sub_categories,id',
+                        'product_type_name' => 'required|string|max:255',
+                    ]);
 
-                MI_ProductType::create([
-                    'sub_category_id' => $request->sub_category_id,
-                    'code'            => strtoupper(substr($request->product_type_name, 0, 3)),
-                    'name'            => $request->product_type_name,
-                    'description'     => $request->description,
-                    'is_active'       => true,
-                ]);
+                    MI_ProductType::create([
+                        'sub_category_id' => $request->sub_category_id,
+                        'code'            => strtoupper(substr($request->product_type_name, 0, 3)),
+                        'name'            => $request->product_type_name,
+                        'description'     => $request->description,
+                        'is_active'       => true,
+                    ]);
 
-                break;
+                    break;
 
-            /*
-            |--------------------------------------------------------------------------
-            | Collection
-            |--------------------------------------------------------------------------
-            */
-            case 'collection':
+                /*
+                |--------------------------------------------------------------------------
+                | Collection
+                |--------------------------------------------------------------------------
+                */
+                case 'collection':
 
-                $request->validate([
-                    'product_type_id' => 'required|exists:mi_product_types,id',
-                    'collection_name' => 'required|string|max:255',
-                ]);
+                    $request->validate([
+                        'product_type_id' => 'required|exists:mi_product_types,id',
+                        'collection_name' => 'required|string|max:255',
+                    ]);
 
-                MI_Collection::create([
-                    'product_type_id' => $request->product_type_id,
-                    'code'        => $this->generateUniqueCode(MI_Collection::class, $request->collection_name),
-                    'name'            => $request->collection_name,
-                    'description'     => $request->description,
-                    'is_active'       => true,
-                ]);
+                    MI_Collection::create([
+                        'product_type_id' => $request->product_type_id,
+                        'code'        => $this->generateUniqueCode(MI_Collection::class, $request->collection_name),
+                        'name'            => $request->collection_name,
+                        'description'     => $request->description,
+                        'is_active'       => true,
+                    ]);
 
-                break;
+                    break;
 
-            /*
-            |--------------------------------------------------------------------------
-            | Material
-            |--------------------------------------------------------------------------
-            */
-            case 'material':
+                /*
+                |--------------------------------------------------------------------------
+                | Material
+                |--------------------------------------------------------------------------
+                */
+                case 'material':
 
-                $request->validate([
-                    'material_name' => 'required|string|max:255|unique:mi_materials,material_name',
-                ]);
+                    $request->validate([
+                        'material_name' => 'required|string|max:255|unique:mi_materials,material_name',
+                    ]);
 
-                MI_Material::create([
-                    'material_name' => $request->material_name,
-                    'is_active'     => true,
-                ]);
+                    MI_Material::create([
+                        'material_name' => $request->material_name,
+                        'is_active'     => true,
+                    ]);
 
-                break;
+                    break;
 
-            default:
-                return back()->withErrors([
-                    'entity_type' => 'Invalid request.'
+                default:
+                    return back()->withErrors([
+                        'entity_type' => 'Invalid request.'
+                    ]);
+            }
+
+            DB::commit();
+
+            return back()->with('success', 'Record saved successfully.');
+
+        } catch (\Exception $e) {
+
+            DB::rollBack();
+
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'error' => $e->getMessage()
                 ]);
         }
-
-        DB::commit();
-
-        return back()->with('success', 'Record saved successfully.');
-
-    } catch (\Exception $e) {
-
-        DB::rollBack();
-
-        return back()
-            ->withInput()
-            ->withErrors([
-                'error' => $e->getMessage()
-            ]);
     }
-}
-private function generateUniqueCode(string $model, string $name): string
-{
-    $base = strtoupper(preg_replace('/[^A-Za-z]/', '', $name));
-    $base = str_pad(substr($base, 0, 3), 3, 'X'); // e.g. "IND"
+    private function generateUniqueCode(string $model, string $name): string
+    {
+        $base = strtoupper(preg_replace('/[^A-Za-z]/', '', $name));
+        $base = str_pad(substr($base, 0, 3), 3, 'X'); // e.g. "IND"
 
-    if (! $model::where('code', $base)->exists()) {
-        return $base;
+        if (! $model::where('code', $base)->exists()) {
+            return $base;
+        }
+
+        // Try skipping letters within the name (e.g. "INR" from "INdooR")
+        for ($i = 1; $i <= strlen($base) - 1 && strlen($base) >= 3; $i++) {
+            // fallback below handles the common case reliably
+        }
+
+        // Reliable fallback: keep first 2 letters, append a running number
+        $prefix = substr($base, 0, 2);
+        $n = 1;
+        do {
+            $candidate = $prefix . $n;
+            $n++;
+        } while ($model::where('code', $candidate)->exists());
+
+        return $candidate;
     }
-
-    // Try skipping letters within the name (e.g. "INR" from "INdooR")
-    for ($i = 1; $i <= strlen($base) - 1 && strlen($base) >= 3; $i++) {
-        // fallback below handles the common case reliably
-    }
-
-    // Reliable fallback: keep first 2 letters, append a running number
-    $prefix = substr($base, 0, 2);
-    $n = 1;
-    do {
-        $candidate = $prefix . $n;
-        $n++;
-    } while ($model::where('code', $candidate)->exists());
-
-    return $candidate;
-}
     public function store(Request $request) 
     {
         $validated = $request->validate([

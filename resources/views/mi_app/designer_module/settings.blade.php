@@ -796,34 +796,6 @@
                 </div>
             </div>
 
-            {{-- SECTION 6: Materials --}}
-            <div class="tx-card lvl-m">
-                <form method="POST" action="{{ route('mi_app.store') }}" novalidate>
-                    @csrf
-                    <input type="hidden" name="entity_type" value="material">
-                    <div class="tx-card-head">
-                        <span class="tx-card-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4h16v16H4z" opacity="0"/><circle cx="12" cy="12" r="7" /></svg>
-                        </span>
-                        <div>
-                            <h2>Materials</h2>
-                            <p>Shared swatch list used across products — e.g. Cotton, Oak, Steel.</p>
-                        </div>
-                    </div>
-                    <div class="tx-card-body cols-4">
-                        <div>
-                            <label for="material_name" class="tx-label">Material Name <span class="tx-required">*</span></label>
-                            <input type="text" id="material_name" name="material_name" value="{{ old('material_name') }}" placeholder="e.g. Cotton" required class="tx-field">
-                            @error('material_name')
-                                <p class="tx-error">{{ $message }}</p>
-                            @enderror
-                        </div>
-                        <div style="align-self:end;">
-                            <button type="submit" class="tx-btn">Add Material</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
 
         </div>
     </div>

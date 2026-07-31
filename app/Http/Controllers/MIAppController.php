@@ -81,7 +81,7 @@ public function setting_store(Request $request)
                 ]);
 
                 MI_Category::create([
-                    'code'        => strtoupper(substr($request->category_name, 0, 3)),
+                    'code'        => $this->generateUniqueCode(MI_Category::class, $request->category_name),
                     'name'        => $request->category_name,
                     'description' => $request->description,
                     'is_active'   => true,
@@ -103,7 +103,7 @@ public function setting_store(Request $request)
 
                 MI_SubCategory::create([
                     'category_id' => $request->category_id,
-                    'code'        => strtoupper(substr($request->sub_category_name, 0, 3)),
+                    'code'        => $this->generateUniqueCode(MI_SubCategory::class, $request->sub_category_name),
                     'name'        => $request->sub_category_name,
                     'description' => $request->description,
                     'is_active'   => true,
@@ -147,7 +147,7 @@ public function setting_store(Request $request)
 
                 MI_Collection::create([
                     'product_type_id' => $request->product_type_id,
-                    'code'            => strtoupper(substr($request->collection_name, 0, 3)),
+                    'code'        => $this->generateUniqueCode(MI_Collection::class, $request->collection_name),
                     'name'            => $request->collection_name,
                     'description'     => $request->description,
                     'is_active'       => true,
@@ -193,6 +193,30 @@ public function setting_store(Request $request)
                 'error' => $e->getMessage()
             ]);
     }
+}
+private function generateUniqueCode(string $model, string $name): string
+{
+    $base = strtoupper(preg_replace('/[^A-Za-z]/', '', $name));
+    $base = str_pad(substr($base, 0, 3), 3, 'X'); // e.g. "IND"
+
+    if (! $model::where('code', $base)->exists()) {
+        return $base;
+    }
+
+    // Try skipping letters within the name (e.g. "INR" from "INdooR")
+    for ($i = 1; $i <= strlen($base) - 1 && strlen($base) >= 3; $i++) {
+        // fallback below handles the common case reliably
+    }
+
+    // Reliable fallback: keep first 2 letters, append a running number
+    $prefix = substr($base, 0, 2);
+    $n = 1;
+    do {
+        $candidate = $prefix . $n;
+        $n++;
+    } while ($model::where('code', $candidate)->exists());
+
+    return $candidate;
 }
     public function store(Request $request) 
     {

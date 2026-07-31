@@ -43,10 +43,7 @@
                         <td class="px-5 py-4">
                             <div class="flex items-center justify-center gap-2">
 
-                                <a href="{{ route('mi_app.show', ['product' => $product->id]) }}"
-                                   class="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition">
-                                    View
-                                </a>
+                                    {{ dd($product) }}
 
                                 <a href="{{ route('mi_app.edit', $product->id) }}"
                                    class="inline-flex items-center px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition">

@@ -557,8 +557,41 @@
                         <p>Full mapping from Category down to Collection, with generated taxonomy codes.</p>
                     </div>
                 </div>
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
+
+                    <div class="relative w-full md:w-96">
+                        <input
+                            type="text"
+                            id="taxonomySearch"
+                            placeholder="Search taxonomy..."
+                            class="w-full rounded-xl border border-gray-300 px-4 py-2.5 pl-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            class="absolute left-3 top-3.5 h-5 w-5 text-gray-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M21 21l-5-5m2-5A7 7 0 114 11a7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+
+                    <div>
+                        <select id="hierarchyFilter"
+                                class="rounded-xl border border-gray-300 px-4 py-2">
+                            <option value="">All Levels</option>
+                            <option value="Category">Category</option>
+                            <option value="Sub Category">Sub Category</option>
+                            <option value="Product Type">Product Type</option>
+                            <option value="Collection">Collection</option>
+                        </select>
+                    </div>
+
+                </div>
                 <div class="tx-table-wrap">
-                    <table class="tx-table">
+                    <table id="taxonomyTable" class="tx-table">
                         <thead>
                             <tr>
                                 <th>Taxonomy Code</th>

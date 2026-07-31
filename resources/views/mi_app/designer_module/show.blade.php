@@ -26,7 +26,53 @@
         </div>
     </div>
 
-    {{-- Taxonomy --}}
+{{-- Product Identification --}}
+<div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+
+    <h2 class="text-lg font-semibold text-slate-900 mb-5">
+        Product Identification
+    </h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        {{-- Draft Number --}}
+        <div>
+            <p class="text-xs uppercase text-slate-500">
+                Draft Number
+            </p>
+
+            <p class="font-semibold mt-1 font-mono text-blue-600">
+                {{ $product->draft_number ?? '-' }}
+            </p>
+        </div>
+
+
+        {{-- SKU --}}
+        <div>
+            <p class="text-xs uppercase text-slate-500">
+                SKU Number
+            </p>
+
+            <p class="font-semibold mt-1 font-mono text-emerald-600">
+                {{ $product->sku ?? '-' }}
+            </p>
+        </div>
+
+
+        {{-- Item Code --}}
+        <div>
+            <p class="text-xs uppercase text-slate-500">
+                Item Code
+            </p>
+
+            <p class="font-semibold mt-1 font-mono">
+                {{ $product->item_code ?? '-' }}
+            </p>
+        </div>
+
+    </div>
+
+</div>
     <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
 
         <h2 class="text-lg font-semibold text-slate-900 mb-5">

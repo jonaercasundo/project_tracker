@@ -58,18 +58,6 @@
             </p>
         </div>
 
-
-        {{-- Item Code --}}
-        <div>
-            <p class="text-xs uppercase text-slate-500">
-                Item Code
-            </p>
-
-            <p class="font-semibold mt-1 font-mono">
-                {{ $product->item_code ?? '-' }}
-            </p>
-        </div>
-
     </div>
 
 </div>

@@ -444,10 +444,32 @@ DB::commit();
         }
     }
 
-    public function edit($id) 
+    public function edit($id)
     {
-        $product = MI_Product::findOrFail($id); 
-        return view('mi_app.designer_module.edit', compact('product')); 
+        $product = MI_Product::with([
+            'category',
+            'subCategory',
+            'productType',
+            'collection'
+        ])->findOrFail($id);
+
+
+        $categories = MI_Category::orderBy('name')->get();
+
+        $subCategories = MI_SubCategory::orderBy('name')->get();
+
+        $productTypes = MI_ProductType::orderBy('name')->get();
+
+        $collections = MI_Collection::orderBy('name')->get();
+
+
+        return view('mi_app.designer_module.edit', compact(
+            'product',
+            'categories',
+            'subCategories',
+            'productTypes',
+            'collections'
+        ));
     }
 
     public function update(Request $request, $id)

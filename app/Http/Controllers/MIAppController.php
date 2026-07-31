@@ -370,6 +370,8 @@ $category = MI_Category::find($product->category_id);
 
 $subCategory = MI_SubCategory::find($product->sub_category_id);
 
+$subsubCategory = MI_ProductType::find($product->product_type_id);
+
 $collection = MI_Collection::find($product->collection_id);
 
 
@@ -382,6 +384,9 @@ $subCategoryCode = strtoupper(
     substr($subCategory->code ?? 'XX', 0, 2)
 );
 
+$subsubCategory = strtoupper(
+    substr($subsubCategory->code ?? 'XX', 0, 2)
+);
 
 $collectionCode = strtoupper(
     substr($collection->code ?? 'XXX', 0, 3)
@@ -394,6 +399,8 @@ $product->sku =
     . $subCategoryCode
     . '-'
     . $collectionCode
+    . '-'
+    . $subsubCategory
     . '-'
     . str_pad($product->product_id, 4, '0', STR_PAD_LEFT);
 

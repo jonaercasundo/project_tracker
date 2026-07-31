@@ -401,9 +401,6 @@ Route::middleware(['auth'])->group(function () {
     |--------------------------------------------------------------------------
 */
 
-    Route::get('/mi/designer', function () {
-        return view('mi_app.designer_module.index');
-    })->name('mi_designer');
     Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
     Route::get('/mi/settings', [MIAppController::class, 'settings'])->name('mi_app.settings');
     Route::get('/mi/designer', [MIAppController::class, 'index'])->name('mi_app.index');

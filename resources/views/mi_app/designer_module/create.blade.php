@@ -760,7 +760,14 @@
     </div>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-
+    new TomSelect('#color', {
+        plugins: ['remove_button'],
+        maxItems: null,
+        create: false,
+        closeAfterSelect: false,
+        hideSelected: true,
+        placeholder: 'Select one or more colors...'
+    });
     new TomSelect('#materials', {
         plugins: ['remove_button'],
         create: false,

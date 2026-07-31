@@ -99,4 +99,13 @@ class MI_Product extends Model
     {
         return $this->belongsTo(MI_Collection::class);
     }
+    public function images()
+    {
+        return $this->hasMany(
+            MI_Product_Image::class,
+            'product_id',
+            'product_id'
+        )
+        ->orderBy('sort_order');
+    }
 }

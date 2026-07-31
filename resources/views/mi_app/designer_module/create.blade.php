@@ -697,8 +697,12 @@
                         <div>
                             <label for="image_link" class="tx-label">Product Image Link</label>
                             <p class="tx-hint">Provide a direct URL to the product image</p>
-                            <input type="url" id="image_link" name="image_link" value="{{ old('image_link') }}" placeholder="https://example.com/image.jpg" class="tx-field">
+                            <input type="url" id="image_link" name="image_links[]" value="{{ old('image_link') }}" placeholder="https://example.com/image.jpg" class="tx-field">
                             @error('image_link') <p class="tx-error">{{ $message }}</p> @enderror
+                            <button type="button"
+                                onclick="addImageLink()">
+                                + Add Another Link
+                            </button>
                         </div>
 
                         {{-- File Upload Dropzone --}}
@@ -735,7 +739,7 @@
                                     </div>
                                 </div>
 
-                                <input type="file" id="product_file" name="product_file" accept="image/*" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" style="position:absolute; inset:0; width:100%; height:100%; cursor:pointer; opacity:0;">
+                                <input type="file" id="product_file" name="product_images[]" accept="image/*" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" style="position:absolute; inset:0; width:100%; height:100%; cursor:pointer; opacity:0;">
                             </div>
                             @error('product_file') <p class="tx-error">{{ $message }}</p> @enderror
                         </div>
@@ -763,6 +767,19 @@
         </div>
     </div>
 <script>
+function addImageLink(){
+
+    let div=document.getElementById('imageLinks');
+
+    div.innerHTML += `
+    <input 
+    type="url"
+    name="image_links[]"
+    placeholder="https://example.com/image.jpg"
+    class="border rounded-lg w-full mb-2">
+    `;
+
+}
 document.addEventListener('DOMContentLoaded', function () {
     new TomSelect('#color', {
         plugins: ['remove_button'],

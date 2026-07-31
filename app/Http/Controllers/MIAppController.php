@@ -10,6 +10,7 @@ use App\Models\MI_SubCategory;
 use App\Models\MI_ProductType;
 use App\Models\MI_Collection;
 use App\Models\MI_Material;
+use App\Models\MI_Product_Image;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\log;
 
@@ -338,7 +339,54 @@ public function index(Request $request)
             }
 
         $product = MI_Product::create($validated);
+        if($request->image_links){
 
+            foreach($request->image_links as $index=>$url){
+
+                if(!empty($url)){
+
+                    MI_Product_Image::create([
+                        'product_id'=>$product->product_id,
+                        'image_type'=>'url',
+                        'image_url'=>$url,
+                        'is_primary'=>$index == 0,
+                        'sort_order'=>$index
+                    ]);
+
+                }
+
+            }
+
+        }
+        if($request->hasFile('product_images')){
+            foreach($request->file('product_images') as $index=>$file){
+
+
+                $path = $file->store(
+                    'product_images',
+                    'public'
+                );
+
+
+                MI_Product_Image::create([
+
+                    'product_id'=>$product->product_id,
+
+                    'image_type'=>'upload',
+
+                    'image_path'=>$path,
+
+                    'is_primary'=>
+                        empty($request->image_links) && $index == 0,
+
+                    'sort_order'=>$index
+
+                ]);
+
+
+            }
+
+        }
         /*
         |--------------------------------------------------------------------------
         | Convert Google Drive Image Link

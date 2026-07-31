@@ -23,6 +23,8 @@
             --tx-lvl-2-soft: #E3EBF2;
             --tx-lvl-3: #7A4F98;
             --tx-lvl-3-soft: #ECE4F1;
+            --tx-lvl-4: #C7703C;
+            --tx-lvl-4-soft: #F5E7DB;
             --tx-font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
             --tx-font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
             --tx-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
@@ -41,6 +43,7 @@
             --tx-lvl-1-soft: #1C2723;
             --tx-lvl-2-soft: #1A222B;
             --tx-lvl-3-soft: #221C29;
+            --tx-lvl-4-soft: #2A2019;
         }
 
         .tx-display { font-family: var(--tx-font-display); letter-spacing: -0.01em; }
@@ -108,8 +111,17 @@
         .lvl-2 .tx-card-icon { background: var(--tx-lvl-2-soft); color: var(--tx-lvl-2); }
         .lvl-3 .tx-card-icon { background: var(--tx-lvl-3-soft); color: var(--tx-lvl-3); }
 
+        .tx-taxonomy-preview {
+            display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+            margin: 0 1.75rem 1.75rem; padding: 0.9rem 1.1rem;
+            border: 1px dashed var(--tx-line); border-radius: 12px; background: var(--tx-bg);
+        }
+        .tx-taxonomy-preview-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tx-ink-faint); }
+        #taxonomy-preview-path { font-size: 0.8rem; font-weight: 600; color: var(--tx-ink); }
+
         /* Fields */
         .tx-label { display: block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tx-ink-soft); margin-bottom: 0.55rem; }
+        .tx-lvl-dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 999px; margin-right: 0.4rem; }
         .tx-required { color: var(--tx-danger); }
         .tx-field {
             width: 100%; border: 1px solid var(--tx-line); background: var(--tx-bg); color: var(--tx-ink);
@@ -223,10 +235,116 @@
             <form method="POST" action="{{ route('mi_app.store') }}" enctype="multipart/form-data" id="product_form" novalidate>
                 @csrf
 
-                {{-- SECTION 1: General Information --}}
-                <div class="tx-card lvl-1">
+                {{-- SECTION 1: Taxonomy --}}
+                <div class="tx-card lvl-1" id="taxonomy-section">
                     <div class="tx-card-head">
                         <span class="tx-card-icon">01</span>
+                        <div>
+                            <h2>Taxonomy</h2>
+                            <p>Place this product on the Category → Sub Category → Sub Sub Category → Collection ladder.</p>
+                        </div>
+                    </div>
+
+                    <div class="tx-card-body cols-4">
+                        <div>
+                            <label for="category_id" class="tx-label">
+                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-1);"></span>Category <span class="tx-required">*</span>
+                            </label>
+                            <div class="tx-select-wrap">
+                                <select id="category_id" name="category_id" required data-required data-cascade-target="sub_category_id" class="tx-field">
+                                    <option value="">-- Select Category --</option>
+                                    @foreach($categories as $category)
+                                        <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
+                                            {{ $category->code }} - {{ $category->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                            @error('category_id')
+                                <p class="tx-error">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.75 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                                    {{ $message }}
+                                </p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label for="sub_category_id" class="tx-label">
+                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-2);"></span>Sub Category <span class="tx-required">*</span>
+                            </label>
+                            <div class="tx-select-wrap">
+                                <select id="sub_category_id" name="sub_category_id" required data-required data-cascade-target="product_type_id" class="tx-field">
+                                    <option value="">-- Select Category First --</option>
+                                    @foreach($subCategories as $subCategory)
+                                        <option value="{{ $subCategory->id }}" data-parent="{{ $subCategory->category_id }}"
+                                            class="{{ old('category_id') == $subCategory->category_id ? '' : 'hidden' }}"
+                                            {{ old('sub_category_id') == $subCategory->id ? 'selected' : '' }}>
+                                            {{ $subCategory->code }} - {{ $subCategory->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                            @error('sub_category_id')
+                                <p class="tx-error">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.75 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                                    {{ $message }}
+                                </p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label for="product_type_id" class="tx-label">
+                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-3);"></span>Sub Sub Category
+                            </label>
+                            <div class="tx-select-wrap">
+                                <select id="product_type_id" name="product_type_id" data-cascade-target="collection_id" class="tx-field">
+                                    <option value="">-- Select Sub Category First --</option>
+                                    @foreach($productTypes as $productType)
+                                        <option value="{{ $productType->id }}" data-parent="{{ $productType->sub_category_id }}"
+                                            class="{{ old('sub_category_id') == $productType->sub_category_id ? '' : 'hidden' }}"
+                                            {{ old('product_type_id') == $productType->id ? 'selected' : '' }}>
+                                            {{ $productType->code }} - {{ $productType->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                            @error('product_type_id') <p class="tx-error">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="collection_id" class="tx-label">
+                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-4);"></span>Collection
+                            </label>
+                            <div class="tx-select-wrap">
+                                <select id="collection_id" name="collection_id" class="tx-field">
+                                    <option value="">-- Select Sub Sub Category First --</option>
+                                    @foreach($collections as $collection)
+                                        <option value="{{ $collection->id }}" data-parent="{{ $collection->product_type_id }}"
+                                            class="{{ old('product_type_id') == $collection->product_type_id ? '' : 'hidden' }}"
+                                            {{ old('collection_id') == $collection->id ? 'selected' : '' }}>
+                                            {{ $collection->code }} - {{ $collection->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                            @error('collection_id') <p class="tx-error">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <div class="tx-taxonomy-preview" id="taxonomy-preview">
+                        <span class="tx-taxonomy-preview-label">SKU preview</span>
+                        <span id="taxonomy-preview-path" class="tx-mono">Select a category to begin</span>
+                    </div>
+                </div>
+
+                {{-- SECTION 2: General Information --}}
+                <div class="tx-card lvl-1">
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon">02</span>
                         <div>
                             <h2>General Information</h2>
                             <p>Basic identity of the product</p>
@@ -243,23 +361,6 @@
                                     {{ $message }}
                                 </p>
                             @enderror
-                        </div>
-
-                        <div>
-                            <label for="category" class="tx-label">Category <span class="tx-required">*</span></label>
-                            <input type="text" id="category" name="category" value="{{ old('category') }}" placeholder="e.g. Furniture" required data-required class="tx-field">
-                            @error('category')
-                                <p class="tx-error">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.75 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-                                    {{ $message }}
-                                </p>
-                            @enderror
-                        </div>
-
-                        <div>
-                            <label for="collection" class="tx-label">Collection</label>
-                            <input type="text" id="collection" name="collection" value="{{ old('collection') }}" placeholder="e.g. Summer 2026" class="tx-field">
-                            @error('collection') <p class="tx-error">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -295,10 +396,10 @@
                     </div>
                 </div>
 
-                {{-- SECTION 2: Attributes & Product Dimensions --}}
+                {{-- SECTION 3: Attributes & Product Dimensions --}}
                 <div class="tx-card lvl-2">
                     <div class="tx-card-head">
-                        <span class="tx-card-icon">02</span>
+                        <span class="tx-card-icon">03</span>
                         <div>
                             <h2>Attributes & Dimensions</h2>
                             <p>Physical properties and measurements</p>
@@ -443,10 +544,10 @@
                     </div>
                 </div>
 
-                {{-- SECTION 3: Packaging & Media --}}
+                {{-- SECTION 4: Packaging & Media --}}
                 <div class="tx-card lvl-3">
                     <div class="tx-card-head">
-                        <span class="tx-card-icon">03</span>
+                        <span class="tx-card-icon">04</span>
                         <div>
                             <h2>Media & Images</h2>
                             <p>Product photos and linked imagery</p>
@@ -526,6 +627,72 @@
 
     <script>
         (function () {
+            // ---- Taxonomy cascade: Category -> Sub Category -> Sub Sub Category -> Collection ----
+            document.querySelectorAll('#taxonomy-section [data-cascade-target]').forEach(function (parentSelect) {
+                parentSelect.addEventListener('change', function () {
+                    cascadeFrom(parentSelect, true);
+                    updateTaxonomyPreview();
+                });
+            });
+
+            function cascadeFrom(parentSelect, resetValue) {
+                var targetId = parentSelect.getAttribute('data-cascade-target');
+                var target = document.getElementById(targetId);
+                if (!target) return;
+
+                var selectedParent = parentSelect.value;
+                if (resetValue) target.value = '';
+
+                Array.from(target.options).forEach(function (opt) {
+                    if (!opt.value) return; // keep placeholder
+                    var belongs = opt.getAttribute('data-parent') === selectedParent;
+                    opt.classList.toggle('hidden', !belongs);
+                    opt.disabled = !belongs;
+                });
+
+                var nextTargetId = target.getAttribute('data-cascade-target');
+                if (nextTargetId) {
+                    var nextTarget = document.getElementById(nextTargetId);
+                    if (nextTarget && resetValue) {
+                        nextTarget.value = '';
+                        Array.from(nextTarget.options).forEach(function (opt) {
+                            if (!opt.value) return;
+                            opt.classList.add('hidden');
+                            opt.disabled = true;
+                        });
+                    }
+                }
+            }
+
+            // ---- Live SKU / breadcrumb preview ----
+            var categorySelect = document.getElementById('category_id');
+            var subCategorySelect = document.getElementById('sub_category_id');
+            var productTypeSelect = document.getElementById('product_type_id');
+            var collectionSelect = document.getElementById('collection_id');
+            var previewPath = document.getElementById('taxonomy-preview-path');
+
+            function labelOf(select) {
+                var opt = select.options[select.selectedIndex];
+                return opt && opt.value ? opt.textContent.trim() : null;
+            }
+
+            function updateTaxonomyPreview() {
+                var parts = [categorySelect, subCategorySelect, productTypeSelect, collectionSelect]
+                    .map(labelOf)
+                    .filter(Boolean);
+                previewPath.textContent = parts.length ? parts.join('  →  ') : 'Select a category to begin';
+            }
+
+            [categorySelect, subCategorySelect, productTypeSelect, collectionSelect].forEach(function (el) {
+                if (el) el.addEventListener('change', updateTaxonomyPreview);
+            });
+
+            // Re-apply cascades on load so old()-repopulated selects show the right visible options
+            if (categorySelect && categorySelect.value) cascadeFrom(categorySelect, false);
+            if (subCategorySelect && subCategorySelect.value) cascadeFrom(subCategorySelect, false);
+            if (productTypeSelect && productTypeSelect.value) cascadeFrom(productTypeSelect, false);
+            updateTaxonomyPreview();
+
             // ---- Required-field progress indicator ----
             var requiredFields = Array.prototype.slice.call(document.querySelectorAll('[data-required]'));
             var progressBar = document.getElementById('progress_bar');

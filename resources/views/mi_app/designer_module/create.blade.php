@@ -364,28 +364,33 @@
                         </div>
 
                         <div>
-                            <label for="type_of_sample" class="tx-label">Type of Sample <span class="tx-required">*</span></label>
-                            <input type="text" id="type_of_sample" name="type_of_sample" value="{{ old('type_of_sample') }}" placeholder="e.g. Prototype" required data-required class="tx-field">
+                            <label for="type_of_sample" class="tx-label">
+                                Type of Sample <span class="tx-required">*</span>
+                            </label>
+
+                            <select id="type_of_sample"
+                                    name="type_of_sample"
+                                    required
+                                    data-required
+                                    class="tx-field">
+                                <option value="">-- Select Type of Sample --</option>
+                                <option value="Factory Design" {{ old('type_of_sample') == 'Factory Design' ? 'selected' : '' }}>
+                                    Factory Design
+                                </option>
+                                <option value="Metroinc Design" {{ old('type_of_sample') == 'Metroinc Design' ? 'selected' : '' }}>
+                                    Metroinc Design
+                                </option>
+                            </select>
+
                             @error('type_of_sample')
                                 <p class="tx-error">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.75 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.75 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                    </svg>
                                     {{ $message }}
                                 </p>
                             @enderror
-                        </div>
-
-                        <div>
-                            <label for="classification" class="tx-label">Classification <span class="tx-required">*</span></label>
-                            <div class="tx-select-wrap">
-                                <select id="classification" name="classification" required data-required class="tx-field">
-                                    <option value="Available" {{ old('classification', 'Available') == 'Available' ? 'selected' : '' }}>Available</option>
-                                    <option value="Assigned" {{ old('classification') == 'Assigned' ? 'selected' : '' }}>Assigned</option>
-                                    <option value="Repair" {{ old('classification') == 'Repair' ? 'selected' : '' }}>Repair</option>
-                                    <option value="Disposed" {{ old('classification') == 'Disposed' ? 'selected' : '' }}>Disposed</option>
-                                </select>
-                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                            </div>
-                            @error('classification') <p class="tx-error">{{ $message }}</p> @enderror
                         </div>
 
                         <div class="col-span-2">

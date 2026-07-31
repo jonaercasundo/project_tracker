@@ -11,6 +11,7 @@ use App\Models\MI_ProductType;
 use App\Models\MI_Collection;
 use App\Models\MI_Material;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\log;
 
 class MIAppController extends Controller
 {

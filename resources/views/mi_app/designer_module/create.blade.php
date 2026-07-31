@@ -234,7 +234,11 @@
             {{-- Main Form Container --}}
             <form method="POST" action="{{ route('mi_app.store') }}" enctype="multipart/form-data" id="product_form" novalidate>
                 @csrf
-
+                @error('error')
+                    <div class="tx-error" style="margin: 0 1.75rem 1.5rem; padding: 0.85rem 1.1rem; border: 1px solid var(--tx-danger); border-radius: 12px; background: var(--tx-accent-soft);">
+                        {{ $message }}
+                    </div>
+                @enderror
                 {{-- SECTION 1: Taxonomy --}}
                 <div class="tx-card lvl-1" id="taxonomy-section">
                     <div class="tx-card-head">

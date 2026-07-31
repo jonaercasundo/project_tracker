@@ -1,99 +1,399 @@
 <x-mi_app>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <div class="rounded-[32px] border border-slate-200/80 bg-gradient-to-br from-slate-50/90 via-white to-slate-100/80 p-6 shadow-[0_30px_80px_-35px_rgba(15,23,42,0.35)] dark:border-slate-800/70 dark:from-slate-900/80 dark:via-slate-900 dark:to-slate-950/80 sm:p-8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-        {{-- Page Header --}}
-        <div class="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-white/70 p-5 shadow-sm backdrop-blur-sm dark:border-slate-800/70 dark:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-            <div class="flex items-center gap-4">
-                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700 shadow-sm dark:border-slate-700 dark:from-slate-800 dark:to-slate-700 dark:text-slate-100">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5" />
-                    </svg>
-                </div>
+    <style>
+        .tx-console {
+            --tx-bg: #F5F6F3;
+            --tx-surface: #FFFFFF;
+            --tx-ink: #171B1A;
+            --tx-ink-soft: #616B66;
+            --tx-ink-faint: #9AA39C;
+            --tx-line: #E2E5DF;
+            --tx-primary: #2F5D50;
+            --tx-primary-ink: #FFFFFF;
+            --tx-primary-soft: #E5EEE9;
+            --tx-accent: #C7703C;
+            --tx-accent-soft: #F5E7DB;
+            --tx-danger: #B3432E;
+            --tx-lvl-1: #2F5D50;
+            --tx-lvl-1-soft: #E5EEE9;
+            --tx-lvl-2: #35618C;
+            --tx-lvl-2-soft: #E3EBF2;
+            --tx-lvl-3: #7A4F98;
+            --tx-lvl-3-soft: #ECE4F1;
+            --tx-lvl-4: #C7703C;
+            --tx-lvl-4-soft: #F5E7DB;
+            --tx-font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+            --tx-font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            --tx-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+            font-family: var(--tx-font-body);
+            background: var(--tx-bg);
+            color: var(--tx-ink);
+        }
+        .tx-console.dark {
+            --tx-bg: #12151A;
+            --tx-surface: #191D22;
+            --tx-ink: #EDEFEA;
+            --tx-ink-soft: #9AA39C;
+            --tx-ink-faint: #6B746E;
+            --tx-line: #262B31;
+            --tx-primary-soft: #1C2723;
+            --tx-lvl-1-soft: #1C2723;
+            --tx-lvl-2-soft: #1A222B;
+            --tx-lvl-3-soft: #221C29;
+            --tx-lvl-4-soft: #2A2019;
+        }
+
+        .tx-display { font-family: var(--tx-font-display); letter-spacing: -0.01em; }
+        .tx-mono { font-family: var(--tx-font-mono); letter-spacing: 0.02em; }
+
+        .tx-shell {
+            max-width: 78rem;
+            margin: 0 auto;
+            padding: 2.5rem 1.5rem 5rem;
+        }
+
+        /* Header */
+        .tx-header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: flex-end;
+            justify-content: space-between;
+            padding-bottom: 1.75rem;
+            border-bottom: 1px solid var(--tx-line);
+            margin-bottom: 2rem;
+        }
+        .tx-eyebrow {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--tx-ink-faint);
+            margin-bottom: 0.6rem;
+        }
+        .tx-eyebrow a { color: var(--tx-ink-soft); text-decoration: none; }
+        .tx-eyebrow a:hover { color: var(--tx-primary); }
+        .tx-title { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+        .tx-subtitle { color: var(--tx-ink-soft); font-size: 0.925rem; margin-top: 0.5rem; max-width: 38rem; }
+        .tx-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 1px solid var(--tx-line);
+            background: var(--tx-surface);
+            color: var(--tx-ink);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            padding: 0.6rem 1.1rem;
+            border-radius: 999px;
+            text-decoration: none;
+            transition: all .15s ease;
+        }
+        .tx-back:hover { border-color: var(--tx-primary); color: var(--tx-primary); transform: translateX(-2px); }
+
+        /* Ladder / signature nav */
+        .tx-ladder {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            margin-bottom: 2.5rem;
+            border: 1px solid var(--tx-line);
+            border-radius: 18px;
+            overflow: hidden;
+            background: var(--tx-surface);
+        }
+        .tx-rung {
+            flex: 1 1 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.1rem;
+            text-decoration: none;
+            color: var(--tx-ink);
+            position: relative;
+            border-right: 1px solid var(--tx-line);
+            transition: background .15s ease;
+        }
+        .tx-rung:last-child { border-right: none; }
+        .tx-rung:hover { background: var(--tx-primary-soft); }
+        .tx-rung-dot {
+            width: 0.65rem; height: 0.65rem; border-radius: 999px; flex-shrink: 0;
+            box-shadow: 0 0 0 4px var(--dot-soft, transparent);
+        }
+        .tx-rung-label { font-size: 0.8rem; font-weight: 600; }
+        .tx-rung-sub { font-size: 0.7rem; color: var(--tx-ink-faint); }
+        .tx-rung::after {
+            content: '';
+            position: absolute;
+            right: -1px; top: 50%;
+            width: 6px; height: 6px;
+            transform: translateY(-50%) rotate(45deg);
+            border-top: 1px solid var(--tx-line);
+            border-right: 1px solid var(--tx-line);
+            background: var(--tx-surface);
+            z-index: 1;
+        }
+        .tx-rung:last-child::after { display: none; }
+
+        /* Cards */
+        .tx-card {
+            background: var(--tx-surface);
+            border: 1px solid var(--tx-line);
+            border-radius: 20px;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+            scroll-margin-top: 1.5rem;
+        }
+        .tx-card-head {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            padding: 1.35rem 1.75rem;
+            border-bottom: 1px solid var(--tx-line);
+        }
+        .tx-card-icon {
+            width: 2.25rem; height: 2.25rem;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 10px;
+            flex-shrink: 0;
+            font-family: var(--tx-font-mono);
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        .tx-card-head h2 { font-family: var(--tx-font-display); font-size: 1.02rem; font-weight: 600; }
+        .tx-card-head p { font-size: 0.78rem; color: var(--tx-ink-soft); margin-top: 0.15rem; }
+        .tx-card-body {
+            padding: 1.75rem;
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0,1fr));
+            gap: 1.35rem;
+        }
+        @media (min-width: 768px) { .tx-card-body.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+        @media (min-width: 1024px) {
+            .tx-card-body.cols-4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+            .tx-card-body.cols-4-btn { grid-template-columns: repeat(4, minmax(0,1fr)); }
+        }
+
+        /* Fields */
+        .tx-label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--tx-ink-soft);
+            margin-bottom: 0.55rem;
+        }
+        .tx-required { color: var(--tx-danger); }
+        .tx-field {
+            width: 100%;
+            border: 1px solid var(--tx-line);
+            background: var(--tx-bg);
+            color: var(--tx-ink);
+            font-size: 0.875rem;
+            padding: 0.72rem 1rem;
+            border-radius: 12px;
+            outline: none;
+            transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+        }
+        .tx-field::placeholder { color: var(--tx-ink-faint); }
+        .tx-field:focus {
+            border-color: var(--tx-primary);
+            background: var(--tx-surface);
+            box-shadow: 0 0 0 4px var(--tx-primary-soft);
+        }
+        .tx-select-wrap { position: relative; }
+        .tx-select-wrap select { appearance: none; padding-right: 2.5rem; }
+        .tx-select-wrap svg {
+            position: absolute; right: 0.9rem; top: 50%; transform: translateY(-50%);
+            width: 1rem; height: 1rem; color: var(--tx-ink-faint); pointer-events: none;
+        }
+        .tx-error {
+            color: var(--tx-danger);
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 0.4rem;
+        }
+
+        /* Buttons */
+        .tx-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            background: var(--tx-primary);
+            color: var(--tx-primary-ink);
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 0.75rem 1.1rem;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+        }
+        .tx-btn:hover { opacity: 0.92; box-shadow: 0 8px 20px -8px var(--tx-primary); transform: translateY(-1px); }
+        .tx-btn-static {
+            width: auto;
+        }
+
+        /* Level accents per section */
+        .lvl-1 .tx-card-icon { background: var(--tx-lvl-1-soft); color: var(--tx-lvl-1); }
+        .lvl-1 .tx-rung-dot { background: var(--tx-lvl-1); --dot-soft: var(--tx-lvl-1-soft); }
+        .lvl-2 .tx-card-icon { background: var(--tx-lvl-2-soft); color: var(--tx-lvl-2); }
+        .lvl-2 .tx-rung-dot { background: var(--tx-lvl-2); --dot-soft: var(--tx-lvl-2-soft); }
+        .lvl-3 .tx-card-icon { background: var(--tx-lvl-3-soft); color: var(--tx-lvl-3); }
+        .lvl-3 .tx-rung-dot { background: var(--tx-lvl-3); --dot-soft: var(--tx-lvl-3-soft); }
+        .lvl-4 .tx-card-icon { background: var(--tx-lvl-4-soft); color: var(--tx-lvl-4); }
+        .lvl-4 .tx-rung-dot { background: var(--tx-lvl-4); --dot-soft: var(--tx-lvl-4-soft); }
+        .lvl-m .tx-card-icon { background: var(--tx-accent-soft); color: var(--tx-accent); }
+
+        /* Table / tree */
+        .tx-table-wrap { overflow-x: auto; }
+        table.tx-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        table.tx-table thead th {
+            text-align: left;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--tx-ink-faint);
+            padding: 0.9rem 1.2rem;
+            border-bottom: 1px solid var(--tx-line);
+            background: var(--tx-bg);
+        }
+        table.tx-table tbody td {
+            padding: 0.85rem 1.2rem;
+            border-bottom: 1px solid var(--tx-line);
+            vertical-align: middle;
+        }
+        table.tx-table tbody tr:last-child td { border-bottom: none; }
+        table.tx-table tbody tr:hover { background: var(--tx-bg); }
+        .tx-code-badge {
+            font-family: var(--tx-font-mono);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.3rem 0.6rem;
+            border-radius: 7px;
+            background: var(--tx-ink);
+            color: var(--tx-bg);
+            display: inline-block;
+            white-space: nowrap;
+        }
+        .tx-dash { color: var(--tx-ink-faint); }
+        .tx-crumb { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; font-size: 0.8rem; }
+        .tx-crumb span.node { color: var(--tx-ink); }
+        .tx-crumb span.arrow { color: var(--tx-ink-faint); }
+        .tx-swatch {
+            width: 0.5rem; height: 0.5rem; border-radius: 999px; display: inline-block; margin-right: 0.5rem; flex-shrink: 0;
+        }
+        .tx-cell-primary { display:flex; align-items:center; }
+    </style>
+
+    <div class="tx-console">
+        <div class="tx-shell">
+
+            {{-- Page Header --}}
+            <div class="tx-header">
                 <div>
-                    <div class="mb-0.5 flex items-center gap-2 text-xs font-medium text-gray-400 dark:text-gray-500">
-                        <a href="{{ route('mi_app.index') }}" class="transition-colors hover:text-gray-600 dark:hover:text-gray-300">Product Database</a>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-                        <span class="text-gray-500 dark:text-gray-400">Settings</span>
+                    <div class="tx-eyebrow">
+                        <a href="{{ route('mi_app.index') }}">Product Database</a>
+                        <span>/</span>
+                        <span>Settings</span>
                     </div>
-                    <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Settings</h1>
-                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Fill in the Category, Sub Category, Sub Sub Category, Collection, Type of Sample, And Materials</p>
+                    <h1 class="tx-title tx-display">Taxonomy Console</h1>
+                    <p class="tx-subtitle">Build out the catalog hierarchy — Category, Sub Category, Sub Sub Category and Collection — plus the shared Materials list used across products.</p>
                 </div>
+                <a href="{{ route('mi_app.index') }}" class="tx-back">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    Back to Database
+                </a>
             </div>
 
-            <a href="{{ route('mi_app.index') }}"
-               class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:border-gray-700/80 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700/60 dark:hover:text-white dark:focus:ring-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 stroke-[2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                </svg>
-                Back to Database
-            </a>
-        </div>
-
-        <div class="space-y-8 mt-8">
+            {{-- Signature: hierarchy ladder / anchor nav --}}
+            <nav class="tx-ladder" aria-label="Taxonomy levels">
+                <a href="#level-category" class="tx-rung lvl-1">
+                    <span class="tx-rung-dot"></span>
+                    <span>
+                        <span class="tx-rung-label tx-display">Category</span><br>
+                        <span class="tx-rung-sub">{{ $categories->count() }} defined</span>
+                    </span>
+                </a>
+                <a href="#level-subcategory" class="tx-rung lvl-2">
+                    <span class="tx-rung-dot"></span>
+                    <span>
+                        <span class="tx-rung-label tx-display">Sub Category</span><br>
+                        <span class="tx-rung-sub">{{ $subCategories->count() }} defined</span>
+                    </span>
+                </a>
+                <a href="#level-subsubcategory" class="tx-rung lvl-3">
+                    <span class="tx-rung-dot"></span>
+                    <span>
+                        <span class="tx-rung-label tx-display">Sub Sub Category</span><br>
+                        <span class="tx-rung-sub">{{ $productTypes->count() }} defined</span>
+                    </span>
+                </a>
+                <a href="#level-collection" class="tx-rung lvl-4">
+                    <span class="tx-rung-dot"></span>
+                    <span>
+                        <span class="tx-rung-label tx-display">Collection</span><br>
+                        <span class="tx-rung-sub">Newest tier</span>
+                    </span>
+                </a>
+            </nav>
 
             {{-- SECTION 1: Category --}}
-            <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
+            <div class="tx-card lvl-1" id="level-category">
                 <form method="POST" action="{{ route('mi_app.store') }}" novalidate>
                     @csrf
                     <input type="hidden" name="entity_type" value="category">
-                    <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5M3.75 4.5l7.5 7.5-7.5 7.5" />
-                            </svg>
-                        </span>
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon">01</span>
                         <div>
-                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">Category</h2>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Add a new top-level Category</p>
+                            <h2>Category</h2>
+                            <p>Top-level grouping — the root of every product's taxonomy code.</p>
                         </div>
                     </div>
-
-                    <div class="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="tx-card-body cols-4">
                         <div>
-                            <label for="category_name" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                                Category Name <span class="text-rose-500">*</span>
-                            </label>
-                            <input type="text" id="category_name" name="category_name" value="{{ old('category_name') }}" placeholder="e.g. Furniture" required
-                                class="field w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="category_name" class="tx-label">Category Name <span class="tx-required">*</span></label>
+                            <input type="text" id="category_name" name="category_name" value="{{ old('category_name') }}" placeholder="e.g. Furniture" required class="tx-field">
                             @error('category_name')
-                                <p class="flex items-center gap-1 text-rose-500 text-xs mt-1.5 font-medium">{{ $message }}</p>
+                                <p class="tx-error">{{ $message }}</p>
                             @enderror
                         </div>
-                        <div class="flex items-end">
-                            <button type="submit" class="w-full rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold py-2.5 px-4 hover:opacity-90 transition-all">
-                                Add Category
-                            </button>
+                        <div style="align-self:end;">
+                            <button type="submit" class="tx-btn">Add Category</button>
                         </div>
                     </div>
                 </form>
             </div>
 
             {{-- SECTION 2: Sub Category --}}
-            <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
+            <div class="tx-card lvl-2" id="level-subcategory">
                 <form method="POST" action="{{ route('mi_app.store') }}" novalidate>
                     @csrf
                     <input type="hidden" name="entity_type" value="sub_category">
-                    <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5M3.75 4.5l7.5 7.5-7.5 7.5" />
-                            </svg>
-                        </span>
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon">02</span>
                         <div>
-                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">Sub Category</h2>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Add a Sub Category under a Category</p>
+                            <h2>Sub Category</h2>
+                            <p>Nested one level under a Category.</p>
                         </div>
                     </div>
-
-                    <div class="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="tx-card-body cols-4">
                         <div>
-                            <label for="subcat_category_id" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                                Category <span class="text-rose-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <select name="category_id" id="subcat_category_id" required
-                                    class="field w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 pr-10 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="subcat_category_id" class="tx-label">Category <span class="tx-required">*</span></label>
+                            <div class="tx-select-wrap">
+                                <select name="category_id" id="subcat_category_id" required class="tx-field">
                                     <option value="">-- Select Category --</option>
                                     @foreach($categories as $category)
                                         <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
@@ -101,74 +401,58 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </div>
                             @error('category_id')
-                                <p class="flex items-center gap-1 text-rose-500 text-xs mt-1.5 font-medium">{{ $message }}</p>
+                                <p class="tx-error">{{ $message }}</p>
                             @enderror
                         </div>
 
                         <div>
-                            <label for="sub_category_name" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                                Sub Category Name <span class="text-rose-500">*</span>
-                            </label>
-                            <input type="text" id="sub_category_name" name="sub_category_name" value="{{ old('sub_category_name') }}" placeholder="e.g. Chairs" required
-                                class="field w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="sub_category_name" class="tx-label">Sub Category Name <span class="tx-required">*</span></label>
+                            <input type="text" id="sub_category_name" name="sub_category_name" value="{{ old('sub_category_name') }}" placeholder="e.g. Chairs" required class="tx-field">
                             @error('sub_category_name')
-                                <p class="flex items-center gap-1 text-rose-500 text-xs mt-1.5 font-medium">{{ $message }}</p>
+                                <p class="tx-error">{{ $message }}</p>
                             @enderror
                         </div>
 
-                        <div class="flex items-end">
-                            <button type="submit" class="w-full rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold py-2.5 px-4 hover:opacity-90 transition-all">
-                                Add Sub Category
-                            </button>
+                        <div style="align-self:end;">
+                            <button type="submit" class="tx-btn">Add Sub Category</button>
                         </div>
                     </div>
                 </form>
             </div>
 
             {{-- SECTION 3: Sub Sub Category --}}
-            <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
+            <div class="tx-card lvl-3" id="level-subsubcategory">
                 <form method="POST" action="{{ route('mi_app.store') }}" novalidate>
                     @csrf
                     <input type="hidden" name="entity_type" value="product_type">
-                    <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5M3.75 4.5l7.5 7.5-7.5 7.5" />
-                            </svg>
-                        </span>
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon">03</span>
                         <div>
-                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">Sub Sub Category</h2>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Add a Sub Sub Category under a Sub Category</p>
+                            <h2>Sub Sub Category</h2>
+                            <p>Nested under a Sub Category — the most specific product type tier.</p>
                         </div>
                     </div>
-
-                    <div class="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="tx-card-body cols-4">
                         <div>
-                            <label for="ssc_category_id" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                                Category <span class="text-rose-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <select name="category_id" id="ssc_category_id" required data-cascade-target="ssc_subcategory_id"
-                                    class="field w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 pr-10 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="ssc_category_id" class="tx-label">Category <span class="tx-required">*</span></label>
+                            <div class="tx-select-wrap">
+                                <select name="category_id" id="ssc_category_id" required data-cascade-target="ssc_subcategory_id" class="tx-field">
                                     <option value="">-- Select Category --</option>
                                     @foreach($categories as $category)
                                         <option value="{{ $category->id }}"> {{ $category->code }} - {{ $category->name }}</option>
                                     @endforeach
                                 </select>
-                                <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </div>
                         </div>
 
                         <div>
-                            <label for="ssc_subcategory_id" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                                Sub Category <span class="text-rose-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <select name="sub_category_id" id="ssc_subcategory_id" required
-                                    class="field w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 pr-10 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="ssc_subcategory_id" class="tx-label">Sub Category <span class="tx-required">*</span></label>
+                            <div class="tx-select-wrap">
+                                <select name="sub_category_id" id="ssc_subcategory_id" required class="tx-field">
                                     <option value="">-- Select Category First --</option>
                                     @foreach($subCategories as $subCategory)
                                         <option value="{{ $subCategory->id }}" data-parent="{{ $subCategory->category_id }}" class="hidden">
@@ -176,64 +460,52 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </div>
                         </div>
 
                         <div>
-                            <label for="product_type_name" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                                Sub Sub Category Name <span class="text-rose-500">*</span>
-                            </label>
-                            <input type="text" id="product_type_name" name="product_type_name" value="{{ old('product_type_name') }}" placeholder="e.g. Dining Chairs" required
-                                class="field w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="product_type_name" class="tx-label">Sub Sub Category Name <span class="tx-required">*</span></label>
+                            <input type="text" id="product_type_name" name="product_type_name" value="{{ old('product_type_name') }}" placeholder="e.g. Dining Chairs" required class="tx-field">
                         </div>
 
-                        <div class="flex items-end">
-                            <button type="submit" class="w-full rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold py-2.5 px-4 hover:opacity-90 transition-all">
-                                Add Sub Sub Category
-                            </button>
+                        <div style="align-self:end;">
+                            <button type="submit" class="tx-btn">Add Sub Sub Category</button>
                         </div>
                     </div>
                 </form>
             </div>
 
             {{-- SECTION 4: Collection --}}
-            <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
+            <div class="tx-card lvl-4" id="level-collection">
                 <form method="POST" action="{{ route('mi_app.store') }}" novalidate>
                     @csrf
                     <input type="hidden" name="entity_type" value="collection">
-                    <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5M3.75 4.5l7.5 7.5-7.5 7.5" />
-                            </svg>
-                        </span>
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon">04</span>
                         <div>
-                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">Collection</h2>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Add a Collection under a Sub Sub Category</p>
+                            <h2>Collection</h2>
+                            <p>Nested under a Sub Sub Category — usually a seasonal or thematic drop.</p>
                         </div>
                     </div>
-
-                    <div class="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="tx-card-body cols-4">
                         <div>
-                            <label for="col_category_id" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">Category <span class="text-rose-500">*</span></label>
-                            <div class="relative">
-                                <select name="category_id" id="col_category_id" required data-cascade-target="col_subcategory_id"
-                                    class="field w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 pr-10 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="col_category_id" class="tx-label">Category <span class="tx-required">*</span></label>
+                            <div class="tx-select-wrap">
+                                <select name="category_id" id="col_category_id" required data-cascade-target="col_subcategory_id" class="tx-field">
                                     <option value="">-- Select Category --</option>
                                     @foreach($categories as $category)
                                         <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
                                 </select>
-                                <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </div>
                         </div>
 
                         <div>
-                            <label for="col_subcategory_id" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">Sub Category <span class="text-rose-500">*</span></label>
-                            <div class="relative">
-                                <select name="sub_category_id" id="col_subcategory_id" required data-cascade-target="col_subsubcategory_id"
-                                    class="field w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 pr-10 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="col_subcategory_id" class="tx-label">Sub Category <span class="tx-required">*</span></label>
+                            <div class="tx-select-wrap">
+                                <select name="sub_category_id" id="col_subcategory_id" required data-cascade-target="col_subsubcategory_id" class="tx-field">
                                     <option value="">-- Select Category First --</option>
                                     @foreach($subCategories as $subCategory)
                                         <option value="{{ $subCategory->id }}" data-parent="{{ $subCategory->category_id }}" class="hidden">
@@ -241,15 +513,14 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </div>
                         </div>
 
                         <div>
-                            <label for="col_subsubcategory_id" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">Sub Sub Category <span class="text-rose-500">*</span></label>
-                            <div class="relative">
-                                <select name="product_type_id" id="col_subsubcategory_id" required
-                                    class="field w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 pr-10 text-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="col_subsubcategory_id" class="tx-label">Sub Sub Category <span class="tx-required">*</span></label>
+                            <div class="tx-select-wrap">
+                                <select name="product_type_id" id="col_subsubcategory_id" required class="tx-field">
                                     <option value="">-- Select Sub Category First --</option>
                                     @foreach($productTypes as $productType)
                                         <option value="{{ $productType->id }}"
@@ -259,59 +530,61 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </div>
                         </div>
 
                         <div>
-                            <label for="collection_name" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">Collection Name <span class="text-rose-500">*</span></label>
-                            <input type="text" id="collection_name" name="collection_name" value="{{ old('collection_name') }}" placeholder="e.g. Spring 2026" required
-                                class="field w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="collection_name" class="tx-label">Collection Name <span class="tx-required">*</span></label>
+                            <input type="text" id="collection_name" name="collection_name" value="{{ old('collection_name') }}" placeholder="e.g. Spring 2026" required class="tx-field">
                         </div>
                     </div>
 
-                    <div class="px-6 sm:px-8 pb-6 sm:pb-8">
-                        <button type="submit" class="rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold py-2.5 px-6 hover:opacity-90 transition-all">
-                            Add Collection
-                        </button>
+                    <div style="padding: 0 1.75rem 1.75rem;">
+                        <button type="submit" class="tx-btn tx-btn-static">Add Collection</button>
                     </div>
                 </form>
             </div>
 
             {{-- Hierarchy Overview Table --}}
-            <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
-                <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50">
-                    <h2 class="text-base font-semibold text-gray-900 dark:text-white">Taxonomy Structure</h2>
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Existing mapping of categories down to collections</p>
+            <div class="tx-card">
+                <div class="tx-card-head">
+                    <span class="tx-card-icon" style="background: var(--tx-line); color: var(--tx-ink-soft);">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M3 12h12M3 17h6" /></svg>
+                    </span>
+                    <div>
+                        <h2>Taxonomy Structure</h2>
+                        <p>Full mapping from Category down to Collection, with generated taxonomy codes.</p>
+                    </div>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                        <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
+                <div class="tx-table-wrap">
+                    <table class="tx-table">
+                        <thead>
                             <tr>
-                                <th class="px-6 py-3.5 font-semibold">Taxonomy Code</th>
-                                <th class="px-6 py-3.5 font-semibold">Category</th>
-                                <th class="px-6 py-3.5 font-semibold">Sub Category</th>
-                                <th class="px-6 py-3.5 font-semibold">Product Type</th>
-                                <th class="px-6 py-3.5 font-semibold">Collection</th>
-                                <th class="px-6 py-3.5 font-semibold">Hierarchy</th>
+                                <th>Taxonomy Code</th>
+                                <th>Category</th>
+                                <th>Sub Category</th>
+                                <th>Product Type</th>
+                                <th>Collection</th>
+                                <th>Hierarchy</th>
                             </tr>
                         </thead>
 
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <tbody>
                         @foreach($categories as $category)
 
                             {{-- Category only --}}
                             @if($category->subCategories->isEmpty())
                                 <tr>
-                                    <td class="px-6 py-4">
-                                        {{ $category->code }}
+                                    <td><span class="tx-code-badge tx-mono">{{ $category->code }}</span></td>
+                                    <td>
+                                        <span class="tx-cell-primary"><span class="tx-swatch" style="background: var(--tx-lvl-1);"></span>{{ $category->name }}</span>
                                     </td>
-                                    <td class="px-6 py-4">{{ $category->name }}</td>
-                                    <td class="px-6 py-4 text-gray-400">-</td>
-                                    <td class="px-6 py-4 text-gray-400">-</td>
-                                    <td class="px-6 py-4 text-gray-400">-</td>
-                                    <td class="px-6 py-4">
-                                        {{ $category->name }}
+                                    <td class="tx-dash">—</td>
+                                    <td class="tx-dash">—</td>
+                                    <td class="tx-dash">—</td>
+                                    <td>
+                                        <span class="tx-crumb"><span class="node">{{ $category->name }}</span></span>
                                     </td>
                                 </tr>
                             @endif
@@ -321,18 +594,19 @@
                                 {{-- Category + Sub Category --}}
                                 @if($subCategory->productTypes->isEmpty())
                                     <tr>
-                                        <td class="px-6 py-4">
-                                            {{ $category->code }}-{{ $subCategory->code }}
+                                        <td><span class="tx-code-badge tx-mono">{{ $category->code }}-{{ $subCategory->code }}</span></td>
+                                        <td>{{ $category->name }}</td>
+                                        <td>
+                                            <span class="tx-cell-primary"><span class="tx-swatch" style="background: var(--tx-lvl-2);"></span>{{ $subCategory->name }}</span>
                                         </td>
-
-                                        <td class="px-6 py-4">{{ $category->name }}</td>
-                                        <td class="px-6 py-4">{{ $subCategory->name }}</td>
-                                        <td class="px-6 py-4 text-gray-400">-</td>
-                                        <td class="px-6 py-4 text-gray-400">-</td>
-
-                                        <td class="px-6 py-4">
-                                            {{ $category->name }} →
-                                            {{ $subCategory->name }}
+                                        <td class="tx-dash">—</td>
+                                        <td class="tx-dash">—</td>
+                                        <td>
+                                            <span class="tx-crumb">
+                                                <span class="node">{{ $category->name }}</span>
+                                                <span class="arrow">→</span>
+                                                <span class="node">{{ $subCategory->name }}</span>
+                                            </span>
                                         </td>
                                     </tr>
                                 @endif
@@ -342,19 +616,21 @@
                                     {{-- Category + Sub Category + Product Type --}}
                                     @if($productType->collections->isEmpty())
                                         <tr>
-                                            <td class="px-6 py-4">
-                                                {{ $category->code }}-{{ $subCategory->code }}-{{ $productType->code }}
+                                            <td><span class="tx-code-badge tx-mono">{{ $category->code }}-{{ $subCategory->code }}-{{ $productType->code }}</span></td>
+                                            <td>{{ $category->name }}</td>
+                                            <td>{{ $subCategory->name }}</td>
+                                            <td>
+                                                <span class="tx-cell-primary"><span class="tx-swatch" style="background: var(--tx-lvl-3);"></span>{{ $productType->name }}</span>
                                             </td>
-
-                                            <td class="px-6 py-4">{{ $category->name }}</td>
-                                            <td class="px-6 py-4">{{ $subCategory->name }}</td>
-                                            <td class="px-6 py-4">{{ $productType->name }}</td>
-                                            <td class="px-6 py-4 text-gray-400">-</td>
-
-                                            <td class="px-6 py-4">
-                                                {{ $category->name }} →
-                                                {{ $subCategory->name }} →
-                                                {{ $productType->name }}
+                                            <td class="tx-dash">—</td>
+                                            <td>
+                                                <span class="tx-crumb">
+                                                    <span class="node">{{ $category->name }}</span>
+                                                    <span class="arrow">→</span>
+                                                    <span class="node">{{ $subCategory->name }}</span>
+                                                    <span class="arrow">→</span>
+                                                    <span class="node">{{ $productType->name }}</span>
+                                                </span>
                                             </td>
                                         </tr>
                                     @endif
@@ -363,20 +639,23 @@
 
                                         {{-- Complete taxonomy --}}
                                         <tr>
-                                            <td class="px-6 py-4">
-                                                {{ $category->code }}-{{ $subCategory->code }}-{{ $productType->code }}-{{ $collection->code }}
+                                            <td><span class="tx-code-badge tx-mono">{{ $category->code }}-{{ $subCategory->code }}-{{ $productType->code }}-{{ $collection->code }}</span></td>
+                                            <td>{{ $category->name }}</td>
+                                            <td>{{ $subCategory->name }}</td>
+                                            <td>{{ $productType->name }}</td>
+                                            <td>
+                                                <span class="tx-cell-primary"><span class="tx-swatch" style="background: var(--tx-lvl-4);"></span>{{ $collection->name }}</span>
                                             </td>
-
-                                            <td class="px-6 py-4">{{ $category->name }}</td>
-                                            <td class="px-6 py-4">{{ $subCategory->name }}</td>
-                                            <td class="px-6 py-4">{{ $productType->name }}</td>
-                                            <td class="px-6 py-4">{{ $collection->name }}</td>
-
-                                            <td class="px-6 py-4">
-                                                {{ $category->name }} →
-                                                {{ $subCategory->name }} →
-                                                {{ $productType->name }} →
-                                                {{ $collection->name }}
+                                            <td>
+                                                <span class="tx-crumb">
+                                                    <span class="node">{{ $category->name }}</span>
+                                                    <span class="arrow">→</span>
+                                                    <span class="node">{{ $subCategory->name }}</span>
+                                                    <span class="arrow">→</span>
+                                                    <span class="node">{{ $productType->name }}</span>
+                                                    <span class="arrow">→</span>
+                                                    <span class="node">{{ $collection->name }}</span>
+                                                </span>
                                             </td>
                                         </tr>
 
@@ -392,49 +671,39 @@
                 </div>
             </div>
 
-
             {{-- SECTION 6: Materials --}}
-            <div class="reveal overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-gray-900">
+            <div class="tx-card lvl-m">
                 <form method="POST" action="{{ route('mi_app.store') }}" novalidate>
                     @csrf
                     <input type="hidden" name="entity_type" value="material">
-                    <div class="p-6 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-900/50 flex items-center gap-3">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5M3.75 4.5l7.5 7.5-7.5 7.5" />
-                            </svg>
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4h16v16H4z" opacity="0"/><circle cx="12" cy="12" r="7" /></svg>
                         </span>
                         <div>
-                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">Materials</h2>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Add a Material (e.g. Cotton, Oak, Steel)</p>
+                            <h2>Materials</h2>
+                            <p>Shared swatch list used across products — e.g. Cotton, Oak, Steel.</p>
                         </div>
                     </div>
-
-                    <div class="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="tx-card-body cols-4">
                         <div>
-                            <label for="material_name" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                                Material Name <span class="text-rose-500">*</span>
-                            </label>
-                            <input type="text" id="material_name" name="material_name" value="{{ old('material_name') }}" placeholder="e.g. Cotton" required
-                                class="field w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 py-2.5 px-4 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none">
+                            <label for="material_name" class="tx-label">Material Name <span class="tx-required">*</span></label>
+                            <input type="text" id="material_name" name="material_name" value="{{ old('material_name') }}" placeholder="e.g. Cotton" required class="tx-field">
                             @error('material_name')
-                                <p class="flex items-center gap-1 text-rose-500 text-xs mt-1.5 font-medium">{{ $message }}</p>
+                                <p class="tx-error">{{ $message }}</p>
                             @enderror
                         </div>
-                        <div class="flex items-end">
-                            <button type="submit" class="w-full rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold py-2.5 px-4 hover:opacity-90 transition-all">
-                                Add Material
-                            </button>
+                        <div style="align-self:end;">
+                            <button type="submit" class="tx-btn">Add Material</button>
                         </div>
                     </div>
                 </form>
             </div>
 
         </div>
-        </div>
     </div>
 
-    {{-- Cascading dropdown logic --}}
+    {{-- Cascading dropdown logic (unchanged behavior) --}}
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('[data-cascade-target]').forEach(function (parentSelect) {
@@ -444,7 +713,6 @@
                     if (!target) return;
 
                     var selectedParent = parentSelect.value;
-                    var firstOption = target.querySelector('option[value=""]');
                     target.value = '';
 
                     Array.from(target.options).forEach(function (opt) {

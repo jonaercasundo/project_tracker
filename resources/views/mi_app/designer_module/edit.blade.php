@@ -1,392 +1,491 @@
 <x-mi_app>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-<div class="max-w-7xl mx-auto px-6 py-8">
+    <style>
+        .tx-console {
+            --tx-bg: #F5F6F3;
+            --tx-surface: #FFFFFF;
+            --tx-ink: #171B1A;
+            --tx-ink-soft: #616B66;
+            --tx-ink-faint: #9AA39C;
+            --tx-line: #E2E5DF;
+            --tx-primary: #2F5D50;
+            --tx-primary-ink: #FFFFFF;
+            --tx-primary-soft: #E5EEE9;
+            --tx-accent: #C7703C;
+            --tx-accent-soft: #F5E7DB;
+            --tx-danger: #B3432E;
+            --tx-lvl-1: #2F5D50;
+            --tx-lvl-1-soft: #E5EEE9;
+            --tx-lvl-2: #35618C;
+            --tx-lvl-2-soft: #E3EBF2;
+            --tx-lvl-3: #7A4F98;
+            --tx-lvl-3-soft: #ECE4F1;
+            --tx-lvl-4: #C7703C;
+            --tx-lvl-4-soft: #F5E7DB;
+            --tx-font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+            --tx-font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            --tx-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+            font-family: var(--tx-font-body);
+            background: var(--tx-bg);
+            color: var(--tx-ink);
+        }
+        .tx-console.dark {
+            --tx-bg: #12151A;
+            --tx-surface: #191D22;
+            --tx-ink: #EDEFEA;
+            --tx-ink-soft: #9AA39C;
+            --tx-ink-faint: #6B746E;
+            --tx-line: #262B31;
+            --tx-primary-soft: #1C2723;
+            --tx-lvl-1-soft: #1C2723;
+            --tx-lvl-2-soft: #1A222B;
+            --tx-lvl-3-soft: #221C29;
+            --tx-lvl-4-soft: #2A2019;
+        }
 
-    {{-- Header --}}
-    <div class="flex items-center justify-between mb-8">
+        .tx-display { font-family: var(--tx-font-display); letter-spacing: -0.01em; }
+        .tx-mono { font-family: var(--tx-font-mono); letter-spacing: 0.02em; }
 
-        <div>
-            <h1 class="text-3xl font-bold text-slate-900">
-                Edit Product
-            </h1>
+        .tx-shell { max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 8rem; }
 
-            <p class="text-slate-500 mt-1">
-                Update product information.
-            </p>
+        /* Header */
+        .tx-header {
+            display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end;
+            justify-content: space-between; padding-bottom: 1.75rem;
+            border-bottom: 1px solid var(--tx-line); margin-bottom: 2rem;
+        }
+        .tx-title { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+        .tx-subtitle { color: var(--tx-ink-soft); font-size: 0.925rem; margin-top: 0.5rem; }
+        .tx-back {
+            display: inline-flex; align-items: center; gap: 0.5rem; border: 1px solid var(--tx-line);
+            background: var(--tx-surface); color: var(--tx-ink); font-size: 0.8125rem; font-weight: 600;
+            padding: 0.6rem 1.1rem; border-radius: 999px; text-decoration: none; transition: all .15s ease;
+        }
+        .tx-back:hover { border-color: var(--tx-primary); color: var(--tx-primary); transform: translateX(-2px); }
+
+        /* Cards */
+        .tx-card { background: var(--tx-surface); border: 1px solid var(--tx-line); border-radius: 20px; margin-bottom: 1.5rem; overflow: hidden; }
+        .tx-card-head { display: flex; align-items: center; gap: 0.85rem; padding: 1.35rem 1.75rem; border-bottom: 1px solid var(--tx-line); }
+        .tx-card-icon {
+            width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center;
+            border-radius: 10px; flex-shrink: 0; font-family: var(--tx-font-mono); font-weight: 600; font-size: 0.8rem;
+        }
+        .tx-card-head h2 { font-family: var(--tx-font-display); font-size: 1.02rem; font-weight: 600; }
+        .tx-card-head p { font-size: 0.78rem; color: var(--tx-ink-soft); margin-top: 0.15rem; }
+        .tx-card-body { padding: 1.75rem; display: grid; grid-template-columns: repeat(1, minmax(0,1fr)); gap: 1.35rem; }
+        @media (min-width: 768px) { .tx-card-body.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+        @media (min-width: 1024px) { .tx-card-body.cols-4 { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+
+        .lvl-1 .tx-card-icon { background: var(--tx-lvl-1-soft); color: var(--tx-lvl-1); }
+        .lvl-2 .tx-card-icon { background: var(--tx-lvl-2-soft); color: var(--tx-lvl-2); }
+        .lvl-3 .tx-card-icon { background: var(--tx-lvl-3-soft); color: var(--tx-lvl-3); }
+
+        /* Fields */
+        .tx-label { display: block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tx-ink-soft); margin-bottom: 0.55rem; }
+        .tx-lvl-dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 999px; margin-right: 0.4rem; }
+        .tx-field {
+            width: 100%; border: 1px solid var(--tx-line); background: var(--tx-bg); color: var(--tx-ink);
+            font-size: 0.875rem; padding: 0.72rem 1rem; border-radius: 12px; outline: none;
+            transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+        }
+        .tx-field:focus { border-color: var(--tx-primary); background: var(--tx-surface); box-shadow: 0 0 0 4px var(--tx-primary-soft); }
+        .tx-field:disabled { background: var(--tx-line); color: var(--tx-ink-faint); cursor: not-allowed; }
+        .tx-hint { font-size: 0.7rem; color: var(--tx-ink-faint); margin-top: 0.4rem; }
+        .tx-select-wrap { position: relative; }
+        .tx-select-wrap select { appearance: none; padding-right: 2.5rem; }
+        .tx-select-wrap svg { position: absolute; right: 0.9rem; top: 50%; transform: translateY(-50%); width: 1rem; height: 1rem; color: var(--tx-ink-faint); pointer-events: none; }
+
+        .tx-taxonomy-preview {
+            display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+            margin: 0 1.75rem 1.75rem; padding: 0.9rem 1.1rem;
+            border: 1px dashed var(--tx-line); border-radius: 12px; background: var(--tx-bg);
+        }
+        .tx-taxonomy-preview-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tx-ink-faint); }
+        #taxonomy-preview-path { font-size: 0.8rem; font-weight: 600; color: var(--tx-ink); }
+
+        /* Sub-panels: product / carton dimensions */
+        .tx-subpanel { border: 1px solid var(--tx-line); border-radius: 16px; padding: 1.25rem; background: var(--tx-bg); }
+        .tx-subpanel + .tx-subpanel { margin-top: 1.25rem; }
+        .tx-subpanel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.1rem; }
+        .tx-subpanel-head h3 { font-family: var(--tx-font-display); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--tx-ink-soft); }
+        .tx-subpanel-tag {
+            display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 999px; background: var(--tx-surface);
+            border: 1px solid var(--tx-line); padding: 0.3rem 0.65rem; font-size: 0.68rem; font-weight: 600; color: var(--tx-ink-soft); white-space: nowrap;
+        }
+        .tx-dims-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; }
+        @media (min-width: 640px) { .tx-dims-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+        .tx-dim-label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--tx-ink-soft); margin-bottom: 0.4rem; }
+        .tx-dim-input-wrap { position: relative; }
+        .tx-dim-input-wrap input { padding-right: 2.4rem; }
+        .tx-dim-unit { position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%); font-size: 0.7rem; font-weight: 600; color: var(--tx-ink-faint); }
+
+        /* Current image preview */
+        .tx-current-image { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
+        .tx-current-image img { width: 6.5rem; height: 6.5rem; object-fit: cover; border-radius: 12px; border: 1px solid var(--tx-line); }
+        .tx-current-image-meta { font-size: 0.75rem; color: var(--tx-ink-faint); }
+
+        /* Footer */
+        .tx-footer { position: sticky; bottom: 1rem; z-index: 10; margin-top: 2rem; }
+        .tx-footer-inner {
+            display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem;
+            border: 1px solid var(--tx-line); background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+            border-radius: 18px; padding: 1rem 1.25rem; box-shadow: 0 20px 45px -25px rgba(23,27,26,0.35);
+        }
+        .tx-console.dark .tx-footer-inner { background: rgba(25,29,34,0.92); }
+        .tx-btn-ghost { border-radius: 12px; padding: 0.65rem 1.25rem; font-size: 0.85rem; font-weight: 600; color: var(--tx-ink-soft); text-decoration: none; transition: all .15s ease; }
+        .tx-btn-ghost:hover { background: var(--tx-bg); color: var(--tx-ink); }
+        .tx-btn-submit {
+            display: inline-flex; align-items: center; gap: 0.55rem; border: none; cursor: pointer;
+            border-radius: 12px; padding: 0.75rem 1.5rem; font-size: 0.85rem; font-weight: 600;
+            background: var(--tx-primary); color: var(--tx-primary-ink); transition: all .15s ease;
+        }
+        .tx-btn-submit:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -10px var(--tx-primary); }
+    </style>
+
+    <div class="tx-console">
+        <div class="tx-shell">
+
+            {{-- Header --}}
+            <div class="tx-header">
+                <div>
+                    <h1 class="tx-title tx-display">Edit Product</h1>
+                    <p class="tx-subtitle">Update product information.</p>
+                </div>
+                <a href="{{ route('mi_app.show', $product->product_id) }}" class="tx-back">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    Back
+                </a>
+            </div>
+
+            {{-- Form --}}
+            <form action="{{ route('mi_app.update', $product->product_id) }}" method="POST" enctype="multipart/form-data" id="edit_product_form">
+                @csrf
+                @method('PUT')
+
+                {{-- SECTION 1: Identification --}}
+                <div class="tx-card">
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon" style="background: var(--tx-line); color: var(--tx-ink-soft);">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </span>
+                        <div>
+                            <h2>Product Identification</h2>
+                            <p>Auto-generated reference numbers</p>
+                        </div>
+                    </div>
+                    <div class="tx-card-body cols-2">
+                        <div>
+                            <label class="tx-label">SKU Number</label>
+                            <input type="text" value="{{ $product->sku }}" disabled class="tx-field tx-mono">
+                            <p class="tx-hint">Auto generated</p>
+                        </div>
+                        <div>
+                            <label class="tx-label">Draft Number</label>
+                            <input type="text" value="{{ $product->draft_number }}" disabled class="tx-field tx-mono">
+                            <p class="tx-hint">Auto generated</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- SECTION 2: Taxonomy --}}
+                <div class="tx-card lvl-1" id="taxonomy-section">
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon">01</span>
+                        <div>
+                            <h2>Taxonomy</h2>
+                            <p>Category → Sub Category → Sub Sub Category → Collection</p>
+                        </div>
+                    </div>
+                    <div class="tx-card-body cols-4">
+                        <div>
+                            <label for="category_id" class="tx-label">
+                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-1);"></span>Category
+                            </label>
+                            <div class="tx-select-wrap">
+                                <select name="category_id" id="category_id" data-cascade-target="sub_category_id" class="tx-field">
+                                    @foreach($categories as $category)
+                                        <option value="{{ $category->id }}" {{ $product->category_id == $category->id ? 'selected' : '' }}>
+                                            {{ $category->code }} - {{ $category->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="sub_category_id" class="tx-label">
+                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-2);"></span>Sub Category
+                            </label>
+                            <div class="tx-select-wrap">
+                                <select name="sub_category_id" id="sub_category_id" data-cascade-target="product_type_id" class="tx-field">
+                                    @foreach($subCategories as $sub)
+                                        <option value="{{ $sub->id }}" data-parent="{{ $sub->category_id }}"
+                                            class="{{ $product->category_id == $sub->category_id ? '' : 'hidden' }}"
+                                            {{ $product->sub_category_id == $sub->id ? 'selected' : '' }}>
+                                            {{ $sub->code }} - {{ $sub->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="product_type_id" class="tx-label">
+                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-3);"></span>Sub Sub Category
+                            </label>
+                            <div class="tx-select-wrap">
+                                <select name="product_type_id" id="product_type_id" data-cascade-target="collection_id" class="tx-field">
+                                    <option value="">Select</option>
+                                    @foreach($productTypes as $type)
+                                        <option value="{{ $type->id }}" data-parent="{{ $type->sub_category_id }}"
+                                            class="{{ $product->sub_category_id == $type->sub_category_id ? '' : 'hidden' }}"
+                                            {{ $product->product_type_id == $type->id ? 'selected' : '' }}>
+                                            {{ $type->code }} - {{ $type->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="collection_id" class="tx-label">
+                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-4);"></span>Collection
+                            </label>
+                            <div class="tx-select-wrap">
+                                <select name="collection_id" id="collection_id" class="tx-field">
+                                    <option value="">Select</option>
+                                    @foreach($collections as $collection)
+                                        <option value="{{ $collection->id }}" data-parent="{{ $collection->product_type_id }}"
+                                            class="{{ $product->product_type_id == $collection->product_type_id ? '' : 'hidden' }}"
+                                            {{ $product->collection_id == $collection->id ? 'selected' : '' }}>
+                                            {{ $collection->code }} - {{ $collection->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tx-taxonomy-preview">
+                        <span class="tx-taxonomy-preview-label">SKU preview</span>
+                        <span id="taxonomy-preview-path" class="tx-mono">—</span>
+                    </div>
+                </div>
+
+                {{-- SECTION 3: General Information --}}
+                <div class="tx-card lvl-2">
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon">02</span>
+                        <div>
+                            <h2>General Information</h2>
+                            <p>Basic identity and product details</p>
+                        </div>
+                    </div>
+                    <div class="tx-card-body cols-2">
+                        <div style="grid-column: 1 / -1;">
+                            <label for="item_name" class="tx-label">Item Name</label>
+                            <input type="text" id="item_name" name="item_name" value="{{ old('item_name', $product->item_name) }}" class="tx-field">
+                        </div>
+
+                        <div>
+                            <label for="type_of_sample" class="tx-label">Type of Sample</label>
+                            <input type="text" id="type_of_sample" name="type_of_sample" value="{{ old('type_of_sample', $product->type_of_sample) }}" class="tx-field">
+                        </div>
+
+                        <div>
+                            <label for="designed_by" class="tx-label">Designed By</label>
+                            <input type="text" id="designed_by" name="designed_by" value="{{ old('designed_by', $product->designed_by) }}" class="tx-field">
+                        </div>
+                    </div>
+                </div>
+
+                {{-- SECTION 4: Dimensions --}}
+                <div class="tx-card lvl-3">
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon">03</span>
+                        <div>
+                            <h2>Dimensions</h2>
+                            <p>Product and carton measurements</p>
+                        </div>
+                    </div>
+                    <div class="tx-card-body">
+                        <div class="tx-subpanel">
+                            <div class="tx-subpanel-head">
+                                <div><h3>Product dimensions</h3></div>
+                                <span class="tx-subpanel-tag">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M6 24 6 10 14 6 26 10 26 24 18 28 6 24Z" stroke-linejoin="round"/>
+                                        <path d="M6 10 18 14 26 10" stroke-linejoin="round"/>
+                                        <path d="M18 14 18 28" stroke-linejoin="round"/>
+                                    </svg>
+                                    H × W × L × D
+                                </span>
+                            </div>
+                            <div class="tx-dims-grid">
+                                @foreach([
+                                    'product_height' => 'Height',
+                                    'product_width' => 'Width',
+                                    'product_length' => 'Length',
+                                    'product_depth' => 'Depth',
+                                ] as $field => $label)
+                                    <div>
+                                        <label class="tx-dim-label">{{ $label }}</label>
+                                        <div class="tx-dim-input-wrap">
+                                            <input type="number" step="0.01" name="{{ $field }}" value="{{ old($field, $product->$field) }}" class="tx-field">
+                                            <span class="tx-dim-unit">cm</span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <div class="tx-subpanel">
+                            <div class="tx-subpanel-head">
+                                <div><h3>Carton dimensions</h3></div>
+                                <span class="tx-subpanel-tag">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 12 3l9 4.5M3 7.5v9l9 4.5 9-4.5v-9M3 7.5l9 4.5 9-4.5" />
+                                    </svg>
+                                    Box size
+                                </span>
+                            </div>
+                            <div class="tx-dims-grid">
+                                @foreach([
+                                    'carton_height' => 'Height',
+                                    'carton_width' => 'Width',
+                                    'carton_length' => 'Length',
+                                    'carton_depth' => 'Depth',
+                                ] as $field => $label)
+                                    <div>
+                                        <label class="tx-dim-label">{{ $label }}</label>
+                                        <div class="tx-dim-input-wrap">
+                                            <input type="number" step="0.01" name="{{ $field }}" value="{{ old($field, $product->$field) }}" class="tx-field">
+                                            <span class="tx-dim-unit">cm</span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- SECTION 5: Cost & Media --}}
+                <div class="tx-card">
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon" style="background: var(--tx-accent-soft); color: var(--tx-accent);">04</span>
+                        <div>
+                            <h2>Cost & Media</h2>
+                            <p>Purchase cost and product image</p>
+                        </div>
+                    </div>
+                    <div class="tx-card-body cols-2">
+                        <div>
+                            <label for="purchase_cost" class="tx-label">Purchase Cost</label>
+                            <input type="number" step="0.01" id="purchase_cost" name="purchase_cost" value="{{ old('purchase_cost', $product->purchase_cost) }}" class="tx-field">
+                        </div>
+
+                        <div>
+                            <label for="product_file" class="tx-label">Replace Product Image</label>
+                            <input type="file" id="product_file" name="product_file" accept="image/*" class="tx-field" style="padding: 0.5rem 0.75rem;">
+
+                            @if($product->product_file)
+                                <div class="tx-current-image">
+                                    <img src="{{ asset('storage/'.$product->product_file) }}" alt="{{ $product->item_name }}">
+                                    <span class="tx-current-image-meta">Current image — uploading a new file will replace it.</span>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Footer --}}
+                <div class="tx-footer">
+                    <div class="tx-footer-inner">
+                        <a href="{{ route('mi_app.index') }}" class="tx-btn-ghost">Cancel</a>
+                        <button type="submit" class="tx-btn-submit">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                            Update Product
+                        </button>
+                    </div>
+                </div>
+
+            </form>
+
         </div>
-
-
-        <a href="{{ route('mi_app.show',$product->product_id) }}"
-           class="px-5 py-2.5 rounded-lg border border-slate-300 hover:bg-slate-50">
-            Back
-        </a>
-
     </div>
 
-
-    {{-- Form --}}
-    <form action="{{ route('mi_app.update',$product->product_id) }}"
-          method="POST"
-          enctype="multipart/form-data">
-
-        @csrf
-        @method('PUT')
-
-
-        <div class="bg-white rounded-xl border border-slate-200 p-6 space-y-6">
-
-
-            {{-- SKU / Draft --}}
-            <div class="grid md:grid-cols-2 gap-6">
-
-                <div>
-                    <label class="text-sm font-medium text-slate-700">
-                        SKU Number
-                    </label>
-
-                    <input type="text"
-                           value="{{ $product->sku }}"
-                           disabled
-                           class="mt-1 w-full rounded-lg border-slate-300 bg-slate-100">
-
-                    <p class="text-xs text-slate-400 mt-1">
-                        Auto generated
-                    </p>
-                </div>
-
-
-                <div>
-                    <label class="text-sm font-medium text-slate-700">
-                        Draft Number
-                    </label>
-
-                    <input type="text"
-                           value="{{ $product->draft_number }}"
-                           disabled
-                           class="mt-1 w-full rounded-lg border-slate-300 bg-slate-100">
-
-                    <p class="text-xs text-slate-400 mt-1">
-                        Auto generated
-                    </p>
-                </div>
-
-            </div>
-
-
-
-            {{-- Item --}}
-            <div>
-
-                <label class="text-sm font-medium">
-                    Item Name
-                </label>
-
-                <input type="text"
-                       name="item_name"
-                       value="{{ old('item_name',$product->item_name) }}"
-                       class="mt-1 w-full rounded-lg border-slate-300">
-
-            </div>
-
-
-
-            {{-- Taxonomy --}}
-            <div class="grid md:grid-cols-4 gap-5">
-
-
-                <div>
-                    <label>Category</label>
-
-                    <select name="category_id"
-                            class="w-full rounded-lg border-slate-300">
-
-                        @foreach($categories as $category)
-
-                        <option value="{{ $category->id }}"
-                            {{ $product->category_id == $category->id ? 'selected':'' }}>
-
-                            {{ $category->name }}
-
-                        </option>
-
-                        @endforeach
-
-                    </select>
-                </div>
-
-
-
-                <div>
-                    <label>Sub Category</label>
-
-                    <select name="sub_category_id"
-                            class="w-full rounded-lg border-slate-300">
-
-                        @foreach($subCategories as $sub)
-
-                        <option value="{{ $sub->id }}"
-                        {{ $product->sub_category_id == $sub->id ? 'selected':'' }}>
-
-                            {{ $sub->name }}
-
-                        </option>
-
-                        @endforeach
-
-                    </select>
-
-                </div>
-
-
-
-                <div>
-                    <label>Product Type</label>
-
-                    <select name="product_type_id"
-                            class="w-full rounded-lg border-slate-300">
-
-                        <option value="">
-                            Select
-                        </option>
-
-                        @foreach($productTypes as $type)
-
-                        <option value="{{ $type->id }}"
-                        {{ $product->product_type_id == $type->id ? 'selected':'' }}>
-
-                            {{ $type->name }}
-
-                        </option>
-
-                        @endforeach
-
-                    </select>
-
-                </div>
-
-
-
-                <div>
-                    <label>Collection</label>
-
-                    <select name="collection_id"
-                            class="w-full rounded-lg border-slate-300">
-
-                        <option value="">
-                            Select
-                        </option>
-
-
-                        @foreach($collections as $collection)
-
-                        <option value="{{ $collection->id }}"
-                        {{ $product->collection_id == $collection->id ? 'selected':'' }}>
-
-                            {{ $collection->name }}
-
-                        </option>
-
-                        @endforeach
-
-
-                    </select>
-
-                </div>
-
-
-            </div>
-
-
-
-
-            {{-- Details --}}
-            <div class="grid md:grid-cols-2 gap-6">
-
-
-                <div>
-                    <label>
-                        Type of Sample
-                    </label>
-
-                    <input type="text"
-                           name="type_of_sample"
-                           value="{{ old('type_of_sample',$product->type_of_sample) }}"
-                           class="w-full rounded-lg border-slate-300">
-
-                </div>
-
-
-                <div>
-                    <label>
-                        Designed By
-                    </label>
-
-                    <input type="text"
-                           name="designed_by"
-                           value="{{ old('designed_by',$product->designed_by) }}"
-                           class="w-full rounded-lg border-slate-300">
-
-                </div>
-
-
-            </div>
-
-
-
-
-            {{-- Dimensions --}}
-            <h2 class="font-semibold text-lg mt-6">
-                Product Dimensions
-            </h2>
-
-
-            <div class="grid md:grid-cols-4 gap-4">
-
-
-                @foreach([
-                'product_height'=>'Height',
-                'product_width'=>'Width',
-                'product_length'=>'Length',
-                'product_depth'=>'Depth'
-                ] as $field=>$label)
-
-
-                <div>
-
-                    <label>
-                        {{ $label }}
-                    </label>
-
-                    <input type="number"
-                           step="0.01"
-                           name="{{ $field }}"
-                           value="{{ $product->$field }}"
-                           class="w-full rounded-lg border-slate-300">
-
-                </div>
-
-
-                @endforeach
-
-
-            </div>
-
-
-
-
-            {{-- Carton --}}
-            <h2 class="font-semibold text-lg mt-6">
-                Carton Dimensions
-            </h2>
-
-
-            <div class="grid md:grid-cols-4 gap-4">
-
-
-                @foreach([
-                'carton_height'=>'Height',
-                'carton_width'=>'Width',
-                'carton_length'=>'Length',
-                'carton_depth'=>'Depth'
-                ] as $field=>$label)
-
-
-                <div>
-
-                    <label>
-                        {{ $label }}
-                    </label>
-
-                    <input type="number"
-                           step="0.01"
-                           name="{{ $field }}"
-                           value="{{ $product->$field }}"
-                           class="w-full rounded-lg border-slate-300">
-
-                </div>
-
-
-                @endforeach
-
-
-            </div>
-
-
-
-
-
-            {{-- Cost --}}
-            <div>
-
-                <label>
-                    Purchase Cost
-                </label>
-
-                <input type="number"
-                       step="0.01"
-                       name="purchase_cost"
-                       value="{{ $product->purchase_cost }}"
-                       class="w-full rounded-lg border-slate-300">
-
-            </div>
-
-
-
-
-
-            {{-- Image --}}
-            <div>
-
-                <label>
-                    Replace Product Image
-                </label>
-
-                <input type="file"
-                       name="product_file"
-                       class="w-full mt-2">
-
-
-                @if($product->product_file)
-
-                <img src="{{ asset('storage/'.$product->product_file) }}"
-                     class="mt-4 w-40 rounded-lg border">
-
-                @endif
-
-
-            </div>
-
-
-
-
-            {{-- Button --}}
-            <div class="flex justify-end gap-3 pt-6">
-
-
-                <a href="{{ route('mi_app.index') }}"
-                   class="px-5 py-2.5 rounded-lg border">
-                    Cancel
-                </a>
-
-
-                <button
-                    class="px-5 py-2.5 bg-blue-600 text-white rounded-lg">
-
-                    Update Product
-
-                </button>
-
-
-            </div>
-
-
-
-        </div>
-
-
-    </form>
-
-
-</div>
-
+    <script>
+        (function () {
+            document.querySelectorAll('#taxonomy-section [data-cascade-target]').forEach(function (parentSelect) {
+                parentSelect.addEventListener('change', function () {
+                    cascadeFrom(parentSelect, true);
+                    updateTaxonomyPreview();
+                });
+            });
+
+            function cascadeFrom(parentSelect, resetValue) {
+                var targetId = parentSelect.getAttribute('data-cascade-target');
+                var target = document.getElementById(targetId);
+                if (!target) return;
+
+                var selectedParent = parentSelect.value;
+                if (resetValue) target.value = '';
+
+                Array.from(target.options).forEach(function (opt) {
+                    if (!opt.value) return;
+                    var belongs = opt.getAttribute('data-parent') === selectedParent;
+                    opt.classList.toggle('hidden', !belongs);
+                    opt.disabled = !belongs;
+                });
+
+                var nextTargetId = target.getAttribute('data-cascade-target');
+                if (nextTargetId) {
+                    var nextTarget = document.getElementById(nextTargetId);
+                    if (nextTarget && resetValue) {
+                        nextTarget.value = '';
+                        Array.from(nextTarget.options).forEach(function (opt) {
+                            if (!opt.value) return;
+                            opt.classList.add('hidden');
+                            opt.disabled = true;
+                        });
+                    }
+                }
+            }
+
+            var categorySelect = document.getElementById('category_id');
+            var subCategorySelect = document.getElementById('sub_category_id');
+            var productTypeSelect = document.getElementById('product_type_id');
+            var collectionSelect = document.getElementById('collection_id');
+            var previewPath = document.getElementById('taxonomy-preview-path');
+
+            function labelOf(select) {
+                var opt = select.options[select.selectedIndex];
+                return opt && opt.value ? opt.textContent.trim() : null;
+            }
+
+            function updateTaxonomyPreview() {
+                var parts = [categorySelect, subCategorySelect, productTypeSelect, collectionSelect]
+                    .map(labelOf)
+                    .filter(Boolean);
+                previewPath.textContent = parts.length ? parts.join('  →  ') : 'Select a category to begin';
+            }
+
+            [categorySelect, subCategorySelect, productTypeSelect, collectionSelect].forEach(function (el) {
+                if (el) el.addEventListener('change', updateTaxonomyPreview);
+            });
+
+            updateTaxonomyPreview();
+        })();
+    </script>
 </x-mi_app>

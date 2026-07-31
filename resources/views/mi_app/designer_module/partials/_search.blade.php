@@ -75,20 +75,6 @@
         </div>
     </div>
 
-    {{-- Classification --}}
-    <div class="tx-filter-wrap wide">
-        <div class="tx-filter-select-outer">
-            <select name="classification">
-                <option value="">All Classification</option>
-                <option value="Indoor" {{ request('classification') == 'Indoor' ? 'selected' : '' }}>Indoor</option>
-                <option value="Outdoor" {{ request('classification') == 'Outdoor' ? 'selected' : '' }}>Outdoor</option>
-                <option value="Office" {{ request('classification') == 'Office' ? 'selected' : '' }}>Office</option>
-                <option value="Residential" {{ request('classification') == 'Residential' ? 'selected' : '' }}>Residential</option>
-            </select>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-        </div>
-    </div>
-
     {{-- Buttons --}}
     <div class="tx-search-actions">
         <button type="submit" class="tx-btn-search">

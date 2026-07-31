@@ -77,7 +77,52 @@ public function index(Request $request)
 
     return view('mi_app.designer_module.index', compact('products'));
 }
+public function dashboard()
+{
+    $stats = [
+        'total_products'    => MI_Product::count(),
+        'active_products'   => MI_Product::where('classification', 'Available')->count(),
+        'total_categories'  => MI_Category::count(),
+        'total_collections' => MI_Collection::count(),
+    ];
 
+    $taxonomyCounts = [
+        'categories'     => MI_Category::count(),
+        'sub_categories' => MI_SubCategory::count(),
+        'product_types'  => MI_ProductType::count(),
+        'collections'    => MI_Collection::count(),
+    ];
+
+    $classificationBreakdown = MI_Product::selectRaw('classification, count(*) as count')
+        ->whereNotNull('classification')
+        ->groupBy('classification')
+        ->pluck('count', 'classification');
+
+    $categoryBreakdown = MI_Product::with('category')
+        ->get()
+        ->groupBy(fn ($product) => $product->category->name ?? 'Uncategorized')
+        ->map(fn ($group, $name) => [
+            'name'  => $name,
+            'count' => $group->count(),
+        ])
+        ->values()
+        ->sortByDesc('count')
+        ->take(8)
+        ->values();
+
+    $recentProducts = MI_Product::with('category')
+        ->latest()
+        ->take(8)
+        ->get();
+
+    return view('mi_app.designer_module.dashboard', compact(
+        'stats',
+        'taxonomyCounts',
+        'classificationBreakdown',
+        'categoryBreakdown',
+        'recentProducts'
+    ));
+}
     public function create()
     {
         $categories    = MI_Category::orderBy('name')->get();

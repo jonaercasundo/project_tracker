@@ -404,6 +404,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
     Route::get('/mi/settings', [MIAppController::class, 'settings'])->name('mi_app.settings');
     Route::get('/mi/designer', [MIAppController::class, 'index'])->name('mi_app.index');
+    Route::get('/mi/dashboard', [MIAppController::class, 'dashboard'])->name('mi_app.dashboard');
     Route::post('/mi/setting_store', [MIAppController::class, 'setting_store'])->name('mi_app.store');
     Route::post('/mi/store', [MIAppController::class, 'store'])->name('mi_app.store_1');
     Route::get('/mi/{product}', [MIAppController::class, 'show'])

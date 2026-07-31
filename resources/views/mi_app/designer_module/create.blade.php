@@ -413,7 +413,7 @@
 
                     <div class="tx-card-body">
                         <div class="tx-card-body cols-4" style="padding: 0;">
-                            <div>
+                            <div class="col-span-2">
                                 <label for="materials" class="tx-label">Materials <span class="tx-required">*</span></label>
                                 <input type="text" id="materials" name="materials" value="{{ old('materials') }}" placeholder="e.g. Oak, Aluminum" required data-required class="tx-field">
                                 @error('materials')
@@ -422,12 +422,6 @@
                                         {{ $message }}
                                     </p>
                                 @enderror
-                            </div>
-
-                            <div>
-                                <label for="type" class="tx-label">Type</label>
-                                <input type="text" id="type" name="type" value="{{ old('type') }}" placeholder="Product variant type" class="tx-field">
-                                @error('type') <p class="tx-error">{{ $message }}</p> @enderror
                             </div>
 
                             <div class="col-span-2">

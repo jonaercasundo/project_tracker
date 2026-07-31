@@ -363,7 +363,7 @@
                             @enderror
                         </div>
 
-                        <div>
+                        <div class="tx-card-body cols-4">
                             <label for="type_of_sample" class="tx-label">
                                 Type of Sample <span class="tx-required">*</span>
                             </label>

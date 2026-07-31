@@ -43,14 +43,17 @@
                         <td class="px-5 py-4">
                             <div class="flex items-center justify-center gap-2">
 
-                                    {{ dd($product) }}
+                                <a href="{{ route('mi_app.show', ['product' => $product->product_id]) }}"
+                                   class="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition">
+                                    View
+                                </a>
 
-                                <a href="{{ route('mi_app.edit', $product->id) }}"
+                                <a href="{{ route('mi_app.edit', $product->product_id) }}"
                                    class="inline-flex items-center px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition">
                                     Edit
                                 </a>
 
-                                <form action="{{ route('mi_app.destroy', $product->id) }}"
+                                <form action="{{ route('mi_app.destroy', $product->product_id) }}"
                                       method="POST"
                                       onsubmit="return confirm('Delete this product?')">
                                     @csrf
@@ -58,7 +61,7 @@
 
                                     <button type="submit"
                                             class="inline-flex items-center px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition">
-                                        Delete
+                                        Archive
                                     </button>
                                 </form>
 

@@ -61,7 +61,7 @@
                     </label>
 
                     <input type="text"
-                           value="{{ $product->item_code }}"
+                           value="{{ $product->draft_number }}"
                            disabled
                            class="mt-1 w-full rounded-lg border-slate-300 bg-slate-100">
 

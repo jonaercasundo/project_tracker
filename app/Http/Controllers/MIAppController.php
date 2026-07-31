@@ -430,9 +430,15 @@ public function index(Request $request)
         return redirect()->route('mi_app.index')->with('success', 'Product deleted successfully.');
     }
 
-    public function show($id) 
+    public function show(MI_Product $product)
     {
-        $product = MI_Product::findOrFail($id);
-        return view('mi_app.designer_module.show', compact('product'));    
+        $product->load([
+            'category',
+            'subCategory',
+            'productType',
+            'collection',
+        ]);
+
+        return view('mi_app.designer_module.show', compact('product'));
     }
 }

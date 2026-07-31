@@ -337,111 +337,126 @@ public function index(Request $request)
                     ->store('product_files', 'public');
             }
 
-$product = MI_Product::create($validated);
+        $product = MI_Product::create($validated);
 
+        /*
+        |--------------------------------------------------------------------------
+        | Convert Google Drive Image Link
+        |--------------------------------------------------------------------------
+        */
 
-/*
-|--------------------------------------------------------------------------
-| Auto Generate Draft Number
-|--------------------------------------------------------------------------
-*/
+        if (!empty($validated['image_link'])) {
 
-$product->draft_number = 'DR-' 
-    . date('Y') 
-    . '-' 
-    . str_pad($product->product_id, 4, '0', STR_PAD_LEFT);
+            if (preg_match('/\/d\/([^\/]+)/', $validated['image_link'], $matches)) {
 
+                $fileId = $matches[1];
 
-/*
-|--------------------------------------------------------------------------
-| Auto Generate SKU
-|--------------------------------------------------------------------------
-| Example:
-| HD-IN-AAL-0001
-|
-| Category Code
-| Sub Category Code
-| Collection Code
-| Sequence
-|--------------------------------------------------------------------------
-*/
-
-$category = MI_Category::find($product->category_id);
-
-$subCategory = MI_SubCategory::find($product->sub_category_id);
-
-$subsubCategory = MI_ProductType::find($product->product_type_id);
-
-$collection = MI_Collection::find($product->collection_id);
-
-
-$categoryCode = strtoupper(
-    substr($category->code ?? 'GEN', 0, 2)
-);
-
-
-$subCategoryCode = strtoupper(
-    substr($subCategory->code ?? 'XX', 0, 2)
-);
-
-$subsubCategory = strtoupper(
-    substr($subsubCategory->code ?? 'XX', 0, 2)
-);
-
-$collectionCode = strtoupper(
-    substr($collection->code ?? 'XXX', 0, 3)
-);
-
-
-$product->sku =
-    $categoryCode
-    . '-'
-    . $subCategoryCode
-    . '-'
-    . $collectionCode
-    . '-'
-    . $subsubCategory
-    . '-'
-    . str_pad($product->product_id, 4, '0', STR_PAD_LEFT);
-
-
-/*
-|--------------------------------------------------------------------------
-| Save Generated Values
-|--------------------------------------------------------------------------
-*/
-
-$product->save();
-
-
-DB::commit();
-
-            return redirect()
-                ->route('mi_app.index')
-                ->with('success', 'Product saved successfully!');
-
-        } catch (\Throwable $e) {
-
-            DB::rollBack();
-
-            // Clean up the uploaded file if the DB write failed after upload
-            if (!empty($validated['product_file'])) {
-                Storage::disk('public')->delete($validated['product_file']);
+                $product->image_link =
+                    "https://drive.google.com/uc?export=view&id=".$fileId;
             }
-
-            Log::error('Product save failed: ' . $e->getMessage(), [
-                'exception' => $e,
-                'input' => $request->except('product_file'),
-            ]);
-
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'error' => app()->environment('production')
-                        ? 'Something went wrong while saving the product. Please try again or contact support.'
-                        : $e->getMessage(),
-                ]);
         }
+        /*
+        |--------------------------------------------------------------------------
+        | Auto Generate Draft Number
+        |--------------------------------------------------------------------------
+        */
+
+        $product->draft_number = 'DR-' 
+            . date('Y') 
+            . '-' 
+            . str_pad($product->product_id, 4, '0', STR_PAD_LEFT);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Auto Generate SKU
+        |--------------------------------------------------------------------------
+        | Example:
+        | HD-IN-AAL-0001
+        |
+        | Category Code
+        | Sub Category Code
+        | Collection Code
+        | Sequence
+        |--------------------------------------------------------------------------
+        */
+
+        $category = MI_Category::find($product->category_id);
+
+        $subCategory = MI_SubCategory::find($product->sub_category_id);
+
+        $subsubCategory = MI_ProductType::find($product->product_type_id);
+
+        $collection = MI_Collection::find($product->collection_id);
+
+
+        $categoryCode = strtoupper(
+            substr($category->code ?? 'GEN', 0, 2)
+        );
+
+
+        $subCategoryCode = strtoupper(
+            substr($subCategory->code ?? 'XX', 0, 2)
+        );
+
+        $subsubCategory = strtoupper(
+            substr($subsubCategory->code ?? 'XX', 0, 2)
+        );
+
+        $collectionCode = strtoupper(
+            substr($collection->code ?? 'XXX', 0, 3)
+        );
+
+
+        $product->sku =
+            $categoryCode
+            . '-'
+            . $subCategoryCode
+            . '-'
+            . $collectionCode
+            . '-'
+            . $subsubCategory
+            . '-'
+            . str_pad($product->product_id, 4, '0', STR_PAD_LEFT);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Save Generated Values
+        |--------------------------------------------------------------------------
+        */
+
+        $product->save();
+
+
+        DB::commit();
+
+                    return redirect()
+                        ->route('mi_app.index')
+                        ->with('success', 'Product saved successfully!');
+
+                } catch (\Throwable $e) {
+
+                    DB::rollBack();
+
+                    // Clean up the uploaded file if the DB write failed after upload
+                    if (!empty($validated['product_file'])) {
+                        Storage::disk('public')->delete($validated['product_file']);
+                    }
+
+                    Log::error('Product save failed: ' . $e->getMessage(), [
+                        'exception' => $e,
+                        'input' => $request->except('product_file'),
+                    ]);
+
+                    return back()
+                        ->withInput()
+                        ->withErrors([
+                            'error' => app()->environment('production')
+                                ? 'Something went wrong while saving the product. Please try again or contact support.'
+                                : $e->getMessage(),
+                        ]);
+                }
     }
 
     public function edit($id)

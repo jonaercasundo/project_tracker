@@ -413,16 +413,104 @@
 
                     <div class="tx-card-body">
                         <div class="tx-card-body cols-4" style="padding: 0;">
-                            <div class="col-span-2">
-                                <label for="materials" class="tx-label">Materials <span class="tx-required">*</span></label>
-                                <input type="text" id="materials" name="materials" value="{{ old('materials') }}" placeholder="e.g. Oak, Aluminum" required data-required class="tx-field">
-                                @error('materials')
-                                    <p class="tx-error">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.75 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-                                        {{ $message }}
-                                    </p>
-                                @enderror
-                            </div>
+                        <div class="col-span-2">
+                            <label for="materials" class="tx-label">
+                                Materials <span class="tx-required">*</span>
+                            </label>
+
+                            <select id="materials"
+                                    name="materials"
+                                    required
+                                    data-required
+                                    class="tx-field">
+                                <option value="">Select Material</option>
+
+                                <optgroup label="Solid Wood">
+                                    <option value="Acacia Wood" {{ old('materials') == 'Acacia Wood' ? 'selected' : '' }}>Acacia Wood</option>
+                                    <option value="Ash Wood" {{ old('materials') == 'Ash Wood' ? 'selected' : '' }}>Ash Wood</option>
+                                    <option value="Beech Wood" {{ old('materials') == 'Beech Wood' ? 'selected' : '' }}>Beech Wood</option>
+                                    <option value="Birch Wood" {{ old('materials') == 'Birch Wood' ? 'selected' : '' }}>Birch Wood</option>
+                                    <option value="Mahogany" {{ old('materials') == 'Mahogany' ? 'selected' : '' }}>Mahogany</option>
+                                    <option value="Mango Wood" {{ old('materials') == 'Mango Wood' ? 'selected' : '' }}>Mango Wood</option>
+                                    <option value="Oak" {{ old('materials') == 'Oak' ? 'selected' : '' }}>Oak</option>
+                                    <option value="Pine" {{ old('materials') == 'Pine' ? 'selected' : '' }}>Pine</option>
+                                    <option value="Rubberwood" {{ old('materials') == 'Rubberwood' ? 'selected' : '' }}>Rubberwood</option>
+                                    <option value="Teak" {{ old('materials') == 'Teak' ? 'selected' : '' }}>Teak</option>
+                                    <option value="Walnut" {{ old('materials') == 'Walnut' ? 'selected' : '' }}>Walnut</option>
+                                </optgroup>
+
+                                <optgroup label="Engineered Wood">
+                                    <option value="MDF" {{ old('materials') == 'MDF' ? 'selected' : '' }}>MDF</option>
+                                    <option value="Particle Board" {{ old('materials') == 'Particle Board' ? 'selected' : '' }}>Particle Board</option>
+                                    <option value="Plywood" {{ old('materials') == 'Plywood' ? 'selected' : '' }}>Plywood</option>
+                                    <option value="HDF" {{ old('materials') == 'HDF' ? 'selected' : '' }}>HDF</option>
+                                    <option value="Melamine Board" {{ old('materials') == 'Melamine Board' ? 'selected' : '' }}>Melamine Board</option>
+                                </optgroup>
+
+                                <optgroup label="Metal">
+                                    <option value="Aluminum" {{ old('materials') == 'Aluminum' ? 'selected' : '' }}>Aluminum</option>
+                                    <option value="Brass" {{ old('materials') == 'Brass' ? 'selected' : '' }}>Brass</option>
+                                    <option value="Cast Iron" {{ old('materials') == 'Cast Iron' ? 'selected' : '' }}>Cast Iron</option>
+                                    <option value="Iron" {{ old('materials') == 'Iron' ? 'selected' : '' }}>Iron</option>
+                                    <option value="Stainless Steel" {{ old('materials') == 'Stainless Steel' ? 'selected' : '' }}>Stainless Steel</option>
+                                    <option value="Steel" {{ old('materials') == 'Steel' ? 'selected' : '' }}>Steel</option>
+                                </optgroup>
+
+                                <optgroup label="Glass & Stone">
+                                    <option value="Clear Glass" {{ old('materials') == 'Clear Glass' ? 'selected' : '' }}>Clear Glass</option>
+                                    <option value="Tempered Glass" {{ old('materials') == 'Tempered Glass' ? 'selected' : '' }}>Tempered Glass</option>
+                                    <option value="Marble" {{ old('materials') == 'Marble' ? 'selected' : '' }}>Marble</option>
+                                    <option value="Granite" {{ old('materials') == 'Granite' ? 'selected' : '' }}>Granite</option>
+                                    <option value="Ceramic" {{ old('materials') == 'Ceramic' ? 'selected' : '' }}>Ceramic</option>
+                                    <option value="Concrete" {{ old('materials') == 'Concrete' ? 'selected' : '' }}>Concrete</option>
+                                </optgroup>
+
+                                <optgroup label="Natural Fibers">
+                                    <option value="Bamboo" {{ old('materials') == 'Bamboo' ? 'selected' : '' }}>Bamboo</option>
+                                    <option value="Cane" {{ old('materials') == 'Cane' ? 'selected' : '' }}>Cane</option>
+                                    <option value="Rattan" {{ old('materials') == 'Rattan' ? 'selected' : '' }}>Rattan</option>
+                                    <option value="Seagrass" {{ old('materials') == 'Seagrass' ? 'selected' : '' }}>Seagrass</option>
+                                    <option value="Water Hyacinth" {{ old('materials') == 'Water Hyacinth' ? 'selected' : '' }}>Water Hyacinth</option>
+                                    <option value="Abaca" {{ old('materials') == 'Abaca' ? 'selected' : '' }}>Abaca</option>
+                                </optgroup>
+
+                                <optgroup label="Fabric & Upholstery">
+                                    <option value="Boucle" {{ old('materials') == 'Boucle' ? 'selected' : '' }}>Boucle</option>
+                                    <option value="Canvas" {{ old('materials') == 'Canvas' ? 'selected' : '' }}>Canvas</option>
+                                    <option value="Cotton" {{ old('materials') == 'Cotton' ? 'selected' : '' }}>Cotton</option>
+                                    <option value="Leather" {{ old('materials') == 'Leather' ? 'selected' : '' }}>Leather</option>
+                                    <option value="PU Leather" {{ old('materials') == 'PU Leather' ? 'selected' : '' }}>PU Leather</option>
+                                    <option value="Linen" {{ old('materials') == 'Linen' ? 'selected' : '' }}>Linen</option>
+                                    <option value="Microfiber" {{ old('materials') == 'Microfiber' ? 'selected' : '' }}>Microfiber</option>
+                                    <option value="Polyester" {{ old('materials') == 'Polyester' ? 'selected' : '' }}>Polyester</option>
+                                    <option value="Velvet" {{ old('materials') == 'Velvet' ? 'selected' : '' }}>Velvet</option>
+                                </optgroup>
+
+                                <optgroup label="Plastic & Synthetic">
+                                    <option value="ABS Plastic" {{ old('materials') == 'ABS Plastic' ? 'selected' : '' }}>ABS Plastic</option>
+                                    <option value="Acrylic" {{ old('materials') == 'Acrylic' ? 'selected' : '' }}>Acrylic</option>
+                                    <option value="Fiberglass" {{ old('materials') == 'Fiberglass' ? 'selected' : '' }}>Fiberglass</option>
+                                    <option value="Polypropylene" {{ old('materials') == 'Polypropylene' ? 'selected' : '' }}>Polypropylene</option>
+                                    <option value="PVC" {{ old('materials') == 'PVC' ? 'selected' : '' }}>PVC</option>
+                                    <option value="Resin" {{ old('materials') == 'Resin' ? 'selected' : '' }}>Resin</option>
+                                </optgroup>
+
+                                <optgroup label="Other">
+                                    <option value="Composite" {{ old('materials') == 'Composite' ? 'selected' : '' }}>Composite</option>
+                                    <option value="Mixed Materials" {{ old('materials') == 'Mixed Materials' ? 'selected' : '' }}>Mixed Materials</option>
+                                </optgroup>
+                            </select>
+
+                            @error('materials')
+                                <p class="tx-error">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.75 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                    </svg>
+                                    {{ $message }}
+                                </p>
+                            @enderror
+                        </div>
 
                             <div class="col-span-2">
                                 <label for="color" class="tx-label">Color</label>

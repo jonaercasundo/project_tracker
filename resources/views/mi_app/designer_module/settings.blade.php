@@ -254,6 +254,75 @@
         .lvl-4 .tx-rung-dot { background: var(--tx-lvl-4); --dot-soft: var(--tx-lvl-4-soft); }
         .lvl-m .tx-card-icon { background: var(--tx-accent-soft); color: var(--tx-accent); }
 
+        /* Search / filter toolbar */
+        .tx-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            padding: 1.25rem 1.75rem;
+            border-bottom: 1px solid var(--tx-line);
+            align-items: center;
+        }
+        .tx-search { position: relative; flex: 1 1 16rem; }
+        .tx-search svg {
+            position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%);
+            width: 1rem; height: 1rem; color: var(--tx-ink-faint); pointer-events: none;
+        }
+        .tx-search input.tx-field { padding-left: 2.5rem; }
+        .tx-toolbar-select { flex: 0 1 13rem; }
+        .tx-toolbar-select select.tx-field { padding-top: 0.72rem; padding-bottom: 0.72rem; }
+        .tx-toolbar-reset {
+            border: 1px solid var(--tx-line);
+            background: transparent;
+            color: var(--tx-ink-soft);
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 0.68rem 1rem;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all .15s ease;
+        }
+        .tx-toolbar-reset:hover { border-color: var(--tx-danger); color: var(--tx-danger); }
+        .tx-result-count {
+            font-size: 0.75rem;
+            color: var(--tx-ink-faint);
+            padding: 0.85rem 1.75rem 0;
+        }
+        .tx-empty-state {
+            padding: 3rem 1.75rem;
+            text-align: center;
+            color: var(--tx-ink-faint);
+            font-size: 0.875rem;
+        }
+
+        /* Pagination */
+        .tx-pagination {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.1rem 1.75rem;
+            border-top: 1px solid var(--tx-line);
+        }
+        .tx-pagination-info { font-size: 0.78rem; color: var(--tx-ink-soft); }
+        .tx-pagination-controls { display: flex; align-items: center; gap: 0.6rem; }
+        .tx-page-size.tx-field { width: auto; padding: 0.5rem 0.85rem; font-size: 0.78rem; }
+        .tx-page-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 2.1rem; height: 2.1rem;
+            border: 1px solid var(--tx-line);
+            background: var(--tx-surface);
+            border-radius: 10px;
+            cursor: pointer;
+            color: var(--tx-ink);
+            transition: all .15s ease;
+        }
+        .tx-page-btn svg { width: 1rem; height: 1rem; }
+        .tx-page-btn:hover:not(:disabled) { border-color: var(--tx-primary); color: var(--tx-primary); }
+        .tx-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .tx-page-current { font-size: 0.8rem; font-weight: 600; color: var(--tx-ink-soft); min-width: 3.5rem; text-align: center; }
+
         /* Table / tree */
         .tx-table-wrap { overflow-x: auto; }
         table.tx-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
@@ -557,41 +626,40 @@
                         <p>Full mapping from Category down to Collection, with generated taxonomy codes.</p>
                     </div>
                 </div>
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
 
-                    <div class="relative w-full md:w-96">
-                        <input
-                            type="text"
-                            id="taxonomySearch"
-                            placeholder="Search taxonomy..."
-                            class="w-full rounded-xl border border-gray-300 px-4 py-2.5 pl-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                            class="absolute left-3 top-3.5 h-5 w-5 text-gray-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M21 21l-5-5m2-5A7 7 0 114 11a7 7 0 0114 0z"/>
+                {{-- Search / filter toolbar --}}
+                <div class="tx-toolbar">
+                    <div class="tx-search">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
+                        <input type="text" id="tx-search-input" class="tx-field" placeholder="Search category, sub category, type, collection or code…" autocomplete="off">
                     </div>
-
-                    <div>
-                        <select id="hierarchyFilter"
-                                class="rounded-xl border border-gray-300 px-4 py-2">
-                            <option value="">All Levels</option>
-                            <option value="Category">Category</option>
-                            <option value="Sub Category">Sub Category</option>
-                            <option value="Product Type">Product Type</option>
-                            <option value="Collection">Collection</option>
+                    <div class="tx-select-wrap tx-toolbar-select">
+                        <select id="tx-filter-category" class="tx-field">
+                            <option value="">All Categories</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->id }}">{{ $category->code }} — {{ $category->name }}</option>
+                            @endforeach
                         </select>
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                     </div>
-
+                    <div class="tx-select-wrap tx-toolbar-select">
+                        <select id="tx-filter-level" class="tx-field">
+                            <option value="">All Levels</option>
+                            <option value="1">Category only</option>
+                            <option value="2">Sub Category</option>
+                            <option value="3">Sub Sub Category</option>
+                            <option value="4">Collection</option>
+                        </select>
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </div>
+                    <button type="button" id="tx-filter-reset" class="tx-toolbar-reset">Clear</button>
                 </div>
+                <p id="tx-result-count" class="tx-result-count"></p>
+
                 <div class="tx-table-wrap">
-                    <table id="taxonomyTable" class="tx-table">
+                    <table class="tx-table" id="tx-table">
                         <thead>
                             <tr>
                                 <th>Taxonomy Code</th>
@@ -603,12 +671,12 @@
                             </tr>
                         </thead>
 
-                        <tbody>
+                        <tbody id="tx-tbody">
                         @foreach($categories as $category)
 
                             {{-- Category only --}}
                             @if($category->subCategories->isEmpty())
-                                <tr>
+                                <tr data-level="1" data-cat="{{ $category->id }}" data-search="{{ strtolower($category->code.' '.$category->name) }}">
                                     <td><span class="tx-code-badge tx-mono">{{ $category->code }}</span></td>
                                     <td>
                                         <span class="tx-cell-primary"><span class="tx-swatch" style="background: var(--tx-lvl-1);"></span>{{ $category->name }}</span>
@@ -626,7 +694,7 @@
 
                                 {{-- Category + Sub Category --}}
                                 @if($subCategory->productTypes->isEmpty())
-                                    <tr>
+                                    <tr data-level="2" data-cat="{{ $category->id }}" data-search="{{ strtolower($category->code.' '.$subCategory->code.' '.$category->name.' '.$subCategory->name) }}">
                                         <td><span class="tx-code-badge tx-mono">{{ $category->code }}-{{ $subCategory->code }}</span></td>
                                         <td>{{ $category->name }}</td>
                                         <td>
@@ -648,7 +716,7 @@
 
                                     {{-- Category + Sub Category + Product Type --}}
                                     @if($productType->collections->isEmpty())
-                                        <tr>
+                                        <tr data-level="3" data-cat="{{ $category->id }}" data-search="{{ strtolower($category->code.' '.$subCategory->code.' '.$productType->code.' '.$category->name.' '.$subCategory->name.' '.$productType->name) }}">
                                             <td><span class="tx-code-badge tx-mono">{{ $category->code }}-{{ $subCategory->code }}-{{ $productType->code }}</span></td>
                                             <td>{{ $category->name }}</td>
                                             <td>{{ $subCategory->name }}</td>
@@ -671,7 +739,7 @@
                                     @foreach($productType->collections as $collection)
 
                                         {{-- Complete taxonomy --}}
-                                        <tr>
+                                        <tr data-level="4" data-cat="{{ $category->id }}" data-search="{{ strtolower($category->code.' '.$subCategory->code.' '.$productType->code.' '.$collection->code.' '.$category->name.' '.$subCategory->name.' '.$productType->name.' '.$collection->name) }}">
                                             <td><span class="tx-code-badge tx-mono">{{ $category->code }}-{{ $subCategory->code }}-{{ $productType->code }}-{{ $collection->code }}</span></td>
                                             <td>{{ $category->name }}</td>
                                             <td>{{ $subCategory->name }}</td>
@@ -701,6 +769,30 @@
                         @endforeach
                         </tbody>
                     </table>
+                    <div id="tx-empty-state" class="tx-empty-state" hidden>
+                        <p>No taxonomy rows match your search or filters.</p>
+                    </div>
+                </div>
+
+                <div class="tx-pagination" id="tx-pagination">
+                    <div class="tx-pagination-info">
+                        Showing <span id="tx-page-from">0</span>–<span id="tx-page-to">0</span> of <span id="tx-page-total">0</span>
+                    </div>
+                    <div class="tx-pagination-controls">
+                        <select id="tx-page-size" class="tx-field tx-page-size">
+                            <option value="10">10 / page</option>
+                            <option value="25" selected>25 / page</option>
+                            <option value="50">50 / page</option>
+                            <option value="100">100 / page</option>
+                        </select>
+                        <button type="button" id="tx-prev-page" class="tx-page-btn" aria-label="Previous page">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+                        <span class="tx-page-current"><span id="tx-page-num">1</span> / <span id="tx-page-count">1</span></span>
+                        <button type="button" id="tx-next-page" class="tx-page-btn" aria-label="Next page">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -772,69 +864,101 @@
             });
         });
     </script>
-     <script>
 
-            $(function(){
+    {{-- Taxonomy table: search, filter, pagination (client-side) --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var tbody = document.getElementById('tx-tbody');
+            if (!tbody) return;
 
-                let table = $('#taxonomyTable').DataTable({
+            var allRows = Array.from(tbody.querySelectorAll('tr'));
+            var searchInput = document.getElementById('tx-search-input');
+            var categoryFilter = document.getElementById('tx-filter-category');
+            var levelFilter = document.getElementById('tx-filter-level');
+            var resetBtn = document.getElementById('tx-filter-reset');
+            var pageSizeSelect = document.getElementById('tx-page-size');
+            var prevBtn = document.getElementById('tx-prev-page');
+            var nextBtn = document.getElementById('tx-next-page');
+            var pageNumEl = document.getElementById('tx-page-num');
+            var pageCountEl = document.getElementById('tx-page-count');
+            var pageFromEl = document.getElementById('tx-page-from');
+            var pageToEl = document.getElementById('tx-page-to');
+            var pageTotalEl = document.getElementById('tx-page-total');
+            var resultCountEl = document.getElementById('tx-result-count');
+            var emptyState = document.getElementById('tx-empty-state');
+            var tableWrap = document.querySelector('.tx-table-wrap');
+            var paginationBar = document.getElementById('tx-pagination');
 
-                    pageLength: 10,
+            var currentPage = 1;
+            var pageSize = parseInt(pageSizeSelect.value, 10);
 
-                    lengthMenu: [
-                        [10,25,50,100,-1],
-                        [10,25,50,100,"All"]
-                    ],
+            function getFiltered() {
+                var term = searchInput.value.trim().toLowerCase();
+                var cat = categoryFilter.value;
+                var level = levelFilter.value;
 
-                    ordering: true,
-
-                    info: true,
-
-                    paging: true,
-
-                    searching: true,
-
-                    responsive: true,
-
-                    language:{
-                        search:"",
-                        searchPlaceholder:"Search..."
-                    },
-
-                    dom:'lrtip'
+                return allRows.filter(function (row) {
+                    if (term && row.getAttribute('data-search').indexOf(term) === -1) return false;
+                    if (cat && row.getAttribute('data-cat') !== cat) return false;
+                    if (level && row.getAttribute('data-level') !== level) return false;
+                    return true;
                 });
+            }
 
-                // Custom Search Box
-                $('#taxonomySearch').on('keyup',function(){
-                    table.search($(this).val()).draw();
-                });
+            function render() {
+                var filtered = getFiltered();
+                var total = filtered.length;
+                var pageCount = Math.max(1, Math.ceil(total / pageSize));
+                if (currentPage > pageCount) currentPage = pageCount;
+                if (currentPage < 1) currentPage = 1;
 
-                // Hierarchy Filter
-                $('#hierarchyFilter').on('change',function(){
+                // hide every row, then show only the current page's slice of the filtered set
+                allRows.forEach(function (row) { row.style.display = 'none'; });
 
-                    let value=$(this).val();
+                var start = (currentPage - 1) * pageSize;
+                var end = Math.min(start + pageSize, total);
+                filtered.slice(start, end).forEach(function (row) { row.style.display = ''; });
 
-                    if(value==""){
+                pageNumEl.textContent = currentPage;
+                pageCountEl.textContent = pageCount;
+                pageFromEl.textContent = total === 0 ? 0 : start + 1;
+                pageToEl.textContent = end;
+                pageTotalEl.textContent = total;
 
-                        table.column(5).search("").draw();
+                prevBtn.disabled = currentPage <= 1;
+                nextBtn.disabled = currentPage >= pageCount;
 
-                    }else{
+                var term = searchInput.value.trim();
+                var hasFilter = term || categoryFilter.value || levelFilter.value;
+                resultCountEl.textContent = hasFilter
+                    ? total + ' matching row' + (total === 1 ? '' : 's') + ' of ' + allRows.length + ' total'
+                    : total + ' row' + (total === 1 ? '' : 's') + ' total';
 
-                        table.column(5).search(value).draw();
+                var isEmpty = total === 0;
+                emptyState.hidden = !isEmpty;
+                tableWrap.querySelector('table').style.display = isEmpty ? 'none' : '';
+                paginationBar.style.display = isEmpty ? 'none' : '';
+            }
 
-                    }
-
-                });
-
+            searchInput.addEventListener('input', function () { currentPage = 1; render(); });
+            categoryFilter.addEventListener('change', function () { currentPage = 1; render(); });
+            levelFilter.addEventListener('change', function () { currentPage = 1; render(); });
+            pageSizeSelect.addEventListener('change', function () {
+                pageSize = parseInt(pageSizeSelect.value, 10);
+                currentPage = 1;
+                render();
             });
+            resetBtn.addEventListener('click', function () {
+                searchInput.value = '';
+                categoryFilter.value = '';
+                levelFilter.value = '';
+                currentPage = 1;
+                render();
+            });
+            prevBtn.addEventListener('click', function () { currentPage--; render(); });
+            nextBtn.addEventListener('click', function () { currentPage++; render(); });
 
-            </script>
-        <link rel="stylesheet"
-            href="https://cdn.datatables.net/1.13.8/css/dataTables.tailwindcss.min.css">
-
-            <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-            <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-
-            <script src="https://cdn.datatables.net/1.13.8/js/dataTables.tailwindcss.min.js"></script>
- 
+            render();
+        });
+    </script>
 </x-mi_app>

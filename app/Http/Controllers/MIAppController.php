@@ -231,7 +231,103 @@ class MIAppController extends Controller
     }
 public function store(Request $request)
 {
-    dd($request->all());
+    $validated = $request->validate([
+
+        // Product Information
+        'item_name' => 'required|string|max:255',
+        'description' => 'nullable|string',
+
+        // Taxonomy
+        'category_id' => 'required|integer|exists:mi_categories,id',
+        'sub_category_id' => 'nullable|integer|exists:mi_sub_categories,id',
+        'product_type_id' => 'nullable|integer|exists:mi_product_types,id',
+        'collection_id' => 'nullable|integer|exists:mi_collections,id',
+
+        // Product Details
+        'type_of_sample' => 'required|string|max:255',
+        'designed_by' => 'nullable|string|max:255',
+
+        // Attributes
+        'materials' => 'required|array|min:1',
+        'materials.*' => 'string|max:255',
+
+        'type' => 'nullable|string|max:255',
+
+        'color' => 'nullable|array',
+        'color.*' => 'string|max:255',
+
+        // Product Dimensions
+        'product_height' => 'nullable|numeric',
+        'product_width' => 'nullable|numeric',
+        'product_length' => 'nullable|numeric',
+        'product_depth' => 'nullable|numeric',
+
+        // Carton Dimensions
+        'carton_height' => 'nullable|numeric',
+        'carton_width' => 'nullable|numeric',
+        'carton_length' => 'nullable|numeric',
+        'carton_depth' => 'nullable|numeric',
+
+        // Cost
+        'purchase_cost' => 'nullable|numeric',
+
+        // File
+        'product_file' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
+    ]);
+
+    // Save arrays as JSON
+    $validated['materials'] = !empty($validated['materials'])
+        ? json_encode($validated['materials'])
+        : null;
+
+    $validated['color'] = !empty($validated['color'])
+        ? json_encode($validated['color'])
+        : null;
+
+    $validated['status'] = 'Active';
+
+    DB::beginTransaction();
+
+    try {
+
+        // Upload file only inside the transaction attempt, so a DB failure
+        // doesn't leave an orphaned file sitting in storage.
+        if ($request->hasFile('product_file')) {
+            $validated['product_file'] = $request
+                ->file('product_file')
+                ->store('product_files', 'public');
+        }
+
+        $product = MI_Product::create($validated);
+
+        DB::commit();
+
+        return redirect()
+            ->route('mi_app.index')
+            ->with('success', 'Product saved successfully!');
+
+    } catch (\Throwable $e) {
+
+        DB::rollBack();
+
+        // Clean up the uploaded file if the DB write failed after upload
+        if (!empty($validated['product_file'])) {
+            Storage::disk('public')->delete($validated['product_file']);
+        }
+
+        Log::error('Product save failed: ' . $e->getMessage(), [
+            'exception' => $e,
+            'input' => $request->except('product_file'),
+        ]);
+
+        return back()
+            ->withInput()
+            ->withErrors([
+                'error' => app()->environment('production')
+                    ? 'Something went wrong while saving the product. Please try again or contact support.'
+                    : $e->getMessage(),
+            ]);
+    }
 }
 
     public function edit($id) 

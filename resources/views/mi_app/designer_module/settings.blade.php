@@ -657,7 +657,6 @@
                     <button type="button" id="tx-filter-reset" class="tx-toolbar-reset">Clear</button>
                 </div>
                 <p id="tx-result-count" class="tx-result-count"></p>
-
                 <div class="tx-table-wrap">
                     <table class="tx-table" id="tx-table">
                         <thead>
@@ -668,6 +667,7 @@
                                 <th>Product Type</th>
                                 <th>Collection</th>
                                 <th>Hierarchy</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
 
@@ -686,6 +686,14 @@
                                     <td class="tx-dash">—</td>
                                     <td>
                                         <span class="tx-crumb"><span class="node">{{ $category->name }}</span></span>
+                                    </td>
+                                    <td class="tx-actions">
+                                        <a href="{{ route('categories.edit', $category->id) }}" class="tx-btn tx-btn-edit" title="Edit">Edit</a>
+                                        <form action="{{ route('categories.archive', $category->id) }}" method="POST" class="tx-inline-form" onsubmit="return confirm('Archive this category?');">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="tx-btn tx-btn-archive" title="Archive">Archive</button>
+                                        </form>
                                     </td>
                                 </tr>
                             @endif
@@ -708,6 +716,14 @@
                                                 <span class="arrow">→</span>
                                                 <span class="node">{{ $subCategory->name }}</span>
                                             </span>
+                                        </td>
+                                        <td class="tx-actions">
+                                            <a href="{{ route('sub-categories.edit', $subCategory->id) }}" class="tx-btn tx-btn-edit" title="Edit">Edit</a>
+                                            <form action="{{ route('sub-categories.archive', $subCategory->id) }}" method="POST" class="tx-inline-form" onsubmit="return confirm('Archive this sub category?');">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" class="tx-btn tx-btn-archive" title="Archive">Archive</button>
+                                            </form>
                                         </td>
                                     </tr>
                                 @endif
@@ -733,6 +749,14 @@
                                                     <span class="node">{{ $productType->name }}</span>
                                                 </span>
                                             </td>
+                                            <td class="tx-actions">
+                                                <a href="{{ route('product-types.edit', $productType->id) }}" class="tx-btn tx-btn-edit" title="Edit">Edit</a>
+                                                <form action="{{ route('product-types.archive', $productType->id) }}" method="POST" class="tx-inline-form" onsubmit="return confirm('Archive this product type?');">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="tx-btn tx-btn-archive" title="Archive">Archive</button>
+                                                </form>
+                                            </td>
                                         </tr>
                                     @endif
 
@@ -757,6 +781,14 @@
                                                     <span class="arrow">→</span>
                                                     <span class="node">{{ $collection->name }}</span>
                                                 </span>
+                                            </td>
+                                            <td class="tx-actions">
+                                                <a href="{{ route('collections.edit', $collection->id) }}" class="tx-btn tx-btn-edit" title="Edit">Edit</a>
+                                                <form action="{{ route('collections.archive', $collection->id) }}" method="POST" class="tx-inline-form" onsubmit="return confirm('Archive this collection?');">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="tx-btn tx-btn-archive" title="Archive">Archive</button>
+                                                </form>
                                             </td>
                                         </tr>
 
@@ -795,8 +827,6 @@
                     </div>
                 </div>
             </div>
-
-
         </div>
     </div>
 

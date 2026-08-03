@@ -708,31 +708,6 @@ public function taxonomy_update(Request $request, $type, $id)
 }
 public function taxonomy_destroy(Request $request, $id)
 {
-    switch ($request->entity_type) {
-
-        case 'category':
-            $item = MI_Category::findOrFail($id);
-            $item->delete();
-            break;
-
-        case 'sub_category':
-            $item = MI_SubCategory::findOrFail($id);
-            $item->delete();
-            break;
-
-        case 'product_type':
-            $item = MI_ProductType::findOrFail($id);
-            $item->delete();
-            break;
-
-        case 'collection':
-            $item = MI_Collection::findOrFail($id);
-            $item->delete();
-            break;
-    }
-
-    return redirect()
-        ->route('mi_app.settings')
-        ->with('success', 'Taxonomy deleted successfully.');
+dd($type, $product);
 }
 }

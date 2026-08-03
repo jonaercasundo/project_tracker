@@ -708,6 +708,33 @@ public function taxonomy_update(Request $request, $type, $id)
 }
 public function taxonomy_destroy($type, $product)
 {
-    dd($type, $product);
+    switch ($type) {
+
+        case 'category':
+            $item = MI_Category::findOrFail($product);
+            break;
+
+        case 'sub_category':
+            $item = MI_SubCategory::findOrFail($product);
+            break;
+
+        case 'product_type':
+            $item = MI_ProductType::findOrFail($product);
+            break;
+
+        case 'collection':
+            $item = MI_Collection::findOrFail($product);
+            break;
+
+        default:
+            abort(404);
+    }
+
+    dd($item);
+
+    $item->delete();
+
+    return redirect()->route('mi_app.settings')
+        ->with('success', 'Deleted successfully.');
 }
 }

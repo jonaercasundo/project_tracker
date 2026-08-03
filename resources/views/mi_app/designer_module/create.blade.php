@@ -924,22 +924,37 @@ document.addEventListener('DOMContentLoaded', function () {
                 return (kb / 1024).toFixed(1) + ' MB';
             }
 
-            function showFile(file) {
-                fileName.textContent = file.name;
-                fileSize.textContent = formatBytes(file.size);
+            function showFiles(fileList) {
+                if (!fileList || !fileList.length) return;
+                var files = Array.from(fileList);
+                var totalSize = files.reduce(function (sum, file) { return sum + file.size; }, 0);
+
+                fileName.textContent = files.length > 1 ? files.length + ' files selected' : files[0].name;
+                fileSize.textContent = formatBytes(totalSize);
                 emptyState.style.display = 'none';
                 filledState.style.display = 'flex';
 
                 fileThumb.innerHTML = '';
-                if (file.type && file.type.indexOf('image/') === 0) {
+                var firstFile = files[0];
+                if (firstFile.type && firstFile.type.indexOf('image/') === 0) {
                     var img = document.createElement('img');
                     img.alt = 'Selected file preview';
                     var reader = new FileReader();
                     reader.onload = function (e) { img.src = e.target.result; };
-                    reader.readAsDataURL(file);
+                    reader.readAsDataURL(firstFile);
                     fileThumb.appendChild(img);
                 } else {
                     fileThumb.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>';
+                }
+
+                if (files.length > 1) {
+                    var count = document.createElement('span');
+                    count.textContent = files.length + ' files';
+                    count.style.display = 'block';
+                    count.style.fontSize = '0.75rem';
+                    count.style.color = 'var(--tx-ink-faint)';
+                    count.style.marginTop = '0.25rem';
+                    fileThumb.appendChild(count);
                 }
             }
 
@@ -950,7 +965,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             fileInput.addEventListener('change', function () {
-                if (fileInput.files && fileInput.files[0]) showFile(fileInput.files[0]);
+                if (fileInput.files && fileInput.files.length) showFiles(fileInput.files);
             });
 
             removeBtn.addEventListener('click', function (e) {

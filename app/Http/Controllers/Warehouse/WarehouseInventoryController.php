@@ -84,7 +84,7 @@ class WarehouseInventoryController extends Controller
     public function getDeliveryItems(Request $request)
     {
         $request->validate([
-            'lot_id' => 'required|integer',
+            'lot_id' => 'required|integer|exists:lots,lot_id',
         ]);
 
         $delivery = Delivery::with([
@@ -94,8 +94,19 @@ class WarehouseInventoryController extends Controller
             'packageStatuses.package.packageContent.item'
         ])
         ->where('lot_id', $request->lot_id)
-        ->latest()
-        ->firstOrFail();
+        ->where('status', 'warehouse') // optional if only warehouse deliveries should be shown
+        ->latest('delivery_date')
+        ->first();
+
+        if (!$delivery) {
+            return response()->json([
+                'project' => '',
+                'lot' => '',
+                'school' => '',
+                'delivery_date' => '',
+                'items' => [],
+            ]);
+        }
 
         $items = collect();
 
@@ -109,15 +120,13 @@ class WarehouseInventoryController extends Controller
                     'item_name'         => $content->item?->item_name ?? 'Unnamed Item',
                     'qty'               => (int) $content->qty,
                 ]);
-
             }
-
         }
 
         return response()->json([
-            'project'       => $delivery->project->project_name,
-            'lot'           => $delivery->lot->lot_name,
-            'school'        => optional($delivery->school)->school_name,
+            'project'       => $delivery->project->project_name ?? '',
+            'lot'           => $delivery->lot->lot_name ?? '',
+            'school'        => $delivery->school->school_name ?? '',
             'delivery_date' => $delivery->delivery_date,
             'items'         => $items->values(),
         ]);

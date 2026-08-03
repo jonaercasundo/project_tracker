@@ -293,6 +293,19 @@ public function dashboard()
                 ]);
         }
     }
+    private function normalizeArrayInput($value): array
+    {
+        if (!is_array($value)) {
+            $value = $value ? [$value] : [];
+        }
+
+        return array_values(array_filter(array_map(function ($item) {
+            return trim((string) $item);
+        }, $value), function ($item) {
+            return $item !== '';
+        }));
+    }
+
     private function generateUniqueCode(string $model, string $name): string
     {
         $base = strtoupper(preg_replace('/[^A-Za-z]/', '', $name));
@@ -378,13 +391,8 @@ public function dashboard()
         $uploadedPaths = [];
 
         // Save arrays as JSON
-        $validated['materials'] = !empty($validated['materials'])
-            ? json_encode($validated['materials'])
-            : null;
-
-        $validated['color'] = !empty($validated['color'])
-            ? json_encode($validated['color'])
-            : null;
+        $validated['materials'] = $this->normalizeArrayInput($validated['materials'] ?? []);
+        $validated['color'] = $this->normalizeArrayInput($validated['color'] ?? []);
 
         $validated['status'] = 'Active';
 
@@ -602,8 +610,8 @@ public function dashboard()
                 'product_images.*' => 'file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
             ]);
 
-            $validated['materials'] = $request->input('materials', []);
-            $validated['color'] = $request->input('color', []);
+            $validated['materials'] = $this->normalizeArrayInput($request->input('materials', []));
+            $validated['color'] = $this->normalizeArrayInput($request->input('color', []));
             $validated['image_links'] = $request->input('image_links', []);
 
             $product->update($validated);

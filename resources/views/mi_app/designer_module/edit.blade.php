@@ -422,14 +422,7 @@
                         <div>
                             <label for="materials" class="tx-label">Materials</label>
                             @php
-                                $selectedMaterials = old(
-                                    'materials',
-                                    is_array($product->materials)
-                                        ? $product->materials
-                                        : json_decode($product->materials ?? '[]', true)
-                                );
-
-                                $selectedMaterials = $selectedMaterials ?: [];
+                                $selectedMaterials = old('materials', $product->materials ?? []);
                             @endphp
                             <div class="tx-multi-select-wrap">
                                 <div class="tx-multi-toolbar">
@@ -512,15 +505,8 @@
 
                         <div>
                             @php
-                                $selectedColors = old(
-                                    'color',
-                                    is_array($product->color)
-                                        ? $product->color
-                                        : json_decode($product->color ?? '[]', true)
-                                );
-
-                                $selectedColors = $selectedColors ?: [];
-                                @endphp
+                                $selectedColors = old('color', $product->color ?? []);
+                            @endphp
                             <label for="color" class="tx-label">Color</label>
                             <div class="tx-multi-select-wrap">
                                 <div class="tx-multi-toolbar">

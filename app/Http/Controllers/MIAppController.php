@@ -582,11 +582,12 @@ public function dashboard()
                 'product_type_id' => 'nullable|integer|exists:mi_product_types,id',
                 'collection_id'  => 'nullable|integer|exists:mi_collections,id',
                 'type_of_sample' => 'required|string|max:255',
-                'classification' => 'required|string|max:255',
                 'designed_by'    => 'nullable|string|max:255',
-                'materials'      => 'required|string|max:255',
+                'materials'      => 'required|array|min:1',
+                'materials.*'    => 'string|max:255',
                 'type'           => 'nullable|string|max:255',
-                'color'          => 'nullable|string|max:255',
+                'color'          => 'nullable|array',
+                'color.*'        => 'string|max:255',
                 'product_height' => 'required|string|max:255',
                 'product_width'  => 'nullable|string|max:255',
                 'product_length' => 'nullable|string|max:255',
@@ -601,13 +602,8 @@ public function dashboard()
                 'product_images.*' => 'file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
             ]);
 
-            $materials = array_values(array_filter(array_map(function ($value) {
-                return trim((string) $value);
-            }, preg_split('/[\n,;]+/', (string) $request->input('materials', ''))), function ($value) {
-                return $value !== '';
-            }));
-
-            $validated['materials'] = $materials;
+            $validated['materials'] = $request->input('materials', []);
+            $validated['color'] = $request->input('color', []);
             $validated['image_links'] = $request->input('image_links', []);
 
             $product->update($validated);

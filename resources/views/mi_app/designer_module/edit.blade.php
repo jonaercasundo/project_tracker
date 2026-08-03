@@ -317,18 +317,8 @@
                         </div>
 
                         <div>
-                            <label for="classification" class="tx-label">Classification</label>
-                            <input type="text" id="classification" name="classification" value="{{ old('classification', $product->classification) }}" class="tx-field" required>
-                        </div>
-
-                        <div>
                             <label for="type_of_sample" class="tx-label">Type of Sample</label>
                             <input type="text" id="type_of_sample" name="type_of_sample" value="{{ old('type_of_sample', $product->type_of_sample) }}" class="tx-field" required>
-                        </div>
-
-                        <div>
-                            <label for="materials" class="tx-label">Materials</label>
-                            <input type="text" id="materials" name="materials" value="{{ old('materials', is_array($product->materials) ? implode($product->materials, ', ') : $product->materials) }}" class="tx-field" placeholder="e.g. Oak, Walnut" required>
                         </div>
 
                         <div>
@@ -408,7 +398,7 @@
                     </div>
                 </div>
 
-                {{-- SECTION 5: Cost & Media --}}
+                {{-- SECTION 5: Attributes & Media --}}
                 <div class="tx-card">
                     <div class="tx-card-head">
                         <span class="tx-card-icon" style="background: var(--tx-accent-soft); color: var(--tx-accent);">04</span>
@@ -418,6 +408,126 @@
                         </div>
                     </div>
                     <div class="tx-card-body cols-2">
+                        <div>
+                            <label for="materials" class="tx-label">Materials</label>
+                            <select id="materials" name="materials[]" multiple autocomplete="off" class="tx-field">
+                                <optgroup label="Solid Wood">
+                                    <option value="Acacia Wood" {{ in_array('Acacia Wood', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Acacia Wood</option>
+                                    <option value="Ash Wood" {{ in_array('Ash Wood', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Ash Wood</option>
+                                    <option value="Beech Wood" {{ in_array('Beech Wood', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Beech Wood</option>
+                                    <option value="Birch Wood" {{ in_array('Birch Wood', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Birch Wood</option>
+                                    <option value="Mahogany" {{ in_array('Mahogany', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Mahogany</option>
+                                    <option value="Mango Wood" {{ in_array('Mango Wood', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Mango Wood</option>
+                                    <option value="Oak" {{ in_array('Oak', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Oak</option>
+                                    <option value="Pine" {{ in_array('Pine', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Pine</option>
+                                    <option value="Rubberwood" {{ in_array('Rubberwood', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Rubberwood</option>
+                                    <option value="Teak" {{ in_array('Teak', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Teak</option>
+                                    <option value="Walnut" {{ in_array('Walnut', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Walnut</option>
+                                </optgroup>
+                                <optgroup label="Engineered Wood">
+                                    <option value="MDF" {{ in_array('MDF', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>MDF</option>
+                                    <option value="Particle Board" {{ in_array('Particle Board', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Particle Board</option>
+                                    <option value="Plywood" {{ in_array('Plywood', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Plywood</option>
+                                    <option value="HDF" {{ in_array('HDF', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>HDF</option>
+                                    <option value="Melamine Board" {{ in_array('Melamine Board', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Melamine Board</option>
+                                </optgroup>
+                                <optgroup label="Metal">
+                                    <option value="Aluminum" {{ in_array('Aluminum', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Aluminum</option>
+                                    <option value="Brass" {{ in_array('Brass', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Brass</option>
+                                    <option value="Cast Iron" {{ in_array('Cast Iron', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Cast Iron</option>
+                                    <option value="Iron" {{ in_array('Iron', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Iron</option>
+                                    <option value="Stainless Steel" {{ in_array('Stainless Steel', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Stainless Steel</option>
+                                    <option value="Steel" {{ in_array('Steel', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Steel</option>
+                                </optgroup>
+                                <optgroup label="Glass & Stone">
+                                    <option value="Clear Glass" {{ in_array('Clear Glass', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Clear Glass</option>
+                                    <option value="Tempered Glass" {{ in_array('Tempered Glass', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Tempered Glass</option>
+                                    <option value="Marble" {{ in_array('Marble', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Marble</option>
+                                    <option value="Granite" {{ in_array('Granite', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Granite</option>
+                                    <option value="Ceramic" {{ in_array('Ceramic', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Ceramic</option>
+                                    <option value="Concrete" {{ in_array('Concrete', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Concrete</option>
+                                </optgroup>
+                                <optgroup label="Natural Fibers">
+                                    <option value="Bamboo" {{ in_array('Bamboo', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Bamboo</option>
+                                    <option value="Cane" {{ in_array('Cane', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Cane</option>
+                                    <option value="Rattan" {{ in_array('Rattan', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Rattan</option>
+                                    <option value="Seagrass" {{ in_array('Seagrass', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Seagrass</option>
+                                    <option value="Water Hyacinth" {{ in_array('Water Hyacinth', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Water Hyacinth</option>
+                                    <option value="Abaca" {{ in_array('Abaca', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Abaca</option>
+                                </optgroup>
+                                <optgroup label="Fabric & Upholstery">
+                                    <option value="Boucle" {{ in_array('Boucle', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Boucle</option>
+                                    <option value="Canvas" {{ in_array('Canvas', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Canvas</option>
+                                    <option value="Cotton" {{ in_array('Cotton', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Cotton</option>
+                                    <option value="Leather" {{ in_array('Leather', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Leather</option>
+                                    <option value="PU Leather" {{ in_array('PU Leather', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>PU Leather</option>
+                                    <option value="Linen" {{ in_array('Linen', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Linen</option>
+                                    <option value="Microfiber" {{ in_array('Microfiber', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Microfiber</option>
+                                    <option value="Polyester" {{ in_array('Polyester', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Polyester</option>
+                                    <option value="Velvet" {{ in_array('Velvet', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Velvet</option>
+                                </optgroup>
+                                <optgroup label="Plastic & Synthetic">
+                                    <option value="ABS Plastic" {{ in_array('ABS Plastic', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>ABS Plastic</option>
+                                    <option value="Acrylic" {{ in_array('Acrylic', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Acrylic</option>
+                                    <option value="Fiberglass" {{ in_array('Fiberglass', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Fiberglass</option>
+                                    <option value="Polypropylene" {{ in_array('Polypropylene', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Polypropylene</option>
+                                    <option value="PVC" {{ in_array('PVC', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>PVC</option>
+                                    <option value="Resin" {{ in_array('Resin', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Resin</option>
+                                </optgroup>
+                                <optgroup label="Other">
+                                    <option value="Composite" {{ in_array('Composite', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Composite</option>
+                                    <option value="Mixed Materials" {{ in_array('Mixed Materials', old('materials', is_array($product->materials) ? $product->materials : []) ) ? 'selected' : '' }}>Mixed Materials</option>
+                                </optgroup>
+                            </select>
+                            <p class="tx-hint">Select one or more materials.</p>
+                        </div>
+
+                        <div>
+                            <label for="color" class="tx-label">Color</label>
+                            <select id="color" name="color[]" multiple class="tx-field">
+                                <optgroup label="Basic Colors">
+                                    <option value="Black" {{ in_array('Black', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Black</option>
+                                    <option value="White" {{ in_array('White', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>White</option>
+                                    <option value="Gray" {{ in_array('Gray', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Gray</option>
+                                    <option value="Silver" {{ in_array('Silver', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Silver</option>
+                                    <option value="Gold" {{ in_array('Gold', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Gold</option>
+                                    <option value="Bronze" {{ in_array('Bronze', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Bronze</option>
+                                </optgroup>
+                                <optgroup label="Wood Finishes">
+                                    <option value="Natural" {{ in_array('Natural', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Natural</option>
+                                    <option value="Oak" {{ in_array('Oak', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Oak</option>
+                                    <option value="Walnut" {{ in_array('Walnut', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Walnut</option>
+                                    <option value="Teak" {{ in_array('Teak', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Teak</option>
+                                    <option value="Mahogany" {{ in_array('Mahogany', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Mahogany</option>
+                                    <option value="Espresso" {{ in_array('Espresso', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Espresso</option>
+                                </optgroup>
+                                <optgroup label="Neutral">
+                                    <option value="Beige" {{ in_array('Beige', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Beige</option>
+                                    <option value="Cream" {{ in_array('Cream', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Cream</option>
+                                    <option value="Ivory" {{ in_array('Ivory', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Ivory</option>
+                                    <option value="Taupe" {{ in_array('Taupe', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Taupe</option>
+                                    <option value="Brown" {{ in_array('Brown', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Brown</option>
+                                </optgroup>
+                                <optgroup label="Accent Colors">
+                                    <option value="Blue" {{ in_array('Blue', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Blue</option>
+                                    <option value="Green" {{ in_array('Green', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Green</option>
+                                    <option value="Red" {{ in_array('Red', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Red</option>
+                                    <option value="Yellow" {{ in_array('Yellow', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Yellow</option>
+                                    <option value="Orange" {{ in_array('Orange', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Orange</option>
+                                    <option value="Pink" {{ in_array('Pink', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Pink</option>
+                                    <option value="Purple" {{ in_array('Purple', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Purple</option>
+                                </optgroup>
+                                <optgroup label="Special Finishes">
+                                    <option value="Matte Black" {{ in_array('Matte Black', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Matte Black</option>
+                                    <option value="Gloss White" {{ in_array('Gloss White', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Gloss White</option>
+                                    <option value="Brushed Gold" {{ in_array('Brushed Gold', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Brushed Gold</option>
+                                    <option value="Rose Gold" {{ in_array('Rose Gold', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Rose Gold</option>
+                                    <option value="Chrome" {{ in_array('Chrome', old('color', is_array($product->color) ? $product->color : []) ) ? 'selected' : '' }}>Chrome</option>
+                                </optgroup>
+                            </select>
+                            <p class="tx-hint">Select one or more colors.</p>
+                        </div>
+
                         <div>
                             <label for="image_links" class="tx-label">Image Links</label>
                             <p class="tx-hint">Add one or more direct image URLs.</p>

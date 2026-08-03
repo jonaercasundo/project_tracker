@@ -17,6 +17,7 @@
             --tx-accent: #C7703C;
             --tx-accent-soft: #F5E7DB;
             --tx-danger: #B3432E;
+            --tx-danger-soft: #F3E4E0;
             --tx-lvl-1: #2F5D50;
             --tx-lvl-1-soft: #E5EEE9;
             --tx-lvl-2: #35618C;
@@ -44,6 +45,7 @@
             --tx-lvl-2-soft: #1A222B;
             --tx-lvl-3-soft: #221C29;
             --tx-lvl-4-soft: #2A2019;
+            --tx-danger-soft: #2A1D1A;
         }
 
         .tx-display { font-family: var(--tx-font-display); letter-spacing: -0.01em; }
@@ -242,6 +244,34 @@
         .tx-btn-static {
             width: auto;
         }
+
+        /* Row-level action buttons (Edit / Archive) inside the table */
+        .tx-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+        .tx-actions .tx-btn,
+        .tx-inline-form {
+            width: auto;
+        }
+        .tx-actions .tx-btn {
+            padding: 0.4rem 0.85rem;
+            font-size: 0.75rem;
+            border-radius: 8px;
+            text-decoration: none;
+        }
+        .tx-btn-edit {
+            background: var(--tx-primary-soft);
+            color: var(--tx-primary);
+        }
+        .tx-btn-edit:hover { opacity: 1; background: var(--tx-primary); color: var(--tx-primary-ink); box-shadow: none; transform: none; }
+        .tx-btn-archive {
+            background: var(--tx-danger-soft);
+            color: var(--tx-danger);
+        }
+        .tx-btn-archive:hover { opacity: 1; background: var(--tx-danger); color: #fff; box-shadow: none; transform: none; }
 
         /* Level accents per section */
         .lvl-1 .tx-card-icon { background: var(--tx-lvl-1-soft); color: var(--tx-lvl-1); }
@@ -688,11 +718,21 @@
                                         <span class="tx-crumb"><span class="node">{{ $category->name }}</span></span>
                                     </td>
                                     <td class="tx-actions">
-                                        <a href="{{ route('categories.edit', $category->id) }}" class="tx-btn tx-btn-edit" title="Edit">Edit</a>
-                                        <form action="{{ route('categories.archive', $category->id) }}" method="POST" class="tx-inline-form" onsubmit="return confirm('Archive this category?');">
+                                        <a href="{{ route('taxonomy.edit', ['type' => 'category', 'product' => $category->id]) }}"
+                                           class="tx-btn tx-btn-edit">
+                                            Edit
+                                        </a>
+
+                                        <form action="{{ route('taxonomy.destroy', ['type' => 'category', 'product' => $category->id]) }}"
+                                              method="POST"
+                                              class="tx-inline-form"
+                                              onsubmit="return confirm('Archive this Category?');">
                                             @csrf
-                                            @method('PATCH')
-                                            <button type="submit" class="tx-btn tx-btn-archive" title="Archive">Archive</button>
+                                            @method('DELETE')
+
+                                            <button type="submit" class="tx-btn tx-btn-archive">
+                                                Archive
+                                            </button>
                                         </form>
                                     </td>
                                 </tr>
@@ -718,15 +758,15 @@
                                             </span>
                                         </td>
                                         <td class="tx-actions">
-                                            <a href="{{ route('taxonomy.edit', ['type' => 'product_type', 'product' => $productType->id]) }}"
-                                            class="tx-btn tx-btn-edit">
+                                            <a href="{{ route('taxonomy.edit', ['type' => 'sub_category', 'product' => $subCategory->id]) }}"
+                                               class="tx-btn tx-btn-edit">
                                                 Edit
                                             </a>
 
-                                            <form action="{{ route('taxonomy.destroy', ['type' => 'product_type', 'product' => $productType->id]) }}"
-                                                method="POST"
-                                                class="tx-inline-form"
-                                                onsubmit="return confirm('Archive this Product Type?');">
+                                            <form action="{{ route('taxonomy.destroy', ['type' => 'sub_category', 'product' => $subCategory->id]) }}"
+                                                  method="POST"
+                                                  class="tx-inline-form"
+                                                  onsubmit="return confirm('Archive this Sub Category?');">
                                                 @csrf
                                                 @method('DELETE')
 
@@ -759,24 +799,24 @@
                                                     <span class="node">{{ $productType->name }}</span>
                                                 </span>
                                             </td>
-<td class="tx-actions">
-    <a href="{{ route('taxonomy.edit', ['type' => 'product_type', 'product' => $productType->id]) }}"
-       class="tx-btn tx-btn-edit">
-        Edit
-    </a>
+                                            <td class="tx-actions">
+                                                <a href="{{ route('taxonomy.edit', ['type' => 'product_type', 'product' => $productType->id]) }}"
+                                                   class="tx-btn tx-btn-edit">
+                                                    Edit
+                                                </a>
 
-    <form action="{{ route('taxonomy.destroy', ['type' => 'product_type', 'product' => $productType->id]) }}"
-          method="POST"
-          class="tx-inline-form"
-          onsubmit="return confirm('Archive this Product Type?');">
-        @csrf
-        @method('DELETE')
+                                                <form action="{{ route('taxonomy.destroy', ['type' => 'product_type', 'product' => $productType->id]) }}"
+                                                      method="POST"
+                                                      class="tx-inline-form"
+                                                      onsubmit="return confirm('Archive this Product Type?');">
+                                                    @csrf
+                                                    @method('DELETE')
 
-        <button type="submit" class="tx-btn tx-btn-archive">
-            Archive
-        </button>
-    </form>
-</td>
+                                                    <button type="submit" class="tx-btn tx-btn-archive">
+                                                        Archive
+                                                    </button>
+                                                </form>
+                                            </td>
                                         </tr>
                                     @endif
 
@@ -803,11 +843,21 @@
                                                 </span>
                                             </td>
                                             <td class="tx-actions">
-                                                <a href="{{ route('collections.edit', $collection->id) }}" class="tx-btn tx-btn-edit" title="Edit">Edit</a>
-                                                <form action="{{ route('collections.archive', $collection->id) }}" method="POST" class="tx-inline-form" onsubmit="return confirm('Archive this collection?');">
+                                                <a href="{{ route('taxonomy.edit', ['type' => 'collection', 'product' => $collection->id]) }}"
+                                                   class="tx-btn tx-btn-edit">
+                                                    Edit
+                                                </a>
+
+                                                <form action="{{ route('taxonomy.destroy', ['type' => 'collection', 'product' => $collection->id]) }}"
+                                                      method="POST"
+                                                      class="tx-inline-form"
+                                                      onsubmit="return confirm('Archive this Collection?');">
                                                     @csrf
-                                                    @method('PATCH')
-                                                    <button type="submit" class="tx-btn tx-btn-archive" title="Archive">Archive</button>
+                                                    @method('DELETE')
+
+                                                    <button type="submit" class="tx-btn tx-btn-archive">
+                                                        Archive
+                                                    </button>
                                                 </form>
                                             </td>
                                         </tr>

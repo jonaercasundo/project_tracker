@@ -90,87 +90,27 @@
                         return;
                     }
 
-                    fetch(`{{ route('warehouse.stock-in.items') }}?lot_id=${lotId}`)
-                        .then(response => {
+fetch(`{{ route('warehouse.stock-in.items') }}?lot_id=${lotId}`)
+    .then(async response => {
 
-                            if (!response.ok) {
-                                throw new Error('Server returned ' + response.status);
-                            }
+        console.log("Status:", response.status);
 
-                            return response.json();
+        const text = await response.text();
+        console.log(text);
 
-                        })
-                        .then(data => {
+        if (!response.ok) {
+            throw new Error(text);
+        }
 
-                            console.log(data);
+        return JSON.parse(text);
 
-                            // Delivery Information
-                            document.getElementById('info_project').textContent = data.project;
-                            document.getElementById('info_lot').textContent = data.lot;
-                            document.getElementById('info_school').textContent = data.school;
-                            document.getElementById('info_date').textContent = data.delivery_date;
-
-                            deliveryInfo.classList.remove('hidden');
-
-                            itemsTable.innerHTML = '';
-
-                            if (data.items.length === 0) {
-
-                                itemsTable.innerHTML = `
-                                    <tr>
-                                        <td colspan="4" class="px-4 py-6 text-center text-slate-500">
-                                            No items found.
-                                        </td>
-                                    </tr>
-                                `;
-
-                            } else {
-
-                                data.items.forEach(item => {
-
-                                    itemsTable.innerHTML += `
-                                        <tr class="border-t" data-item-id="${item.item_id}" data-package-status-id="${item.package_status_id}">
-
-                                            <td class="px-4 py-3 font-medium">
-                                                ${item.item_name}
-                                            </td>
-
-                                            <td class="px-4 py-3 text-center">
-                                                ${item.qty}
-                                            </td>
-
-                                            <td class="px-4 py-3 text-center">
-                                                <input
-                                                    type="number"
-                                                    class="received_qty w-24 rounded-xl border border-slate-300 px-3 py-2 text-center"
-                                                    value="${item.qty}"
-                                                    min="0">
-                                            </td>
-
-                                            <td class="px-4 py-3">
-                                                <input
-                                                    type="text"
-                                                    class="remarks w-full rounded-xl border border-slate-300 px-3 py-2"
-                                                    placeholder="Remarks">
-                                            </td>
-
-                                        </tr>
-                                    `;
-
-                                });
-
-                            }
-
-                            itemsSection.classList.remove('hidden');
-                            saveSection.classList.remove('hidden');
-
-                        })
-                        .catch(error => {
-
-                            console.error(error);
-                            alert('Unable to load delivery items.');
-
-                        });
+    })
+    .then(data => {
+        console.log(data);
+    })
+    .catch(error => {
+        console.error(error);
+    });
 
                 });
             });

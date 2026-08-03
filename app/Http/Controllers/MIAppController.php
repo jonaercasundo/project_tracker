@@ -319,6 +319,15 @@ public function dashboard()
     }
     public function store(Request $request)
     {
+        // Remove blank image link values before validation so optional empty inputs do not fail the URL rule.
+        if ($request->has('image_links')) {
+            $request->merge([
+                'image_links' => array_values(array_filter($request->input('image_links', []), function ($value) {
+                    return trim((string) $value) !== '';
+                })),
+            ]);
+        }
+
         $validated = $request->validate([
 
             // Product Information
@@ -514,13 +523,16 @@ public function dashboard()
                         'input' => $request->except('product_images'),
                     ]);
 
+                    $errorMessage = app()->environment('production')
+                        ? 'Something went wrong while saving the product. Please try again or contact support.'
+                        : $e->getMessage();
+
                     return back()
                         ->withInput()
                         ->withErrors([
-                            'error' => app()->environment('production')
-                                ? 'Something went wrong while saving the product. Please try again or contact support.'
-                                : $e->getMessage(),
-                        ]);
+                            'error' => $errorMessage,
+                        ])
+                        ->with('error', $errorMessage);
                 }
     }
 

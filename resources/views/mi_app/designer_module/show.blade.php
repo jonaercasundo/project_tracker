@@ -399,23 +399,7 @@
                             ];
                         })->filter(function ($image) {
                             return !empty($image['url']);
-                        })->toArray();
-
-                        if (empty($images)) {
-                            if (!empty($product->product_file)) {
-                                $images[] = [
-                                    'title' => 'Uploaded Image',
-                                    'url' => asset('storage/'.$product->product_file),
-                                ];
-                            }
-
-                            if (!empty($product->image_link)) {
-                                $images[] = [
-                                    'title' => 'Image Link',
-                                    'url' => $product->image_link,
-                                ];
-                            }
-                        }
+                        })->values()->toArray();
 
                         $count = count($images);
                     @endphp

@@ -234,11 +234,24 @@
             {{-- Main Form Container --}}
             <form method="POST" action="{{ route('mi_app.store_1') }}" enctype="multipart/form-data" id="product_form" novalidate>
                 @csrf
-                @error('error')
+                @php
+                    $saveError = $errors->first('error') ?: session('error');
+                @endphp
+                @if($saveError)
                     <div class="tx-error" style="margin: 0 1.75rem 1.5rem; padding: 0.85rem 1.1rem; border: 1px solid var(--tx-danger); border-radius: 12px; background: var(--tx-accent-soft);">
-                        {{ $message }}
+                        <strong>Unable to save the product.</strong>
+                        <div style="margin-top: 0.35rem;">{{ $saveError }}</div>
                     </div>
-                @enderror
+                @endif
+                @if($errors->any() && !$saveError)
+                    <div class="tx-error" style="margin: 0 1.75rem 1.5rem; padding: 0.85rem 1.1rem; border: 1px solid var(--tx-danger); border-radius: 12px; background: var(--tx-accent-soft);">
+                        <ul style="margin: 0; padding-left: 1rem;">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
                 {{-- SECTION 1: Taxonomy --}}
                 <div class="tx-card lvl-1" id="taxonomy-section">
                     <div class="tx-card-head">

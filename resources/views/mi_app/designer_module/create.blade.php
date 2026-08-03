@@ -791,7 +791,7 @@ function addImageLink(){
     type="url"
     name="image_links[]"
     placeholder="https://example.com/image.jpg"
-    class="border rounded-lg w-full mb-2">
+    class="tx-field mb-2">
     `;
 
 }

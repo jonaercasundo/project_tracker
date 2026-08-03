@@ -718,11 +718,21 @@
                                             </span>
                                         </td>
                                         <td class="tx-actions">
-                                            <a href="{{ route('sub-categories.edit', $subCategory->id) }}" class="tx-btn tx-btn-edit" title="Edit">Edit</a>
-                                            <form action="{{ route('sub-categories.archive', $subCategory->id) }}" method="POST" class="tx-inline-form" onsubmit="return confirm('Archive this sub category?');">
+                                            <a href="{{ route('taxonomy.edit', ['type' => 'product_type', 'product' => $productType->id]) }}"
+                                            class="tx-btn tx-btn-edit">
+                                                Edit
+                                            </a>
+
+                                            <form action="{{ route('taxonomy.destroy', ['type' => 'product_type', 'product' => $productType->id]) }}"
+                                                method="POST"
+                                                class="tx-inline-form"
+                                                onsubmit="return confirm('Archive this Product Type?');">
                                                 @csrf
-                                                @method('PATCH')
-                                                <button type="submit" class="tx-btn tx-btn-archive" title="Archive">Archive</button>
+                                                @method('DELETE')
+
+                                                <button type="submit" class="tx-btn tx-btn-archive">
+                                                    Archive
+                                                </button>
                                             </form>
                                         </td>
                                     </tr>

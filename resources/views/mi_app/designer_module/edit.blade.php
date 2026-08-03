@@ -718,6 +718,30 @@
     </script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            var materialsSelect = document.getElementById('materials');
+            if (materialsSelect) {
+                new TomSelect(materialsSelect, {
+                    plugins: ['remove_button'],
+                    create: false,
+                    maxItems: 100,
+                    hideSelected: true,
+                    closeAfterSelect: false,
+                    placeholder: 'Select one or more materials...'
+                });
+            }
+
+            var colorSelect = document.getElementById('color');
+            if (colorSelect) {
+                new TomSelect(colorSelect, {
+                    plugins: ['remove_button'],
+                    create: false,
+                    maxItems: 100,
+                    hideSelected: true,
+                    closeAfterSelect: false,
+                    placeholder: 'Select one or more colors...'
+                });
+            }
+
             document.querySelectorAll('select.tx-multi-select').forEach(function (select) {
                 var wrapper = select.closest('.tx-multi-select-wrap');
                 if (!wrapper) return;
@@ -763,6 +787,11 @@
                 select.addEventListener('change', function () {
                     window.setTimeout(updateChips, 0);
                 });
+                if (select.tomselect) {
+                    select.tomselect.on('item_add item_remove', function () {
+                        window.setTimeout(updateChips, 0);
+                    });
+                }
                 if (clearButton) {
                     clearButton.addEventListener('click', function (event) {
                         event.preventDefault();

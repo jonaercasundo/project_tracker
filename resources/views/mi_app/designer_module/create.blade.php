@@ -842,29 +842,35 @@ function addImageLink(){
 
 }
 document.addEventListener('DOMContentLoaded', function () {
-    new TomSelect('#color', {
-        plugins: ['remove_button'],
-        maxItems: null,
-        create: false,
-        closeAfterSelect: false,
-        hideSelected: true,
-        placeholder: 'Select one or more colors...'
-    });
-    new TomSelect('#materials', {
-        plugins: ['remove_button'],
-        create: false,
-        maxItems: null,
-        hideSelected: true,
-        closeAfterSelect: false,
-        placeholder: 'Select one or more materials...',
-        searchField: ['text'],
-        render: {
-            no_results: function(data, escape) {
-                return '<div class="no-results">No material found</div>';
-            }
-        }
-    });
+    var colorSelect = document.getElementById('color');
+    if (colorSelect) {
+        new TomSelect(colorSelect, {
+            plugins: ['remove_button'],
+            maxItems: 100,
+            create: false,
+            closeAfterSelect: false,
+            hideSelected: true,
+            placeholder: 'Select one or more colors...'
+        });
+    }
 
+    var materialsSelect = document.getElementById('materials');
+    if (materialsSelect) {
+        new TomSelect(materialsSelect, {
+            plugins: ['remove_button'],
+            create: false,
+            maxItems: 100,
+            hideSelected: true,
+            closeAfterSelect: false,
+            placeholder: 'Select one or more materials...',
+            searchField: ['text'],
+            render: {
+                no_results: function(data, escape) {
+                    return '<div class="no-results">No material found</div>';
+                }
+            }
+        });
+    }
 });
 </script>
     <script>
@@ -999,6 +1005,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 select.addEventListener('change', function () {
                     window.setTimeout(updateChips, 0);
                 });
+                if (select.tomselect) {
+                    select.tomselect.on('item_add item_remove', function () {
+                        window.setTimeout(updateChips, 0);
+                    });
+                }
                 if (clearButton) {
                     clearButton.addEventListener('click', function (event) {
                         event.preventDefault();

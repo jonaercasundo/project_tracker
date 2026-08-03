@@ -359,8 +359,12 @@ public function dashboard()
             // Cost
             'purchase_cost' => 'nullable|numeric',
 
-            // File
+            // Media
             'product_file' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
+            'product_images' => 'nullable|array',
+            'product_images.*' => 'file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
+            'image_links' => 'nullable|array',
+            'image_links.*' => 'nullable|url|max:1000',
         ]);
 
         // Save arrays as JSON

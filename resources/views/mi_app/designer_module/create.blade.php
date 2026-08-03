@@ -697,10 +697,22 @@
                         <div>
                             <label for="image_link" class="tx-label">Product Image Link</label>
                             <p class="tx-hint">Provide a direct URL to the product image</p>
-                            <input type="url" id="image_link" name="image_links[]" value="{{ old('image_link') }}" placeholder="https://example.com/image.jpg" class="tx-field">
-                            @error('image_link') <p class="tx-error">{{ $message }}</p> @enderror
-                            <button type="button"
-                                onclick="addImageLink()">
+                            <div id="imageLinks">
+                                @php
+                                    $imageLinks = old('image_links', []);
+                                @endphp
+                                @if (is_array($imageLinks) && count($imageLinks))
+                                    @foreach ($imageLinks as $link)
+                                        <input type="url" name="image_links[]" value="{{ $link }}" placeholder="https://example.com/image.jpg" class="tx-field mb-2">
+                                    @endforeach
+                                @else
+                                    <input type="url" name="image_links[]" value="{{ old('image_links.0') }}" placeholder="https://example.com/image.jpg" class="tx-field">
+                                @endif
+                            </div>
+                            @if ($errors->has('image_links') || $errors->has('image_links.*'))
+                                <p class="tx-error">{{ $errors->first('image_links.*') ?? $errors->first('image_links') }}</p>
+                            @endif
+                            <button type="button" onclick="addImageLink()" class="tx-btn-ghost">
                                 + Add Another Link
                             </button>
                         </div>
@@ -739,9 +751,11 @@
                                     </div>
                                 </div>
 
-                                <input type="file" id="product_file" name="product_images[]" accept="image/*" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" style="position:absolute; inset:0; width:100%; height:100%; cursor:pointer; opacity:0;">
+                                <input type="file" id="product_file" name="product_images[]" accept="image/*" multiple class="absolute inset-0 h-full w-full cursor-pointer opacity-0" style="position:absolute; inset:0; width:100%; height:100%; cursor:pointer; opacity:0;">
                             </div>
-                            @error('product_file') <p class="tx-error">{{ $message }}</p> @enderror
+                            @if ($errors->has('product_images') || $errors->has('product_images.*'))
+                                <p class="tx-error">{{ $errors->first('product_images.*') ?? $errors->first('product_images') }}</p>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -766,6 +780,7 @@
 
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
 <script>
 function addImageLink(){
 
@@ -999,5 +1014,4 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         })();
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
 </x-mi_app>

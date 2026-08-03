@@ -647,139 +647,92 @@ public function dashboard()
         return view('mi_app.designer_module.show', compact('product'));
     }
 
-public function taxonomy_edit($id)
+public function taxonomy_edit($type, $id)
 {
-    $category = MI_Category::find($id);
-
-    if ($category) {
-        return view('mi_app.taxonomy.edit', [
-            'entityType' => 'category',
-            'item' => $category,
-            'categories' => MI_Category::all(),
-            'subCategories' => MI_SubCategory::all(),
-            'productTypes' => MI_ProductType::all(),
-        ]);
+    switch ($type) {
+        case 'category':
+            $item = MI_Category::findOrFail($id);
+            break;
+        case 'sub_category':
+            $item = MI_SubCategory::findOrFail($id);
+            break;
+        case 'product_type':
+            $item = MI_ProductType::findOrFail($id);
+            break;
+        case 'collection':
+            $item = MI_Collection::findOrFail($id);
+            break;
+        default:
+            abort(404, 'Invalid taxonomy type.');
     }
 
-    $subCategory = MI_SubCategory::find($id);
-
-    if ($subCategory) {
-        return view('mi_app.taxonomy.edit', [
-            'entityType' => 'sub_category',
-            'item' => $subCategory,
-            'categories' => MI_Category::all(),
-            'subCategories' => MI_SubCategory::all(),
-            'productTypes' => MI_ProductType::all(),
-        ]);
-    }
-
-    $productType = MI_ProductType::find($id);
-
-    if ($productType) {
-        return view('mi_app.taxonomy.edit', [
-            'entityType' => 'product_type',
-            'item' => $productType,
-            'categories' => MI_Category::all(),
-            'subCategories' => MI_SubCategory::all(),
-            'productTypes' => MI_ProductType::all(),
-        ]);
-    }
-
-    $collection = MI_Collection::find($id);
-
-    if ($collection) {
-        return view('mi_app.taxonomy.edit', [
-            'entityType' => 'collection',
-            'item' => $collection,
-            'categories' => MI_Category::all(),
-            'subCategories' => MI_SubCategory::all(),
-            'productTypes' => MI_ProductType::all(),
-        ]);
-    }
-
-    abort(404);
+    return view('mi_app.designer_module.taxonomy_edit', compact('item', 'type'));
 }
 
-public function taxonomy_update(Request $request, $id)
+public function taxonomy_update(Request $request, $type, $id)
+{
+    switch ($type) {
+        case 'category':
+            $item = MI_Category::findOrFail($id);
+            $request->validate([
+                'name' => 'required|string|max:255|unique:mi_categories,name,' . $item->id,
+            ]);
+            break;
+        case 'sub_category':
+            $item = MI_SubCategory::findOrFail($id);
+            $request->validate([
+                'name' => 'required|string|max:255|unique:mi_sub_categories,name,' . $item->id,
+            ]);
+            break;
+        case 'product_type':
+            $item = MI_ProductType::findOrFail($id);
+            $request->validate([
+                'name' => 'required|string|max:255|unique:mi_product_types,name,' . $item->id,
+            ]);
+            break;
+        case 'collection':
+            $item = MI_Collection::findOrFail($id);
+            $request->validate([
+                'name' => 'required|string|max:255|unique:mi_collections,name,' . $item->id,
+            ]);
+            break;
+        default:
+            abort(404, 'Invalid taxonomy type.');
+    }
+
+    $item->update($request->only('name', 'description'));
+
+    return redirect()
+        ->route('mi_app.settings')
+        ->with('success', ucfirst(str_replace('_', ' ', $type)) . ' updated successfully.');
+}
+public function taxonomy_destroy(Request $request, $id)
 {
     switch ($request->entity_type) {
 
         case 'category':
             $item = MI_Category::findOrFail($id);
-
-            $request->validate([
-                'name' => 'required|string|max:255',
-            ]);
-
-            $item->update([
-                'name' => $request->name,
-            ]);
+            $item->delete();
             break;
 
         case 'sub_category':
             $item = MI_SubCategory::findOrFail($id);
-
-            $request->validate([
-                'category_id' => 'required|exists:mi_categories,id',
-                'name' => 'required|string|max:255',
-            ]);
-
-            $item->update([
-                'category_id' => $request->category_id,
-                'name' => $request->name,
-            ]);
+            $item->delete();
             break;
 
         case 'product_type':
             $item = MI_ProductType::findOrFail($id);
-
-            $request->validate([
-                'sub_category_id' => 'required|exists:mi_sub_categories,id',
-                'name' => 'required|string|max:255',
-            ]);
-
-            $item->update([
-                'sub_category_id' => $request->sub_category_id,
-                'name' => $request->name,
-            ]);
+            $item->delete();
             break;
 
         case 'collection':
             $item = MI_Collection::findOrFail($id);
-
-            $request->validate([
-                'product_type_id' => 'required|exists:mi_product_types,id',
-                'name' => 'required|string|max:255',
-            ]);
-
-            $item->update([
-                'product_type_id' => $request->product_type_id,
-                'name' => $request->name,
-            ]);
+            $item->delete();
             break;
     }
 
     return redirect()
-        ->route('mi_app.index')
-        ->with('success', 'Taxonomy updated successfully.');
-}
-
-public function taxonomy_destroy($id)
-{
-    if ($item = MI_Collection::find($id)) {
-        $item->delete();
-    } elseif ($item = MI_ProductType::find($id)) {
-        $item->delete();
-    } elseif ($item = MI_SubCategory::find($id)) {
-        $item->delete();
-    } elseif ($item = MI_Category::find($id)) {
-        $item->delete();
-    } else {
-        abort(404);
-    }
-
-    return redirect()
-        ->route('mi_app.index')
-        ->with('success', 'Taxonomy archived successfully.');
+        ->route('mi_app.settings')
+        ->with('success', 'Taxonomy deleted successfully.');
 }
 }

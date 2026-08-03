@@ -72,15 +72,22 @@
                 });
 
                 lotSelect.addEventListener('change', function () {
-
                     const lotId = this.value;
 
                     const itemsTable = document.getElementById('itemsTable');
                     const itemsSection = document.getElementById('itemsSection');
                     const saveSection = document.getElementById('saveSection');
                     const deliveryInfo = document.getElementById('deliveryInfo');
+                    const infoProject = document.getElementById('info_project');
+                    const infoLot = document.getElementById('info_lot');
+                    const infoSchool = document.getElementById('info_school');
+                    const infoDate = document.getElementById('info_date');
 
                     itemsTable.innerHTML = '';
+                    infoProject.textContent = '';
+                    infoLot.textContent = '';
+                    infoSchool.textContent = '';
+                    infoDate.textContent = '';
 
                     itemsSection.classList.add('hidden');
                     saveSection.classList.add('hidden');
@@ -90,28 +97,54 @@
                         return;
                     }
 
-fetch(`{{ route('warehouse.stock-in.items') }}?lot_id=${lotId}`)
-    .then(async response => {
+                    fetch(`{{ route('warehouse.stock-in.items') }}?lot_id=${lotId}`)
+                        .then(async response => {
+                            const text = await response.text();
+                            if (!response.ok) {
+                                throw new Error(text || 'Unable to load delivery items.');
+                            }
 
-        console.log("Status:", response.status);
+                            try {
+                                return JSON.parse(text);
+                            } catch (error) {
+                                throw new Error('Invalid response from server.');
+                            }
+                        })
+                        .then(data => {
+                            const items = Array.isArray(data.items) ? data.items : [];
 
-        const text = await response.text();
-        console.log(text);
+                            infoProject.textContent = data.project || '';
+                            infoLot.textContent = data.lot || '';
+                            infoSchool.textContent = data.school || '';
+                            infoDate.textContent = data.delivery_date || '';
 
-        if (!response.ok) {
-            throw new Error(text);
-        }
-
-        return JSON.parse(text);
-
-    })
-    .then(data => {
-        console.log(data);
-    })
-    .catch(error => {
-        console.error(error);
-    });
-
+                            if (items.length) {
+                                itemsTable.innerHTML = items.map(item => `
+                                    <tr class="border-t border-slate-100">
+                                        <td class="px-4 py-3 font-medium text-slate-800">${item.item_name || 'Unnamed Item'}</td>
+                                        <td class="px-4 py-3 text-center text-slate-600">${item.qty || 0}</td>
+                                        <td class="px-4 py-3 text-center">
+                                            <input type="number" min="0" value="0" class="w-24 rounded-xl border border-slate-300 px-3 py-2 text-center text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">
+                                            <input type="text" placeholder="Remarks" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
+                                        </td>
+                                    </tr>
+                                `).join('');
+                                itemsSection.classList.remove('hidden');
+                                saveSection.classList.remove('hidden');
+                                deliveryInfo.classList.remove('hidden');
+                            } else {
+                                itemsTable.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-sm text-slate-500">No delivery items found for this lot.</td></tr>';
+                                itemsSection.classList.remove('hidden');
+                                deliveryInfo.classList.remove('hidden');
+                            }
+                        })
+                        .catch(error => {
+                            console.error(error);
+                            itemsTable.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-sm text-red-600">Unable to load delivery items.</td></tr>';
+                            itemsSection.classList.remove('hidden');
+                        });
                 });
             });
         </script>

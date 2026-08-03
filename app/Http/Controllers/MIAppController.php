@@ -653,20 +653,30 @@ public function taxonomy_edit($type, $id)
         case 'category':
             $item = MI_Category::findOrFail($id);
             break;
+
         case 'sub_category':
             $item = MI_SubCategory::findOrFail($id);
             break;
+
         case 'product_type':
             $item = MI_ProductType::findOrFail($id);
             break;
+
         case 'collection':
             $item = MI_Collection::findOrFail($id);
             break;
+
         default:
             abort(404, 'Invalid taxonomy type.');
     }
 
-    return view('mi_app.designer_module.taxonomy_edit', compact('item', 'type'));
+    return view('mi_app.designer_module.taxonomy_edit', [
+        'item' => $item,
+        'entityType' => $type,
+        'categories' => MI_Category::all(),
+        'subCategories' => MI_SubCategory::all(),
+        'productTypes' => MI_ProductType::all(),
+    ]);
 }
 
 public function taxonomy_update(Request $request, $type, $id)

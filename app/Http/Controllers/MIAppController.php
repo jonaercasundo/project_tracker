@@ -567,10 +567,20 @@ public function dashboard()
         $product = MI_Product::findOrFail($id);
 
         try {
+            if ($request->has('image_links')) {
+                $request->merge([
+                    'image_links' => array_values(array_filter($request->input('image_links', []), function ($value) {
+                        return trim((string) $value) !== '';
+                    })),
+                ]);
+            }
+
             $validated = $request->validate([
                 'item_name'      => 'required|string|max:255',
-                'category'       => 'required|string|max:255',
-                'collection'     => 'nullable|string|max:255',
+                'category_id'    => 'required|integer|exists:mi_categories,id',
+                'sub_category_id' => 'nullable|integer|exists:mi_sub_categories,id',
+                'product_type_id' => 'nullable|integer|exists:mi_product_types,id',
+                'collection_id'  => 'nullable|integer|exists:mi_collections,id',
                 'type_of_sample' => 'required|string|max:255',
                 'classification' => 'required|string|max:255',
                 'designed_by'    => 'nullable|string|max:255',
@@ -591,14 +601,13 @@ public function dashboard()
                 'product_images.*' => 'file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
             ]);
 
-            if ($request->has('image_links')) {
-                $request->merge([
-                    'image_links' => array_values(array_filter($request->input('image_links', []), function ($value) {
-                        return trim((string) $value) !== '';
-                    })),
-                ]);
-            }
+            $materials = array_values(array_filter(array_map(function ($value) {
+                return trim((string) $value);
+            }, preg_split('/[\n,;]+/', (string) $request->input('materials', ''))), function ($value) {
+                return $value !== '';
+            }));
 
+            $validated['materials'] = $materials;
             $validated['image_links'] = $request->input('image_links', []);
 
             $product->update($validated);

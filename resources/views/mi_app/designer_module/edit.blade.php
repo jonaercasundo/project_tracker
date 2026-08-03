@@ -226,7 +226,8 @@
                                 <span class="tx-lvl-dot" style="background: var(--tx-lvl-1);"></span>Category
                             </label>
                             <div class="tx-select-wrap">
-                                <select name="category_id" id="category_id" data-cascade-target="sub_category_id" class="tx-field">
+                                <select name="category_id" id="category_id" data-cascade-target="sub_category_id" class="tx-field" required>
+                                    <option value="">-- Select Category --</option>
                                     @foreach($categories as $category)
                                         <option value="{{ $category->id }}" {{ $product->category_id == $category->id ? 'selected' : '' }}>
                                             {{ $category->code }} - {{ $category->name }}
@@ -312,12 +313,22 @@
                     <div class="tx-card-body cols-2">
                         <div style="grid-column: 1 / -1;">
                             <label for="item_name" class="tx-label">Item Name</label>
-                            <input type="text" id="item_name" name="item_name" value="{{ old('item_name', $product->item_name) }}" class="tx-field">
+                            <input type="text" id="item_name" name="item_name" value="{{ old('item_name', $product->item_name) }}" class="tx-field" required>
+                        </div>
+
+                        <div>
+                            <label for="classification" class="tx-label">Classification</label>
+                            <input type="text" id="classification" name="classification" value="{{ old('classification', $product->classification) }}" class="tx-field" required>
                         </div>
 
                         <div>
                             <label for="type_of_sample" class="tx-label">Type of Sample</label>
-                            <input type="text" id="type_of_sample" name="type_of_sample" value="{{ old('type_of_sample', $product->type_of_sample) }}" class="tx-field">
+                            <input type="text" id="type_of_sample" name="type_of_sample" value="{{ old('type_of_sample', $product->type_of_sample) }}" class="tx-field" required>
+                        </div>
+
+                        <div>
+                            <label for="materials" class="tx-label">Materials</label>
+                            <input type="text" id="materials" name="materials" value="{{ old('materials', is_array($product->materials) ? implode($product->materials, ', ') : $product->materials) }}" class="tx-field" placeholder="e.g. Oak, Walnut" required>
                         </div>
 
                         <div>

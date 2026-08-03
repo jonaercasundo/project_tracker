@@ -115,7 +115,7 @@
                             Connected
                         </span>
                         <span class="tx-status-sep">•</span>
-                        <span class="tx-status-synced">Synced: <time class="tx-mono">Just now</time></span>
+                        <span class="tx-status-synced">Synced : <time class="tx-mono">Just now</time></span>
                     </div>
                 </div>
 

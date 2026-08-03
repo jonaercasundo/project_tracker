@@ -523,9 +523,7 @@ public function dashboard()
                         'input' => $request->except('product_images'),
                     ]);
 
-                    $errorMessage = app()->environment('production')
-                        ? 'Something went wrong while saving the product. Please try again or contact support.'
-                        : $e->getMessage();
+                    $errorMessage = $e->getMessage() ?: 'Something went wrong while saving the product. Please try again or contact support.';
 
                     return back()
                         ->withInput()

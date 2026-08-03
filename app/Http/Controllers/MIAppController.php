@@ -12,7 +12,7 @@ use App\Models\MI_Collection;
 use App\Models\MI_Material;
 use App\Models\MI_Product_Image;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\log;
+use Illuminate\Support\Facades\Log;
 
 class MIAppController extends Controller
 {

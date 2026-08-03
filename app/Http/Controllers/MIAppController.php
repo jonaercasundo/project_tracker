@@ -221,7 +221,10 @@ public function dashboard()
 
                     MI_ProductType::create([
                         'sub_category_id' => $request->sub_category_id,
-                        'code'            => strtoupper(substr($request->product_type_name, 0, 3)),
+                        'code' => $this->generateUniqueCode(
+                            MI_ProductType::class,
+                            $request->product_type_name
+                        ),
                         'name'            => $request->product_type_name,
                         'description'     => $request->description,
                         'is_active'       => true,

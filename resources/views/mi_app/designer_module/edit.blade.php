@@ -2,6 +2,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css" rel="stylesheet">
 
     <style>
         .tx-console {
@@ -708,8 +709,34 @@
             updateTaxonomyPreview();
         })();
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            var materialsSelect = document.getElementById('materials');
+            var colorSelect = document.getElementById('color');
+
+            if (materialsSelect) {
+                new TomSelect(materialsSelect, {
+                    plugins: ['remove_button'],
+                    create: false,
+                    maxItems: null,
+                    hideSelected: true,
+                    closeAfterSelect: false,
+                    placeholder: 'Select one or more materials...'
+                });
+            }
+
+            if (colorSelect) {
+                new TomSelect(colorSelect, {
+                    plugins: ['remove_button'],
+                    create: false,
+                    maxItems: null,
+                    hideSelected: true,
+                    closeAfterSelect: false,
+                    placeholder: 'Select one or more colors...'
+                });
+            }
+
             document.querySelectorAll('select.tx-multi-select').forEach(function (select) {
                 var wrapper = select.closest('.tx-multi-select-wrap');
                 if (!wrapper) return;

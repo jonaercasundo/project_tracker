@@ -90,69 +90,11 @@
                         return;
                     }
 
-                    fetch(`{{ route('warehouse.stock-in.items') }}?lot_id=${lotId}`)
-                        .then(response => response.json())
-                        .then(data => {
-
-                            // Delivery Information
-                            document.getElementById('info_project').textContent = data.project;
-                            document.getElementById('info_lot').textContent = data.lot;
-                            document.getElementById('info_school').textContent = data.school;
-                            document.getElementById('info_date').textContent = data.delivery_date;
-
-                            deliveryInfo.classList.remove('hidden');
-
-                            if (data.items.length === 0) {
-
-                                itemsTable.innerHTML = `
-                                    <tr>
-                                        <td colspan="4" class="px-4 py-6 text-center text-slate-500">
-                                            No items found.
-                                        </td>
-                                    </tr>
-                                `;
-
-                            } else {
-
-                                data.items.forEach(item => {
-
-                                    itemsTable.innerHTML += `
-                                        <tr class="border-t">
-
-                                            <td class="px-4 py-3 font-medium">
-                                                ${item.item_name}
-                                            </td>
-
-                                            <td class="px-4 py-3 text-center">
-                                                ${item.qty}
-                                            </td>
-
-                                            <td class="px-4 py-3 text-center">
-                                                <input
-                                                    type="number"
-                                                    value="${item.qty}"
-                                                    min="0"
-                                                    class="w-24 rounded-xl border border-slate-300 px-3 py-2 text-center">
-                                            </td>
-
-                                            <td class="px-4 py-3">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Remarks"
-                                                    class="w-full rounded-xl border border-slate-300 px-3 py-2">
-                                            </td>
-
-                                        </tr>
-                                    `;
-
-                                });
-
-                            }
-
-                            itemsSection.classList.remove('hidden');
-                            saveSection.classList.remove('hidden');
-
-                        });
+fetch(`{{ route('warehouse.stock-in.items') }}?lot_id=${lotId}`)
+    .then(response => response.text())
+    .then(data => {
+        console.log(data);
+    });
 
                 });
             });

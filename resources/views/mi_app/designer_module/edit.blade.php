@@ -740,12 +740,16 @@
 
                         chip.querySelector('button').addEventListener('click', function (event) {
                             event.preventDefault();
-                            Array.from(select.options).forEach(function (option) {
-                                if (option.value === value) {
-                                    option.selected = false;
-                                }
-                            });
-                            updateChips();
+                            if (select.tomselect) {
+                                select.tomselect.removeItem(value);
+                            } else {
+                                Array.from(select.options).forEach(function (option) {
+                                    if (option.value === value) {
+                                        option.selected = false;
+                                    }
+                                });
+                            }
+                            window.setTimeout(updateChips, 0);
                         });
 
                         chips.appendChild(chip);
@@ -756,14 +760,20 @@
                     }
                 }
 
-                select.addEventListener('change', updateChips);
+                select.addEventListener('change', function () {
+                    window.setTimeout(updateChips, 0);
+                });
                 if (clearButton) {
                     clearButton.addEventListener('click', function (event) {
                         event.preventDefault();
-                        Array.from(select.options).forEach(function (option) {
-                            option.selected = false;
-                        });
-                        updateChips();
+                        if (select.tomselect) {
+                            select.tomselect.clear();
+                        } else {
+                            Array.from(select.options).forEach(function (option) {
+                                option.selected = false;
+                            });
+                        }
+                        window.setTimeout(updateChips, 0);
                     });
                 }
 

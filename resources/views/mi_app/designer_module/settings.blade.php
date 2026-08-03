@@ -749,14 +749,24 @@
                                                     <span class="node">{{ $productType->name }}</span>
                                                 </span>
                                             </td>
-                                            <td class="tx-actions">
-                                                <a href="{{ route('product-types.edit', $productType->id) }}" class="tx-btn tx-btn-edit" title="Edit">Edit</a>
-                                                <form action="{{ route('product-types.archive', $productType->id) }}" method="POST" class="tx-inline-form" onsubmit="return confirm('Archive this product type?');">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <button type="submit" class="tx-btn tx-btn-archive" title="Archive">Archive</button>
-                                                </form>
-                                            </td>
+<td class="tx-actions">
+    <a href="{{ route('taxonomy.edit', ['type' => 'product_type', 'product' => $productType->id]) }}"
+       class="tx-btn tx-btn-edit">
+        Edit
+    </a>
+
+    <form action="{{ route('taxonomy.destroy', ['type' => 'product_type', 'product' => $productType->id]) }}"
+          method="POST"
+          class="tx-inline-form"
+          onsubmit="return confirm('Archive this Product Type?');">
+        @csrf
+        @method('DELETE')
+
+        <button type="submit" class="tx-btn tx-btn-archive">
+            Archive
+        </button>
+    </form>
+</td>
                                         </tr>
                                     @endif
 

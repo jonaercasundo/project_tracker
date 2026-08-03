@@ -418,4 +418,13 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/mi/{product}', [MIAppController::class, 'destroy'])
         ->name('mi_app.destroy');
+       
+    Route::get('/taxonomy/{type}/{product}/edit', [MIAppController::class, 'taxonomy_edit'])
+        ->name('taxonomy.edit');
+
+    Route::put('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_update'])
+        ->name('taxonomy.update');
+
+    Route::delete('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_destroy'])
+        ->name('taxonomy.destroy');
 require __DIR__.'/auth.php';

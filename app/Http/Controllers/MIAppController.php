@@ -646,4 +646,140 @@ public function dashboard()
 
         return view('mi_app.designer_module.show', compact('product'));
     }
+
+public function taxonomy_edit($id)
+{
+    $category = MI_Category::find($id);
+
+    if ($category) {
+        return view('mi_app.taxonomy.edit', [
+            'entityType' => 'category',
+            'item' => $category,
+            'categories' => MI_Category::all(),
+            'subCategories' => MI_SubCategory::all(),
+            'productTypes' => MI_ProductType::all(),
+        ]);
+    }
+
+    $subCategory = MI_SubCategory::find($id);
+
+    if ($subCategory) {
+        return view('mi_app.taxonomy.edit', [
+            'entityType' => 'sub_category',
+            'item' => $subCategory,
+            'categories' => MI_Category::all(),
+            'subCategories' => MI_SubCategory::all(),
+            'productTypes' => MI_ProductType::all(),
+        ]);
+    }
+
+    $productType = MI_ProductType::find($id);
+
+    if ($productType) {
+        return view('mi_app.taxonomy.edit', [
+            'entityType' => 'product_type',
+            'item' => $productType,
+            'categories' => MI_Category::all(),
+            'subCategories' => MI_SubCategory::all(),
+            'productTypes' => MI_ProductType::all(),
+        ]);
+    }
+
+    $collection = MI_Collection::find($id);
+
+    if ($collection) {
+        return view('mi_app.taxonomy.edit', [
+            'entityType' => 'collection',
+            'item' => $collection,
+            'categories' => MI_Category::all(),
+            'subCategories' => MI_SubCategory::all(),
+            'productTypes' => MI_ProductType::all(),
+        ]);
+    }
+
+    abort(404);
+}
+
+public function taxonomy_update(Request $request, $id)
+{
+    switch ($request->entity_type) {
+
+        case 'category':
+            $item = MI_Category::findOrFail($id);
+
+            $request->validate([
+                'name' => 'required|string|max:255',
+            ]);
+
+            $item->update([
+                'name' => $request->name,
+            ]);
+            break;
+
+        case 'sub_category':
+            $item = MI_SubCategory::findOrFail($id);
+
+            $request->validate([
+                'category_id' => 'required|exists:mi_categories,id',
+                'name' => 'required|string|max:255',
+            ]);
+
+            $item->update([
+                'category_id' => $request->category_id,
+                'name' => $request->name,
+            ]);
+            break;
+
+        case 'product_type':
+            $item = MI_ProductType::findOrFail($id);
+
+            $request->validate([
+                'sub_category_id' => 'required|exists:mi_sub_categories,id',
+                'name' => 'required|string|max:255',
+            ]);
+
+            $item->update([
+                'sub_category_id' => $request->sub_category_id,
+                'name' => $request->name,
+            ]);
+            break;
+
+        case 'collection':
+            $item = MI_Collection::findOrFail($id);
+
+            $request->validate([
+                'product_type_id' => 'required|exists:mi_product_types,id',
+                'name' => 'required|string|max:255',
+            ]);
+
+            $item->update([
+                'product_type_id' => $request->product_type_id,
+                'name' => $request->name,
+            ]);
+            break;
+    }
+
+    return redirect()
+        ->route('mi_app.index')
+        ->with('success', 'Taxonomy updated successfully.');
+}
+
+public function taxonomy_destroy($id)
+{
+    if ($item = MI_Collection::find($id)) {
+        $item->delete();
+    } elseif ($item = MI_ProductType::find($id)) {
+        $item->delete();
+    } elseif ($item = MI_SubCategory::find($id)) {
+        $item->delete();
+    } elseif ($item = MI_Category::find($id)) {
+        $item->delete();
+    } else {
+        abort(404);
+    }
+
+    return redirect()
+        ->route('mi_app.index')
+        ->with('success', 'Taxonomy archived successfully.');
+}
 }

@@ -8,7 +8,7 @@
                         Warehouse Receipt
                     </div>
                     <h1 class="mt-3 text-2xl font-bold tracking-tight text-slate-900">📥 Stock In</h1>
-                    <p class="mt-2 text-sm text-slate-500">Receive inventory into the warehouse using the approved delivery receipt details.</p>
+                    <p class="mt-2 text-sm text-slate-500">Receive inventory into the warehouse using the approved details.</p>
                 </div>
 
                 <a href="{{ route('warehouse.dashboard') }}" class="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">
@@ -20,7 +20,7 @@
         <div class="rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/60">
             <div class="border-b border-slate-200 px-6 py-4">
                 <h2 class="text-lg font-semibold text-slate-900">Stock In Information</h2>
-                <p class="mt-1 text-sm text-slate-500">Select the project, lot, and delivery receipt to begin receiving inventory.</p>
+                <p class="mt-1 text-sm text-slate-500">Select the project, lot to begin receiving inventory.</p>
             </div>
 
             <div class="grid gap-6 p-6 md:grid-cols-3">
@@ -72,51 +72,88 @@
                 });
 
                 lotSelect.addEventListener('change', function () {
+
                     const lotId = this.value;
-                    const deliveryId = this.value;
+
                     const itemsTable = document.getElementById('itemsTable');
                     const itemsSection = document.getElementById('itemsSection');
                     const saveSection = document.getElementById('saveSection');
+                    const deliveryInfo = document.getElementById('deliveryInfo');
 
                     itemsTable.innerHTML = '';
+
                     itemsSection.classList.add('hidden');
                     saveSection.classList.add('hidden');
+                    deliveryInfo.classList.add('hidden');
 
-                    if (!deliveryId) {
-                        return;
-                    }
-
-                    fetch(`{{ route('warehouse.stock-in.items') }}?delivery_id=${deliveryId}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (!data.length) {
-                                itemsTable.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-sm text-slate-500">No items found for this delivery.</td></tr>';
-                                itemsSection.classList.remove('hidden');
-                                return;
-                            }
-
-                            data.forEach((item, index) => {
-                                const row = document.createElement('tr');
-                                row.className = 'border-t border-slate-200';
-                                row.innerHTML = `
-                                    <td class="px-4 py-3 font-medium text-slate-800">${item.item_name}</td>
-                                    <td class="px-4 py-3 text-center text-slate-600">${item.qty}</td>
-                                    <td class="px-4 py-3 text-center">
-                                        <input type="number" min="0" value="${item.qty}" class="w-24 rounded-xl border border-slate-300 px-3 py-2 text-center text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
-                                    </td>
-                                    <td class="px-4 py-3 text-slate-600">
-                                        <input type="text" placeholder="Remarks" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
-                                    </td>
-                                `;
-                                itemsTable.appendChild(row);
-                            });
-
-                            itemsSection.classList.remove('hidden');
-                            saveSection.classList.remove('hidden');
-                        });
                     if (!lotId) {
                         return;
                     }
+
+                    fetch(`{{ route('warehouse.stock-in.items') }}?lot_id=${lotId}`)
+                        .then(response => response.json())
+                        .then(data => {
+
+                            // Delivery Information
+                            document.getElementById('info_project').textContent = data.project;
+                            document.getElementById('info_lot').textContent = data.lot;
+                            document.getElementById('info_school').textContent = data.school;
+                            document.getElementById('info_date').textContent = data.delivery_date;
+
+                            deliveryInfo.classList.remove('hidden');
+
+                            if (data.items.length === 0) {
+
+                                itemsTable.innerHTML = `
+                                    <tr>
+                                        <td colspan="4" class="px-4 py-6 text-center text-slate-500">
+                                            No items found.
+                                        </td>
+                                    </tr>
+                                `;
+
+                            } else {
+
+                                data.items.forEach(item => {
+
+                                    itemsTable.innerHTML += `
+                                        <tr class="border-t">
+
+                                            <td class="px-4 py-3 font-medium">
+                                                ${item.item_name}
+                                            </td>
+
+                                            <td class="px-4 py-3 text-center">
+                                                ${item.qty}
+                                            </td>
+
+                                            <td class="px-4 py-3 text-center">
+                                                <input
+                                                    type="number"
+                                                    value="${item.qty}"
+                                                    min="0"
+                                                    class="w-24 rounded-xl border border-slate-300 px-3 py-2 text-center">
+                                            </td>
+
+                                            <td class="px-4 py-3">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Remarks"
+                                                    class="w-full rounded-xl border border-slate-300 px-3 py-2">
+                                            </td>
+
+                                        </tr>
+                                    `;
+
+                                });
+
+                            }
+
+                            itemsSection.classList.remove('hidden');
+                            saveSection.classList.remove('hidden');
+
+                        });
+
                 });
             });
         </script>

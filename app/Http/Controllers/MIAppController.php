@@ -730,8 +730,6 @@ public function taxonomy_destroy($type, $product)
             abort(404);
     }
 
-    dd($item);
-
     $item->delete();
 
     return redirect()->route('mi_app.settings')

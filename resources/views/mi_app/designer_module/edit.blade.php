@@ -423,10 +423,14 @@
                         <div>
                             <label for="materials" class="tx-label">Materials</label>
                             @php
-                                $selectedMaterials = old('materials', is_array($product->materials) ? $product->materials : []);
-                                if (!is_array($selectedMaterials)) {
-                                    $selectedMaterials = $selectedMaterials ? [$selectedMaterials] : [];
-                                }
+                            $selectedMaterials = old(
+                                'materials',
+                                is_array($product->materials)
+                                    ? $product->materials
+                                    : json_decode($product->materials ?? '[]', true)
+                            );
+
+                            $selectedMaterials = $selectedMaterials ?: [];
                             @endphp
                             <pre>
                                 Materials:
@@ -439,12 +443,16 @@
                         </div>
 
                         <div>
-                            @php
-                                $selectedColors = old('color', is_array($product->color) ? $product->color : []);
-                                if (!is_array($selectedColors)) {
-                                    $selectedColors = $selectedColors ? [$selectedColors] : [];
-                                }
-                            @endphp
+                        @php
+                        $selectedColors = old(
+                            'color',
+                            is_array($product->color)
+                                ? $product->color
+                                : json_decode($product->color ?? '[]', true)
+                        );
+
+                        $selectedColors = $selectedColors ?: [];
+                        @endphp
                             <label for="color" class="tx-label">Color</label>
                             <pre>
                                 Colors:

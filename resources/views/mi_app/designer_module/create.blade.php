@@ -719,8 +719,8 @@
 
                         {{-- File Upload Dropzone --}}
                         <div>
-                            <label class="tx-label">Upload Product Image</label>
-                            <p class="tx-hint">Drag and drop your image or click to browse</p>
+                            <label class="tx-label">Upload Product Images</label>
+                            <p class="tx-hint">Drag and drop one or more files or click to browse</p>
                             <div id="dropzone" class="tx-dropzone">
                                 {{-- Empty State --}}
                                 <div id="dropzone_empty" class="tx-dropzone-empty">
@@ -751,7 +751,7 @@
                                     </div>
                                 </div>
 
-                                <input type="file" id="product_file" name="product_images[]" accept="image/*" multiple class="absolute inset-0 h-full w-full cursor-pointer opacity-0" style="position:absolute; inset:0; width:100%; height:100%; cursor:pointer; opacity:0;">
+                                <input type="file" id="product_file" name="product_images[]" accept="image/*,.pdf,.obj,.stl" multiple class="absolute inset-0 h-full w-full cursor-pointer opacity-0" style="position:absolute; inset:0; width:100%; height:100%; cursor:pointer; opacity:0;">
                             </div>
                             @if ($errors->has('product_images') || $errors->has('product_images.*'))
                                 <p class="tx-error">{{ $errors->first('product_images.*') ?? $errors->first('product_images') }}</p>
@@ -990,9 +990,9 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             dropzone.addEventListener('drop', function (e) {
                 var dt = e.dataTransfer;
-                if (dt && dt.files && dt.files[0]) {
+                if (dt && dt.files && dt.files.length) {
                     fileInput.files = dt.files;
-                    showFile(dt.files[0]);
+                    showFiles(dt.files);
                 }
             });
 

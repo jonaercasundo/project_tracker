@@ -360,12 +360,13 @@ public function dashboard()
             'purchase_cost' => 'nullable|numeric',
 
             // Media
-            'product_file' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
             'product_images' => 'nullable|array',
             'product_images.*' => 'file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
             'image_links' => 'nullable|array',
             'image_links.*' => 'nullable|url|max:1000',
         ]);
+
+        $uploadedPaths = [];
 
         // Save arrays as JSON
         $validated['materials'] = !empty($validated['materials'])
@@ -382,62 +383,35 @@ public function dashboard()
 
         try {
 
-            // Upload file only inside the transaction attempt, so a DB failure
-            // doesn't leave an orphaned file sitting in storage.
-            if ($request->hasFile('product_file')) {
-                $validated['product_file'] = $request
-                    ->file('product_file')
-                    ->store('product_files', 'public');
-            }
-
         $product = MI_Product::create($validated);
-        if($request->image_links){
 
-            foreach($request->image_links as $index=>$url){
-
-                if(!empty($url)){
-
+        if ($request->image_links) {
+            foreach ($request->image_links as $index => $url) {
+                if (!empty($url)) {
                     MI_Product_Image::create([
-                        'product_id'=>$product->product_id,
-                        'image_type'=>'url',
-                        'image_url'=>$url,
-                        'is_primary'=>$index == 0,
-                        'sort_order'=>$index
+                        'product_id' => $product->product_id,
+                        'image_type' => 'url',
+                        'image_url' => $url,
+                        'is_primary' => $index == 0,
+                        'sort_order' => $index,
                     ]);
-
                 }
-
             }
-
         }
-        if($request->hasFile('product_images')){
-            foreach($request->file('product_images') as $index=>$file){
 
-
-                $path = $file->store(
-                    'product_images',
-                    'public'
-                );
-
+        if ($request->hasFile('product_images')) {
+            foreach ($request->file('product_images') as $index => $file) {
+                $path = $file->store('product_images', 'public');
+                $uploadedPaths[] = $path;
 
                 MI_Product_Image::create([
-
-                    'product_id'=>$product->product_id,
-
-                    'image_type'=>'upload',
-
-                    'image_path'=>$path,
-
-                    'is_primary'=>
-                        empty($request->image_links) && $index == 0,
-
-                    'sort_order'=>$index
-
+                    'product_id' => $product->product_id,
+                    'image_type' => 'upload',
+                    'image_path' => $path,
+                    'is_primary' => empty($request->image_links) && $index == 0,
+                    'sort_order' => $index,
                 ]);
-
-
             }
-
         }
         /*
         |--------------------------------------------------------------------------
@@ -445,16 +419,6 @@ public function dashboard()
         |--------------------------------------------------------------------------
         */
 
-        if (!empty($validated['image_link'])) {
-
-            if (preg_match('/\/d\/([^\/]+)/', $validated['image_link'], $matches)) {
-
-                $fileId = $matches[1];
-
-                $product->image_link =
-                    "https://drive.google.com/uc?export=view&id=".$fileId;
-            }
-        }
         /*
         |--------------------------------------------------------------------------
         | Auto Generate Draft Number
@@ -539,14 +503,15 @@ public function dashboard()
 
                     DB::rollBack();
 
-                    // Clean up the uploaded file if the DB write failed after upload
-                    if (!empty($validated['product_file'])) {
-                        Storage::disk('public')->delete($validated['product_file']);
+                    foreach ($uploadedPaths as $path) {
+                        if (!empty($path)) {
+                            Storage::disk('public')->delete($path);
+                        }
                     }
 
                     Log::error('Product save failed: ' . $e->getMessage(), [
                         'exception' => $e,
-                        'input' => $request->except('product_file'),
+                        'input' => $request->except('product_images'),
                     ]);
 
                     return back()

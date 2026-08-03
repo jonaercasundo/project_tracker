@@ -389,34 +389,43 @@
                         </div>
                     </div>
 
+                    @php
+                        $images = $product->images->map(function ($image) {
+                            return [
+                                'title' => $image->image_type === 'upload' ? 'Uploaded Image' : 'Image Link',
+                                'url' => $image->image_type === 'upload'
+                                    ? asset('storage/'.$image->image_path)
+                                    : $image->image_url,
+                            ];
+                        })->filter(function ($image) {
+                            return !empty($image['url']);
+                        })->toArray();
+
+                        if (empty($images)) {
+                            if (!empty($product->product_file)) {
+                                $images[] = [
+                                    'title' => 'Uploaded Image',
+                                    'url' => asset('storage/'.$product->product_file),
+                                ];
+                            }
+
+                            if (!empty($product->image_link)) {
+                                $images[] = [
+                                    'title' => 'Image Link',
+                                    'url' => $product->image_link,
+                                ];
+                            }
+                        }
+
+                        $count = count($images);
+                    @endphp
+
                     <span class="tx-gallery-count">
-                        @php
-                            $count = 0;
-                            if(!empty($product->product_file)) $count++;
-                            if(!empty($product->image_link)) $count++;
-                        @endphp
                         {{ $count }} Image{{ $count != 1 ? 's' : '' }}
                     </span>
                 </div>
 
                 <div class="tx-card-body">
-                    @php
-                        $images = [];
-
-                        if(!empty($product->product_file)){
-                            $images[] = [
-                                'title' => 'Uploaded Image',
-                                'url'   => asset('storage/'.$product->product_file)
-                            ];
-                        }
-
-                        if(!empty($product->image_link)){
-                            $images[] = [
-                                'title' => 'Image Link',
-                                'url'   => $product->image_link
-                            ];
-                        }
-                    @endphp
 
                     @if(count($images))
 

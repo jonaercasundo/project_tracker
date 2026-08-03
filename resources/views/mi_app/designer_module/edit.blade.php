@@ -414,8 +414,8 @@
                     <div class="tx-card-head">
                         <span class="tx-card-icon" style="background: var(--tx-accent-soft); color: var(--tx-accent);">04</span>
                         <div>
-                            <h2>Cost & Media</h2>
-                            <p>Purchase cost and product images</p>
+                            <h2>Classification & Media</h2>
+                            <p>Classification and product images</p>
                         </div>
                     </div>
                     <div class="tx-card-body cols-2">

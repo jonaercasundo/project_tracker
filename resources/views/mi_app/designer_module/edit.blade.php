@@ -167,6 +167,25 @@
                 @csrf
                 @method('PUT')
 
+                @php
+                    $saveError = $errors->first('error') ?: session('error');
+                @endphp
+                @if($saveError)
+                    <div class="tx-error" style="margin: 0 0 1.5rem; padding: 0.85rem 1.1rem; border: 1px solid var(--tx-danger); border-radius: 12px; background: var(--tx-accent-soft);">
+                        <strong>Unable to update the product.</strong>
+                        <div style="margin-top: 0.35rem;">{{ $saveError }}</div>
+                    </div>
+                @endif
+                @if($errors->any() && !$saveError)
+                    <div class="tx-error" style="margin: 0 0 1.5rem; padding: 0.85rem 1.1rem; border: 1px solid var(--tx-danger); border-radius: 12px; background: var(--tx-accent-soft);">
+                        <ul style="margin: 0; padding-left: 1rem;">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 {{-- SECTION 1: Identification --}}
                 <div class="tx-card">
                     <div class="tx-card-head">
@@ -384,23 +403,56 @@
                         <span class="tx-card-icon" style="background: var(--tx-accent-soft); color: var(--tx-accent);">04</span>
                         <div>
                             <h2>Cost & Media</h2>
-                            <p>Purchase cost and product image</p>
+                            <p>Purchase cost and product images</p>
                         </div>
                     </div>
                     <div class="tx-card-body cols-2">
                         <div>
-                            <label for="purchase_cost" class="tx-label">Purchase Cost</label>
-                            <input type="number" step="0.01" id="purchase_cost" name="purchase_cost" value="{{ old('purchase_cost', $product->purchase_cost) }}" class="tx-field">
+                            <label for="image_links" class="tx-label">Image Links</label>
+                            <p class="tx-hint">Add one or more direct image URLs.</p>
+                            <div id="imageLinks">
+                                @php
+                                    $imageLinks = old('image_links', $product->images->pluck('image_url')->filter()->values()->all());
+                                @endphp
+                                @if (is_array($imageLinks) && count($imageLinks))
+                                    @foreach ($imageLinks as $link)
+                                        <input type="url" name="image_links[]" value="{{ $link }}" placeholder="https://example.com/image.jpg" class="tx-field mb-2">
+                                    @endforeach
+                                @else
+                                    <input type="url" name="image_links[]" value="{{ old('image_links.0') }}" placeholder="https://example.com/image.jpg" class="tx-field">
+                                @endif
+                            </div>
+                            @if ($errors->has('image_links') || $errors->has('image_links.*'))
+                                <p class="tx-error">{{ $errors->first('image_links.*') ?? $errors->first('image_links') }}</p>
+                            @endif
+                            <button type="button" onclick="addImageLink()" class="tx-btn-ghost" style="margin-top: 0.6rem;">
+                                + Add Another Link
+                            </button>
                         </div>
 
-                        <div>
-                            <label for="product_file" class="tx-label">Replace Product Image</label>
-                            <input type="file" id="product_file" name="product_file" accept="image/*" class="tx-field" style="padding: 0.5rem 0.75rem;">
+                        <div style="grid-column: 1 / -1;">
+                            <label class="tx-label">Upload Product Images</label>
+                            <p class="tx-hint">Select one or more files to upload alongside any links above.</p>
+                            <input type="file" id="product_images" name="product_images[]" accept="image/*,.pdf,.obj,.stl" multiple class="tx-field" style="padding: 0.5rem 0.75rem;">
+                            @if ($errors->has('product_images') || $errors->has('product_images.*'))
+                                <p class="tx-error">{{ $errors->first('product_images.*') ?? $errors->first('product_images') }}</p>
+                            @endif
 
-                            @if($product->product_file)
-                                <div class="tx-current-image">
-                                    <img src="{{ asset('storage/'.$product->product_file) }}" alt="{{ $product->item_name }}">
-                                    <span class="tx-current-image-meta">Current image — uploading a new file will replace it.</span>
+                            @if($product->images->isNotEmpty())
+                                <div class="tx-current-image" style="flex-wrap: wrap; margin-top: 1rem;">
+                                    @foreach($product->images as $image)
+                                        @if($image->image_type === 'upload' && $image->image_path)
+                                            <div style="display:flex; flex-direction:column; gap:0.35rem;">
+                                                <img src="{{ asset('storage/' . $image->image_path) }}" alt="{{ $product->item_name }}">
+                                                <span class="tx-current-image-meta">Uploaded image</span>
+                                            </div>
+                                        @elseif($image->image_type === 'url' && $image->image_url)
+                                            <div style="display:flex; flex-direction:column; gap:0.35rem;">
+                                                <img src="{{ $image->image_url }}" alt="{{ $product->item_name }}" style="object-fit:cover;">
+                                                <span class="tx-current-image-meta">Linked image</span>
+                                            </div>
+                                        @endif
+                                    @endforeach
                                 </div>
                             @endif
                         </div>
@@ -426,6 +478,16 @@
     </div>
 
     <script>
+        function addImageLink() {
+            var container = document.getElementById('imageLinks');
+            var input = document.createElement('input');
+            input.type = 'url';
+            input.name = 'image_links[]';
+            input.placeholder = 'https://example.com/image.jpg';
+            input.className = 'tx-field mb-2';
+            container.appendChild(input);
+        }
+
         (function () {
             document.querySelectorAll('#taxonomy-section [data-cascade-target]').forEach(function (parentSelect) {
                 parentSelect.addEventListener('change', function () {

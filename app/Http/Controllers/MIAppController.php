@@ -566,41 +566,88 @@ public function dashboard()
     {
         $product = MI_Product::findOrFail($id);
 
-        $validated = $request->validate([
-            'item_name'      => 'required|string|max:255',
-            'category'       => 'required|string|max:255',
-            'collection'     => 'nullable|string|max:255',
-            'type_of_sample' => 'required|string|max:255',
-            'classification' => 'required|string|max:255',
-            'designed_by'    => 'nullable|string|max:255',
-            'materials'      => 'required|string|max:255',
-            'type'           => 'nullable|string|max:255',
-            'color'          => 'nullable|string|max:255',
-            'product_height' => 'required|string|max:255',
-            'product_width'  => 'nullable|string|max:255',
-            'product_length' => 'nullable|string|max:255',
-            'product_depth'  => 'nullable|string|max:255',
-            'carton_height'  => 'nullable|string|max:255',
-            'carton_width'   => 'nullable|string|max:255',
-            'carton_length'  => 'nullable|string|max:255',
-            'carton_depth'   => 'nullable|string|max:255',
-            'purchase_cost'  => 'nullable|numeric',
-            'product_file'   => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480', 
-        ]);
+        try {
+            $validated = $request->validate([
+                'item_name'      => 'required|string|max:255',
+                'category'       => 'required|string|max:255',
+                'collection'     => 'nullable|string|max:255',
+                'type_of_sample' => 'required|string|max:255',
+                'classification' => 'required|string|max:255',
+                'designed_by'    => 'nullable|string|max:255',
+                'materials'      => 'required|string|max:255',
+                'type'           => 'nullable|string|max:255',
+                'color'          => 'nullable|string|max:255',
+                'product_height' => 'required|string|max:255',
+                'product_width'  => 'nullable|string|max:255',
+                'product_length' => 'nullable|string|max:255',
+                'product_depth'  => 'nullable|string|max:255',
+                'carton_height'  => 'nullable|string|max:255',
+                'carton_width'   => 'nullable|string|max:255',
+                'carton_length'  => 'nullable|string|max:255',
+                'carton_depth'   => 'nullable|string|max:255',
+                'image_links'    => 'nullable|array',
+                'image_links.*'  => 'nullable|url|max:1000',
+                'product_images' => 'nullable|array',
+                'product_images.*' => 'file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
+            ]);
 
-        if ($request->hasFile('product_file')) {
-            // Optional: Delete the old file before saving the new one
-            if ($product->product_file) {
-                Storage::disk('public')->delete($product->product_file);
+            if ($request->has('image_links')) {
+                $request->merge([
+                    'image_links' => array_values(array_filter($request->input('image_links', []), function ($value) {
+                        return trim((string) $value) !== '';
+                    })),
+                ]);
+            }
+
+            $validated['image_links'] = $request->input('image_links', []);
+
+            $product->update($validated);
+
+            $product->images()->delete();
+
+            if (!empty($validated['image_links'])) {
+                foreach ($validated['image_links'] as $index => $url) {
+                    MI_Product_Image::create([
+                        'product_id' => $product->product_id,
+                        'image_type' => 'url',
+                        'image_url' => $url,
+                        'is_primary' => $index === 0,
+                        'sort_order' => $index,
+                    ]);
+                }
+            }
+
+            if ($request->hasFile('product_images')) {
+                foreach ($request->file('product_images') as $index => $file) {
+                    $path = $file->store('product_images', 'public');
+
+                    MI_Product_Image::create([
+                        'product_id' => $product->product_id,
+                        'image_type' => 'upload',
+                        'image_path' => $path,
+                        'is_primary' => empty($validated['image_links']) && $index === 0,
+                        'sort_order' => count($validated['image_links']) + $index,
+                    ]);
+                }
             }
             
-            $path = $request->file('product_file')->store('product_files', 'public');
-            $validated['product_file'] = $path;
-        }
+            return redirect()->route('mi_app.index')->with('success', 'Product updated successfully!');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Product update failed: ' . $e->getMessage(), [
+                'exception' => $e,
+                'product_id' => $id,
+                'input' => $request->except('product_file'),
+            ]);
 
-        $product->update($validated);
-        
-        return redirect()->route('mi_app.index')->with('success', 'Product updated successfully!');
+            $errorMessage = $e->getMessage() ?: 'Something went wrong while updating the product. Please try again or contact support.';
+
+            return back()
+                ->withInput()
+                ->withErrors(['error' => $errorMessage])
+                ->with('error', $errorMessage);
+        }
     }
 
     public function destroy($id) 

@@ -94,6 +94,16 @@
         .tx-field:focus { border-color: var(--tx-primary); background: var(--tx-surface); box-shadow: 0 0 0 4px var(--tx-primary-soft); }
         .tx-field:disabled { background: var(--tx-line); color: var(--tx-ink-faint); cursor: not-allowed; }
         .tx-hint { font-size: 0.7rem; color: var(--tx-ink-faint); margin-top: 0.4rem; }
+        .tx-multi-select-wrap { display: flex; flex-direction: column; gap: 0.6rem; }
+        .tx-multi-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+        .tx-multi-hint { font-size: 0.72rem; color: var(--tx-ink-faint); }
+        .tx-multi-clear { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink-soft); border-radius: 999px; padding: 0.3rem 0.7rem; font-size: 0.7rem; font-weight: 600; cursor: pointer; }
+        .tx-multi-clear:hover { border-color: var(--tx-primary); color: var(--tx-primary); }
+        .tx-multi-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; min-height: 1.75rem; }
+        .tx-multi-chip { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.7rem; border-radius: 999px; background: var(--tx-primary-soft); color: var(--tx-primary); font-size: 0.74rem; font-weight: 600; }
+        .tx-multi-chip button { border: none; background: transparent; color: inherit; cursor: pointer; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+        .tx-multi-chip button:hover { opacity: 0.75; }
+        .tx-multi-select { min-height: 10rem; }
         .tx-select-wrap { position: relative; }
         .tx-select-wrap select { appearance: none; padding-right: 2.5rem; }
         .tx-select-wrap svg { position: absolute; right: 0.9rem; top: 50%; transform: translateY(-50%); width: 1rem; height: 1rem; color: var(--tx-ink-faint); pointer-events: none; }
@@ -143,6 +153,7 @@
             background: var(--tx-primary); color: var(--tx-primary-ink); transition: all .15s ease;
         }
         .tx-btn-submit:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -10px var(--tx-primary); }
+    
     </style>
 
     <div class="tx-console">
@@ -416,75 +427,82 @@
                                     $selectedMaterials = $selectedMaterials ? [$selectedMaterials] : [];
                                 }
                             @endphp
-                            <select id="materials" name="materials[]" multiple autocomplete="off" class="tx-field">
-                                <optgroup label="Solid Wood">
-                                    <option value="Acacia Wood" {{ in_array('Acacia Wood', $selectedMaterials) ? 'selected' : '' }}>Acacia Wood</option>
-                                    <option value="Ash Wood" {{ in_array('Ash Wood', $selectedMaterials) ? 'selected' : '' }}>Ash Wood</option>
-                                    <option value="Beech Wood" {{ in_array('Beech Wood', $selectedMaterials) ? 'selected' : '' }}>Beech Wood</option>
-                                    <option value="Birch Wood" {{ in_array('Birch Wood', $selectedMaterials) ? 'selected' : '' }}>Birch Wood</option>
-                                    <option value="Mahogany" {{ in_array('Mahogany', $selectedMaterials) ? 'selected' : '' }}>Mahogany</option>
-                                    <option value="Mango Wood" {{ in_array('Mango Wood', $selectedMaterials) ? 'selected' : '' }}>Mango Wood</option>
-                                    <option value="Oak" {{ in_array('Oak', $selectedMaterials) ? 'selected' : '' }}>Oak</option>
-                                    <option value="Pine" {{ in_array('Pine', $selectedMaterials) ? 'selected' : '' }}>Pine</option>
-                                    <option value="Rubberwood" {{ in_array('Rubberwood', $selectedMaterials) ? 'selected' : '' }}>Rubberwood</option>
-                                    <option value="Teak" {{ in_array('Teak', $selectedMaterials) ? 'selected' : '' }}>Teak</option>
-                                    <option value="Walnut" {{ in_array('Walnut', $selectedMaterials) ? 'selected' : '' }}>Walnut</option>
-                                </optgroup>
-                                <optgroup label="Engineered Wood">
-                                    <option value="MDF" {{ in_array('MDF', $selectedMaterials) ? 'selected' : '' }}>MDF</option>
-                                    <option value="Particle Board" {{ in_array('Particle Board', $selectedMaterials) ? 'selected' : '' }}>Particle Board</option>
-                                    <option value="Plywood" {{ in_array('Plywood', $selectedMaterials) ? 'selected' : '' }}>Plywood</option>
-                                    <option value="HDF" {{ in_array('HDF', $selectedMaterials) ? 'selected' : '' }}>HDF</option>
-                                    <option value="Melamine Board" {{ in_array('Melamine Board', $selectedMaterials) ? 'selected' : '' }}>Melamine Board</option>
-                                </optgroup>
-                                <optgroup label="Metal">
-                                    <option value="Aluminum" {{ in_array('Aluminum', $selectedMaterials) ? 'selected' : '' }}>Aluminum</option>
-                                    <option value="Brass" {{ in_array('Brass', $selectedMaterials) ? 'selected' : '' }}>Brass</option>
-                                    <option value="Cast Iron" {{ in_array('Cast Iron', $selectedMaterials) ? 'selected' : '' }}>Cast Iron</option>
-                                    <option value="Iron" {{ in_array('Iron', $selectedMaterials) ? 'selected' : '' }}>Iron</option>
-                                    <option value="Stainless Steel" {{ in_array('Stainless Steel', $selectedMaterials) ? 'selected' : '' }}>Stainless Steel</option>
-                                    <option value="Steel" {{ in_array('Steel', $selectedMaterials) ? 'selected' : '' }}>Steel</option>
-                                </optgroup>
-                                <optgroup label="Glass & Stone">
-                                    <option value="Clear Glass" {{ in_array('Clear Glass', $selectedMaterials) ? 'selected' : '' }}>Clear Glass</option>
-                                    <option value="Tempered Glass" {{ in_array('Tempered Glass', $selectedMaterials) ? 'selected' : '' }}>Tempered Glass</option>
-                                    <option value="Marble" {{ in_array('Marble', $selectedMaterials) ? 'selected' : '' }}>Marble</option>
-                                    <option value="Granite" {{ in_array('Granite', $selectedMaterials) ? 'selected' : '' }}>Granite</option>
-                                    <option value="Ceramic" {{ in_array('Ceramic', $selectedMaterials) ? 'selected' : '' }}>Ceramic</option>
-                                    <option value="Concrete" {{ in_array('Concrete', $selectedMaterials) ? 'selected' : '' }}>Concrete</option>
-                                </optgroup>
-                                <optgroup label="Natural Fibers">
-                                    <option value="Bamboo" {{ in_array('Bamboo', $selectedMaterials) ? 'selected' : '' }}>Bamboo</option>
-                                    <option value="Cane" {{ in_array('Cane', $selectedMaterials) ? 'selected' : '' }}>Cane</option>
-                                    <option value="Rattan" {{ in_array('Rattan', $selectedMaterials) ? 'selected' : '' }}>Rattan</option>
-                                    <option value="Seagrass" {{ in_array('Seagrass', $selectedMaterials) ? 'selected' : '' }}>Seagrass</option>
-                                    <option value="Water Hyacinth" {{ in_array('Water Hyacinth', $selectedMaterials) ? 'selected' : '' }}>Water Hyacinth</option>
-                                    <option value="Abaca" {{ in_array('Abaca', $selectedMaterials) ? 'selected' : '' }}>Abaca</option>
-                                </optgroup>
-                                <optgroup label="Fabric & Upholstery">
-                                    <option value="Boucle" {{ in_array('Boucle', $selectedMaterials) ? 'selected' : '' }}>Boucle</option>
-                                    <option value="Canvas" {{ in_array('Canvas', $selectedMaterials) ? 'selected' : '' }}>Canvas</option>
-                                    <option value="Cotton" {{ in_array('Cotton', $selectedMaterials) ? 'selected' : '' }}>Cotton</option>
-                                    <option value="Leather" {{ in_array('Leather', $selectedMaterials) ? 'selected' : '' }}>Leather</option>
-                                    <option value="PU Leather" {{ in_array('PU Leather', $selectedMaterials) ? 'selected' : '' }}>PU Leather</option>
-                                    <option value="Linen" {{ in_array('Linen', $selectedMaterials) ? 'selected' : '' }}>Linen</option>
-                                    <option value="Microfiber" {{ in_array('Microfiber', $selectedMaterials) ? 'selected' : '' }}>Microfiber</option>
-                                    <option value="Polyester" {{ in_array('Polyester', $selectedMaterials) ? 'selected' : '' }}>Polyester</option>
-                                    <option value="Velvet" {{ in_array('Velvet', $selectedMaterials) ? 'selected' : '' }}>Velvet</option>
-                                </optgroup>
-                                <optgroup label="Plastic & Synthetic">
-                                    <option value="ABS Plastic" {{ in_array('ABS Plastic', $selectedMaterials) ? 'selected' : '' }}>ABS Plastic</option>
-                                    <option value="Acrylic" {{ in_array('Acrylic', $selectedMaterials) ? 'selected' : '' }}>Acrylic</option>
-                                    <option value="Fiberglass" {{ in_array('Fiberglass', $selectedMaterials) ? 'selected' : '' }}>Fiberglass</option>
-                                    <option value="Polypropylene" {{ in_array('Polypropylene', $selectedMaterials) ? 'selected' : '' }}>Polypropylene</option>
-                                    <option value="PVC" {{ in_array('PVC', $selectedMaterials) ? 'selected' : '' }}>PVC</option>
-                                    <option value="Resin" {{ in_array('Resin', $selectedMaterials) ? 'selected' : '' }}>Resin</option>
-                                </optgroup>
-                                <optgroup label="Other">
-                                    <option value="Composite" {{ in_array('Composite', $selectedMaterials) ? 'selected' : '' }}>Composite</option>
-                                    <option value="Mixed Materials" {{ in_array('Mixed Materials', $selectedMaterials) ? 'selected' : '' }}>Mixed Materials</option>
-                                </optgroup>
-                            </select>
+                            <div class="tx-multi-select-wrap">
+                                <div class="tx-multi-toolbar">
+                                    <span class="tx-multi-hint">Selected values appear below</span>
+                                    <button type="button" class="tx-multi-clear" data-target="materials">Clear</button>
+                                </div>
+                                <select id="materials" name="materials[]" multiple size="8" autocomplete="off" class="tx-field tx-multi-select">
+                                    <optgroup label="Solid Wood">
+                                        <option value="Acacia Wood" {{ in_array('Acacia Wood', $selectedMaterials) ? 'selected' : '' }}>Acacia Wood</option>
+                                        <option value="Ash Wood" {{ in_array('Ash Wood', $selectedMaterials) ? 'selected' : '' }}>Ash Wood</option>
+                                        <option value="Beech Wood" {{ in_array('Beech Wood', $selectedMaterials) ? 'selected' : '' }}>Beech Wood</option>
+                                        <option value="Birch Wood" {{ in_array('Birch Wood', $selectedMaterials) ? 'selected' : '' }}>Birch Wood</option>
+                                        <option value="Mahogany" {{ in_array('Mahogany', $selectedMaterials) ? 'selected' : '' }}>Mahogany</option>
+                                        <option value="Mango Wood" {{ in_array('Mango Wood', $selectedMaterials) ? 'selected' : '' }}>Mango Wood</option>
+                                        <option value="Oak" {{ in_array('Oak', $selectedMaterials) ? 'selected' : '' }}>Oak</option>
+                                        <option value="Pine" {{ in_array('Pine', $selectedMaterials) ? 'selected' : '' }}>Pine</option>
+                                        <option value="Rubberwood" {{ in_array('Rubberwood', $selectedMaterials) ? 'selected' : '' }}>Rubberwood</option>
+                                        <option value="Teak" {{ in_array('Teak', $selectedMaterials) ? 'selected' : '' }}>Teak</option>
+                                        <option value="Walnut" {{ in_array('Walnut', $selectedMaterials) ? 'selected' : '' }}>Walnut</option>
+                                    </optgroup>
+                                    <optgroup label="Engineered Wood">
+                                        <option value="MDF" {{ in_array('MDF', $selectedMaterials) ? 'selected' : '' }}>MDF</option>
+                                        <option value="Particle Board" {{ in_array('Particle Board', $selectedMaterials) ? 'selected' : '' }}>Particle Board</option>
+                                        <option value="Plywood" {{ in_array('Plywood', $selectedMaterials) ? 'selected' : '' }}>Plywood</option>
+                                        <option value="HDF" {{ in_array('HDF', $selectedMaterials) ? 'selected' : '' }}>HDF</option>
+                                        <option value="Melamine Board" {{ in_array('Melamine Board', $selectedMaterials) ? 'selected' : '' }}>Melamine Board</option>
+                                    </optgroup>
+                                    <optgroup label="Metal">
+                                        <option value="Aluminum" {{ in_array('Aluminum', $selectedMaterials) ? 'selected' : '' }}>Aluminum</option>
+                                        <option value="Brass" {{ in_array('Brass', $selectedMaterials) ? 'selected' : '' }}>Brass</option>
+                                        <option value="Cast Iron" {{ in_array('Cast Iron', $selectedMaterials) ? 'selected' : '' }}>Cast Iron</option>
+                                        <option value="Iron" {{ in_array('Iron', $selectedMaterials) ? 'selected' : '' }}>Iron</option>
+                                        <option value="Stainless Steel" {{ in_array('Stainless Steel', $selectedMaterials) ? 'selected' : '' }}>Stainless Steel</option>
+                                        <option value="Steel" {{ in_array('Steel', $selectedMaterials) ? 'selected' : '' }}>Steel</option>
+                                    </optgroup>
+                                    <optgroup label="Glass & Stone">
+                                        <option value="Clear Glass" {{ in_array('Clear Glass', $selectedMaterials) ? 'selected' : '' }}>Clear Glass</option>
+                                        <option value="Tempered Glass" {{ in_array('Tempered Glass', $selectedMaterials) ? 'selected' : '' }}>Tempered Glass</option>
+                                        <option value="Marble" {{ in_array('Marble', $selectedMaterials) ? 'selected' : '' }}>Marble</option>
+                                        <option value="Granite" {{ in_array('Granite', $selectedMaterials) ? 'selected' : '' }}>Granite</option>
+                                        <option value="Ceramic" {{ in_array('Ceramic', $selectedMaterials) ? 'selected' : '' }}>Ceramic</option>
+                                        <option value="Concrete" {{ in_array('Concrete', $selectedMaterials) ? 'selected' : '' }}>Concrete</option>
+                                    </optgroup>
+                                    <optgroup label="Natural Fibers">
+                                        <option value="Bamboo" {{ in_array('Bamboo', $selectedMaterials) ? 'selected' : '' }}>Bamboo</option>
+                                        <option value="Cane" {{ in_array('Cane', $selectedMaterials) ? 'selected' : '' }}>Cane</option>
+                                        <option value="Rattan" {{ in_array('Rattan', $selectedMaterials) ? 'selected' : '' }}>Rattan</option>
+                                        <option value="Seagrass" {{ in_array('Seagrass', $selectedMaterials) ? 'selected' : '' }}>Seagrass</option>
+                                        <option value="Water Hyacinth" {{ in_array('Water Hyacinth', $selectedMaterials) ? 'selected' : '' }}>Water Hyacinth</option>
+                                        <option value="Abaca" {{ in_array('Abaca', $selectedMaterials) ? 'selected' : '' }}>Abaca</option>
+                                    </optgroup>
+                                    <optgroup label="Fabric & Upholstery">
+                                        <option value="Boucle" {{ in_array('Boucle', $selectedMaterials) ? 'selected' : '' }}>Boucle</option>
+                                        <option value="Canvas" {{ in_array('Canvas', $selectedMaterials) ? 'selected' : '' }}>Canvas</option>
+                                        <option value="Cotton" {{ in_array('Cotton', $selectedMaterials) ? 'selected' : '' }}>Cotton</option>
+                                        <option value="Leather" {{ in_array('Leather', $selectedMaterials) ? 'selected' : '' }}>Leather</option>
+                                        <option value="PU Leather" {{ in_array('PU Leather', $selectedMaterials) ? 'selected' : '' }}>PU Leather</option>
+                                        <option value="Linen" {{ in_array('Linen', $selectedMaterials) ? 'selected' : '' }}>Linen</option>
+                                        <option value="Microfiber" {{ in_array('Microfiber', $selectedMaterials) ? 'selected' : '' }}>Microfiber</option>
+                                        <option value="Polyester" {{ in_array('Polyester', $selectedMaterials) ? 'selected' : '' }}>Polyester</option>
+                                        <option value="Velvet" {{ in_array('Velvet', $selectedMaterials) ? 'selected' : '' }}>Velvet</option>
+                                    </optgroup>
+                                    <optgroup label="Plastic & Synthetic">
+                                        <option value="ABS Plastic" {{ in_array('ABS Plastic', $selectedMaterials) ? 'selected' : '' }}>ABS Plastic</option>
+                                        <option value="Acrylic" {{ in_array('Acrylic', $selectedMaterials) ? 'selected' : '' }}>Acrylic</option>
+                                        <option value="Fiberglass" {{ in_array('Fiberglass', $selectedMaterials) ? 'selected' : '' }}>Fiberglass</option>
+                                        <option value="Polypropylene" {{ in_array('Polypropylene', $selectedMaterials) ? 'selected' : '' }}>Polypropylene</option>
+                                        <option value="PVC" {{ in_array('PVC', $selectedMaterials) ? 'selected' : '' }}>PVC</option>
+                                        <option value="Resin" {{ in_array('Resin', $selectedMaterials) ? 'selected' : '' }}>Resin</option>
+                                    </optgroup>
+                                    <optgroup label="Other">
+                                        <option value="Composite" {{ in_array('Composite', $selectedMaterials) ? 'selected' : '' }}>Composite</option>
+                                        <option value="Mixed Materials" {{ in_array('Mixed Materials', $selectedMaterials) ? 'selected' : '' }}>Mixed Materials</option>
+                                    </optgroup>
+                                </select>
+                                <div id="materials_chips" class="tx-multi-chips" aria-live="polite"></div>
+                            </div>
                             <p class="tx-hint">Select one or more materials.</p>
                         </div>
 
@@ -496,47 +514,54 @@
                                 }
                             @endphp
                             <label for="color" class="tx-label">Color</label>
-                            <select id="color" name="color[]" multiple class="tx-field">
-                                <optgroup label="Basic Colors">
-                                    <option value="Black" {{ in_array('Black', $selectedColors) ? 'selected' : '' }}>Black</option>
-                                    <option value="White" {{ in_array('White', $selectedColors) ? 'selected' : '' }}>White</option>
-                                    <option value="Gray" {{ in_array('Gray', $selectedColors) ? 'selected' : '' }}>Gray</option>
-                                    <option value="Silver" {{ in_array('Silver', $selectedColors) ? 'selected' : '' }}>Silver</option>
-                                    <option value="Gold" {{ in_array('Gold', $selectedColors) ? 'selected' : '' }}>Gold</option>
-                                    <option value="Bronze" {{ in_array('Bronze', $selectedColors) ? 'selected' : '' }}>Bronze</option>
-                                </optgroup>
-                                <optgroup label="Wood Finishes">
-                                    <option value="Natural" {{ in_array('Natural', $selectedColors) ? 'selected' : '' }}>Natural</option>
-                                    <option value="Oak" {{ in_array('Oak', $selectedColors) ? 'selected' : '' }}>Oak</option>
-                                    <option value="Walnut" {{ in_array('Walnut', $selectedColors) ? 'selected' : '' }}>Walnut</option>
-                                    <option value="Teak" {{ in_array('Teak', $selectedColors) ? 'selected' : '' }}>Teak</option>
-                                    <option value="Mahogany" {{ in_array('Mahogany', $selectedColors) ? 'selected' : '' }}>Mahogany</option>
-                                    <option value="Espresso" {{ in_array('Espresso', $selectedColors) ? 'selected' : '' }}>Espresso</option>
-                                </optgroup>
-                                <optgroup label="Neutral">
-                                    <option value="Beige" {{ in_array('Beige', $selectedColors) ? 'selected' : '' }}>Beige</option>
-                                    <option value="Cream" {{ in_array('Cream', $selectedColors) ? 'selected' : '' }}>Cream</option>
-                                    <option value="Ivory" {{ in_array('Ivory', $selectedColors) ? 'selected' : '' }}>Ivory</option>
-                                    <option value="Taupe" {{ in_array('Taupe', $selectedColors) ? 'selected' : '' }}>Taupe</option>
-                                    <option value="Brown" {{ in_array('Brown', $selectedColors) ? 'selected' : '' }}>Brown</option>
-                                </optgroup>
-                                <optgroup label="Accent Colors">
-                                    <option value="Blue" {{ in_array('Blue', $selectedColors) ? 'selected' : '' }}>Blue</option>
-                                    <option value="Green" {{ in_array('Green', $selectedColors) ? 'selected' : '' }}>Green</option>
-                                    <option value="Red" {{ in_array('Red', $selectedColors) ? 'selected' : '' }}>Red</option>
-                                    <option value="Yellow" {{ in_array('Yellow', $selectedColors) ? 'selected' : '' }}>Yellow</option>
-                                    <option value="Orange" {{ in_array('Orange', $selectedColors) ? 'selected' : '' }}>Orange</option>
-                                    <option value="Pink" {{ in_array('Pink', $selectedColors) ? 'selected' : '' }}>Pink</option>
-                                    <option value="Purple" {{ in_array('Purple', $selectedColors) ? 'selected' : '' }}>Purple</option>
-                                </optgroup>
-                                <optgroup label="Special Finishes">
-                                    <option value="Matte Black" {{ in_array('Matte Black', $selectedColors) ? 'selected' : '' }}>Matte Black</option>
-                                    <option value="Gloss White" {{ in_array('Gloss White', $selectedColors) ? 'selected' : '' }}>Gloss White</option>
-                                    <option value="Brushed Gold" {{ in_array('Brushed Gold', $selectedColors) ? 'selected' : '' }}>Brushed Gold</option>
-                                    <option value="Rose Gold" {{ in_array('Rose Gold', $selectedColors) ? 'selected' : '' }}>Rose Gold</option>
-                                    <option value="Chrome" {{ in_array('Chrome', $selectedColors) ? 'selected' : '' }}>Chrome</option>
-                                </optgroup>
-                            </select>
+                            <div class="tx-multi-select-wrap">
+                                <div class="tx-multi-toolbar">
+                                    <span class="tx-multi-hint">Selected values appear below</span>
+                                    <button type="button" class="tx-multi-clear" data-target="color">Clear</button>
+                                </div>
+                                <select id="color" name="color[]" multiple size="8" class="tx-field tx-multi-select">
+                                    <optgroup label="Basic Colors">
+                                        <option value="Black" {{ in_array('Black', $selectedColors) ? 'selected' : '' }}>Black</option>
+                                        <option value="White" {{ in_array('White', $selectedColors) ? 'selected' : '' }}>White</option>
+                                        <option value="Gray" {{ in_array('Gray', $selectedColors) ? 'selected' : '' }}>Gray</option>
+                                        <option value="Silver" {{ in_array('Silver', $selectedColors) ? 'selected' : '' }}>Silver</option>
+                                        <option value="Gold" {{ in_array('Gold', $selectedColors) ? 'selected' : '' }}>Gold</option>
+                                        <option value="Bronze" {{ in_array('Bronze', $selectedColors) ? 'selected' : '' }}>Bronze</option>
+                                    </optgroup>
+                                    <optgroup label="Wood Finishes">
+                                        <option value="Natural" {{ in_array('Natural', $selectedColors) ? 'selected' : '' }}>Natural</option>
+                                        <option value="Oak" {{ in_array('Oak', $selectedColors) ? 'selected' : '' }}>Oak</option>
+                                        <option value="Walnut" {{ in_array('Walnut', $selectedColors) ? 'selected' : '' }}>Walnut</option>
+                                        <option value="Teak" {{ in_array('Teak', $selectedColors) ? 'selected' : '' }}>Teak</option>
+                                        <option value="Mahogany" {{ in_array('Mahogany', $selectedColors) ? 'selected' : '' }}>Mahogany</option>
+                                        <option value="Espresso" {{ in_array('Espresso', $selectedColors) ? 'selected' : '' }}>Espresso</option>
+                                    </optgroup>
+                                    <optgroup label="Neutral">
+                                        <option value="Beige" {{ in_array('Beige', $selectedColors) ? 'selected' : '' }}>Beige</option>
+                                        <option value="Cream" {{ in_array('Cream', $selectedColors) ? 'selected' : '' }}>Cream</option>
+                                        <option value="Ivory" {{ in_array('Ivory', $selectedColors) ? 'selected' : '' }}>Ivory</option>
+                                        <option value="Taupe" {{ in_array('Taupe', $selectedColors) ? 'selected' : '' }}>Taupe</option>
+                                        <option value="Brown" {{ in_array('Brown', $selectedColors) ? 'selected' : '' }}>Brown</option>
+                                    </optgroup>
+                                    <optgroup label="Accent Colors">
+                                        <option value="Blue" {{ in_array('Blue', $selectedColors) ? 'selected' : '' }}>Blue</option>
+                                        <option value="Green" {{ in_array('Green', $selectedColors) ? 'selected' : '' }}>Green</option>
+                                        <option value="Red" {{ in_array('Red', $selectedColors) ? 'selected' : '' }}>Red</option>
+                                        <option value="Yellow" {{ in_array('Yellow', $selectedColors) ? 'selected' : '' }}>Yellow</option>
+                                        <option value="Orange" {{ in_array('Orange', $selectedColors) ? 'selected' : '' }}>Orange</option>
+                                        <option value="Pink" {{ in_array('Pink', $selectedColors) ? 'selected' : '' }}>Pink</option>
+                                        <option value="Purple" {{ in_array('Purple', $selectedColors) ? 'selected' : '' }}>Purple</option>
+                                    </optgroup>
+                                    <optgroup label="Special Finishes">
+                                        <option value="Matte Black" {{ in_array('Matte Black', $selectedColors) ? 'selected' : '' }}>Matte Black</option>
+                                        <option value="Gloss White" {{ in_array('Gloss White', $selectedColors) ? 'selected' : '' }}>Gloss White</option>
+                                        <option value="Brushed Gold" {{ in_array('Brushed Gold', $selectedColors) ? 'selected' : '' }}>Brushed Gold</option>
+                                        <option value="Rose Gold" {{ in_array('Rose Gold', $selectedColors) ? 'selected' : '' }}>Rose Gold</option>
+                                        <option value="Chrome" {{ in_array('Chrome', $selectedColors) ? 'selected' : '' }}>Chrome</option>
+                                    </optgroup>
+                                </select>
+                                <div id="color_chips" class="tx-multi-chips" aria-live="polite"></div>
+                            </div>
                             <p class="tx-hint">Select one or more colors.</p>
                         </div>
 
@@ -682,5 +707,60 @@
 
             updateTaxonomyPreview();
         })();
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('select.tx-multi-select').forEach(function (select) {
+                var wrapper = select.closest('.tx-multi-select-wrap');
+                if (!wrapper) return;
+
+                var chips = wrapper.querySelector('.tx-multi-chips');
+                var clearButton = wrapper.querySelector('.tx-multi-clear');
+
+                function updateChips() {
+                    if (!chips) return;
+
+                    var selectedValues = Array.from(select.selectedOptions)
+                        .map(function (option) { return option.value; })
+                        .filter(Boolean);
+
+                    chips.innerHTML = '';
+                    selectedValues.forEach(function (value) {
+                        var chip = document.createElement('span');
+                        chip.className = 'tx-multi-chip';
+                        chip.innerHTML = '<span>' + value + '</span><button type="button" aria-label="Remove ' + value + '">&times;</button>';
+
+                        chip.querySelector('button').addEventListener('click', function (event) {
+                            event.preventDefault();
+                            Array.from(select.options).forEach(function (option) {
+                                if (option.value === value) {
+                                    option.selected = false;
+                                }
+                            });
+                            updateChips();
+                        });
+
+                        chips.appendChild(chip);
+                    });
+
+                    if (clearButton) {
+                        clearButton.style.display = selectedValues.length ? 'inline-flex' : 'none';
+                    }
+                }
+
+                select.addEventListener('change', updateChips);
+                if (clearButton) {
+                    clearButton.addEventListener('click', function (event) {
+                        event.preventDefault();
+                        Array.from(select.options).forEach(function (option) {
+                            option.selected = false;
+                        });
+                        updateChips();
+                    });
+                }
+
+                updateChips();
+            });
+        });
     </script>
 </x-mi_app>

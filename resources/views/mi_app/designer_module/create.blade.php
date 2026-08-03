@@ -138,6 +138,16 @@
         .tx-error { display: flex; align-items: center; gap: 0.3rem; color: var(--tx-danger); font-size: 0.75rem; font-weight: 600; margin-top: 0.45rem; }
         .tx-error svg { width: 0.9rem; height: 0.9rem; flex-shrink: 0; }
         .tx-hint { font-size: 0.72rem; color: var(--tx-ink-faint); margin-bottom: 0.75rem; }
+        .tx-multi-select-wrap { display: flex; flex-direction: column; gap: 0.6rem; }
+        .tx-multi-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+        .tx-multi-hint { font-size: 0.72rem; color: var(--tx-ink-faint); }
+        .tx-multi-clear { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink-soft); border-radius: 999px; padding: 0.3rem 0.7rem; font-size: 0.7rem; font-weight: 600; cursor: pointer; }
+        .tx-multi-clear:hover { border-color: var(--tx-primary); color: var(--tx-primary); }
+        .tx-multi-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; min-height: 1.75rem; }
+        .tx-multi-chip { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.7rem; border-radius: 999px; background: var(--tx-primary-soft); color: var(--tx-primary); font-size: 0.74rem; font-weight: 600; }
+        .tx-multi-chip button { border: none; background: transparent; color: inherit; cursor: pointer; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+        .tx-multi-chip button:hover { opacity: 0.75; }
+        .tx-multi-select { min-height: 10rem; }
 
         .tx-swatch-input { position: relative; }
         #color_swatch { position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%); height: 1rem; width: 1rem; border-radius: 999px; border: 1px solid var(--tx-line); background: var(--tx-line); transition: background-color .15s ease; }
@@ -201,6 +211,13 @@
         .tx-btn-submit:disabled { opacity: 0.7; cursor: not-allowed; }
         .tx-btn-submit svg.spin { animation: tx-spin 0.8s linear infinite; }
         @keyframes tx-spin { to { transform: rotate(360deg); } }
+        .materials-select optgroup {
+            font-weight: 700;
+        }
+
+        .materials-select option {
+            font-weight: 400;
+        }
     </style>
 
     <div class="tx-console">
@@ -435,12 +452,18 @@
                                 Materials <span class="tx-required">*</span>
                             </label>
 
-                            <select
-                                id="materials"
-                                name="materials[]"
-                                multiple
-                                autocomplete="off"
-                                class="tx-field">
+                            <div class="tx-multi-select-wrap">
+                                <div class="tx-multi-toolbar">
+                                    <span class="tx-multi-hint">Selected values appear below</span>
+                                    <button type="button" class="tx-multi-clear" data-target="materials">Clear</button>
+                                </div>
+                                <select
+                                    id="materials"
+                                    name="materials[]"
+                                    multiple
+                                    size="8"
+                                    autocomplete="off"
+                                    class="tx-field tx-multi-select materials-select">
 
                                 <optgroup label="Solid Wood">
                                     <option value="Acacia Wood" {{ in_array('Acacia Wood', old('materials', [])) ? 'selected' : '' }}>Acacia Wood</option>
@@ -517,7 +540,9 @@
                                     <option value="Mixed Materials" {{ in_array('Mixed Materials', old('materials', [])) ? 'selected' : '' }}>Mixed Materials</option>
                                 </optgroup>
 
-                            </select>
+                                </select>
+                                <div id="materials_chips" class="tx-multi-chips" aria-live="polite"></div>
+                            </div>
 
                             @error('materials')
                                 <p class="tx-error">{{ $message }}</p>
@@ -529,10 +554,16 @@
                                 Color
                             </label>
 
-                            <select id="color"
+                            <div class="tx-multi-select-wrap">
+                                <div class="tx-multi-toolbar">
+                                    <span class="tx-multi-hint">Selected values appear below</span>
+                                    <button type="button" class="tx-multi-clear" data-target="color">Clear</button>
+                                </div>
+                                <select id="color"
                                     name="color[]"
                                     multiple
-                                    class="tx-field">
+                                    size="8"
+                                    class="tx-field tx-multi-select">
 
                                 <optgroup label="Basic Colors">
                                     <option value="Black" {{ in_array('Black', old('color', [])) ? 'selected' : '' }}>Black</option>
@@ -578,7 +609,9 @@
                                     <option value="Chrome" {{ in_array('Chrome', old('color', [])) ? 'selected' : '' }}>Chrome</option>
                                 </optgroup>
 
-                            </select>
+                                </select>
+                                <div id="color_chips" class="tx-multi-chips" aria-live="polite"></div>
+                            </div>
 
                             @error('color')
                                 <p class="tx-error">{{ $message }}</p>
@@ -919,6 +952,59 @@ document.addEventListener('DOMContentLoaded', function () {
                 el.addEventListener('change', updateProgress);
             });
             updateProgress();
+
+            // ---- Multi-select chips for materials and color ----
+            document.querySelectorAll('select.tx-multi-select').forEach(function (select) {
+                var wrapper = select.closest('.tx-multi-select-wrap');
+                if (!wrapper) return;
+
+                var chips = wrapper.querySelector('.tx-multi-chips');
+                var clearButton = wrapper.querySelector('.tx-multi-clear');
+
+                function updateChips() {
+                    if (!chips) return;
+
+                    var selectedValues = Array.from(select.selectedOptions)
+                        .map(function (option) { return option.value; })
+                        .filter(Boolean);
+
+                    chips.innerHTML = '';
+                    selectedValues.forEach(function (value) {
+                        var chip = document.createElement('span');
+                        chip.className = 'tx-multi-chip';
+                        chip.innerHTML = '<span>' + value + '</span><button type="button" aria-label="Remove ' + value + '">&times;</button>';
+
+                        chip.querySelector('button').addEventListener('click', function (event) {
+                            event.preventDefault();
+                            Array.from(select.options).forEach(function (option) {
+                                if (option.value === value) {
+                                    option.selected = false;
+                                }
+                            });
+                            updateChips();
+                        });
+
+                        chips.appendChild(chip);
+                    });
+
+                    if (clearButton) {
+                        clearButton.style.display = selectedValues.length ? 'inline-flex' : 'none';
+                    }
+                }
+
+                select.addEventListener('change', updateChips);
+                if (clearButton) {
+                    clearButton.addEventListener('click', function (event) {
+                        event.preventDefault();
+                        Array.from(select.options).forEach(function (option) {
+                            option.selected = false;
+                        });
+                        updateChips();
+                    });
+                }
+
+                updateChips();
+            });
 
             // ---- File upload: drag & drop, preview, remove ----
             var dropzone = document.getElementById('dropzone');

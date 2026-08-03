@@ -40,13 +40,6 @@
                         <option value="">-- Select Lot --</option>
                     </select>
                 </div>
-
-                <div>
-                    <label class="mb-2 block text-sm font-semibold text-slate-700">Delivery Receipt (DR#) <span class="text-red-500">*</span></label>
-                    <select id="delivery_id" disabled class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
-                        <option value="">-- Select DR Number --</option>
-                    </select>
-                </div>
             </div>
         </div>
 
@@ -55,14 +48,11 @@
             document.addEventListener('DOMContentLoaded', function () {
                 const projectSelect = document.getElementById('project_id');
                 const lotSelect = document.getElementById('lot_id');
-                const deliverySelect = document.getElementById('delivery_id');
 
                 projectSelect.addEventListener('change', function () {
                     const projectId = this.value;
                     lotSelect.innerHTML = '<option value="">-- Select Lot --</option>';
-                    deliverySelect.innerHTML = '<option value="">-- Select DR Number --</option>';
                     lotSelect.disabled = true;
-                    deliverySelect.disabled = true;
 
                     if (!projectId) {
                         return;
@@ -83,27 +73,6 @@
 
                 lotSelect.addEventListener('change', function () {
                     const lotId = this.value;
-                    deliverySelect.innerHTML = '<option value="">-- Select DR Number --</option>';
-                    deliverySelect.disabled = true;
-
-                    if (!lotId) {
-                        return;
-                    }
-
-                    fetch(`{{ route('warehouse.stock-in.deliveries') }}?lot_id=${lotId}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            data.forEach(delivery => {
-                                const option = document.createElement('option');
-                                option.value = delivery.delivery_id;
-                                option.textContent = `DR-${delivery.delivery_id}`;
-                                deliverySelect.appendChild(option);
-                            });
-                            deliverySelect.disabled = false;
-                        });
-                });
-
-                deliverySelect.addEventListener('change', function () {
                     const deliveryId = this.value;
                     const itemsTable = document.getElementById('itemsTable');
                     const itemsSection = document.getElementById('itemsSection');
@@ -145,6 +114,9 @@
                             itemsSection.classList.remove('hidden');
                             saveSection.classList.remove('hidden');
                         });
+                    if (!lotId) {
+                        return;
+                    }
                 });
             });
         </script>

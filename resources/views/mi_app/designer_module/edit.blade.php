@@ -436,7 +436,7 @@
                                     <span class="tx-multi-hint">Selected values appear below</span>
                                     <button type="button" class="tx-multi-clear" data-target="materials">Clear</button>
                                 </div>
-                                <select id="materials" name="materials[]" multiple size="8" autocomplete="off" class="tx-field tx-multi-select">
+                                <select id="materials" name="materials[]" multiple size="8" autocomplete="off" class="tx-field ">
                                     <optgroup label="Solid Wood">
                                         <option value="Acacia Wood" {{ in_array('Acacia Wood', $selectedMaterials) ? 'selected' : '' }}>Acacia Wood</option>
                                         <option value="Ash Wood" {{ in_array('Ash Wood', $selectedMaterials) ? 'selected' : '' }}>Ash Wood</option>
@@ -527,7 +527,7 @@
                                     <span class="tx-multi-hint">Selected values appear below</span>
                                     <button type="button" class="tx-multi-clear" data-target="color">Clear</button>
                                 </div>
-                                <select id="color" name="color[]" multiple size="8" class="tx-field tx-multi-select">
+                                <select id="color" name="color[]" multiple size="8" class="tx-field">
                                     <optgroup label="Basic Colors">
                                         <option value="Black" {{ in_array('Black', $selectedColors) ? 'selected' : '' }}>Black</option>
                                         <option value="White" {{ in_array('White', $selectedColors) ? 'selected' : '' }}>White</option>

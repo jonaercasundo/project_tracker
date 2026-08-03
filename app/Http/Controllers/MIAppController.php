@@ -706,8 +706,8 @@ public function taxonomy_update(Request $request, $type, $id)
         ->route('mi_app.settings')
         ->with('success', ucfirst(str_replace('_', ' ', $type)) . ' updated successfully.');
 }
-public function taxonomy_destroy(Request $request, $id)
+public function taxonomy_destroy($type, $product)
 {
-dd($type, $product);
+    dd($type, $product);
 }
 }

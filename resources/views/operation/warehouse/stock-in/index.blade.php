@@ -122,7 +122,6 @@
                                 itemsTable.innerHTML = items.map(item => `
                                     <tr class="border-t border-slate-100">
                                         <td class="px-4 py-3 font-medium text-slate-800">${item.item_name || 'Unnamed Item'}</td>
-                                        <td class="px-4 py-3 text-center text-slate-600">${item.qty || 0}</td>
                                         <td class="px-4 py-3 text-center">
                                             <input type="number" min="0" value="0" class="w-24 rounded-xl border border-slate-300 px-3 py-2 text-center text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
                                         </td>
@@ -135,14 +134,14 @@
                                 saveSection.classList.remove('hidden');
                                 deliveryInfo.classList.remove('hidden');
                             } else {
-                                itemsTable.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-sm text-slate-500">No delivery items found for this lot.</td></tr>';
+                                itemsTable.innerHTML = '<tr><td colspan="3" class="px-4 py-6 text-center text-sm text-slate-500">No delivery items found for this lot.</td></tr>';
                                 itemsSection.classList.remove('hidden');
                                 deliveryInfo.classList.remove('hidden');
                             }
                         })
                         .catch(error => {
                             console.error(error);
-                            itemsTable.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-sm text-red-600">Unable to load delivery items.</td></tr>';
+                            itemsTable.innerHTML = '<tr><td colspan="3" class="px-4 py-6 text-center text-sm text-red-600">Unable to load delivery items.</td></tr>';
                             itemsSection.classList.remove('hidden');
                         });
                 });
@@ -184,7 +183,6 @@
                     <thead class="bg-slate-100 text-slate-700">
                         <tr>
                             <th class="px-4 py-3 text-left font-semibold">Item</th>
-                            <th class="px-4 py-3 text-center font-semibold">DR Quantity</th>
                             <th class="px-4 py-3 text-center font-semibold">Received Quantity</th>
                             <th class="px-4 py-3 text-left font-semibold">Remarks</th>
                         </tr>

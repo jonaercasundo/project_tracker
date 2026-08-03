@@ -70,7 +70,7 @@ class WarehouseInventoryController extends Controller
     public function getDeliveriesForLot(Request $request)
     {
         $request->validate([
-            'lot_id' => 'required|integer|exists:lot,lot_id',
+            'lot_id' => 'required|integer|exists:lots,id',
         ]);
 
         $deliveries = Delivery::where('lot_id', $request->lot_id)
@@ -81,56 +81,56 @@ class WarehouseInventoryController extends Controller
         return response()->json($deliveries);
     }
 
-    public function getDeliveryItems(Request $request)
-    {
-        $request->validate([
-            'lot_id' => 'required|integer|exists:lots,lot_id',
-        ]);
-
-        $delivery = Delivery::with([
-            'project',
-            'lot',
-            'school',
-            'packageStatuses.package.packageContent.item'
-        ])
-        ->where('lot_id', $request->lot_id)
-        ->where('status', 'warehouse') // optional if only warehouse deliveries should be shown
-        ->latest('delivery_date')
-        ->first();
-
-        if (!$delivery) {
-            return response()->json([
-                'project' => '',
-                'lot' => '',
-                'school' => '',
-                'delivery_date' => '',
-                'items' => [],
+        public function getDeliveryItems(Request $request)
+        {
+            $request->validate([
+                'lot_id' => 'required|integer|exists:lots,id',
             ]);
-        }
 
-        $items = collect();
+            $delivery = Delivery::with([
+                'project',
+                'lot',
+                'school',
+                'packageStatuses.package.packageContent.item'
+            ])
+            ->where('lot_id', $request->lot_id)
+            ->where('status', 'warehouse') // optional if only warehouse deliveries should be shown
+            ->latest('delivery_date')
+            ->first();
 
-        foreach ($delivery->packageStatuses as $status) {
-
-            foreach ($status->package?->packageContent ?? [] as $content) {
-
-                $items->push([
-                    'package_status_id' => $status->package_status_id,
-                    'item_id'           => $content->item_id,
-                    'item_name'         => $content->item?->item_name ?? 'Unnamed Item',
-                    'qty'               => (int) $content->qty,
+            if (!$delivery) {
+                return response()->json([
+                    'project' => '',
+                    'lot' => '',
+                    'school' => '',
+                    'delivery_date' => '',
+                    'items' => [],
                 ]);
             }
-        }
 
-        return response()->json([
-            'project'       => $delivery->project->project_name ?? '',
-            'lot'           => $delivery->lot->lot_name ?? '',
-            'school'        => $delivery->school->school_name ?? '',
-            'delivery_date' => $delivery->delivery_date,
-            'items'         => $items->values(),
-        ]);
-    }
+            $items = collect();
+
+            foreach ($delivery->packageStatuses as $status) {
+
+                foreach ($status->package?->packageContent ?? [] as $content) {
+
+                    $items->push([
+                        'package_status_id' => $status->package_status_id,
+                        'item_id'           => $content->item_id,
+                        'item_name'         => $content->item?->item_name ?? 'Unnamed Item',
+                        'qty'               => (int) $content->qty,
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'project'       => $delivery->project->project_name ?? '',
+                'lot'           => $delivery->lot->lot_name ?? '',
+                'school'        => $delivery->school->school_name ?? '',
+                'delivery_date' => $delivery->delivery_date,
+                'items'         => $items->values(),
+            ]);
+        }
 
     // ==========================================================
     // NEW: validate a single QR — lookup only, NO writes.

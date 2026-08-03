@@ -84,27 +84,43 @@ class WarehouseInventoryController extends Controller
     public function getDeliveryItems(Request $request)
     {
         $request->validate([
-            'delivery_id' => 'required|integer|exists:deliveries,delivery_id',
+            'lot_id' => 'required|integer',
         ]);
 
-        $delivery = Delivery::with(['packageStatuses.package.packageContent.item'])
-            ->findOrFail($request->delivery_id);
+        $delivery = Delivery::with([
+            'project',
+            'lot',
+            'school',
+            'packageStatuses.package.packageContent.item'
+        ])
+        ->where('lot_id', $request->lot_id)
+        ->latest()
+        ->firstOrFail();
 
         $items = collect();
 
         foreach ($delivery->packageStatuses as $status) {
+
             foreach ($status->package?->packageContent ?? [] as $content) {
-                $itemName = $content->item?->item_name ?? 'Unnamed Item';
+
                 $items->push([
                     'package_status_id' => $status->package_status_id,
-                    'item_id' => $content->item_id,
-                    'item_name' => $itemName,
-                    'qty' => (int) ($content->qty ?? 0),
+                    'item_id'           => $content->item_id,
+                    'item_name'         => $content->item?->item_name ?? 'Unnamed Item',
+                    'qty'               => (int) $content->qty,
                 ]);
+
             }
+
         }
 
-        return response()->json($items->values());
+        return response()->json([
+            'project'       => $delivery->project->project_name,
+            'lot'           => $delivery->lot->lot_name,
+            'school'        => optional($delivery->school)->school_name,
+            'delivery_date' => $delivery->delivery_date,
+            'items'         => $items->values(),
+        ]);
     }
 
     // ==========================================================

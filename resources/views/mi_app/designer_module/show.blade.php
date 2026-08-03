@@ -307,7 +307,7 @@
                     <div class="tx-data-grid cols-2">
                         <div>
                             <p class="tx-datum-label" style="margin-bottom: 0.75rem;">Materials</p>
-                            @php $materialList = json_decode($product->materials ?? '[]', true) ?: []; @endphp
+                            @php  $materialList = $product->materials ?? []; @endphp
                             @forelse($materialList as $material)
                                 <span class="tx-chip material">{{ $material }}</span>
                             @empty
@@ -316,7 +316,7 @@
                         </div>
                         <div>
                             <p class="tx-datum-label" style="margin-bottom: 0.75rem;">Colors</p>
-                            @php $colorList = json_decode($product->color ?? '[]', true) ?: []; @endphp
+                            @php $colorList = $product->color ?? []; @endphp
                             @forelse($colorList as $color)
                                 <span class="tx-chip color">{{ $color }}</span>
                             @empty

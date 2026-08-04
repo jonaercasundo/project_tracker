@@ -60,7 +60,7 @@ class WarehouseInventoryController extends Controller
             'project_id' => 'required|integer|exists:projects,project_id',
         ]);
 
-        $lots = ProjectLot::where('project_id', $request->project_id)
+        $lots = lot::where('project_id', $request->project_id)
             ->select('lot_id', 'lot_name')
             ->orderBy('lot_name')
             ->get();

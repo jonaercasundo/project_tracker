@@ -389,20 +389,51 @@
                         </div>
                     </div>
 
-                    @php
-                        $images = $product->images->map(function ($image) {
-                            return [
-                                'title' => $image->image_type === 'upload' ? 'Uploaded Image' : 'Image Link',
-                                'url' => $image->image_type === 'upload'
-                                    ? asset('storage/'.$image->image_path)
-                                    : $image->image_url,
-                            ];
-                        })->filter(function ($image) {
-                            return !empty($image['url']);
-                        })->values()->toArray();
+@php
 
-                        $count = count($images);
-                    @endphp
+$convertImageUrl = function ($url) {
+
+    if (empty($url)) {
+        return null;
+    }
+
+    // Google Drive: uc?id=...
+    if (preg_match('/drive\.google\.com\/uc\?.*id=([^&]+)/', $url, $matches)) {
+        return "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
+    }
+
+    // Google Drive: file/d/...
+    if (preg_match('#drive\.google\.com/file/d/([^/]+)#', $url, $matches)) {
+        return "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
+    }
+
+    // Google Drive: open?id=...
+    if (preg_match('/drive\.google\.com\/open\?id=([^&]+)/', $url, $matches)) {
+        return "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
+    }
+
+    return trim($url);
+};
+
+$images = $product->images->map(function ($image) use ($convertImageUrl) {
+
+    return [
+        'title' => $image->image_type === 'upload'
+            ? 'Uploaded Image'
+            : 'Image Link',
+
+        'url' => $image->image_type === 'upload'
+            ? asset('storage/' . $image->image_path)
+            : $convertImageUrl($image->image_url),
+    ];
+
+})->filter(function ($image) {
+    return !empty($image['url']);
+})->values()->toArray();
+
+$count = count($images);
+
+@endphp
 
                     <span class="tx-gallery-count">
                         {{ $count }} Image{{ $count != 1 ? 's' : '' }}

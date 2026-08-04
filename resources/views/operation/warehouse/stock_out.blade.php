@@ -394,139 +394,266 @@
 
         // Calls a lookup/validate endpoint that returns item details
         // WITHOUT writing anything to the database.
-        async function validateScan(qr) {
-            try {
-                const response = await fetch("{{ route('warehouse.inventory.scan.validate') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json', // forces Laravel to return JSON on validation failures instead of a redirect
-                        'X-CSRF-TOKEN': getCsrfToken()
-                    },
-                    body: JSON.stringify({
-                        qr: qr,
-                        warehouse_id: warehouseId,
-                        transaction: transactionType,
-                        scan_type: scanType
-                    })
+async function validateScan(qr) {
+    let result = null;
+
+    try {
+        const response = await fetch("{{ route('warehouse.inventory.scan.validate') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken()
+            },
+            body: JSON.stringify({
+                qr: qr,
+                warehouse_id: warehouseId,
+                transaction: transactionType,
+                scan_type: scanType
+            })
+        });
+
+        try {
+            result = await response.json();
+        } catch {
+            console.error('Non-JSON response:', response.status);
+
+            scannedCount++;
+            failedCounter++;
+
+            addReviewRow({
+                package_status_id: null,
+                package: '-',
+                item: '-',
+                reason: 'Invalid server response'
+            });
+
+            updateDashboard();
+
+            return false;
+        }
+
+
+        scannedCount++;
+
+        const hasValidPackageName =
+            result.package_name &&
+            String(result.package_name).trim() !== '';
+
+
+        if (!response.ok) {
+            console.log('Validation failed:', result);
+        }
+
+
+        if (response.ok && result.success && hasValidPackageName) {
+
+
+            // FIX 1:
+            // Define scannedQty BEFORE using it
+            const scannedQty = Number(result.qty);
+
+
+            if (!scannedQty || scannedQty <= 0) {
+
+                failedCounter++;
+
+                addRow({
+                    package: result.package_name || '-',
+                    item: result.item || '-',
+                    qty: '-',
+                    status: 'Invalid quantity'
                 });
 
-                let result;
-                try {
-                    result = await response.json();
-                } catch {
-                    console.error('Non-JSON response, status:', response.status, response.statusText);
-                    scannedCount++;
-                    failedCounter++;
-                    addReviewRow({
-                        package_status_id: result.package_status_id,
-                        package: result.package,
-                        item: result.item,
-                        reason: result.message
-                    });
-                    updateDashboard();
-                    return false;
-                }
+                updateDashboard();
 
-                scannedCount++;
-                const hasValidPackageName =
-                    result.package_name &&
-                    String(result.package_name).trim() !== '';
-                if (!response.ok) {
-                    console.log('Validation failed:', result);
-                }
-                if (response.ok && result.success && hasValidPackageName) {
-                    successCounter++;
-                    if (!scannedQty || scannedQty <= 0) {
+                return false;
+            }
 
-                        failedCounter++;
 
-                        addRow({
-                            package: result.package_name || '-',
-                            item: result.item || '-',
-                            qty: '-',
-                            status: 'Invalid quantity'
-                        });
+            // Count only valid scans
+            successCounter++;
 
-                        updateDashboard();
 
-                        return false;
-                    }
-                    const scannedQty = Number(result.qty);
-                    const itemNameKey = normalizeItemName(result.item);
+            const itemNameKey = normalizeItemName(result.item);
 
-                    // Only merge single-item scans with a real name — never merge
-                    // multi-item package summaries (e.g. "3 items").
-                    const isMergeable = itemNameKey !== '' && result.item_id !== null;
 
-                    // Always record the full scan — this is what actually gets saved.
-                    stagedItems.push({
-                        qr: qr,
-                        package_status_id: result.package_status_id,
-                        item_id: result.item_id,
-                        package: result.package_name,
-                        item: result.item,
-                        qty: scannedQty
-                    });
+            const isMergeable =
+                itemNameKey !== '' &&
+                result.item_id !== null;
 
-                    if (isMergeable && stagedByItemName.has(itemNameKey)) {
-                        // Same item name as an earlier scan — merge the display row.
-                        const existing = stagedByItemName.get(itemNameKey);
-                        existing.totalQty += scannedQty;
-                        existing.count += 1;
-                        updateRowQty(existing.rowEl, existing.totalQty);
-                    } else {
-                    const rowEl = addRow({
-                        package: result.package_name,
-                        item: result.item,
-                        qty: scannedQty,
-                        status: transactionType === 'IN'
+
+
+            // Save actual scan record
+            stagedItems.push({
+
+                qr: qr,
+
+                package_status_id:
+                    result.package_status_id,
+
+                item_id:
+                    result.item_id,
+
+                package:
+                    result.package_name,
+
+                item:
+                    result.item,
+
+                qty:
+                    scannedQty
+
+            });
+
+
+
+            if (isMergeable && stagedByItemName.has(itemNameKey)) {
+
+
+                const existing =
+                    stagedByItemName.get(itemNameKey);
+
+
+                existing.totalQty += scannedQty;
+                existing.count++;
+
+                updateRowQty(
+                    existing.rowEl,
+                    existing.totalQty
+                );
+
+
+            } else {
+
+
+                const rowEl = addRow({
+
+                    package:
+                        result.package_name,
+
+                    item:
+                        result.item,
+
+                    qty:
+                        scannedQty,
+
+                    status:
+                        transactionType === 'IN'
                             ? 'Stock In'
                             : 'Stock Out'
+
+                });
+
+
+                if (isMergeable) {
+
+                    stagedByItemName.set(itemNameKey, {
+
+                        rowEl,
+
+                        totalQty:
+                            scannedQty,
+
+                        count:
+                            1
+
                     });
 
-                        if (isMergeable) {
-                            stagedByItemName.set(itemNameKey, {
-                                rowEl,
-                                totalQty: scannedQty,
-                                count: 1
-                            });
-                        }
-                    }
-
-                    updateDashboard();
-                    return true;
-                } else {
-                    failedCounter++;
-                    const msg = !hasValidPackageName
-                        ? 'No package name found — not staged'
-                        : (result.message ?? (result.errors ? Object.values(result.errors).flat().join(', ') : 'Failed'));
-
-                        addRow({
-                            package: result.package_name || '-',
-                            item: result.item || '-',
-                            qty: result.qty ?? '-',
-                            status: msg
-                        });
-                    updateDashboard();
-                    return false;
                 }
-            } catch (err) {
-                console.error(err);
-                scannedCount++;
-                failedCounter++;
-                addReviewRow({
-                    package_status_id: result.package_status_id,
-                    package: result.package_name,
-                    item: result.item,
-                    reason: result.message
-                });
-                updateDashboard();
-                return false;
-            } finally {
-                scannerInput.focus();
+
             }
+
+
+            updateDashboard();
+
+            return true;
+
+
+        } else {
+
+
+            failedCounter++;
+
+
+            const msg =
+                !hasValidPackageName
+                    ? 'No package name found — not staged'
+                    : (
+                        result.message ??
+                        (
+                            result.errors
+                                ? Object.values(result.errors).flat().join(', ')
+                                : 'Failed'
+                        )
+                    );
+
+
+            addRow({
+
+                package:
+                    result.package_name || '-',
+
+                item:
+                    result.item || '-',
+
+                qty:
+                    result.qty ?? '-',
+
+                status:
+                    msg
+
+            });
+
+
+            updateDashboard();
+
+            return false;
+
         }
+
+
+    } catch (err) {
+
+
+        console.error('Validate Scan Error:', err);
+
+
+        scannedCount++;
+        failedCounter++;
+
+
+        // FIX 2:
+        // result may not exist here
+        addReviewRow({
+
+            package_status_id:
+                result?.package_status_id ?? null,
+
+            package:
+                result?.package_name ?? '-',
+
+            item:
+                result?.item ?? '-',
+
+            reason:
+                err.message || 'Unexpected validation error'
+
+        });
+
+
+        updateDashboard();
+
+
+        return false;
+
+
+    } finally {
+
+        scannerInput.focus();
+
+    }
+}
 
         // ============================================================
         // TABLE / DASHBOARD RENDERING

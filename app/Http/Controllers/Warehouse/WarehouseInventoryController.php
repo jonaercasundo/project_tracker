@@ -113,21 +113,18 @@ class WarehouseInventoryController extends Controller
                 ]);
             }
 
-            $items = collect();
+            $items = [];
 
             foreach ($delivery->packageStatuses as $status) {
-
                 foreach ($status->package?->packageContent ?? [] as $content) {
-
                     $key = $content->item_id;
 
-                    if (!$items->has($key)) {
-
+                    if (!isset($items[$key])) {
                         $items[$key] = [
-                            'item_id'       => $content->item_id,
-                            'item_name'     => $content->item?->item_name ?? 'Unnamed Item',
-                            'unit'          => $content->item?->unit ?? '',
-                            'qty'           => 0, // delivered qty for this item, summed across packages
+                            'item_id'   => $content->item_id,
+                            'item_name' => $content->item?->item_name ?? 'Unnamed Item',
+                            'unit'      => $content->item?->unit ?? '',
+                            'qty'       => 0,
                         ];
                     }
 
@@ -141,7 +138,7 @@ class WarehouseInventoryController extends Controller
                 'lot'           => $delivery->lot->lot_name ?? '',
                 'school'        => $delivery->school->school_name ?? '',
                 'delivery_date' => $delivery->delivery_date,
-                'items'         => $items->values(),
+                'items'         => array_values($items),
             ]);
         } catch (\Throwable $e) {
 

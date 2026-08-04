@@ -133,7 +133,7 @@
                         // here correctly, then immediately overwritten below by
                         // $history->qty_change, a column that doesn't exist on
                         // inventory_history — that dead/wrong block has been removed.)
-                        $qtyDelta = (int) $history->new_qty - (int) $history->old_qty;
+                        $qtyDelta = $history->qty_change;
                         $deltaSign = $qtyDelta > 0 ? '+' : '';
                         $deltaClass = $qtyDelta > 0
                             ? 'text-emerald-600 font-semibold'

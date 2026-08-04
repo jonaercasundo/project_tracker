@@ -222,8 +222,12 @@ public function history(Request $request)
 {
     $query = InventoryHistory::query()
     ->select([
-        DB::raw('IFNULL(batch_no, CONCAT("IND-", history_id)) as batch_key'),
+        DB::raw("COALESCE(batch_no, CONCAT('IND-', history_id)) as batch_key"),
+
         DB::raw('MAX(history_id) as history_id'),
+        DB::raw('MIN(history_id) as first_history_id'),
+        DB::raw('MAX(history_id) as last_history_id'),
+
         DB::raw('MAX(batch_no) as batch_no'),
         DB::raw('MAX(item_id) as item_id'),
         DB::raw('MAX(warehouse_id) as warehouse_id'),
@@ -231,10 +235,6 @@ public function history(Request $request)
         DB::raw('MAX(changed_by) as changed_by'),
         DB::raw('MAX(remarks) as remarks'),
         DB::raw('MAX(changed_at) as changed_at'),
-
-        DB::raw('MIN(old_qty) as old_qty'),
-        DB::raw('MAX(new_qty) as new_qty'),
-        DB::raw('(MAX(new_qty) - MIN(old_qty)) as qty_change'),
     ])
     ->groupBy(
         DB::raw('IFNULL(batch_no, CONCAT("IND-", history_id))'),
@@ -282,7 +282,17 @@ public function history(Request $request)
         ->orderByDesc(DB::raw('MAX(changed_at)'))
         ->paginate(50)
         ->withQueryString();
+    $histories->getCollection()->transform(function ($history) {
 
+        $first = InventoryHistory::find($history->first_history_id);
+        $last  = InventoryHistory::find($history->last_history_id);
+
+        $history->old_qty = $first->old_qty;
+        $history->new_qty = $last->new_qty;
+        $history->qty_change = $last->new_qty - $first->old_qty;
+
+        return $history;
+    });
     $warehouses = Warehouse::orderBy('warehouse_name')->get();
 
     return view('inventory.history', compact(

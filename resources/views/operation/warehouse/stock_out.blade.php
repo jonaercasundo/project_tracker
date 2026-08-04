@@ -373,7 +373,7 @@
                 duplicateCounter++;
                 addReviewRow({
                     package_status_id:null,
-                    package_name:'-',
+                    package:'-',
                     item:'-',
                     reason:'Duplicate QR scanned'
                 });
@@ -765,6 +765,21 @@ async function validateScan(qr) {
 
             reviewTable.appendChild(row);
         }
+
+        // Handles the "Remove" button inside review rows. Delegated on the
+        // table body since rows are added dynamically after page load.
+        reviewTable.addEventListener('click', function (e) {
+            const btn = e.target.closest('.remove-review');
+            if (!btn) return;
+
+            const row = btn.closest('tr');
+            if (row) row.remove();
+
+            if (reviewTable.children.length === 0) {
+                reviewSection.classList.add('hidden');
+            }
+        });
+
         // ============================================================
         // SAVE TO DATABASE (batch commit)
         // ============================================================

@@ -9,6 +9,7 @@ use App\Models\Keystage;
 use App\Models\PackageStatus;
 use App\Models\Item;
 use App\Models\Package;
+use App\Models\Lot;
 
 class Delivery extends Model
 {

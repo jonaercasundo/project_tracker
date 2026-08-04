@@ -506,12 +506,9 @@ class WarehouseInventoryController extends Controller
             'items.*.remarks'      => 'nullable|string',
         ]);
 
-        $deliveries = Delivery::with([
-            'packageStatuses.package.packageContent.item'
-        ])
-        ->where('lot_id', $request->lot_id)
-        ->where('status', 'pending')
-        ->get();
+        $deliveries = Delivery::where('lot_id', $request->lot_id)
+            ->where('status', 'pending')
+            ->get();
 
         if ($deliveries->isEmpty()) {
             return response()->json([
@@ -525,19 +522,15 @@ class WarehouseInventoryController extends Controller
 
         $deliveredTotals = [];
 
-        foreach ($deliveries as $delivery) {
+        foreach ($request->items as $item) {
 
-            foreach ($delivery->packageStatuses as $status) {
+            $itemId = $item['item_id'];
 
-                foreach ($status->package?->packageContent ?? [] as $content) {
-
-                    $itemName = strtolower($content->item?->item_name ?? '');
-
-                    $deliveredTotals[$content->item_id] =
-                        (str_contains($itemName, 'teacher') || str_contains($itemName, 'manual'))
-                            ? $totalTeacherQty
-                            : $totalPackageQty;
-                }
+            // Replace these IDs with your actual Teacher Manual item IDs
+            if ($itemId == 756) {
+                $deliveredTotals[$itemId] = $totalTeacherQty;
+            } else {
+                $deliveredTotals[$itemId] = $totalPackageQty;
             }
         }
 
@@ -622,23 +615,25 @@ class WarehouseInventoryController extends Controller
             }
         }
 
-        // Only close out the delivery's package statuses if every item came in complete.
         if ($fullyReceived && count($results['failed']) === 0) {
-            foreach ($deliveries as $delivery) {
 
-                foreach ($delivery->packageStatuses as $status) {
+            // Update all package statuses for this lot
+            PackageStatus::whereIn(
+                'delivery_id',
+                Delivery::where('lot_id', $request->lot_id)
+                    ->where('status', 'pending')
+                    ->pluck('delivery_id')
+            )->update([
+                'status'  => 'warehouse',
+                'remarks' => 'Received by Warehouse (Lot Stock In)',
+            ]);
 
-                    if ($status->status !== 'warehouse') {
-                        $status->status = 'warehouse';
-                        $status->remarks = 'Received by Warehouse (Lot Stock In)';
-                        $status->save();
-                    }
-
-                }
-
-                $delivery->status = 'warehouse'; // or 'completed' if that's your status
-                $delivery->save();
-            }
+            // Update all deliveries for this lot
+            Delivery::where('lot_id', $request->lot_id)
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'warehouse',
+                ]);
         }
 
         return response()->json([

@@ -98,7 +98,7 @@ class WarehouseInventoryController extends Controller
                 'packageStatuses.package.packageContent.item'
             ])
             ->where('lot_id', $request->lot_id)
-            ->where('status', 'warehouse') // optional if only warehouse deliveries should be shown
+            ->where('status', '!=', 'warehouse')  // optional if only warehouse deliveries should be shown
             ->latest('delivery_date')
             ->first();
 

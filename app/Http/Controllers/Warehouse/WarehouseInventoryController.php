@@ -189,88 +189,127 @@ class WarehouseInventoryController extends Controller
         $request->validate([
             'qr'           => 'required|string',
             'warehouse_id' => 'required|integer',
-            'transaction'  => 'required|in:IN,OUT',
         ]);
 
+        // Extract package_status_id from QR
         $packageStatusId = $this->extractPackageStatusId($request->qr);
 
         if (!$packageStatusId) {
-            return response()->json(['success' => false, 'message' => 'Invalid QR code.']);
-        }
-
-        $status = PackageStatus::with('package.contents.item')
-            ->find($packageStatusId);
-
-        if (!$status) {
-            return response()->json(['success' => false, 'message' => 'Package not found.']);
-        }
-
-        if ($request->transaction === 'IN') {
-
-            // Stock In: reject if already in warehouse
-            if ($status->status === 'warehouse') {
-
-                return response()->json([
-                    'success' => false,
-                    'already_scanned' => true,
-                    'package_status_id' => $status->package_status_id,
-                    'package' => $status->package->package_num,
-                    'message' => 'Already received in Warehouse.'
-                ]);
-
-            }
-
-        } else {
-
-            // Stock Out: package must already be in warehouse
-            if ($status->status !== 'warehouse') {
-
-                return response()->json([
-                    'success' => false,
-                    'package_status_id' => $status->package_status_id,
-                    'package' => $status->package->package_num,
-                    'message' => 'Package is not inside the warehouse.'
-                ]);
-
-            }
-
-        }
-
-        $contents = $status->package->contents;
-
-        if ($contents->isEmpty()) {
-            return response()->json(['success' => false, 'message' => 'Package has no contents defined.']);
-        }
-
-        $packageName = $status->package->package_num ?? null;
-
-        if (!$packageName) {
             return response()->json([
                 'success' => false,
-                'message' => 'Package record exists but has no package number assigned.',
+                'message' => 'Invalid QR code.'
             ]);
         }
 
+
+        // Load package + contents + item + delivery
+        $status = PackageStatus::with([
+            'delivery',
+            'package.contents.item'
+        ])->find($packageStatusId);
+
+
+        if (!$status) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Package not found.'
+            ]);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STOCK OUT VALIDATION
+        |--------------------------------------------------------------------------
+        */
+
+        // Package must already be received by warehouse
+        if ($status->status !== 'warehouse') {
+
+            return response()->json([
+                'success'           => false,
+                'package_status_id' => $status->package_status_id,
+                'package_id'        => $status->package_id,
+                'message'           => 'Package is not available for stock out.'
+            ]);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PACKAGE CONTENTS
+        |--------------------------------------------------------------------------
+        */
+
+        $contents = $status->package?->contents ?? collect();
+
+
+        if ($contents->isEmpty()) {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Package has no contents defined.'
+            ]);
+        }
+
+
+        $packageName = $status->package->package_num ?? null;
+
+
+        if (!$packageName) {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Package number not assigned.'
+            ]);
+        }
+
+
         $isSingleItem = $contents->count() === 1;
+
 
         $itemName = $isSingleItem
             ? ($contents->first()->item->item_name ?? null)
             : $contents->count() . ' items';
 
+
         if ($isSingleItem && !$itemName) {
+
             return response()->json([
                 'success' => false,
-                'message' => 'Item record exists but has no name assigned.',
+                'message' => 'Item record exists but has no name.'
             ]);
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUCCESS RESPONSE
+        |--------------------------------------------------------------------------
+        */
+
         return response()->json([
+
             'success'           => true,
+
             'package_status_id' => $status->package_status_id,
-            'package'           => $packageName,
+
+            'package_id'        => $status->package_id,
+
+            'delivery_id'       => $status->delivery_id,
+
+            'dr_no'             => $status->delivery->dr_no ?? null,
+
+            'package_name'      => 'Package #' . $packageName,
+
             'item'              => $itemName,
-            'item_id'           => $isSingleItem ? $contents->first()->item_id : null,
+
+            'item_id'           => $isSingleItem
+                                    ? $contents->first()->item_id
+                                    : null,
+
             'qty'               => $contents->sum('qty'),
+
         ]);
     }
 

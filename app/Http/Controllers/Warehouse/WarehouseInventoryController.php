@@ -109,16 +109,26 @@ class WarehouseInventoryController extends Controller
                     ]);
                 }
                 $items = collect();
+
                 foreach ($delivery->packageStatuses as $status) {
 
                     foreach ($status->package?->packageContent ?? [] as $content) {
 
-                        $items->push([
-                            'package_status_id' => $status->package_status_id,
-                            'item_id'           => $content->item_id,
-                            'item_name'         => $content->item?->item_name ?? 'Unnamed Item',
-                            'qty'               => (int) $content->qty,
-                        ]);
+                        $key = $content->item_id;
+
+                        if (!$items->has($key)) {
+
+                            $items[$key] = [
+                                'item_id'       => $content->item_id,
+                                'item_name'     => $content->item?->item_name ?? 'Unnamed Item',
+                                'unit'          => $content->item?->unit ?? '',
+                                'delivered_qty' => 0,
+                                'received_qty'  => 0,
+                            ];
+                        }
+
+                        $items[$key]['delivered_qty'] += (int) $content->qty;
+                        $items[$key]['received_qty'] += (int) $content->qty;
                     }
                 }
                 return response()->json([

@@ -577,7 +577,7 @@ async function validateScan(qr) {
 
 
             const msg =
-                !hasValidPackageName
+                (result.success && !hasValidPackageName)
                     ? 'No package name found — not staged'
                     : (
                         result.message ??

@@ -189,7 +189,6 @@ public function validateScan(Request $request)
     $request->validate([
         'qr'           => 'required|string',
         'warehouse_id' => 'required|integer',
-        'transaction'  => 'required|in:IN,OUT',
     ]);
 
 
@@ -235,26 +234,6 @@ public function validateScan(Request $request)
 
     }
 
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | STOCK OUT VALIDATION
-    |--------------------------------------------------------------------------
-    */
-
-    if ($request->transaction === 'OUT') {
-
-        if ($status->status !== 'warehouse') {
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Package is not available in warehouse.'
-            ]);
-
-        }
-
-    }
 
 
 
@@ -417,11 +396,10 @@ if ($drQty <= 0) {
         Log::info('SAVE REQUEST', $request->all());
         $request->validate([
             'warehouse_id'              => 'required|exists:warehouse,warehouse_id',
-            'transaction'               => 'required|in:IN,OUT',
             'items'                     => 'required|array|min:1',
             'items.*.package_status_id' => 'required|integer',
         ]);
-
+        $transaction = 'OUT';
         $batchNo = 'BATCH-' . now()->format('YmdHis');
 
         $results = [
@@ -451,21 +429,18 @@ if ($drQty <= 0) {
                         throw new \Exception('Package has no contents.');
                     }
 
-                    if ($request->transaction === 'IN') {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | STOCK OUT VALIDATION
+                    |--------------------------------------------------------------------------
+                    */
 
-                        if ($status->status === 'warehouse') {
-                            throw new \RuntimeException(
-                                'Already received in warehouse.'
-                            );
-                        }
+                    if ($status->status !== 'warehouse') {
 
-                    } else {
+                        throw new \RuntimeException(
+                            'Package is not available in warehouse.'
+                        );
 
-                        if ($status->status !== 'warehouse') {
-                            throw new \RuntimeException(
-                                'Package is not inside warehouse.'
-                            );
-                        }
                     }
 
                     foreach ($status->package->contents as $content) {
@@ -484,12 +459,6 @@ if ($drQty <= 0) {
                             ? $inventory->qty
                             : 0;
 
-                        if ($request->transaction === 'IN') {
-
-                            $newQty = $oldQty + $content->qty;
-
-                        } else {
-
                             if ($oldQty < $content->qty) {
 
                                 throw new \RuntimeException(
@@ -499,7 +468,6 @@ if ($drQty <= 0) {
                             }
 
                             $newQty = $oldQty - $content->qty;
-                        }
 
                         /*
                         |--------------------------------------------------------------------------
@@ -539,14 +507,8 @@ if ($drQty <= 0) {
                             'new_qty'      => $newQty,
 
                             'changed_by'   => Auth::user()->name,
-
-                            'remarks' => $request->transaction === 'IN'
-                                ? 'Stock In via QR Scanner'
-                                : 'Stock Out via QR Scanner',
-
-                            'change_type' => $request->transaction === 'IN'
-                                ? 'stock_in'
-                                : 'stock_out',
+                            'remarks' => 'Stock Out via QR Scanner',
+                            'change_type' => 'stock_out',
 
                         ]);
 

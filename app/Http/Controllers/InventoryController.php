@@ -220,79 +220,109 @@ public function summary(Request $request)
 }
 public function history(Request $request)
 {
+    $batchExpr = "IFNULL(batch_no, CONCAT('IND-', history_id))";
+
     $query = InventoryHistory::query()
-    ->select([
-        DB::raw("COALESCE(batch_no, CONCAT('IND-', history_id)) as batch_key"),
+        ->select([
+            DB::raw("$batchExpr AS batch_key"),
 
-        DB::raw('MAX(history_id) as history_id'),
-        DB::raw('MIN(history_id) as first_history_id'),
-        DB::raw('MAX(history_id) as last_history_id'),
+            DB::raw('MIN(history_id) AS first_history_id'),
+            DB::raw('MAX(history_id) AS last_history_id'),
 
-        DB::raw('MAX(batch_no) as batch_no'),
-        DB::raw('MAX(item_id) as item_id'),
-        DB::raw('MAX(warehouse_id) as warehouse_id'),
-        DB::raw('MAX(change_type) as change_type'),
-        DB::raw('MAX(changed_by) as changed_by'),
-        DB::raw('MAX(remarks) as remarks'),
-        DB::raw('MAX(changed_at) as changed_at'),
-    ])
-    ->groupBy(
-        DB::raw('IFNULL(batch_no, CONCAT("IND-", history_id))'),
-        'item_id'
-    )
-    ->with([
-        'item',
-        'warehouse'
-    ]);
+            DB::raw('MAX(history_id) AS history_id'),
+            DB::raw('MAX(batch_no) AS batch_no'),
+            DB::raw('MAX(item_id) AS item_id'),
+            DB::raw('MAX(warehouse_id) AS warehouse_id'),
+            DB::raw('MAX(change_type) AS change_type'),
+            DB::raw('MAX(changed_by) AS changed_by'),
+            DB::raw('MAX(remarks) AS remarks'),
+            DB::raw('MAX(changed_at) AS changed_at'),
+        ])
+        ->groupBy(
+            DB::raw($batchExpr),
+            'item_id'
+        )
+        ->with([
+            'item',
+            'warehouse'
+        ]);
 
-    // Search
+    /*
+    |--------------------------------------------------------------------------
+    | Search
+    |--------------------------------------------------------------------------
+    */
+
     if ($request->filled('search')) {
         $search = $request->search;
 
         $query->where(function ($q) use ($search) {
             $q->where('changed_by', 'like', "%{$search}%")
-              ->orWhere('remarks', 'like', "%{$search}%")
-              ->orWhereHas('item', function ($item) use ($search) {
-                  $item->where('item_name', 'like', "%{$search}%");
-              });
+                ->orWhere('remarks', 'like', "%{$search}%")
+                ->orWhereHas('item', function ($item) use ($search) {
+                    $item->where('item_name', 'like', "%{$search}%");
+                });
         });
     }
 
-    // Change Type
+    /*
+    |--------------------------------------------------------------------------
+    | Filters
+    |--------------------------------------------------------------------------
+    */
+
     if ($request->filled('change_type')) {
         $query->where('change_type', $request->change_type);
     }
 
-    // Warehouse
     if ($request->filled('warehouse_id')) {
         $query->where('warehouse_id', $request->warehouse_id);
     }
 
-    // Date From
     if ($request->filled('date_from')) {
         $query->whereDate('changed_at', '>=', $request->date_from);
     }
 
-    // Date To
     if ($request->filled('date_to')) {
         $query->whereDate('changed_at', '<=', $request->date_to);
     }
 
     $histories = $query
-        ->orderByDesc(DB::raw('MAX(changed_at)'))
+        ->orderByDesc('changed_at')
         ->paginate(50)
         ->withQueryString();
-    $histories->getCollection()->transform(function ($history) {
 
-        $first = InventoryHistory::find($history->first_history_id);
-        $last  = InventoryHistory::find($history->last_history_id);
+    /*
+    |--------------------------------------------------------------------------
+    | Load first & last history
+    |--------------------------------------------------------------------------
+    */
 
-        $history->old_qty = $first->old_qty;
-        $history->new_qty = $last->new_qty;
-        $history->qty_change = $last->new_qty - $first->old_qty;
+    $ids = collect();
+
+    foreach ($histories as $history) {
+        $ids->push($history->first_history_id);
+        $ids->push($history->last_history_id);
+    }
+
+    $historyMap = InventoryHistory::whereIn('history_id', $ids)
+        ->get()
+        ->keyBy('history_id');
+
+    $histories->getCollection()->transform(function ($history) use ($historyMap) {
+
+        $first = $historyMap[$history->first_history_id] ?? null;
+        $last  = $historyMap[$history->last_history_id] ?? null;
+
+        if ($first && $last) {
+            $history->old_qty = $first->old_qty;
+            $history->new_qty = $last->new_qty;
+            $history->qty_change = $last->new_qty - $first->old_qty;
+        }
 
         return $history;
     });
+
     $warehouses = Warehouse::orderBy('warehouse_name')->get();
 
     return view('inventory.history', compact(

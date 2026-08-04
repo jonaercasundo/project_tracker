@@ -127,9 +127,17 @@
                             'delivered' => ['bg-purple-50 text-purple-700 border border-purple-200/50', 'bg-purple-500', 'Delivered'],
                             default  => ['bg-rose-50 text-rose-700 border border-rose-200/50', 'bg-rose-500', 'Delete'],
                         };
+
+                        // Single source of truth for the delta — derived straight from
+                        // old_qty/new_qty on this row. (Previously this was computed
+                        // here correctly, then immediately overwritten below by
+                        // $history->qty_change, a column that doesn't exist on
+                        // inventory_history — that dead/wrong block has been removed.)
                         $qtyDelta = (int) $history->new_qty - (int) $history->old_qty;
-                        $deltaClass = $qtyDelta > 0 ? 'text-emerald-600 font-semibold' : ($qtyDelta < 0 ? 'text-rose-600 font-semibold' : 'text-slate-400');
                         $deltaSign = $qtyDelta > 0 ? '+' : '';
+                        $deltaClass = $qtyDelta > 0
+                            ? 'text-emerald-600 font-semibold'
+                            : ($qtyDelta < 0 ? 'text-rose-600 font-semibold' : 'text-slate-400');
                     @endphp
 
                     <tr class="hover:bg-slate-50/40 transition-colors duration-150">
@@ -144,7 +152,6 @@
                         <td class="px-5 py-3.5 text-xs text-slate-700 whitespace-nowrap">
                             <span class="font-medium">{{ $history->batch_no ?? 'Individual' }}</span>
                         </td>
-                        </td>
 
                         {{-- Item --}}
                         <td class="px-5 py-3.5 text-xs font-semibold text-slate-900 tracking-tight">
@@ -156,14 +163,7 @@
                             {{ optional($history->warehouse)->warehouse_name }}
                         </td>
 
-                        @php
-                            $qtyDelta = $history->qty_change;
-                            $deltaSign = $qtyDelta > 0 ? '+' : '';
-                            $deltaClass = $qtyDelta > 0
-                                ? 'text-emerald-600'
-                                : ($qtyDelta < 0 ? 'text-red-600' : 'text-slate-500');
-                        @endphp
-
+                        {{-- Qty Change --}}
                         <td class="px-5 py-3.5 whitespace-nowrap">
                             <div class="flex items-center justify-center gap-2 text-xs tabular-nums">
                                 <span class="text-slate-400 font-normal">{{ $history->old_qty }}</span>
@@ -178,7 +178,7 @@
                                     ({{ $deltaSign }}{{ $qtyDelta }})
                                 </span>
                             </div>
-                        </td>                       
+                        </td>
 
                         {{-- Change Badge --}}
                         <td class="px-5 py-3.5 text-center whitespace-nowrap">

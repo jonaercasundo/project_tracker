@@ -117,7 +117,7 @@
                     <thead class="bg-slate-100 text-slate-700">
                         <tr>
                             <th class="px-4 py-3 text-left font-semibold">Item</th>
-                            <th class="px-4 py-3 text-center font-semibold">Delivered</th>
+                            <th class="px-4 py-3 text-center font-semibold" hidden>Delivered</th>
                             <th class="px-4 py-3 text-center font-semibold">Received</th>
                             <th class="px-4 py-3 text-center font-semibold">Remaining</th>
                             <th class="px-4 py-3 text-left font-semibold">Remarks</th>
@@ -277,7 +277,7 @@
                             return `
                                 <tr data-item-id="${item.item_id}">
                                     <td class="px-4 py-3 font-medium text-slate-800">${item.item_name || 'Unnamed Item'}</td>
-                                    <td class="px-4 py-3 text-center text-slate-600">${delivered}</td>
+                                    <td class="px-4 py-3 text-center text-slate-600" hidden>${delivered}</td>
                                     <td class="px-4 py-3 text-center">
                                         <input type="number" min="0" max="${delivered}" value="${delivered}"
                                                data-delivered="${delivered}"

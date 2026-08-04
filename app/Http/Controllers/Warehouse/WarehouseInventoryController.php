@@ -84,82 +84,101 @@ class WarehouseInventoryController extends Controller
         return response()->json($deliveries);
     }
 
-    public function getDeliveryItems(Request $request)
-    {
-        try {
-            $request->validate([
-                'lot_id' => 'required|integer|exists:lot,lot_id',
-            ]);
+        public function getDeliveryItems(Request $request)
+        {
+            try {
 
-            $delivery = Delivery::with([
-                'project',
-                'lot',
-                'school',
-                'packageStatuses.package.packageContent.item'
-            ])
-            ->where('lot_id', $request->lot_id)
-            ->where('status', 'pending') // only pending deliveries are eligible for stock-in
-            ->latest('delivery_date')
-            ->first();
+                $request->validate([
+                    'lot_id' => 'required|integer|exists:lot,lot_id',
+                ]);
 
-            if (!$delivery) {
+                $deliveries = Delivery::with([
+                    'project',
+                    'lot',
+                    'school',
+                    'packageStatuses.package.packageContent.item'
+                ])
+                ->where('lot_id', $request->lot_id)
+                ->where('status', 'pending')
+                ->get();
+
+                if ($deliveries->isEmpty()) {
+                    return response()->json([
+                        'delivery_id'   => null,
+                        'project'       => '',
+                        'lot'           => '',
+                        'school'        => '',
+                        'delivery_date' => '',
+                        'items'         => [],
+                    ]);
+                }
+
+                $firstDelivery = $deliveries->first();
+
+                // Total quantities for the whole lot
+                $totalPackageQty = $deliveries->sum('package_qty');
+                $totalTeacherQty = $deliveries->sum('qty_teachers_manual');
+
+                $items = [];
+
+                foreach ($deliveries as $delivery) {
+
+                    foreach ($delivery->packageStatuses as $status) {
+
+                        foreach ($status->package?->packageContent ?? [] as $content) {
+
+                            $itemId = $content->item_id;
+
+                            if (isset($items[$itemId])) {
+                                continue;
+                            }
+
+                            $itemName = strtolower($content->item?->item_name ?? '');
+
+                            // Teacher Manual
+                            if (
+                                str_contains($itemName, 'teacher') ||
+                                str_contains($itemName, 'manual')
+                            ) {
+                                $qty = $totalTeacherQty;
+                            } else {
+                                $qty = $totalPackageQty;
+                            }
+
+                            $items[$itemId] = [
+                                'item_id'   => $itemId,
+                                'item_name' => $content->item?->item_name ?? 'Unnamed Item',
+                                'unit'      => $content->item?->unit ?? '',
+                                'qty'       => (int) $qty,
+                            ];
+                        }
+                    }
+                }
+
                 return response()->json([
-                    'delivery_id'   => null,
-                    'project'       => '',
-                    'lot'           => '',
+                    'delivery_id'   => null, // Per LOT, not per DR
+                    'project'       => $firstDelivery->project->project_name ?? '',
+                    'lot'           => $firstDelivery->lot->lot_name ?? '',
                     'school'        => '',
                     'delivery_date' => '',
-                    'items'         => [],
+                    'items'         => array_values($items),
                 ]);
+
+            } catch (\Throwable $e) {
+
+                Log::error('getDeliveryItems failed', [
+                    'message' => $e->getMessage(),
+                    'line'    => $e->getLine(),
+                    'file'    => $e->getFile(),
+                ]);
+
+                return response()->json([
+                    'error' => $e->getMessage(),
+                    'line'  => $e->getLine(),
+                    'file'  => $e->getFile(),
+                ], 500);
             }
-
-$items = [];
-
-foreach ($delivery->packageStatuses as $status) {
-    foreach ($status->package?->packageContent ?? [] as $content) {
-
-        $itemName = strtolower($content->item?->item_name ?? '');
-
-        // Default quantity
-        $qty = $delivery->package_qty;
-
-        // Teacher's Manual uses a different field
-        if (str_contains($itemName, 'teacher')) {
-            $qty = $delivery->qty_teachers_manual ?? 0;
         }
-
-        $items[$content->item_id] = [
-            'item_id'   => $content->item_id,
-            'item_name' => $content->item?->item_name ?? 'Unnamed Item',
-            'unit'      => $content->item?->unit ?? '',
-            'qty'       => (int) $qty,
-        ];
-    }
-}
-
-            return response()->json([
-                'delivery_id'   => $delivery->delivery_id,
-                'project'       => $delivery->project->project_name ?? '',
-                'lot'           => $delivery->lot->lot_name ?? '',
-                'school'        => $delivery->school->school_name ?? '',
-                'delivery_date' => $delivery->delivery_date,
-                'items'         => array_values($items),
-            ]);
-        } catch (\Throwable $e) {
-
-            Log::error('getDeliveryItems failed', [
-                'message' => $e->getMessage(),
-                'line'    => $e->getLine(),
-                'file'    => $e->getFile(),
-            ]);
-
-            return response()->json([
-                'error' => $e->getMessage(),
-                'line'  => $e->getLine(),
-                'file'  => $e->getFile(),
-            ], 500);
-        }
-    }
 
     // ==========================================================
     // NEW: validate a single QR — lookup only, NO writes.

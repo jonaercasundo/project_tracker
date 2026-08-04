@@ -120,15 +120,52 @@
 
                             if (items.length) {
                                 itemsTable.innerHTML = items.map(item => `
-                                    <tr class="border-t border-slate-100">
-                                        <td class="px-4 py-3 font-medium text-slate-800">${item.item_name || 'Unnamed Item'}</td>
-                                        <td class="px-4 py-3 text-center">
-                                            <input type="number" min="0" value="0" class="w-24 rounded-xl border border-slate-300 px-3 py-2 text-center text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
-                                        </td>
-                                        <td class="px-4 py-3 text-slate-600">
-                                            <input type="text" placeholder="Remarks" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
-                                        </td>
-                                    </tr>
+                                <tr class="border-t">
+
+                                    <td class="px-4 py-3">
+
+                                        <div class="font-semibold">
+                                            ${item.item_name}
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-4 py-3 text-center">
+
+                                        ${item.delivered_qty}
+
+                                    </td>
+
+                                    <td class="px-4 py-3 text-center">
+
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="${item.delivered_qty}"
+                                            value="${item.delivered_qty}"
+                                            data-delivered="${item.delivered_qty}"
+                                            class="receivedQty w-24 rounded-lg border px-2 py-1 text-center">
+
+                                    </td>
+
+                                    <td class="px-4 py-3 text-center">
+
+                                        <span class="remainingQty">
+                                            0
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-4 py-3">
+
+                                        <input
+                                            type="text"
+                                            class="w-full rounded-lg border px-2 py-1"
+                                            placeholder="Remarks">
+
+                                    </td>
+
+                                </tr>
                                 `).join('');
                                 itemsSection.classList.remove('hidden');
                                 saveSection.classList.remove('hidden');
@@ -146,6 +183,32 @@
                         });
                 });
             });
+            document.querySelectorAll('.receivedQty').forEach(input => {
+
+    input.addEventListener('input', function () {
+
+        let delivered = parseInt(this.dataset.delivered);
+
+        let received = parseInt(this.value);
+
+        if (isNaN(received))
+            received = 0;
+
+        if (received > delivered)
+            received = delivered;
+
+        if (received < 0)
+            received = 0;
+
+        this.value = received;
+
+        this.closest('tr')
+            .querySelector('.remainingQty')
+            .textContent = delivered - received;
+
+    });
+
+});
         </script>
         @endpush
 
@@ -174,22 +237,57 @@
         </div>
 
         <div id="itemsSection" class="hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/60">
+
             <div class="border-b border-slate-200 px-6 py-4">
-                <h2 class="text-lg font-semibold text-slate-900">Delivery Items</h2>
-                <p class="mt-1 text-sm text-slate-500">Review the package contents and enter the quantity received into the warehouse.</p>
+                <h2 class="text-lg font-semibold text-slate-900">
+                    Delivery Items
+                </h2>
+
+                <p class="mt-1 text-sm text-slate-500">
+                    Encode the quantity that was actually received in the warehouse.
+                </p>
             </div>
+
             <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-slate-100 text-slate-700">
+
+                <table class="min-w-full">
+
+                    <thead class="bg-slate-100">
+
                         <tr>
-                            <th class="px-4 py-3 text-left font-semibold">Item</th>
-                            <th class="px-4 py-3 text-center font-semibold">Received Quantity</th>
-                            <th class="px-4 py-3 text-left font-semibold">Remarks</th>
+
+                            <th class="px-4 py-3 text-left">
+                                Item
+                            </th>
+
+                            <th class="px-4 py-3 text-center">
+                                Delivered
+                            </th>
+
+                            <th class="px-4 py-3 text-center">
+                                Received
+                            </th>
+
+                            <th class="px-4 py-3 text-center">
+                                Remaining
+                            </th>
+
+                            <th class="px-4 py-3">
+                                Remarks
+                            </th>
+
                         </tr>
+
                     </thead>
-                    <tbody id="itemsTable"></tbody>
+
+                    <tbody id="itemsTable">
+
+                    </tbody>
+
                 </table>
+
             </div>
+
         </div>
 
         <div id="saveSection" class="hidden flex justify-end">
@@ -198,4 +296,5 @@
             </button>
         </div>
     </div>
+    
 </x-project_warehouse_app>

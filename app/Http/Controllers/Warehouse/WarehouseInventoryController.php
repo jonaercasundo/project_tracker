@@ -87,7 +87,7 @@ class WarehouseInventoryController extends Controller
         {
         try {
                 $request->validate([
-                    'lot_id' => 'required|integer|exists:lots,lot_id',
+                    'lot_id' => 'required|integer|exists:lot,lot_id',
                 ]);
                 $delivery = Delivery::with([
                     'project',

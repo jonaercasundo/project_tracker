@@ -446,13 +446,10 @@
                     // Always record the full scan — this is what actually gets saved.
                     stagedItems.push({
                         qr: qr,
-                        package_status_id: result.package_status_id ?? null,
-                        package_id: result.package_id ?? null,
-                        delivery_id: result.delivery_id ?? null,
-                        dr_no: result.dr_no ?? null,
-                        item_id: result.item_id ?? null,
-                        package_name: result.package_name,
-                        item: result.item ?? null,
+                        package_status_id: result.package_status_id,
+                        item_id: result.item_id,
+                        package: result.package_name,
+                        item: result.item,
                         qty: scannedQty
                     });
 
@@ -504,7 +501,7 @@
                 failedCounter++;
                 addReviewRow({
                     package_status_id: result.package_status_id,
-                    package: result.package,
+                    package: result.package_name,
                     item: result.item,
                     reason: result.message
                 });

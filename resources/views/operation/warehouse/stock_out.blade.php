@@ -373,7 +373,7 @@
                 duplicateCounter++;
                 addReviewRow({
                     package_status_id:null,
-                    package:'-',
+                    package_name:'-',
                     item:'-',
                     reason:'Duplicate QR scanned'
                 });
@@ -429,8 +429,9 @@
                 }
 
                 scannedCount++;
-
-                const hasValidPackageName = result.package && String(result.package).trim() !== '';
+                const hasValidPackageName =
+                    result.package_name &&
+                    String(result.package_name).trim() !== '';
 
                 if (response.ok && result.success && hasValidPackageName) {
                     successCounter++;
@@ -446,8 +447,11 @@
                     stagedItems.push({
                         qr: qr,
                         package_status_id: result.package_status_id ?? null,
+                        package_id: result.package_id ?? null,
+                        delivery_id: result.delivery_id ?? null,
+                        dr_no: result.dr_no ?? null,
                         item_id: result.item_id ?? null,
-                        package: result.package,
+                        package_name: result.package_name,
                         item: result.item ?? null,
                         qty: scannedQty
                     });
@@ -459,14 +463,14 @@
                         existing.count += 1;
                         updateRowQty(existing.rowEl, existing.totalQty);
                     } else {
-                        const rowEl = addRow({
-                            package: result.package,
-                            item: result.item,
-                            qty: scannedQty,
-                            status: transactionType === 'IN'
-                                ? 'Stock In'
-                                : 'Stock Out'
-                        });
+                    const rowEl = addRow({
+                        package: result.package_name,
+                        item: result.item,
+                        qty: scannedQty,
+                        status: transactionType === 'IN'
+                            ? 'Stock In'
+                            : 'Stock Out'
+                    });
 
                         if (isMergeable) {
                             stagedByItemName.set(itemNameKey, {
@@ -485,12 +489,12 @@
                         ? 'No package name found — not staged'
                         : (result.message ?? (result.errors ? Object.values(result.errors).flat().join(', ') : 'Failed'));
 
-                    addRow({
-                        package: result.package || '-',
-                        item: result.item || '-',
-                        qty: result.qty ?? '-',
-                        status: msg
-                    });
+                        addRow({
+                            package: result.package_name || '-',
+                            item: result.item || '-',
+                            qty: result.qty ?? '-',
+                            status: msg
+                        });
                     updateDashboard();
                     return false;
                 }

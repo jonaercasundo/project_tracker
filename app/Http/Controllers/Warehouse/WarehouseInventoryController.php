@@ -308,6 +308,10 @@ class WarehouseInventoryController extends Controller
             | Scanning a single package represents the full DR quantity, not
             | just the contents of that one physical package — this must
             | match the deduction logic in saveScan().
+            |
+            | Teacher's Manuals are delivered in a separate quantity
+            | (qty_teachers_manual) from the rest of the package_qty, same
+            | distinction already made in getDeliveryItems() for stock-in.
             |--------------------------------------------------------------------------
             */
 
@@ -322,7 +326,15 @@ class WarehouseInventoryController extends Controller
 
             }
 
-            $drQty = (int) ($delivery->package_qty ?? 0);
+            $normalizedItemName = strtolower($itemName);
+
+            $isTeacherManual =
+                str_contains($normalizedItemName, 'teacher') ||
+                str_contains($normalizedItemName, 'manual');
+
+            $drQty = $isTeacherManual
+                ? (int) ($delivery->qty_teachers_manual ?? 0)
+                : (int) ($delivery->package_qty ?? 0);
 
             if ($drQty <= 0) {
 
@@ -429,7 +441,7 @@ class WarehouseInventoryController extends Controller
                 ) {
 
                     $status = PackageStatus::with([
-                        'package.contents',
+                        'package.contents.item',
                         'delivery'
                     ])
                         ->findOrFail($item['package_status_id']);
@@ -466,10 +478,22 @@ class WarehouseInventoryController extends Controller
                         | DR C230
                         | package_qty = 230
                         | QR Scan = deduct 230 pcs
+                        |
+                        | Teacher's Manuals are delivered under a separate
+                        | quantity (qty_teachers_manual), same distinction as
+                        | validateScan() and getDeliveryItems().
                         |--------------------------------------------------------------------------
                         */
 
-                        $drQty = (int) ($status->delivery->package_qty ?? 0);
+                        $contentItemName = strtolower($content->item->item_name ?? '');
+
+                        $contentIsTeacherManual =
+                            str_contains($contentItemName, 'teacher') ||
+                            str_contains($contentItemName, 'manual');
+
+                        $drQty = $contentIsTeacherManual
+                            ? (int) ($status->delivery->qty_teachers_manual ?? 0)
+                            : (int) ($status->delivery->package_qty ?? 0);
 
 
                         if ($drQty <= 0) {

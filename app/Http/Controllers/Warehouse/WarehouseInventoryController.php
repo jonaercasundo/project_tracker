@@ -8,7 +8,7 @@ use App\Models\Inventory;
 use App\Models\InventoryHistory;
 use App\Models\PackageStatus;
 use App\Models\Project;
-use App\Models\ProjectLot;
+use App\Models\Lot;
 use App\Models\Delivery;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -62,9 +62,9 @@ class WarehouseInventoryController extends Controller
             'project_id' => 'required|integer|exists:projects,project_id',
         ]);
 
-        $lots = ProjectLot::where('project_id', $request->project_id)
-            ->select('id', 'lot_no')
-            ->orderBy('lot_no')
+        $lots = Lot::where('project_id', $request->project_id)
+            ->select('lot_id', 'lot_name')
+            ->orderBy('lot_name')
             ->get();
 
         return response()->json($lots);
@@ -138,7 +138,7 @@ class WarehouseInventoryController extends Controller
             return response()->json([
                 'delivery_id'   => $delivery->delivery_id,
                 'project'       => $delivery->project->project_name ?? '',
-                'lot'           => $delivery->lot->lot_no ?? '',
+                'lot'           => $delivery->lot->lot_name ?? '',
                 'school'        => $delivery->school->school_name ?? '',
                 'delivery_date' => $delivery->delivery_date,
                 'items'         => $items->values(),

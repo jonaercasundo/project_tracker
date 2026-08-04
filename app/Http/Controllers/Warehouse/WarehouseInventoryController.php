@@ -9,6 +9,7 @@ use App\Models\InventoryHistory;
 use App\Models\PackageStatus;
 use App\Models\Project;
 use App\Models\Lot;
+use App\Models\ProjectLot;
 use App\Models\Delivery;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -59,10 +60,11 @@ class WarehouseInventoryController extends Controller
             'project_id' => 'required|integer|exists:projects,project_id',
         ]);
 
-        $lots = Lot::where('project_id', $request->project_id)
-            ->select('lot_id', 'lot_name')
-            ->orderBy('lot_name')
+        $lots = ProjectLot::where('project_id', $request->project_id)
+            ->select('id', 'lot_no')
+            ->orderBy('lot_no')
             ->get();
+
 
         return response()->json($lots);
     }

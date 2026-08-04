@@ -45,7 +45,7 @@ class Delivery extends Model
 
     public function lot()
     {
-        return $this->belongsTo(Lot::class, 'lot_id', 'lot_id');
+        return $this->belongsTo(ProjectLot::class, 'lot_id', 'id');
     }
 
     public function packageStatuses()

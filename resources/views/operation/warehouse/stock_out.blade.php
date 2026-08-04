@@ -432,7 +432,9 @@
                 const hasValidPackageName =
                     result.package_name &&
                     String(result.package_name).trim() !== '';
-
+                if (!response.ok) {
+                    console.log('Validation failed:', result);
+                }
                 if (response.ok && result.success && hasValidPackageName) {
                     successCounter++;
                     if (!scannedQty || scannedQty <= 0) {

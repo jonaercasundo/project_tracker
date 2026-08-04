@@ -498,24 +498,46 @@ class WarehouseInventoryController extends Controller
         Log::info('STOCK IN SAVE REQUEST', $request->all());
 
         $request->validate([
-            'delivery_id'            => 'required|integer|exists:deliveries,delivery_id',
-            'lot_id'                 => 'required|integer|exists:lot,lot_id',
-            'warehouse_id'           => 'required|exists:warehouse,warehouse_id',
-            'items'                  => 'required|array|min:1',
-            'items.*.item_id'        => 'required|integer|exists:items,item_id',
-            'items.*.received_qty'   => 'required|integer|min:0',
-            'items.*.remarks'        => 'nullable|string',
+            'lot_id'       => 'required|integer|exists:lot,lot_id',
+            'warehouse_id' => 'required|exists:warehouse,warehouse_id',
+            'items'        => 'required|array|min:1',
+            'items.*.item_id'      => 'required|integer|exists:items,item_id',
+            'items.*.received_qty' => 'required|integer|min:0',
+            'items.*.remarks'      => 'nullable|string',
         ]);
 
-        $delivery = Delivery::with('packageStatuses.package.packageContent')
-            ->findOrFail($request->delivery_id);
+        $deliveries = Delivery::with([
+            'packageStatuses.package.packageContent.item'
+        ])
+        ->where('lot_id', $request->lot_id)
+        ->where('status', 'pending')
+        ->get();
 
-        // Total delivered per item, summed across all packages in this delivery.
+        if ($deliveries->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No pending deliveries found for this lot.'
+            ], 404);
+        }
+
+        $totalPackageQty = $deliveries->sum('package_qty');
+        $totalTeacherQty = $deliveries->sum('qty_teachers_manual');
+
         $deliveredTotals = [];
-        foreach ($delivery->packageStatuses as $status) {
-            foreach ($status->package?->packageContent ?? [] as $content) {
-                $deliveredTotals[$content->item_id] =
-                    ($deliveredTotals[$content->item_id] ?? 0) + (int) $content->qty;
+
+        foreach ($deliveries as $delivery) {
+
+            foreach ($delivery->packageStatuses as $status) {
+
+                foreach ($status->package?->packageContent ?? [] as $content) {
+
+                    $itemName = strtolower($content->item?->item_name ?? '');
+
+                    $deliveredTotals[$content->item_id] =
+                        (str_contains($itemName, 'teacher') || str_contains($itemName, 'manual'))
+                            ? $totalTeacherQty
+                            : $totalPackageQty;
+                }
             }
         }
 
@@ -602,12 +624,20 @@ class WarehouseInventoryController extends Controller
 
         // Only close out the delivery's package statuses if every item came in complete.
         if ($fullyReceived && count($results['failed']) === 0) {
-            foreach ($delivery->packageStatuses as $status) {
-                if ($status->status !== 'warehouse') {
-                    $status->status = 'warehouse';
-                    $status->remarks = 'Received by Warehouse (Delivery Receipt)';
-                    $status->save();
+            foreach ($deliveries as $delivery) {
+
+                foreach ($delivery->packageStatuses as $status) {
+
+                    if ($status->status !== 'warehouse') {
+                        $status->status = 'warehouse';
+                        $status->remarks = 'Received by Warehouse (Lot Stock In)';
+                        $status->save();
+                    }
+
                 }
+
+                $delivery->status = 'warehouse'; // or 'completed' if that's your status
+                $delivery->save();
             }
         }
 

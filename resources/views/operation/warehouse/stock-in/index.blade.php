@@ -360,7 +360,6 @@
                         'Accept': 'application/json',
                     },
                     body: JSON.stringify({
-                        delivery_id:   currentDeliveryId,
                         lot_id:        lotSelect.value,
                         warehouse_id:  warehouseId,
                         items,

@@ -189,9 +189,9 @@ class WarehouseInventoryController extends Controller
         $request->validate([
             'qr'           => 'required|string',
             'warehouse_id' => 'required|integer',
+            'transaction'  => 'required|in:IN,OUT',
         ]);
 
-        // Extract package_status_id from QR
         $packageStatusId = $this->extractPackageStatusId($request->qr);
 
         if (!$packageStatusId) {
@@ -202,17 +202,16 @@ class WarehouseInventoryController extends Controller
         }
 
 
-        // Load package + contents + item + delivery
         $status = PackageStatus::with([
-            'delivery',
-            'package.contents.item'
+            'package.contents.item',
+            'delivery'
         ])->find($packageStatusId);
 
 
         if (!$status) {
             return response()->json([
                 'success' => false,
-                'message' => 'Package not found.'
+                'message' => 'Package status not found.'
             ]);
         }
 
@@ -223,94 +222,94 @@ class WarehouseInventoryController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        // Package must already be received by warehouse
-        if ($status->status !== 'warehouse') {
+        if ($request->transaction === 'OUT') {
 
-            return response()->json([
-                'success'           => false,
-                'package_status_id' => $status->package_status_id,
-                'package_id'        => $status->package_id,
-                'message'           => 'Package is not available for stock out.'
-            ]);
+            if ($status->status !== 'warehouse') {
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Package is not available in warehouse.'
+                ]);
+            }
+
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | PACKAGE CONTENTS
+        | PACKAGE CONTENT
         |--------------------------------------------------------------------------
         */
 
-        $contents = $status->package?->contents ?? collect();
+        $contents = $status->package?->contents;
 
 
-        if ($contents->isEmpty()) {
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Package has no contents defined.'
-            ]);
-        }
-
-
-        $packageName = $status->package->package_num ?? null;
-
-
-        if (!$packageName) {
+        if (!$contents || $contents->isEmpty()) {
 
             return response()->json([
                 'success' => false,
-                'message' => 'Package number not assigned.'
+                'message' => 'Package has no item contents.'
             ]);
-        }
 
-
-        $isSingleItem = $contents->count() === 1;
-
-
-        $itemName = $isSingleItem
-            ? ($contents->first()->item->item_name ?? null)
-            : $contents->count() . ' items';
-
-
-        if ($isSingleItem && !$itemName) {
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Item record exists but has no name.'
-            ]);
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | SUCCESS RESPONSE
+        | ITEM DETAILS
+        |--------------------------------------------------------------------------
+        */
+
+        $firstItem = $contents->first();
+
+
+        $itemName = $firstItem->item->item_name ?? 'Unknown Item';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RETURN SCANNED PACKAGE DATA
         |--------------------------------------------------------------------------
         */
 
         return response()->json([
 
-            'success'           => true,
+            'success' => true,
 
-            'package_status_id' => $status->package_status_id,
+            'package_status_id' =>
+                $status->package_status_id,
 
-            'package_id'        => $status->package_id,
+            'package_id' =>
+                $status->package_id,
 
-            'delivery_id'       => $status->delivery_id,
+            'delivery_id' =>
+                $status->delivery_id,
 
-            'dr_no'             => $status->delivery->dr_no ?? null,
+            'dr_no' =>
+                $status->delivery->dr_no ?? null,
 
-            'package_name'      => 'Package #' . $packageName,
 
-            'item'              => $itemName,
+            'package_name' =>
+                'Package #' . $status->package->package_num,
 
-            'item_id'           => $isSingleItem
-                                    ? $contents->first()->item_id
-                                    : null,
 
-            'qty'               => $contents->sum('qty'),
+            'item' =>
+                $itemName,
+
+
+            'item_id' =>
+                $firstItem->item_id,
+
+
+            /*
+            Quantity comes from package content.
+            Because this QR represents one package.
+            */
+            'qty' =>
+                $contents->sum('qty')
 
         ]);
+
     }
 
     // ==========================================================

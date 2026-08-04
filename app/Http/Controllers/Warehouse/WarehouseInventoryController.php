@@ -193,6 +193,12 @@ public function validateScan(Request $request)
     ]);
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | EXTRACT QR PACKAGE STATUS ID
+    |--------------------------------------------------------------------------
+    */
+
     $packageStatusId = $this->extractPackageStatusId($request->qr);
 
 
@@ -205,6 +211,13 @@ public function validateScan(Request $request)
 
     }
 
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD PACKAGE DATA
+    |--------------------------------------------------------------------------
+    */
 
     $status = PackageStatus::with([
         'package.contents.item',
@@ -226,12 +239,11 @@ public function validateScan(Request $request)
 
     /*
     |--------------------------------------------------------------------------
-    | STOCK OUT
+    | STOCK OUT VALIDATION
     |--------------------------------------------------------------------------
     */
 
     if ($request->transaction === 'OUT') {
-
 
         if ($status->status !== 'warehouse') {
 
@@ -248,11 +260,21 @@ public function validateScan(Request $request)
 
     /*
     |--------------------------------------------------------------------------
-    | PACKAGE CONTENT
+    | PACKAGE VALIDATION
     |--------------------------------------------------------------------------
     */
 
-    $contents = $status->package?->contents;
+    if (!$status->package) {
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Package information not found.'
+        ]);
+
+    }
+
+
+    $contents = $status->package->contents;
 
 
     if (!$contents || $contents->isEmpty()) {
@@ -268,30 +290,75 @@ public function validateScan(Request $request)
 
     /*
     |--------------------------------------------------------------------------
-    | ITEM DETAILS
+    | ITEM INFORMATION
     |--------------------------------------------------------------------------
     */
 
     $firstItem = $contents->first();
 
 
-    $itemName = $firstItem->item->item_name ?? 'Unknown Item';
+    if (!$firstItem->item) {
 
+        return response()->json([
+            'success' => false,
+            'message' => 'Item information not found.'
+        ]);
+
+    }
+
+
+    $itemName = $firstItem->item->item_name;
+
+
+
+/*
+|--------------------------------------------------------------------------
+| DR BASED QUANTITY
+|
+| Example:
+|
+| DR C230
+| QR Scan = 230 pcs
+|
+|--------------------------------------------------------------------------
+*/
+
+$delivery = $status->delivery;
+
+
+if (!$delivery) {
+
+    return response()->json([
+        'success' => false,
+        'message' => 'Delivery record not found.'
+    ]);
+
+}
+
+
+$drQty = (int) $delivery->package_qty;
+
+
+if ($drQty <= 0) {
+
+    return response()->json([
+        'success' => false,
+        'message' => 'Delivery quantity is not defined.'
+    ]);
+
+}
 
 
     /*
     |--------------------------------------------------------------------------
-    | DR BASED QUANTITY
+    | SUCCESS RESPONSE
     |--------------------------------------------------------------------------
     */
-
-    $drQty = $status->delivery->package_qty ?? 1;
-
-
 
     return response()->json([
 
         'success' => true,
+
 
         'package_status_id' =>
             $status->package_status_id,
@@ -322,9 +389,18 @@ public function validateScan(Request $request)
 
 
         /*
-        | Quantity from DR
+        Inventory quantity based on DR
         */
+
         'qty' =>
+            $drQty,
+
+
+        /*
+        For display/reference only
+        */
+
+        'dr_qty' =>
             $drQty
 
     ]);

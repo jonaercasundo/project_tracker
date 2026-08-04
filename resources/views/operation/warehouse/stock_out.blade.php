@@ -435,8 +435,22 @@
 
                 if (response.ok && result.success && hasValidPackageName) {
                     successCounter++;
+                    if (!scannedQty || scannedQty <= 0) {
 
-                    const scannedQty = Number(result.qty) || 1;
+                        failedCounter++;
+
+                        addRow({
+                            package: result.package_name || '-',
+                            item: result.item || '-',
+                            qty: '-',
+                            status: 'Invalid quantity'
+                        });
+
+                        updateDashboard();
+
+                        return false;
+                    }
+                    const scannedQty = Number(result.qty);
                     const itemNameKey = normalizeItemName(result.item);
 
                     // Only merge single-item scans with a real name — never merge

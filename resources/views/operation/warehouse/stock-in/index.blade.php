@@ -217,8 +217,8 @@
                         }
                         data.forEach(lot => {
                             const option = document.createElement('option');
-                            option.value = lot.id;          // primary key on `lots`
-                            option.textContent = lot.lot_no; // display field on `lots`
+                            option.value = lot.lot_id;       // primary key on `lot`
+                            option.textContent = lot.lot_name; // display field on `lot`
                             lotSelect.appendChild(option);
                         });
                         lotSelect.disabled = false;
@@ -275,7 +275,7 @@
                         itemsTable.innerHTML = items.map(item => {
                             const delivered = Number(item.qty) || 0;
                             return `
-                                <tr data-item-id="${item.item_id}" data-package-status-id="${item.package_status_id ?? ''}">
+                                <tr data-item-id="${item.item_id}">
                                     <td class="px-4 py-3 font-medium text-slate-800">${item.item_name || 'Unnamed Item'}</td>
                                     <td class="px-4 py-3 text-center text-slate-600">${delivered}</td>
                                     <td class="px-4 py-3 text-center">
@@ -345,10 +345,9 @@
                 }
 
                 const items = rows.map(row => ({
-                    item_id:            row.dataset.itemId,
-                    package_status_id:  row.dataset.packageStatusId || null,
-                    received_qty:       parseInt(row.querySelector('.receivedQty').value, 10) || 0,
-                    remarks:            row.querySelector('.itemRemarks').value.trim(),
+                    item_id:       row.dataset.itemId,
+                    received_qty:  parseInt(row.querySelector('.receivedQty').value, 10) || 0,
+                    remarks:       row.querySelector('.itemRemarks').value.trim(),
                 }));
 
                 setSaving(true);

@@ -120,8 +120,10 @@ class DeliveryReceiveController extends Controller
 
 public function store(Request $request, $packageStatusId)
 {
-    $packageStatus = PackageStatus::with('delivery')
-        ->findOrFail($packageStatusId);
+    $packageStatus = PackageStatus::with([
+        'delivery',
+        'package.contents.item',
+    ])->findOrFail($packageStatusId);
 
     if ($packageStatus->status === 'delivered') {
         return back()->withErrors([
@@ -148,7 +150,35 @@ public function store(Request $request, $packageStatusId)
         $packageStatus->delivered_by = null;
 
         $packageStatus->save();
+        foreach ($packageStatus->package->contents as $content) {
 
+            $inventory = Inventory::where('item_id', $content->item_id)
+                ->first();
+
+            if (!$inventory) {
+                continue;
+            }
+
+            InventoryHistory::create([
+                'batch_no'     => 'DELIVERED-' . now()->format('YmdHis'),
+
+                'inventory_id' => $inventory->inventory_id,
+                'item_id'      => $inventory->item_id,
+                'warehouse_id' => $inventory->warehouse_id,
+
+                // Delivery does not change warehouse quantity because
+                // stock was already deducted during Stock Out.
+                'old_qty'      => $inventory->qty,
+                'new_qty'      => $inventory->qty,
+
+                'changed_by'   => 'Receiver',
+
+                'remarks'      => 'Package delivered'
+                    . ($request->remarks ? ' - ' . $request->remarks : ''),
+
+                'change_type'  => 'delivered',
+            ]);
+        }
 
         DeliveryHistory::create([
             'package_status_id' => $packageStatus->package_status_id,

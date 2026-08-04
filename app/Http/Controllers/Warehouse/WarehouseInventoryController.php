@@ -72,7 +72,7 @@ class WarehouseInventoryController extends Controller
     public function getDeliveriesForLot(Request $request)
     {
         $request->validate([
-            'lot_id' => 'required|integer|exists:lots,lot_id',
+            'lot_id' => 'required|integer|exists:lot,lot_id',
         ]);
 
         $deliveries = Delivery::where('lot_id', $request->lot_id)

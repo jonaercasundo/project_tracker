@@ -63,8 +63,8 @@
                         .then(data => {
                             data.forEach(lot => {
                                 const option = document.createElement('option');
-                                option.value = lot.id;
-                                option.textContent = lot.lot_no;
+                                option.value = lot.lot_id;
+                                option.textContent = lot.lot_name;
                                 lotSelect.appendChild(option);
                             });
                             lotSelect.disabled = false;

@@ -61,8 +61,8 @@ class WarehouseInventoryController extends Controller
         ]);
 
         $lots = ProjectLot::where('project_id', $request->project_id)
-            ->select('id', 'lot_no')
-            ->orderBy('lot_no')
+            ->select('lot_id', 'lot_name')
+            ->orderBy('lot_name')
             ->get();
 
 

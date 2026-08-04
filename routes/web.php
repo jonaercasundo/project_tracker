@@ -430,4 +430,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_destroy'])
         ->name('taxonomy.destroy');
+
+    Route::get('/test-drive', function () {
+        return view('test');
+    });
 require __DIR__.'/auth.php';

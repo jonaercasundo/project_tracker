@@ -184,133 +184,152 @@ class WarehouseInventoryController extends Controller
     // NEW: validate a single QR — lookup only, NO writes.
     // Used while the user is scanning, before they hit "Save".
     // ==========================================================
-    public function validateScan(Request $request)
-    {
-        $request->validate([
-            'qr'           => 'required|string',
-            'warehouse_id' => 'required|integer',
-            'transaction'  => 'required|in:IN,OUT',
-        ]);
-
-        $packageStatusId = $this->extractPackageStatusId($request->qr);
-
-        if (!$packageStatusId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid QR code.'
-            ]);
-        }
+public function validateScan(Request $request)
+{
+    $request->validate([
+        'qr'           => 'required|string',
+        'warehouse_id' => 'required|integer',
+        'transaction'  => 'required|in:IN,OUT',
+    ]);
 
 
-        $status = PackageStatus::with([
-            'package.contents.item',
-            'delivery'
-        ])->find($packageStatusId);
+    $packageStatusId = $this->extractPackageStatusId($request->qr);
 
 
-        if (!$status) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Package status not found.'
-            ]);
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | STOCK OUT VALIDATION
-        |--------------------------------------------------------------------------
-        */
-
-        if ($request->transaction === 'OUT') {
-
-            if ($status->status !== 'warehouse') {
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Package is not available in warehouse.'
-                ]);
-            }
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | PACKAGE CONTENT
-        |--------------------------------------------------------------------------
-        */
-
-        $contents = $status->package?->contents;
-
-
-        if (!$contents || $contents->isEmpty()) {
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Package has no item contents.'
-            ]);
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | ITEM DETAILS
-        |--------------------------------------------------------------------------
-        */
-
-        $firstItem = $contents->first();
-
-
-        $itemName = $firstItem->item->item_name ?? 'Unknown Item';
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | RETURN SCANNED PACKAGE DATA
-        |--------------------------------------------------------------------------
-        */
+    if (!$packageStatusId) {
 
         return response()->json([
-
-            'success' => true,
-
-            'package_status_id' =>
-                $status->package_status_id,
-
-            'package_id' =>
-                $status->package_id,
-
-            'delivery_id' =>
-                $status->delivery_id,
-
-            'dr_no' =>
-                $status->delivery->dr_no ?? null,
-
-
-            'package_name' =>
-                'Package #' . $status->package->package_num,
-
-
-            'item' =>
-                $itemName,
-
-
-            'item_id' =>
-                $firstItem->item_id,
-
-
-            /*
-            Quantity comes from package content.
-            Because this QR represents one package.
-            */
-            'qty' =>
-                $contents->sum('qty')
-
+            'success' => false,
+            'message' => 'Invalid QR code.'
         ]);
 
     }
+
+
+    $status = PackageStatus::with([
+        'package.contents.item',
+        'delivery'
+    ])->find($packageStatusId);
+
+
+
+    if (!$status) {
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Package status not found.'
+        ]);
+
+    }
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STOCK OUT
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->transaction === 'OUT') {
+
+
+        if ($status->status !== 'warehouse') {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Package is not available in warehouse.'
+            ]);
+
+        }
+
+    }
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PACKAGE CONTENT
+    |--------------------------------------------------------------------------
+    */
+
+    $contents = $status->package?->contents;
+
+
+    if (!$contents || $contents->isEmpty()) {
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Package has no item contents.'
+        ]);
+
+    }
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ITEM DETAILS
+    |--------------------------------------------------------------------------
+    */
+
+    $firstItem = $contents->first();
+
+
+    $itemName = $firstItem->item->item_name ?? 'Unknown Item';
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DR BASED QUANTITY
+    |--------------------------------------------------------------------------
+    */
+
+    $drQty = $status->delivery->package_qty ?? 1;
+
+
+
+    return response()->json([
+
+        'success' => true,
+
+        'package_status_id' =>
+            $status->package_status_id,
+
+
+        'package_id' =>
+            $status->package_id,
+
+
+        'delivery_id' =>
+            $status->delivery_id,
+
+
+        'dr_no' =>
+            $status->delivery->dr_no ?? null,
+
+
+        'package_name' =>
+            'Package #' . $status->package->package_num,
+
+
+        'item' =>
+            $itemName,
+
+
+        'item_id' =>
+            $firstItem->item_id,
+
+
+        /*
+        | Quantity from DR
+        */
+        'qty' =>
+            $drQty
+
+    ]);
+
+}
 
     // ==========================================================
     // NEW: batch save — persists everything staged in the browser.

@@ -98,7 +98,7 @@ class WarehouseInventoryController extends Controller
                 'packageStatuses.package.packageContent.item'
             ])
             ->where('lot_id', $request->lot_id)
-            ->where('status', 'pending') // optional if only warehouse deliveries should be shown
+            ->where('status', 'pending') // only pending deliveries are eligible for stock-in
             ->latest('delivery_date')
             ->first();
 

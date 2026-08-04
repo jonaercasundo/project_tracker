@@ -399,7 +399,6 @@ if ($drQty <= 0) {
             'items'                     => 'required|array|min:1',
             'items.*.package_status_id' => 'required|integer',
         ]);
-        $transaction = 'OUT';
         $batchNo = 'BATCH-' . now()->format('YmdHis');
 
         $results = [
@@ -418,7 +417,10 @@ if ($drQty <= 0) {
                     $batchNo
                 ) {
 
-                    $status = PackageStatus::with('package.contents')
+                    $status = PackageStatus::with([
+                        'package.contents',
+                        'delivery'
+                    ])
                         ->findOrFail($item['package_status_id']);
 
                     if (!$status->package) {
@@ -444,34 +446,66 @@ if ($drQty <= 0) {
                     }
 
                     foreach ($status->package->contents as $content) {
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Quantity Based on DR
+                        |
+                        | Example:
+                        | DR C230
+                        | package_qty = 230
+                        | QR Scan = deduct 230 pcs
+                        |--------------------------------------------------------------------------
+                        */
+
+                        $drQty = (int) ($status->delivery->package_qty ?? 0);
+
+
+                        if ($drQty <= 0) {
+
+                            throw new \RuntimeException(
+                                "DR quantity is missing."
+                            );
+
+                        }
+
+
                         Log::info('PACKAGE CONTENT', [
                             'package_status_id' => $item['package_status_id'],
                             'item_id'           => $content->item_id,
-                            'qty'               => $content->qty,
+                            'dr_qty'            => $drQty,
                         ]);
+
 
                         $inventory = Inventory::firstOrNew([
                             'warehouse_id' => $request->warehouse_id,
                             'item_id'      => $content->item_id,
                         ]);
 
+
                         $oldQty = $inventory->exists
                             ? $inventory->qty
                             : 0;
 
-                            if ($oldQty < $content->qty) {
 
-                                throw new \RuntimeException(
-                                    "Insufficient stock for item {$content->item_id}"
-                                );
 
-                            }
+                        if ($oldQty < $drQty) {
 
-                            $newQty = $oldQty - $content->qty;
+                            throw new \RuntimeException(
+                                "Insufficient stock for item {$content->item_id}. Available: {$oldQty}, Required: {$drQty}"
+                            );
+
+                        }
+
+
+
+                        $newQty = $oldQty - $drQty;
+
+
 
                         /*
                         |--------------------------------------------------------------------------
-                        | Prevent duplicate history from Model Observer
+                        | Update Inventory
                         |--------------------------------------------------------------------------
                         */
 
@@ -486,9 +520,11 @@ if ($drQty <= 0) {
 
                         });
 
+
+
                         /*
                         |--------------------------------------------------------------------------
-                        | Single Batch History Record
+                        | Inventory History
                         |--------------------------------------------------------------------------
                         */
 
@@ -507,24 +543,17 @@ if ($drQty <= 0) {
                             'new_qty'      => $newQty,
 
                             'changed_by'   => Auth::user()->name,
-                            'remarks' => 'Stock Out via QR Scanner',
-                            'change_type' => 'stock_out',
+
+                            'remarks'      => 'Stock Out via QR Scanner - DR Qty: ' . $drQty,
+
+                            'change_type'  => 'stock_out',
 
                         ]);
 
                     }
 
-                    if ($request->transaction === 'IN') {
-
-                        $status->status = 'warehouse';
-                        $status->remarks = 'Received by Warehouse';
-
-                    } else {
-
-                        $status->status = 'released';
-                        $status->remarks = 'Released from Warehouse';
-
-                    }
+                    $status->status = 'released';
+                    $status->remarks = 'Released from Warehouse';
 
                     $status->save();
 

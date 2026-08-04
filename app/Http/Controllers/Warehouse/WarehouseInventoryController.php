@@ -287,7 +287,7 @@ class WarehouseInventoryController extends Controller
             |--------------------------------------------------------------------------
             */
 
-            if ($status->status !== 'warehouse') {
+            if ($status->status !== 'pending') {
 
                 return response()->json([
                     'success' => false,
@@ -460,7 +460,7 @@ class WarehouseInventoryController extends Controller
                     |--------------------------------------------------------------------------
                     */
 
-                    if ($status->status !== 'warehouse') {
+                    if ($status->status !== 'pending') {
 
                         throw new \RuntimeException(
                             'Package is not available in warehouse.'

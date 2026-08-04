@@ -73,7 +73,7 @@ class WarehouseInventoryController extends Controller
     public function getDeliveriesForLot(Request $request)
     {
         $request->validate([
-            'lot_id' => 'required|integer|exists:lots,id',
+            'lot_id' => 'required|integer|exists:lots,lot_id',
         ]);
 
         $deliveries = Delivery::where('lot_id', $request->lot_id)
@@ -88,7 +88,7 @@ class WarehouseInventoryController extends Controller
     {
         try {
             $request->validate([
-                'lot_id' => 'required|integer|exists:lots,id',
+                'lot_id' => 'required|integer|exists:lots,lot_id',
             ]);
 
             $delivery = Delivery::with([
@@ -478,7 +478,7 @@ class WarehouseInventoryController extends Controller
 
         $request->validate([
             'delivery_id'            => 'required|integer|exists:deliveries,delivery_id',
-            'lot_id'                 => 'required|integer|exists:lots,id',
+            'lot_id'                 => 'required|integer|exists:lots,lot_id',
             'warehouse_id'           => 'required|exists:warehouse,warehouse_id',
             'items'                  => 'required|array|min:1',
             'items.*.item_id'        => 'required|integer|exists:items,item_id',

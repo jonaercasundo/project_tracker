@@ -117,8 +117,8 @@
                     <thead class="bg-slate-100 text-slate-700">
                         <tr>
                             <th class="px-4 py-3 text-left font-semibold">Item</th>
-                            <th class="px-4 py-3 text-center font-semibold" >Delivered</th>
-                            <th class="px-4 py-3 text-center font-semibold">Received</th>
+                            <th class="px-4 py-3 text-center font-semibold" >Receiving Quantity</th>
+                            <th class="px-4 py-3 text-center font-semibold">Received Quantity</th>
                             <th class="px-4 py-3 text-center font-semibold">Remaining</th>
                             <th class="px-4 py-3 text-left font-semibold">Remarks</th>
                         </tr>

@@ -119,7 +119,7 @@
                             <th class="px-4 py-3 text-left font-semibold">Item</th>
                             <th class="px-4 py-3 text-center font-semibold" hidden>Receiving Quantity</th>
                             <th class="px-4 py-3 text-center font-semibold">Received Quantity</th>
-                            <th class="px-4 py-3 text-center font-semibold">Remaining</th>
+                            <th class="px-4 py-3 text-center font-semibold" hidden>Remaining</th>
                             <th class="px-4 py-3 text-left font-semibold">Remarks</th>
                         </tr>
                     </thead>
@@ -279,10 +279,10 @@
                                     <td class="px-4 py-3 font-medium text-slate-800">${item.item_name || 'Unnamed Item'}</td>
                                     <td class="px-4 py-3 text-center text-slate-600" hidden>${delivered}</td>
                                     <td class="px-4 py-3 text-center">
-                                        <input type="number" min="0" max="${delivered}"
+                                        <input type="number" min="0"
                                                class="receivedQty w-24 rounded-xl border border-slate-300 px-3 py-2 text-center text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
                                     </td>
-                                    <td class="px-4 py-3 text-center">
+                                    <td class="px-4 py-3 text-center" hidden>
                                         <span class="remainingQty font-semibold text-slate-700">0</span>
                                     </td>
                                     <td class="px-4 py-3">

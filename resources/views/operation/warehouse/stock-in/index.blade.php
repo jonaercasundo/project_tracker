@@ -309,23 +309,6 @@
                     });
             });
 
-            // ---------- Live remaining-qty calculation ----------
-            function bindQuantityInputs() {
-                document.querySelectorAll('.receivedQty').forEach(input => {
-                    input.addEventListener('input', function () {
-                        const delivered = parseInt(this.dataset.delivered, 10) || 0;
-                        let received = parseInt(this.value, 10);
-
-                        if (isNaN(received)) received = 0;
-                        if (received > delivered) received = delivered;
-                        if (received < 0) received = 0;
-
-                        this.value = received;
-                        this.closest('tr').querySelector('.remainingQty').textContent = delivered - received;
-                    });
-                });
-            }
-
             // ---------- Save ----------
             btnSave.addEventListener('click', function () {
                 hideAlert();

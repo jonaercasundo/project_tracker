@@ -217,13 +217,17 @@ class DeliveryController extends Controller
             ->get();
 
         // =========================
-        // GROUP BY DR
+        // GROUP BY DR + DELIVERY
         // =========================
         $grouped = [];
 
         foreach ($rows as $row) {
+
             $dr = $row->dr_no;
 
+            // =========================
+            // CREATE DR GROUP
+            // =========================
             if (!isset($grouped[$dr])) {
                 $grouped[$dr] = [
                     'dr_no'         => $dr,
@@ -238,22 +242,50 @@ class DeliveryController extends Controller
                     'municipality'  => $row->municipality,
                     'delivery_date' => $row->delivery_date,
                     'status'        => $row->status,
-                    'lot_name'      => $row->lot_name,
                     'deliveries'    => [],
-                    'items_list'    => [],
                 ];
             }
 
-            $grouped[$dr]['deliveries'][] = $row;
+            // =========================
+            // GROUP ITEMS BY DELIVERY
+            // =========================
+            $deliveryId = $row->delivery_id;
 
+            if (!isset($grouped[$dr]['deliveries'][$deliveryId])) {
+
+                $delivery = clone $row;
+
+                // Create item list for this delivery
+                $delivery->items_list = [];
+
+                $grouped[$dr]['deliveries'][$deliveryId] = $delivery;
+            }
+
+            // Add item to this delivery
             if (!empty($row->item_name)) {
-                $grouped[$dr]['items_list'][] = $row->item_name;
+                $grouped[$dr]['deliveries'][$deliveryId]->items_list[] = $row->item_name;
             }
         }
 
+        // =========================
+        // CLEAN UP ITEM LISTS
+        // =========================
         foreach ($grouped as &$g) {
-            $g['items_list'] = array_values(array_unique(array_filter($g['items_list'])));
+
+            foreach ($g['deliveries'] as &$delivery) {
+
+                $delivery->items_list = array_values(
+                    array_unique(
+                        array_filter($delivery->items_list)
+                    )
+                );
+            }
+
+            // Convert associative delivery array to normal indexed array
+            $g['deliveries'] = array_values($g['deliveries']);
         }
+
+        unset($g, $delivery);
 
         // =========================
         // DROPDOWNS

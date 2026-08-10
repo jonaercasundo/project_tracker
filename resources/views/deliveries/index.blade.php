@@ -96,8 +96,15 @@
                                         @endif
                                     </div>
 
-                                    <div class="text-xs text-slate-500 leading-relaxed">
-                                    {{ $d->item_name ?: 'No items available' }}
+                                    <div class="text-xs text-slate-500 leading-relaxed space-y-1">
+                                        @forelse($d->items_list ?? [] as $item)
+                                            <div class="flex items-start gap-2">
+                                                <span class="text-slate-300">•</span>
+                                                <span>{{ $item }}</span>
+                                            </div>
+                                        @empty
+                                            <span class="text-slate-400">No items available</span>
+                                        @endforelse
                                     </div>
                                 </div>
 

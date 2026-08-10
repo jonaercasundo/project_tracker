@@ -275,6 +275,8 @@ td,th{
 
     </div>
 
+    <div class="page-break"></div>
+
     {{-- ========================================= --}}
     {{-- PAGE 2 — QR Codes, grouped by keystage --}}
     {{-- ========================================= --}}
@@ -342,6 +344,8 @@ td,th{
         @endforeach
 
     </div>
+
+    <div class="page-break"></div>
 @endforeach
 
 

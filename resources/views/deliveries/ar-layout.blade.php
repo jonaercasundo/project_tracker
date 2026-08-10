@@ -193,13 +193,14 @@ td,th{
                             <td align="center">
                                 @php
                                     $package1 = $learnerItem->packageContent?->package;
+                                    $unit1 = $package1?->unit ?? 'cm';
                                 @endphp
 
-                                {{ $package1?->width }} × {{ $package1?->height }} × {{ $package1?->length }}
+                                {{ $package1?->width }} × {{ $package1?->height }} × {{ $package1?->length }} {{ $unit1 }}
 
                                 <hr style="margin:3px 0;">
 
-                                {{ $delivery->package_qty }} <p>Copies</p>
+                                {{ $delivery->package_qty }} <p>{{ $learnerItem->unit ?? 'Copies' }}</p>
                             </td>
                         </tr>
 
@@ -212,13 +213,14 @@ td,th{
                                 <td align="center">
                                     @php
                                         $package2 = $teacherItem->packageContent?->package;
+                                        $unit2 = $package2?->unit ?? 'cm';
                                     @endphp
 
-                                    {{ $package2?->width }} × {{ $package2?->height }} × {{ $package2?->length }}
+                                    {{ $package2?->width }} × {{ $package2?->height }} × {{ $package2?->length }} {{ $unit2 }}
 
                                     <hr style="margin:3px 0;">
 
-                                    {{ $delivery->qty_teachers_manual }} <p>Copies</p>
+                                    {{ $delivery->qty_teachers_manual }} <p>{{ $teacherItem->unit ?? 'Copies' }}</p>
                                 </td>
                             </tr>
                         @endif

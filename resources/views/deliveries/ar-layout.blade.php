@@ -64,40 +64,19 @@ td,th{
 
 <body>
 
-{{--
-    EXPECTED DATA SHAPE (mirrors deliveries_batch.php)
+@php
+    // $deliveries is FLAT: one row per delivery per keystage (Delivery::keystage is belongsTo).
+    // A single DR with 2 keystages = 2 Delivery rows sharing the same dr_no.
+    // Group them here so page 1 / page 2 are built once per DR, with each
+    // keystage rendered as a sub-section underneath — mirrors deliveries_batch.php.
+    $drGroups = $deliveries->groupBy('dr_no');
+@endphp
 
-    $drGroups: a collection, ONE ENTRY PER DR NUMBER (not per keystage row).
-    Each $drGroup should expose:
-
-        $drGroup->dr_no
-        $drGroup->school_id
-        $drGroup->project        -> ->project_name, ->arSetting (same as before: $ar)
-        $drGroup->school         -> ->school_name, ->address
-        $drGroup->lot            -> ->contract_no, ->lot_name
-
-        $drGroup->keystageGroups : collection, one per keystage tied to this DR
-            each keystage group exposes:
-                ->label            (e.g. "Keystage 1 G1toG3")
-                ->packages : collection, one per package_status row
-                    each package exposes:
-                        ->package_num   (e.g. "Package 1 of 3")
-                        ->dimensions    -> ->width / ->height / ->length / ->unit
-                        ->items         : collection of ['item_name' => ..., 'qty' => ...]
-                                          (qty here = package_content.qty * keystage multiplier,
-                                           already computed server-side — do NOT re-multiply in the view)
-                        ->qr_code       (base64 data URI or image URL)
-                        ->qr_label      (fallback label if no keystage, e.g. "Package 1 of 3 ORD-00001")
-
-    This replaces the old flat $delivery->items / $delivery->packageStatuses shape.
-    Adjust property/relationship names below to match your actual Eloquent models —
-    the structure (DR -> keystage -> package -> items) is what matters.
---}}
-
-@foreach($drGroups as $drGroup)
+@foreach($drGroups as $drNo => $drDeliveries)
     @php
 
-        $ar = $drGroup->project->arSetting ?? null;
+        $first = $drDeliveries->first();
+        $ar    = $first->project->arSetting ?? null;
 
         $logoPath = public_path('logo.png');
 
@@ -142,7 +121,7 @@ td,th{
 
             @if(optional($ar)->display_school_id)
                 <small>
-                    AR: {{ preg_replace('/^TX-LOT\d+-/', '', $drGroup->school_id) }}
+                    AR: {{ preg_replace('/^TX-LOT\d+-/', '', $first->school_id) }}
                 </small>
             @endif
         </div>
@@ -156,7 +135,7 @@ td,th{
 
                 <td class="no-border">
                     <strong>
-                        {{ $ar->project_name ?? $drGroup->project->project_name ?? '' }}
+                        {{ $ar->project_name ?? $first->project->project_name ?? '' }}
                     </strong>
                 </td>
             </tr>
@@ -172,10 +151,10 @@ td,th{
             The undersigned hereby acknowledges the receipt of goods
             pursuant to Contract No.
 
-            {{ $drGroup->lot->contract_no ?? '' }}
+            {{ $first->lot->contract_no ?? '' }}
 
-            @if(!empty($drGroup->lot->lot_name))
-                (LOT {{ $drGroup->lot->lot_name }})
+            @if(!empty($first->lot->lot_name))
+                (LOT {{ $first->lot->lot_name }})
             @endif
 
             between
@@ -193,36 +172,53 @@ td,th{
             <p>
 
                 <strong>School Name:</strong>
-                {{ $drGroup->school->school_name ?? '' }}
+                {{ $first->school->school_name ?? '' }}
 
                 <br>
 
                 <strong>School Address:</strong>
-                {{ $drGroup->school->address ?? '' }}
+                {{ $first->school->address ?? '' }}
             </p>
 
         @endif
 
-        @foreach($drGroup->keystageGroups as $keystageGroup)
+        @foreach($drDeliveries as $delivery)
 
-            @if(!empty($keystageGroup->label))
-                <p><strong>Keystage {{ $keystageGroup->label }}</strong></p>
+            @php
+                // package_type holds something like "Box of 2" — same numeric-extraction
+                // logic as deliveries_batch.php, applied per keystage row.
+                $multiplier = 1;
+                if (!empty($delivery->package_type)) {
+                    $numeric    = preg_replace('/[^0-9]/', '', $delivery->package_type);
+                    $multiplier = $numeric !== '' ? (int) $numeric : 1;
+                }
+
+                $keystageLabel = $delivery->keystage
+                    ? trim($delivery->keystage->keystage_num . ' ' . $delivery->package_type . ' ' . ($delivery->keystage->description ?? ''))
+                    : '';
+
+                $packageCount = $delivery->packageStatuses->count();
+            @endphp
+
+            @if($keystageLabel)
+                <p><strong>Keystage {{ $keystageLabel }}</strong></p>
             @endif
 
             <table>
-                @foreach($keystageGroup->packages as $package)
+                @foreach($delivery->packageStatuses as $i => $status)
+                    @php $pkg = $status->package; @endphp
 
                     <tr class="package-row">
                         <td style="width:50%;">
-                            <small>{{ $package->package_num }}</small>
+                            <small>Package {{ $i + 1 }} of {{ $packageCount }}</small>
                         </td>
                         <td style="width:50%; text-align:center;">
-                            @if($package->dimensions)
+                            @if($pkg)
                                 <small>
-                                    {{ $package->dimensions->width ?? 'N/A' }} ×
-                                    {{ $package->dimensions->height ?? 'N/A' }} ×
-                                    {{ $package->dimensions->length ?? 'N/A' }}
-                                    {{ $package->dimensions->unit ?? 'cm' }}
+                                    {{ $pkg->length ?? 'N/A' }} ×
+                                    {{ $pkg->width ?? 'N/A' }} ×
+                                    {{ $pkg->height ?? 'N/A' }}
+                                    {{ $pkg->unit ?? 'cm' }}
                                 </small>
                             @else
                                 <small>Dimensions: N/A</small>
@@ -230,17 +226,16 @@ td,th{
                         </td>
                     </tr>
 
-                    @foreach($package->items as $item)
+                    @foreach($pkg->packageContent ?? [] as $content)
                         <tr>
                             <td style="width:80%;">
-                                {{ $item['item_name'] }}
+                                {{ $content->item->item_name ?? '' }}
                             </td>
                             <td style="width:20%; text-align:center;">
-                                {{ $item['qty'] }}
+                                {{ ($content->qty ?? 0) * $multiplier }}
                             </td>
                         </tr>
                     @endforeach
-
                 @endforeach
             </table>
 
@@ -291,39 +286,47 @@ td,th{
         <div style="text-align:right;">
             <small>Date: {{ now()->format('Y-M-d') }}</small>
             <br>
-            <small>DR: {{ $drGroup->dr_no }}</small>
+            <small>DR: {{ $drNo }}</small>
         </div>
 
-        @foreach($drGroup->keystageGroups as $keystageGroup)
+        @foreach($drDeliveries as $delivery)
 
-            @if(!empty($keystageGroup->label))
+            @php
+                $keystageLabel = $delivery->keystage
+                    ? 'Keystage ' . $delivery->keystage->keystage_num . ' ' . strtok($delivery->keystage->description ?? '', ' ')
+                    : '';
+            @endphp
+
+            @if($keystageLabel)
                 <table>
                     <tr>
                         <td class="keystage-header" colspan="2">
-                            Keystage {{ $keystageGroup->label }}
+                            {{ $keystageLabel }}
                         </td>
                     </tr>
                 </table>
             @endif
 
             <table>
-                @foreach($keystageGroup->packages->chunk(2) as $chunk)
+                @foreach($delivery->packageStatuses->chunk(2) as $chunk)
 
                     <tr>
 
-                        @foreach($chunk as $package)
+                        @foreach($chunk as $status)
                             <td class="qr">
-                                @if($package->qr_code)
+                                @if(isset($qrCodes[$status->package_status_id]))
+
                                     <img
-                                        src="{{ $package->qr_code }}"
+                                        src="{{ $qrCodes[$status->package_status_id] }}"
                                         width="150"
                                     >
+
                                 @endif
 
                                 <br>
                                     <small>
                                         <strong>
-                                            {{ $keystageGroup->label ?: $package->qr_label }}
+                                            {{ $keystageLabel ?: ($status->qr_label ?? 'Unknown Item') }}
                                         </strong>
                                     </small>
                             </td>

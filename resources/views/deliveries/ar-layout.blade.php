@@ -275,8 +275,6 @@ td,th{
 
     </div>
 
-    <div class="page-break"></div>
-
     {{-- ========================================= --}}
     {{-- PAGE 2 — QR Codes, grouped by keystage --}}
     {{-- ========================================= --}}
@@ -326,7 +324,7 @@ td,th{
                                 <br>
                                     <small>
                                         <strong>
-                                            {{ $keystageLabel ?: ($status->qr_label ?? 'Unknown Item') }}
+                                            {{ $status->qr_label ?? 'Unknown Item' }}
                                         </strong>
                                     </small>
                             </td>
@@ -344,8 +342,6 @@ td,th{
         @endforeach
 
     </div>
-
-    <div class="page-break"></div>
 @endforeach
 
 

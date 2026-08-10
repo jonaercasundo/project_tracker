@@ -323,9 +323,30 @@ class DeliveryController extends Controller
             ->map(fn($v) => trim($v))
             ->filter(fn($v) => is_numeric($v) && $v > 0)
             ->values();
-
+    
         if ($ids->isEmpty()) abort(422, 'Invalid DR numbers.');
-
+    
+        // The frontend may only send the delivery_id(s) for ONE keystage row
+        // under a DR (e.g. the row the user clicked "View" on). Since each
+        // keystage is its own Delivery row (keystage is belongsTo Delivery),
+        // fetching only those ids means sibling keystages under the same DR
+        // never get loaded -> only one keystage's QR codes render.
+        //
+        // Fix: resolve the dr_no(s) for whatever ids were submitted, then
+        // expand the id list to every delivery row sharing those dr_no(s).
+        // This guarantees "select one keystage" == "generate the whole DR".
+        $drNos = Delivery::whereIn('delivery_id', $ids)
+            ->pluck('dr_no')
+            ->unique()
+            ->values();
+    
+        if ($drNos->isEmpty()) abort(404, 'No deliveries found.');
+    
+        $ids = Delivery::whereIn('dr_no', $drNos)
+            ->pluck('delivery_id')
+            ->unique()
+            ->values();
+    
         $deliveries = Delivery::with([
             'school',
             'project.arSetting',
@@ -340,26 +361,27 @@ class DeliveryController extends Controller
         ])
         ->whereIn('delivery_id', $ids)
         ->orderBy('dr_no')
+        ->orderBy('keystage_id')
         ->get();
-
+    
         if ($deliveries->isEmpty()) abort(404, 'No deliveries found.');
-
+    
         $qrCodes = [];
-
+    
         foreach ($deliveries as $delivery) {
-
+    
             if ($delivery->packageStatuses->isEmpty()) {
-
+    
                 $packageIds = DB::table('package')
                     ->where('lot_id', $delivery->lot_id)
                     ->pluck('package_id');
-
+    
                 foreach ($packageIds as $packageId) {
                     $exists = DB::table('package_status')
                         ->where('delivery_id', $delivery->delivery_id)
                         ->where('package_id', $packageId)
                         ->exists();
-
+    
                     if (!$exists) {
                         DB::table('package_status')->insert([
                             'delivery_id' => $delivery->delivery_id,
@@ -369,41 +391,41 @@ class DeliveryController extends Controller
                         ]);
                     }
                 }
-
+    
                 $delivery->unsetRelation('packageStatuses');
                 $delivery->load(['packageStatuses.package.packageContent.item']);
             }
-
+    
             $delivery->ar = $delivery->project->arSetting ?? null;
-
+    
             $statuses = PackageStatus::with(['package.packageContent.item'])
                 ->where('delivery_id', $delivery->delivery_id)
                 ->get();
-
+    
             $delivery->setRelation('packageStatuses', $statuses);
-
+    
             foreach ($statuses as $status) {
                 if (!$status->package_status_id) continue;
-
+    
                 $url = sprintf(
                     'https://mmc.metro-ltd.com/entry.php?id=%s&delivery_id=%s',
                     $status->package_status_id,
                     $delivery->delivery_id
                 );
                 $result = (new PngWriter())->write(new QrCode($url));
-
+    
                 $qrCodes[$status->package_status_id] =
                     'data:image/png;base64,' . base64_encode($result->getString());
-
+    
                 $items = $status->package?->packageContent?->pluck('item') ?? collect();
                 $itemNames = $items->pluck('item_name')->filter();
-
+    
                 $status->qr_label = $itemNames->isNotEmpty()
                     ? $itemNames->implode(', ')
                     : 'Unknown Item';
             }
         }
-
+    
         return Pdf::loadView('deliveries.ar-layout', [
             'deliveries' => $deliveries,
             'qrCodes'    => $qrCodes,

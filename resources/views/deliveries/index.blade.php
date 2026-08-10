@@ -83,7 +83,6 @@
                     {{-- ITEMS LIST --}}
                     <div class="divide-y divide-slate-100">
                         @foreach($dr_group['deliveries'] as $d)
-                        @dd($d)
                             <div class="px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-slate-50/50 transition">
 
                                 {{-- LEFT DETAILS --}}
@@ -98,7 +97,7 @@
                                     </div>
 
                                     <div class="text-xs text-slate-500 leading-relaxed">
-                                        {{ collect($d->items_list ?? [])->implode(', ') ?: 'No items available' }}
+                                    {{ $d->item_name ?: 'No items available' }}
                                     </div>
                                 </div>
 

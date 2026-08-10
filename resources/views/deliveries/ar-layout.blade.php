@@ -85,269 +85,225 @@ td,th{
             $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logoPath));
         }
 
+        // Group items into pairs: [Learner's Material, Teacher's Manual], [next pair], ...
+        // Replace with your real subject-label field if not `subject_name`.
+        $itemPairs = $delivery->items->chunk(2);
+
     @endphp
 
-{{-- ========================================= --}}
-{{-- PAGE 1 --}}
-{{-- ========================================= --}}
+    {{-- ========================================= --}}
+    {{-- PAGE 1 --}}
+    {{-- ========================================= --}}
 
-<div>
+    <div>
 
-    <div style="text-align:center;">
-        <img src="{{ $logoPath }}" class="logoimg">
-    </div>
+        <div style="text-align:center;">
+            <img src="{{ $logoPath }}" class="logoimg">
+        </div>
 
-    <div style="text-align:right;">
-        <small>Date: June 29, 2026</small>
-        <br>
+        <div style="text-align:right;">
+            <small>Date: June 29, 2026</small>
+            <br>
 
-        @if(optional($ar)->display_school_id)
-            <small>
-                AR: {{ preg_replace('/^TX-LOT\d+-/', '', $delivery->school_id) }}
-            </small>
-        @endif
-    </div>
+            @if(optional($ar)->display_school_id)
+                <small>
+                    AR: {{ preg_replace('/^TX-LOT\d+-/', '', $delivery->school_id) }}
+                </small>
+            @endif
+        </div>
 
-    <table class="no-border">
+        <table class="no-border">
 
-        <tr>
-            <td class="no-border" width="120">
-                <strong>Project:</strong>
-            </td>
+            <tr>
+                <td class="no-border" width="120">
+                    <strong>Project:</strong>
+                </td>
 
-            <td class="no-border">
-                <strong>
-                    {{ $ar->project_name ?? $delivery->project->project_name ?? '' }}
-                </strong>
-            </td>
-        </tr>
+                <td class="no-border">
+                    <strong>
+                        {{ $ar->project_name ?? $delivery->project->project_name ?? '' }}
+                    </strong>
+                </td>
+            </tr>
 
-    </table>
+        </table>
 
-    <h3 style="text-align:center;">
-        ACKNOWLEDGEMENT OF RECEIPT OF GOODS
-    </h3>
-
-    <p>
-
-        The undersigned hereby acknowledges the receipt of goods
-        pursuant to Contract No.
-
-        {{ $delivery->lot->contract_no ?? '' }}
-
-        @if(!empty($delivery->lot->lot_name))
-            (LOT {{ $delivery->lot->lot_name }})
-        @endif
-
-        between
-
-        {{ $ar->company ?? '' }}
-
-        and
-
-        {{ $ar->client ?? '' }}.
-
-    </p>
-
-    @if(optional($ar)->display_label)
+        <h3 style="text-align:center;">
+            ACKNOWLEDGEMENT OF RECEIPT OF GOODS
+        </h3>
 
         <p>
 
-            <strong>School Name:</strong>
-            {{ $delivery->school->school_name ?? '' }}
+            The undersigned hereby acknowledges the receipt of goods
+            pursuant to Contract No.
 
-            <br>
+            {{ $delivery->lot->contract_no ?? '' }}
 
-            <strong>School Address:</strong>
-            {{ $delivery->school->address ?? '' }}
+            @if(!empty($delivery->lot->lot_name))
+                (LOT {{ $delivery->lot->lot_name }})
+            @endif
+
+            between
+
+            {{ $ar->company ?? '' }}
+
+            and
+
+            {{ $ar->client ?? '' }}.
+
         </p>
 
-    @endif
-        @php
-            $prefix = implode('-', array_slice(explode('-', $delivery->school_id), 0, 2));
+        @if(optional($ar)->display_label)
 
-            $firstItem = $delivery->items[0] ?? null;
-            $secondItem = $delivery->items[1] ?? null;
-            $thirdItem = $delivery->items[2] ?? null;
-            $fourthItem = $delivery->items[3] ?? null;
-        @endphp
-        
+            <p>
+
+                <strong>School Name:</strong>
+                {{ $delivery->school->school_name ?? '' }}
+
+                <br>
+
+                <strong>School Address:</strong>
+                {{ $delivery->school->address ?? '' }}
+            </p>
+
+        @endif
+
         <table>
-            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT12')
-                <thead>
-                    <tr>
-                        <th colspan="2" style="text-align: left;">
-                            Grade 2 Makabansa
-                        </th>
-                    </tr>
-                </thead>
+            @foreach($itemPairs as $pair)
+                @php
+                    $learnerItem = $pair->values()[0] ?? null;
+                    $teacherItem = $pair->values()[1] ?? null;
+                @endphp
 
-                <tbody>
-                    <tr>
-                        <td class="w-1/2">
-                            {{ $firstItem?->item_name }}
-                        </td>
+                @if($learnerItem)
+                    <thead>
+                        <tr>
+                            <th colspan="2" style="text-align: left;">
+                                {{ $learnerItem->subject_name ?? $learnerItem->item_name }}
+                            </th>
+                        </tr>
+                    </thead>
 
-                        <td align="center">
-                            @php
-                                $package1 = $firstItem?->packageContent?->package;
-                            @endphp
+                    <tbody>
+                        <tr>
+                            <td class="w-1/2">
+                                {{ $learnerItem->item_name }}
+                            </td>
 
-                             {{ $package1?->width }} × {{ $package1?->height }} × {{ $package1?->length }}
+                            <td align="center">
+                                @php
+                                    $package1 = $learnerItem->packageContent?->package;
+                                @endphp
 
-                            <hr style="margin:3px 0;">
+                                {{ $package1?->width }} × {{ $package1?->height }} × {{ $package1?->length }}
 
-                            {{ $delivery->package_qty }} <p> Copies</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="w-1/2">
-                            {{ $secondItem?->item_name }}
-                        </td>
+                                <hr style="margin:3px 0;">
 
-                        <td align="center">
-                            @php
-                                $package2 = $secondItem?->packageContent?->package;
-                            @endphp
+                                {{ $delivery->package_qty }} <p>Copies</p>
+                            </td>
+                        </tr>
 
-                            {{ $package2?->width }} × {{ $package2?->height }} × {{ $package2?->length }}
+                        @if($teacherItem)
+                            <tr>
+                                <td class="w-1/2">
+                                    {{ $teacherItem->item_name }}
+                                </td>
 
-                            <hr style="margin:3px 0;">
+                                <td align="center">
+                                    @php
+                                        $package2 = $teacherItem->packageContent?->package;
+                                    @endphp
 
-                            {{ $delivery->qty_teachers_manual }}<p> Copies</p>
-                        </td>
-                    </tr>
-                </tbody>       
-            @endif
-            @if($delivery->items->isNotEmpty() && $prefix === 'TX-LOT13')
-                <thead>
-                    <tr>
-                        <th colspan="2" style="text-align: left;">
-                            Grade 2 Filipino
-                        </th>
-                    </tr>
-                </thead>
+                                    {{ $package2?->width }} × {{ $package2?->height }} × {{ $package2?->length }}
 
-                <tbody>
-                    <tr>
-                        <td class="w-1/2">
-                            {{ $thirdItem?->item_name }}
-                        </td>
+                                    <hr style="margin:3px 0;">
 
-                        <td align="center">
-                            @php
-                                $package1 = $thirdItem?->packageContent?->package;
-                            @endphp
-
-                            {{ $package1?->width }} × {{ $package1?->height }} × {{ $package1?->length }}
-
-                            <hr style="margin:3px 0;">
-
-                            {{ $delivery->package_qty }}<p> Copies</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="w-1/2">
-                            {{ $fourthItem?->item_name }}
-                        </td>
-
-                        <td align="center">
-                            @php
-                                $package2 = $fourthItem?->packageContent?->package;
-                            @endphp
-
-                            {{ $package2?->width }} × {{ $package2?->height }} × {{ $package2?->length }}
-
-                            <hr style="margin:3px 0;">
-
-                            {{ $delivery->qty_teachers_manual }}<p> Copies</p>
-                        </td>
-                    </tr>
-                </tbody>       
-            @endif
+                                    {{ $delivery->qty_teachers_manual }} <p>Copies</p>
+                                </td>
+                            </tr>
+                        @endif
+                    </tbody>
+                @endif
+            @endforeach
         </table>
 
-    <div class="footer">
+        <div class="footer">
 
-        <table style="border:none;">
+            <table style="border:none;">
 
-            <tr>
+                <tr>
 
-                <td style="border:none;">
-                    Printed Name Over Signature
-                </td>
+                    <td style="border:none;">
+                        Printed Name Over Signature
+                    </td>
 
-                <td style="border:none;">
-                    {{ $signerName }}
-                    <br>
-                    {{ $ar->ar_company_footer ?? 'Metro Mobilia Corporation' }}
-                </td>
+                    <td style="border:none;">
+                        {{ $signerName }}
+                        <br>
+                        {{ $ar->ar_company_footer ?? 'Metro Mobilia Corporation' }}
+                    </td>
 
-            </tr>
+                </tr>
 
-        </table>
+            </table>
 
-        <small>
+            <small>
 
-            {{ $ar->ar_address_footer ?? '' }}
+                {{ $ar->ar_address_footer ?? '' }}
 
-            <br>
+                <br>
 
-            {{ $ar->ar_contact_footer ?? '' }}
+                {{ $ar->ar_contact_footer ?? '' }}
 
-        </small>
+            </small>
+
+        </div>
 
     </div>
 
-</div>
-<div>
+    {{-- ========================================= --}}
+    {{-- PAGE 2 --}}
+    {{-- ========================================= --}}
 
+    <div>
 
-    @php
-        $prefix = implode('-', array_slice(explode('-', $delivery->school_id), 0, 2));
+        <table>
 
-        $firstItem = $delivery->items[0] ?? null;
-        $secondItem = $delivery->items[1] ?? null;
-        $thirdItem = $delivery->items[2] ?? null;
-        $fourthItem = $delivery->items[3] ?? null;
-    @endphp
-    <table>
+            @foreach($delivery->packageStatuses->chunk(2) as $chunk)
 
-        @foreach($delivery->packageStatuses->chunk(2) as $chunk)
+                <tr>
 
-            <tr>
+                    @foreach($chunk as $status)
+                        <td class="qr">
+                            @if(isset($qrCodes[$status->package_status_id]))
 
-                @foreach($chunk as $status)
-                    <td class="qr">
-                        @if(isset($qrCodes[$status->package_status_id]))
+                                <img
+                                    src="{{ $qrCodes[$status->package_status_id] }}"
+                                    width="150"
+                                >
 
-                            <img
-                                src="{{ $qrCodes[$status->package_status_id] }}"
-                                width="150"
-                            >
+                            @endif
 
-                        @endif
+                            <br>
+                                {{ $status->qr_label ?? 'Unknown Item' }}
 
-                        <br>
-                            {{ $status->qr_label ?? 'Unknown Item' }}
-                            
-                    </td>
+                        </td>
 
-                @endforeach
+                    @endforeach
 
-                @if($chunk->count() == 1)
-                    <td></td>
-                @endif
+                    @if($chunk->count() == 1)
+                        <td></td>
+                    @endif
 
-            </tr>
+                </tr>
 
-        @endforeach
+            @endforeach
 
-    </table>
+        </table>
 
-</div>
+    </div>
 
-<div class="page-break"></div>
+    <div class="page-break"></div>
 @endforeach
 
 

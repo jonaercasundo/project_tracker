@@ -314,26 +314,6 @@ class DeliveryController extends Controller
         unset($g, $delivery);
 
         // =========================
-        // CLEAN UP ITEM LISTS
-        // =========================
-        foreach ($grouped as &$g) {
-
-            foreach ($g['deliveries'] as &$delivery) {
-
-                $delivery->items_list = array_values(
-                    array_unique(
-                        array_filter($delivery->items_list)
-                    )
-                );
-            }
-
-            // Convert associative delivery array to normal indexed array
-            $g['deliveries'] = array_values($g['deliveries']);
-        }
-
-        unset($g, $delivery);
-
-        // =========================
         // DROPDOWNS
         // =========================
         $years = DB::table('deliveries')

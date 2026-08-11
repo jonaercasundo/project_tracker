@@ -170,7 +170,10 @@ td,th{
         @if(optional($ar)->display_label)
 
             <p>
+                <strong>School ID:</strong>
+                {{ $first->school->school_id ?? '' }}
 
+                <br>
                 <strong>School Name:</strong>
                 {{ $first->school->school_name ?? '' }}
 
@@ -280,12 +283,6 @@ td,th{
     {{-- ========================================= --}}
 
     <div>
-
-        <div style="text-align:right;">
-            <small>Date: {{ now()->format('Y-M-d') }}</small>
-            <br>
-            <small>DR: {{ $drNo }}</small>
-        </div>
 
         @foreach($drDeliveries as $delivery)
 

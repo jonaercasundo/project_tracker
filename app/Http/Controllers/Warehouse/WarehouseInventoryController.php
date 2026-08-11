@@ -17,11 +17,6 @@ use App\Models\Warehouse;
 
 class WarehouseInventoryController extends Controller
 {
-    // ==========================================================
-    // Existing single-scan-immediate-save endpoint (kept as-is,
-    // in case anything else still calls it directly).
-    // ==========================================================
-
     public function scanner()
     {
         $warehouses = Warehouse::orderBy('warehouse_name')->get();
@@ -84,101 +79,88 @@ class WarehouseInventoryController extends Controller
         return response()->json($deliveries);
     }
 
-        public function getDeliveryItems(Request $request)
-        {
-            try {
+    public function getDeliveryItems(Request $request)
+    {
+        try {
 
-                $request->validate([
-                    'lot_id' => 'required|integer|exists:lot,lot_id',
-                ]);
+            $request->validate([
+                'lot_id' => 'required|integer|exists:lot,lot_id',
+            ]);
 
-                $deliveries = Delivery::with([
-                    'project',
-                    'lot',
-                    'school',
-                    'packageStatuses.package.packageContent.item'
-                ])
-                ->where('lot_id', $request->lot_id)
-                ->where('status', 'pending')
-                ->get();
+            $deliveries = Delivery::with([
+                'project',
+                'lot',
+                'school',
+                'packageStatuses.package.packageContent.item'
+            ])
+            ->where('lot_id', $request->lot_id)
+            ->where('status', 'pending')
+            ->get();
 
-                if ($deliveries->isEmpty()) {
-                    return response()->json([
-                        'delivery_id'   => null,
-                        'project'       => '',
-                        'lot'           => '',
-                        'school'        => '',
-                        'delivery_date' => '',
-                        'items'         => [],
-                    ]);
-                }
-
-                $firstDelivery = $deliveries->first();
-
-                // Total quantities for the whole lot
-                $totalPackageQty = $deliveries->sum('package_qty');
-                $totalTeacherQty = $deliveries->sum('qty_teachers_manual');
-
-                $items = [];
-
-                foreach ($deliveries as $delivery) {
-
-                    foreach ($delivery->packageStatuses as $status) {
-
-                        foreach ($status->package?->packageContent ?? [] as $content) {
-
-                            $itemId = $content->item_id;
-
-                            if (isset($items[$itemId])) {
-                                continue;
-                            }
-
-                            $itemName = strtolower($content->item?->item_name ?? '');
-
-                            // Teacher Manual
-                            if (
-                                str_contains($itemName, 'teacher') ||
-                                str_contains($itemName, 'manual')
-                            ) {
-                                $qty = $totalTeacherQty;
-                            } else {
-                                $qty = $totalPackageQty;
-                            }
-
-                            $items[$itemId] = [
-                                'item_id'   => $itemId,
-                                'item_name' => $content->item?->item_name ?? 'Unnamed Item',
-                                'unit'      => $content->item?->unit ?? '',
-                                'qty'       => (int) $qty,
-                            ];
-                        }
-                    }
-                }
-
+            if ($deliveries->isEmpty()) {
                 return response()->json([
-                    'delivery_id'   => null, // Per LOT, not per DR
-                    'project'       => $firstDelivery->project->project_name ?? '',
-                    'lot'           => $firstDelivery->lot->lot_name ?? '',
+                    'delivery_id'   => null,
+                    'project'       => '',
+                    'lot'           => '',
                     'school'        => '',
                     'delivery_date' => '',
-                    'items'         => array_values($items),
+                    'items'         => [],
                 ]);
-
-            } catch (\Throwable $e) {
-
-                Log::error('getDeliveryItems failed', [
-                    'message' => $e->getMessage(),
-                    'line'    => $e->getLine(),
-                    'file'    => $e->getFile(),
-                ]);
-
-                return response()->json([
-                    'error' => $e->getMessage(),
-                    'line'  => $e->getLine(),
-                    'file'  => $e->getFile(),
-                ], 500);
             }
+
+            $firstDelivery = $deliveries->first();
+
+            // Total quantity for the whole lot — uniform, no item-name branching.
+            $totalPackageQty = $deliveries->sum('package_qty');
+
+            $items = [];
+
+            foreach ($deliveries as $delivery) {
+
+                foreach ($delivery->packageStatuses as $status) {
+
+                    foreach ($status->package?->packageContent ?? [] as $content) {
+
+                        $itemId = $content->item_id;
+
+                        if (isset($items[$itemId])) {
+                            continue;
+                        }
+
+                        $items[$itemId] = [
+                            'item_id'   => $itemId,
+                            'item_name' => $content->item?->item_name ?? 'Unnamed Item',
+                            'unit'      => $content->item?->unit ?? '',
+                            'qty'       => (int) $totalPackageQty,
+                        ];
+                    }
+                }
+            }
+
+            return response()->json([
+                'delivery_id'   => null, // Per LOT, not per DR
+                'project'       => $firstDelivery->project->project_name ?? '',
+                'lot'           => $firstDelivery->lot->lot_name ?? '',
+                'school'        => '',
+                'delivery_date' => '',
+                'items'         => array_values($items),
+            ]);
+
+        } catch (\Throwable $e) {
+
+            Log::error('getDeliveryItems failed', [
+                'message' => $e->getMessage(),
+                'line'    => $e->getLine(),
+                'file'    => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage(),
+                'line'  => $e->getLine(),
+                'file'  => $e->getFile(),
+            ], 500);
         }
+    }
 
     // ==========================================================
     // NEW: validate a single QR — lookup only, NO writes.
@@ -193,28 +175,14 @@ class WarehouseInventoryController extends Controller
                 'warehouse_id' => 'required|integer',
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | EXTRACT QR PACKAGE STATUS ID
-            |--------------------------------------------------------------------------
-            */
-
             $packageStatusId = $this->extractPackageStatusId($request->qr);
 
             if (!$packageStatusId) {
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid QR code.'
                 ]);
-
             }
-
-            /*
-            |--------------------------------------------------------------------------
-            | LOAD PACKAGE DATA
-            |--------------------------------------------------------------------------
-            */
 
             $status = PackageStatus::with([
                 'package.contents.item',
@@ -222,78 +190,44 @@ class WarehouseInventoryController extends Controller
             ])->find($packageStatusId);
 
             if (!$status) {
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Package status not found.'
                 ]);
-
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | PACKAGE VALIDATION
-            |--------------------------------------------------------------------------
-            */
-
             if (!$status->package) {
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Package information not found.'
                 ]);
-
             }
 
             $contents = $status->package->contents;
 
             if (!$contents || $contents->isEmpty()) {
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Package has no item contents.'
                 ]);
-
             }
-
-            /*
-            |--------------------------------------------------------------------------
-            | ITEM INFORMATION
-            |--------------------------------------------------------------------------
-            */
 
             $firstItem = $contents->first();
 
             if (!$firstItem->item) {
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Item information not found.'
                 ]);
-
             }
 
             $itemName = $firstItem->item->item_name ?? 'Unknown';
 
-            /*
-            |--------------------------------------------------------------------------
-            | PACKAGE STATE VALIDATION
-            |
-            | A package must currently be sitting in the warehouse before it
-            | can be scanned out. Checking this here (rather than only at
-            | save time) means the scanner rejects it immediately instead of
-            | letting it sit in the "ready to save" list and only fail when
-            | the batch is actually committed.
-            |--------------------------------------------------------------------------
-            */
-
             if ($status->status !== 'pending') {
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Package is not available in warehouse.'
                 ]);
-
             }
 
             /*
@@ -301,96 +235,45 @@ class WarehouseInventoryController extends Controller
             | DR BASED QUANTITY
             |
             | Example:
-            |
             | DR C230
             | QR Scan = 230 pcs
             |
             | Scanning a single package represents the full DR quantity, not
             | just the contents of that one physical package — this must
-            | match the deduction logic in saveScan().
-            |
-            | Teacher's Manuals are delivered in a separate quantity
-            | (qty_teachers_manual) from the rest of the package_qty, same
-            | distinction already made in getDeliveryItems() for stock-in.
+            | match the deduction logic in saveScan(). Uniform across all
+            | items, no per-item-name branching.
             |--------------------------------------------------------------------------
             */
 
             $delivery = $status->delivery;
 
             if (!$delivery) {
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Delivery record not found.'
                 ]);
-
             }
 
-            $normalizedItemName = strtolower($itemName);
-
-            $isTeacherManual =
-                str_contains($normalizedItemName, 'teacher') ||
-                str_contains($normalizedItemName, 'manual');
-
-            $drQty = $isTeacherManual
-                ? (int) ($delivery->qty_teachers_manual ?? 0)
-                : (int) ($delivery->package_qty ?? 0);
+            $drQty = (int) ($delivery->package_qty ?? 0);
 
             if ($drQty <= 0) {
-
                 return response()->json([
                     'success' => false,
                     'message' => 'DR quantity is missing.'
                 ]);
-
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | SUCCESS RESPONSE
-            |--------------------------------------------------------------------------
-            */
-
             return response()->json([
-
                 'success' => true,
-
-                'package_status_id' =>
-                    $status->package_status_id,
-
-                'package_id' =>
-                    $status->package_id,
-
-                'delivery_id' =>
-                    $status->delivery_id,
-
-                'dr_no' =>
-                    $status->delivery->dr_no ?? null,
-
-                'package_name' =>
-                    'Package #' . $status->package->package_num,
-
-                'item' =>
-                    $itemName,
-
-                'item_id' =>
-                    $firstItem->item_id,
-
-                /*
-                Inventory quantity based on DR — this is exactly what
-                saveScan() will deduct for every content item on this
-                package.
-                */
-
-                'qty' => $drQty,
-
-                /*
-                Same value, kept separate for display/reference clarity.
-                */
-
-                'dr_qty' =>
-                    $drQty
-
+                'package_status_id' => $status->package_status_id,
+                'package_id'        => $status->package_id,
+                'delivery_id'       => $status->delivery_id,
+                'dr_no'             => $status->delivery->dr_no ?? null,
+                'package_name'      => 'Package #' . $status->package->package_num,
+                'item'              => $itemName,
+                'item_id'           => $firstItem->item_id,
+                'qty'               => $drQty,
+                'dr_qty'            => $drQty,
             ]);
 
         } catch (\Throwable $e) {
@@ -454,56 +337,29 @@ class WarehouseInventoryController extends Controller
                         throw new \Exception('Package has no contents.');
                     }
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | STOCK OUT VALIDATION
-                    |--------------------------------------------------------------------------
-                    */
-
                     if ($status->status !== 'pending') {
-
                         throw new \RuntimeException(
                             'Package is not available in warehouse.'
                         );
-
                     }
 
                     foreach ($status->package->contents as $content) {
 
                         /*
                         |--------------------------------------------------------------------------
-                        | Quantity Based on DR
-                        |
-                        | Example:
-                        | DR C230
-                        | package_qty = 230
-                        | QR Scan = deduct 230 pcs
-                        |
-                        | Teacher's Manuals are delivered under a separate
-                        | quantity (qty_teachers_manual), same distinction as
-                        | validateScan() and getDeliveryItems().
+                        | Quantity Based on DR — uniform across all items,
+                        | no per-item-name branching. Must match
+                        | validateScan().
                         |--------------------------------------------------------------------------
                         */
 
-                        $contentItemName = strtolower($content->item->item_name ?? '');
-
-                        $contentIsTeacherManual =
-                            str_contains($contentItemName, 'teacher') ||
-                            str_contains($contentItemName, 'manual');
-
-                        $drQty = $contentIsTeacherManual
-                            ? (int) ($status->delivery->qty_teachers_manual ?? 0)
-                            : (int) ($status->delivery->package_qty ?? 0);
-
+                        $drQty = (int) ($status->delivery->package_qty ?? 0);
 
                         if ($drQty <= 0) {
-
                             throw new \RuntimeException(
                                 "DR quantity is missing."
                             );
-
                         }
-
 
                         Log::info('PACKAGE CONTENT', [
                             'package_status_id' => $item['package_status_id'],
@@ -511,78 +367,42 @@ class WarehouseInventoryController extends Controller
                             'dr_qty'            => $drQty,
                         ]);
 
-
                         $inventory = Inventory::firstOrNew([
                             'warehouse_id' => $request->warehouse_id,
                             'item_id'      => $content->item_id,
                         ]);
 
-
                         $oldQty = $inventory->exists
                             ? $inventory->qty
                             : 0;
 
-
-
                         if ($oldQty < $drQty) {
-
                             throw new \RuntimeException(
                                 "Insufficient stock for item {$content->item_id}. Available: {$oldQty}, Required: {$drQty}"
                             );
-
                         }
 
-
-
                         $newQty = $oldQty - $drQty;
-
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Update Inventory
-                        |--------------------------------------------------------------------------
-                        */
 
                         $inventory->withoutEvents(function () use (
                             $inventory,
                             $newQty
                         ) {
-
                             $inventory->qty = $newQty;
                             $inventory->inventory_status = 'Approved';
                             $inventory->save();
-
                         });
 
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Inventory History
-                        |--------------------------------------------------------------------------
-                        */
-
                         InventoryHistory::create([
-
                             'batch_no'     => $batchNo,
-
                             'inventory_id' => $inventory->inventory_id,
-
                             'item_id'      => $content->item_id,
-
                             'warehouse_id' => $request->warehouse_id,
-
                             'old_qty'      => $oldQty,
-
                             'new_qty'      => $newQty,
-
                             'changed_by'   => Auth::user()->name,
-
                             'remarks'      => 'Stock Out via QR Scanner - DR Qty: ' . $drQty,
-
                             'change_type'  => 'stock_out',
-
                         ]);
 
                     }
@@ -599,21 +419,14 @@ class WarehouseInventoryController extends Controller
             } catch (\Throwable $e) {
 
                 Log::error('Warehouse Scan Error', [
-
                     'package_status_id' => $item['package_status_id'],
-
                     'message' => $e->getMessage(),
-
                     'line' => $e->getLine(),
-
                 ]);
 
                 $results['failed'][] = [
-
                     'package_status_id' => $item['package_status_id'],
-
                     'message' => $e->getMessage(),
-
                 ];
 
             }
@@ -621,20 +434,14 @@ class WarehouseInventoryController extends Controller
         }
 
         return response()->json([
-
             'success' => count($results['failed']) === 0,
-
             'message' => count($results['saved']) .
                 ' saved, ' .
                 count($results['failed']) .
                 ' failed.',
-
             'batch_no' => $batchNo,
-
             'saved'   => $results['saved'],
-
             'failed'  => $results['failed'],
-
         ]);
     }
 
@@ -644,6 +451,9 @@ class WarehouseInventoryController extends Controller
     // exactly what was entered as "received", not the full
     // delivered amount, so short/partial receipts are recorded
     // accurately.
+    //
+    // Quantity is uniform (package_qty) for every item — no
+    // per-item-name branching.
     //
     // ASSUMPTION (confirm / adjust to your process): package
     // statuses for the delivery are only flipped to 'warehouse'
@@ -677,32 +487,15 @@ class WarehouseInventoryController extends Controller
         }
 
         $totalPackageQty = $deliveries->sum('package_qty');
-        $totalTeacherQty = $deliveries->sum('qty_teachers_manual');
-
-        $deliveredTotals = [];
-
-        foreach ($request->items as $item) {
-
-            $itemId = $item['item_id'];
-
-            $itemModel = \App\Models\Item::find($itemId);
-
-            $isTeacherManual =
-                str_contains(strtolower($itemModel->item_name), 'teacher') ||
-                str_contains(strtolower($itemModel->item_name), 'manual');
-            
-            $deliveredTotals[$itemId] = $isTeacherManual
-                ? $totalTeacherQty
-                : $totalPackageQty;
-        }
 
         $batchNo = 'STOCKIN-' . now()->format('YmdHis');
         $results = ['saved' => [], 'failed' => []];
+
         foreach ($request->items as $item) {
 
             $itemId      = $item['item_id'];
             $receivedQty = (int) $item['received_qty'];
-            $delivered   = $deliveredTotals[$itemId] ?? 0;
+            $delivered   = $totalPackageQty;
             $remarks     = trim($item['remarks'] ?? '');
 
             try {

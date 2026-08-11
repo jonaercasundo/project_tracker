@@ -83,11 +83,11 @@
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Lot</label>
                     <div id="info_lot" class="mt-1 font-semibold text-slate-800">—</div>
                 </div>
-                <div>
+                <div hidden>
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">School</label>
                     <div id="info_school" class="mt-1 font-semibold text-slate-800">—</div>
                 </div>
-                <div>
+                <div hidden>
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Delivery Date</label>
                     <div id="info_date" class="mt-1 font-semibold text-slate-800">—</div>
                 </div>

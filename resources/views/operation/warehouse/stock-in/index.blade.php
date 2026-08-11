@@ -74,7 +74,7 @@
             <div class="border-b border-slate-200 px-6 py-4">
                 <h2 class="text-lg font-semibold text-slate-900">Delivery Information</h2>
             </div>
-            <div class="grid gap-6 p-6 md:grid-cols-2 xl:grid-cols-4">
+            <div class="grid gap-6 p-6 md:grid-cols-2 xl:grid-cols-2">
                 <div>
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Project</label>
                     <div id="info_project" class="mt-1 font-semibold text-slate-800">—</div>
@@ -83,7 +83,9 @@
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Lot</label>
                     <div id="info_lot" class="mt-1 font-semibold text-slate-800">—</div>
                 </div>
-                <div hidden>
+            </div>
+        </div>
+        <div hidden>
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">School</label>
                     <div id="info_school" class="mt-1 font-semibold text-slate-800">—</div>
                 </div>
@@ -91,9 +93,6 @@
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Delivery Date</label>
                     <div id="info_date" class="mt-1 font-semibold text-slate-800">—</div>
                 </div>
-            </div>
-        </div>
-
         {{-- ================= LOADING SKELETON ================= --}}
         <div id="itemsLoading" class="hidden rounded-3xl border border-slate-200 bg-white p-10 shadow-sm shadow-slate-200/60">
             <div class="flex flex-col items-center justify-center gap-3 text-slate-400">

@@ -121,7 +121,7 @@ td,th{
 
             @if(optional($ar)->display_school_id)
                 <small>
-                    AR: {{ preg_replace('/^TX-LOT\d+-/', '', $first->school_id) }}
+                    AR: {{ preg_replace('/^TX-LOT\d+-/', '', $first->ar_no) }}
                 </small>
             @endif
         </div>

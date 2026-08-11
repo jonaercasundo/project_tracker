@@ -109,7 +109,7 @@ td {
                     </td>
 
                     <td style="text-align:center;">
-                        Copies
+                        {{ $item['unit'] }}
                     </td>
 
                 </tr>

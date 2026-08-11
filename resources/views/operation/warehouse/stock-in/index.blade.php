@@ -74,8 +74,8 @@
             <div class="border-b border-slate-200 px-6 py-4">
                 <h2 class="text-lg font-semibold text-slate-900">Delivery Information</h2>
             </div>
-            <div class="grid gap-6 p-6 md:grid-cols-2 xl:grid-cols-2">
-                <div>
+            <div class="grid gap-6 p-6 md:grid-cols-2 xl:grid-cols-5">
+                <div class="md:col-span-4">
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Project</label>
                     <div id="info_project" class="mt-1 font-semibold text-slate-800">—</div>
                 </div>

@@ -487,6 +487,15 @@ class DeliveryController extends Controller
     
         if ($ids->isEmpty()) abort(422, 'No deliveries selected.');
     
+        // Same fix as generate(): expand whatever delivery_id(s) were submitted
+        // to every delivery row sharing the same dr_no, so all keystages under
+        // a selected DR are included — not just the one row that was checked.
+        $drNos = Delivery::whereIn('delivery_id', $ids)->pluck('dr_no')->unique()->values();
+    
+        if ($drNos->isEmpty()) abort(404, 'No deliveries found.');
+    
+        $ids = Delivery::whereIn('dr_no', $drNos)->pluck('delivery_id')->unique()->values();
+    
         $deliveries = Delivery::with([
             'school',
             'project.arSetting',
@@ -517,8 +526,6 @@ class DeliveryController extends Controller
             $sid = $school->school_id;
             $lot = $delivery->lot?->lot_name ?? 'NO LOT';
     
-            // Group under keystage_id when present, otherwise a shared 'none'
-            // bucket so ungrouped deliveries still merge together like before.
             $keystageKey = $delivery->keystage_id ?? 'none';
     
             $keystageLabel = $delivery->keystage
@@ -544,15 +551,26 @@ class DeliveryController extends Controller
     
             if (!isset($data[$sid]['lots'][$lot][$keystageKey])) {
                 $data[$sid]['lots'][$lot][$keystageKey] = [
-                    'label' => $keystageLabel, // null = no keystage on this delivery
+                    'label' => $keystageLabel,
                     'items' => [],
                 ];
             }
     
+            // Prune stray package_status rows left over from the old buggy
+            // top-up logic: a package only belongs in this delivery's group
+            // if it actually matches this delivery's keystage_id (or, when
+            // the delivery has no keystage, its lot_id).
             foreach ($delivery->packageStatuses as $status) {
-                if (!$status->package) continue;
+                $pkg = $status->package;
+                if (!$pkg) continue;
     
-                foreach ($status->package->packageContent as $content) {
+                $belongsHere = $delivery->keystage_id
+                    ? $pkg->keystage_id == $delivery->keystage_id
+                    : $pkg->lot_id == $delivery->lot_id;
+    
+                if (!$belongsHere) continue;
+    
+                foreach ($pkg->packageContent as $content) {
                     if (!$content->item) continue;
     
                     $itemName = $content->item->item_name;

@@ -80,43 +80,53 @@ td {
                 </td>
             </tr>
         @endif
+        @foreach($school['lots'] as $lotName => $keystageGroups)
 
-        @foreach($school['lots'] as $lotName => $items)
+@php
+    // Total rows spanned by the LOT cell = one header row per keystage
+    // that has a label, plus one row per item across all groups.
+    $totalRows = 0;
+    foreach ($keystageGroups as $group) {
+        $totalRows += ($group['label'] ? 1 : 0) + count($group['items']);
+    }
+    $firstRowOfLot = true;
+@endphp
 
-            @php
-                $items = array_values($items);
-                $itemCount = count($items);
-                $first = true;
-            @endphp
+@foreach($keystageGroups as $group)
 
-            @foreach($items as $item)
+    @if($group['label'])
+        <tr>
+            @if($firstRowOfLot)
+                <td class="lot-cell" rowspan="{{ $totalRows }}">
+                    LOT {{ $lotName }}
+                </td>
+                @php $firstRowOfLot = false; @endphp
+            @endif
 
-                <tr>
+            <td colspan="3" style="background:#f2f2f2; font-weight:bold;">
+                {{ $group['label'] }}
+            </td>
+        </tr>
+    @endif
 
-                    @if($first)
-                        <td class="lot-cell" rowspan="{{ $itemCount }}">
-                            LOT {{ $lotName }}
-                        </td>
-                        @php $first = false; @endphp
-                    @endif
+    @foreach($group['items'] as $item)
+        <tr>
+            @if($firstRowOfLot)
+                <td class="lot-cell" rowspan="{{ $totalRows }}">
+                    LOT {{ $lotName }}
+                </td>
+                @php $firstRowOfLot = false; @endphp
+            @endif
 
-                    <td>
-                        {{ $item['item_name'] }}
-                    </td>
+            <td>{{ $item['item_name'] }}</td>
+            <td style="text-align:center;">{{ number_format($item['qty']) }}</td>
+            <td style="text-align:center;">{{ $item['unit'] }}</td>
+        </tr>
+    @endforeach
 
-                    <td style="text-align:center;">
-                        {{ number_format($item['qty']) }}
-                    </td>
+@endforeach
 
-                    <td style="text-align:center;">
-                        {{ $item['unit'] }}
-                    </td>
-
-                </tr>
-
-            @endforeach
-
-        @endforeach
+@endforeach
 
     </table>
 

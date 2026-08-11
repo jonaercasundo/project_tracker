@@ -501,22 +501,69 @@ class DeliveryController extends Controller
         $deliveries = Delivery::whereIn('delivery_id', $ids)->get();
 
         foreach ($deliveries as $delivery) {
-
-            $packageIds = DB::table('package')
-                ->where('lot_id', $delivery->lot_id)
-                ->pluck('package_id');
-
-            foreach ($packageIds as $packageId) {
-
-                DB::table('package_status')->updateOrInsert(
-                    [
-                        'delivery_id' => $delivery->delivery_id,
-                        'package_id'  => $packageId,
+            $school = $delivery->school;
+            if (!$school) continue;
+        
+            $sid = $school->school_id;
+            $lot = $delivery->lot?->lot_name ?? 'NO LOT';
+        
+            // Group under keystage_id when present, otherwise a shared 'none'
+            // bucket so ungrouped deliveries still merge together like before.
+            $keystageKey = $delivery->keystage_id ?? 'none';
+        
+            $keystageLabel = $delivery->keystage
+                ? trim('Keystage ' . $delivery->keystage->keystage_num . ' ' . ($delivery->keystage->description ?? ''))
+                : null;
+        
+            if (!isset($data[$sid])) {
+                $data[$sid] = [
+                    'info' => [
+                        'school_name'  => $school->school_name,
+                        'school_id'    => $school->school_id,
+                        'municipality' => $school->municipality,
+                        'division'     => $school->division,
+                        'region'       => $school->region,
                     ],
-                    [
-                        'status' => 'pending'
-                    ]
-                );
+                    'lots' => [],
+                ];
+            }
+        
+            if (!isset($data[$sid]['lots'][$lot])) {
+                $data[$sid]['lots'][$lot] = [];
+            }
+        
+            if (!isset($data[$sid]['lots'][$lot][$keystageKey])) {
+                $data[$sid]['lots'][$lot][$keystageKey] = [
+                    'label' => $keystageLabel, // null = no keystage on this delivery
+                    'items' => [],
+                ];
+            }
+        
+            foreach ($delivery->packageStatuses as $status) {
+                if (!$status->package) continue;
+        
+                foreach ($status->package->packageContent as $content) {
+                    if (!$content->item) continue;
+        
+                    $itemName = $content->item->item_name;
+                    if (!$itemName) continue;
+        
+                    $qty = (int) ($content->qty ?? 1) * (int) ($delivery->package_qty ?? 1);
+        
+                    $items = &$data[$sid]['lots'][$lot][$keystageKey]['items'];
+        
+                    if (isset($items[$itemName])) {
+                        $items[$itemName]['qty'] += $qty;
+                    } else {
+                        $items[$itemName] = [
+                            'item_name' => $itemName,
+                            'qty'       => $qty,
+                            'unit'      => $content->item->unit,
+                        ];
+                    }
+        
+                    unset($items);
+                }
             }
         }
         $projectId  = $deliveries->first()->project_id;

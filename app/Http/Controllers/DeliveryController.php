@@ -396,41 +396,41 @@ class DeliveryController extends Controller
     
         foreach ($deliveries as $delivery) {
     
-            if ($delivery->packageStatuses->isEmpty()) {
+            // Always compute the FULL expected package set for this delivery's
+            // keystage (or lot, if no keystage) and insert any missing rows.
+            // Previously this only ran when packageStatuses was completely
+            // empty, so deliveries with stale/incomplete package_status rows
+            // (created under the old single-package matching logic) never got
+            // topped up — that's why some keystages were stuck at "1 of 1"
+            // instead of showing all packages for that keystage.
+            $packageQuery = DB::table('package');
     
-                // Match the same package-resolution concept used in index():
-                // packages belong to a specific keystage if the delivery has one,
-                // otherwise fall back to lot-level packages. Using lot_id alone
-                // here pulled in packages from OTHER keystages in the same lot.
-                $packageQuery = DB::table('package');
-    
-                if (!empty($delivery->keystage_id)) {
-                    $packageQuery->where('keystage_id', $delivery->keystage_id);
-                } else {
-                    $packageQuery->where('lot_id', $delivery->lot_id);
-                }
-    
-                $packageIds = $packageQuery->pluck('package_id');
-    
-                foreach ($packageIds as $packageId) {
-                    $exists = DB::table('package_status')
-                        ->where('delivery_id', $delivery->delivery_id)
-                        ->where('package_id', $packageId)
-                        ->exists();
-    
-                    if (!$exists) {
-                        DB::table('package_status')->insert([
-                            'delivery_id' => $delivery->delivery_id,
-                            'package_id'  => $packageId,
-                            'status'      => 'pending',
-                            'remarks'     => null,
-                        ]);
-                    }
-                }
-    
-                $delivery->unsetRelation('packageStatuses');
-                $delivery->load(['packageStatuses.package.packageContent.item']);
+            if (!empty($delivery->keystage_id)) {
+                $packageQuery->where('keystage_id', $delivery->keystage_id);
+            } else {
+                $packageQuery->where('lot_id', $delivery->lot_id);
             }
+    
+            $packageIds = $packageQuery->pluck('package_id');
+    
+            foreach ($packageIds as $packageId) {
+                $exists = DB::table('package_status')
+                    ->where('delivery_id', $delivery->delivery_id)
+                    ->where('package_id', $packageId)
+                    ->exists();
+    
+                if (!$exists) {
+                    DB::table('package_status')->insert([
+                        'delivery_id' => $delivery->delivery_id,
+                        'package_id'  => $packageId,
+                        'status'      => 'pending',
+                        'remarks'     => null,
+                    ]);
+                }
+            }
+    
+            $delivery->unsetRelation('packageStatuses');
+            $delivery->load(['packageStatuses.package.packageContent.item']);
     
             $delivery->ar = $delivery->project->arSetting ?? null;
     

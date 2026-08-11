@@ -470,7 +470,7 @@ class WarehouseInventoryController extends Controller
             'lot_id'       => 'required|integer|exists:lot,lot_id',
             'warehouse_id' => 'required|exists:warehouse,warehouse_id',
             'items'        => 'required|array|min:1',
-            'items.*.item_id'      => 'required|integer|exists:items,item_id',
+            'items.*.item_id'      => 'required|integer|exists:item,item_id',
             'items.*.received_qty' => 'required|integer|min:0',
             'items.*.remarks'      => 'nullable|string',
         ]);

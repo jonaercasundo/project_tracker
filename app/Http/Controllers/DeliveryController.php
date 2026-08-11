@@ -398,9 +398,19 @@ class DeliveryController extends Controller
     
             if ($delivery->packageStatuses->isEmpty()) {
     
-                $packageIds = DB::table('package')
-                    ->where('lot_id', $delivery->lot_id)
-                    ->pluck('package_id');
+                // Match the same package-resolution concept used in index():
+                // packages belong to a specific keystage if the delivery has one,
+                // otherwise fall back to lot-level packages. Using lot_id alone
+                // here pulled in packages from OTHER keystages in the same lot.
+                $packageQuery = DB::table('package');
+    
+                if (!empty($delivery->keystage_id)) {
+                    $packageQuery->where('keystage_id', $delivery->keystage_id);
+                } else {
+                    $packageQuery->where('lot_id', $delivery->lot_id);
+                }
+    
+                $packageIds = $packageQuery->pluck('package_id');
     
                 foreach ($packageIds as $packageId) {
                     $exists = DB::table('package_status')

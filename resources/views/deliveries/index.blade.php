@@ -95,12 +95,40 @@
                                             </span>
                                         @endif
                                     </div>
+                                    <div class="text-xs text-slate-500 leading-relaxed space-y-3">
+                                        @forelse($d->packages ?? [] as $pkg)
+                                            <div>
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    <span class="font-semibold text-slate-600">
+                                                        Package {{ $pkg['package_num'] }} of {{ $pkg['total_packages'] }}
+                                                    </span>
 
-                                    <div class="text-xs text-slate-500 leading-relaxed space-y-1">
-                                        @forelse($d->items_list ?? [] as $item)
-                                            <div class="flex items-start gap-2">
-                                                <span class="text-slate-300">•</span>
-                                                <span>{{ $item }}</span>
+                                                    @php
+                                                        $statusStyles = [
+                                                            'delivered' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                                            'accepted'  => 'bg-blue-50 text-blue-700 border-blue-200',
+                                                            'warehouse' => 'bg-cyan-50 text-cyan-700 border-cyan-200',
+                                                            'pending'   => 'bg-amber-50 text-amber-700 border-amber-200',
+                                                        ];
+                                                        $statusKey = strtolower($pkg['status']);
+                                                        $statusClass = $statusStyles[$statusKey] ?? $statusStyles['pending'];
+                                                    @endphp
+
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border {{ $statusClass }}">
+                                                        {{ strtoupper($pkg['status']) }}
+                                                    </span>
+                                                </div>
+
+                                                <div class="space-y-0.5 pl-1">
+                                                    @forelse($pkg['items'] as $item)
+                                                        <div class="flex items-start gap-2">
+                                                            <span class="text-slate-300">•</span>
+                                                            <span>{{ $item }}</span>
+                                                        </div>
+                                                    @empty
+                                                        <span class="text-slate-400">No items</span>
+                                                    @endforelse
+                                                </div>
                                             </div>
                                         @empty
                                             <span class="text-slate-400">No items available</span>

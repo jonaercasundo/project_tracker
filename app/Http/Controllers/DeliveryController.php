@@ -479,42 +479,52 @@ class DeliveryController extends Controller
     {
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
-
+    
         $ids = collect(explode(',', $request->ids))
             ->map(fn($id) => (int) trim($id))
             ->filter()
             ->values();
-
+    
         if ($ids->isEmpty()) abort(422, 'No deliveries selected.');
-
+    
         $deliveries = Delivery::with([
             'school',
             'project.arSetting',
             'lot',
+            'keystage',
             'packageStatuses.package.packageContent.item',
         ])
         ->whereIn('delivery_id', $ids)
         ->orderBy('school_id')
         ->get();
-
+    
         if ($deliveries->isEmpty()) abort(404, 'No deliveries found.');
-        $deliveries = Delivery::whereIn('delivery_id', $ids)->get();
-
+    
+        $projectId  = $deliveries->first()->project_id;
+        $arSettings = ARSetting::where('project_id', $projectId)->first();
+    
+        $showSchoolID     = (bool) ($arSettings?->label_school_id    ?? false);
+        $showMunicipality = (bool) ($arSettings?->label_municipality  ?? false);
+        $showDivision     = (bool) ($arSettings?->label_division      ?? false);
+        $showRegion       = (bool) ($arSettings?->label_region        ?? false);
+    
+        $data = [];
+    
         foreach ($deliveries as $delivery) {
             $school = $delivery->school;
             if (!$school) continue;
-        
+    
             $sid = $school->school_id;
             $lot = $delivery->lot?->lot_name ?? 'NO LOT';
-        
+    
             // Group under keystage_id when present, otherwise a shared 'none'
             // bucket so ungrouped deliveries still merge together like before.
             $keystageKey = $delivery->keystage_id ?? 'none';
-        
+    
             $keystageLabel = $delivery->keystage
                 ? trim('Keystage ' . $delivery->keystage->keystage_num . ' ' . ($delivery->keystage->description ?? ''))
                 : null;
-        
+    
             if (!isset($data[$sid])) {
                 $data[$sid] = [
                     'info' => [
@@ -527,31 +537,31 @@ class DeliveryController extends Controller
                     'lots' => [],
                 ];
             }
-        
+    
             if (!isset($data[$sid]['lots'][$lot])) {
                 $data[$sid]['lots'][$lot] = [];
             }
-        
+    
             if (!isset($data[$sid]['lots'][$lot][$keystageKey])) {
                 $data[$sid]['lots'][$lot][$keystageKey] = [
                     'label' => $keystageLabel, // null = no keystage on this delivery
                     'items' => [],
                 ];
             }
-        
+    
             foreach ($delivery->packageStatuses as $status) {
                 if (!$status->package) continue;
-        
+    
                 foreach ($status->package->packageContent as $content) {
                     if (!$content->item) continue;
-        
+    
                     $itemName = $content->item->item_name;
                     if (!$itemName) continue;
-        
+    
                     $qty = (int) ($content->qty ?? 1) * (int) ($delivery->package_qty ?? 1);
-        
+    
                     $items = &$data[$sid]['lots'][$lot][$keystageKey]['items'];
-        
+    
                     if (isset($items[$itemName])) {
                         $items[$itemName]['qty'] += $qty;
                     } else {
@@ -561,76 +571,12 @@ class DeliveryController extends Controller
                             'unit'      => $content->item->unit,
                         ];
                     }
-        
+    
                     unset($items);
                 }
             }
         }
-        $projectId  = $deliveries->first()->project_id;
-        $arSettings = ARSetting::where('project_id', $projectId)->first();
-
-        $showSchoolID     = (bool) ($arSettings?->label_school_id    ?? false);
-        $showMunicipality = (bool) ($arSettings?->label_municipality  ?? false);
-        $showDivision     = (bool) ($arSettings?->label_division      ?? false);
-        $showRegion       = (bool) ($arSettings?->label_region        ?? false);
-
-        $data = [];
-
-        foreach ($deliveries as $delivery) {
-            $school = $delivery->school;
-            if (!$school) continue;
-
-            $sid = $school->school_id;
-            $lot = $delivery->lot?->lot_name ?? 'NO LOT';
-
-            if (!isset($data[$sid])) {
-                $data[$sid] = [
-                    'info' => [
-                        'school_name'         => $school->school_name,
-                        'school_id'           => $school->school_id,
-                        'municipality'        => $school->municipality,
-                        'division'            => $school->division,
-                        'region'              => $school->region,
-                        'qty_teachers_manual' => $delivery->qty_teachers_manual,
-                    ],
-                    'lots' => [],
-                ];
-            }
-
-            if (!isset($data[$sid]['lots'][$lot])) {
-                $data[$sid]['lots'][$lot] = [];
-            }
-
-            foreach ($delivery->packageStatuses as $status) {
-                if (!$status->package) continue;
-
-                foreach ($status->package->packageContent as $content) {
-                    if (!$content->item) continue;
-
-                    $itemName = $content->item->item_name;
-                    if (!$itemName) continue;
-
-                    $isTeacherManual = str_contains(strtolower($itemName), 'teacher')
-                                    || str_contains(strtolower($itemName), 'manual');
-
-                    $qty = $isTeacherManual
-                        ? (int) $delivery->qty_teachers_manual
-                        : (int) ($content->qty ?? 1) * (int) ($delivery->package_qty ?? 1);
-
-                    if (isset($data[$sid]['lots'][$lot][$itemName])) {
-                        $data[$sid]['lots'][$lot][$itemName]['qty'] += $qty;
-                    } else {
-                        $data[$sid]['lots'][$lot][$itemName] = [
-                            'item_name'           => $itemName,
-                            'qty'                 => $qty,
-                            'unit'                => $content->item->unit,
-                            'qty_teachers_manual' => $delivery->qty_teachers_manual ?? 0,
-                        ];
-                    }
-                }
-            }
-        }
-
+    
         return Pdf::loadView('deliveries.label-layout', [
             'data'             => $data,
             'showSchoolID'     => $showSchoolID,

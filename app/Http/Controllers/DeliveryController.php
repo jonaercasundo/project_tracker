@@ -630,7 +630,7 @@ class DeliveryController extends Controller
     // GENERATE LABELS PDF
     // =========================
 
-public function generateLabels(Request $request)
+    public function generateLabels(Request $request)
     {
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
@@ -719,6 +719,7 @@ public function generateLabels(Request $request)
             'school',
             'project.arSetting',
             'lot',
+            'lot.packages.packageContent.item',
             'keystage',
             'packageStatuses.package.packageContent.item',
         ])
@@ -745,28 +746,6 @@ public function generateLabels(Request $request)
         | whether it's Step 4's broader query that's excluding it.
         |
         */
-
-        dd([
-            'selected_ids_input'     => $ids->toArray(),
-            'selectedDeliveries_raw' => $selectedDeliveries
-                ->map(fn ($d) => [
-                    'delivery_id' => $d->delivery_id,
-                    'project_id'  => $d->project_id,
-                    'school_id'   => $d->school_id,
-                ])
-                ->toArray(),
-            'projectIds'  => $projectIds->toArray(),
-            'schoolIds'   => $schoolIds->toArray(),
-            'deliveries_loaded_count' => $deliveries->count(),
-            'deliveries_loaded' => $deliveries
-                ->map(fn ($d) => [
-                    'delivery_id' => $d->delivery_id,
-                    'school_id'   => $d->school_id,
-                    'lot_id'      => $d->lot_id,
-                    'school_relation_loaded' => $d->school ? $d->school->school_id : 'NULL - school relation failed to load',
-                ])
-                ->toArray(),
-        ]);
 
 
         /*

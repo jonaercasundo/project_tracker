@@ -298,6 +298,7 @@ td,th{
     {{-- PAGE 2 — QR Codes, grouped by keystage --}}
     {{-- ========================================= --}}
 
+    <div class="page-break"></div>
     <div>
 
         @foreach($drDeliveries as $delivery)

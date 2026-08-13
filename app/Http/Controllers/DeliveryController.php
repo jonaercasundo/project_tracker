@@ -749,7 +749,7 @@ class DeliveryController extends Controller
                 }
             }
         }
-    
+        dd($data);
         return Pdf::loadView('deliveries.label-layout', [
             'data'             => $data,
             'showSchoolID'     => $showSchoolID,

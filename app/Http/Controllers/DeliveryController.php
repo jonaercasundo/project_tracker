@@ -11,6 +11,7 @@ use App\Models\Delivery;
 use App\Models\ARSetting;
 use App\Models\PackageStatus;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Package;
 
 class DeliveryController extends Controller
 {
@@ -629,7 +630,6 @@ class DeliveryController extends Controller
     // =========================
     // GENERATE LABELS PDF
     // =========================
-
     public function generateLabels(Request $request)
     {
         ini_set('memory_limit', '1024M');
@@ -640,6 +640,7 @@ class DeliveryController extends Controller
         | GET SELECTED DELIVERY IDS
         |--------------------------------------------------------------------------
         */
+    
         $ids = collect(explode(',', $request->ids))
             ->map(fn ($id) => (int) trim($id))
             ->filter()
@@ -652,21 +653,13 @@ class DeliveryController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | RESOLVE DR NUMBERS
+        | GET DR NUMBERS
         |--------------------------------------------------------------------------
-        |
-        | If one delivery row is selected, include ALL delivery rows
-        | belonging to the same DR.
-        |
-        | Example:
-        |
-        | DR 37001
-        |   delivery 478276 - Keystage 68
-        |   delivery 478277 - Keystage 69
-        |
         */
+    
         $drNos = Delivery::whereIn('delivery_id', $ids)
             ->pluck('dr_no')
+            ->filter()
             ->unique()
             ->values();
     
@@ -677,9 +670,10 @@ class DeliveryController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | EXPAND TO ALL DELIVERIES UNDER THE SAME DR
+        | GET ALL DELIVERY ROWS UNDER THE SAME DR
         |--------------------------------------------------------------------------
         */
+    
         $ids = Delivery::whereIn('dr_no', $drNos)
             ->pluck('delivery_id')
             ->unique()
@@ -691,11 +685,13 @@ class DeliveryController extends Controller
         | LOAD DELIVERIES
         |--------------------------------------------------------------------------
         */
+    
         $deliveries = Delivery::with([
             'school',
             'project.arSetting',
             'lot',
             'keystage',
+            'packageStatuses.package.packageContent.item',
         ])
         ->whereIn('delivery_id', $ids)
         ->orderBy('school_id')
@@ -713,10 +709,10 @@ class DeliveryController extends Controller
         | AR SETTINGS
         |--------------------------------------------------------------------------
         */
+    
         $projectId = $deliveries->first()->project_id;
     
-        $arSettings = ARSetting::where('project_id', $projectId)
-            ->first();
+        $arSettings = ARSetting::where('project_id', $projectId)->first();
     
         $showSchoolID = (bool) (
             $arSettings?->label_school_id ?? false
@@ -739,18 +735,8 @@ class DeliveryController extends Controller
         |--------------------------------------------------------------------------
         | BUILD DATA
         |--------------------------------------------------------------------------
-        |
-        | Structure:
-        |
-        | $data
-        |   └── school
-        |       └── lots
-        |           └── lot
-        |               └── keystage
-        |                   ├── label
-        |                   └── items
-        |
         */
+    
         $data = [];
     
     
@@ -768,6 +754,7 @@ class DeliveryController extends Controller
             | SCHOOL
             |--------------------------------------------------------------------------
             */
+    
             $sid = $school->school_id;
     
     
@@ -776,6 +763,7 @@ class DeliveryController extends Controller
             | LOT
             |--------------------------------------------------------------------------
             */
+    
             $lotName = $delivery->lot?->lot_name ?? 'NO LOT';
     
     
@@ -784,6 +772,7 @@ class DeliveryController extends Controller
             | KEYSTAGE
             |--------------------------------------------------------------------------
             */
+    
             $keystageKey = $delivery->keystage_id ?? 'none';
     
             $keystageLabel = $delivery->keystage
@@ -798,9 +787,10 @@ class DeliveryController extends Controller
     
             /*
             |--------------------------------------------------------------------------
-            | INITIALIZE SCHOOL
+            | CREATE SCHOOL
             |--------------------------------------------------------------------------
             */
+    
             if (!isset($data[$sid])) {
     
                 $data[$sid] = [
@@ -819,9 +809,10 @@ class DeliveryController extends Controller
     
             /*
             |--------------------------------------------------------------------------
-            | INITIALIZE LOT
+            | CREATE LOT
             |--------------------------------------------------------------------------
             */
+    
             if (!isset($data[$sid]['lots'][$lotName])) {
     
                 $data[$sid]['lots'][$lotName] = [];
@@ -830,9 +821,10 @@ class DeliveryController extends Controller
     
             /*
             |--------------------------------------------------------------------------
-            | INITIALIZE KEYSTAGE
+            | CREATE KEYSTAGE
             |--------------------------------------------------------------------------
             */
+    
             if (!isset(
                 $data[$sid]['lots'][$lotName][$keystageKey]
             )) {
@@ -846,62 +838,101 @@ class DeliveryController extends Controller
     
             /*
             |--------------------------------------------------------------------------
-            | GET PACKAGES DIRECTLY
-            |--------------------------------------------------------------------------
-            |
-            | IMPORTANT:
-            |
-            | We DO NOT depend on package_status here.
-            |
-            | This fixes cases where package_status was deleted or never created.
-            |
-            | If delivery has a keystage:
-            |
-            |     package.keystage_id = delivery.keystage_id
-            |
-            | Otherwise:
-            |
-            |     package.lot_id = delivery.lot_id
-            |
-            */
-            $packageQuery = DB::table('package')
-                ->where(function ($query) use ($delivery) {
-    
-                    if (!empty($delivery->keystage_id)) {
-    
-                        $query->where(
-                            'keystage_id',
-                            $delivery->keystage_id
-                        );
-    
-                    } else {
-    
-                        $query->where(
-                            'lot_id',
-                            $delivery->lot_id
-                        );
-                    }
-                });
-    
-    
-            /*
-            |--------------------------------------------------------------------------
             | GET PACKAGE IDS
             |--------------------------------------------------------------------------
+            |
+            | First use package_status.
+            |
             */
-            $packageIds = $packageQuery
-                ->pluck('package_id');
+    
+            $packageIds = collect();
+    
+    
+            foreach ($delivery->packageStatuses as $status) {
+    
+                $package = $status->package;
+    
+                if (!$package) {
+                    continue;
+                }
+    
+                /*
+                | Make sure package belongs to this LOT.
+                */
+    
+                if (
+                    !is_null($delivery->lot_id) &&
+                    (int) $package->lot_id !== (int) $delivery->lot_id
+                ) {
+                    continue;
+                }
+    
+    
+                /*
+                | Make sure package belongs to this KEYSTAGE.
+                */
+    
+                if (
+                    !is_null($delivery->keystage_id) &&
+                    !is_null($package->keystage_id) &&
+                    (int) $package->keystage_id !== (int) $delivery->keystage_id
+                ) {
+                    continue;
+                }
+    
+    
+                $packageIds->push($package->package_id);
+            }
     
     
             /*
             |--------------------------------------------------------------------------
-            | NO PACKAGES
+            | FALLBACK
             |--------------------------------------------------------------------------
             |
-            | Don't remove the keystage from the output.
-            | It will still display the keystage header.
+            | If package_status was deleted, search package directly.
             |
             */
+    
+            if ($packageIds->isEmpty()) {
+    
+                $query = DB::table('package')
+                    ->where('lot_id', $delivery->lot_id);
+    
+                if (!is_null($delivery->keystage_id)) {
+    
+                    $query->where(
+                        'keystage_id',
+                        $delivery->keystage_id
+                    );
+                }
+    
+                $packageIds = $query
+                    ->pluck('package_id');
+            }
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | REMOVE DUPLICATES
+            |--------------------------------------------------------------------------
+            */
+    
+            $packageIds = $packageIds
+                ->filter()
+                ->unique()
+                ->values();
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | NO PACKAGE
+            |--------------------------------------------------------------------------
+            |
+            | Keep the keystage in the data, but there are no items.
+            |
+            */
+    
             if ($packageIds->isEmpty()) {
                 continue;
             }
@@ -909,10 +940,11 @@ class DeliveryController extends Controller
     
             /*
             |--------------------------------------------------------------------------
-            | LOAD PACKAGE CONTENTS
+            | GET PACKAGE CONTENT + ITEM
             |--------------------------------------------------------------------------
             */
-            $packageContents = DB::table('package_content as pc')
+    
+            $contents = DB::table('package_content as pc')
                 ->leftJoin(
                     'item as i',
                     'i.item_id',
@@ -935,31 +967,30 @@ class DeliveryController extends Controller
             | ADD ITEMS
             |--------------------------------------------------------------------------
             */
-            foreach ($packageContents as $content) {
+    
+            foreach ($contents as $content) {
     
                 /*
-                | Skip deleted / invalid items
+                | Item was deleted.
                 */
-                if (empty($content->item_id)) {
+    
+                if (
+                    empty($content->item_id) ||
+                    empty($content->item_name)
+                ) {
                     continue;
                 }
     
-                if (empty($content->item_name)) {
-                    continue;
-                }
     
-    
-                $itemName = $content->item_name;
+                $itemName = trim($content->item_name);
     
     
                 /*
                 |--------------------------------------------------------------------------
-                | CALCULATE QUANTITY
+                | QUANTITY
                 |--------------------------------------------------------------------------
-                |
-                | package_content.qty × delivery.package_qty
-                |
                 */
+    
                 $qty =
                     (int) ($content->qty ?? 1)
                     *
@@ -968,9 +999,10 @@ class DeliveryController extends Controller
     
                 /*
                 |--------------------------------------------------------------------------
-                | REFERENCE CURRENT KEYSTAGE ITEMS
+                | CURRENT ITEM GROUP
                 |--------------------------------------------------------------------------
                 */
+    
                 $items = &$data[$sid]
                     ['lots'][$lotName]
                     [$keystageKey]
@@ -982,6 +1014,7 @@ class DeliveryController extends Controller
                 | MERGE SAME ITEM
                 |--------------------------------------------------------------------------
                 */
+    
                 if (isset($items[$itemName])) {
     
                     $items[$itemName]['qty'] += $qty;
@@ -1003,33 +1036,10 @@ class DeliveryController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | REMOVE COMPLETELY EMPTY SCHOOLS / LOTS / KEYSTAGES
-        |--------------------------------------------------------------------------
-        |
-        | We keep a keystage if it has a label, even if it currently has
-        | no package items.
-        |
-        */
-    
-    
-        /*
-        |--------------------------------------------------------------------------
-        | DEBUG
-        |--------------------------------------------------------------------------
-        |
-        | Uncomment temporarily if needed.
-        |
-        */
-        /*
-        dd($data);
-        */
-    
-    
-        /*
-        |--------------------------------------------------------------------------
         | GENERATE PDF
         |--------------------------------------------------------------------------
         */
+    
         return Pdf::loadView(
             'deliveries.label-layout',
             [

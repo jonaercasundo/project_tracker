@@ -20,7 +20,7 @@ class DeliveryReceiveController extends Controller
         $packageStatus = PackageStatus::with([
             'delivery.project',
             'delivery.school',
-            'package.contents.item',
+            'package.packageContent.item',
         ])->findOrFail($packageStatusId);
 
         $delivery = $packageStatus->delivery;
@@ -70,7 +70,7 @@ class DeliveryReceiveController extends Controller
 
         $items = [];
 
-        foreach ($packageStatus->package->contents as $content) {
+        foreach ($packageStatus->package->packageContent as $content) {
 
             $item = $content->item;
 
@@ -122,7 +122,7 @@ public function store(Request $request, $packageStatusId)
 {
     $packageStatus = PackageStatus::with([
         'delivery',
-        'package.contents.item',
+        'package.packageContent.item',
     ])->findOrFail($packageStatusId);
 
     if ($packageStatus->status === 'delivered') {
@@ -150,7 +150,7 @@ public function store(Request $request, $packageStatusId)
         $packageStatus->delivered_by = null;
 
         $packageStatus->save();
-        foreach ($packageStatus->package->contents as $content) {
+        foreach ($packageStatus->package->packageContent as $content) {
 
             $inventory = Inventory::where('item_id', $content->item_id)
                 ->first();

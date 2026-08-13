@@ -30,7 +30,14 @@ class Lot extends Model
             'project_id'
         );
     }
-
+    public function packages()
+    {
+        return $this->hasMany(
+            Package::class,
+            'lot_id',
+            'lot_id'
+        );
+    }
     public function deliveries()
     {
         return $this->hasMany(

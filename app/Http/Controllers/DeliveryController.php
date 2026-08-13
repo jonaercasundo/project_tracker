@@ -1110,11 +1110,7 @@ class DeliveryController extends Controller
             |
             */
     
-            $packageQuery = DB::table('package')
-                ->where(
-                    'project_id',
-                    $projectId
-                );
+            $packageQuery = DB::table('package');
     
     
             /*

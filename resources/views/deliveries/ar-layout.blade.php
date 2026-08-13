@@ -73,7 +73,38 @@ td,th{
 @endphp
 
 @foreach($drGroups as $drNo => $drDeliveries)
-    @php
+    <h2>DR: {{ $drNo }}</h2>
+
+    @foreach($drDeliveries as $delivery)
+
+        <h3>
+            Delivery ID: {{ $delivery->delivery_id }}
+            |
+            Keystage ID: {{ $delivery->keystage_id }}
+            |
+            Keystage:
+            {{ $delivery->keystage->keystage_num ?? 'NULL' }}
+        </h3>
+
+        @foreach($delivery->packageStatuses as $status)
+
+            <div>
+                Package Status ID:
+                {{ $status->package_status_id }}
+
+                |
+                delivery_id:
+                {{ $status->delivery_id }}
+
+                |
+                package_id:
+                {{ $status->package_id }}
+            </div>
+
+        @endforeach
+
+    @endforeach   
+@php
 
         $first = $drDeliveries->first();
         $ar    = $first->project->arSetting ?? null;

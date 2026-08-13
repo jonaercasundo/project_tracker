@@ -894,21 +894,59 @@ class DeliveryController extends Controller
             |--------------------------------------------------------------------------
             */
 
+            $packages = collect();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Packages from package_status
+            |--------------------------------------------------------------------------
+            */
+            
             foreach ($delivery->packageStatuses as $status) {
-
-                $pkg = $status->package;
-
-                if (!$pkg) {
-                    continue;
+            
+                if ($status->package) {
+                    $packages->push($status->package);
                 }
-
-
+            }
+            
+            /*
+            |--------------------------------------------------------------------------
+            | Packages directly belonging to the LOT
+            |--------------------------------------------------------------------------
+            */
+            
+            if ($delivery->lot) {
+            
+                foreach ($delivery->lot->packages as $package) {
+                    $packages->push($package);
+                }
+            }
+            
+            /*
+            |--------------------------------------------------------------------------
+            | Remove duplicate packages
+            |--------------------------------------------------------------------------
+            */
+            
+            $packages = $packages
+                ->unique('package_id')
+                ->values();
+            
+            
+            /*
+            |--------------------------------------------------------------------------
+            | Process packages
+            |--------------------------------------------------------------------------
+            */
+            
+            foreach ($packages as $pkg) {
+            
                 /*
                 |--------------------------------------------------------------------------
                 | CHECK PACKAGE LOT
                 |--------------------------------------------------------------------------
                 */
-
+            
                 if (
                     $delivery->lot_id !== null &&
                     $pkg->lot_id !== null &&
@@ -916,24 +954,23 @@ class DeliveryController extends Controller
                 ) {
                     continue;
                 }
-
-
+            
+            
                 /*
                 |--------------------------------------------------------------------------
-                | DETERMINE THIS PACKAGE'S KEYSTAGE
+                | DETERMINE PACKAGE KEYSTAGE
                 |--------------------------------------------------------------------------
-                |
-                | Use the package's own keystage_id when present, since
-                | packages can legitimately belong to a different
-                | keystage than their parent delivery. Fall back to the
-                | delivery's keystage only if the package has none set.
-                |
                 */
-
-                $pkgKeystageId = $pkg->keystage_id ?? $delivery->keystage_id ?? 'none';
-
+            
+                $pkgKeystageId =
+                    $pkg->keystage_id
+                    ?? $delivery->keystage_id
+                    ?? 'none';
+            
+            
                 $pkgKeystage = $keystageLookup->get($pkgKeystageId);
-
+            
+            
                 $pkgKeystageLabel = $pkgKeystage
                     ? trim(
                         'Keystage ' .
@@ -942,75 +979,93 @@ class DeliveryController extends Controller
                         ($pkgKeystage->description ?? '')
                     )
                     : null;
-
-                if (!isset($data[$sid]['lots'][$lotId]['keystages'][$pkgKeystageId])) {
-
+            
+            
+                /*
+                |--------------------------------------------------------------------------
+                | CREATE KEYSTAGE
+                |--------------------------------------------------------------------------
+                */
+            
+                if (!isset(
+                    $data[$sid]['lots'][$lotId]['keystages'][$pkgKeystageId]
+                )) {
+            
                     $data[$sid]['lots'][$lotId]['keystages'][$pkgKeystageId] = [
                         'label' => $pkgKeystageLabel,
                         'items' => [],
                     ];
                 }
-
-
+            
+            
                 /*
                 |--------------------------------------------------------------------------
                 | PACKAGE CONTENT
                 |--------------------------------------------------------------------------
                 */
-
+            
                 foreach ($pkg->packageContent as $content) {
-
+            
                     $item = $content->item;
-
+            
                     if (!$item) {
                         continue;
                     }
-
+            
+            
                     $itemName = trim($item->item_name ?? '');
-
+            
                     if ($itemName === '') {
                         continue;
                     }
-
-
+            
+            
                     /*
                     |--------------------------------------------------------------------------
-                    | CALCULATE QTY
+                    | PACKAGE CONTENT QTY
                     |--------------------------------------------------------------------------
+                    |
+                    | IMPORTANT:
+                    |
+                    | We are reading the actual package quantity here.
+                    | Do NOT multiply by delivery.package_qty because we're
+                    | processing individual packages.
+                    |
                     */
-
-                    $contentQty = (int) ($content->qty ?? 1);
-
-                    $packageQty = (int) ($delivery->package_qty ?? 1);
-
-                    $qty = $contentQty * $packageQty;
-
-
+            
+                    $qty = (int) ($content->qty ?? 0);
+            
+                    if ($qty <= 0) {
+                        continue;
+                    }
+            
+            
                     /*
                     |--------------------------------------------------------------------------
                     | ITEM ARRAY
                     |--------------------------------------------------------------------------
                     */
-
+            
                     $items = &$data[$sid]
                         ['lots'][$lotId]
                         ['keystages'][$pkgKeystageId]
                         ['items'];
-
-
+            
+            
                     if (isset($items[$itemName])) {
-
+            
                         $items[$itemName]['qty'] += $qty;
-
+            
                     } else {
-
+            
                         $items[$itemName] = [
                             'item_name' => $itemName,
                             'qty'       => $qty,
                             'unit'      => $item->unit,
                         ];
                     }
-
+            
+            
                     unset($items);
                 }
             }

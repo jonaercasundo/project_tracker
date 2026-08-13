@@ -1,4 +1,4 @@
-:::writing{variant="document" id="41752" title="Revised Blade — Multiple LOTs per School"}
+:::writing{variant="document" id="63847" title="Final Blade — Multiple LOTs per School"}
 <!DOCTYPE html>
 <html>
 <head>
@@ -42,6 +42,10 @@
             font-weight: bold;
         }
 
+        .item-cell {
+            width: 55%;
+        }
+
         .qty-cell {
             text-align: center;
             width: 15%;
@@ -66,11 +70,22 @@
 @endphp
 
 
-@foreach($data as $school)
+{{-- ============================================================
+     EACH SCHOOL
+============================================================ --}}
+@foreach($data as $schoolId => $lots)
 
     @php
         $schoolCount++;
-        $info = $school['info'];
+
+        /*
+         * If your school information is stored separately,
+         * keep using your existing $school information here.
+         *
+         * Replace this section with your actual school info
+         * source if necessary.
+         */
+        $info = $school['info'] ?? [];
     @endphp
 
 
@@ -81,7 +96,7 @@
         ====================================================== --}}
         <tr class="header">
             <td colspan="4">
-                DISTRICT: {{ $info['school_name'] ?? '' }}
+                DISTRICT: {{ $info['school_name'] ?? $schoolId }}
             </td>
         </tr>
 
@@ -90,6 +105,7 @@
              DIVISION
         ====================================================== --}}
         @if($showDivision)
+
             <tr>
                 <td>
                     <strong>Division</strong>
@@ -99,6 +115,7 @@
                     {{ $info['division'] ?? '' }}
                 </td>
             </tr>
+
         @endif
 
 
@@ -106,6 +123,7 @@
              REGION
         ====================================================== --}}
         @if($showRegion)
+
             <tr>
                 <td>
                     <strong>Region</strong>
@@ -115,38 +133,33 @@
                     {{ $info['region'] ?? '' }}
                 </td>
             </tr>
+
         @endif
 
 
         {{-- =====================================================
-             LOTS
+             MULTIPLE LOTS FOR THIS SCHOOL
 
-             IMPORTANT:
-             Your actual structure is:
+             ACTUAL STRUCTURE:
 
-             $school['lots'][LOT_ID]['label']
-             $school['lots'][LOT_ID]['items']
+             $data
+                [school_id]
+                    [lot_id]
+                        [label]
+                        [items]
         ====================================================== --}}
 
-        @foreach($school['lots'] as $lotName => $lot)
+        @foreach($lots as $lotName => $lot)
 
             @php
                 $label = $lot['label'] ?? '';
                 $items = $lot['items'] ?? [];
 
                 /*
-                 * Each LOT gets its own rowspan.
+                 * Calculate the rowspan for THIS LOT.
                  *
-                 * One row is required for the keystage label.
-                 * Then one row for every item.
-                 *
-                 * Example:
-                 *
-                 * LOT 68
-                 *   Keystage 1 G1toG3       = 1 row
-                 *   Balance, Double-pan     = 1 row
-                 *
-                 * rowspan = 2
+                 * Keystage label = 1 row
+                 * Each item       = 1 row
                  */
 
                 $lotRowspan = 0;
@@ -160,7 +173,7 @@
 
 
             {{-- =================================================
-                 SKIP COMPLETELY EMPTY LOT
+                 DO NOT SKIP A LOT JUST BECAUSE IT HAS NO ITEMS
             ================================================== --}}
             @if($lotRowspan > 0)
 
@@ -170,7 +183,7 @@
 
 
                 {{-- =================================================
-                     KEYSTAGE LABEL
+                     KEYSTAGE
                 ================================================== --}}
                 @if(!empty($label))
 
@@ -209,10 +222,7 @@
 
                     <tr>
 
-                        {{-- 
-                            If there was no keystage label,
-                            print LOT here instead.
-                        --}}
+                        {{-- LOT CELL --}}
                         @if(!$lotCellPrinted)
 
                             <td
@@ -230,7 +240,7 @@
 
 
                         {{-- ITEM NAME --}}
-                        <td>
+                        <td class="item-cell">
                             {{ $item['item_name'] ?? '' }}
                         </td>
 
@@ -257,11 +267,13 @@
     </table>
 
 
-    {{-- =========================================================
+    {{-- ============================================================
          PAGE BREAK BETWEEN SCHOOLS
-    ========================================================== --}}
+    ============================================================= --}}
     @if($schoolCount < $totalSchools)
+
         <div class="page-break"></div>
+
     @endif
 
 @endforeach

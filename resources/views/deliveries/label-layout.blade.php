@@ -1,4 +1,4 @@
-:::writing{variant="document" id="63847" title="Final Blade — Multiple LOTs per School"}
+:::writing{variant="document" id="70418" title="Final Packing List Blade — Multiple LOTs and Keystages"}
 <!DOCTYPE html>
 <html>
 <head>
@@ -71,21 +71,14 @@
 
 
 {{-- ============================================================
-     EACH SCHOOL
+     SCHOOLS
 ============================================================ --}}
-@foreach($data as $schoolId => $lots)
+@foreach($data as $sid => $school)
 
     @php
         $schoolCount++;
-
-        /*
-         * If your school information is stored separately,
-         * keep using your existing $school information here.
-         *
-         * Replace this section with your actual school info
-         * source if necessary.
-         */
         $info = $school['info'] ?? [];
+        $lots = $school['lots'] ?? [];
     @endphp
 
 
@@ -96,9 +89,45 @@
         ====================================================== --}}
         <tr class="header">
             <td colspan="4">
-                DISTRICT: {{ $info['school_name'] ?? $schoolId }}
+                DISTRICT: {{ $info['school_name'] ?? '' }}
             </td>
         </tr>
+
+
+        {{-- =====================================================
+             SCHOOL ID
+        ====================================================== --}}
+        @if($showSchoolID)
+
+            <tr>
+                <td>
+                    <strong>School ID</strong>
+                </td>
+
+                <td colspan="3">
+                    {{ $info['school_id'] ?? '' }}
+                </td>
+            </tr>
+
+        @endif
+
+
+        {{-- =====================================================
+             MUNICIPALITY
+        ====================================================== --}}
+        @if($showMunicipality)
+
+            <tr>
+                <td>
+                    <strong>Municipality</strong>
+                </td>
+
+                <td colspan="3">
+                    {{ $info['municipality'] ?? '' }}
+                </td>
+            </tr>
+
+        @endif
 
 
         {{-- =====================================================
@@ -138,42 +167,48 @@
 
 
         {{-- =====================================================
-             MULTIPLE LOTS FOR THIS SCHOOL
+             LOTS
 
-             ACTUAL STRUCTURE:
+             Structure from controller:
 
-             $data
-                [school_id]
-                    [lot_id]
-                        [label]
-                        [items]
+             $school['lots']
+                 |
+                 +-- LOT
+                       |
+                       +-- KEYSTAGE
+                             |
+                             +-- label
+                             +-- items
         ====================================================== --}}
 
-        @foreach($lots as $lotName => $lot)
+        @foreach($lots as $lotName => $keystageGroups)
 
             @php
-                $label = $lot['label'] ?? '';
-                $items = $lot['items'] ?? [];
-
                 /*
-                 * Calculate the rowspan for THIS LOT.
+                 * Calculate the total rows occupied by THIS LOT.
                  *
-                 * Keystage label = 1 row
-                 * Each item       = 1 row
+                 * Every keystage with a label = 1 row
+                 * Every item = 1 row
                  */
 
                 $lotRowspan = 0;
 
-                if (!empty($label)) {
-                    $lotRowspan++;
-                }
+                foreach ($keystageGroups as $group) {
 
-                $lotRowspan += count($items);
+                    $label = $group['label'] ?? null;
+                    $items = $group['items'] ?? [];
+
+                    if (!empty($label)) {
+                        $lotRowspan++;
+                    }
+
+                    $lotRowspan += count($items);
+                }
             @endphp
 
 
             {{-- =================================================
-                 DO NOT SKIP A LOT JUST BECAUSE IT HAS NO ITEMS
+                 SKIP COMPLETELY EMPTY LOT
             ================================================== --}}
             @if($lotRowspan > 0)
 
@@ -183,80 +218,100 @@
 
 
                 {{-- =================================================
-                     KEYSTAGE
+                     KEYSTAGES
                 ================================================== --}}
-                @if(!empty($label))
-
-                    <tr>
-
-                        {{-- LOT --}}
-                        <td
-                            class="lot-cell"
-                            rowspan="{{ $lotRowspan }}"
-                        >
-                            LOT {{ $lotName }}
-                        </td>
-
-
-                        {{-- KEYSTAGE --}}
-                        <td
-                            colspan="3"
-                            class="keystage-cell"
-                        >
-                            {{ $label }}
-                        </td>
-
-                    </tr>
+                @foreach($keystageGroups as $group)
 
                     @php
-                        $lotCellPrinted = true;
+                        $label = $group['label'] ?? null;
+                        $items = $group['items'] ?? [];
                     @endphp
 
-                @endif
+
+                    {{-- =================================================
+                         KEYSTAGE HEADER
+                    ================================================== --}}
+                    @if(!empty($label))
+
+                        <tr>
+
+                            {{-- LOT CELL --}}
+                            @if(!$lotCellPrinted)
+
+                                <td
+                                    class="lot-cell"
+                                    rowspan="{{ $lotRowspan }}"
+                                >
+                                    LOT {{ $lotName }}
+                                </td>
+
+                                @php
+                                    $lotCellPrinted = true;
+                                @endphp
+
+                            @endif
 
 
-                {{-- =================================================
-                     ITEMS
-                ================================================== --}}
-                @foreach($items as $item)
-
-                    <tr>
-
-                        {{-- LOT CELL --}}
-                        @if(!$lotCellPrinted)
-
+                            {{-- KEYSTAGE --}}
                             <td
-                                class="lot-cell"
-                                rowspan="{{ $lotRowspan }}"
+                                colspan="3"
+                                class="keystage-cell"
                             >
-                                LOT {{ $lotName }}
+                                {{ $label }}
                             </td>
 
-                            @php
-                                $lotCellPrinted = true;
-                            @endphp
+                        </tr>
 
-                        @endif
+                    @endif
 
 
-                        {{-- ITEM NAME --}}
-                        <td class="item-cell">
-                            {{ $item['item_name'] ?? '' }}
-                        </td>
+                    {{-- =================================================
+                         ITEMS
+                    ================================================== --}}
+                    @foreach($items as $item)
+
+                        <tr>
+
+                            {{-- LOT CELL
+                                 This only happens when the LOT
+                                 has no keystage label.
+                            --}}
+                            @if(!$lotCellPrinted)
+
+                                <td
+                                    class="lot-cell"
+                                    rowspan="{{ $lotRowspan }}"
+                                >
+                                    LOT {{ $lotName }}
+                                </td>
+
+                                @php
+                                    $lotCellPrinted = true;
+                                @endphp
+
+                            @endif
 
 
-                        {{-- QUANTITY --}}
-                        <td class="qty-cell">
-                            {{ number_format((float) ($item['qty'] ?? 0)) }}
-                        </td>
+                            {{-- ITEM NAME --}}
+                            <td class="item-cell">
+                                {{ $item['item_name'] ?? '' }}
+                            </td>
 
 
-                        {{-- UNIT --}}
-                        <td class="unit-cell">
-                            {{ $item['unit'] ?? '' }}
-                        </td>
+                            {{-- QUANTITY --}}
+                            <td class="qty-cell">
+                                {{ number_format((float) ($item['qty'] ?? 0)) }}
+                            </td>
 
-                    </tr>
+
+                            {{-- UNIT --}}
+                            <td class="unit-cell">
+                                {{ $item['unit'] ?? '' }}
+                            </td>
+
+                        </tr>
+
+                    @endforeach
 
                 @endforeach
 

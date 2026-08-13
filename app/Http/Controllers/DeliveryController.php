@@ -749,6 +749,21 @@ class DeliveryController extends Controller
                 }
             }
         }
+        dd(
+            $deliveries->map(function ($delivery) {
+                return [
+                    'delivery_id' => $delivery->delivery_id,
+                    'school_id' => $delivery->school_id,
+                    'dr_no' => $delivery->dr_no,
+                    'lot_id' => $delivery->lot_id,
+                    'lot_name' => $delivery->lot?->lot_name,
+                    'keystage_id' => $delivery->keystage_id,
+                    'keystage' => $delivery->keystage
+                        ? $delivery->keystage->keystage_num . ' ' . $delivery->keystage->description
+                        : null,
+                ];
+            })->values()->toArray()
+        );
         dd($data);
         return Pdf::loadView('deliveries.label-layout', [
             'data'             => $data,

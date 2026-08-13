@@ -644,8 +644,12 @@ class DeliveryController extends Controller
         $ids = collect(
             explode(',', (string) $request->ids)
         )
-            ->map(fn ($id) => (int) trim($id))
-            ->filter(fn ($id) => $id > 0)
+            ->map(function ($id) {
+                return (int) trim($id);
+            })
+            ->filter(function ($id) {
+                return $id > 0;
+            })
             ->unique()
             ->values();
     
@@ -661,9 +665,13 @@ class DeliveryController extends Controller
         |
         | IMPORTANT:
         |
-        | We NEVER load deliveries by project, school, or lot here.
+        | We NEVER query all deliveries by:
         |
-        | Only delivery IDs explicitly selected by the user are processed.
+        | project
+        | school
+        | lot
+        |
+        | Only delivery IDs selected by the user are loaded.
         |
         */
     
@@ -672,28 +680,7 @@ class DeliveryController extends Controller
             'project.arSetting',
             'lot',
             'keystage',
-    
-            /*
-            |--------------------------------------------------------------------------
-            | package_status
-            |--------------------------------------------------------------------------
-            |
-            | This is the important relationship:
-            |
-            | delivery
-            |    ↓
-            | package_status
-            |    ↓
-            | package
-            |    ↓
-            | package_content
-            |    ↓
-            | item
-            |
-            */
-    
             'packageStatuses.package.packageContent.item',
-    
         ])
             ->whereIn('delivery_id', $ids)
             ->orderBy('school_id')
@@ -726,7 +713,7 @@ class DeliveryController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | 4. AR SETTINGS
+        | 4. GET AR SETTINGS
         |--------------------------------------------------------------------------
         */
     
@@ -755,10 +742,10 @@ class DeliveryController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | 5. BUILD KEYSTAGE LOOKUP
+        | 5. COLLECT ALL KEYSTAGE IDS
         |--------------------------------------------------------------------------
         |
-        | Collect keystages from:
+        | We collect keystages from:
         |
         | 1. Delivery
         | 2. Package
@@ -767,13 +754,14 @@ class DeliveryController extends Controller
     
         $allKeystageIds = collect();
     
+    
         foreach ($deliveries as $delivery) {
     
             /*
             | Delivery keystage
             */
     
-            if ($delivery->keystage_id) {
+            if (!empty($delivery->keystage_id)) {
     
                 $allKeystageIds->push(
                     (int) $delivery->keystage_id
@@ -791,7 +779,7 @@ class DeliveryController extends Controller
     
                 if (
                     $package &&
-                    $package->keystage_id
+                    !empty($package->keystage_id)
                 ) {
     
                     $allKeystageIds->push(
@@ -808,20 +796,43 @@ class DeliveryController extends Controller
             ->values();
     
     
-        $keystageLookup = $allKeystageIds->isNotEmpty()
-            ? \App\Models\Keystage::whereIn(
-                'keystage_id',
-                $allKeystageIds
-            )
+        /*
+        |--------------------------------------------------------------------------
+        | 6. BUILD KEYSTAGE LOOKUP
+        |--------------------------------------------------------------------------
+        */
+    
+        $keystageLookup = collect();
+    
+        if ($allKeystageIds->isNotEmpty()) {
+    
+            $keystageLookup =
+                \App\Models\Keystage::whereIn(
+                    'keystage_id',
+                    $allKeystageIds
+                )
                 ->get()
-                ->keyBy('keystage_id')
-            : collect();
+                ->keyBy(function ($keystage) {
+    
+                    return (int) $keystage->keystage_id;
+    
+                });
+        }
     
     
         /*
         |--------------------------------------------------------------------------
-        | 6. BUILD LABEL DATA
+        | 7. BUILD LABEL DATA
         |--------------------------------------------------------------------------
+        |
+        | Structure:
+        |
+        | $data
+        |   └── school
+        |        └── lots
+        |             └── keystages
+        |                  └── items
+        |
         */
     
         $data = [];
@@ -842,7 +853,7 @@ class DeliveryController extends Controller
             }
     
     
-            $sid = $school->school_id;
+            $schoolId = (int) $school->school_id;
     
     
             /*
@@ -853,9 +864,20 @@ class DeliveryController extends Controller
     
             $lotId = $delivery->lot_id;
     
-            $lotKey = $lotId !== null
-                ? (string) $lotId
-                : 'no-lot-' . $delivery->delivery_id;
+            if ($lotId !== null) {
+    
+                $lotKey = 'lot-' . (int) $lotId;
+    
+            } else {
+    
+                /*
+                | If no lot exists, make it unique per delivery.
+                */
+    
+                $lotKey =
+                    'no-lot-' .
+                    (int) $delivery->delivery_id;
+            }
     
     
             $lotName = $delivery->lot?->lot_name;
@@ -875,26 +897,26 @@ class DeliveryController extends Controller
             |--------------------------------------------------------------------------
             */
     
-            if (!isset($data[$sid])) {
+            if (!isset($data[$schoolId])) {
     
-                $data[$sid] = [
+                $data[$schoolId] = [
     
                     'info' => [
     
                         'school_name' =>
-                            $school->school_name,
+                            $school->school_name ?? '',
     
                         'school_id' =>
-                            $school->school_id,
+                            $school->school_id ?? '',
     
                         'municipality' =>
-                            $school->municipality,
+                            $school->municipality ?? '',
     
                         'division' =>
-                            $school->division,
+                            $school->division ?? '',
     
                         'region' =>
-                            $school->region,
+                            $school->region ?? '',
     
                     ],
     
@@ -910,13 +932,19 @@ class DeliveryController extends Controller
             |--------------------------------------------------------------------------
             */
     
-            if (!isset(
-                $data[$sid]['lots'][$lotKey]
-            )) {
+            if (
+                !isset(
+                    $data[$schoolId]['lots'][$lotKey]
+                )
+            ) {
     
-                $data[$sid]['lots'][$lotKey] = [
+                $data[$schoolId]['lots'][$lotKey] = [
     
-                    'lot_name' => $lotName,
+                    'lot_id' =>
+                        $lotId,
+    
+                    'lot_name' =>
+                        $lotName,
     
                     'keystages' => [],
     
@@ -926,41 +954,27 @@ class DeliveryController extends Controller
     
             /*
             |--------------------------------------------------------------------------
-            | 7. GET ONLY PACKAGES LINKED TO THIS DELIVERY
+            | 8. PROCESS PACKAGE STATUSES
             |--------------------------------------------------------------------------
-            |
-            | VERY IMPORTANT
-            |
-            | We use packageStatuses.
-            |
-            | We DO NOT use:
-            |
-            |     $delivery->lot->packages
-            |
-            | because that would retrieve all packages belonging to the lot.
-            |
-            */
-    
-    
-            /*
-            |--------------------------------------------------------------------------
-            | PREVENT DUPLICATE PACKAGE PROCESSING
-            |--------------------------------------------------------------------------
-            |
-            | If package_status contains multiple status rows for the same
-            | delivery/package combination, don't count the package twice.
-            |
             */
     
             $processedPackages = [];
     
     
-            foreach ($delivery->packageStatuses as $status) {
+            foreach (
+                $delivery->packageStatuses
+                as $status
+            ) {
     
                 /*
                 |--------------------------------------------------------------------------
-                | VERIFY PACKAGE STATUS BELONGS TO THIS DELIVERY
+                | VERIFY DELIVERY
                 |--------------------------------------------------------------------------
+                |
+                | package_status should contain delivery_id.
+                |
+                | If it does, make absolutely sure it belongs to this delivery.
+                |
                 */
     
                 if (
@@ -979,9 +993,22 @@ class DeliveryController extends Controller
                 |--------------------------------------------------------------------------
                 */
     
-                $pkg = $status->package;
+                $package = $status->package;
     
-                if (!$pkg) {
+                if (!$package) {
+                    continue;
+                }
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | VERIFY PACKAGE ID
+                |--------------------------------------------------------------------------
+                */
+    
+                $packageId = (int) $package->package_id;
+    
+                if ($packageId <= 0) {
                     continue;
                 }
     
@@ -990,12 +1017,15 @@ class DeliveryController extends Controller
                 |--------------------------------------------------------------------------
                 | VERIFY PACKAGE LOT
                 |--------------------------------------------------------------------------
+                |
+                | A package must belong to the same lot as the selected delivery.
+                |
                 */
     
                 if (
                     $lotId !== null &&
-                    $pkg->lot_id !== null &&
-                    (int) $pkg->lot_id !== (int) $lotId
+                    $package->lot_id !== null &&
+                    (int) $package->lot_id !== (int) $lotId
                 ) {
     
                     continue;
@@ -1006,16 +1036,18 @@ class DeliveryController extends Controller
                 |--------------------------------------------------------------------------
                 | PREVENT DUPLICATE PACKAGE
                 |--------------------------------------------------------------------------
+                |
+                | package_status may contain multiple records for the same
+                | package. We only process each package once per delivery.
+                |
                 */
     
-                $packageId = (int) $pkg->package_id;
+                if (
+                    isset(
+                        $processedPackages[$packageId]
+                    )
+                ) {
     
-                if ($packageId <= 0) {
-                    continue;
-                }
-    
-    
-                if (isset($processedPackages[$packageId])) {
                     continue;
                 }
     
@@ -1025,38 +1057,48 @@ class DeliveryController extends Controller
     
                 /*
                 |--------------------------------------------------------------------------
-                | 8. PACKAGE KEYSTAGE
+                | 9. DETERMINE KEYSTAGE
                 |--------------------------------------------------------------------------
                 |
                 | Priority:
                 |
-                | 1. package.keystage_id
-                | 2. delivery.keystage_id
+                | PACKAGE KEYSTAGE
+                |        ↓
+                | DELIVERY KEYSTAGE
+                |        ↓
+                | NO KEYSTAGE
                 |
                 */
     
-                $pkgKeystageId = $pkg->keystage_id
-                    ? (int) $pkg->keystage_id
-                    : (
-                        $delivery->keystage_id
-                            ? (int) $delivery->keystage_id
-                            : 0
-                    );
+                if (!empty($package->keystage_id)) {
+    
+                    $keystageId =
+                        (int) $package->keystage_id;
+    
+                } elseif (!empty($delivery->keystage_id)) {
+    
+                    $keystageId =
+                        (int) $delivery->keystage_id;
+    
+                } else {
+    
+                    $keystageId = 0;
+                }
     
     
                 /*
                 |--------------------------------------------------------------------------
-                | GET KEYSTAGE
+                | KEYSTAGE LOOKUP
                 |--------------------------------------------------------------------------
                 */
     
-                $pkgKeystage = null;
+                $keystage = null;
     
-                if ($pkgKeystageId > 0) {
+                if ($keystageId > 0) {
     
-                    $pkgKeystage =
+                    $keystage =
                         $keystageLookup->get(
-                            $pkgKeystageId
+                            $keystageId
                         );
                 }
     
@@ -1067,18 +1109,51 @@ class DeliveryController extends Controller
                 |--------------------------------------------------------------------------
                 */
     
-                if ($pkgKeystage) {
+                if ($keystage) {
     
-                    $pkgKeystageLabel = trim(
-                        'Keystage ' .
-                        ($pkgKeystage->keystage_num ?? '') .
-                        ' ' .
-                        ($pkgKeystage->description ?? '')
-                    );
+                    $keystageNumber =
+                        trim(
+                            (string) (
+                                $keystage->keystage_num
+                                ?? ''
+                            )
+                        );
+    
+                    $description =
+                        trim(
+                            (string) (
+                                $keystage->description
+                                ?? ''
+                            )
+                        );
+    
+    
+                    $parts = [];
+    
+    
+                    if ($keystageNumber !== '') {
+    
+                        $parts[] =
+                            'Keystage ' .
+                            $keystageNumber;
+                    }
+    
+    
+                    if ($description !== '') {
+    
+                        $parts[] =
+                            $description;
+                    }
+    
+    
+                    $keystageLabel =
+                        !empty($parts)
+                            ? implode(' ', $parts)
+                            : 'Keystage';
     
                 } else {
     
-                    $pkgKeystageLabel =
+                    $keystageLabel =
                         'No Keystage';
                 }
     
@@ -1089,9 +1164,10 @@ class DeliveryController extends Controller
                 |--------------------------------------------------------------------------
                 */
     
-                $keystageKey = $pkgKeystageId > 0
-                    ? (string) $pkgKeystageId
-                    : 'none';
+                $keystageKey =
+                    $keystageId > 0
+                        ? 'keystage-' . $keystageId
+                        : 'no-keystage';
     
     
                 /*
@@ -1100,35 +1176,46 @@ class DeliveryController extends Controller
                 |--------------------------------------------------------------------------
                 */
     
-                if (!isset(
-                    $data[$sid]
-                        ['lots'][$lotKey]
-                        ['keystages'][$keystageKey]
-                )) {
+                if (
+                    !isset(
+                        $data[$schoolId]
+                            ['lots'][$lotKey]
+                            ['keystages'][$keystageKey]
+                    )
+                ) {
     
-                    $data[$sid]
+                    $data[$schoolId]
                         ['lots'][$lotKey]
                         ['keystages'][$keystageKey] = [
     
-                            'label' =>
-                                $pkgKeystageLabel,
+                        'keystage_id' =>
+                            $keystageId,
     
-                            'items' => [],
+                        'label' =>
+                            $keystageLabel,
     
-                        ];
+                        'items' => [],
+    
+                    ];
                 }
     
     
                 /*
                 |--------------------------------------------------------------------------
-                | 9. PACKAGE CONTENT
+                | 10. PACKAGE CONTENT
                 |--------------------------------------------------------------------------
                 */
     
                 foreach (
-                    $pkg->packageContent
+                    $package->packageContent
                     as $content
                 ) {
+    
+                    /*
+                    |--------------------------------------------------------------------------
+                    | ITEM
+                    |--------------------------------------------------------------------------
+                    */
     
                     $item = $content->item;
     
@@ -1144,7 +1231,10 @@ class DeliveryController extends Controller
                     */
     
                     $itemName = trim(
-                        $item->item_name ?? ''
+                        (string) (
+                            $item->item_name
+                            ?? ''
+                        )
                     );
     
                     if ($itemName === '') {
@@ -1154,13 +1244,8 @@ class DeliveryController extends Controller
     
                     /*
                     |--------------------------------------------------------------------------
-                    | PACKAGE CONTENT QUANTITY
+                    | PACKAGE CONTENT QTY
                     |--------------------------------------------------------------------------
-                    |
-                    | Example:
-                    |
-                    | package_content.qty = 5
-                    |
                     */
     
                     $contentQty = (int) (
@@ -1174,18 +1259,29 @@ class DeliveryController extends Controller
     
                     /*
                     |--------------------------------------------------------------------------
-                    | DELIVERY PACKAGE QUANTITY
+                    | DELIVERY PACKAGE QTY
                     |--------------------------------------------------------------------------
                     |
                     | Example:
                     |
-                    | delivery.package_qty = 10
+                    | Package content:
+                    |
+                    | Filipino Textbook = 5
+                    |
+                    | Delivery:
+                    |
+                    | package_qty = 10
+                    |
+                    | Result:
+                    |
+                    | 5 × 10 = 50
                     |
                     */
     
                     $packageQty = (int) (
                         $delivery->package_qty ?? 1
                     );
+    
     
                     if ($packageQty <= 0) {
                         $packageQty = 1;
@@ -1196,27 +1292,25 @@ class DeliveryController extends Controller
                     |--------------------------------------------------------------------------
                     | FINAL QUANTITY
                     |--------------------------------------------------------------------------
-                    |
-                    | package_content.qty × delivery.package_qty
-                    |
-                    | Example:
-                    |
-                    | 5 × 10 = 50
-                    |
                     */
     
-                    $qty =
+                    $finalQty =
                         $contentQty *
                         $packageQty;
     
     
+                    if ($finalQty <= 0) {
+                        continue;
+                    }
+    
+    
                     /*
                     |--------------------------------------------------------------------------
-                    | ITEMS ARRAY
+                    | ITEMS REFERENCE
                     |--------------------------------------------------------------------------
                     */
     
-                    $items =& $data[$sid]
+                    $items =& $data[$schoolId]
                         ['lots'][$lotKey]
                         ['keystages'][$keystageKey]
                         ['items'];
@@ -1224,29 +1318,46 @@ class DeliveryController extends Controller
     
                     /*
                     |--------------------------------------------------------------------------
-                    | MERGE SAME ITEM
+                    | USE ITEM ID AS INTERNAL KEY
+                    |--------------------------------------------------------------------------
+                    |
+                    | This is safer than using item_name as the key.
+                    |
+                    | Two items with slightly different names will not accidentally
+                    | overwrite each other.
+                    |
+                    */
+    
+                    $itemKey = 'item-' .
+                        (int) $item->item_id;
+    
+    
+                    /*
+                    |--------------------------------------------------------------------------
+                    | MERGE ITEM
                     |--------------------------------------------------------------------------
                     */
     
-                    if (isset(
-                        $items[$itemName]
-                    )) {
+                    if (isset($items[$itemKey])) {
     
-                        $items[$itemName]['qty'] +=
-                            $qty;
+                        $items[$itemKey]['qty'] +=
+                            $finalQty;
     
                     } else {
     
-                        $items[$itemName] = [
+                        $items[$itemKey] = [
+    
+                            'item_id' =>
+                                $item->item_id,
     
                             'item_name' =>
                                 $itemName,
     
                             'qty' =>
-                                $qty,
+                                $finalQty,
     
                             'unit' =>
-                                $item->unit,
+                                $item->unit ?? '',
     
                         ];
                     }
@@ -1260,12 +1371,12 @@ class DeliveryController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | 10. REMOVE EMPTY DATA
+        | 11. REMOVE EMPTY DATA
         |--------------------------------------------------------------------------
         */
     
         foreach (
-            $data as $sid => &$schoolData
+            $data as $schoolId => &$schoolData
         ) {
     
             foreach (
@@ -1275,7 +1386,7 @@ class DeliveryController extends Controller
     
                 foreach (
                     $lotData['keystages']
-                    as $keystageId => &$keystageData
+                    as $keystageKey => &$keystageData
                 ) {
     
                     if (
@@ -1286,18 +1397,19 @@ class DeliveryController extends Controller
     
                         unset(
                             $lotData['keystages']
-                                [$keystageId]
+                                [$keystageKey]
                         );
                     }
                 }
+    
     
                 unset($keystageData);
     
     
                 /*
-                |----------------------------------------------------------------------
+                |--------------------------------------------------------------------------
                 | REMOVE EMPTY LOT
-                |----------------------------------------------------------------------
+                |--------------------------------------------------------------------------
                 */
     
                 if (
@@ -1312,6 +1424,7 @@ class DeliveryController extends Controller
                     );
                 }
             }
+    
     
             unset($lotData);
     
@@ -1329,17 +1442,18 @@ class DeliveryController extends Controller
             ) {
     
                 unset(
-                    $data[$sid]
+                    $data[$schoolId]
                 );
             }
         }
+    
     
         unset($schoolData);
     
     
         /*
         |--------------------------------------------------------------------------
-        | 11. NO DATA
+        | 12. NO DATA
         |--------------------------------------------------------------------------
         */
     
@@ -1354,13 +1468,14 @@ class DeliveryController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | 12. GENERATE PDF
+        | 13. GENERATE PDF
         |--------------------------------------------------------------------------
         */
     
         return Pdf::loadView(
             'deliveries.label-layout',
             [
+    
                 'data' =>
                     $data,
     
@@ -1375,6 +1490,7 @@ class DeliveryController extends Controller
     
                 'showRegion' =>
                     $showRegion,
+    
             ]
         )
             ->setPaper(

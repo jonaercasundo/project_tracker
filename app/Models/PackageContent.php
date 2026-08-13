@@ -9,7 +9,6 @@ class PackageContent extends Model
     protected $table = 'package_content';
 
     public $timestamps = false;
-
     public $incrementing = false;
 
     protected $primaryKey = null;

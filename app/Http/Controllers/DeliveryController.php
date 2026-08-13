@@ -386,8 +386,16 @@ class DeliveryController extends Controller
         |--------------------------------------------------------------------------
         |
         | IMPORTANT:
-        | package_status.item_id is the source of the item.
-        | package_id is only used for package information/dimensions.
+        |
+        | package_status only knows:
+        |     delivery_id
+        |     package_id
+        |
+        | The item and quantity come from:
+        |
+        | package
+        |     -> packageContent
+        |         -> item
         |
         */
     
@@ -396,8 +404,8 @@ class DeliveryController extends Controller
             'project.arSetting',
             'lot',
             'keystage',
-            'packageStatuses.package',
-            'packageStatuses.item',
+    
+            'packageStatuses.package.packageContent.item',
         ])
         ->whereIn('delivery_id', $ids)
         ->orderBy('dr_no')
@@ -410,11 +418,17 @@ class DeliveryController extends Controller
     
         $qrCodes = [];
     
+        /*
+        |--------------------------------------------------------------------------
+        | Process each delivery / keystage
+        |--------------------------------------------------------------------------
+        */
+    
         foreach ($deliveries as $delivery) {
     
             /*
             |--------------------------------------------------------------------------
-            | Get packages belonging to THIS keystage
+            | Get packages belonging ONLY to this delivery's keystage
             |--------------------------------------------------------------------------
             */
     
@@ -438,10 +452,15 @@ class DeliveryController extends Controller
             $packageIds = $packageQuery
                 ->pluck('package_id');
     
+    
             /*
             |--------------------------------------------------------------------------
-            | Make sure every expected package has a PackageStatus
+            | Create missing package_status rows
             |--------------------------------------------------------------------------
+            |
+            | IMPORTANT:
+            | Do NOT put item_id or qty here.
+            |
             */
     
             foreach ($packageIds as $packageId) {
@@ -462,52 +481,66 @@ class DeliveryController extends Controller
                 }
             }
     
+    
             /*
             |--------------------------------------------------------------------------
-            | Reload package statuses
+            | Reload package statuses with package contents
             |--------------------------------------------------------------------------
             */
     
             $statuses = PackageStatus::with([
-                'package',
-                'item',
+                'package.packageContent.item',
             ])
             ->where('delivery_id', $delivery->delivery_id)
             ->get();
     
+    
             /*
             |--------------------------------------------------------------------------
-            | IMPORTANT:
-            | Remove stray PackageStatus records that belong to another
-            | keystage/package set.
+            | Remove package_status rows belonging to another keystage
             |--------------------------------------------------------------------------
             */
     
             if (!empty($delivery->keystage_id)) {
     
-                $statuses = $statuses->filter(function ($status) use ($delivery) {
+                $statuses = $statuses
+                    ->filter(function ($status) use ($delivery) {
     
-                    return $status->package
-                        && $status->package->keystage_id == $delivery->keystage_id;
+                        return $status->package
+                            && (int) $status->package->keystage_id
+                                === (int) $delivery->keystage_id;
     
-                })->values();
+                    })
+                    ->values();
     
             } else {
     
-                $statuses = $statuses->filter(function ($status) use ($delivery) {
+                $statuses = $statuses
+                    ->filter(function ($status) use ($delivery) {
     
-                    return $status->package
-                        && $status->package->lot_id == $delivery->lot_id;
+                        return $status->package
+                            && (int) $status->package->lot_id
+                                === (int) $delivery->lot_id;
     
-                })->values();
+                    })
+                    ->values();
             }
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | Set filtered statuses back onto delivery
+            |--------------------------------------------------------------------------
+            */
     
             $delivery->setRelation(
                 'packageStatuses',
                 $statuses
             );
     
-            $delivery->ar = $delivery->project->arSetting ?? null;
+            $delivery->ar =
+                $delivery->project->arSetting ?? null;
+    
     
             /*
             |--------------------------------------------------------------------------
@@ -535,16 +568,48 @@ class DeliveryController extends Controller
                     'data:image/png;base64,' .
                     base64_encode($result->getString());
     
+    
                 /*
                 |--------------------------------------------------------------------------
-                | QR LABEL COMES DIRECTLY FROM PackageStatus.item_id
+                | QR LABEL
                 |--------------------------------------------------------------------------
+                |
+                | package_status
+                |      ↓
+                | package
+                |      ↓
+                | package_content
+                |      ↓
+                | item
+                |
                 */
     
-                $status->qr_label =
-                    $status->item?->item_name ?? 'Unknown Item';
+                $itemNames = collect();
+    
+                if ($status->package) {
+    
+                    foreach (
+                        $status->package->packageContent
+                        as $content
+                    ) {
+    
+                        if ($content->item) {
+    
+                            $itemName = $content->item->item_name;
+    
+                            if ($itemName) {
+                                $itemNames->push($itemName);
+                            }
+                        }
+                    }
+                }
+    
+                $status->qr_label = $itemNames->isNotEmpty()
+                    ? $itemNames->unique()->implode(', ')
+                    : 'Unknown Item';
             }
         }
+    
     
         /*
         |--------------------------------------------------------------------------

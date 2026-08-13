@@ -404,7 +404,6 @@ class DeliveryController extends Controller
             'project.arSetting',
             'lot',
             'keystage',
-    
             'packageStatuses.package.packageContent.item',
         ])
         ->whereIn('delivery_id', $ids)

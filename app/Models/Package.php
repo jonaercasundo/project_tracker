@@ -12,11 +12,11 @@ class Package extends Model
     public $timestamps = false;
     public function packageContent()
     {
-        return $this->hasMany(PackageContent::class, 'package_id');
-    }
-        public function contents()
-    {
-        return $this->hasMany(PackageContent::class, 'package_id', 'package_id');
+        return $this->hasMany(
+            PackageContent::class,
+            'package_id',
+            'package_id'
+        );
     }
 
     public function statuses()

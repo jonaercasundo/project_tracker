@@ -1068,7 +1068,7 @@ class DeliveryController extends Controller
         |
         */
  
-        // dd($data);
+        dd($data);
  
  
         /*

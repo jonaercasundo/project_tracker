@@ -7,62 +7,111 @@
     <style>
 
         @page {
-            margin: 15px;
+            margin: 18px 20px 18px 20px;
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
-            font-family: DejaVu Sans;
-            font-size: 10px;
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 9px;
             margin: 0;
             padding: 0;
+            color: #000;
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | TABLE
+        |--------------------------------------------------------------------------
+        */
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
+            border-spacing: 0;
         }
 
         th,
         td {
             border: 1px solid #000;
-            padding: 6px;
+            padding: 5px;
+            vertical-align: middle;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | SCHOOL HEADER
+        | SCHOOL BLOCK
         |--------------------------------------------------------------------------
         */
+
+        .school-table {
+            margin-bottom: 8px;
+        }
 
         .school-header {
             background: #d9d9d9;
             font-size: 12px;
             font-weight: bold;
             text-align: center;
+            padding: 7px;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | SCHOOL INFORMATION
-        |--------------------------------------------------------------------------
-        */
-
         .school-info-label {
-            width: 18%;
-            font-weight: bold;
+            width: 20%;
             background: #eeeeee;
+            font-weight: bold;
         }
 
         .school-info-value {
-            width: 82%;
+            width: 80%;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | COLUMN HEADER
+        | ITEMS TABLE
         |--------------------------------------------------------------------------
         */
+
+        .items-table {
+            width: 100%;
+            table-layout: fixed;
+            margin-bottom: 15px;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | COLUMN WIDTHS
+        |--------------------------------------------------------------------------
+        */
+
+        .col-lot {
+            width: 16%;
+        }
+
+        .col-item {
+            width: 54%;
+        }
+
+        .col-qty {
+            width: 15%;
+        }
+
+        .col-unit {
+            width: 15%;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | TABLE HEADER
+        |--------------------------------------------------------------------------
+        */
+
+        .items-table thead {
+            display: table-header-group;
+        }
 
         .column-header {
             background: #eeeeee;
@@ -70,122 +119,150 @@
             text-align: center;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | LOT
-        |--------------------------------------------------------------------------
-        */
-
-        .lot-cell {
-            background: #d9d9d9;
-            font-weight: bold;
-            text-align: center;
-            vertical-align: middle;
-            width: 15%;
+        .column-header th {
+            padding: 6px 4px;
+            font-size: 9px;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | KEYSTAGE
+        | LOT HEADER
         |--------------------------------------------------------------------------
         */
 
-        .keystage-cell {
-            background: #eeeeee;
+        .lot-row td {
+            background: #d9d9d9;
             font-weight: bold;
-            text-align: left;
+            font-size: 10px;
             padding: 6px;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | ITEM
-        |--------------------------------------------------------------------------
-        */
-
-        .item-cell {
-            width: 55%;
+        .lot-title {
+            text-align: left;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | QUANTITY
+        | KEYSTAGE HEADER
         |--------------------------------------------------------------------------
         */
 
-        .qty-cell {
-            width: 15%;
+        .keystage-row td {
+            background: #f2f2f2;
+            font-weight: bold;
+            font-size: 9px;
+            padding: 5px 6px;
+        }
+
+        .keystage-title {
+            text-align: left;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ITEM ROW
+        |--------------------------------------------------------------------------
+        */
+
+        .item-row td {
+            padding: 5px;
+        }
+
+        .item-lot {
             text-align: center;
+            vertical-align: middle;
+            font-weight: bold;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | UNIT
-        |--------------------------------------------------------------------------
-        */
+        .item-name {
+            text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
 
-        .unit-cell {
-            width: 15%;
+        .item-qty {
             text-align: center;
+            white-space: nowrap;
+        }
+
+        .item-unit {
+            text-align: center;
+            white-space: nowrap;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | EMPTY
+        | EMPTY DATA
         |--------------------------------------------------------------------------
         */
 
-        .empty-row {
+        .empty-row td {
             text-align: center;
             padding: 10px;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | PAGE BREAK
+        | PAGE CONTROL
         |--------------------------------------------------------------------------
         */
 
-        .page-break {
-            page-break-after: always;
-        }
-
         /*
-        |--------------------------------------------------------------------------
-        | PREVENT ROW SPLITTING
-        |--------------------------------------------------------------------------
+        | Do NOT force page breaks inside the items table.
+        | The table is allowed to continue naturally.
         */
 
         tr {
             page-break-inside: avoid;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | SCHOOL PAGE BREAK
+        |--------------------------------------------------------------------------
+        |
+        | Each school starts on a new page, except the first school.
+        |
+        */
+
+        .school-page {
+            page-break-before: always;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | SMALL TEXT
+        |--------------------------------------------------------------------------
+        */
+
+        .small-text {
+            font-size: 8px;
+        }
+
     </style>
 
 </head>
 
-
 <body>
-
 
 @php
 
     $totalSchools = count($data);
 
-    $schoolCount = 0;
+    $schoolIndex = 0;
 
 @endphp
 
 
-{{-- =========================================================================
-     SCHOOLS
+{{-- ========================================================================
+     SCHOOL LOOP
 ========================================================================= --}}
 
-@foreach($data as $sid => $school)
+@foreach($data as $schoolId => $school)
 
     @php
 
-        $schoolCount++;
+        $schoolIndex++;
 
         $info = $school['info'] ?? [];
 
@@ -194,149 +271,179 @@
     @endphp
 
 
-    {{-- =====================================================================
+    {{-- ====================================================================
+         NEW SCHOOL
+    ===================================================================== --}}
+
+    @if($schoolIndex > 1)
+
+        <div class="school-page"></div>
+
+    @endif
+
+
+    {{-- ====================================================================
          SCHOOL INFORMATION
-    ====================================================================== --}}
+    ===================================================================== --}}
 
-    <table>
+    <table class="school-table">
 
-        {{-- SCHOOL NAME --}}
+        <tbody>
 
-        <tr class="school-header">
-
-            <td colspan="4">
-
-                SCHOOL:
-                {{ $info['school_name'] ?? 'N/A' }}
-
-            </td>
-
-        </tr>
-
-
-        {{-- SCHOOL ID --}}
-
-        @if($showSchoolID)
+            {{-- SCHOOL NAME --}}
 
             <tr>
 
-                <td class="school-info-label">
-                    School ID
-                </td>
-
                 <td
-                    colspan="3"
-                    class="school-info-value"
+                    colspan="4"
+                    class="school-header"
                 >
 
-                    {{ $info['school_id'] ?? 'N/A' }}
+                    SCHOOL:
+                    {{ $info['school_name'] ?? 'N/A' }}
 
                 </td>
 
             </tr>
 
-        @endif
+
+            {{-- SCHOOL ID --}}
+
+            @if($showSchoolID)
+
+                <tr>
+
+                    <td class="school-info-label">
+                        School ID
+                    </td>
+
+                    <td
+                        colspan="3"
+                        class="school-info-value"
+                    >
+
+                        {{ $info['school_id'] ?? 'N/A' }}
+
+                    </td>
+
+                </tr>
+
+            @endif
 
 
-        {{-- MUNICIPALITY --}}
+            {{-- MUNICIPALITY --}}
 
-        @if($showMunicipality)
+            @if($showMunicipality)
 
-            <tr>
+                <tr>
 
-                <td class="school-info-label">
-                    Municipality
-                </td>
+                    <td class="school-info-label">
+                        Municipality
+                    </td>
 
-                <td
-                    colspan="3"
-                    class="school-info-value"
-                >
+                    <td
+                        colspan="3"
+                        class="school-info-value"
+                    >
 
-                    {{ $info['municipality'] ?? 'N/A' }}
+                        {{ $info['municipality'] ?? 'N/A' }}
 
-                </td>
+                    </td>
 
-            </tr>
+                </tr>
 
-        @endif
-
-
-        {{-- DIVISION --}}
-
-        @if($showDivision)
-
-            <tr>
-
-                <td class="school-info-label">
-                    Division
-                </td>
-
-                <td
-                    colspan="3"
-                    class="school-info-value"
-                >
-
-                    {{ $info['division'] ?? 'N/A' }}
-
-                </td>
-
-            </tr>
-
-        @endif
+            @endif
 
 
-        {{-- REGION --}}
+            {{-- DIVISION --}}
 
-        @if($showRegion)
+            @if($showDivision)
 
-            <tr>
+                <tr>
 
-                <td class="school-info-label">
-                    Region
-                </td>
+                    <td class="school-info-label">
+                        Division
+                    </td>
 
-                <td
-                    colspan="3"
-                    class="school-info-value"
-                >
+                    <td
+                        colspan="3"
+                        class="school-info-value"
+                    >
 
-                    {{ $info['region'] ?? 'N/A' }}
+                        {{ $info['division'] ?? 'N/A' }}
 
-                </td>
+                    </td>
 
-            </tr>
+                </tr>
 
-        @endif
+            @endif
+
+
+            {{-- REGION --}}
+
+            @if($showRegion)
+
+                <tr>
+
+                    <td class="school-info-label">
+                        Region
+                    </td>
+
+                    <td
+                        colspan="3"
+                        class="school-info-value"
+                    >
+
+                        {{ $info['region'] ?? 'N/A' }}
+
+                    </td>
+
+                </tr>
+
+            @endif
+
+        </tbody>
 
     </table>
 
 
-    {{-- =====================================================================
+    {{-- ====================================================================
          ITEMS TABLE
-    ====================================================================== --}}
+    ===================================================================== --}}
 
-    <table>
+    <table class="items-table">
 
-        {{-- TABLE HEADER --}}
+        <colgroup>
+
+            <col class="col-lot">
+            <col class="col-item">
+            <col class="col-qty">
+            <col class="col-unit">
+
+        </colgroup>
+
+
+        {{-- =================================================================
+             TABLE HEADER
+        ================================================================== --}}
 
         <thead>
 
             <tr class="column-header">
 
-                <th style="width:15%;">
+                <th>
                     LOT
                 </th>
 
-                <th style="width:55%;">
+                <th>
                     ITEM
                 </th>
 
-                <th style="width:15%;">
+                <th>
                     QUANTITY
                 </th>
 
-                <th style="width:15%;">
+                <th>
                     UNIT
                 </th>
 
@@ -352,14 +459,15 @@
              LOTS
         ================================================================== --}}
 
-        @foreach($lots as $lotKey => $lot)
+        @forelse($lots as $lotKey => $lot)
 
             @php
 
+                $lotId = $lot['lot_id'] ?? null;
+
                 $lotName = trim(
                     (string) (
-                        $lot['lot_name']
-                        ?? 'NO LOT'
+                        $lot['lot_name'] ?? ''
                     )
                 );
 
@@ -367,194 +475,190 @@
                     $lotName = 'NO LOT';
                 }
 
-                $keystages =
-                    $lot['keystages']
-                    ?? [];
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Calculate total rows occupied by LOT
-                |--------------------------------------------------------------------------
-                |
-                | Every keystage = 1 row
-                |
-                | Every item = 1 row
-                |
-                */
-
-                $lotRowspan = 0;
-
-                foreach ($keystages as $keystage) {
-
-                    /*
-                    | Keystage header row
-                    */
-
-                    $lotRowspan++;
-
-                    /*
-                    | Item rows
-                    */
-
-                    $lotRowspan += count(
-                        $keystage['items'] ?? []
-                    );
-                }
+                $keystages = $lot['keystages'] ?? [];
 
             @endphp
 
 
             {{-- =============================================================
-                 SKIP EMPTY LOT
+                 LOT HEADER
             ============================================================== --}}
 
-            @if($lotRowspan > 0)
+            <tr class="lot-row">
+
+                <td
+                    colspan="4"
+                    class="lot-title"
+                >
+
+                    @if($lotId)
+                        LOT {{ $lotName }}
+                    @else
+                        NO LOT
+                    @endif
+
+                </td>
+
+            </tr>
+
+
+            {{-- =============================================================
+                 KEYSTAGES
+            ============================================================== --}}
+
+            @forelse($keystages as $keystageKey => $keystage)
 
                 @php
 
-                    $lotPrinted = false;
+                    $keystageId =
+                        $keystage['keystage_id']
+                        ?? null;
+
+                    $keystageLabel = trim(
+                        (string) (
+                            $keystage['label']
+                            ?? ''
+                        )
+                    );
+
+                    if ($keystageLabel === '') {
+                        $keystageLabel = 'No Keystage';
+                    }
+
+                    $items =
+                        $keystage['items']
+                        ?? [];
 
                 @endphp
 
 
                 {{-- =========================================================
-                     KEYSTAGES
+                     KEYSTAGE HEADER
                 ========================================================== --}}
 
-                @foreach(
-                    $keystages
-                    as $keystageKey => $keystage
-                )
+                <tr class="keystage-row">
+
+                    <td
+                        colspan="4"
+                        class="keystage-title"
+                    >
+
+                        {{ $keystageLabel }}
+
+                    </td>
+
+                </tr>
+
+
+                {{-- =========================================================
+                     ITEMS
+                ========================================================== --}}
+
+                @forelse($items as $item)
 
                     @php
 
-                        $keystageLabel = trim(
+                        $itemName = trim(
                             (string) (
-                                $keystage['label']
+                                $item['item_name']
                                 ?? ''
                             )
                         );
 
-                        if ($keystageLabel === '') {
-                            $keystageLabel = 'No Keystage';
-                        }
+                        $itemQty =
+                            (float) (
+                                $item['qty']
+                                ?? 0
+                            );
 
-                        $items =
-                            $keystage['items']
-                            ?? [];
+                        $itemUnit = trim(
+                            (string) (
+                                $item['unit']
+                                ?? ''
+                            )
+                        );
 
                     @endphp
 
 
-                    {{-- =====================================================
-                         KEYSTAGE HEADER
-                    ====================================================== --}}
+                    <tr class="item-row">
 
-                    <tr>
+                        {{-- LOT --}}
 
+                        <td class="item-lot">
 
-                        {{-- LOT CELL --}}
+                            {{ $lotName }}
 
-                        @if(!$lotPrinted)
-
-                            <td
-                                class="lot-cell"
-                                rowspan="{{ $lotRowspan }}"
-                            >
-
-                                LOT {{ $lotName }}
-
-                            </td>
-
-                            @php
-
-                                $lotPrinted = true;
-
-                            @endphp
-
-                        @endif
+                        </td>
 
 
-                        {{-- KEYSTAGE --}}
+                        {{-- ITEM --}}
 
-                        <td
-                            colspan="3"
-                            class="keystage-cell"
-                        >
+                        <td class="item-name">
 
-                            {{ $keystageLabel }}
+                            {{ $itemName }}
+
+                        </td>
+
+
+                        {{-- QUANTITY --}}
+
+                        <td class="item-qty">
+
+                            {{ number_format($itemQty) }}
+
+                        </td>
+
+
+                        {{-- UNIT --}}
+
+                        <td class="item-unit">
+
+                            {{ $itemUnit }}
 
                         </td>
 
                     </tr>
 
+                @empty
 
-                    {{-- =====================================================
-                         ITEMS
-                    ====================================================== --}}
+                    <tr class="empty-row">
 
-                    @foreach($items as $item)
+                        <td colspan="4">
 
-                        <tr>
+                            No items found for this keystage.
 
+                        </td>
 
-                            {{-- ITEM --}}
+                    </tr>
 
-                            <td class="item-cell">
-
-                                {{ $item['item_name'] ?? '' }}
-
-                            </td>
+                @endforelse
 
 
-                            {{-- QUANTITY --}}
+            @empty
 
-                            <td class="qty-cell">
+                <tr class="empty-row">
 
-                                {{ number_format(
-                                    (float) (
-                                        $item['qty']
-                                        ?? 0
-                                    )
-                                ) }}
+                    <td colspan="4">
 
-                            </td>
+                        No keystages found for this lot.
 
+                    </td>
 
-                            {{-- UNIT --}}
+                </tr>
 
-                            <td class="unit-cell">
-
-                                {{ $item['unit'] ?? '' }}
-
-                            </td>
+            @endforelse
 
 
-                        </tr>
+        @empty
 
-                    @endforeach
+            {{-- =============================================================
+                 NO LOTS
+            ============================================================== --}}
 
+            <tr class="empty-row">
 
-                @endforeach
-
-            @endif
-
-        @endforeach
-
-
-        {{-- =================================================================
-             NO DATA
-        ================================================================== --}}
-
-        @if(empty($lots))
-
-            <tr>
-
-                <td
-                    colspan="4"
-                    class="empty-row"
-                >
+                <td colspan="4">
 
                     No package items found.
 
@@ -562,7 +666,7 @@
 
             </tr>
 
-        @endif
+        @endforelse
 
 
         </tbody>
@@ -570,19 +674,7 @@
     </table>
 
 
-    {{-- =====================================================================
-         PAGE BREAK BETWEEN SCHOOLS
-    ====================================================================== --}}
-
-    @if($schoolCount < $totalSchools)
-
-        <div class="page-break"></div>
-
-    @endif
-
-
 @endforeach
-
 
 </body>
 </html>

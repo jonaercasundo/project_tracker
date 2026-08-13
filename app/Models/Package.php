@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class Package extends Model
 {
     protected $table = 'package';
+
     protected $primaryKey = 'package_id';
 
     public $timestamps = false;
+
     public function packageContent()
     {
         return $this->hasMany(
@@ -21,6 +23,10 @@ class Package extends Model
 
     public function statuses()
     {
-        return $this->hasMany(PackageStatus::class, 'package_id', 'package_id');
+        return $this->hasMany(
+            PackageStatus::class,
+            'package_id',
+            'package_id'
+        );
     }
 }

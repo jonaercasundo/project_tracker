@@ -208,44 +208,54 @@ td,th{
             @endif
 
             <table>
-    @foreach($delivery->packageStatuses as $i => $status)
+            @foreach($delivery->packageStatuses as $i => $status)
 
-        @php
-            $pkg = $status->package;
-        @endphp
+@php
+    $pkg = $status->package;
+@endphp
 
-        <tr class="package-row">
-            <td style="width:50%;">
-                <small>
-                    Package {{ $i + 1 }} of {{ $packageCount }}
-                </small>
-            </td>
+<tr class="package-row">
+    <td style="width:50%;">
+        <small>
+            Package {{ $i + 1 }} of {{ $packageCount }}
+        </small>
+    </td>
 
-            <td style="width:50%; text-align:center;">
-                @if($pkg)
-                    <small>
-                        {{ $pkg->length ?? 'N/A' }} ×
-                        {{ $pkg->width ?? 'N/A' }} ×
-                        {{ $pkg->height ?? 'N/A' }}
-                        {{ $pkg->unit ?? 'cm' }}
-                    </small>
-                @else
-                    <small>Dimensions: N/A</small>
-                @endif
-            </td>
-        </tr>
+    <td style="width:50%; text-align:center;">
+        @if($pkg)
+            <small>
+                {{ $pkg->length ?? 'N/A' }}
+                ×
+                {{ $pkg->width ?? 'N/A' }}
+                ×
+                {{ $pkg->height ?? 'N/A' }}
+                {{ $pkg->unit ?? 'cm' }}
+            </small>
+        @else
+            <small>Dimensions: N/A</small>
+        @endif
+    </td>
+</tr>
+
+@if($pkg)
+
+    @foreach($pkg->packageContent as $content)
 
         <tr>
             <td style="width:80%;">
-                {{ $status->item->item_name ?? '' }}
+                {{ $content->item->item_name ?? 'Unknown Item' }}
             </td>
 
             <td style="width:20%; text-align:center;">
-                {{ ($status->qty ?? 0) * $multiplier }}
+                {{ $content->qty ?? 0 }}
             </td>
         </tr>
 
     @endforeach
+
+@endif
+
+@endforeach
 </table>
 
         @endforeach

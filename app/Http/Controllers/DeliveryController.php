@@ -350,76 +350,109 @@ class DeliveryController extends Controller
             ->filter(fn($v) => is_numeric($v) && $v > 0)
             ->values();
     
-        if ($ids->isEmpty()) abort(422, 'Invalid DR numbers.');
+        if ($ids->isEmpty()) {
+            abort(422, 'Invalid DR numbers.');
+        }
     
-        // The frontend may only send the delivery_id(s) for ONE keystage row
-        // under a DR (e.g. the row the user clicked "View" on). Since each
-        // keystage is its own Delivery row (keystage is belongsTo Delivery),
-        // fetching only those ids means sibling keystages under the same DR
-        // never get loaded -> only one keystage's QR codes render.
-        //
-        // Fix: resolve the dr_no(s) for whatever ids were submitted, then
-        // expand the id list to every delivery row sharing those dr_no(s).
-        // This guarantees "select one keystage" == "generate the whole DR".
+        /*
+        |--------------------------------------------------------------------------
+        | Resolve DR numbers
+        |--------------------------------------------------------------------------
+        */
+    
         $drNos = Delivery::whereIn('delivery_id', $ids)
             ->pluck('dr_no')
             ->unique()
             ->values();
     
-        if ($drNos->isEmpty()) abort(404, 'No deliveries found.');
+        if ($drNos->isEmpty()) {
+            abort(404, 'No deliveries found.');
+        }
+    
+        /*
+        |--------------------------------------------------------------------------
+        | Expand to ALL delivery rows belonging to the selected DR
+        |--------------------------------------------------------------------------
+        */
     
         $ids = Delivery::whereIn('dr_no', $drNos)
             ->pluck('delivery_id')
             ->unique()
             ->values();
     
+        /*
+        |--------------------------------------------------------------------------
+        | Load deliveries
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        | package_status.item_id is the source of the item.
+        | package_id is only used for package information/dimensions.
+        |
+        */
+    
         $deliveries = Delivery::with([
             'school',
             'project.arSetting',
             'lot',
             'keystage',
-            'keystage.packages',
-            'items',
-            'package',
-            'packageStatuses',
-            'items.packageContent.package',
-            'packageStatuses.package.packageContent.item',
+            'packageStatuses.package',
+            'packageStatuses.item',
         ])
         ->whereIn('delivery_id', $ids)
         ->orderBy('dr_no')
         ->orderBy('keystage_id')
         ->get();
     
-        if ($deliveries->isEmpty()) abort(404, 'No deliveries found.');
+        if ($deliveries->isEmpty()) {
+            abort(404, 'No deliveries found.');
+        }
     
         $qrCodes = [];
     
         foreach ($deliveries as $delivery) {
     
-            // Always compute the FULL expected package set for this delivery's
-            // keystage (or lot, if no keystage) and insert any missing rows.
-            // Previously this only ran when packageStatuses was completely
-            // empty, so deliveries with stale/incomplete package_status rows
-            // (created under the old single-package matching logic) never got
-            // topped up — that's why some keystages were stuck at "1 of 1"
-            // instead of showing all packages for that keystage.
+            /*
+            |--------------------------------------------------------------------------
+            | Get packages belonging to THIS keystage
+            |--------------------------------------------------------------------------
+            */
+    
             $packageQuery = DB::table('package');
     
             if (!empty($delivery->keystage_id)) {
-                $packageQuery->where('keystage_id', $delivery->keystage_id);
+    
+                $packageQuery->where(
+                    'keystage_id',
+                    $delivery->keystage_id
+                );
+    
             } else {
-                $packageQuery->where('lot_id', $delivery->lot_id);
+    
+                $packageQuery->where(
+                    'lot_id',
+                    $delivery->lot_id
+                );
             }
     
-            $packageIds = $packageQuery->pluck('package_id');
+            $packageIds = $packageQuery
+                ->pluck('package_id');
+    
+            /*
+            |--------------------------------------------------------------------------
+            | Make sure every expected package has a PackageStatus
+            |--------------------------------------------------------------------------
+            */
     
             foreach ($packageIds as $packageId) {
+    
                 $exists = DB::table('package_status')
                     ->where('delivery_id', $delivery->delivery_id)
                     ->where('package_id', $packageId)
                     ->exists();
     
                 if (!$exists) {
+    
                     DB::table('package_status')->insert([
                         'delivery_id' => $delivery->delivery_id,
                         'package_id'  => $packageId,
@@ -429,43 +462,101 @@ class DeliveryController extends Controller
                 }
             }
     
-            $delivery->unsetRelation('packageStatuses');
-            $delivery->load(['packageStatuses.package.packageContent.item']);
+            /*
+            |--------------------------------------------------------------------------
+            | Reload package statuses
+            |--------------------------------------------------------------------------
+            */
+    
+            $statuses = PackageStatus::with([
+                'package',
+                'item',
+            ])
+            ->where('delivery_id', $delivery->delivery_id)
+            ->get();
+    
+            /*
+            |--------------------------------------------------------------------------
+            | IMPORTANT:
+            | Remove stray PackageStatus records that belong to another
+            | keystage/package set.
+            |--------------------------------------------------------------------------
+            */
+    
+            if (!empty($delivery->keystage_id)) {
+    
+                $statuses = $statuses->filter(function ($status) use ($delivery) {
+    
+                    return $status->package
+                        && $status->package->keystage_id == $delivery->keystage_id;
+    
+                })->values();
+    
+            } else {
+    
+                $statuses = $statuses->filter(function ($status) use ($delivery) {
+    
+                    return $status->package
+                        && $status->package->lot_id == $delivery->lot_id;
+    
+                })->values();
+            }
+    
+            $delivery->setRelation(
+                'packageStatuses',
+                $statuses
+            );
     
             $delivery->ar = $delivery->project->arSetting ?? null;
     
-            $statuses = PackageStatus::with(['package.packageContent.item'])
-                ->where('delivery_id', $delivery->delivery_id)
-                ->get();
-    
-            $delivery->setRelation('packageStatuses', $statuses);
+            /*
+            |--------------------------------------------------------------------------
+            | Generate QR codes
+            |--------------------------------------------------------------------------
+            */
     
             foreach ($statuses as $status) {
-                if (!$status->package_status_id) continue;
+    
+                if (!$status->package_status_id) {
+                    continue;
+                }
     
                 $url = sprintf(
                     'https://mmc.metro-ltd.com/entry.php?id=%s&delivery_id=%s',
                     $status->package_status_id,
                     $delivery->delivery_id
                 );
-                $result = (new PngWriter())->write(new QrCode($url));
+    
+                $result = (new PngWriter())->write(
+                    new QrCode($url)
+                );
     
                 $qrCodes[$status->package_status_id] =
-                    'data:image/png;base64,' . base64_encode($result->getString());
+                    'data:image/png;base64,' .
+                    base64_encode($result->getString());
     
-                $items = $status->package?->packageContent?->pluck('item') ?? collect();
-                $itemNames = $items->pluck('item_name')->filter();
+                /*
+                |--------------------------------------------------------------------------
+                | QR LABEL COMES DIRECTLY FROM PackageStatus.item_id
+                |--------------------------------------------------------------------------
+                */
     
-                $status->qr_label = $itemNames->isNotEmpty()
-                    ? $itemNames->implode(', ')
-                    : 'Unknown Item';
+                $status->qr_label =
+                    $status->item?->item_name ?? 'Unknown Item';
             }
         }
+    
+        /*
+        |--------------------------------------------------------------------------
+        | Generate PDF
+        |--------------------------------------------------------------------------
+        */
     
         return Pdf::loadView('deliveries.ar-layout', [
             'deliveries' => $deliveries,
             'qrCodes'    => $qrCodes,
-            'signerName' => Auth::user()?->name ?? 'Authorized Representative',
+            'signerName' => Auth::user()?->name
+                ?? 'Authorized Representative',
         ])
         ->setPaper('legal', 'portrait')
         ->stream('deliveries-batch.pdf');

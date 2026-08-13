@@ -18,6 +18,7 @@ class PackageStatus extends Model
         'package_id',
         'status',
         'remarks',
+        'item_id',
     ];
 
     public function package()
@@ -36,5 +37,9 @@ class PackageStatus extends Model
             'package_status_id',
             'package_status_id'
         );
+    }
+    public function item()
+    {
+        return $this->belongsTo(Item::class, 'item_id', 'item_id');
     }
 }

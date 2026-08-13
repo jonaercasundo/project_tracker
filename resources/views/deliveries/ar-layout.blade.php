@@ -73,38 +73,7 @@ td,th{
 @endphp
 
 @foreach($drGroups as $drNo => $drDeliveries)
-    <h2>DR: {{ $drNo }}</h2>
-
-    @foreach($drDeliveries as $delivery)
-
-        <h3>
-            Delivery ID: {{ $delivery->delivery_id }}
-            |
-            Keystage ID: {{ $delivery->keystage_id }}
-            |
-            Keystage:
-            {{ $delivery->keystage->keystage_num ?? 'NULL' }}
-        </h3>
-
-        @foreach($delivery->packageStatuses as $status)
-
-            <div>
-                Package Status ID:
-                {{ $status->package_status_id }}
-
-                |
-                delivery_id:
-                {{ $status->delivery_id }}
-
-                |
-                package_id:
-                {{ $status->package_id }}
-            </div>
-
-        @endforeach
-
-    @endforeach   
-@php
+    @php
 
         $first = $drDeliveries->first();
         $ar    = $first->project->arSetting ?? null;
@@ -239,39 +208,45 @@ td,th{
             @endif
 
             <table>
-                @foreach($delivery->packageStatuses as $i => $status)
-                    @php $pkg = $status->package; @endphp
+    @foreach($delivery->packageStatuses as $i => $status)
 
-                    <tr class="package-row">
-                        <td style="width:50%;">
-                            <small>Package {{ $i + 1 }} of {{ $packageCount }}</small>
-                        </td>
-                        <td style="width:50%; text-align:center;">
-                            @if($pkg)
-                                <small>
-                                    {{ $pkg->length ?? 'N/A' }} ×
-                                    {{ $pkg->width ?? 'N/A' }} ×
-                                    {{ $pkg->height ?? 'N/A' }}
-                                    {{ $pkg->unit ?? 'cm' }}
-                                </small>
-                            @else
-                                <small>Dimensions: N/A</small>
-                            @endif
-                        </td>
-                    </tr>
+        @php
+            $pkg = $status->package;
+        @endphp
 
-                    @foreach($pkg->packageContent ?? [] as $content)
-                        <tr>
-                            <td style="width:80%;">
-                                {{ $content->item->item_name ?? '' }}
-                            </td>
-                            <td style="width:20%; text-align:center;">
-                                {{ ($content->qty ?? 0) * $multiplier }}
-                            </td>
-                        </tr>
-                    @endforeach
-                @endforeach
-            </table>
+        <tr class="package-row">
+            <td style="width:50%;">
+                <small>
+                    Package {{ $i + 1 }} of {{ $packageCount }}
+                </small>
+            </td>
+
+            <td style="width:50%; text-align:center;">
+                @if($pkg)
+                    <small>
+                        {{ $pkg->length ?? 'N/A' }} ×
+                        {{ $pkg->width ?? 'N/A' }} ×
+                        {{ $pkg->height ?? 'N/A' }}
+                        {{ $pkg->unit ?? 'cm' }}
+                    </small>
+                @else
+                    <small>Dimensions: N/A</small>
+                @endif
+            </td>
+        </tr>
+
+        <tr>
+            <td style="width:80%;">
+                {{ $status->item->item_name ?? '' }}
+            </td>
+
+            <td style="width:20%; text-align:center;">
+                {{ ($status->qty ?? 0) * $multiplier }}
+            </td>
+        </tr>
+
+    @endforeach
+</table>
 
         @endforeach
 

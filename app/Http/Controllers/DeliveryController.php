@@ -715,12 +715,11 @@ class DeliveryController extends Controller
         $deliveries = Delivery::with([
             'school',
             'project.arSetting',
-            'lot.packages.packageContent.item',
+            'lot',
             'keystage',
             'packageStatuses.package.packageContent.item',
         ])
-            ->whereIn('project_id', $projectIds)
-            ->whereIn('school_id', $schoolIds)
+            ->whereIn('delivery_id', $ids)
             ->orderBy('school_id')
             ->orderBy('lot_id')
             ->orderBy('keystage_id')

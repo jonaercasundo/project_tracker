@@ -719,6 +719,7 @@ class DeliveryController extends Controller
             'school',
             'project.arSetting',
             'lot',
+            'lot.packages.packageContent.item',
             'keystage',
             'packageStatuses.package.packageContent.item',
         ])

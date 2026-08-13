@@ -1,6 +1,8 @@
+
 <!DOCTYPE html>
 <html>
 <head>
+
     <meta charset="utf-8">
 
     <style>
@@ -41,6 +43,12 @@
             text-align: center;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | SCHOOL INFORMATION
+        |--------------------------------------------------------------------------
+        */
+
         .school-info-label {
             width: 18%;
             font-weight: bold;
@@ -70,7 +78,7 @@
         */
 
         .lot-cell {
-            background: #d9d9d9;
+            background: #e0e0e0;
             font-weight: bold;
             text-align: center;
             vertical-align: middle;
@@ -79,19 +87,7 @@
 
         /*
         |--------------------------------------------------------------------------
-        | KEYSTAGE
-        |--------------------------------------------------------------------------
-        */
-
-        .keystage-cell {
-            background: #eeeeee;
-            font-weight: bold;
-            padding: 6px;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | ITEMS
+        | ITEM
         |--------------------------------------------------------------------------
         */
 
@@ -99,30 +95,25 @@
             width: 55%;
         }
 
-        .qty-cell {
-            width: 15%;
-            text-align: center;
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | QUANTITY
+        |--------------------------------------------------------------------------
+        */
 
-        .unit-cell {
+        .qty-cell {
             width: 15%;
             text-align: center;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | TOTAL
+        | UNIT
         |--------------------------------------------------------------------------
         */
 
-        .total-label {
-            font-weight: bold;
-            text-align: right;
-            background: #eeeeee;
-        }
-
-        .total-value {
-            font-weight: bold;
+        .unit-cell {
+            width: 15%;
             text-align: center;
         }
 
@@ -136,19 +127,34 @@
             page-break-after: always;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | PREVENT ROW SPLITTING
+        |--------------------------------------------------------------------------
+        */
+
         tr {
             page-break-inside: avoid;
         }
 
     </style>
+
 </head>
 
 
 <body>
 
+
 @php
 
+    /*
+    |--------------------------------------------------------------------------
+    | TOTAL SCHOOLS
+    |--------------------------------------------------------------------------
+    */
+
     $totalSchools = count($data);
+
     $schoolCount = 0;
 
 @endphp
@@ -156,7 +162,7 @@
 
 {{-- ========================================================================
      SCHOOLS
-========================================================================= --}}
+======================================================================== --}}
 
 @foreach($data as $sid => $school)
 
@@ -282,7 +288,7 @@
 
 
     {{-- ====================================================================
-         PACKAGE CONTENT TABLE
+         ITEMS TABLE
     ===================================================================== --}}
 
     <table>
@@ -314,57 +320,76 @@
              LOTS
         ================================================================== --}}
 
-        @foreach($lots as $lotId => $lot)
+        @foreach($lots as $lotName => $items)
 
             @php
 
-                $lotName =
-                    trim(
-                        (string) (
-                            $lot['lot_name']
-                            ?? 'NO LOT'
-                        )
-                    );
+                /*
+                |--------------------------------------------------------------------------
+                | NORMALIZE LOT NAME
+                |--------------------------------------------------------------------------
+                */
 
-                if ($lotName === '') {
-                    $lotName = 'NO LOT';
+                $displayLotName = trim(
+                    (string) $lotName
+                );
+
+                if ($displayLotName === '') {
+                    $displayLotName = 'NO LOT';
                 }
 
-                $keystages =
-                    $lot['keystages']
-                    ?? [];
 
                 /*
                 |--------------------------------------------------------------------------
-                | Calculate total rows occupied by this LOT
+                | NORMALIZE ITEMS
                 |--------------------------------------------------------------------------
-                |
-                | Every keystage header is one row.
-                | Every item is one row.
-                |
                 */
 
-                $lotRowspan = 0;
+                $items = array_values(
+                    $items ?? []
+                );
 
-                foreach ($keystages as $keystage) {
 
-                    $items =
-                        $keystage['items']
-                        ?? [];
+                /*
+                |--------------------------------------------------------------------------
+                | REMOVE EMPTY ITEMS
+                |--------------------------------------------------------------------------
+                */
 
-                    /*
-                    | A keystage header occupies one row
-                    */
+                $items = array_filter(
+                    $items,
+                    function ($item) {
 
-                    $lotRowspan++;
+                        return !empty(
+                            trim(
+                                (string) (
+                                    $item['item_name']
+                                    ?? ''
+                                )
+                            )
+                        );
+                    }
+                );
 
-                    /*
-                    | Each item occupies one row
-                    */
 
-                    $lotRowspan += count($items);
+                /*
+                |--------------------------------------------------------------------------
+                | REINDEX
+                |--------------------------------------------------------------------------
+                */
 
-                }
+                $items = array_values(
+                    $items
+                );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | NUMBER OF ITEMS
+                |--------------------------------------------------------------------------
+                */
+
+                $itemCount = count($items);
 
             @endphp
 
@@ -373,7 +398,7 @@
                  SKIP EMPTY LOT
             ============================================================== --}}
 
-            @if($lotRowspan > 0)
+            @if($itemCount > 0)
 
                 @php
                     $lotPrinted = false;
@@ -381,47 +406,25 @@
 
 
                 {{-- =========================================================
-                     KEYSTAGES
+                     ITEMS
                 ========================================================== --}}
 
-                @foreach(
-                    $keystages
-                    as $keystageId => $keystage
-                )
-
-                    @php
-
-                        $label =
-                            trim(
-                                (string) (
-                                    $keystage['label']
-                                    ?? ''
-                                )
-                            );
-
-                        $items =
-                            $keystage['items']
-                            ?? [];
-
-                    @endphp
-
-
-                    {{-- =====================================================
-                         KEYSTAGE HEADER
-                    ====================================================== --}}
+                @foreach($items as $item)
 
                     <tr>
 
-                        {{-- LOT --}}
+                        {{-- =================================================
+                             LOT
+                        ================================================== --}}
 
                         @if(!$lotPrinted)
 
                             <td
                                 class="lot-cell"
-                                rowspan="{{ $lotRowspan }}"
+                                rowspan="{{ $itemCount }}"
                             >
 
-                                LOT {{ $lotName }}
+                                LOT {{ $displayLotName }}
 
                             </td>
 
@@ -432,68 +435,51 @@
                         @endif
 
 
-                        {{-- KEYSTAGE --}}
+                        {{-- =================================================
+                             ITEM
+                        ================================================== --}}
 
-                        <td
-                            colspan="3"
-                            class="keystage-cell"
-                        >
+                        <td class="item-cell">
 
-                            {{ $label ?: 'No Keystage' }}
+                            {{ $item['item_name'] ?? '' }}
+
+                        </td>
+
+
+                        {{-- =================================================
+                             QUANTITY
+                        ================================================== --}}
+
+                        <td class="qty-cell">
+
+                            {{ number_format(
+                                (float) (
+                                    $item['qty']
+                                    ?? 0
+                                )
+                            ) }}
+
+                        </td>
+
+
+                        {{-- =================================================
+                             UNIT
+                        ================================================== --}}
+
+                        <td class="unit-cell">
+
+                            {{ $item['unit'] ?? '' }}
 
                         </td>
 
                     </tr>
-
-
-                    {{-- =====================================================
-                         ITEMS
-                    ====================================================== --}}
-
-                    @foreach($items as $item)
-
-                        <tr>
-
-                            {{-- ITEM --}}
-
-                            <td class="item-cell">
-
-                                {{ $item['item_name'] ?? '' }}
-
-                            </td>
-
-
-                            {{-- QUANTITY --}}
-
-                            <td class="qty-cell">
-
-                                {{ number_format(
-                                    (float) (
-                                        $item['qty']
-                                        ?? 0
-                                    )
-                                ) }}
-
-                            </td>
-
-
-                            {{-- UNIT --}}
-
-                            <td class="unit-cell">
-
-                                {{ $item['unit'] ?? '' }}
-
-                            </td>
-
-                        </tr>
-
-                    @endforeach
 
                 @endforeach
 
             @endif
 
         @endforeach
+
 
     </table>
 
@@ -508,7 +494,9 @@
 
     @endif
 
+
 @endforeach
+
 
 </body>
 </html>

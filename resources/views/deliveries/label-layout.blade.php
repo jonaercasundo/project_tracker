@@ -113,7 +113,7 @@
 
         <tr class="header">
             <td colspan="4">
-                DISTRICT:
+                SCHOOL:
                 {{ $info['school_name'] ?? '' }}
             </td>
         </tr>

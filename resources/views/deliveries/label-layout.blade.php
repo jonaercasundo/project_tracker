@@ -41,7 +41,6 @@ td {
 </style>
 
 </head>
-:::writing{variant="document" id="74126" title="Blade Template — Multiple LOTs per School"}
 <!DOCTYPE html>
 <html>
 <head>
@@ -162,7 +161,9 @@ td {
              MULTIPLE LOTS FOR ONE SCHOOL
         ===================================================== --}}
         @foreach($school['lots'] as $lotName => $keystageGroups)
-
+        <pre>
+         {{ print_r($school['lots'], true) }}
+        </pre>
             @php
 
                 /*

@@ -635,938 +635,743 @@ class DeliveryController extends Controller
     {
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
-
+    
         /*
         |--------------------------------------------------------------------------
         | 1. GET SELECTED DELIVERY IDS
         |--------------------------------------------------------------------------
         */
-
-        $ids = collect(
+    
+        $selectedIds = collect(
             explode(',', (string) $request->ids)
         )
             ->map(fn ($id) => (int) trim($id))
             ->filter(fn ($id) => $id > 0)
             ->unique()
             ->values();
-
-        if ($ids->isEmpty()) {
+    
+        if ($selectedIds->isEmpty()) {
             abort(422, 'No deliveries selected.');
         }
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
-        | 2. LOAD SELECTED DELIVERIES
+        | 2. GET DR NUMBERS
+        |--------------------------------------------------------------------------
+        |
+        | A selected delivery represents the DR.
+        |
+        | We must include ALL delivery rows belonging to those DR numbers.
+        |
+        */
+    
+        $drNos = DB::table('deliveries')
+            ->whereIn('delivery_id', $selectedIds)
+            ->pluck('dr_no')
+            ->filter()
+            ->unique()
+            ->values();
+    
+        if ($drNos->isEmpty()) {
+            abort(404, 'No DR numbers found.');
+        }
+    
+    
+        /*
+        |--------------------------------------------------------------------------
+        | 3. EXPAND TO ALL DELIVERY ROWS FOR SELECTED DR NUMBERS
         |--------------------------------------------------------------------------
         */
-
-        $deliveries = Delivery::with([
-            'school',
-            'project',
-            'lot',
-            'keystage',
-        ])
-            ->whereIn('delivery_id', $ids)
-            ->orderBy('school_id')
-            ->orderBy('lot_id')
-            ->orderBy('keystage_id')
-            ->orderBy('delivery_id')
+    
+        $deliveryIds = DB::table('deliveries')
+            ->whereIn('dr_no', $drNos)
+            ->pluck('delivery_id')
+            ->unique()
+            ->values();
+    
+        if ($deliveryIds->isEmpty()) {
+            abort(404, 'No deliveries found.');
+        }
+    
+    
+        /*
+        |--------------------------------------------------------------------------
+        | 4. LOAD DELIVERIES
+        |--------------------------------------------------------------------------
+        */
+    
+        $deliveries = DB::table('deliveries as d')
+            ->join('school as s', 's.school_id', '=', 'd.school_id')
+            ->leftJoin('lot as l', 'l.lot_id', '=', 'd.lot_id')
+            ->leftJoin('projects as p', 'p.project_id', '=', 'd.project_id')
+            ->whereIn('d.delivery_id', $deliveryIds)
+            ->select(
+                'd.delivery_id',
+                'd.dr_no',
+                'd.project_id',
+                'd.school_id',
+                'd.lot_id',
+                'd.keystage_id',
+                'd.package_qty',
+    
+                's.school_id',
+                's.school_name',
+                's.municipality',
+                's.division',
+                's.region',
+    
+                'l.lot_name',
+    
+                'p.project_name'
+            )
+            ->orderBy('s.school_name')
+            ->orderBy('d.lot_id')
+            ->orderBy('d.keystage_id')
+            ->orderBy('d.delivery_id')
             ->get();
-
+    
         if ($deliveries->isEmpty()) {
             abort(404, 'No deliveries found.');
         }
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
-        | 3. PROJECT ID
+        | 5. PROJECT
         |--------------------------------------------------------------------------
         */
-
+    
         $projectId = $deliveries
             ->pluck('project_id')
             ->filter()
             ->first();
-
+    
         if (!$projectId) {
             abort(404, 'No project found.');
         }
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
-        | 4. AR SETTINGS
+        | 6. AR SETTINGS
         |--------------------------------------------------------------------------
         */
-
+    
         $arSettings = ARSetting::where(
             'project_id',
             $projectId
         )->first();
-
+    
         $showSchoolID = (bool) (
             $arSettings?->label_school_id ?? false
         );
-
+    
         $showMunicipality = (bool) (
             $arSettings?->label_municipality ?? false
         );
-
+    
         $showDivision = (bool) (
             $arSettings?->label_division ?? false
         );
-
+    
         $showRegion = (bool) (
             $arSettings?->label_region ?? false
         );
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
-        | 5. GET DELIVERY IDS
-        |--------------------------------------------------------------------------
-        */
-
-        $deliveryIds = $deliveries
-            ->pluck('delivery_id')
-            ->map(fn ($id) => (int) $id)
-            ->values();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | 6. PACKAGE DATA
+        | 7. BUILD PACKAGE DATA
         |--------------------------------------------------------------------------
         |
         | IMPORTANT:
         |
-        | We DO NOT rely on package_status joins directly because duplicate
-        | package_status rows can multiply the quantity.
+        | We DO NOT depend only on package_status.
         |
-        | Instead, EXISTS is used to verify:
+        | Packages are found directly from:
         |
-        | package_status.delivery_id = delivery.delivery_id
-        | package_status.package_id  = package.package_id
+        | delivery.keystage_id
+        | OR
+        | delivery.lot_id
         |
-        |
-        | PACKAGE MATCHING:
-        |
-        | If delivery has keystage:
-        |
-        |     package.keystage_id = delivery.keystage_id
-        |
-        | Otherwise:
-        |
-        |     package.lot_id = delivery.lot_id
+        | This prevents missing packages/keystages when package_status
+        | records were deleted or are incomplete.
         |
         */
-
-        $rows = DB::table('deliveries as d')
-
-            /*
-            |--------------------------------------------------------------------------
-            | SCHOOL
-            |--------------------------------------------------------------------------
-            */
-
-            ->join(
-                'school as s',
-                's.school_id',
-                '=',
-                'd.school_id'
-            )
-
-            /*
-            |--------------------------------------------------------------------------
-            | LOT
-            |--------------------------------------------------------------------------
-            */
-
-            ->leftJoin(
-                'lot as l',
-                'l.lot_id',
-                '=',
-                'd.lot_id'
-            )
-
-            /*
-            |--------------------------------------------------------------------------
-            | PACKAGE
-            |--------------------------------------------------------------------------
-            |
-            | Package belongs either to the delivery keystage OR delivery lot.
-            |
-            */
-
-            ->join(
-                'package as p',
-                function ($join) {
-
-                    $join->where(function ($q) {
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | DELIVERY HAS KEYSTAGE
-                        |--------------------------------------------------------------------------
-                        */
-
-                        $q->where(function ($q2) {
-
-                            $q2->whereNotNull(
-                                'd.keystage_id'
-                            )
-
-                            ->whereColumn(
-                                'p.keystage_id',
-                                '=',
-                                'd.keystage_id'
-                            );
-
-                        })
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | DELIVERY HAS NO KEYSTAGE
-                        |--------------------------------------------------------------------------
-                        */
-
-                        ->orWhere(function ($q2) {
-
-                            $q2->whereNull(
-                                'd.keystage_id'
-                            )
-
-                            ->whereColumn(
-                                'p.lot_id',
-                                '=',
-                                'd.lot_id'
-                            );
-
-                        });
-
-                    });
-
-                }
-            )
-
-            /*
-            |--------------------------------------------------------------------------
-            | PACKAGE CONTENT
-            |--------------------------------------------------------------------------
-            */
-
-            ->join(
-                'package_content as pc',
-                'pc.package_id',
-                '=',
-                'p.package_id'
-            )
-
-            /*
-            |--------------------------------------------------------------------------
-            | ITEM
-            |--------------------------------------------------------------------------
-            */
-
-            ->join(
-                'item as i',
-                'i.item_id',
-                '=',
-                'pc.item_id'
-            )
-
-            /*
-            |--------------------------------------------------------------------------
-            | KEYSTAGE
-            |--------------------------------------------------------------------------
-            |
-            | Package keystage is preferred.
-            | Delivery keystage is fallback.
-            |
-            */
-
-            ->leftJoin(
-                'keystage as k',
-                function ($join) {
-
-                    $join->on(
-                        DB::raw(
-                            'COALESCE(p.keystage_id, d.keystage_id)'
-                        ),
-                        '=',
-                        'k.keystage_id'
-                    );
-
-                }
-            )
-
-            /*
-            |--------------------------------------------------------------------------
-            | SELECTED DELIVERIES ONLY
-            |--------------------------------------------------------------------------
-            */
-
-            ->whereIn(
-                'd.delivery_id',
-                $deliveryIds
-            )
-
-            /*
-            |--------------------------------------------------------------------------
-            | PACKAGE STATUS MUST EXIST
-            |--------------------------------------------------------------------------
-            |
-            | This prevents packages unrelated to the delivery from appearing.
-            |
-            */
-
-            ->whereExists(function ($query) {
-
-                $query->select(
-                    DB::raw(1)
-                )
-
-                ->from(
-                    'package_status as ps'
-                )
-
-                ->whereColumn(
-                    'ps.delivery_id',
-                    '=',
-                    'd.delivery_id'
-                )
-
-                ->whereColumn(
-                    'ps.package_id',
-                    '=',
-                    'p.package_id'
-                );
-
-            })
-
-            /*
-            |--------------------------------------------------------------------------
-            | SELECT
-            |--------------------------------------------------------------------------
-            */
-
-            ->select(
-
-                /*
-                |--------------------------------------------------------------------------
-                | DELIVERY
-                |--------------------------------------------------------------------------
-                */
-
-                'd.delivery_id',
-                'd.package_qty',
-                'd.project_id',
-                'd.school_id',
-                'd.lot_id',
-                'd.keystage_id',
-
-                /*
-                |--------------------------------------------------------------------------
-                | SCHOOL
-                |--------------------------------------------------------------------------
-                */
-
-                's.school_name',
-                's.municipality',
-                's.division',
-                's.region',
-
-                /*
-                |--------------------------------------------------------------------------
-                | LOT
-                |--------------------------------------------------------------------------
-                */
-
-                'l.lot_name',
-
-                /*
-                |--------------------------------------------------------------------------
-                | PACKAGE
-                |--------------------------------------------------------------------------
-                */
-
-                'p.package_id',
-                'p.keystage_id as package_keystage_id',
-
-                /*
-                |--------------------------------------------------------------------------
-                | KEYSTAGE
-                |--------------------------------------------------------------------------
-                */
-
-                'k.keystage_num',
-                'k.description',
-
-                /*
-                |--------------------------------------------------------------------------
-                | ITEM
-                |--------------------------------------------------------------------------
-                */
-
-                'i.item_id',
-                'i.item_name',
-                'i.unit',
-
-                /*
-                |--------------------------------------------------------------------------
-                | QUANTITY
-                |--------------------------------------------------------------------------
-                */
-
-                DB::raw(
-                    '
-                    SUM(
-                        COALESCE(pc.qty, 1)
-                        *
-                        COALESCE(d.package_qty, 1)
-                    ) AS total_qty
-                    '
-                )
-            )
-
-            /*
-            |--------------------------------------------------------------------------
-            | GROUP
-            |--------------------------------------------------------------------------
-            */
-
-            ->groupBy(
-
-                'd.delivery_id',
-                'd.package_qty',
-                'd.project_id',
-                'd.school_id',
-                'd.lot_id',
-                'd.keystage_id',
-
-                's.school_name',
-                's.municipality',
-                's.division',
-                's.region',
-
-                'l.lot_name',
-
-                'p.package_id',
-                'p.keystage_id',
-
-                'k.keystage_num',
-                'k.description',
-
-                'i.item_id',
-                'i.item_name',
-                'i.unit'
-            )
-
-            ->orderBy(
-                's.school_name'
-            )
-
-            ->orderBy(
-                'l.lot_name'
-            )
-
-            ->orderBy(
-                'k.keystage_num'
-            )
-
-            ->orderBy(
-                'i.item_name'
-            )
-
-            ->get();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | 7. BUILD DATA
-        |--------------------------------------------------------------------------
-        |
-        | Structure:
-        |
-        | SCHOOL
-        |   └── LOT
-        |        └── KEYSTAGE
-        |             └── ITEMS
-        |
-        */
-
+    
         $data = [];
-
-
-        foreach ($rows as $row) {
-
+    
+    
+        foreach ($deliveries as $delivery) {
+    
             /*
             |--------------------------------------------------------------------------
             | SCHOOL
             |--------------------------------------------------------------------------
             */
-
-            $schoolId = (int) $row->school_id;
-
+    
+            $schoolId = (int) $delivery->school_id;
+    
             if ($schoolId <= 0) {
                 continue;
             }
-
-
+    
+    
             /*
             |--------------------------------------------------------------------------
             | CREATE SCHOOL
             |--------------------------------------------------------------------------
             */
-
+    
             if (!isset($data[$schoolId])) {
-
+    
                 $data[$schoolId] = [
-
+    
                     'info' => [
-
+    
                         'school_name' =>
-                            $row->school_name ?? '',
-
+                            $delivery->school_name ?? '',
+    
                         'school_id' =>
-                            $row->school_id ?? '',
-
+                            $delivery->school_id ?? '',
+    
                         'municipality' =>
-                            $row->municipality ?? '',
-
+                            $delivery->municipality ?? '',
+    
                         'division' =>
-                            $row->division ?? '',
-
+                            $delivery->division ?? '',
+    
                         'region' =>
-                            $row->region ?? '',
-
+                            $delivery->region ?? '',
+    
                     ],
-
+    
                     'lots' => [],
-
+    
                 ];
             }
-
-
+    
+    
             /*
             |--------------------------------------------------------------------------
-            | LOT KEY
+            | LOT
             |--------------------------------------------------------------------------
             */
-
-            $lotId = $row->lot_id;
-
-            if ($lotId !== null) {
-
-                $lotKey =
-                    'lot-' . (int) $lotId;
-
-            } else {
-
-                $lotKey = 'no-lot';
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | LOT NAME
-            |--------------------------------------------------------------------------
-            */
-
+    
+            $lotId = $delivery->lot_id;
+    
+            $lotKey = $lotId !== null
+                ? 'lot-' . (int) $lotId
+                : 'no-lot';
+    
+    
             $lotName = trim(
                 (string) (
-                    $row->lot_name ?? ''
+                    $delivery->lot_name ?? ''
                 )
             );
-
+    
             if ($lotName === '') {
                 $lotName = 'NO LOT';
             }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | CREATE LOT
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                !isset(
-                    $data[$schoolId]
-                        ['lots'][$lotKey]
-                )
-            ) {
-
-                $data[$schoolId]
-                    ['lots'][$lotKey] = [
-
+    
+    
+            if (!isset(
+                $data[$schoolId]['lots'][$lotKey]
+            )) {
+    
+                $data[$schoolId]['lots'][$lotKey] = [
+    
                     'lot_id' =>
                         $lotId,
-
+    
                     'lot_name' =>
                         $lotName,
-
+    
                     'keystages' => [],
-
+    
                 ];
             }
-
-
+    
+    
             /*
             |--------------------------------------------------------------------------
-            | DETERMINE KEYSTAGE
+            | 8. FIND PACKAGES
             |--------------------------------------------------------------------------
             |
-            | Priority:
+            | If delivery has keystage:
             |
-            | 1. Package keystage
-            | 2. Delivery keystage
+            |     package.keystage_id = delivery.keystage_id
+            |
+            | Otherwise:
+            |
+            |     package.lot_id = delivery.lot_id
             |
             */
-
-            $keystageId = null;
-
-            if (!empty($row->package_keystage_id)) {
-
-                $keystageId =
-                    (int) $row->package_keystage_id;
-
-            } elseif (!empty($row->keystage_id)) {
-
-                $keystageId =
-                    (int) $row->keystage_id;
+    
+            $packageQuery = DB::table('package');
+    
+    
+            if (!empty($delivery->keystage_id)) {
+    
+                $packageQuery
+                    ->where(
+                        'keystage_id',
+                        $delivery->keystage_id
+                    );
+    
+            } else {
+    
+                $packageQuery
+                    ->where(
+                        'lot_id',
+                        $delivery->lot_id
+                    );
             }
-
-
+    
+    
             /*
             |--------------------------------------------------------------------------
-            | KEYSTAGE KEY
+            | GET PACKAGES
             |--------------------------------------------------------------------------
             */
-
-            $keystageKey =
-                $keystageId
-                    ? 'keystage-' . $keystageId
-                    : 'no-keystage';
-
-
+    
+            $packages = $packageQuery
+                ->orderBy('package_id')
+                ->get();
+    
+    
             /*
             |--------------------------------------------------------------------------
-            | KEYSTAGE NUMBER
+            | 9. PROCESS PACKAGES
             |--------------------------------------------------------------------------
             */
-
-            $keystageNumber = trim(
-                (string) (
-                    $row->keystage_num ?? ''
-                )
-            );
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | KEYSTAGE DESCRIPTION
-            |--------------------------------------------------------------------------
-            */
-
-            $description = trim(
-                (string) (
-                    $row->description ?? ''
-                )
-            );
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | BUILD KEYSTAGE LABEL
-            |--------------------------------------------------------------------------
-            */
-
-            $parts = [];
-
-            if ($keystageNumber !== '') {
-
-                $parts[] =
-                    'Keystage ' .
-                    $keystageNumber;
-            }
-
-            if ($description !== '') {
-
-                $parts[] =
-                    $description;
-            }
-
-
-            $keystageLabel =
-                !empty($parts)
-                    ? implode(' ', $parts)
-                    : 'No Keystage';
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | CREATE KEYSTAGE
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                !isset(
+    
+            foreach ($packages as $package) {
+    
+                if (!$package) {
+                    continue;
+                }
+    
+    
+                $packageId = (int) $package->package_id;
+    
+                if ($packageId <= 0) {
+                    continue;
+                }
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | VERIFY PACKAGE LOT
+                |--------------------------------------------------------------------------
+                */
+    
+                if (
+                    $lotId !== null &&
+                    $package->lot_id !== null &&
+                    (int) $package->lot_id !== (int) $lotId
+                ) {
+                    continue;
+                }
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | DETERMINE KEYSTAGE
+                |--------------------------------------------------------------------------
+                |
+                | PACKAGE KEYSTAGE has priority.
+                |
+                | Then DELIVERY KEYSTAGE.
+                |
+                */
+    
+                $keystageId = null;
+    
+                if (!empty($package->keystage_id)) {
+    
+                    $keystageId =
+                        (int) $package->keystage_id;
+    
+                } elseif (!empty($delivery->keystage_id)) {
+    
+                    $keystageId =
+                        (int) $delivery->keystage_id;
+                }
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | GET KEYSTAGE
+                |--------------------------------------------------------------------------
+                */
+    
+                $keystage = null;
+    
+                if ($keystageId) {
+    
+                    $keystage = DB::table('keystage')
+                        ->where(
+                            'keystage_id',
+                            $keystageId
+                        )
+                        ->first();
+                }
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | KEYSTAGE LABEL
+                |--------------------------------------------------------------------------
+                */
+    
+                if ($keystage) {
+    
+                    $number = trim(
+                        (string) (
+                            $keystage->keystage_num ?? ''
+                        )
+                    );
+    
+                    $description = trim(
+                        (string) (
+                            $keystage->description ?? ''
+                        )
+                    );
+    
+                    $parts = [];
+    
+                    if ($number !== '') {
+                        $parts[] =
+                            'Keystage ' . $number;
+                    }
+    
+                    if ($description !== '') {
+                        $parts[] =
+                            $description;
+                    }
+    
+                    $keystageLabel =
+                        !empty($parts)
+                            ? implode(' - ', $parts)
+                            : 'Keystage ' . $keystageId;
+    
+                } else {
+    
+                    $keystageLabel =
+                        'No Keystage';
+                }
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | KEYSTAGE KEY
+                |--------------------------------------------------------------------------
+                */
+    
+                $keystageKey =
+                    $keystageId
+                        ? 'keystage-' . $keystageId
+                        : 'no-keystage';
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | CREATE KEYSTAGE
+                |--------------------------------------------------------------------------
+                */
+    
+                if (!isset(
                     $data[$schoolId]
                         ['lots'][$lotKey]
                         ['keystages'][$keystageKey]
-                )
-            ) {
-
-                $data[$schoolId]
-                    ['lots'][$lotKey]
-                    ['keystages'][$keystageKey] = [
-
-                    'keystage_id' =>
-                        $keystageId,
-
-                    'label' =>
-                        $keystageLabel,
-
-                    'items' => [],
-
-                ];
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | ITEM
-            |--------------------------------------------------------------------------
-            */
-
-            $itemId = (int) $row->item_id;
-
-            $itemName = trim(
-                (string) (
-                    $row->item_name ?? ''
-                )
-            );
-
-            if (
-                $itemId <= 0 ||
-                $itemName === ''
-            ) {
-                continue;
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | QUANTITY
-            |--------------------------------------------------------------------------
-            */
-
-            $qty = (int) (
-                $row->total_qty ?? 0
-            );
-
-            if ($qty <= 0) {
-                continue;
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | ITEM KEY
-            |--------------------------------------------------------------------------
-            */
-
-            $itemKey =
-                'item-' . $itemId;
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | ADD / MERGE ITEM
-            |--------------------------------------------------------------------------
-            */
-
-            $items =& $data[$schoolId]
-                ['lots'][$lotKey]
-                ['keystages'][$keystageKey]
-                ['items'];
-
-
-            if (isset($items[$itemKey])) {
-
-                $items[$itemKey]['qty'] += $qty;
-
-            } else {
-
-                $items[$itemKey] = [
-
-                    'item_id' =>
-                        $itemId,
-
-                    'item_name' =>
-                        $itemName,
-
-                    'qty' =>
-                        $qty,
-
-                    'unit' =>
-                        $row->unit ?? '',
-
-                ];
-            }
-
-
-            unset($items);
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | 8. CLEAN EMPTY DATA
-        |--------------------------------------------------------------------------
-        */
-
-        foreach ($data as $schoolId => &$schoolData) {
-
-            foreach (
-                $schoolData['lots']
-                as $lotKey => &$lotData
-            ) {
-
-                foreach (
-                    $lotData['keystages']
-                    as $keystageKey => &$keystageData
-                ) {
-
-                    if (
-                        empty(
-                            $keystageData['items']
-                        )
-                    ) {
-
-                        unset(
-                            $lotData['keystages']
-                                [$keystageKey]
-                        );
-
-                        continue;
-                    }
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | REINDEX ITEMS
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $keystageData['items'] =
-                        array_values(
-                            $keystageData['items']
-                        );
+                )) {
+    
+                    $data[$schoolId]
+                        ['lots'][$lotKey]
+                        ['keystages'][$keystageKey] = [
+    
+                        'keystage_id' =>
+                            $keystageId,
+    
+                        'label' =>
+                            $keystageLabel,
+    
+                        'items' => [],
+    
+                    ];
                 }
-
-                unset($keystageData);
-
-
+    
+    
                 /*
                 |--------------------------------------------------------------------------
-                | REMOVE EMPTY LOT
+                | 10. GET PACKAGE CONTENT
                 |--------------------------------------------------------------------------
                 */
-
+    
+                $contents = DB::table(
+                    'package_content as pc'
+                )
+                    ->join(
+                        'item as i',
+                        'i.item_id',
+                        '=',
+                        'pc.item_id'
+                    )
+                    ->where(
+                        'pc.package_id',
+                        $packageId
+                    )
+                    ->select(
+                        'i.item_id',
+                        'i.item_name',
+                        'i.unit',
+                        'pc.qty'
+                    )
+                    ->get();
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | 11. PROCESS ITEMS
+                |--------------------------------------------------------------------------
+                */
+    
+                foreach ($contents as $content) {
+    
+                    $itemId = (int) $content->item_id;
+    
+                    if ($itemId <= 0) {
+                        continue;
+                    }
+    
+    
+                    $itemName = trim(
+                        (string) (
+                            $content->item_name ?? ''
+                        )
+                    );
+    
+                    if ($itemName === '') {
+                        continue;
+                    }
+    
+    
+                    /*
+                    |--------------------------------------------------------------------------
+                    | PACKAGE CONTENT QTY
+                    |--------------------------------------------------------------------------
+                    */
+    
+                    $contentQty = (int) (
+                        $content->qty ?? 1
+                    );
+    
+                    if ($contentQty <= 0) {
+                        $contentQty = 1;
+                    }
+    
+    
+                    /*
+                    |--------------------------------------------------------------------------
+                    | DELIVERY PACKAGE QTY
+                    |--------------------------------------------------------------------------
+                    */
+    
+                    $packageQty = (int) (
+                        $delivery->package_qty ?? 1
+                    );
+    
+                    if ($packageQty <= 0) {
+                        $packageQty = 1;
+                    }
+    
+    
+                    /*
+                    |--------------------------------------------------------------------------
+                    | FINAL QUANTITY
+                    |--------------------------------------------------------------------------
+                    */
+    
+                    $finalQty =
+                        $contentQty *
+                        $packageQty;
+    
+    
+                    if ($finalQty <= 0) {
+                        continue;
+                    }
+    
+    
+                    /*
+                    |--------------------------------------------------------------------------
+                    | ITEM KEY
+                    |--------------------------------------------------------------------------
+                    */
+    
+                    $itemKey =
+                        'item-' . $itemId;
+    
+    
+                    $items =& $data[$schoolId]
+                        ['lots'][$lotKey]
+                        ['keystages'][$keystageKey]
+                        ['items'];
+    
+    
+                    /*
+                    |--------------------------------------------------------------------------
+                    | MERGE
+                    |--------------------------------------------------------------------------
+                    */
+    
+                    if (isset($items[$itemKey])) {
+    
+                        $items[$itemKey]['qty'] +=
+                            $finalQty;
+    
+                    } else {
+    
+                        $items[$itemKey] = [
+    
+                            'item_id' =>
+                                $itemId,
+    
+                            'item_name' =>
+                                $itemName,
+    
+                            'qty' =>
+                                $finalQty,
+    
+                            'unit' =>
+                                $content->unit ?? '',
+    
+                        ];
+                    }
+    
+    
+                    unset($items);
+                }
+            }
+        }
+    
+    
+        /*
+        |--------------------------------------------------------------------------
+        | 12. REMOVE EMPTY DATA
+        |--------------------------------------------------------------------------
+        */
+    
+        foreach ($data as $schoolId => &$school) {
+    
+            foreach (
+                $school['lots']
+                as $lotKey => &$lot
+            ) {
+    
+                foreach (
+                    $lot['keystages']
+                    as $keystageKey => &$keystage
+                ) {
+    
+                    if (
+                        empty(
+                            $keystage['items']
+                        )
+                    ) {
+    
+                        unset(
+                            $lot['keystages']
+                                [$keystageKey]
+                        );
+                    }
+                }
+    
+                unset($keystage);
+    
+    
                 if (
                     empty(
-                        $lotData['keystages']
+                        $lot['keystages']
                     )
                 ) {
-
+    
                     unset(
-                        $schoolData['lots']
+                        $school['lots']
                             [$lotKey]
                     );
                 }
             }
-
-            unset($lotData);
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | REMOVE EMPTY SCHOOL
-            |--------------------------------------------------------------------------
-            */
-
+    
+            unset($lot);
+    
+    
             if (
                 empty(
-                    $schoolData['lots']
+                    $school['lots']
                 )
             ) {
-
+    
                 unset(
                     $data[$schoolId]
                 );
             }
         }
-
-        unset($schoolData);
-
-
+    
+        unset($school);
+    
+    
         /*
         |--------------------------------------------------------------------------
-        | 9. NO DATA
+        | 13. CHECK DATA
         |--------------------------------------------------------------------------
         */
-
+    
         if (empty($data)) {
-
+    
             abort(
                 404,
-                'No package data found for the selected deliveries.'
+                'No package items found for the selected DR.'
             );
         }
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
-        | 10. GENERATE PDF
+        | 14. PDF
         |--------------------------------------------------------------------------
         */
-
+    
         return Pdf::loadView(
             'deliveries.label-layout',
             [
-
                 'data' =>
                     $data,
-
+    
                 'showSchoolID' =>
                     $showSchoolID,
-
+    
                 'showMunicipality' =>
                     $showMunicipality,
-
+    
                 'showDivision' =>
                     $showDivision,
-
+    
                 'showRegion' =>
                     $showRegion,
-
             ]
         )
-
-        ->setPaper(
-            'a4',
-            'portrait'
-        )
-
-        ->stream(
-            'Packing_List_Batch_' .
-            now()->format('Ymd_His') .
-            '.pdf'
-        );
+            ->setPaper(
+                'a4',
+                'portrait'
+            )
+            ->stream(
+                'Packing_List_' .
+                now()->format('Ymd_His') .
+                '.pdf'
+            );
     }
 
 

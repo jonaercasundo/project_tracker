@@ -362,7 +362,7 @@ class QuotationController extends Controller
         $issued_at = now();
     
         return view(
-            'mi_app.quotation.print',
+            'mi_app.public.print',
             compact(
                 'product',
                 'quantity',

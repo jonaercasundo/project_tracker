@@ -172,7 +172,7 @@
 
             @if(!is_null($product->price ?? null))
                 <div class="pd-price">
-                    ₱{{ number_format($product->price, 2) }} <span class="unit">/ unit</span>
+                    ${{ number_format($product->price, 2) }} <span class="unit">/ unit</span>
                 </div>
             @else
                 <div class="pd-no-price">Price available upon request</div>
@@ -214,7 +214,7 @@
 
             <div class="pd-total-row">
                 <span>Estimated Total</span>
-                <span class="amt" id="pdTotalAmt">₱0.00</span>
+                <span class="amt" id="pdTotalAmt">$0.00</span>
             </div>
 
             <div class="pd-btn-row">
@@ -281,7 +281,7 @@
     const pdTotalAmt = document.getElementById('pdTotalAmt');
 
     function pdFormatCurrency(n) {
-        return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return '$' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function pdRecalcTotal() {

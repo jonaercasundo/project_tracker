@@ -220,7 +220,7 @@
                         <button
                             type="button"
                             class="tx-action-btn qr"
-                            data-qr-url="{{ route('mi_app.show', ['product' => $product->product_id]) }}"
+                            data-qr-url="{{ route('public.product.show', ['product' => $product->product_id]) }}"
                             data-qr-name="{{ $product->item_name }}"
                             data-qr-sub="{{ $product->sku ?? $product->product_id }}"
                             onclick="txOpenQrModal(this.dataset.qrUrl, this.dataset.qrName, this.dataset.qrSub)"

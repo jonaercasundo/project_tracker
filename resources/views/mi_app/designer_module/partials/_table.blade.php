@@ -46,6 +46,8 @@
     .tx-action-btn.view:hover { background: var(--tx-primary); color: var(--tx-primary-ink); }
     .tx-action-btn.edit { background: var(--tx-accent-soft); color: var(--tx-accent); }
     .tx-action-btn.edit:hover { background: var(--tx-accent); color: #fff; }
+    .tx-action-btn.qr { background: #E4EEF5; color: #2C6E8C; }
+    .tx-action-btn.qr:hover { background: #2C6E8C; color: #fff; }
     .tx-action-btn.archive { background: #F5E4E0; color: var(--tx-danger); }
     .tx-action-btn.archive:hover { background: var(--tx-danger); color: #fff; }
     .tx-action-btn svg { width: 0.9rem; height: 0.9rem; }
@@ -56,6 +58,83 @@
         color: var(--tx-ink-faint);
         font-size: 0.875rem;
     }
+
+    /* QR Modal */
+    .tx-qr-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(20, 20, 20, 0.55);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+    .tx-qr-modal-overlay.open { display: flex; }
+    .tx-qr-modal {
+        background: #fff;
+        border-radius: 14px;
+        padding: 1.75rem;
+        width: 100%;
+        max-width: 320px;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+        position: relative;
+        font-family: var(--tx-font-body);
+    }
+    .tx-qr-modal-close {
+        position: absolute;
+        top: 0.65rem;
+        right: 0.65rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--tx-ink-faint);
+        width: 1.75rem;
+        height: 1.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+    }
+    .tx-qr-modal-close:hover { background: var(--tx-bg); color: var(--tx-ink); }
+    .tx-qr-modal-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: var(--tx-ink);
+        margin: 0 0 0.15rem;
+    }
+    .tx-qr-modal-sub {
+        font-size: 0.75rem;
+        color: var(--tx-ink-faint);
+        margin: 0 0 1rem;
+        font-family: var(--tx-font-mono);
+    }
+    .tx-qr-canvas-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: var(--tx-bg);
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+    .tx-qr-download-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        width: 100%;
+        padding: 0.6rem 1rem;
+        border-radius: 8px;
+        border: none;
+        background: var(--tx-primary);
+        color: var(--tx-primary-ink);
+        font-weight: 600;
+        font-size: 0.8rem;
+        cursor: pointer;
+    }
+    .tx-qr-download-btn svg { width: 0.9rem; height: 0.9rem; }
 </style>
 
 <table class="tx-products-table">
@@ -123,6 +202,18 @@
                             Edit
                         </a>
 
+                        <button
+                            type="button"
+                            class="tx-action-btn qr"
+                            data-qr-url="{{ route('mi_app.show', ['product' => $product->product_id]) }}"
+                            data-qr-name="{{ $product->item_name }}"
+                            data-qr-sub="{{ $product->sku ?? $product->product_id }}"
+                            onclick="txOpenQrModal(this.dataset.qrUrl, this.dataset.qrName, this.dataset.qrSub)"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h6v6h-6v-6zM3.75 13.5h6v6h-6v-6zM13.5 4.5h6v6h-6v-6zM13.5 13.5h2.25v2.25H13.5v-2.25zM17.25 13.5h2.25v2.25h-2.25v-2.25zM13.5 17.25h2.25v2.25H13.5v-2.25zM17.25 17.25h2.25v2.25h-2.25v-2.25z" /></svg>
+                            QR
+                        </button>
+
                         <form action="{{ route('mi_app.destroy', $product->product_id) }}" method="POST" onsubmit="return confirm('Delete this product?')">
                             @csrf
                             @method('DELETE')
@@ -141,3 +232,69 @@
         @endforelse
     </tbody>
 </table>
+
+<!-- QR Modal (shared by all rows) -->
+<div class="tx-qr-modal-overlay" id="txQrModalOverlay" onclick="if(event.target === this) txCloseQrModal()">
+    <div class="tx-qr-modal">
+        <button type="button" class="tx-qr-modal-close" onclick="txCloseQrModal()" aria-label="Close">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+        <p class="tx-qr-modal-title" id="txQrModalTitle">Item Name</p>
+        <p class="tx-qr-modal-sub" id="txQrModalSub">SKU</p>
+        <div class="tx-qr-canvas-wrap" id="txQrCanvasWrap"></div>
+        <button type="button" class="tx-qr-download-btn" onclick="txDownloadQr()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+            Download PNG
+        </button>
+    </div>
+</div>
+
+@once
+    @push('scripts')
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        <script>
+            let txQrCurrentFileName = 'qr-code';
+
+            function txOpenQrModal(url, itemName, skuOrId) {
+                const overlay = document.getElementById('txQrModalOverlay');
+                const wrap = document.getElementById('txQrCanvasWrap');
+                const title = document.getElementById('txQrModalTitle');
+                const sub = document.getElementById('txQrModalSub');
+
+                title.textContent = itemName || 'Product';
+                sub.textContent = skuOrId || '';
+                txQrCurrentFileName = 'qr-' + (skuOrId || 'product').toString().replace(/[^a-z0-9\-_]+/gi, '-');
+
+                wrap.innerHTML = '';
+                new QRCode(wrap, {
+                    text: url,
+                    width: 200,
+                    height: 200,
+                    colorDark: '#141414',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+
+                overlay.classList.add('open');
+            }
+
+            function txCloseQrModal() {
+                document.getElementById('txQrModalOverlay').classList.remove('open');
+            }
+
+            function txDownloadQr() {
+                const wrap = document.getElementById('txQrCanvasWrap');
+                const canvas = wrap.querySelector('canvas');
+                if (!canvas) return;
+                const link = document.createElement('a');
+                link.download = txQrCurrentFileName + '.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') txCloseQrModal();
+            });
+        </script>
+    @endpush
+@endonce

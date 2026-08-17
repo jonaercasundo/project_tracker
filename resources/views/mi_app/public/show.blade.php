@@ -309,33 +309,25 @@ if (!name) {
 const form = document.createElement('form');
 
 form.method = 'POST';
-
-form.action = "{{ route('mi_app.quotation.print', $product->product_id) }}";
-
+form.action = PD_PRINT_URL;
 form.target = '_blank';
 
 const csrf = document.createElement('input');
-
 csrf.type = 'hidden';
 csrf.name = '_token';
 csrf.value = '{{ csrf_token() }}';
-
 form.appendChild(csrf);
 
 const nameInput = document.createElement('input');
-
 nameInput.type = 'hidden';
 nameInput.name = 'customer_name';
 nameInput.value = name;
-
 form.appendChild(nameInput);
 
 const qtyInput = document.createElement('input');
-
 qtyInput.type = 'hidden';
 qtyInput.name = 'quantity';
 qtyInput.value = qty;
-
 form.appendChild(qtyInput);
 
 document.body.appendChild(form);

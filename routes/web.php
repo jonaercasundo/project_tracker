@@ -27,6 +27,7 @@ use App\Http\Controllers\ITinventoryController;
 use App\Http\Controllers\Warehouse\WarehouseInventoryController;
 use App\Http\Controllers\DeliveryReceiveController;
 use App\Http\Controllers\MIAppController;
+use App\Http\Controllers\QuotationController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTE
@@ -430,7 +431,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_destroy'])
         ->name('taxonomy.destroy');
-
+    Route::post('/products/{product}/quotation', [QuotationController::class, 'download'])
+    ->name('mi_app.quotation.download');
     Route::get('/test-drive', function () {
         return view('test');
     });

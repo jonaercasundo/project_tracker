@@ -17,7 +17,7 @@
             --tx-accent: #C7703C;
             --tx-accent-soft: #F5E7DB;
             --tx-danger: #B3432E;
-            --tx-lvl-1: #2F5D50;
+            --tx-lvl-1:rgb(17, 104, 79);
             --tx-lvl-1-soft: #E5EEE9;
             --tx-lvl-2: #35618C;
             --tx-lvl-2-soft: #E3EBF2;
@@ -153,7 +153,54 @@
             background: var(--tx-primary); color: var(--tx-primary-ink); transition: all .15s ease;
         }
         .tx-btn-submit:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -10px var(--tx-primary); }
-    
+        /* Price */
+        .tx-price-wrap {
+            position: relative;
+        }
+
+        .tx-price-prefix {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-family: var(--tx-font-mono);
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--tx-ink-soft);
+            pointer-events: none;
+        }
+
+        .tx-price-field {
+            padding-left: 2.75rem !important;
+            font-family: var(--tx-font-mono);
+            font-weight: 600;
+        }
+
+        .tx-price-preview {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 1.15rem;
+            border: 1px solid var(--tx-line);
+            border-radius: 12px;
+            background: var(--tx-bg);
+        }
+
+        .tx-price-preview-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--tx-ink-soft);
+        }
+
+        .tx-price-preview-value {
+            font-family: var(--tx-font-mono);
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--tx-primary);
+        }
     </style>
 
     <div class="tx-console">
@@ -240,7 +287,8 @@
                                 <select name="category_id" id="category_id" data-cascade-target="sub_category_id" class="tx-field" required>
                                     <option value="">-- Select Category --</option>
                                     @foreach($categories as $category)
-                                        <option value="{{ $category->id }}" {{ $product->category_id == $category->id ? 'selected' : '' }}>
+                                        <option value="{{ $category->id }}"
+                                            {{ old('category_id', $product->category_id) == $category->id ? 'selected' : '' }}>
                                             {{ $category->code }} - {{ $category->name }}
                                         </option>
                                     @endforeach
@@ -256,11 +304,11 @@
                             <div class="tx-select-wrap">
                                 <select name="sub_category_id" id="sub_category_id" data-cascade-target="product_type_id" class="tx-field">
                                     @foreach($subCategories as $sub)
-                                        <option value="{{ $sub->id }}" data-parent="{{ $sub->category_id }}"
-                                            class="{{ $product->category_id == $sub->category_id ? '' : 'hidden' }}"
-                                            {{ $product->sub_category_id == $sub->id ? 'selected' : '' }}>
-                                            {{ $sub->code }} - {{ $sub->name }}
-                                        </option>
+                                    <option value="{{ $sub->id }}"
+                                        data-parent="{{ $sub->category_id }}"
+                                        {{ old('sub_category_id', $product->sub_category_id) == $sub->id ? 'selected' : '' }}>
+                                        {{ $sub->code }} - {{ $sub->name }}
+                                    </option>
                                     @endforeach
                                 </select>
                                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
@@ -275,11 +323,11 @@
                                 <select name="product_type_id" id="product_type_id" data-cascade-target="collection_id" class="tx-field">
                                     <option value="">Select</option>
                                     @foreach($productTypes as $type)
-                                        <option value="{{ $type->id }}" data-parent="{{ $type->sub_category_id }}"
-                                            class="{{ $product->sub_category_id == $type->sub_category_id ? '' : 'hidden' }}"
-                                            {{ $product->product_type_id == $type->id ? 'selected' : '' }}>
-                                            {{ $type->code }} - {{ $type->name }}
-                                        </option>
+                                    <option value="{{ $type->id }}"
+                                        data-parent="{{ $type->sub_category_id }}"
+                                        {{ old('product_type_id', $product->product_type_id) == $type->id ? 'selected' : '' }}>
+                                        {{ $type->code }} - {{ $type->name }}
+                                    </option>
                                     @endforeach
                                 </select>
                                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
@@ -294,11 +342,11 @@
                                 <select name="collection_id" id="collection_id" class="tx-field">
                                     <option value="">Select</option>
                                     @foreach($collections as $collection)
-                                        <option value="{{ $collection->id }}" data-parent="{{ $collection->product_type_id }}"
-                                            class="{{ $product->product_type_id == $collection->product_type_id ? '' : 'hidden' }}"
-                                            {{ $product->collection_id == $collection->id ? 'selected' : '' }}>
-                                            {{ $collection->code }} - {{ $collection->name }}
-                                        </option>
+                                    <option value="{{ $collection->id }}"
+                                        data-parent="{{ $collection->product_type_id }}"
+                                        {{ old('collection_id', $product->collection_id) == $collection->id ? 'selected' : '' }}>
+                                        {{ $collection->code }} - {{ $collection->name }}
+                                    </option>
                                     @endforeach
                                 </select>
                                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
@@ -408,11 +456,75 @@
                         </div>
                     </div>
                 </div>
+                {{-- SECTION 5: Pricing --}}
+                <div class="tx-card lvl-3">
+                    <div class="tx-card-head">
+                        <span class="tx-card-icon">05</span>
+                        <div>
+                            <h2>Pricing</h2>
+                            <p>Set the selling price for this product</p>
+                        </div>
+                    </div>
 
-                {{-- SECTION 5: Attributes & Media --}}
+                    <div class="tx-card-body cols-2">
+
+                        {{-- Price --}}
+                        <div>
+                            <label for="price" class="tx-label">
+                                Price
+                            </label>
+
+                            <div class="tx-price-wrap">
+                                <span class="tx-price-prefix">₱</span>
+
+                                <input
+                                    type="number"
+                                    id="price"
+                                    name="price"
+                                    value="{{ old('price', $product->price) }}"
+                                    class="tx-field tx-price-field"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    required
+                                >
+                            </div>
+
+                            <p class="tx-hint">
+                                Enter the selling price per unit.
+                            </p>
+                        </div>
+
+                        {{-- Price Preview --}}
+                        <div>
+                            <label class="tx-label">
+                                Current Price
+                            </label>
+
+                            <div class="tx-price-preview">
+                                <span class="tx-price-preview-label">
+                                    Unit Price
+                                </span>
+
+                                <span
+                                    class="tx-price-preview-value"
+                                    id="price-preview"
+                                >
+                                    ₱{{ number_format((float) old('price', $product->price), 2) }}
+                                </span>
+                            </div>
+
+                            <p class="tx-hint">
+                                Preview of the price that will be saved.
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+                {{-- SECTION 6: Attributes & Media --}}
                 <div class="tx-card">
                     <div class="tx-card-head">
-                        <span class="tx-card-icon" style="background: var(--tx-accent-soft); color: var(--tx-accent);">04</span>
+                        <span class="tx-card-icon" style="background: var(--tx-accent-soft); color: var(--tx-accent);">06</span>
                         <div>
                             <h2>Classification & Media</h2>
                             <p>Classification and product images</p>
@@ -577,9 +689,17 @@
                             <label for="image_links" class="tx-label">Image Links</label>
                             <p class="tx-hint">Add one or more direct image URLs.</p>
                             <div id="imageLinks">
-                                @php
-                                    $imageLinks = old('image_links', $product->images->pluck('image_url')->filter()->values()->all());
-                                @endphp
+                            @php
+                                $imageLinks = old(
+                                    'image_links',
+                                    $product->images
+                                        ->where('image_type', 'url')
+                                        ->pluck('image_url')
+                                        ->filter()
+                                        ->values()
+                                        ->all()
+                                );
+                            @endphp
                                 @if (is_array($imageLinks) && count($imageLinks))
                                     @foreach ($imageLinks as $link)
                                         <input type="url" name="image_links[]" value="{{ $link }}" placeholder="https://example.com/image.jpg" class="tx-field mb-2">
@@ -642,172 +762,812 @@
 
         </div>
     </div>
-<script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
-    <script>
-        function addImageLink() {
-            var container = document.getElementById('imageLinks');
-            var input = document.createElement('input');
-            input.type = 'url';
-            input.name = 'image_links[]';
-            input.placeholder = 'https://example.com/image.jpg';
-            input.className = 'tx-field mb-2';
-            container.appendChild(input);
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    /* ============================================================
+     * IMAGE LINKS
+     * ============================================================ */
+
+    window.addImageLink = function () {
+        const container = document.getElementById('imageLinks');
+
+        if (!container) {
+            return;
         }
 
-        (function () {
-            document.querySelectorAll('#taxonomy-section [data-cascade-target]').forEach(function (parentSelect) {
-                parentSelect.addEventListener('change', function () {
-                    cascadeFrom(parentSelect, true);
-                    updateTaxonomyPreview();
-                });
+        const input = document.createElement('input');
+
+        input.type = 'url';
+        input.name = 'image_links[]';
+        input.placeholder = 'https://example.com/image.jpg';
+        input.className = 'tx-field mb-2';
+
+        container.appendChild(input);
+
+        input.focus();
+    };
+
+
+    /* ============================================================
+     * TAXONOMY CASCADE
+     *
+     * Category
+     *     ↓
+     * Sub Category
+     *     ↓
+     * Sub Sub Category
+     *     ↓
+     * Collection
+     * ============================================================ */
+
+    const categorySelect = document.getElementById('category_id');
+    const subCategorySelect = document.getElementById('sub_category_id');
+    const productTypeSelect = document.getElementById('product_type_id');
+    const collectionSelect = document.getElementById('collection_id');
+    const previewPath = document.getElementById('taxonomy-preview-path');
+
+    if (
+        categorySelect &&
+        subCategorySelect &&
+        productTypeSelect &&
+        collectionSelect
+    ) {
+
+        function filterSelect(select, parentValue, selectedValue = null) {
+
+            if (!select) {
+                return;
+            }
+
+            const options = Array.from(select.options);
+
+            options.forEach(function (option) {
+
+                // Placeholder
+                if (!option.value) {
+                    option.hidden = false;
+                    option.disabled = false;
+                    return;
+                }
+
+                const optionParent = option.getAttribute('data-parent');
+
+                const belongs =
+                    optionParent !== null &&
+                    String(optionParent) === String(parentValue);
+
+                option.hidden = !belongs;
+                option.disabled = !belongs;
+
+                /*
+                 * If the option does not belong to the selected parent,
+                 * make sure it cannot remain selected.
+                 */
+                if (!belongs && option.selected) {
+                    option.selected = false;
+                }
             });
 
-            function cascadeFrom(parentSelect, resetValue) {
-                var targetId = parentSelect.getAttribute('data-cascade-target');
-                var target = document.getElementById(targetId);
-                if (!target) return;
+            /*
+             * Restore selected value only if it belongs to the
+             * currently selected parent.
+             */
+            if (selectedValue !== null && selectedValue !== '') {
 
-                var selectedParent = parentSelect.value;
-                if (resetValue) target.value = '';
-
-                Array.from(target.options).forEach(function (opt) {
-                    if (!opt.value) return;
-                    var belongs = opt.getAttribute('data-parent') === selectedParent;
-                    opt.classList.toggle('hidden', !belongs);
-                    opt.disabled = !belongs;
+                const matchingOption = options.find(function (option) {
+                    return (
+                        String(option.value) === String(selectedValue) &&
+                        String(option.getAttribute('data-parent')) === String(parentValue)
+                    );
                 });
 
-                var nextTargetId = target.getAttribute('data-cascade-target');
-                if (nextTargetId) {
-                    var nextTarget = document.getElementById(nextTargetId);
-                    if (nextTarget && resetValue) {
-                        nextTarget.value = '';
-                        Array.from(nextTarget.options).forEach(function (opt) {
-                            if (!opt.value) return;
-                            opt.classList.add('hidden');
-                            opt.disabled = true;
-                        });
-                    }
+                if (matchingOption) {
+                    select.value = selectedValue;
                 }
             }
+        }
 
-            var categorySelect = document.getElementById('category_id');
-            var subCategorySelect = document.getElementById('sub_category_id');
-            var productTypeSelect = document.getElementById('product_type_id');
-            var collectionSelect = document.getElementById('collection_id');
-            var previewPath = document.getElementById('taxonomy-preview-path');
 
-            function labelOf(select) {
-                var opt = select.options[select.selectedIndex];
-                return opt && opt.value ? opt.textContent.trim() : null;
+        function resetSelect(select, placeholder = 'Select') {
+
+            if (!select) {
+                return;
             }
 
-            function updateTaxonomyPreview() {
-                var parts = [categorySelect, subCategorySelect, productTypeSelect, collectionSelect]
-                    .map(labelOf)
-                    .filter(Boolean);
-                previewPath.textContent = parts.length ? parts.join('  →  ') : 'Select a category to begin';
-            }
+            select.value = '';
 
-            [categorySelect, subCategorySelect, productTypeSelect, collectionSelect].forEach(function (el) {
-                if (el) el.addEventListener('change', updateTaxonomyPreview);
+            Array.from(select.options).forEach(function (option) {
+
+                if (!option.value) {
+                    option.hidden = false;
+                    option.disabled = false;
+                    return;
+                }
+
+                option.hidden = true;
+                option.disabled = true;
+                option.selected = false;
             });
+        }
+
+
+        /*
+         * Initial values from the existing product.
+         *
+         * These are used ONLY during page initialization.
+         */
+        const initialSubCategory = @json(old('sub_category_id', $product->sub_category_id));
+        const initialProductType = @json(old('product_type_id', $product->product_type_id));
+        const initialCollection = @json(old('collection_id', $product->collection_id));
+
+
+        /*
+         * Initialize taxonomy in the correct order.
+         */
+        function initializeTaxonomy() {
+
+            const categoryValue = categorySelect.value;
+
+            /*
+             * Category → Sub Category
+             */
+            if (categoryValue) {
+
+                filterSelect(
+                    subCategorySelect,
+                    categoryValue,
+                    initialSubCategory
+                );
+
+                /*
+                 * Sub Category → Product Type
+                 */
+                const subCategoryValue = subCategorySelect.value;
+
+                if (subCategoryValue) {
+
+                    filterSelect(
+                        productTypeSelect,
+                        subCategoryValue,
+                        initialProductType
+                    );
+
+                    /*
+                     * Product Type → Collection
+                     */
+                    const productTypeValue = productTypeSelect.value;
+
+                    if (productTypeValue) {
+
+                        filterSelect(
+                            collectionSelect,
+                            productTypeValue,
+                            initialCollection
+                        );
+
+                    } else {
+                        resetSelect(collectionSelect);
+                    }
+
+                } else {
+
+                    resetSelect(productTypeSelect);
+                    resetSelect(collectionSelect);
+                }
+
+            } else {
+
+                resetSelect(subCategorySelect);
+                resetSelect(productTypeSelect);
+                resetSelect(collectionSelect);
+            }
 
             updateTaxonomyPreview();
-        })();
-    </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var materialsSelect = document.getElementById('materials');
-            if (materialsSelect) {
-                new TomSelect(materialsSelect, {
-                    plugins: ['remove_button'],
-                    create: false,
-                    maxItems: 100,
-                    hideSelected: true,
-                    closeAfterSelect: false,
-                    placeholder: 'Select one or more materials...'
-                });
+        }
+
+
+        /*
+         * Category changed
+         */
+        categorySelect.addEventListener('change', function () {
+
+            const categoryValue = this.value;
+
+            resetSelect(productTypeSelect);
+            resetSelect(collectionSelect);
+
+            if (categoryValue) {
+
+                filterSelect(
+                    subCategorySelect,
+                    categoryValue
+                );
+
+            } else {
+
+                resetSelect(subCategorySelect);
             }
 
-            var colorSelect = document.getElementById('color');
-            if (colorSelect) {
-                new TomSelect(colorSelect, {
-                    plugins: ['remove_button'],
-                    create: false,
-                    maxItems: 100,
-                    hideSelected: true,
-                    closeAfterSelect: false,
-                    placeholder: 'Select one or more colors...'
-                });
+            updateTaxonomyPreview();
+        });
+
+
+        /*
+         * Sub Category changed
+         */
+        subCategorySelect.addEventListener('change', function () {
+
+            const subCategoryValue = this.value;
+
+            resetSelect(collectionSelect);
+
+            if (subCategoryValue) {
+
+                filterSelect(
+                    productTypeSelect,
+                    subCategoryValue
+                );
+
+            } else {
+
+                resetSelect(productTypeSelect);
             }
 
-            document.querySelectorAll('select.tx-multi-select').forEach(function (select) {
-                var wrapper = select.closest('.tx-multi-select-wrap');
-                if (!wrapper) return;
+            updateTaxonomyPreview();
+        });
 
-                var chips = wrapper.querySelector('.tx-multi-chips');
-                var clearButton = wrapper.querySelector('.tx-multi-clear');
 
-                function updateChips() {
-                    if (!chips) return;
+        /*
+         * Product Type changed
+         */
+        productTypeSelect.addEventListener('change', function () {
 
-                    var selectedValues = Array.from(select.selectedOptions)
-                        .map(function (option) { return option.value; })
-                        .filter(Boolean);
+            const productTypeValue = this.value;
 
-                    chips.innerHTML = '';
-                    selectedValues.forEach(function (value) {
-                        var chip = document.createElement('span');
-                        chip.className = 'tx-multi-chip';
-                        chip.innerHTML = '<span>' + value + '</span><button type="button" aria-label="Remove ' + value + '">&times;</button>';
+            if (productTypeValue) {
 
-                        chip.querySelector('button').addEventListener('click', function (event) {
-                            event.preventDefault();
-                            if (select.tomselect) {
-                                select.tomselect.removeItem(value);
-                            } else {
-                                Array.from(select.options).forEach(function (option) {
-                                    if (option.value === value) {
-                                        option.selected = false;
-                                    }
-                                });
-                            }
-                            window.setTimeout(updateChips, 0);
-                        });
+                filterSelect(
+                    collectionSelect,
+                    productTypeValue
+                );
 
-                        chips.appendChild(chip);
-                    });
+            } else {
 
-                    if (clearButton) {
-                        clearButton.style.display = selectedValues.length ? 'inline-flex' : 'none';
+                resetSelect(collectionSelect);
+            }
+
+            updateTaxonomyPreview();
+        });
+
+
+        /*
+         * Collection changed
+         */
+        collectionSelect.addEventListener('change', function () {
+            updateTaxonomyPreview();
+        });
+
+
+        /*
+         * Get selected option label.
+         */
+        function labelOf(select) {
+
+            if (!select || !select.value) {
+                return null;
+            }
+
+            const option =
+                select.options[select.selectedIndex];
+
+            if (!option) {
+                return null;
+            }
+
+            return option.textContent.trim();
+        }
+
+
+        /*
+         * Update taxonomy preview.
+         */
+        function updateTaxonomyPreview() {
+
+            if (!previewPath) {
+                return;
+            }
+
+            const parts = [
+                categorySelect,
+                subCategorySelect,
+                productTypeSelect,
+                collectionSelect
+            ]
+                .map(labelOf)
+                .filter(Boolean);
+
+            previewPath.textContent =
+                parts.length
+                    ? parts.join('  →  ')
+                    : 'Select a category to begin';
+        }
+
+
+        /*
+         * Initialize edit values.
+         */
+        initializeTaxonomy();
+    }
+
+
+    /* ============================================================
+     * TOM SELECT
+     * ============================================================ */
+
+    const materialsSelect =
+        document.getElementById('materials');
+
+    const colorSelect =
+        document.getElementById('color');
+
+
+    let materialsTomSelect = null;
+    let colorTomSelect = null;
+
+
+    if (materialsSelect) {
+
+        materialsTomSelect = new TomSelect(
+            materialsSelect,
+            {
+                plugins: {
+                    remove_button: {
+                        title: 'Remove this material'
+                    }
+                },
+
+                create: false,
+
+                maxItems: 100,
+
+                hideSelected: true,
+
+                closeAfterSelect: false,
+
+                allowEmptyOption: true,
+
+                placeholder:
+                    'Select one or more materials...',
+
+                /*
+                 * Keeps optgroups visible.
+                 */
+                render: {
+                    optgroup_header: function (data, escape) {
+
+                        return `
+                            <div class="optgroup-header">
+                                ${escape(data.label)}
+                            </div>
+                        `;
                     }
                 }
+            }
+        );
+    }
 
-                select.addEventListener('change', function () {
-                    window.setTimeout(updateChips, 0);
-                });
-                if (select.tomselect) {
-                    select.tomselect.on('item_add item_remove', function () {
-                        window.setTimeout(updateChips, 0);
-                    });
+
+    if (colorSelect) {
+
+        colorTomSelect = new TomSelect(
+            colorSelect,
+            {
+                plugins: {
+                    remove_button: {
+                        title: 'Remove this color'
+                    }
+                },
+
+                create: false,
+
+                maxItems: 100,
+
+                hideSelected: true,
+
+                closeAfterSelect: false,
+
+                allowEmptyOption: true,
+
+                placeholder:
+                    'Select one or more colors...',
+
+                render: {
+                    optgroup_header: function (data, escape) {
+
+                        return `
+                            <div class="optgroup-header">
+                                ${escape(data.label)}
+                            </div>
+                        `;
+                    }
                 }
-                if (clearButton) {
-                    clearButton.addEventListener('click', function (event) {
+            }
+        );
+    }
+
+
+    /* ============================================================
+     * CUSTOM CHIPS
+     * ============================================================ */
+
+    function initializeChips(select) {
+
+        if (!select) {
+            return;
+        }
+
+        const wrapper =
+            select.closest('.tx-multi-select-wrap');
+
+        if (!wrapper) {
+            return;
+        }
+
+        const chips =
+            wrapper.querySelector('.tx-multi-chips');
+
+        const clearButton =
+            wrapper.querySelector('.tx-multi-clear');
+
+        if (!chips) {
+            return;
+        }
+
+
+        function updateChips() {
+
+            const selectedValues =
+                Array.from(select.selectedOptions)
+                    .map(function (option) {
+                        return option.value;
+                    })
+                    .filter(Boolean);
+
+
+            chips.innerHTML = '';
+
+
+            selectedValues.forEach(function (value) {
+
+                const chip =
+                    document.createElement('span');
+
+                chip.className =
+                    'tx-multi-chip';
+
+
+                const text =
+                    document.createElement('span');
+
+                text.textContent = value;
+
+
+                const removeButton =
+                    document.createElement('button');
+
+                removeButton.type = 'button';
+
+                removeButton.innerHTML = '&times;';
+
+                removeButton.setAttribute(
+                    'aria-label',
+                    'Remove ' + value
+                );
+
+
+                removeButton.addEventListener(
+                    'click',
+                    function (event) {
+
                         event.preventDefault();
+
+                        /*
+                         * Use TomSelect when available.
+                         */
                         if (select.tomselect) {
-                            select.tomselect.clear();
+
+                            select.tomselect.removeItem(
+                                value
+                            );
+
                         } else {
-                            Array.from(select.options).forEach(function (option) {
-                                option.selected = false;
+
+                            Array.from(
+                                select.options
+                            ).forEach(function (option) {
+
+                                if (
+                                    option.value === value
+                                ) {
+                                    option.selected = false;
+                                }
+
                             });
+
+                            select.dispatchEvent(
+                                new Event('change', {
+                                    bubbles: true
+                                })
+                            );
                         }
-                        window.setTimeout(updateChips, 0);
-                    });
+                    }
+                );
+
+
+                chip.appendChild(text);
+                chip.appendChild(removeButton);
+
+                chips.appendChild(chip);
+            });
+
+
+            /*
+             * Show / hide Clear button.
+             */
+            if (clearButton) {
+
+                clearButton.style.display =
+                    selectedValues.length
+                        ? 'inline-flex'
+                        : 'none';
+            }
+        }
+
+
+        /*
+         * Normal select change.
+         */
+        select.addEventListener(
+            'change',
+            updateChips
+        );
+
+
+        /*
+         * TomSelect events.
+         */
+        if (select.tomselect) {
+
+            select.tomselect.on(
+                'item_add',
+                updateChips
+            );
+
+            select.tomselect.on(
+                'item_remove',
+                updateChips
+            );
+
+            select.tomselect.on(
+                'clear',
+                updateChips
+            );
+        }
+
+
+        /*
+         * Clear button.
+         */
+        if (clearButton) {
+
+            clearButton.addEventListener(
+                'click',
+                function (event) {
+
+                    event.preventDefault();
+
+                    if (select.tomselect) {
+
+                        select.tomselect.clear();
+
+                    } else {
+
+                        Array.from(
+                            select.options
+                        ).forEach(function (option) {
+
+                            option.selected = false;
+
+                        });
+
+                        select.dispatchEvent(
+                            new Event('change', {
+                                bubbles: true
+                            })
+                        );
+                    }
+
+                    updateChips();
+                }
+            );
+        }
+
+
+        /*
+         * Initial render.
+         */
+        updateChips();
+    }
+
+
+    initializeChips(materialsSelect);
+    initializeChips(colorSelect);
+
+
+    /* ============================================================
+     * PRICE PREVIEW
+     * ============================================================ */
+
+    const priceInput =
+        document.getElementById('price');
+
+    const pricePreview =
+        document.getElementById('price-preview');
+
+
+    if (priceInput && pricePreview) {
+
+        function updatePricePreview() {
+
+            let value =
+                parseFloat(priceInput.value);
+
+
+            if (
+                Number.isNaN(value) ||
+                value < 0
+            ) {
+                value = 0;
+            }
+
+
+            pricePreview.textContent =
+                '₱' +
+                value.toLocaleString(
+                    'en-PH',
+                    {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }
+                );
+        }
+
+
+        priceInput.addEventListener(
+            'input',
+            updatePricePreview
+        );
+
+
+        priceInput.addEventListener(
+            'change',
+            updatePricePreview
+        );
+
+
+        updatePricePreview();
+    }
+
+
+    /* ============================================================
+     * FORM SUBMISSION PROTECTION
+     *
+     * Prevent accidental double submission.
+     * ============================================================ */
+
+    const form =
+        document.getElementById('edit_product_form');
+
+
+    if (form) {
+
+        form.addEventListener(
+            'submit',
+            function () {
+
+                const submitButton =
+                    form.querySelector(
+                        '.tx-btn-submit'
+                    );
+
+                if (!submitButton) {
+                    return;
                 }
 
-                updateChips();
-            });
-        });
-    </script>
+
+                /*
+                 * Prevent multiple clicks.
+                 */
+                if (submitButton.dataset.submitted === '1') {
+                    return;
+                }
+
+
+                submitButton.dataset.submitted = '1';
+
+                submitButton.disabled = true;
+
+                submitButton.style.opacity = '0.7';
+
+                submitButton.style.cursor = 'not-allowed';
+
+
+                /*
+                 * Keep the icon and change text.
+                 */
+                const originalHtml =
+                    submitButton.innerHTML;
+
+                submitButton.dataset.originalHtml =
+                    originalHtml;
+
+
+                submitButton.innerHTML = `
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M12 6v6l4 2"
+                        />
+                    </svg>
+                    Updating...
+                `;
+            }
+        );
+    }
+
+
+    /* ============================================================
+     * IMAGE URL VALIDATION
+     * ============================================================ */
+
+    const imageLinksContainer =
+        document.getElementById('imageLinks');
+
+
+    if (imageLinksContainer) {
+
+        imageLinksContainer.addEventListener(
+            'input',
+            function (event) {
+
+                if (
+                    event.target &&
+                    event.target.matches(
+                        'input[name="image_links[]"]'
+                    )
+                ) {
+
+                    /*
+                     * Remove accidental whitespace.
+                     */
+                    event.target.value =
+                        event.target.value.trim();
+                }
+            }
+        );
+    }
+
+});
+</script>
 </x-mi_app>

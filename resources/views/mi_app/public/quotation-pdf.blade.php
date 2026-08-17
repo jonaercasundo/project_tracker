@@ -37,7 +37,7 @@
         <tr>
             <td class="company-name">
                 {{-- Swap in your actual company name / logo <img> tag here --}}
-                Your Company Name
+                Metroinc
             </td>
             <td class="quote-label">QUOTATION</td>
         </tr>

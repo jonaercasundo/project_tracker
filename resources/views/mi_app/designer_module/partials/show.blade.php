@@ -1,96 +1,153 @@
-@extends('layouts.app') {{-- adjust to your actual layout --}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ $product->item_name }} — Product Details</title>
+    <style>
+        :root {
+            --pd-primary: #2C6E8C;
+            --pd-primary-soft: #E4EEF5;
+            --pd-ink: #1a1a1a;
+            --pd-ink-faint: #888;
+            --pd-line: #e5e5e5;
+            --pd-bg: #f7f8f9;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--pd-bg);
+            color: var(--pd-ink);
+        }
 
-@section('content')
-<style>
-    .pd-wrap { max-width: 480px; margin: 0 auto; padding: 1.25rem 1rem 3rem; font-family: var(--tx-font-body, sans-serif); }
+        .pd-wrap { max-width: 480px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
 
-    .pd-card {
-        background: #fff;
-        border: 1px solid var(--tx-line, #e5e5e5);
-        border-radius: 14px;
-        overflow: hidden;
-        margin-bottom: 1.25rem;
-    }
-    .pd-image-wrap { width: 100%; aspect-ratio: 4 / 3; background: var(--tx-bg, #f5f5f5); display: flex; align-items: center; justify-content: center; }
-    .pd-image-wrap img { width: 100%; height: 100%; object-fit: cover; }
-    .pd-body { padding: 1.25rem; }
+        .pd-card {
+            background: #fff;
+            border: 1px solid var(--pd-line);
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 1.25rem;
+        }
+        .pd-image-wrap { width: 100%; aspect-ratio: 4 / 3; background: var(--pd-bg); display: flex; align-items: center; justify-content: center; }
+        .pd-image-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .pd-image-placeholder { color: var(--pd-ink-faint); font-size: 0.8rem; }
+        .pd-body { padding: 1.25rem; }
 
-    .pd-sku-chip {
-        display: inline-flex; font-family: var(--tx-font-mono, monospace); font-size: 0.75rem;
-        font-weight: 600; color: var(--tx-primary, #2C6E8C); background: var(--tx-primary-soft, #E4EEF5);
-        padding: 0.3rem 0.6rem; border-radius: 7px; margin-bottom: 0.6rem;
-    }
-    .pd-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 0.4rem; color: var(--tx-ink, #1a1a1a); }
-    .pd-taxo { font-size: 0.8rem; color: var(--tx-ink-faint, #888); margin-bottom: 0.75rem; }
-    .pd-price { font-size: 1.4rem; font-weight: 700; color: var(--tx-ink, #1a1a1a); }
-    .pd-price .unit { font-size: 0.75rem; font-weight: 500; color: var(--tx-ink-faint, #888); }
+        .pd-ref-chip {
+            display: inline-flex; font-family: 'SF Mono', Consolas, monospace; font-size: 0.75rem;
+            font-weight: 600; color: var(--pd-primary); background: var(--pd-primary-soft);
+            padding: 0.3rem 0.6rem; border-radius: 7px; margin-bottom: 0.6rem;
+        }
+        .pd-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 0.4rem; }
+        .pd-taxo { font-size: 0.8rem; color: var(--pd-ink-faint); margin: 0 0 0.75rem; }
+        .pd-description { font-size: 0.85rem; line-height: 1.5; color: var(--pd-ink); margin: 0 0 0.9rem; }
+        .pd-price { font-size: 1.4rem; font-weight: 700; }
+        .pd-price .unit { font-size: 0.75rem; font-weight: 500; color: var(--pd-ink-faint); }
+        .pd-no-price { font-size: 0.85rem; color: var(--pd-ink-faint); font-style: italic; }
 
-    .pd-section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tx-ink-faint, #888); margin: 0 0 0.75rem; }
+        .pd-specs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--pd-line); }
+        .pd-spec-item { font-size: 0.78rem; }
+        .pd-spec-label { color: var(--pd-ink-faint); display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.1rem; }
 
-    .pd-field { margin-bottom: 0.9rem; }
-    .pd-field label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--tx-ink, #1a1a1a); margin-bottom: 0.3rem; }
-    .pd-field input {
-        width: 100%; box-sizing: border-box; padding: 0.65rem 0.8rem; font-size: 0.9rem;
-        border: 1px solid var(--tx-line, #ddd); border-radius: 8px; font-family: inherit;
-    }
-    .pd-field input:focus { outline: none; border-color: var(--tx-primary, #2C6E8C); }
+        .pd-section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pd-ink-faint); margin: 0 0 0.75rem; }
 
-    .pd-total-row {
-        display: flex; justify-content: space-between; align-items: center;
-        padding-top: 0.9rem; margin-top: 0.4rem; border-top: 1px dashed var(--tx-line, #ddd);
-        font-size: 0.9rem; font-weight: 700; color: var(--tx-ink, #1a1a1a);
-    }
-    .pd-total-row span.amt { font-size: 1.1rem; }
+        .pd-field { margin-bottom: 0.9rem; }
+        .pd-field label { display: block; font-size: 0.78rem; font-weight: 600; margin-bottom: 0.3rem; }
+        .pd-field input {
+            width: 100%; padding: 0.65rem 0.8rem; font-size: 0.9rem;
+            border: 1px solid var(--pd-line); border-radius: 8px; font-family: inherit;
+        }
+        .pd-field input:focus { outline: none; border-color: var(--pd-primary); }
 
-    .pd-btn-row { display: flex; gap: 0.6rem; margin-top: 1.1rem; }
-    .pd-btn {
-        flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
-        padding: 0.75rem 1rem; border-radius: 9px; font-size: 0.85rem; font-weight: 700;
-        border: none; cursor: pointer; text-decoration: none;
-    }
-    .pd-btn svg { width: 1rem; height: 1rem; }
-    .pd-btn.primary { background: var(--tx-primary, #2C6E8C); color: #fff; }
-    .pd-btn.primary:hover { opacity: 0.92; }
-    .pd-btn.secondary { background: var(--tx-bg, #f2f2f2); color: var(--tx-ink, #1a1a1a); border: 1px solid var(--tx-line, #ddd); }
-    .pd-btn.secondary:hover { background: var(--tx-line, #e5e5e5); }
+        .pd-total-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding-top: 0.9rem; margin-top: 0.4rem; border-top: 1px dashed var(--pd-line);
+            font-size: 0.9rem; font-weight: 700;
+        }
+        .pd-total-row span.amt { font-size: 1.1rem; }
 
-    .pd-note { font-size: 0.72rem; color: var(--tx-ink-faint, #999); text-align: center; margin-top: 0.75rem; }
+        .pd-btn-row { display: flex; gap: 0.6rem; margin-top: 1.1rem; }
+        .pd-btn {
+            flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+            padding: 0.75rem 1rem; border-radius: 9px; font-size: 0.85rem; font-weight: 700;
+            border: none; cursor: pointer; text-decoration: none;
+        }
+        .pd-btn svg { width: 1rem; height: 1rem; }
+        .pd-btn.primary { background: var(--pd-primary); color: #fff; }
+        .pd-btn.primary:hover { opacity: 0.92; }
+        .pd-btn.secondary { background: var(--pd-bg); color: var(--pd-ink); border: 1px solid var(--pd-line); }
+        .pd-btn.secondary:hover { background: var(--pd-line); }
 
-    /* Print-only quote sheet, hidden on screen */
-    #pdPrintSheet { display: none; }
+        .pd-note { font-size: 0.72rem; color: var(--pd-ink-faint); text-align: center; margin-top: 0.75rem; }
+        .pd-footer { text-align: center; font-size: 0.72rem; color: var(--pd-ink-faint); margin-top: 1.5rem; }
 
-    @media print {
-        body * { visibility: hidden; }
-        #pdPrintSheet, #pdPrintSheet * { visibility: visible; }
-        #pdPrintSheet { display: block; position: absolute; top: 0; left: 0; width: 100%; padding: 1.5rem; }
-        .pd-btn-row, .pd-note { display: none !important; }
-    }
-</style>
+        #pdPrintSheet { display: none; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #pdPrintSheet, #pdPrintSheet * { visibility: visible; }
+            #pdPrintSheet { display: block; position: absolute; top: 0; left: 0; width: 100%; padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+@php
+    $mainImage = $product->images->first();
+@endphp
 
 <div class="pd-wrap">
 
     <div class="pd-card">
-        @if($product->image_path ?? false)
-            <div class="pd-image-wrap">
-                <img src="{{ asset('storage/' . $product->image_path) }}" alt="{{ $product->item_name }}">
-            </div>
-        @endif
+        <div class="pd-image-wrap">
+            @if($mainImage)
+                <img src="{{ asset('storage/' . $mainImage->path) }}" alt="{{ $product->item_name }}">
+            @else
+                <span class="pd-image-placeholder">No image available</span>
+            @endif
+        </div>
 
         <div class="pd-body">
-            <span class="pd-sku-chip">{{ $product->sku ?? '—' }}</span>
+            <span class="pd-ref-chip">Ref. PID-{{ $product->product_id }}</span>
             <h1 class="pd-title">{{ $product->item_name }}</h1>
             <p class="pd-taxo">
                 {{ collect([$product->category->name ?? null, $product->subCategory->name ?? null, $product->collection->name ?? null])->filter()->implode(' · ') ?: 'Uncategorized' }}
             </p>
 
+            @if($product->description)
+                <p class="pd-description">{{ $product->description }}</p>
+            @endif
+
             @if(!is_null($product->price ?? null))
                 <div class="pd-price">
                     ₱{{ number_format($product->price, 2) }} <span class="unit">/ unit</span>
+                </div>
+            @else
+                <div class="pd-no-price">Price available upon request</div>
+            @endif
+
+            @if($product->product_height || $product->product_width || $product->product_length)
+                <div class="pd-specs">
+                    @if($product->product_height)
+                        <div class="pd-spec-item"><span class="pd-spec-label">Height</span>{{ $product->product_height }} cm</div>
+                    @endif
+                    @if($product->product_width)
+                        <div class="pd-spec-item"><span class="pd-spec-label">Width</span>{{ $product->product_width }} cm</div>
+                    @endif
+                    @if($product->product_length)
+                        <div class="pd-spec-item"><span class="pd-spec-label">Length</span>{{ $product->product_length }} cm</div>
+                    @endif
+                    @if($product->product_depth)
+                        <div class="pd-spec-item"><span class="pd-spec-label">Depth</span>{{ $product->product_depth }} cm</div>
+                    @endif
                 </div>
             @endif
         </div>
     </div>
 
+    @if(!is_null($product->price ?? null))
     <div class="pd-card">
         <div class="pd-body">
             <p class="pd-section-title">Request a Quotation</p>
@@ -124,13 +181,16 @@
             <p class="pd-note">Quotation is valid for 30 days from the date issued.</p>
         </div>
     </div>
+    @endif
+
+    <p class="pd-footer">Scanned from product tag &middot; Ref. PID-{{ $product->product_id }}</p>
 
 </div>
 
 {{-- Hidden sheet used only when printing --}}
 <div id="pdPrintSheet">
     <h2 style="margin:0 0 4px;">{{ $product->item_name }}</h2>
-    <p style="font-family:monospace; color:#666; margin:0 0 16px;">{{ $product->sku ?? '—' }}</p>
+    <p style="font-family:monospace; color:#666; margin:0 0 16px;">PID-{{ $product->product_id }}</p>
     <table style="width:100%; border-collapse:collapse; font-size:13px;">
         <tr><td style="padding:6px 0; color:#666;">Customer</td><td id="pdPrintCustomer" style="padding:6px 0; text-align:right;"></td></tr>
         <tr><td style="padding:6px 0; color:#666;">Quantity</td><td id="pdPrintQty" style="padding:6px 0; text-align:right;"></td></tr>
@@ -139,9 +199,9 @@
     </table>
 </div>
 
-@push('scripts')
+@if(!is_null($product->price ?? null))
 <script>
-    const PD_UNIT_PRICE = {{ (float) ($product->price ?? 0) }};
+    const PD_UNIT_PRICE = {{ (float) $product->price }};
     const PD_DOWNLOAD_URL = "{{ route('mi_app.quotation.download', $product->product_id) }}";
 
     const pdQtyInput = document.getElementById('pdQuantity');
@@ -186,7 +246,6 @@
             return;
         }
 
-        // Submit as a real POST so the browser downloads the PDF response directly.
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = PD_DOWNLOAD_URL;
@@ -214,5 +273,7 @@
         form.remove();
     }
 </script>
-@endpush
-@endsection
+@endif
+
+</body>
+</html>

@@ -119,22 +119,37 @@
         border-radius: 10px;
         margin-bottom: 1rem;
     }
-    .tx-qr-download-btn {
+    .tx-qr-btn-row {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .tx-qr-download-btn,
+    .tx-qr-print-btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 0.4rem;
-        width: 100%;
+        flex: 1;
         padding: 0.6rem 1rem;
         border-radius: 8px;
         border: none;
-        background: var(--tx-primary);
-        color: var(--tx-primary-ink);
         font-weight: 600;
         font-size: 0.8rem;
         cursor: pointer;
     }
-    .tx-qr-download-btn svg { width: 0.9rem; height: 0.9rem; }
+    .tx-qr-download-btn { background: var(--tx-primary); color: var(--tx-primary-ink); }
+    .tx-qr-download-btn:hover { opacity: 0.9; }
+    .tx-qr-print-btn { background: var(--tx-bg); color: var(--tx-ink); border: 1px solid var(--tx-line); }
+    .tx-qr-print-btn:hover { background: var(--tx-line); }
+    .tx-qr-download-btn svg,
+    .tx-qr-print-btn svg { width: 0.9rem; height: 0.9rem; }
+
+    .tx-empty-row td {
+        padding: 3.5rem 1.25rem;
+        text-align: center;
+        color: var(--tx-ink-faint);
+        font-size: 0.875rem;
+    }
 </style>
 
 <table class="tx-products-table">
@@ -242,10 +257,16 @@
         <p class="tx-qr-modal-title" id="txQrModalTitle">Item Name</p>
         <p class="tx-qr-modal-sub" id="txQrModalSub">SKU</p>
         <div class="tx-qr-canvas-wrap" id="txQrCanvasWrap"></div>
-        <button type="button" class="tx-qr-download-btn" onclick="txDownloadQr()">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-            Download PNG
-        </button>
+        <div class="tx-qr-btn-row">
+            <button type="button" class="tx-qr-download-btn" onclick="txDownloadQr()">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                Download
+            </button>
+            <button type="button" class="tx-qr-print-btn" onclick="txPrintQr()">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" /></svg>
+                Print
+            </button>
+        </div>
     </div>
 </div>
 
@@ -254,6 +275,8 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
         <script>
             let txQrCurrentFileName = 'qr-code';
+            let txQrCurrentName = '';
+            let txQrCurrentSub = '';
 
             function txOpenQrModal(url, itemName, skuOrId) {
                 const overlay = document.getElementById('txQrModalOverlay');
@@ -263,6 +286,8 @@
 
                 title.textContent = itemName || 'Product';
                 sub.textContent = skuOrId || '';
+                txQrCurrentName = itemName || 'Product';
+                txQrCurrentSub = skuOrId || '';
                 txQrCurrentFileName = 'qr-' + (skuOrId || 'product').toString().replace(/[^a-z0-9\-_]+/gi, '-');
 
                 wrap.innerHTML = '';
@@ -282,14 +307,69 @@
                 document.getElementById('txQrModalOverlay').classList.remove('open');
             }
 
-            function txDownloadQr() {
+            function txGetQrDataUrl() {
                 const wrap = document.getElementById('txQrCanvasWrap');
                 const canvas = wrap.querySelector('canvas');
-                if (!canvas) return;
+                return canvas ? canvas.toDataURL('image/png') : null;
+            }
+
+            function txDownloadQr() {
+                const dataUrl = txGetQrDataUrl();
+                if (!dataUrl) return;
                 const link = document.createElement('a');
                 link.download = txQrCurrentFileName + '.png';
-                link.href = canvas.toDataURL('image/png');
+                link.href = dataUrl;
                 link.click();
+            }
+
+            function txPrintQr() {
+                const dataUrl = txGetQrDataUrl();
+                if (!dataUrl) return;
+
+                const printWindow = window.open('', '_blank', 'width=420,height=560');
+                if (!printWindow) {
+                    alert('Please allow pop-ups to print the QR code.');
+                    return;
+                }
+
+                const safeName = txQrCurrentName.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeSub = txQrCurrentSub.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Print QR - ${safeName}</title>
+                        <style>
+                            @page { margin: 0.5in; }
+                            body {
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                justify-content: center;
+                                text-align: center;
+                                margin: 0;
+                                padding: 2rem;
+                            }
+                            img { width: 260px; height: 260px; }
+                            h1 { font-size: 1rem; margin: 1rem 0 0.15rem; }
+                            p { font-size: 0.8rem; color: #666; margin: 0; font-family: monospace; }
+                        </style>
+                    </head>
+                    <body>
+                        <img src="${dataUrl}" alt="QR code" />
+                        <h1>${safeName}</h1>
+                        <p>${safeSub}</p>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+
+                printWindow.onload = function () {
+                    printWindow.focus();
+                    printWindow.print();
+                };
             }
 
             document.addEventListener('keydown', function (e) {

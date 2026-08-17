@@ -361,6 +361,104 @@ class QuotationController extends Controller
     
         $issued_at = now();
     
+    
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCT IMAGE
+        |--------------------------------------------------------------------------
+        */
+    
+        $product_image = null;
+    
+        $image = $product->images->first();
+    
+        if ($image) {
+    
+            /*
+            |--------------------------------------------------------------------------
+            | Uploaded image
+            |--------------------------------------------------------------------------
+            */
+    
+            if (
+                $image->image_type === 'upload'
+                && !empty($image->image_path)
+            ) {
+    
+                $product_image = public_path(
+                    'storage/' . $image->image_path
+                );
+    
+            }
+    
+            /*
+            |--------------------------------------------------------------------------
+            | External image / Google Drive
+            |--------------------------------------------------------------------------
+            */
+    
+            elseif (!empty($image->image_url)) {
+    
+                $url = trim($image->image_url);
+    
+                // Google Drive: /file/d/FILE_ID/
+                if (
+                    preg_match(
+                        '#drive\.google\.com/file/d/([^/]+)#',
+                        $url,
+                        $matches
+                    )
+                ) {
+    
+                    $product_image =
+                        'https://drive.google.com/thumbnail?id='
+                        . $matches[1]
+                        . '&sz=w1600';
+    
+                }
+    
+                // Google Drive: ?id=FILE_ID
+                elseif (
+                    preg_match(
+                        '/drive\.google\.com\/open\?id=([^&]+)/',
+                        $url,
+                        $matches
+                    )
+                ) {
+    
+                    $product_image =
+                        'https://drive.google.com/thumbnail?id='
+                        . $matches[1]
+                        . '&sz=w1600';
+    
+                }
+    
+                // Google Drive: uc?id=FILE_ID
+                elseif (
+                    preg_match(
+                        '/drive\.google\.com\/uc\?.*id=([^&]+)/',
+                        $url,
+                        $matches
+                    )
+                ) {
+    
+                    $product_image =
+                        'https://drive.google.com/thumbnail?id='
+                        . $matches[1]
+                        . '&sz=w1600';
+    
+                }
+    
+                // Normal external image URL
+                else {
+    
+                    $product_image = $url;
+    
+                }
+            }
+        }
+    
+    
         return view(
             'mi_app.public.print',
             compact(
@@ -371,7 +469,8 @@ class QuotationController extends Controller
                 'subtotal',
                 'total',
                 'quote_number',
-                'issued_at'
+                'issued_at',
+                'product_image'
             )
         );
     }

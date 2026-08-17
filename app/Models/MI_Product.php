@@ -41,6 +41,7 @@ class MI_Product extends Model
         'carton_length',
         'carton_depth',
 
+        'price',
         'purchase_cost',
 
         'product_file',
@@ -61,6 +62,7 @@ class MI_Product extends Model
         'carton_length' => 'decimal:2',
         'carton_depth' => 'decimal:2',
 
+        'price' => 'decimal:2',
         'purchase_cost' => 'decimal:2',
 
     ];

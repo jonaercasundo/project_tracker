@@ -436,10 +436,8 @@ Route::middleware(['auth'])->group(function () {
     ->name('public.product.show');
     Route::post('/p/{product}/quotation', [QuotationController::class, 'download'])
         ->name('mi_app.quotation.download');
-    Route::get(
-        '/quotation/{product}/print',
-        [QuotationController::class, 'print']
-    )->name('mi_app.quotation.print');
+    Route::post('/p/{product}/quotation/print', [QuotationController::class, 'print'])
+    ->name('mi_app.quotation.print');
     Route::get('/test-drive', function () {
         return view('test');
     });

@@ -13,6 +13,7 @@ use App\Models\MI_Material;
 use App\Models\MI_Product_Image;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class MIAppController extends Controller
 {
@@ -548,19 +549,18 @@ public function dashboard()
             'category',
             'subCategory',
             'productType',
-            'collection'
+            'collection',
+            'images',
         ])->findOrFail($id);
-
-
+    
         $categories = MI_Category::orderBy('name')->get();
-
+    
         $subCategories = MI_SubCategory::orderBy('name')->get();
-
+    
         $productTypes = MI_ProductType::orderBy('name')->get();
-
+    
         $collections = MI_Collection::orderBy('name')->get();
-
-
+    
         return view('mi_app.designer_module.edit', compact(
             'product',
             'categories',
@@ -572,54 +572,384 @@ public function dashboard()
 
     public function update(Request $request, $id)
     {
-        $product = MI_Product::findOrFail($id);
-
+        $product = MI_Product::with('images')->findOrFail($id);
+    
         try {
-            if ($request->has('image_links')) {
-                $request->merge([
-                    'image_links' => array_values(array_filter($request->input('image_links', []), function ($value) {
-                        return trim((string) $value) !== '';
-                    })),
-                ]);
-            }
-
-            $validated = $request->validate([
-                'item_name'      => 'required|string|max:255',
-                'category_id'    => 'required|integer|exists:mi_categories,id',
-                'sub_category_id' => 'nullable|integer|exists:mi_sub_categories,id',
-                'product_type_id' => 'nullable|integer|exists:mi_product_types,id',
-                'collection_id'  => 'nullable|integer|exists:mi_collections,id',
-                'type_of_sample' => 'required|string|max:255',
-                'designed_by'    => 'nullable|string|max:255',
-                'materials'      => 'required|array|min:1',
-                'materials.*'    => 'string|max:255',
-                'type'           => 'nullable|string|max:255',
-                'color'          => 'nullable|array',
-                'color.*'        => 'string|max:255',
-                'product_height' => 'required|string|max:255',
-                'product_width'  => 'nullable|string|max:255',
-                'product_length' => 'nullable|string|max:255',
-                'product_depth'  => 'nullable|string|max:255',
-                'carton_height'  => 'nullable|string|max:255',
-                'carton_width'   => 'nullable|string|max:255',
-                'carton_length'  => 'nullable|string|max:255',
-                'carton_depth'   => 'nullable|string|max:255',
-                'image_links'    => 'nullable|array',
-                'image_links.*'  => 'nullable|url|max:1000',
-                'product_images' => 'nullable|array',
-                'product_images.*' => 'file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
+    
+            /*
+            |--------------------------------------------------------------------------
+            | 1. CLEAN IMAGE LINKS BEFORE VALIDATION
+            |--------------------------------------------------------------------------
+            */
+    
+            $imageLinks = collect($request->input('image_links', []))
+                ->map(fn ($value) => trim((string) $value))
+                ->filter(fn ($value) => $value !== '')
+                ->values()
+                ->all();
+    
+            $request->merge([
+                'image_links' => $imageLinks,
             ]);
-
-            $validated['materials'] = $this->normalizeArrayInput($request->input('materials', []));
-            $validated['color'] = $this->normalizeArrayInput($request->input('color', []));
-            $validated['image_links'] = $request->input('image_links', []);
-
-            $product->update($validated);
-
-            $product->images()->delete();
-
-            if (!empty($validated['image_links'])) {
-                foreach ($validated['image_links'] as $index => $url) {
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | 2. VALIDATE
+            |--------------------------------------------------------------------------
+            */
+    
+            $validated = $request->validate([
+    
+                // General
+                'item_name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                ],
+    
+                'type_of_sample' => [
+                    'required',
+                    'string',
+                    'max:255',
+                ],
+    
+                'designed_by' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Taxonomy
+                |--------------------------------------------------------------------------
+                */
+    
+                'category_id' => [
+                    'required',
+                    'integer',
+                    'exists:mi_categories,id',
+                ],
+    
+                'sub_category_id' => [
+                    'nullable',
+                    'integer',
+                    'exists:mi_sub_categories,id',
+                ],
+    
+                'product_type_id' => [
+                    'nullable',
+                    'integer',
+                    'exists:mi_product_types,id',
+                ],
+    
+                'collection_id' => [
+                    'nullable',
+                    'integer',
+                    'exists:mi_collections,id',
+                ],
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Materials / Colors
+                |--------------------------------------------------------------------------
+                */
+    
+                'materials' => [
+                    'required',
+                    'array',
+                    'min:1',
+                ],
+    
+                'materials.*' => [
+                    'string',
+                    'max:255',
+                ],
+    
+                'color' => [
+                    'nullable',
+                    'array',
+                ],
+    
+                'color.*' => [
+                    'string',
+                    'max:255',
+                ],
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Product Dimensions
+                |--------------------------------------------------------------------------
+                */
+    
+                'product_height' => [
+                    'required',
+                    'numeric',
+                    'min:0',
+                ],
+    
+                'product_width' => [
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                ],
+    
+                'product_length' => [
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                ],
+    
+                'product_depth' => [
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                ],
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Carton Dimensions
+                |--------------------------------------------------------------------------
+                */
+    
+                'carton_height' => [
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                ],
+    
+                'carton_width' => [
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                ],
+    
+                'carton_length' => [
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                ],
+    
+                'carton_depth' => [
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                ],
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Price
+                |--------------------------------------------------------------------------
+                */
+    
+                'price' => [
+                    'required',
+                    'numeric',
+                    'min:0',
+                ],
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Image Links
+                |--------------------------------------------------------------------------
+                */
+    
+                'image_links' => [
+                    'nullable',
+                    'array',
+                ],
+    
+                'image_links.*' => [
+                    'nullable',
+                    'url',
+                    'max:1000',
+                ],
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Uploaded Files
+                |--------------------------------------------------------------------------
+                */
+    
+                'product_images' => [
+                    'nullable',
+                    'array',
+                ],
+    
+                'product_images.*' => [
+                    'file',
+                    'mimes:jpeg,png,jpg,webp,pdf,obj,stl',
+                    'max:20480',
+                ],
+            ]);
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | 3. NORMALIZE JSON FIELDS
+            |--------------------------------------------------------------------------
+            */
+    
+            $validated['materials'] = $this->normalizeArrayInput(
+                $request->input('materials', [])
+            );
+    
+            $validated['color'] = $this->normalizeArrayInput(
+                $request->input('color', [])
+            );
+    
+            $validated['image_links'] = $imageLinks;
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | 4. VERIFY TAXONOMY HIERARCHY
+            |--------------------------------------------------------------------------
+            */
+    
+            if (!empty($validated['sub_category_id'])) {
+    
+                $subCategory = MI_SubCategory::findOrFail(
+                    $validated['sub_category_id']
+                );
+    
+                if ((int) $subCategory->category_id !== (int) $validated['category_id']) {
+                    throw ValidationException::withMessages([
+                        'sub_category_id' =>
+                            'The selected sub category does not belong to the selected category.',
+                    ]);
+                }
+            }
+    
+    
+            if (!empty($validated['product_type_id'])) {
+    
+                if (empty($validated['sub_category_id'])) {
+                    throw ValidationException::withMessages([
+                        'product_type_id' =>
+                            'Please select a sub category first.',
+                    ]);
+                }
+    
+                $productType = MI_ProductType::findOrFail(
+                    $validated['product_type_id']
+                );
+    
+                if (
+                    (int) $productType->sub_category_id !==
+                    (int) $validated['sub_category_id']
+                ) {
+                    throw ValidationException::withMessages([
+                        'product_type_id' =>
+                            'The selected sub sub category does not belong to the selected sub category.',
+                    ]);
+                }
+            }
+    
+    
+            if (!empty($validated['collection_id'])) {
+    
+                if (empty($validated['product_type_id'])) {
+                    throw ValidationException::withMessages([
+                        'collection_id' =>
+                            'Please select a sub sub category first.',
+                    ]);
+                }
+    
+                $collection = MI_Collection::findOrFail(
+                    $validated['collection_id']
+                );
+    
+                if (
+                    (int) $collection->product_type_id !==
+                    (int) $validated['product_type_id']
+                ) {
+                    throw ValidationException::withMessages([
+                        'collection_id' =>
+                            'The selected collection does not belong to the selected sub sub category.',
+                    ]);
+                }
+            }
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | 5. HANDLE DATABASE + FILE RECORDS IN TRANSACTION
+            |--------------------------------------------------------------------------
+            */
+    
+            DB::transaction(function () use (
+                $product,
+                $validated,
+                $request
+            ) {
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Update Product
+                |--------------------------------------------------------------------------
+                */
+    
+                $product->update([
+                    'item_name'       => $validated['item_name'],
+                    'category_id'     => $validated['category_id'],
+                    'sub_category_id' => $validated['sub_category_id'] ?? null,
+                    'product_type_id' => $validated['product_type_id'] ?? null,
+                    'collection_id'   => $validated['collection_id'] ?? null,
+    
+                    'type_of_sample'  => $validated['type_of_sample'],
+                    'designed_by'     => $validated['designed_by'] ?? null,
+    
+                    'materials'       => $validated['materials'],
+                    'color'           => $validated['color'],
+    
+                    'product_height'  => $validated['product_height'],
+                    'product_width'   => $validated['product_width'] ?? null,
+                    'product_length'  => $validated['product_length'] ?? null,
+                    'product_depth'   => $validated['product_depth'] ?? null,
+    
+                    'carton_height'   => $validated['carton_height'] ?? null,
+                    'carton_width'    => $validated['carton_width'] ?? null,
+                    'carton_length'   => $validated['carton_length'] ?? null,
+                    'carton_depth'    => $validated['carton_depth'] ?? null,
+    
+                    'price'           => $validated['price'],
+                ]);
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Delete Old Image Records + Uploaded Files
+                |--------------------------------------------------------------------------
+                */
+    
+                foreach ($product->images as $oldImage) {
+    
+                    if (
+                        $oldImage->image_type === 'upload' &&
+                        $oldImage->image_path
+                    ) {
+                        Storage::disk('public')->delete(
+                            $oldImage->image_path
+                        );
+                    }
+    
+                    $oldImage->delete();
+                }
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Save Image URLs
+                |--------------------------------------------------------------------------
+                */
+    
+                foreach (
+                    $validated['image_links']
+                    as $index => $url
+                ) {
+    
                     MI_Product_Image::create([
                         'product_id' => $product->product_id,
                         'image_type' => 'url',
@@ -628,38 +958,83 @@ public function dashboard()
                         'sort_order' => $index,
                     ]);
                 }
-            }
-
-            if ($request->hasFile('product_images')) {
-                foreach ($request->file('product_images') as $index => $file) {
-                    $path = $file->store('product_images', 'public');
-
-                    MI_Product_Image::create([
-                        'product_id' => $product->product_id,
-                        'image_type' => 'upload',
-                        'image_path' => $path,
-                        'is_primary' => empty($validated['image_links']) && $index === 0,
-                        'sort_order' => count($validated['image_links']) + $index,
-                    ]);
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Save Uploaded Files
+                |--------------------------------------------------------------------------
+                */
+    
+                if ($request->hasFile('product_images')) {
+    
+                    $startingSortOrder =
+                        count($validated['image_links']);
+    
+                    foreach (
+                        $request->file('product_images')
+                        as $index => $file
+                    ) {
+    
+                        $path = $file->store(
+                            'product_images',
+                            'public'
+                        );
+    
+                        MI_Product_Image::create([
+                            'product_id' => $product->product_id,
+                            'image_type' => 'upload',
+                            'image_path' => $path,
+    
+                            'is_primary' =>
+                                empty($validated['image_links']) &&
+                                $index === 0,
+    
+                            'sort_order' =>
+                                $startingSortOrder + $index,
+                        ]);
+                    }
                 }
-            }
-            
-            return redirect()->route('mi_app.index')->with('success', 'Product updated successfully!');
-        } catch (\Illuminate\Validation\ValidationException $e) {
+            });
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | 6. SUCCESS
+            |--------------------------------------------------------------------------
+            */
+    
+            return redirect()
+                ->route('mi_app.index')
+                ->with(
+                    'success',
+                    'Product updated successfully!'
+                );
+    
+    
+        } catch (ValidationException $e) {
+    
             throw $e;
+    
+    
         } catch (\Throwable $e) {
-            Log::error('Product update failed: ' . $e->getMessage(), [
-                'exception' => $e,
-                'product_id' => $id,
-                'input' => $request->except('product_file'),
-            ]);
-
-            $errorMessage = $e->getMessage() ?: 'Something went wrong while updating the product. Please try again or contact support.';
-
+    
+            Log::error(
+                'Product update failed',
+                [
+                    'message' => $e->getMessage(),
+                    'exception' => $e,
+                    'product_id' => $id,
+                ]
+            );
+    
             return back()
                 ->withInput()
-                ->withErrors(['error' => $errorMessage])
-                ->with('error', $errorMessage);
+                ->withErrors([
+                    'error' => $e->getMessage()
+                        ?: 'Something went wrong while updating the product.',
+                ])
+                ->with('error', $e->getMessage());
         }
     }
 

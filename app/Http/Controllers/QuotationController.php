@@ -36,13 +36,8 @@ class QuotationController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Load Product Information
+        | Load Product Relationships
         |--------------------------------------------------------------------------
-        |
-        | Load the same product relationships used by the public product page.
-        | This also loads the product images so the quotation PDF can display
-        | the primary/first available image.
-        |
         */
 
         $product->load([
@@ -59,11 +54,12 @@ class QuotationController extends Controller
         | Product Price
         |--------------------------------------------------------------------------
         |
-        | MI_Product uses purchase_cost as the current price field.
+        | "price" is the customer selling/quotation price.
+        | "purchase_cost" should remain internal.
         |
         */
 
-        $unitPrice = (float) ($product->purchase_cost ?? 0);
+        $unitPrice = (float) ($product->price ?? 0);
 
         $quantity = (int) $validated['quantity'];
 
@@ -72,52 +68,72 @@ class QuotationController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Product Image
+        | Select Product Image
         |--------------------------------------------------------------------------
         |
-        | Prefer the primary image.
-        | If there is no primary image, use the first available image.
+        | Priority:
+        |
+        | 1. Primary image
+        | 2. First available image
         |
         */
 
         $productImage = null;
 
-        $primaryImage = $product->images
+        $selectedImage = $product->images
             ->firstWhere('is_primary', true);
 
-        $selectedImage = $primaryImage
-            ?? $product->images->first();
+        if (!$selectedImage) {
+            $selectedImage = $product->images->first();
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prepare Image For Dompdf
+        |--------------------------------------------------------------------------
+        */
 
         if ($selectedImage) {
 
-            if ($selectedImage->image_type === 'upload') {
+            /*
+            |----------------------------------------------------------------------
+            | Uploaded Image
+            |----------------------------------------------------------------------
+            */
 
-                if (!empty($selectedImage->image_path)) {
+            if (
+                $selectedImage->image_type === 'upload' &&
+                !empty($selectedImage->image_path)
+            ) {
 
-                    $productImage = public_path(
-                        'storage/' . $selectedImage->image_path
-                    );
+                $imagePath = public_path(
+                    'storage/' . $selectedImage->image_path
+                );
 
-                    /*
-                    |------------------------------------------------------------------
-                    | Make sure the file actually exists.
-                    |------------------------------------------------------------------
-                    */
-
-                    if (!file_exists($productImage)) {
-                        $productImage = null;
-                    }
+                if (file_exists($imagePath)) {
+                    $productImage = $imagePath;
                 }
+            }
 
-            } elseif ($selectedImage->image_type === 'url') {
+
+            /*
+            |----------------------------------------------------------------------
+            | Image URL
+            |----------------------------------------------------------------------
+            */
+
+            elseif (
+                $selectedImage->image_type === 'url' &&
+                !empty($selectedImage->image_url)
+            ) {
+
+                $url = trim($selectedImage->image_url);
+
 
                 /*
-                |------------------------------------------------------------------
-                | Google Drive images
-                |------------------------------------------------------------------
+                | Google Drive: uc?id=...
                 */
-
-                $url = trim((string) $selectedImage->image_url);
 
                 if (
                     preg_match(
@@ -126,37 +142,57 @@ class QuotationController extends Controller
                         $matches
                     )
                 ) {
+
                     $productImage =
                         'https://drive.google.com/thumbnail?id=' .
                         $matches[1] .
                         '&sz=w1200';
+                }
 
-                } elseif (
+
+                /*
+                | Google Drive: file/d/...
+                */
+
+                elseif (
                     preg_match(
                         '#drive\.google\.com/file/d/([^/]+)#',
                         $url,
                         $matches
                     )
                 ) {
+
                     $productImage =
                         'https://drive.google.com/thumbnail?id=' .
                         $matches[1] .
                         '&sz=w1200';
+                }
 
-                } elseif (
+
+                /*
+                | Google Drive: open?id=...
+                */
+
+                elseif (
                     preg_match(
                         '/drive\.google\.com\/open\?id=([^&]+)/',
                         $url,
                         $matches
                     )
                 ) {
+
                     $productImage =
                         'https://drive.google.com/thumbnail?id=' .
                         $matches[1] .
                         '&sz=w1200';
+                }
 
-                } else {
 
+                /*
+                | Normal image URL
+                */
+
+                else {
                     $productImage = $url;
                 }
             }
@@ -190,28 +226,14 @@ class QuotationController extends Controller
         $pdf = Pdf::loadView(
             'mi_app.public.quotation-pdf',
             [
-                'product' => $product,
-
-                'customer_name' =>
-                    $validated['customer_name'],
-
-                'quantity' =>
-                    $quantity,
-
-                'unit_price' =>
-                    $unitPrice,
-
-                'total' =>
-                    $total,
-
-                'quote_number' =>
-                    $quoteNumber,
-
-                'issued_at' =>
-                    now(),
-
-                'product_image' =>
-                    $productImage,
+                'product'       => $product,
+                'customer_name' => $validated['customer_name'],
+                'quantity'      => $quantity,
+                'unit_price'    => $unitPrice,
+                'total'         => $total,
+                'quote_number'  => $quoteNumber,
+                'issued_at'     => now(),
+                'product_image' => $productImage,
             ]
         );
 
@@ -227,7 +249,7 @@ class QuotationController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | PDF Filename
+        | Filename
         |--------------------------------------------------------------------------
         */
 

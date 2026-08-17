@@ -297,22 +297,53 @@
         return { name, qty };
     }
     function pdPrintQuote() {
-        const { name, qty } = pdGetFormValues();
 
-        if (!name) {
-            alert('Please enter the customer name before printing.');
-            document.getElementById('pdCustomerName').focus();
-            return;
-        }
+const { name, qty } = pdGetFormValues();
 
-        const url = new URL(PD_DOWNLOAD_URL, window.location.origin);
+if (!name) {
+    alert('Please enter the customer name before printing.');
+    document.getElementById('pdCustomerName').focus();
+    return;
+}
 
-        url.searchParams.set('customer_name', name);
-        url.searchParams.set('quantity', qty);
-        url.searchParams.set('print', '1');
+const form = document.createElement('form');
 
-        window.open(url.toString(), '_blank');
-    }
+form.method = 'POST';
+
+form.action = "{{ route('mi_app.quotation.print', $product->product_id) }}";
+
+form.target = '_blank';
+
+const csrf = document.createElement('input');
+
+csrf.type = 'hidden';
+csrf.name = '_token';
+csrf.value = '{{ csrf_token() }}';
+
+form.appendChild(csrf);
+
+const nameInput = document.createElement('input');
+
+nameInput.type = 'hidden';
+nameInput.name = 'customer_name';
+nameInput.value = name;
+
+form.appendChild(nameInput);
+
+const qtyInput = document.createElement('input');
+
+qtyInput.type = 'hidden';
+qtyInput.name = 'quantity';
+qtyInput.value = qty;
+
+form.appendChild(qtyInput);
+
+document.body.appendChild(form);
+
+form.submit();
+
+form.remove();
+}
 
     function pdDownloadQuotation() {
         const { name, qty } = pdGetFormValues();

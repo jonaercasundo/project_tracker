@@ -19,7 +19,7 @@
         }
 
         body {
-            font-family: Helvetica, Arial, sans-serif;
+            font-family: DejaVu Sans, sans-serif;
             font-size: 11px;
             color: #1a1a1a;
             margin: 0;
@@ -927,7 +927,7 @@
                 ₱{{ number_format((float) $unit_price, 2) }}
             </td>
 
-            <td class="value">
+            <td class="num">
                 ₱{{ number_format((float) $subtotal, 2) }}
             </td>
 

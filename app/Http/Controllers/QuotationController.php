@@ -308,7 +308,7 @@ class QuotationController extends Controller
             'isHtml5ParserEnabled' => true,
             'isRemoteEnabled' => true,
             'isPhpEnabled' => false,
-            'defaultFont' => 'Helvetica',
+            'defaultFont' => 'DejaVu Sans',
         ]);
 
 

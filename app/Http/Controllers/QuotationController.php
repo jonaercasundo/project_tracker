@@ -332,4 +332,209 @@ class QuotationController extends Controller
 
         return $pdf->download($filename);
     }
+    public function print(Request $request, MI_Product $product)
+{
+    $validated = $request->validate([
+        'customer_name' => [
+            'required',
+            'string',
+            'max:150',
+        ],
+
+        'quantity' => [
+            'required',
+            'integer',
+            'min:1',
+        ],
+    ]);
+
+    $product->load([
+        'category',
+        'subCategory',
+        'productType',
+        'collection',
+        'images',
+    ]);
+
+    // USE PRICE, NOT PURCHASE COST
+    $unitPrice = (float) ($product->price ?? 0);
+
+    $quantity = (int) $validated['quantity'];
+
+    $subtotal = $unitPrice * $quantity;
+
+    $total = $subtotal;
+
+    $quoteNumber =
+        'Q-' .
+        now()->format('Ymd') .
+        '-' .
+        str_pad(
+            (string) $product->product_id,
+            4,
+            '0',
+            STR_PAD_LEFT
+        );
+
+    // Your existing image-loading code goes here
+    $productImage = null;
+
+    foreach ($product->images as $image) {
+
+        if (
+            isset($image->image_type) &&
+            $image->image_type === 'upload' &&
+            !empty($image->image_path)
+        ) {
+            $storagePath = storage_path(
+                'app/public/' . ltrim($image->image_path, '/')
+            );
+
+            if (file_exists($storagePath)) {
+
+                $mimeType = mime_content_type($storagePath);
+                $imageData = file_get_contents($storagePath);
+
+                if ($imageData !== false) {
+                    $productImage =
+                        'data:' .
+                        $mimeType .
+                        ';base64,' .
+                        base64_encode($imageData);
+
+                    break;
+                }
+            }
+        }
+
+        if (
+            isset($image->image_type) &&
+            $image->image_type !== 'upload' &&
+            !empty($image->image_url)
+        ) {
+
+            $imageUrl = trim($image->image_url);
+
+            if (
+                preg_match(
+                    '/drive\.google\.com\/uc\?.*id=([^&]+)/',
+                    $imageUrl,
+                    $matches
+                )
+            ) {
+                $imageUrl =
+                    'https://drive.google.com/thumbnail?id=' .
+                    $matches[1] .
+                    '&sz=w1600';
+            }
+
+            elseif (
+                preg_match(
+                    '#drive\.google\.com/file/d/([^/]+)#',
+                    $imageUrl,
+                    $matches
+                )
+            ) {
+                $imageUrl =
+                    'https://drive.google.com/thumbnail?id=' .
+                    $matches[1] .
+                    '&sz=w1600';
+            }
+
+            elseif (
+                preg_match(
+                    '/drive\.google\.com\/open\?id=([^&]+)/',
+                    $imageUrl,
+                    $matches
+                )
+            ) {
+                $imageUrl =
+                    'https://drive.google.com/thumbnail?id=' .
+                    $matches[1] .
+                    '&sz=w1600';
+            }
+
+            try {
+
+                $response = Http::timeout(15)
+                    ->withOptions([
+                        'verify' => false,
+                    ])
+                    ->get($imageUrl);
+
+                if ($response->successful()) {
+
+                    $contentType = $response->header('Content-Type');
+
+                    if (
+                        $contentType &&
+                        str_starts_with(
+                            strtolower($contentType),
+                            'image/'
+                        )
+                    ) {
+                        $productImage =
+                            'data:' .
+                            $contentType .
+                            ';base64,' .
+                            base64_encode(
+                                $response->body()
+                            );
+
+                        break;
+                    }
+                }
+
+            } catch (\Throwable $e) {
+                // Ignore image failure
+            }
+        }
+    }
+
+    $pdf = Pdf::loadView(
+        'mi_app.public.quotation-pdf',
+        [
+            'product' => $product,
+
+            'customer_name' =>
+                $validated['customer_name'],
+
+            'quantity' =>
+                $quantity,
+
+            'unit_price' =>
+                $unitPrice,
+
+            'subtotal' =>
+                $subtotal,
+
+            'total' =>
+                $total,
+
+            'quote_number' =>
+                $quoteNumber,
+
+            'issued_at' =>
+                now(),
+
+            'product_image' =>
+                $productImage,
+        ]
+    );
+
+    $pdf->setPaper('A4', 'portrait');
+
+    $pdf->setOptions([
+        'isHtml5ParserEnabled' => true,
+        'isRemoteEnabled' => true,
+        'isPhpEnabled' => false,
+        'defaultFont' => 'DejaVu Sans',
+    ]);
+
+    return $pdf->stream(
+        'quotation-' .
+        ($product->sku ?? $product->product_id) .
+        '.pdf'
+    );
+}
 }

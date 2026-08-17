@@ -275,6 +275,7 @@
 <script>
     const PD_UNIT_PRICE = {{ (float) $product->price }};
     const PD_DOWNLOAD_URL = "{{ route('mi_app.quotation.download', $product->product_id) }}";
+    const PD_PRINT_URL = "{{ route('mi_app.quotation.print', $product->product_id) }}";
 
     const pdQtyInput = document.getElementById('pdQuantity');
     const pdTotalAmt = document.getElementById('pdTotalAmt');
@@ -295,19 +296,22 @@
         const qty = Math.max(1, parseInt(pdQtyInput.value || '1', 10));
         return { name, qty };
     }
-
     function pdPrintQuote() {
         const { name, qty } = pdGetFormValues();
+
         if (!name) {
             alert('Please enter the customer name before printing.');
             document.getElementById('pdCustomerName').focus();
             return;
         }
-        document.getElementById('pdPrintCustomer').textContent = name;
-        document.getElementById('pdPrintQty').textContent = qty;
-        document.getElementById('pdPrintUnit').textContent = pdFormatCurrency(PD_UNIT_PRICE);
-        document.getElementById('pdPrintTotal').textContent = pdFormatCurrency(PD_UNIT_PRICE * qty);
-        window.print();
+
+        const url = new URL(PD_DOWNLOAD_URL, window.location.origin);
+
+        url.searchParams.set('customer_name', name);
+        url.searchParams.set('quantity', qty);
+        url.searchParams.set('print', '1');
+
+        window.open(url.toString(), '_blank');
     }
 
     function pdDownloadQuotation() {

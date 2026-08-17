@@ -30,9 +30,23 @@
             overflow: hidden;
             margin-bottom: 1.25rem;
         }
-        .pd-image-wrap { width: 100%; aspect-ratio: 4 / 3; background: var(--pd-bg); display: flex; align-items: center; justify-content: center; }
+        .pd-image-wrap { width: 100%; aspect-ratio: 4 / 3; background: var(--pd-bg); display: flex; align-items: center; justify-content: center; position: relative; }
         .pd-image-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .pd-image-placeholder { color: var(--pd-ink-faint); font-size: 0.8rem; }
+
+        .pd-image-nav {
+            position: absolute; top: 50%; transform: translateY(-50%); width: 2.25rem; height: 2.25rem;
+            display: flex; align-items: center; justify-content: center; border-radius: 999px; border: none; cursor: pointer;
+            background: rgba(255,255,255,0.9); box-shadow: 0 6px 16px -6px rgba(0,0,0,0.3); color: var(--pd-ink);
+        }
+        .pd-image-nav.prev { left: 0.6rem; }
+        .pd-image-nav.next { right: 0.6rem; }
+        .pd-image-nav svg { width: 1.1rem; height: 1.1rem; }
+        .pd-image-counter {
+            position: absolute; bottom: 0.6rem; right: 0.6rem; background: rgba(0,0,0,0.55); color: #fff;
+            font-size: 0.68rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 999px;
+        }
+
         .pd-body { padding: 1.25rem; }
 
         .pd-ref-chip {
@@ -95,22 +109,58 @@
 <body>
 
 @php
-    $mainImage = $product->images->first();
+    // Same resolution logic as your admin gallery: uploads use image_path via
+    // storage/, links use image_url (with Google Drive URLs converted to a
+    // direct thumbnail link).
+    $convertImageUrl = function ($url) {
+        if (empty($url)) {
+            return null;
+        }
+        if (preg_match('/drive\.google\.com\/uc\?.*id=([^&]+)/', $url, $matches)) {
+            return "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
+        }
+        if (preg_match('#drive\.google\.com/file/d/([^/]+)#', $url, $matches)) {
+            return "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
+        }
+        if (preg_match('/drive\.google\.com\/open\?id=([^&]+)/', $url, $matches)) {
+            return "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
+        }
+        return trim($url);
+    };
+
+    $pdImages = $product->images->map(function ($image) use ($convertImageUrl) {
+        return [
+            'url' => $image->image_type === 'upload'
+                ? asset('storage/' . $image->image_path)
+                : $convertImageUrl($image->image_url),
+        ];
+    })->filter(fn ($img) => !empty($img['url']))->values();
+
+    $pdRef = $product->sku ?: ('PID-' . $product->product_id);
 @endphp
 
 <div class="pd-wrap">
 
     <div class="pd-card">
         <div class="pd-image-wrap">
-            @if($mainImage)
-                <img src="{{ asset('storage/' . $mainImage->path) }}" alt="{{ $product->item_name }}">
+            @if($pdImages->count())
+                <img id="pdGalleryImg" src="{{ $pdImages[0]['url'] }}" alt="{{ $product->item_name }}">
+                @if($pdImages->count() > 1)
+                    <button type="button" class="pd-image-nav prev" onclick="pdPrevImage()" aria-label="Previous image">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <button type="button" class="pd-image-nav next" onclick="pdNextImage()" aria-label="Next image">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                    <span class="pd-image-counter" id="pdGalleryCounter">1 / {{ $pdImages->count() }}</span>
+                @endif
             @else
                 <span class="pd-image-placeholder">No image available</span>
             @endif
         </div>
 
         <div class="pd-body">
-            <span class="pd-ref-chip">Ref. PID-{{ $product->product_id }}</span>
+            <span class="pd-ref-chip">{{ $pdRef }}</span>
             <h1 class="pd-title">{{ $product->item_name }}</h1>
             <p class="pd-taxo">
                 {{ collect([$product->category->name ?? null, $product->subCategory->name ?? null, $product->collection->name ?? null])->filter()->implode(' · ') ?: 'Uncategorized' }}
@@ -183,14 +233,14 @@
     </div>
     @endif
 
-    <p class="pd-footer">Scanned from product tag &middot; Ref. PID-{{ $product->product_id }}</p>
+    <p class="pd-footer">Scanned from product tag &middot; {{ $pdRef }}</p>
 
 </div>
 
 {{-- Hidden sheet used only when printing --}}
 <div id="pdPrintSheet">
     <h2 style="margin:0 0 4px;">{{ $product->item_name }}</h2>
-    <p style="font-family:monospace; color:#666; margin:0 0 16px;">PID-{{ $product->product_id }}</p>
+    <p style="font-family:monospace; color:#666; margin:0 0 16px;">{{ $pdRef }}</p>
     <table style="width:100%; border-collapse:collapse; font-size:13px;">
         <tr><td style="padding:6px 0; color:#666;">Customer</td><td id="pdPrintCustomer" style="padding:6px 0; text-align:right;"></td></tr>
         <tr><td style="padding:6px 0; color:#666;">Quantity</td><td id="pdPrintQty" style="padding:6px 0; text-align:right;"></td></tr>
@@ -198,6 +248,28 @@
         <tr style="border-top:2px solid #000;"><td style="padding:10px 0; font-weight:bold;">Total</td><td id="pdPrintTotal" style="padding:10px 0; text-align:right; font-weight:bold;"></td></tr>
     </table>
 </div>
+
+@if($pdImages->count() > 1)
+<script>
+    const pdGalleryImages = @json($pdImages->pluck('url'));
+    let pdCurrentImage = 0;
+    const pdGalleryImg = document.getElementById('pdGalleryImg');
+    const pdGalleryCounter = document.getElementById('pdGalleryCounter');
+
+    function pdUpdateGallery() {
+        pdGalleryImg.src = pdGalleryImages[pdCurrentImage];
+        pdGalleryCounter.textContent = (pdCurrentImage + 1) + ' / ' + pdGalleryImages.length;
+    }
+    function pdNextImage() {
+        pdCurrentImage = (pdCurrentImage + 1) % pdGalleryImages.length;
+        pdUpdateGallery();
+    }
+    function pdPrevImage() {
+        pdCurrentImage = (pdCurrentImage - 1 + pdGalleryImages.length) % pdGalleryImages.length;
+        pdUpdateGallery();
+    }
+</script>
+@endif
 
 @if(!is_null($product->price ?? null))
 <script>

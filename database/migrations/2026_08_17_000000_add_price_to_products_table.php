@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('products', function (Blueprint $table) {
+        Schema::table('mi_products', function (Blueprint $table) {
             // Nullable so existing rows aren't broken; backfill later.
             $table->decimal('price', 12, 2)->nullable()->after('sku');
         });
@@ -16,7 +16,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('products', function (Blueprint $table) {
+        Schema::table('mi_products', function (Blueprint $table) {
             $table->dropColumn('price');
         });
     }

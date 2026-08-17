@@ -67,7 +67,7 @@ class QuotationController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $pdf = Pdf::loadView('mi_app.quotation-pdf', [
+        $pdf = Pdf::loadView('mi_app.public.quotation-pdf', [
 
             'product' => $product,
 

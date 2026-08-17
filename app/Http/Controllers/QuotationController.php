@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\MI_Product;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 class QuotationController extends Controller
 {
@@ -15,7 +17,7 @@ class QuotationController extends Controller
     {
         /*
         |--------------------------------------------------------------------------
-        | Validate Customer Information
+        | Validate Request
         |--------------------------------------------------------------------------
         */
 
@@ -36,8 +38,11 @@ class QuotationController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Load Product Relationships
+        | Load Product Information
         |--------------------------------------------------------------------------
+        |
+        | Load all relationships needed by the quotation.
+        |
         */
 
         $product->load([
@@ -51,152 +56,18 @@ class QuotationController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Product Price
+        | Price
         |--------------------------------------------------------------------------
         |
-        | "price" is the customer selling/quotation price.
-        | "purchase_cost" should remain internal.
+        | Use purchase_cost as requested for the quotation.
         |
         */
 
-        $unitPrice = (float) ($product->price ?? 0);
+        $unitPrice = (float) ($product->purchase_cost ?? 0);
 
         $quantity = (int) $validated['quantity'];
 
         $total = $unitPrice * $quantity;
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Select Product Image
-        |--------------------------------------------------------------------------
-        |
-        | Priority:
-        |
-        | 1. Primary image
-        | 2. First available image
-        |
-        */
-
-        $productImage = null;
-
-        $selectedImage = $product->images
-            ->firstWhere('is_primary', true);
-
-        if (!$selectedImage) {
-            $selectedImage = $product->images->first();
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Prepare Image For Dompdf
-        |--------------------------------------------------------------------------
-        */
-
-        if ($selectedImage) {
-
-            /*
-            |----------------------------------------------------------------------
-            | Uploaded Image
-            |----------------------------------------------------------------------
-            */
-
-            if (
-                $selectedImage->image_type === 'upload' &&
-                !empty($selectedImage->image_path)
-            ) {
-
-                $imagePath = public_path(
-                    'storage/' . $selectedImage->image_path
-                );
-
-                if (file_exists($imagePath)) {
-                    $productImage = $imagePath;
-                }
-            }
-
-
-            /*
-            |----------------------------------------------------------------------
-            | Image URL
-            |----------------------------------------------------------------------
-            */
-
-            elseif (
-                $selectedImage->image_type === 'url' &&
-                !empty($selectedImage->image_url)
-            ) {
-
-                $url = trim($selectedImage->image_url);
-
-
-                /*
-                | Google Drive: uc?id=...
-                */
-
-                if (
-                    preg_match(
-                        '/drive\.google\.com\/uc\?.*id=([^&]+)/',
-                        $url,
-                        $matches
-                    )
-                ) {
-
-                    $productImage =
-                        'https://drive.google.com/thumbnail?id=' .
-                        $matches[1] .
-                        '&sz=w1200';
-                }
-
-
-                /*
-                | Google Drive: file/d/...
-                */
-
-                elseif (
-                    preg_match(
-                        '#drive\.google\.com/file/d/([^/]+)#',
-                        $url,
-                        $matches
-                    )
-                ) {
-
-                    $productImage =
-                        'https://drive.google.com/thumbnail?id=' .
-                        $matches[1] .
-                        '&sz=w1200';
-                }
-
-
-                /*
-                | Google Drive: open?id=...
-                */
-
-                elseif (
-                    preg_match(
-                        '/drive\.google\.com\/open\?id=([^&]+)/',
-                        $url,
-                        $matches
-                    )
-                ) {
-
-                    $productImage =
-                        'https://drive.google.com/thumbnail?id=' .
-                        $matches[1] .
-                        '&sz=w1200';
-                }
-
-
-                /*
-                | Normal image URL
-                */
-
-                else {
-                    $productImage = $url;
-                }
-            }
-        }
 
 
         /*
@@ -219,6 +90,190 @@ class QuotationController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Product Image
+        |--------------------------------------------------------------------------
+        |
+        | Dompdf works best with a Base64 image.
+        |
+        | We take the first available product image.
+        |
+        */
+
+        $productImage = null;
+
+        foreach ($product->images as $image) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Uploaded Image
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                isset($image->image_type) &&
+                $image->image_type === 'upload' &&
+                !empty($image->image_path)
+            ) {
+
+                $storagePath = storage_path(
+                    'app/public/' . ltrim($image->image_path, '/')
+                );
+
+                if (file_exists($storagePath)) {
+
+                    $mimeType = mime_content_type($storagePath);
+
+                    $imageData = file_get_contents($storagePath);
+
+                    if ($imageData !== false) {
+
+                        $productImage =
+                            'data:' .
+                            $mimeType .
+                            ';base64,' .
+                            base64_encode($imageData);
+
+                        break;
+                    }
+                }
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | External Image / Google Drive
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                isset($image->image_type) &&
+                $image->image_type !== 'upload' &&
+                !empty($image->image_url)
+            ) {
+
+                $imageUrl = trim($image->image_url);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Convert Google Drive URL
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    preg_match(
+                        '/drive\.google\.com\/uc\?.*id=([^&]+)/',
+                        $imageUrl,
+                        $matches
+                    )
+                ) {
+
+                    $fileId = $matches[1];
+
+                    $imageUrl =
+                        'https://drive.google.com/thumbnail?id=' .
+                        $fileId .
+                        '&sz=w1600';
+                }
+
+
+                elseif (
+                    preg_match(
+                        '#drive\.google\.com/file/d/([^/]+)#',
+                        $imageUrl,
+                        $matches
+                    )
+                ) {
+
+                    $fileId = $matches[1];
+
+                    $imageUrl =
+                        'https://drive.google.com/thumbnail?id=' .
+                        $fileId .
+                        '&sz=w1600';
+                }
+
+
+                elseif (
+                    preg_match(
+                        '/drive\.google\.com\/open\?id=([^&]+)/',
+                        $imageUrl,
+                        $matches
+                    )
+                ) {
+
+                    $fileId = $matches[1];
+
+                    $imageUrl =
+                        'https://drive.google.com/thumbnail?id=' .
+                        $fileId .
+                        '&sz=w1600';
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Download External Image
+                |--------------------------------------------------------------------------
+                */
+
+                try {
+
+                    $response = Http::timeout(15)
+                        ->withOptions([
+                            'verify' => false,
+                        ])
+                        ->get($imageUrl);
+
+                    if ($response->successful()) {
+
+                        $contentType =
+                            $response->header('Content-Type');
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Make sure the response is actually an image
+                        |--------------------------------------------------------------------------
+                        */
+
+                        if (
+                            $contentType &&
+                            str_starts_with(
+                                strtolower($contentType),
+                                'image/'
+                            )
+                        ) {
+
+                            $productImage =
+                                'data:' .
+                                $contentType .
+                                ';base64,' .
+                                base64_encode(
+                                    $response->body()
+                                );
+
+                            break;
+                        }
+                    }
+
+                } catch (\Throwable $e) {
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Ignore image failure
+                    |--------------------------------------------------------------------------
+                    |
+                    | The quotation will still generate even if
+                    | an external image cannot be downloaded.
+                    |
+                    */
+                }
+            }
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
         | Generate PDF
         |--------------------------------------------------------------------------
         */
@@ -226,14 +281,28 @@ class QuotationController extends Controller
         $pdf = Pdf::loadView(
             'mi_app.public.quotation-pdf',
             [
-                'product'       => $product,
-                'customer_name' => $validated['customer_name'],
-                'quantity'      => $quantity,
-                'unit_price'    => $unitPrice,
-                'total'         => $total,
-                'quote_number'  => $quoteNumber,
-                'issued_at'     => now(),
-                'product_image' => $productImage,
+                'product' => $product,
+
+                'customer_name' =>
+                    $validated['customer_name'],
+
+                'quantity' =>
+                    $quantity,
+
+                'unit_price' =>
+                    $unitPrice,
+
+                'total' =>
+                    $total,
+
+                'quote_number' =>
+                    $quoteNumber,
+
+                'issued_at' =>
+                    now(),
+
+                'product_image' =>
+                    $productImage,
             ]
         );
 
@@ -245,6 +314,13 @@ class QuotationController extends Controller
         */
 
         $pdf->setPaper('A4', 'portrait');
+
+        $pdf->setOptions([
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => true,
+            'isPhpEnabled' => false,
+            'defaultFont' => 'Helvetica',
+        ]);
 
 
         /*
@@ -258,6 +334,12 @@ class QuotationController extends Controller
             ($product->sku ?? $product->product_id) .
             '.pdf';
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Download
+        |--------------------------------------------------------------------------
+        */
 
         return $pdf->download($filename);
     }

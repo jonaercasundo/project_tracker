@@ -413,7 +413,7 @@
         <td>
 
             <div class="company-name">
-                METROINC
+                METRO
             </div>
 
             <div class="company-info">
@@ -988,7 +988,7 @@
 
     <br><br>
 
-    Thank you for your interest in METROINC products.
+    Thank you for your interest in METRO products.
 
 </div>
 

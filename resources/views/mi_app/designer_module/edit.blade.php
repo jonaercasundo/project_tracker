@@ -475,7 +475,7 @@
                             </label>
 
                             <div class="tx-price-wrap">
-                                <span class="tx-price-prefix">₱</span>
+                                <span class="tx-price-prefix">$</span>
 
                                 <input
                                     type="number"
@@ -510,7 +510,7 @@
                                     class="tx-price-preview-value"
                                     id="price-preview"
                                 >
-                                    ₱{{ number_format((float) old('price', $product->price), 2) }}
+                                    ${{ number_format((float) old('price', $product->price), 2) }}
                                 </span>
                             </div>
 
@@ -1435,7 +1435,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
             pricePreview.textContent =
-                '₱' +
+                '$' +
                 value.toLocaleString(
                     'en-PH',
                     {

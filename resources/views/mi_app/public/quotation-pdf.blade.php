@@ -489,7 +489,6 @@
     Product Information
 </div>
 
-
 <table class="product-info-table">
 
     <tr>
@@ -497,15 +496,16 @@
         {{-- Product Image --}}
         <td class="product-image-cell">
 
-                @if(!empty($product_image))
+            @if(!empty($product_image))
 
-                    <img
-                        src="{{ $product_image }}"
-                        class="product-image"
-                        alt="Product Image"
-                    >
+                <img
+                    src="{{ $product_image }}"
+                    class="product-image"
+                    alt="Product Image"
+                >
 
-                @else
+            @else
+
                 <table class="no-image">
                     <tr>
                         <td>
@@ -539,7 +539,8 @@
             @else
 
                 <div class="description">
-                    Product quotation for {{ $product->item_name }}.
+                    Product quotation for
+                    {{ $product->item_name }}.
                 </div>
 
             @endif
@@ -923,11 +924,11 @@
             </td>
 
             <td class="num">
-                ₱{{ number_format($unit_price, 2) }}
+                ₱{{ number_format((float) $unit_price, 2) }}
             </td>
 
-            <td class="num">
-                ₱{{ number_format($unit_price * $quantity, 2) }}
+            <td class="value">
+                ₱{{ number_format((float) $subtotal, 2) }}
             </td>
 
         </tr>
@@ -963,7 +964,7 @@
         </td>
 
         <td class="value">
-            ₱{{ number_format($total, 2) }}
+            ₱{{ number_format((float) $total, 2) }}
         </td>
 
     </tr>

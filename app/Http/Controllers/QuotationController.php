@@ -63,11 +63,13 @@ class QuotationController extends Controller
         |
         */
 
-        $unitPrice = (float) ($product->purchase_cost ?? 0);
-
         $quantity = (int) $validated['quantity'];
 
-        $total = $unitPrice * $quantity;
+        $unitPrice = (float) ($product->price ?? 0);
+        
+        $subtotal = $unitPrice * $quantity;
+        
+        $total = $subtotal;
 
 
         /*
@@ -282,27 +284,14 @@ class QuotationController extends Controller
             'mi_app.public.quotation-pdf',
             [
                 'product' => $product,
-
-                'customer_name' =>
-                    $validated['customer_name'],
-
-                'quantity' =>
-                    $quantity,
-
-                'unit_price' =>
-                    $unitPrice,
-
-                'total' =>
-                    $total,
-
-                'quote_number' =>
-                    $quoteNumber,
-
-                'issued_at' =>
-                    now(),
-
-                'product_image' =>
-                    $productImage,
+                'customer_name' => $validated['customer_name'],
+                'quantity' => $quantity,
+                'unit_price' => $unitPrice,
+                'subtotal' => $subtotal,
+                'total' => $total,
+                'quote_number' => $quoteNumber,
+                'issued_at' => now(),
+                'product_image' => $productImage,
             ]
         );
 

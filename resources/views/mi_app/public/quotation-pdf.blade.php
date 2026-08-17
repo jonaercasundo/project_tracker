@@ -489,6 +489,7 @@
     Product Information
 </div>
 
+
 <table class="product-info-table">
 
     <tr>
@@ -496,16 +497,15 @@
         {{-- Product Image --}}
         <td class="product-image-cell">
 
-            @if(!empty($product_image))
+                @if(!empty($product_image))
 
-                <img
-                    src="{{ $product_image }}"
-                    class="product-image"
-                    alt="Product Image"
-                >
+                    <img
+                        src="{{ $product_image }}"
+                        class="product-image"
+                        alt="Product Image"
+                    >
 
-            @else
-
+                @else
                 <table class="no-image">
                     <tr>
                         <td>
@@ -539,8 +539,7 @@
             @else
 
                 <div class="description">
-                    Product quotation for
-                    {{ $product->item_name }}.
+                    Product quotation for {{ $product->item_name }}.
                 </div>
 
             @endif

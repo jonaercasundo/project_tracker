@@ -18,7 +18,7 @@ class PublicProductController extends Controller
 
         $product->load(['category', 'subCategory', 'collection', 'images']);
 
-        return view('public.product-show', [
+        return view('product-show', [
             'product' => $product,
         ]);
     }

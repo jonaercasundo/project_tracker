@@ -612,18 +612,126 @@ class DeliveryController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | Generate PDF
+        | Generate PDF - PROJECT BY PROJECT, BACK TO BACK
         |--------------------------------------------------------------------------
+        |
+        | Each project is rendered as its own standalone PDF using the
+        | existing 'deliveries.ar-layout' view (unchanged), so per-project
+        | page count can actually be measured.
+        |
+        | Every project must START on an odd page. Since projects are
+        | concatenated in order, this is guaranteed as long as EVERY
+        | project's own page count is even - so if a project renders to
+        | an odd number of pages, one blank page is appended to it before
+        | moving on to the next project.
+        |
+        | The individual PDFs are then merged into a single final PDF
+        | using FPDI (composer require setasign/fpdi-fpdf).
+        |
         */
     
-        return Pdf::loadView('deliveries.ar-layout', [
-            'deliveries' => $deliveries,
-            'qrCodes'    => $qrCodes,
-            'signerName' => Auth::user()?->name
-                ?? 'Authorized Representative',
-        ])
-        ->setPaper('legal', 'portrait')
-        ->stream('deliveries-batch.pdf');
+        $projectGroups = $deliveries->groupBy(
+            fn ($delivery) => $delivery->project_id
+        );
+    
+        $tempFiles = [];
+    
+        $mergedPdf = new \setasign\Fpdi\Fpdi();
+        try {
+    
+            foreach ($projectGroups as $projectId => $projectDeliveries) {
+    
+                /*
+                |----------------------------------------------------------------
+                | RENDER THIS PROJECT'S PDF ALONE
+                |----------------------------------------------------------------
+                */
+    
+                $projectPdfContent = Pdf::loadView('deliveries.ar-layout', [
+                    'deliveries' => $projectDeliveries->values(),
+                    'qrCodes'    => $qrCodes,
+                    'signerName' => Auth::user()?->name
+                        ?? 'Authorized Representative',
+                ])
+                ->setPaper('legal', 'portrait')
+                ->output();
+    
+    
+                $tempPath = tempnam(sys_get_temp_dir(), 'ar_project_') . '.pdf';
+    
+                file_put_contents($tempPath, $projectPdfContent);
+    
+                $tempFiles[] = $tempPath;
+    
+    
+                /*
+                |----------------------------------------------------------------
+                | IMPORT ITS PAGES INTO THE MERGED PDF
+                |----------------------------------------------------------------
+                */
+    
+                $pageCount = $mergedPdf->setSourceFile($tempPath);
+    
+                $lastSize = null;
+    
+                for ($page = 1; $page <= $pageCount; $page++) {
+    
+                    $templateId = $mergedPdf->importPage($page);
+    
+                    $lastSize = $mergedPdf->getTemplateSize($templateId);
+    
+                    $mergedPdf->AddPage(
+                        $lastSize['orientation'],
+                        [$lastSize['width'], $lastSize['height']]
+                    );
+    
+                    $mergedPdf->useTemplate($templateId);
+                }
+    
+    
+                /*
+                |----------------------------------------------------------------
+                | PAD WITH A BLANK PAGE IF THIS PROJECT ENDED ON AN ODD PAGE
+                |----------------------------------------------------------------
+                |
+                | Keeping every project's own page count even guarantees the
+                | NEXT project always starts on an odd page.
+                |
+                */
+    
+                if ($pageCount % 2 !== 0 && $lastSize) {
+    
+                    $mergedPdf->AddPage(
+                        $lastSize['orientation'],
+                        [$lastSize['width'], $lastSize['height']]
+                    );
+                }
+            }
+    
+    
+            $mergedOutput = $mergedPdf->Output('S');
+    
+        } finally {
+    
+            /*
+            |--------------------------------------------------------------------------
+            | CLEAN UP TEMP FILES
+            |--------------------------------------------------------------------------
+            */
+    
+            foreach ($tempFiles as $tempFile) {
+    
+                if (file_exists($tempFile)) {
+                    unlink($tempFile);
+                }
+            }
+        }
+    
+    
+        return response($mergedOutput, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="deliveries-batch.pdf"',
+        ]);
     }
 
     // =========================

@@ -12,6 +12,7 @@
         "laravel/tinker": "^2.9",
         "maatwebsite/excel": "^1.1",
         "phpoffice/phpspreadsheet": "^5.8",
+        "setasign/fpdi-fpdf": "^2.3",
         "spatie/laravel-permission": "^6.25",
         "symfony/process": "^7.4"
     },

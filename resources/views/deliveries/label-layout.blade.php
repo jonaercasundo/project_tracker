@@ -43,35 +43,6 @@
 
         /*
         |--------------------------------------------------------------------------
-        | PROJECT BLOCK
-        |--------------------------------------------------------------------------
-        */
-
-        .project-table {
-            margin-bottom: 8px;
-        }
-
-        .project-header {
-            background: #333333;
-            color: #ffffff;
-            font-size: 13px;
-            font-weight: bold;
-            text-align: center;
-            padding: 8px;
-        }
-
-        .project-info-label {
-            width: 20%;
-            background: #eeeeee;
-            font-weight: bold;
-        }
-
-        .project-info-value {
-            width: 80%;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
         | SCHOOL BLOCK
         |--------------------------------------------------------------------------
         */
@@ -247,30 +218,15 @@
 
         /*
         |--------------------------------------------------------------------------
-        | PROJECT PAGE BREAK
+        | SCHOOL PAGE BREAK
         |--------------------------------------------------------------------------
         |
-        | Each project starts on a new page, except the first project.
+        | Each school starts on a new page, except the first school.
         |
         */
 
-        .project-page {
+        .school-page {
             page-break-before: always;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | SCHOOL SPACING
-        |--------------------------------------------------------------------------
-        |
-        | Schools no longer force a page break - they are grouped
-        | together under their parent project. A visual gap separates
-        | one school block from the next within the same project.
-        |
-        */
-
-        .school-block {
-            margin-top: 10px;
         }
 
         /*
@@ -291,9 +247,13 @@
 
 @php
 
-    $totalProjects = count($data);
+    $totalSchools = 0;
 
-    $projectIndex = 0;
+    foreach ($data as $project) {
+        $totalSchools += count($project['schools'] ?? []);
+    }
+
+    $schoolIndex = 0;
 
 @endphp
 
@@ -306,8 +266,6 @@
 
     @php
 
-        $projectIndex++;
-
         $projectInfo = $project['info'] ?? [];
 
         $schools = $project['schools'] ?? [];
@@ -316,100 +274,14 @@
 
 
     {{-- ====================================================================
-         NEW PROJECT
-    ===================================================================== --}}
-
-    @if($projectIndex > 1)
-
-        <div class="project-page"></div>
-
-    @endif
-
-
-    {{-- ====================================================================
-         PROJECT INFORMATION
-    ===================================================================== --}}
-
-    <table class="project-table">
-
-        <tbody>
-
-            {{-- PROJECT NAME --}}
-
-            <tr>
-
-                <td
-                    colspan="4"
-                    class="project-header"
-                >
-
-                    PROJECT:
-                    {{ $projectInfo['project_name'] ?? 'N/A' }}
-
-                </td>
-
-            </tr>
-
-
-            {{-- DIVISION --}}
-
-            @if($showDivision)
-
-                <tr>
-
-                    <td class="project-info-label">
-                        Division
-                    </td>
-
-                    <td
-                        colspan="3"
-                        class="project-info-value"
-                    >
-
-                        {{ $projectInfo['division'] ?? 'N/A' }}
-
-                    </td>
-
-                </tr>
-
-            @endif
-
-
-            {{-- REGION --}}
-
-            @if($showRegion)
-
-                <tr>
-
-                    <td class="project-info-label">
-                        Region
-                    </td>
-
-                    <td
-                        colspan="3"
-                        class="project-info-value"
-                    >
-
-                        {{ $projectInfo['region'] ?? 'N/A' }}
-
-                    </td>
-
-                </tr>
-
-            @endif
-
-        </tbody>
-
-    </table>
-
-
-    {{-- ====================================================================
-         SCHOOL LOOP (within project)
+         SCHOOL LOOP
     ===================================================================== --}}
 
     @forelse($schools as $schoolId => $school)
 
         @php
+
+            $schoolIndex++;
 
             $info = $school['info'] ?? [];
 
@@ -418,7 +290,15 @@
         @endphp
 
 
-        <div class="school-block">
+        {{-- ================================================================
+             NEW SCHOOL
+        ================================================================= --}}
+
+        @if($schoolIndex > 1)
+
+            <div class="school-page"></div>
+
+        @endif
 
 
         {{-- ================================================================
@@ -428,6 +308,23 @@
         <table class="school-table">
 
             <tbody>
+
+                {{-- PROJECT NAME --}}
+
+                <tr>
+
+                    <td
+                        colspan="4"
+                        class="school-header"
+                    >
+
+                        PROJECT:
+                        {{ $projectInfo['project_name'] ?? 'N/A' }}
+
+                    </td>
+
+                </tr>
+
 
                 {{-- SCHOOL NAME --}}
 
@@ -486,6 +383,54 @@
                         >
 
                             {{ $info['municipality'] ?? 'N/A' }}
+
+                        </td>
+
+                    </tr>
+
+                @endif
+
+
+                {{-- DIVISION --}}
+
+                @if($showDivision)
+
+                    <tr>
+
+                        <td class="school-info-label">
+                            Division
+                        </td>
+
+                        <td
+                            colspan="3"
+                            class="school-info-value"
+                        >
+
+                            {{ $projectInfo['division'] ?? 'N/A' }}
+
+                        </td>
+
+                    </tr>
+
+                @endif
+
+
+                {{-- REGION --}}
+
+                @if($showRegion)
+
+                    <tr>
+
+                        <td class="school-info-label">
+                            Region
+                        </td>
+
+                        <td
+                            colspan="3"
+                            class="school-info-value"
+                        >
+
+                            {{ $projectInfo['region'] ?? 'N/A' }}
 
                         </td>
 
@@ -764,8 +709,6 @@
 
         </table>
 
-        </div>
-
 
     @empty
 
@@ -773,15 +716,15 @@
              NO SCHOOLS
         ================================================================= --}}
 
-        <table class="school-table">
-            <tbody>
-                <tr class="empty-row">
-                    <td>
-                        No schools found for this project.
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <tr class="empty-row">
+
+            <td colspan="4">
+
+                No schools found for this project.
+
+            </td>
+
+        </tr>
 
     @endforelse
 

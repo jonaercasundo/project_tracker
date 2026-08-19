@@ -4,6 +4,211 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css" rel="stylesheet">
     <style>
+        /* ============================================================
+   EXISTING IMAGES
+   ============================================================ */
+
+.tx-existing-images {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+@media (max-width: 700px) {
+    .tx-existing-images {
+        grid-template-columns: 1fr;
+    }
+}
+
+.tx-existing-image {
+    position: relative;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem;
+    border: 1px solid var(--tx-line);
+    border-radius: 14px;
+    background: var(--tx-bg);
+    transition: all .15s ease;
+}
+
+.tx-existing-image:hover {
+    border-color: var(--tx-primary);
+}
+
+.tx-existing-image.removing {
+    opacity: .45;
+    transform: scale(.98);
+    border-color: var(--tx-danger);
+}
+
+.tx-existing-image-preview {
+    width: 90px;
+    height: 90px;
+    flex: 0 0 90px;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid var(--tx-line);
+    background: var(--tx-surface);
+}
+
+.tx-existing-image-preview img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.tx-image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tx-ink-faint);
+    font-size: .7rem;
+}
+
+.tx-existing-image-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.tx-existing-image-info strong {
+    display: block;
+    font-size: .8rem;
+    font-weight: 700;
+    color: var(--tx-ink);
+}
+
+.tx-primary-badge {
+    display: inline-flex;
+    margin-top: .35rem;
+    padding: .2rem .55rem;
+    border-radius: 999px;
+    background: var(--tx-primary-soft);
+    color: var(--tx-primary);
+    font-size: .65rem;
+    font-weight: 700;
+}
+
+.tx-image-url {
+    margin-top: .45rem;
+    color: var(--tx-ink-faint);
+    font-size: .68rem;
+    line-height: 1.4;
+    word-break: break-all;
+}
+
+.tx-remove-existing-image {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    flex-shrink: 0;
+    border: 1px solid var(--tx-line);
+    background: var(--tx-surface);
+    color: var(--tx-danger);
+    border-radius: 9px;
+    padding: .45rem .65rem;
+    font-size: .7rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+
+.tx-remove-existing-image:hover {
+    border-color: var(--tx-danger);
+    background: var(--tx-accent-soft);
+}
+
+.tx-existing-image.removing .tx-remove-existing-image {
+    background: var(--tx-danger);
+    color: white;
+    border-color: var(--tx-danger);
+}
+
+
+/* ============================================================
+   IMAGE LINKS
+   ============================================================ */
+
+.tx-image-link-row {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    margin-bottom: .6rem;
+}
+
+.tx-image-link-row .tx-field {
+    flex: 1;
+}
+
+.tx-image-remove-link {
+    flex-shrink: 0;
+    border: 1px solid var(--tx-line);
+    background: var(--tx-surface);
+    color: var(--tx-danger);
+    border-radius: 10px;
+    padding: .65rem .8rem;
+    font-size: .72rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.tx-image-remove-link:hover {
+    border-color: var(--tx-danger);
+    background: var(--tx-accent-soft);
+}
+
+
+/* ============================================================
+   NEW IMAGE PREVIEW
+   ============================================================ */
+
+.tx-new-image-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: .75rem;
+    margin-top: 1rem;
+}
+
+.tx-new-image-preview:empty {
+    display: none;
+}
+
+.tx-new-image-item {
+    position: relative;
+    border: 1px solid var(--tx-line);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--tx-bg);
+}
+
+.tx-new-image-item img {
+    display: block;
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+}
+
+.tx-new-image-name {
+    padding: .45rem .55rem;
+    font-size: .65rem;
+    color: var(--tx-ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tx-no-images {
+    padding: 1rem;
+    border: 1px dashed var(--tx-line);
+    border-radius: 12px;
+    color: var(--tx-ink-faint);
+    font-size: .75rem;
+    text-align: center;
+}
         .tx-console {
             --tx-bg: #F5F6F3;
             --tx-surface: #FFFFFF;
@@ -224,7 +429,8 @@
             <form action="{{ route('mi_app.update', $product->product_id) }}" method="POST" enctype="multipart/form-data" id="edit_product_form">
                 @csrf
                 @method('PUT')
-
+                {{-- Existing images marked for deletion --}}
+                <div id="removedImagesContainer"></div>
                 @php
                     $saveError = $errors->first('error') ?: session('error');
                 @endphp
@@ -685,63 +891,266 @@
                             <p class="tx-hint">Select one or more colors.</p>
                         </div>
 
-                        <div>
-                            <label for="image_links" class="tx-label">Image Links</label>
-                            <p class="tx-hint">Add one or more direct image URLs.</p>
-                            <div id="imageLinks">
-                            @php
-                                $imageLinks = old(
-                                    'image_links',
-                                    $product->images
-                                        ->where('image_type', 'url')
-                                        ->pluck('image_url')
-                                        ->filter()
-                                        ->values()
-                                        ->all()
-                                );
-                            @endphp
-                                @if (is_array($imageLinks) && count($imageLinks))
-                                    @foreach ($imageLinks as $link)
-                                        <input type="url" name="image_links[]" value="{{ $link }}" placeholder="https://example.com/image.jpg" class="tx-field mb-2">
-                                    @endforeach
-                                @else
-                                    <input type="url" name="image_links[]" value="{{ old('image_links.0') }}" placeholder="https://example.com/image.jpg" class="tx-field">
-                                @endif
-                            </div>
-                            @if ($errors->has('image_links') || $errors->has('image_links.*'))
-                                <p class="tx-error">{{ $errors->first('image_links.*') ?? $errors->first('image_links') }}</p>
-                            @endif
-                            <button type="button" onclick="addImageLink()" class="tx-btn-ghost" style="margin-top: 0.6rem;">
-                                + Add Another Link
-                            </button>
+                        {{-- ============================================================
+     IMAGE LINKS
+     ============================================================ --}}
+<div>
+    <label for="image_links" class="tx-label">Image Links</label>
+
+    <p class="tx-hint">
+        Add one or more direct image URLs.
+    </p>
+
+    <div id="imageLinks">
+
+        @php
+            $imageLinks = old(
+                'image_links',
+                $product->images
+                    ->where('image_type', 'url')
+                    ->pluck('image_url')
+                    ->filter()
+                    ->values()
+                    ->all()
+            );
+        @endphp
+
+        @if(is_array($imageLinks) && count($imageLinks))
+
+            @foreach($imageLinks as $link)
+
+                <div class="tx-image-link-row">
+
+                    <input
+                        type="url"
+                        name="image_links[]"
+                        value="{{ $link }}"
+                        placeholder="https://example.com/image.jpg"
+                        class="tx-field"
+                    >
+
+                    <button
+                        type="button"
+                        class="tx-image-remove-link"
+                        onclick="removeImageLink(this)"
+                    >
+                        Remove
+                    </button>
+
+                </div>
+
+            @endforeach
+
+        @else
+
+            <div class="tx-image-link-row">
+
+                <input
+                    type="url"
+                    name="image_links[]"
+                    value="{{ old('image_links.0') }}"
+                    placeholder="https://example.com/image.jpg"
+                    class="tx-field"
+                >
+
+                <button
+                    type="button"
+                    class="tx-image-remove-link"
+                    onclick="removeImageLink(this)"
+                >
+                    Remove
+                </button>
+
+            </div>
+
+        @endif
+
+    </div>
+
+    <button
+        type="button"
+        onclick="addImageLink()"
+        class="tx-btn-ghost"
+        style="margin-top:0.6rem;"
+    >
+        + Add Another Link
+    </button>
+
+    @if ($errors->has('image_links') || $errors->has('image_links.*'))
+
+        <p class="tx-error">
+            {{ $errors->first('image_links.*') ?? $errors->first('image_links') }}
+        </p>
+
+    @endif
+</div>
+
+
+{{-- ============================================================
+     EXISTING IMAGES
+     ============================================================ --}}
+<div style="grid-column:1 / -1;">
+
+    <label class="tx-label">
+        Existing Product Images
+    </label>
+
+    <p class="tx-hint">
+        Remove images you no longer want. Changes are applied when you click Update Product.
+    </p>
+
+    <div
+        id="existingImages"
+        class="tx-existing-images"
+    >
+
+        @forelse($product->images as $image)
+
+            <div
+                class="tx-existing-image"
+                data-image-id="{{ $image->id }}"
+            >
+
+                {{-- Image preview --}}
+
+                <div class="tx-existing-image-preview">
+
+                    @if($image->image_type === 'upload' && $image->image_path)
+
+                        <img
+                            src="{{ asset('storage/' . $image->image_path) }}"
+                            alt="{{ $product->item_name }}"
+                        >
+
+                    @elseif($image->image_type === 'url' && $image->image_url)
+
+                        <img
+                            src="{{ $image->image_url }}"
+                            alt="{{ $product->item_name }}"
+                        >
+
+                    @else
+
+                        <div class="tx-image-placeholder">
+                            No Preview
                         </div>
 
-                        <div style="grid-column: 1 / -1;">
-                            <label class="tx-label">Upload Product Images</label>
-                            <p class="tx-hint">Select one or more files to upload alongside any links above.</p>
-                            <input type="file" id="product_images" name="product_images[]" accept="image/*,.pdf,.obj,.stl" multiple class="tx-field" style="padding: 0.5rem 0.75rem;">
-                            @if ($errors->has('product_images') || $errors->has('product_images.*'))
-                                <p class="tx-error">{{ $errors->first('product_images.*') ?? $errors->first('product_images') }}</p>
-                            @endif
+                    @endif
 
-                            @if($product->images->isNotEmpty())
-                                <div class="tx-current-image" style="flex-wrap: wrap; margin-top: 1rem;">
-                                    @foreach($product->images as $image)
-                                        @if($image->image_type === 'upload' && $image->image_path)
-                                            <div style="display:flex; flex-direction:column; gap:0.35rem;">
-                                                <img src="{{ asset('storage/' . $image->image_path) }}" alt="{{ $product->item_name }}">
-                                                <span class="tx-current-image-meta">Uploaded image</span>
-                                            </div>
-                                        @elseif($image->image_type === 'url' && $image->image_url)
-                                            <div style="display:flex; flex-direction:column; gap:0.35rem;">
-                                                <img src="{{ $image->image_url }}" alt="{{ $product->item_name }}" style="object-fit:cover;">
-                                                <span class="tx-current-image-meta">Linked image</span>
-                                            </div>
-                                        @endif
-                                    @endforeach
-                                </div>
-                            @endif
+                </div>
+
+
+                {{-- Image information --}}
+
+                <div class="tx-existing-image-info">
+
+                    <strong>
+                        {{ ucfirst($image->image_type) }} Image
+                    </strong>
+
+                    @if($image->is_primary)
+                        <span class="tx-primary-badge">
+                            Primary
+                        </span>
+                    @endif
+
+                    @if($image->image_type === 'url')
+
+                        <div class="tx-image-url">
+                            {{ $image->image_url }}
                         </div>
+
+                    @elseif($image->image_type === 'upload')
+
+                        <div class="tx-image-url">
+                            {{ $image->image_path }}
+                        </div>
+
+                    @endif
+
+                </div>
+
+
+                {{-- Remove button --}}
+
+                <button
+                    type="button"
+                    class="tx-remove-existing-image"
+                    onclick="removeExistingImage({{ $image->id }}, this)"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M6 6l12 12M18 6L6 18"
+                        />
+                    </svg>
+
+                    Remove
+                </button>
+
+            </div>
+
+        @empty
+
+            <div class="tx-no-images">
+                No existing images found.
+            </div>
+
+        @endforelse
+
+    </div>
+
+</div>
+
+
+{{-- ============================================================
+     NEW UPLOADS
+     ============================================================ --}}
+<div style="grid-column:1 / -1;">
+
+    <label class="tx-label">
+        Add New Product Images
+    </label>
+
+    <p class="tx-hint">
+        Select one or more new files. They will be added when you update the product.
+    </p>
+
+    <input
+        type="file"
+        id="product_images"
+        name="product_images[]"
+        accept="image/*,.pdf,.obj,.stl"
+        multiple
+        class="tx-field"
+        style="padding:0.5rem 0.75rem;"
+    >
+
+    @if ($errors->has('product_images') || $errors->has('product_images.*'))
+
+        <p class="tx-error">
+            {{ $errors->first('product_images.*') ?? $errors->first('product_images') }}
+        </p>
+
+    @endif
+
+    {{-- New upload preview --}}
+
+    <div
+        id="newImagePreview"
+        class="tx-new-image-preview"
+    ></div>
+
+</div>
                     </div>
                 </div>
 
@@ -772,25 +1181,179 @@ document.addEventListener('DOMContentLoaded', function () {
      * ============================================================ */
 
     window.addImageLink = function () {
-        const container = document.getElementById('imageLinks');
 
-        if (!container) {
-            return;
+const container =
+    document.getElementById('imageLinks');
+
+if (!container) {
+    return;
+}
+
+const row =
+    document.createElement('div');
+
+row.className =
+    'tx-image-link-row';
+
+row.innerHTML = `
+    <input
+        type="url"
+        name="image_links[]"
+        placeholder="https://example.com/image.jpg"
+        class="tx-field"
+    >
+
+    <button
+        type="button"
+        class="tx-image-remove-link"
+        onclick="removeImageLink(this)"
+    >
+        Remove
+    </button>
+`;
+
+container.appendChild(row);
+
+const input =
+    row.querySelector('input');
+
+if (input) {
+    input.focus();
+}
+};
+window.removeImageLink = function (button) {
+
+    if (!button) {
+        return;
+    }
+
+    const row =
+        button.closest('.tx-image-link-row');
+
+    if (!row) {
+        return;
+    }
+
+    row.remove();
+};
+window.removeExistingImage = function (imageId, button) {
+
+    if (!imageId || !button) {
+        return;
+    }
+
+    const card =
+        button.closest('.tx-existing-image');
+
+    if (!card) {
+        return;
+    }
+
+    const container =
+        document.getElementById('removedImagesContainer');
+
+    if (!container) {
+        return;
+    }
+
+
+    /*
+     * If already marked for removal,
+     * allow the user to undo it.
+     */
+    if (card.dataset.removing === '1') {
+
+        card.dataset.removing = '0';
+
+        card.classList.remove('removing');
+
+        button.innerHTML = `
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M6 6l12 12M18 6L6 18"
+                />
+            </svg>
+
+            Remove
+        `;
+
+        const hidden =
+            container.querySelector(
+                'input[data-image-id="' + imageId + '"]'
+            );
+
+        if (hidden) {
+            hidden.remove();
         }
 
-        const input = document.createElement('input');
-
-        input.type = 'url';
-        input.name = 'image_links[]';
-        input.placeholder = 'https://example.com/image.jpg';
-        input.className = 'tx-field mb-2';
-
-        container.appendChild(input);
-
-        input.focus();
-    };
+        return;
+    }
 
 
+    /*
+     * Mark image for removal.
+     */
+
+    card.dataset.removing = '1';
+
+    card.classList.add('removing');
+
+
+    /*
+     * Create hidden input.
+     */
+
+    const input =
+        document.createElement('input');
+
+    input.type = 'hidden';
+
+    input.name =
+        'remove_image_ids[]';
+
+    input.value =
+        imageId;
+
+    input.dataset.imageId =
+        imageId;
+
+    container.appendChild(input);
+
+
+    /*
+     * Change button.
+     */
+
+    button.innerHTML = `
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+        >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M6 6l12 12M18 6L6 18"
+            />
+        </svg>
+
+        Undo
+    `;
+};
     /* ============================================================
      * TAXONOMY CASCADE
      *
@@ -1569,5 +2132,96 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 });
+/* ============================================================
+ * NEW IMAGE PREVIEW
+ * ============================================================ */
+
+const productImagesInput =
+    document.getElementById('product_images');
+
+const newImagePreview =
+    document.getElementById('newImagePreview');
+
+
+if (productImagesInput && newImagePreview) {
+
+    productImagesInput.addEventListener(
+        'change',
+        function () {
+
+            newImagePreview.innerHTML = '';
+
+            const files =
+                Array.from(this.files || []);
+
+            files.forEach(function (file) {
+
+                const item =
+                    document.createElement('div');
+
+                item.className =
+                    'tx-new-image-item';
+
+
+                if (file.type.startsWith('image/')) {
+
+                    const img =
+                        document.createElement('img');
+
+                    const url =
+                        URL.createObjectURL(file);
+
+                    img.src = url;
+
+                    img.onload = function () {
+                        URL.revokeObjectURL(url);
+                    };
+
+                    item.appendChild(img);
+
+                } else {
+
+                    const placeholder =
+                        document.createElement('div');
+
+                    placeholder.style.height = '120px';
+
+                    placeholder.style.display = 'flex';
+
+                    placeholder.style.alignItems = 'center';
+
+                    placeholder.style.justifyContent = 'center';
+
+                    placeholder.style.fontSize = '.7rem';
+
+                    placeholder.style.color =
+                        'var(--tx-ink-faint)';
+
+                    placeholder.textContent =
+                        'File';
+
+                    item.appendChild(placeholder);
+                }
+
+
+                const name =
+                    document.createElement('div');
+
+                name.className =
+                    'tx-new-image-name';
+
+                name.textContent =
+                    file.name;
+
+
+                item.appendChild(name);
+
+                newImagePreview.appendChild(item);
+
+            });
+
+        }
+    );
+}
 </script>
 </x-mi_app>

@@ -7,6 +7,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class QuotationController extends Controller
 {
@@ -375,7 +376,7 @@ class QuotationController extends Controller
                     !is_readable($storagePath)
                 ) {
     
-                    \Log::warning(
+                    Log::warning(
                         'Quotation image file not found',
                         [
                             'product_id' =>
@@ -437,7 +438,7 @@ class QuotationController extends Controller
     
                 } catch (\Throwable $e) {
     
-                    \Log::warning(
+                    Log::warning(
                         'Quotation image conversion failed',
                         [
                             'product_id' =>
@@ -565,7 +566,7 @@ class QuotationController extends Controller
                         !$response->successful()
                     ) {
     
-                        \Log::warning(
+                        Log::warning(
                             'Quotation external image download failed',
                             [
                                 'product_id' =>
@@ -623,7 +624,7 @@ class QuotationController extends Controller
     
                 } catch (\Throwable $e) {
     
-                    \Log::warning(
+                    Log::warning(
                         'Quotation external image error',
                         [
                             'product_id' =>

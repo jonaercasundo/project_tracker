@@ -20,31 +20,28 @@ class QuotationController extends Controller
         | Validate Request
         |--------------------------------------------------------------------------
         */
-
+    
         $validated = $request->validate([
             'customer_name' => [
                 'required',
                 'string',
                 'max:150',
             ],
-
+    
             'quantity' => [
                 'required',
                 'integer',
                 'min:1',
             ],
         ]);
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
         | Load Product Information
         |--------------------------------------------------------------------------
-        |
-        | Load all relationships needed by the quotation.
-        |
         */
-
+    
         $product->load([
             'category',
             'subCategory',
@@ -52,32 +49,29 @@ class QuotationController extends Controller
             'collection',
             'images',
         ]);
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
         | Price
         |--------------------------------------------------------------------------
-        |
-        | Use purchase_cost as requested for the quotation.
-        |
         */
-
+    
         $quantity = (int) $validated['quantity'];
-
+    
         $unitPrice = (float) ($product->price ?? 0);
-        
+    
         $subtotal = $unitPrice * $quantity;
-        
+    
         $total = $subtotal;
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
         | Quote Number
         |--------------------------------------------------------------------------
         */
-
+    
         $quoteNumber =
             'Q-' .
             now()->format('Ymd') .
@@ -88,80 +82,316 @@ class QuotationController extends Controller
                 '0',
                 STR_PAD_LEFT
             );
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
         | Product Image
         |--------------------------------------------------------------------------
         |
-        | Dompdf works best with a Base64 image.
+        | Dompdf has problems with WebP depending on the installed GD support.
         |
-        | We take the first available product image.
+        | To make the PDF generation reliable:
+        |
+        |   WebP  -> JPEG
+        |   GIF   -> JPEG
+        |   Other -> Keep original if supported
+        |
+        | The image is converted to Base64 before being passed to Dompdf.
         |
         */
-
+    
         $productImage = null;
-
+    
+    
+        /*
+        |--------------------------------------------------------------------------
+        | Helper: Convert Image Data to Dompdf-Safe Base64
+        |--------------------------------------------------------------------------
+        */
+    
+        $convertImageForPdf = function ($imageData, $mimeType) {
+    
+            if (empty($imageData)) {
+                return null;
+            }
+    
+            $mimeType = strtolower(
+                trim(
+                    explode(';', $mimeType)[0]
+                )
+            );
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | JPEG
+            |--------------------------------------------------------------------------
+            */
+    
+            if (
+                $mimeType === 'image/jpeg' ||
+                $mimeType === 'image/jpg'
+            ) {
+                return 'data:image/jpeg;base64,' .
+                    base64_encode($imageData);
+            }
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | PNG
+            |--------------------------------------------------------------------------
+            |
+            | Keep PNG because Dompdf supports PNG well.
+            |
+            */
+    
+            if ($mimeType === 'image/png') {
+                return 'data:image/png;base64,' .
+                    base64_encode($imageData);
+            }
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | WEBP / GIF / Other Images
+            |--------------------------------------------------------------------------
+            |
+            | Convert them to JPEG using GD.
+            |
+            */
+    
+            if (
+                function_exists('imagecreatefromstring') &&
+                function_exists('imagejpeg')
+            ) {
+    
+                try {
+    
+                    $source = @imagecreatefromstring($imageData);
+    
+                    if ($source !== false) {
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Create white background
+                        |--------------------------------------------------------------------------
+                        |
+                        | This prevents transparent WebP/GIF images from becoming
+                        | black when converted to JPEG.
+                        |
+                        */
+    
+                        $width = imagesx($source);
+                        $height = imagesy($source);
+    
+                        $background = imagecreatetruecolor(
+                            $width,
+                            $height
+                        );
+    
+                        $white = imagecolorallocate(
+                            $background,
+                            255,
+                            255,
+                            255
+                        );
+    
+                        imagefill(
+                            $background,
+                            0,
+                            0,
+                            $white
+                        );
+    
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Copy Source
+                        |--------------------------------------------------------------------------
+                        */
+    
+                        imagecopy(
+                            $background,
+                            $source,
+                            0,
+                            0,
+                            0,
+                            0,
+                            $width,
+                            $height
+                        );
+    
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Convert to JPEG
+                        |--------------------------------------------------------------------------
+                        */
+    
+                        ob_start();
+    
+                        imagejpeg(
+                            $background,
+                            null,
+                            90
+                        );
+    
+                        $jpegData = ob_get_clean();
+    
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Cleanup
+                        |--------------------------------------------------------------------------
+                        */
+    
+                        imagedestroy($source);
+                        imagedestroy($background);
+    
+    
+                        if ($jpegData !== false && !empty($jpegData)) {
+    
+                            return 'data:image/jpeg;base64,' .
+                                base64_encode($jpegData);
+                        }
+                    }
+    
+                } catch (\Throwable $e) {
+    
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Ignore conversion failure
+                    |--------------------------------------------------------------------------
+                    |
+                    | The quotation can still be generated without an image.
+                    |
+                    */
+                }
+            }
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | Last Resort
+            |--------------------------------------------------------------------------
+            |
+            | If GD cannot convert the image, return null instead of passing
+            | a problematic WebP image to Dompdf.
+            |
+            */
+    
+            return null;
+        };
+    
+    
+        /*
+        |--------------------------------------------------------------------------
+        | Find First Valid Product Image
+        |--------------------------------------------------------------------------
+        */
+    
         foreach ($product->images as $image) {
-
+    
+    
             /*
             |--------------------------------------------------------------------------
             | Uploaded Image
             |--------------------------------------------------------------------------
             */
-
+    
             if (
                 isset($image->image_type) &&
                 $image->image_type === 'upload' &&
                 !empty($image->image_path)
             ) {
-
+    
                 $storagePath = storage_path(
-                    'app/public/' . ltrim($image->image_path, '/')
+                    'app/public/' .
+                    ltrim($image->image_path, '/')
                 );
-
+    
+    
                 if (file_exists($storagePath)) {
-
-                    $mimeType = mime_content_type($storagePath);
-
-                    $imageData = file_get_contents($storagePath);
-
-                    if ($imageData !== false) {
-
-                        $productImage =
-                            'data:' .
-                            $mimeType .
-                            ';base64,' .
-                            base64_encode($imageData);
-
-                        break;
+    
+                    try {
+    
+                        $imageData = file_get_contents(
+                            $storagePath
+                        );
+    
+                        if ($imageData !== false) {
+    
+                            /*
+                            |--------------------------------------------------------------------------
+                            | Detect MIME Type
+                            |--------------------------------------------------------------------------
+                            */
+    
+                            $mimeType = mime_content_type(
+                                $storagePath
+                            );
+    
+    
+                            /*
+                            |--------------------------------------------------------------------------
+                            | Convert Image
+                            |--------------------------------------------------------------------------
+                            */
+    
+                            $convertedImage =
+                                $convertImageForPdf(
+                                    $imageData,
+                                    $mimeType
+                                );
+    
+    
+                            if ($convertedImage !== null) {
+    
+                                $productImage =
+                                    $convertedImage;
+    
+                                break;
+                            }
+                        }
+    
+                    } catch (\Throwable $e) {
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Ignore Invalid Uploaded Image
+                        |--------------------------------------------------------------------------
+                        */
+    
                     }
                 }
             }
-
-
+    
+    
             /*
             |--------------------------------------------------------------------------
             | External Image / Google Drive
             |--------------------------------------------------------------------------
             */
-
+    
             if (
                 isset($image->image_type) &&
                 $image->image_type !== 'upload' &&
                 !empty($image->image_url)
             ) {
-
-                $imageUrl = trim($image->image_url);
-
-
+    
+                $imageUrl = trim(
+                    $image->image_url
+                );
+    
+    
                 /*
                 |--------------------------------------------------------------------------
-                | Convert Google Drive URL
+                | Convert Google Drive UC URL
                 |--------------------------------------------------------------------------
                 */
-
+    
                 if (
                     preg_match(
                         '/drive\.google\.com\/uc\?.*id=([^&]+)/',
@@ -169,16 +399,22 @@ class QuotationController extends Controller
                         $matches
                     )
                 ) {
-
+    
                     $fileId = $matches[1];
-
+    
                     $imageUrl =
                         'https://drive.google.com/thumbnail?id=' .
                         $fileId .
                         '&sz=w1600';
                 }
-
-
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Convert Google Drive File URL
+                |--------------------------------------------------------------------------
+                */
+    
                 elseif (
                     preg_match(
                         '#drive\.google\.com/file/d/([^/]+)#',
@@ -186,16 +422,22 @@ class QuotationController extends Controller
                         $matches
                     )
                 ) {
-
+    
                     $fileId = $matches[1];
-
+    
                     $imageUrl =
                         'https://drive.google.com/thumbnail?id=' .
                         $fileId .
                         '&sz=w1600';
                 }
-
-
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Convert Google Drive Open URL
+                |--------------------------------------------------------------------------
+                */
+    
                 elseif (
                     preg_match(
                         '/drive\.google\.com\/open\?id=([^&]+)/',
@@ -203,41 +445,45 @@ class QuotationController extends Controller
                         $matches
                     )
                 ) {
-
+    
                     $fileId = $matches[1];
-
+    
                     $imageUrl =
                         'https://drive.google.com/thumbnail?id=' .
                         $fileId .
                         '&sz=w1600';
                 }
-
-
+    
+    
                 /*
                 |--------------------------------------------------------------------------
                 | Download External Image
                 |--------------------------------------------------------------------------
                 */
-
+    
                 try {
-
+    
                     $response = Http::timeout(15)
                         ->withOptions([
                             'verify' => false,
                         ])
                         ->get($imageUrl);
-
+    
+    
                     if ($response->successful()) {
-
+    
                         $contentType =
-                            $response->header('Content-Type');
-
+                            $response->header(
+                                'Content-Type'
+                            );
+    
+    
                         /*
                         |--------------------------------------------------------------------------
-                        | Make sure the response is actually an image
+                        | Make Sure Response Is an Image
                         |--------------------------------------------------------------------------
                         */
-
+    
                         if (
                             $contentType &&
                             str_starts_with(
@@ -245,92 +491,129 @@ class QuotationController extends Controller
                                 'image/'
                             )
                         ) {
-
-                            $productImage =
-                                'data:' .
-                                $contentType .
-                                ';base64,' .
-                                base64_encode(
-                                    $response->body()
+    
+                            $imageData =
+                                $response->body();
+    
+    
+                            /*
+                            |--------------------------------------------------------------------------
+                            | Convert External Image
+                            |--------------------------------------------------------------------------
+                            */
+    
+                            $convertedImage =
+                                $convertImageForPdf(
+                                    $imageData,
+                                    $contentType
                                 );
-
-                            break;
+    
+    
+                            if ($convertedImage !== null) {
+    
+                                $productImage =
+                                    $convertedImage;
+    
+                                break;
+                            }
                         }
                     }
-
+    
                 } catch (\Throwable $e) {
-
+    
                     /*
                     |--------------------------------------------------------------------------
-                    | Ignore image failure
+                    | Ignore External Image Failure
                     |--------------------------------------------------------------------------
                     |
-                    | The quotation will still generate even if
-                    | an external image cannot be downloaded.
+                    | The quotation should still generate.
                     |
                     */
+    
                 }
             }
         }
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
         | Generate PDF
         |--------------------------------------------------------------------------
         */
-
+    
         $pdf = Pdf::loadView(
             'mi_app.public.quotation-pdf',
             [
                 'product' => $product,
-                'customer_name' => $validated['customer_name'],
-                'quantity' => $quantity,
-                'unit_price' => $unitPrice,
-                'subtotal' => $subtotal,
-                'total' => $total,
-                'quote_number' => $quoteNumber,
-                'issued_at' => now(),
-                'product_image' => $productImage,
+    
+                'customer_name' =>
+                    $validated['customer_name'],
+    
+                'quantity' =>
+                    $quantity,
+    
+                'unit_price' =>
+                    $unitPrice,
+    
+                'subtotal' =>
+                    $subtotal,
+    
+                'total' =>
+                    $total,
+    
+                'quote_number' =>
+                    $quoteNumber,
+    
+                'issued_at' =>
+                    now(),
+    
+                'product_image' =>
+                    $productImage,
             ]
         );
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
         | PDF Settings
         |--------------------------------------------------------------------------
         */
-
-        $pdf->setPaper('A4', 'portrait');
-
+    
+        $pdf->setPaper(
+            'A4',
+            'portrait'
+        );
+    
+    
         $pdf->setOptions([
             'isHtml5ParserEnabled' => true,
             'isRemoteEnabled' => true,
             'isPhpEnabled' => false,
             'defaultFont' => 'DejaVu Sans',
         ]);
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
         | Filename
         |--------------------------------------------------------------------------
         */
-
+    
         $filename =
             'quotation-' .
             ($product->sku ?? $product->product_id) .
             '.pdf';
-
-
+    
+    
         /*
         |--------------------------------------------------------------------------
-        | Download
+        | Download PDF
         |--------------------------------------------------------------------------
         */
-
-        return $pdf->download($filename);
+    
+        return $pdf->download(
+            $filename
+        );
     }
     public function print(Request $request, $product)
     {

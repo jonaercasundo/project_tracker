@@ -924,11 +924,11 @@
             </td>
 
             <td class="num">
-                ₱{{ number_format((float) $unit_price, 2) }}
+                ${{ number_format((float) $unit_price, 2) }}
             </td>
 
             <td class="num">
-                ₱{{ number_format((float) $subtotal, 2) }}
+                ${{ number_format((float) $subtotal, 2) }}
             </td>
 
         </tr>
@@ -951,7 +951,7 @@
         </td>
 
         <td class="value">
-            ₱{{ number_format($total, 2) }}
+            ${{ number_format($total, 2) }}
         </td>
 
     </tr>
@@ -964,7 +964,7 @@
         </td>
 
         <td class="value">
-            ₱{{ number_format((float) $total, 2) }}
+            ${{ number_format((float) $total, 2) }}
         </td>
 
     </tr>
@@ -994,4 +994,5 @@
 
 
 </body>
+
 </html>

@@ -88,17 +88,6 @@ class QuotationController extends Controller
         |--------------------------------------------------------------------------
         | Product Image
         |--------------------------------------------------------------------------
-        |
-        | Dompdf has problems with WebP depending on the installed GD support.
-        |
-        | To make the PDF generation reliable:
-        |
-        |   WebP  -> JPEG
-        |   GIF   -> JPEG
-        |   Other -> Keep original if supported
-        |
-        | The image is converted to Base64 before being passed to Dompdf.
-        |
         */
     
         $productImage = null;
@@ -106,19 +95,58 @@ class QuotationController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | Helper: Convert Image Data to Dompdf-Safe Base64
+        | Helper: Convert Image To Dompdf-Safe Base64
         |--------------------------------------------------------------------------
         */
     
-        $convertImageForPdf = function ($imageData, $mimeType) {
+        $convertImageForPdf = function ($imageData, $mimeType = null) {
     
-            if (empty($imageData)) {
+            if (
+                empty($imageData) ||
+                !is_string($imageData)
+            ) {
                 return null;
             }
     
+    
+            /*
+            |--------------------------------------------------------------------------
+            | Detect Actual Image Type
+            |--------------------------------------------------------------------------
+            |
+            | Do not completely trust Content-Type.
+            |
+            */
+    
+            $detectedMime = null;
+    
+            try {
+    
+                $finfo = new \finfo(FILEINFO_MIME_TYPE);
+    
+                $detectedMime =
+                    $finfo->buffer($imageData);
+    
+            } catch (\Throwable $e) {
+    
+                $detectedMime = null;
+            }
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | Use Detected MIME When Available
+            |--------------------------------------------------------------------------
+            */
+    
+            $mimeType =
+                $detectedMime
+                ?: $mimeType;
+    
+    
             $mimeType = strtolower(
                 trim(
-                    explode(';', $mimeType)[0]
+                    explode(';', (string) $mimeType)[0]
                 )
             );
     
@@ -133,7 +161,9 @@ class QuotationController extends Controller
                 $mimeType === 'image/jpeg' ||
                 $mimeType === 'image/jpg'
             ) {
-                return 'data:image/jpeg;base64,' .
+    
+                return
+                    'data:image/jpeg;base64,' .
                     base64_encode($imageData);
             }
     
@@ -142,158 +172,176 @@ class QuotationController extends Controller
             |--------------------------------------------------------------------------
             | PNG
             |--------------------------------------------------------------------------
-            |
-            | Keep PNG because Dompdf supports PNG well.
-            |
             */
     
             if ($mimeType === 'image/png') {
-                return 'data:image/png;base64,' .
+    
+                return
+                    'data:image/png;base64,' .
                     base64_encode($imageData);
             }
     
     
             /*
             |--------------------------------------------------------------------------
-            | WEBP / GIF / Other Images
+            | Convert Other Image Formats
             |--------------------------------------------------------------------------
-            |
-            | Convert them to JPEG using GD.
-            |
             */
     
             if (
-                function_exists('imagecreatefromstring') &&
-                function_exists('imagejpeg')
+                !function_exists('imagecreatefromstring') ||
+                !function_exists('imagejpeg')
             ) {
     
-                try {
-    
-                    $source = @imagecreatefromstring($imageData);
-    
-                    if ($source !== false) {
-    
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Create white background
-                        |--------------------------------------------------------------------------
-                        |
-                        | This prevents transparent WebP/GIF images from becoming
-                        | black when converted to JPEG.
-                        |
-                        */
-    
-                        $width = imagesx($source);
-                        $height = imagesy($source);
-    
-                        $background = imagecreatetruecolor(
-                            $width,
-                            $height
-                        );
-    
-                        $white = imagecolorallocate(
-                            $background,
-                            255,
-                            255,
-                            255
-                        );
-    
-                        imagefill(
-                            $background,
-                            0,
-                            0,
-                            $white
-                        );
-    
-    
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Copy Source
-                        |--------------------------------------------------------------------------
-                        */
-    
-                        imagecopy(
-                            $background,
-                            $source,
-                            0,
-                            0,
-                            0,
-                            0,
-                            $width,
-                            $height
-                        );
-    
-    
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Convert to JPEG
-                        |--------------------------------------------------------------------------
-                        */
-    
-                        ob_start();
-    
-                        imagejpeg(
-                            $background,
-                            null,
-                            90
-                        );
-    
-                        $jpegData = ob_get_clean();
-    
-    
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Cleanup
-                        |--------------------------------------------------------------------------
-                        */
-    
-                        imagedestroy($source);
-                        imagedestroy($background);
-    
-    
-                        if ($jpegData !== false && !empty($jpegData)) {
-    
-                            return 'data:image/jpeg;base64,' .
-                                base64_encode($jpegData);
-                        }
-                    }
-    
-                } catch (\Throwable $e) {
-    
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Ignore conversion failure
-                    |--------------------------------------------------------------------------
-                    |
-                    | The quotation can still be generated without an image.
-                    |
-                    */
-                }
+                return null;
             }
     
     
-            /*
-            |--------------------------------------------------------------------------
-            | Last Resort
-            |--------------------------------------------------------------------------
-            |
-            | If GD cannot convert the image, return null instead of passing
-            | a problematic WebP image to Dompdf.
-            |
-            */
+            try {
     
-            return null;
+                $source =
+                    @imagecreatefromstring(
+                        $imageData
+                    );
+    
+    
+                if ($source === false) {
+                    return null;
+                }
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Image Dimensions
+                |--------------------------------------------------------------------------
+                */
+    
+                $width =
+                    imagesx($source);
+    
+                $height =
+                    imagesy($source);
+    
+    
+                if (
+                    $width <= 0 ||
+                    $height <= 0
+                ) {
+    
+                    imagedestroy($source);
+    
+                    return null;
+                }
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Create White Background
+                |--------------------------------------------------------------------------
+                |
+                | Important for transparent WebP / PNG / GIF.
+                |
+                */
+    
+                $background =
+                    imagecreatetruecolor(
+                        $width,
+                        $height
+                    );
+    
+    
+                $white =
+                    imagecolorallocate(
+                        $background,
+                        255,
+                        255,
+                        255
+                    );
+    
+    
+                imagefill(
+                    $background,
+                    0,
+                    0,
+                    $white
+                );
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Copy Image
+                |--------------------------------------------------------------------------
+                */
+    
+                imagecopy(
+                    $background,
+                    $source,
+                    0,
+                    0,
+                    0,
+                    0,
+                    $width,
+                    $height
+                );
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Convert To JPEG
+                |--------------------------------------------------------------------------
+                */
+    
+                ob_start();
+    
+                imagejpeg(
+                    $background,
+                    null,
+                    90
+                );
+    
+                $jpegData =
+                    ob_get_clean();
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Cleanup
+                |--------------------------------------------------------------------------
+                */
+    
+                imagedestroy($source);
+    
+                imagedestroy($background);
+    
+    
+                if (
+                    $jpegData === false ||
+                    empty($jpegData)
+                ) {
+    
+                    return null;
+                }
+    
+    
+                return
+                    'data:image/jpeg;base64,' .
+                    base64_encode($jpegData);
+    
+    
+            } catch (\Throwable $e) {
+    
+                return null;
+            }
         };
     
     
         /*
         |--------------------------------------------------------------------------
-        | Find First Valid Product Image
+        | Find A Valid Product Image
         |--------------------------------------------------------------------------
         */
     
         foreach ($product->images as $image) {
-    
     
             /*
             |--------------------------------------------------------------------------
@@ -302,69 +350,108 @@ class QuotationController extends Controller
             */
     
             if (
-                isset($image->image_type) &&
                 $image->image_type === 'upload' &&
                 !empty($image->image_path)
             ) {
     
-                $storagePath = storage_path(
-                    'app/public/' .
-                    ltrim($image->image_path, '/')
-                );
+                $storagePath =
+                    storage_path(
+                        'app/public/' .
+                        ltrim(
+                            $image->image_path,
+                            '/'
+                        )
+                    );
     
     
-                if (file_exists($storagePath)) {
+                /*
+                |--------------------------------------------------------------------------
+                | Check File Exists
+                |--------------------------------------------------------------------------
+                */
     
-                    try {
+                if (
+                    !is_file($storagePath) ||
+                    !is_readable($storagePath)
+                ) {
     
-                        $imageData = file_get_contents(
+                    \Log::warning(
+                        'Quotation image file not found',
+                        [
+                            'product_id' =>
+                                $product->product_id,
+    
+                            'image_id' =>
+                                $image->id ??
+                                $image->product_image_id ??
+                                null,
+    
+                            'path' =>
+                                $storagePath,
+                        ]
+                    );
+    
+                    continue;
+                }
+    
+    
+                try {
+    
+                    $imageData =
+                        file_get_contents(
                             $storagePath
                         );
     
-                        if ($imageData !== false) {
     
-                            /*
-                            |--------------------------------------------------------------------------
-                            | Detect MIME Type
-                            |--------------------------------------------------------------------------
-                            */
+                    if (
+                        $imageData === false ||
+                        empty($imageData)
+                    ) {
     
-                            $mimeType = mime_content_type(
-                                $storagePath
-                            );
-    
-    
-                            /*
-                            |--------------------------------------------------------------------------
-                            | Convert Image
-                            |--------------------------------------------------------------------------
-                            */
-    
-                            $convertedImage =
-                                $convertImageForPdf(
-                                    $imageData,
-                                    $mimeType
-                                );
-    
-    
-                            if ($convertedImage !== null) {
-    
-                                $productImage =
-                                    $convertedImage;
-    
-                                break;
-                            }
-                        }
-    
-                    } catch (\Throwable $e) {
-    
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Ignore Invalid Uploaded Image
-                        |--------------------------------------------------------------------------
-                        */
-    
+                        continue;
                     }
+    
+    
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Convert Image
+                    |--------------------------------------------------------------------------
+                    */
+    
+                    $convertedImage =
+                        $convertImageForPdf(
+                            $imageData
+                        );
+    
+    
+                    if (
+                        $convertedImage !== null
+                    ) {
+    
+                        $productImage =
+                            $convertedImage;
+    
+                        break;
+                    }
+    
+    
+                } catch (\Throwable $e) {
+    
+                    \Log::warning(
+                        'Quotation image conversion failed',
+                        [
+                            'product_id' =>
+                                $product->product_id,
+    
+                            'path' =>
+                                $storagePath,
+    
+                            'error' =>
+                                $e->getMessage(),
+                        ]
+                    );
+    
+                    continue;
                 }
             }
     
@@ -376,19 +463,19 @@ class QuotationController extends Controller
             */
     
             if (
-                isset($image->image_type) &&
                 $image->image_type !== 'upload' &&
                 !empty($image->image_url)
             ) {
     
-                $imageUrl = trim(
-                    $image->image_url
-                );
+                $imageUrl =
+                    trim(
+                        $image->image_url
+                    );
     
     
                 /*
                 |--------------------------------------------------------------------------
-                | Convert Google Drive UC URL
+                | Google Drive / UC URL
                 |--------------------------------------------------------------------------
                 */
     
@@ -400,7 +487,8 @@ class QuotationController extends Controller
                     )
                 ) {
     
-                    $fileId = $matches[1];
+                    $fileId =
+                        $matches[1];
     
                     $imageUrl =
                         'https://drive.google.com/thumbnail?id=' .
@@ -411,7 +499,7 @@ class QuotationController extends Controller
     
                 /*
                 |--------------------------------------------------------------------------
-                | Convert Google Drive File URL
+                | Google Drive File URL
                 |--------------------------------------------------------------------------
                 */
     
@@ -423,7 +511,8 @@ class QuotationController extends Controller
                     )
                 ) {
     
-                    $fileId = $matches[1];
+                    $fileId =
+                        $matches[1];
     
                     $imageUrl =
                         'https://drive.google.com/thumbnail?id=' .
@@ -434,7 +523,7 @@ class QuotationController extends Controller
     
                 /*
                 |--------------------------------------------------------------------------
-                | Convert Google Drive Open URL
+                | Google Drive Open URL
                 |--------------------------------------------------------------------------
                 */
     
@@ -446,7 +535,8 @@ class QuotationController extends Controller
                     )
                 ) {
     
-                    $fileId = $matches[1];
+                    $fileId =
+                        $matches[1];
     
                     $imageUrl =
                         'https://drive.google.com/thumbnail?id=' .
@@ -463,73 +553,91 @@ class QuotationController extends Controller
     
                 try {
     
-                    $response = Http::timeout(15)
-                        ->withOptions([
-                            'verify' => false,
-                        ])
-                        ->get($imageUrl);
+                    $response =
+                        Http::timeout(15)
+                            ->withOptions([
+                                'verify' => false,
+                            ])
+                            ->get($imageUrl);
     
     
-                    if ($response->successful()) {
+                    if (
+                        !$response->successful()
+                    ) {
     
-                        $contentType =
-                            $response->header(
-                                'Content-Type'
-                            );
+                        \Log::warning(
+                            'Quotation external image download failed',
+                            [
+                                'product_id' =>
+                                    $product->product_id,
     
+                                'url' =>
+                                    $imageUrl,
     
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Make Sure Response Is an Image
-                        |--------------------------------------------------------------------------
-                        */
+                                'status' =>
+                                    $response->status(),
+                            ]
+                        );
     
-                        if (
-                            $contentType &&
-                            str_starts_with(
-                                strtolower($contentType),
-                                'image/'
-                            )
-                        ) {
-    
-                            $imageData =
-                                $response->body();
-    
-    
-                            /*
-                            |--------------------------------------------------------------------------
-                            | Convert External Image
-                            |--------------------------------------------------------------------------
-                            */
-    
-                            $convertedImage =
-                                $convertImageForPdf(
-                                    $imageData,
-                                    $contentType
-                                );
-    
-    
-                            if ($convertedImage !== null) {
-    
-                                $productImage =
-                                    $convertedImage;
-    
-                                break;
-                            }
-                        }
+                        continue;
                     }
     
-                } catch (\Throwable $e) {
+    
+                    $imageData =
+                        $response->body();
+    
+    
+                    if (
+                        empty($imageData)
+                    ) {
+    
+                        continue;
+                    }
+    
     
                     /*
                     |--------------------------------------------------------------------------
-                    | Ignore External Image Failure
+                    | Convert Image
                     |--------------------------------------------------------------------------
-                    |
-                    | The quotation should still generate.
-                    |
                     */
     
+                    $convertedImage =
+                        $convertImageForPdf(
+                            $imageData,
+                            $response->header(
+                                'Content-Type'
+                            )
+                        );
+    
+    
+                    if (
+                        $convertedImage !== null
+                    ) {
+    
+                        $productImage =
+                            $convertedImage;
+    
+                        break;
+                    }
+    
+    
+                } catch (\Throwable $e) {
+    
+                    \Log::warning(
+                        'Quotation external image error',
+                        [
+                            'product_id' =>
+                                $product->product_id,
+    
+                            'url' =>
+                                $imageUrl,
+    
+                            'error' =>
+                                $e->getMessage(),
+                        ]
+                    );
+    
+                    continue;
                 }
             }
         }
@@ -541,36 +649,38 @@ class QuotationController extends Controller
         |--------------------------------------------------------------------------
         */
     
-        $pdf = Pdf::loadView(
-            'mi_app.public.quotation-pdf',
-            [
-                'product' => $product,
+        $pdf =
+            Pdf::loadView(
+                'mi_app.public.quotation-pdf',
+                [
+                    'product' =>
+                        $product,
     
-                'customer_name' =>
-                    $validated['customer_name'],
+                    'customer_name' =>
+                        $validated['customer_name'],
     
-                'quantity' =>
-                    $quantity,
+                    'quantity' =>
+                        $quantity,
     
-                'unit_price' =>
-                    $unitPrice,
+                    'unit_price' =>
+                        $unitPrice,
     
-                'subtotal' =>
-                    $subtotal,
+                    'subtotal' =>
+                        $subtotal,
     
-                'total' =>
-                    $total,
+                    'total' =>
+                        $total,
     
-                'quote_number' =>
-                    $quoteNumber,
+                    'quote_number' =>
+                        $quoteNumber,
     
-                'issued_at' =>
-                    now(),
+                    'issued_at' =>
+                        now(),
     
-                'product_image' =>
-                    $productImage,
-            ]
-        );
+                    'product_image' =>
+                        $productImage,
+                ]
+            );
     
     
         /*
@@ -607,7 +717,7 @@ class QuotationController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | Download PDF
+        | Download
         |--------------------------------------------------------------------------
         */
     

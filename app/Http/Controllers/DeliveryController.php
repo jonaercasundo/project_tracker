@@ -780,7 +780,7 @@ class DeliveryController extends Controller
             )
 
             ->orderBy('d.project_id')
-            ->orderBy('s.school_name')
+            ->orderBy('s.school_id')
             ->orderBy('d.lot_id')
             ->orderBy('d.keystage_id')
             ->orderBy('d.delivery_id')
@@ -1489,6 +1489,14 @@ class DeliveryController extends Controller
         */
 
         foreach ($data as $projectId => &$project) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | SORT SCHOOLS BY SCHOOL ID
+            |--------------------------------------------------------------------------
+            */
+
+            ksort($project['schools']);
 
             foreach (
                 $project['schools']

@@ -39,7 +39,7 @@ class QuotationController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | Load Product Information
+        | Load Product
         |--------------------------------------------------------------------------
         */
     
@@ -87,7 +87,7 @@ class QuotationController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | Product Image
+        | PRODUCT IMAGE
         |--------------------------------------------------------------------------
         */
     
@@ -96,47 +96,58 @@ class QuotationController extends Controller
     
         /*
         |--------------------------------------------------------------------------
-        | Helper: Convert Image To Dompdf-Safe Base64
+        | Helper: Convert Image To Dompdf-Compatible Base64
         |--------------------------------------------------------------------------
         */
     
-        $convertImageForPdf = function ($imageData, $mimeType = null) {
+        $convertImageForPdf = function (
+            string $imageData,
+            ?string $mimeType = null
+        ) use ($product) {
     
-            if (
-                empty($imageData) ||
-                !is_string($imageData)
-            ) {
+            if (empty($imageData)) {
                 return null;
             }
     
     
             /*
             |--------------------------------------------------------------------------
-            | Detect Actual Image Type
+            | Detect Actual MIME Type
             |--------------------------------------------------------------------------
-            |
-            | Do not completely trust Content-Type.
-            |
             */
     
             $detectedMime = null;
     
             try {
     
-                $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                if (class_exists(\finfo::class)) {
     
-                $detectedMime =
-                    $finfo->buffer($imageData);
+                    $finfo = new \finfo(
+                        FILEINFO_MIME_TYPE
+                    );
+    
+                    $detectedMime =
+                        $finfo->buffer($imageData);
+                }
     
             } catch (\Throwable $e) {
     
-                $detectedMime = null;
+                Log::warning(
+                    'Unable to detect quotation image MIME type',
+                    [
+                        'product_id' =>
+                            $product->product_id,
+    
+                        'error' =>
+                            $e->getMessage(),
+                    ]
+                );
             }
     
     
             /*
             |--------------------------------------------------------------------------
-            | Use Detected MIME When Available
+            | Prefer Detected MIME
             |--------------------------------------------------------------------------
             */
     
@@ -147,7 +158,10 @@ class QuotationController extends Controller
     
             $mimeType = strtolower(
                 trim(
-                    explode(';', (string) $mimeType)[0]
+                    explode(
+                        ';',
+                        (string) $mimeType
+                    )[0]
                 )
             );
     
@@ -185,168 +199,508 @@ class QuotationController extends Controller
     
             /*
             |--------------------------------------------------------------------------
-            | Convert Other Image Formats
+            | GIF
             |--------------------------------------------------------------------------
             */
     
-            if (
-                !function_exists('imagecreatefromstring') ||
-                !function_exists('imagejpeg')
-            ) {
+            if ($mimeType === 'image/gif') {
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Try GD conversion
+                |--------------------------------------------------------------------------
+                */
+    
+                if (
+                    function_exists(
+                        'imagecreatefromgif'
+                    ) &&
+                    function_exists('imagejpeg')
+                ) {
+    
+                    try {
+    
+                        $source =
+                            @imagecreatefromgif(
+                                $imageData
+                            );
+    
+                        if ($source !== false) {
+    
+                            $width =
+                                imagesx($source);
+    
+                            $height =
+                                imagesy($source);
+    
+    
+                            $background =
+                                imagecreatetruecolor(
+                                    $width,
+                                    $height
+                                );
+    
+    
+                            $white =
+                                imagecolorallocate(
+                                    $background,
+                                    255,
+                                    255,
+                                    255
+                                );
+    
+    
+                            imagefill(
+                                $background,
+                                0,
+                                0,
+                                $white
+                            );
+    
+    
+                            imagecopy(
+                                $background,
+                                $source,
+                                0,
+                                0,
+                                0,
+                                0,
+                                $width,
+                                $height
+                            );
+    
+    
+                            ob_start();
+    
+                            imagejpeg(
+                                $background,
+                                null,
+                                90
+                            );
+    
+                            $jpegData =
+                                ob_get_clean();
+    
+    
+                            imagedestroy(
+                                $source
+                            );
+    
+                            imagedestroy(
+                                $background
+                            );
+    
+    
+                            if (
+                                !empty($jpegData)
+                            ) {
+    
+                                return
+                                    'data:image/jpeg;base64,' .
+                                    base64_encode(
+                                        $jpegData
+                                    );
+                            }
+                        }
+    
+                    } catch (\Throwable $e) {
+    
+                        Log::warning(
+                            'GIF conversion failed',
+                            [
+                                'product_id' =>
+                                    $product->product_id,
+    
+                                'error' =>
+                                    $e->getMessage(),
+                            ]
+                        );
+                    }
+                }
     
                 return null;
             }
     
     
-            try {
+            /*
+            |--------------------------------------------------------------------------
+            | WEBP
+            |--------------------------------------------------------------------------
+            |
+            | This is the important part for your current image.
+            |
+            */
     
-                $source =
-                    @imagecreatefromstring(
-                        $imageData
+            if (
+                $mimeType === 'image/webp' ||
+                $mimeType === 'image/x-webp'
+            ) {
+    
+                /*
+                |--------------------------------------------------------------------------
+                | Check WebP Support
+                |--------------------------------------------------------------------------
+                */
+    
+                if (
+                    function_exists(
+                        'imagecreatefromwebp'
+                    ) &&
+                    function_exists(
+                        'imagewebp'
+                    )
+                ) {
+    
+                    try {
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Decode WebP
+                        |--------------------------------------------------------------------------
+                        */
+    
+                        $source =
+                            @imagecreatefromwebp(
+                                $imageData
+                            );
+    
+    
+                        if ($source === false) {
+    
+                            Log::warning(
+                                'PHP could not decode WebP image',
+                                [
+                                    'product_id' =>
+                                        $product->product_id,
+                                ]
+                            );
+    
+                            return null;
+                        }
+    
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Get Dimensions
+                        |--------------------------------------------------------------------------
+                        */
+    
+                        $width =
+                            imagesx($source);
+    
+                        $height =
+                            imagesy($source);
+    
+    
+                        if (
+                            $width <= 0 ||
+                            $height <= 0
+                        ) {
+    
+                            imagedestroy(
+                                $source
+                            );
+    
+                            return null;
+                        }
+    
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | White Background
+                        |--------------------------------------------------------------------------
+                        */
+    
+                        $background =
+                            imagecreatetruecolor(
+                                $width,
+                                $height
+                            );
+    
+    
+                        $white =
+                            imagecolorallocate(
+                                $background,
+                                255,
+                                255,
+                                255
+                            );
+    
+    
+                        imagefill(
+                            $background,
+                            0,
+                            0,
+                            $white
+                        );
+    
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Copy WebP Onto Background
+                        |--------------------------------------------------------------------------
+                        */
+    
+                        imagecopy(
+                            $background,
+                            $source,
+                            0,
+                            0,
+                            0,
+                            0,
+                            $width,
+                            $height
+                        );
+    
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Convert WebP → JPEG
+                        |--------------------------------------------------------------------------
+                        */
+    
+                        ob_start();
+    
+                        imagejpeg(
+                            $background,
+                            null,
+                            90
+                        );
+    
+                        $jpegData =
+                            ob_get_clean();
+    
+    
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Cleanup
+                        |--------------------------------------------------------------------------
+                        */
+    
+                        imagedestroy(
+                            $source
+                        );
+    
+                        imagedestroy(
+                            $background
+                        );
+    
+    
+                        if (
+                            empty($jpegData)
+                        ) {
+    
+                            return null;
+                        }
+    
+    
+                        return
+                            'data:image/jpeg;base64,' .
+                            base64_encode(
+                                $jpegData
+                            );
+    
+                    } catch (\Throwable $e) {
+    
+                        Log::warning(
+                            'WebP conversion failed',
+                            [
+                                'product_id' =>
+                                    $product->product_id,
+    
+                                'error' =>
+                                    $e->getMessage(),
+                            ]
+                        );
+    
+                        return null;
+                    }
+                }
+    
+    
+                /*
+                |--------------------------------------------------------------------------
+                | WebP Not Supported
+                |--------------------------------------------------------------------------
+                */
+    
+                Log::warning(
+                    'WebP image found but PHP GD WebP support is unavailable',
+                    [
+                        'product_id' =>
+                            $product->product_id,
+    
+                        'imagecreatefromwebp' =>
+                            function_exists(
+                                'imagecreatefromwebp'
+                            ),
+                    ]
+                );
+    
+    
+                return null;
+            }
+    
+    
+            /*
+            |--------------------------------------------------------------------------
+            | Other Image Types
+            |--------------------------------------------------------------------------
+            */
+    
+            if (
+                function_exists(
+                    'imagecreatefromstring'
+                ) &&
+                function_exists('imagejpeg')
+            ) {
+    
+                try {
+    
+                    $source =
+                        @imagecreatefromstring(
+                            $imageData
+                        );
+    
+    
+                    if ($source === false) {
+                        return null;
+                    }
+    
+    
+                    $width =
+                        imagesx($source);
+    
+                    $height =
+                        imagesy($source);
+    
+    
+                    if (
+                        $width <= 0 ||
+                        $height <= 0
+                    ) {
+    
+                        imagedestroy(
+                            $source
+                        );
+    
+                        return null;
+                    }
+    
+    
+                    $background =
+                        imagecreatetruecolor(
+                            $width,
+                            $height
+                        );
+    
+    
+                    $white =
+                        imagecolorallocate(
+                            $background,
+                            255,
+                            255,
+                            255
+                        );
+    
+    
+                    imagefill(
+                        $background,
+                        0,
+                        0,
+                        $white
                     );
     
     
-                if ($source === false) {
-                    return null;
-                }
-    
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Image Dimensions
-                |--------------------------------------------------------------------------
-                */
-    
-                $width =
-                    imagesx($source);
-    
-                $height =
-                    imagesy($source);
-    
-    
-                if (
-                    $width <= 0 ||
-                    $height <= 0
-                ) {
-    
-                    imagedestroy($source);
-    
-                    return null;
-                }
-    
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Create White Background
-                |--------------------------------------------------------------------------
-                |
-                | Important for transparent WebP / PNG / GIF.
-                |
-                */
-    
-                $background =
-                    imagecreatetruecolor(
+                    imagecopy(
+                        $background,
+                        $source,
+                        0,
+                        0,
+                        0,
+                        0,
                         $width,
                         $height
                     );
     
     
-                $white =
-                    imagecolorallocate(
+                    ob_start();
+    
+                    imagejpeg(
                         $background,
-                        255,
-                        255,
-                        255
+                        null,
+                        90
+                    );
+    
+                    $jpegData =
+                        ob_get_clean();
+    
+    
+                    imagedestroy(
+                        $source
+                    );
+    
+                    imagedestroy(
+                        $background
                     );
     
     
-                imagefill(
-                    $background,
-                    0,
-                    0,
-                    $white
-                );
+                    if (
+                        empty($jpegData)
+                    ) {
+                        return null;
+                    }
     
     
-                /*
-                |--------------------------------------------------------------------------
-                | Copy Image
-                |--------------------------------------------------------------------------
-                */
+                    return
+                        'data:image/jpeg;base64,' .
+                        base64_encode(
+                            $jpegData
+                        );
     
-                imagecopy(
-                    $background,
-                    $source,
-                    0,
-                    0,
-                    0,
-                    0,
-                    $width,
-                    $height
-                );
+                } catch (\Throwable $e) {
     
+                    Log::warning(
+                        'Generic image conversion failed',
+                        [
+                            'product_id' =>
+                                $product->product_id,
     
-                /*
-                |--------------------------------------------------------------------------
-                | Convert To JPEG
-                |--------------------------------------------------------------------------
-                */
-    
-                ob_start();
-    
-                imagejpeg(
-                    $background,
-                    null,
-                    90
-                );
-    
-                $jpegData =
-                    ob_get_clean();
-    
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Cleanup
-                |--------------------------------------------------------------------------
-                */
-    
-                imagedestroy($source);
-    
-                imagedestroy($background);
-    
-    
-                if (
-                    $jpegData === false ||
-                    empty($jpegData)
-                ) {
-    
-                    return null;
+                            'error' =>
+                                $e->getMessage(),
+                        ]
+                    );
                 }
-    
-    
-                return
-                    'data:image/jpeg;base64,' .
-                    base64_encode($jpegData);
-    
-    
-            } catch (\Throwable $e) {
-    
-                return null;
             }
+    
+    
+            return null;
         };
     
     
         /*
         |--------------------------------------------------------------------------
-        | Find A Valid Product Image
+        | FIND PRODUCT IMAGE
         |--------------------------------------------------------------------------
+        |
+        | Primary image is checked first.
+        | If it fails, other images are attempted.
+        |
         */
     
-        foreach ($product->images as $image) {
+        $images = $product->images
+            ->sortByDesc(
+                fn ($image) =>
+                    (int) ($image->is_primary ?? 0)
+            )
+            ->values();
+    
+    
+        foreach ($images as $image) {
     
             /*
             |--------------------------------------------------------------------------
-            | Uploaded Image
+            | UPLOADED IMAGE
             |--------------------------------------------------------------------------
             */
     
@@ -364,12 +718,6 @@ class QuotationController extends Controller
                         )
                     );
     
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Check File Exists
-                |--------------------------------------------------------------------------
-                */
     
                 if (
                     !is_file($storagePath) ||
@@ -405,19 +753,11 @@ class QuotationController extends Controller
     
     
                     if (
-                        $imageData === false ||
                         empty($imageData)
                     ) {
-    
                         continue;
                     }
     
-    
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Convert Image
-                    |--------------------------------------------------------------------------
-                    */
     
                     $convertedImage =
                         $convertImageForPdf(
@@ -435,11 +775,10 @@ class QuotationController extends Controller
                         break;
                     }
     
-    
                 } catch (\Throwable $e) {
     
                     Log::warning(
-                        'Quotation image conversion failed',
+                        'Uploaded quotation image failed',
                         [
                             'product_id' =>
                                 $product->product_id,
@@ -459,7 +798,7 @@ class QuotationController extends Controller
     
             /*
             |--------------------------------------------------------------------------
-            | External Image / Google Drive
+            | EXTERNAL IMAGE
             |--------------------------------------------------------------------------
             */
     
@@ -476,7 +815,7 @@ class QuotationController extends Controller
     
                 /*
                 |--------------------------------------------------------------------------
-                | Google Drive / UC URL
+                | Google Drive UC
                 |--------------------------------------------------------------------------
                 */
     
@@ -500,7 +839,7 @@ class QuotationController extends Controller
     
                 /*
                 |--------------------------------------------------------------------------
-                | Google Drive File URL
+                | Google Drive FILE
                 |--------------------------------------------------------------------------
                 */
     
@@ -524,7 +863,7 @@ class QuotationController extends Controller
     
                 /*
                 |--------------------------------------------------------------------------
-                | Google Drive Open URL
+                | Google Drive OPEN
                 |--------------------------------------------------------------------------
                 */
     
@@ -555,7 +894,13 @@ class QuotationController extends Controller
                 try {
     
                     $response =
-                        Http::timeout(15)
+                        Http::timeout(20)
+                            ->withHeaders([
+                                'User-Agent' =>
+                                    'Mozilla/5.0',
+                                'Accept' =>
+                                    'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                            ])
                             ->withOptions([
                                 'verify' => false,
                             ])
@@ -571,6 +916,11 @@ class QuotationController extends Controller
                             [
                                 'product_id' =>
                                     $product->product_id,
+    
+                                'image_id' =>
+                                    $image->id ??
+                                    $image->product_image_id ??
+                                    null,
     
                                 'url' =>
                                     $imageUrl,
@@ -591,7 +941,6 @@ class QuotationController extends Controller
                     if (
                         empty($imageData)
                     ) {
-    
                         continue;
                     }
     
@@ -621,7 +970,6 @@ class QuotationController extends Controller
                         break;
                     }
     
-    
                 } catch (\Throwable $e) {
     
                     Log::warning(
@@ -629,6 +977,11 @@ class QuotationController extends Controller
                         [
                             'product_id' =>
                                 $product->product_id,
+    
+                            'image_id' =>
+                                $image->id ??
+                                $image->product_image_id ??
+                                null,
     
                             'url' =>
                                 $imageUrl,
@@ -641,6 +994,30 @@ class QuotationController extends Controller
                     continue;
                 }
             }
+        }
+    
+    
+        /*
+        |--------------------------------------------------------------------------
+        | LOG IF NO IMAGE WAS FOUND
+        |--------------------------------------------------------------------------
+        */
+    
+        if ($productImage === null) {
+    
+            Log::warning(
+                'No usable quotation image found',
+                [
+                    'product_id' =>
+                        $product->product_id,
+    
+                    'item_name' =>
+                        $product->item_name,
+    
+                    'image_count' =>
+                        $product->images->count(),
+                ]
+            );
         }
     
     

@@ -54,25 +54,16 @@
             
             <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-xs sm:text-sm font-semibold mb-8">
                 <span class="w-2 h-2 rounded-full bg-brand-500 animate-pulse"></span>
-                METRO v4.2 Pipeline Engine Released
+                METRO v2.1 Pipeline Engine Released
             </div>
 
             <h1 class="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.1] max-w-4xl mx-auto">
-                Total Control Over Your <span class="bg-gradient-to-r from-brand-500 via-blue-400 to-indigo-400 bg-clip-text text-transparent">Operations Pipeline</span>
+                METRO <span class="bg-gradient-to-r from-brand-500 via-blue-400 to-indigo-400 bg-clip-text text-transparent">Operations Pipeline</span>
             </h1>
 
             <p class="mt-6 text-base sm:text-xl text-slate-400 max-w-2xl mx-auto font-normal leading-relaxed">
-                Connect field teams, dispatch logistics, and quality approvals into one seamlessly automated operational pipeline. Stop bottlenecks before they start.
+                Connect field teams, operation tracking, and quality approvals into one seamlessly automated operational pipeline. Stop bottlenecks before they start.
             </p>
-
-            <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/register" class="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-xl shadow-brand-600/30">
-                    Get Started
-                </a>
-                <a href="#pipeline" class="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all">
-                    Explore Pipeline Demo
-                </a>
-            </div>
 
         </div>
     </section>

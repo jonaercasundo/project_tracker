@@ -11,7 +11,14 @@ class Package extends Model
     protected $primaryKey = 'package_id';
 
     public $timestamps = false;
-
+    public function contents()
+    {
+        return $this->hasMany(
+            PackageContent::class,
+            'package_id',
+            'package_id'
+        );
+    }
     public function packageContent()
     {
         return $this->hasMany(

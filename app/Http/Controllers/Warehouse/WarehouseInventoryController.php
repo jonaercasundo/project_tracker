@@ -287,6 +287,8 @@ class WarehouseInventoryController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Unexpected error validating scan.',
+                'debug'   => $e->getMessage(), // remove after debugging
+                'debug_line' => $e->getLine(),
             ], 500);
 
         }

@@ -75,7 +75,7 @@
 
             <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a href="/register" class="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-xl shadow-brand-600/30">
-                    Get Started Free — 14-Day Trial
+                    Get Started
                 </a>
                 <a href="#pipeline" class="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all">
                     Explore Pipeline Demo

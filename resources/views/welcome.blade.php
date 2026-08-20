@@ -2,12 +2,12 @@
 <html lang="en" class="h-full scroll-smooth">
 <head>
     <meta charset="UTF-8">
-    <title>METRO — All-in-One Business App</title>
+    <title>METRO — The All-in-One Business Operating System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="METRO is the operations sheet for construction and field teams — projects, crews, and approvals on one live plan.">
+    <meta name="description" content="METRO unifies your projects, crews, and operational workflows into a single, intuitive real-time workspace.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -15,74 +15,57 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        display: ['"Space Grotesk"', 'sans-serif'],
-                        sans: ['Inter', 'sans-serif'],
-                        mono: ['"Space Mono"', 'monospace'],
+                        sans: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+                        body: ['Inter', 'sans-serif'],
                     },
                     colors: {
-                        ink: '#0B1E39',
-                        blueprint: '#14315C',
-                        line: '#4C7EA8',
-                        amber: '#F4A100',
-                        paper: '#F7F5F0',
-                        concrete: '#7C8593',
-                    },
+                        brand: {
+                            50: '#F4F7FF',
+                            100: '#E8EFFF',
+                            500: '#3B82F6',
+                            600: '#2563EB',
+                            900: '#0F172A',
+                        },
+                        surface: '#FAFAFA',
+                    }
                 }
             }
         }
     </script>
-
     <style>
-        /* Blueprint grid — the signature texture, used sparingly on dark panels only */
-        .grid-sheet {
-            background-image:
-                linear-gradient(rgba(76,126,168,0.35) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(76,126,168,0.35) 1px, transparent 1px),
-                linear-gradient(rgba(76,126,168,0.15) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(76,126,168,0.15) 1px, transparent 1px);
-            background-size: 88px 88px, 88px 88px, 22px 22px, 22px 22px;
-            background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
-        }
-        /* Drafting corner crop marks on sheet cards */
-        .sheet-card { position: relative; }
-        .sheet-card::before,
-        .sheet-card::after,
-        .sheet-card .corner-tl,
-        .sheet-card .corner-br { content: ''; position: absolute; width: 14px; height: 14px; pointer-events: none; }
-        .sheet-card::before { top: -1px; left: -1px; border-top: 2px solid #0B1E39; border-left: 2px solid #0B1E39; }
-        .sheet-card::after { bottom: -1px; right: -1px; border-bottom: 2px solid #0B1E39; border-right: 2px solid #0B1E39; }
-        .dim-line { border-top: 1px dashed rgba(255,255,255,0.35); }
         @media (prefers-reduced-motion: reduce) {
             * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
         }
     </style>
 </head>
 
-<body class="bg-paper text-ink antialiased font-sans min-h-full flex flex-col justify-between">
+<body class="bg-surface text-slate-900 antialiased font-sans min-h-full flex flex-col justify-between selection:bg-brand-500 selection:text-white">
 
-<header class="bg-paper/90 backdrop-blur-md sticky top-0 z-50 border-b border-ink/10">
+<!-- Header -->
+<header class="bg-surface/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200/60">
     <div class="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
-        <div class="flex items-center gap-3 group">
-            <div class="w-10 h-10 bg-ink rounded-sm flex items-center justify-center text-amber shadow-sm group-hover:rotate-3 transition-transform">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M4 21V7l8-4 8 4v14M9 21v-6h6v6" />
+        <a href="/" class="flex items-center gap-2.5 group">
+            <div class="w-9 h-9 bg-brand-900 rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
             </div>
-            <span class="text-lg font-display font-bold tracking-tight text-ink">METRO
-                <span class="hidden sm:inline text-concrete font-mono text-[11px] font-normal tracking-widest align-middle ml-1">ALL-IN-ONE BUSINESS APP</span>
-            </span>
-        </div>
+            <span class="text-xl font-bold tracking-tight text-slate-900">METRO</span>
+        </a>
 
-        <div>
+        <div class="flex items-center gap-4">
             @auth
                 <a href="{{ \App\Services\DashboardService::route(auth()->user()) }}"
-                   class="inline-flex items-center justify-center px-5 py-2.5 rounded-md font-semibold text-sm bg-ink/5 text-ink hover:bg-ink/10 transition-colors duration-200">
-                    Go to Dashboard
+                   class="inline-flex items-center justify-center px-5 py-2.5 rounded-full font-semibold text-sm bg-slate-900 text-white hover:bg-slate-800 transition-all duration-200 shadow-sm hover:shadow">
+                    Dashboard
                 </a>
             @else
-                <a href="/login"
-                   class="inline-flex items-center justify-center px-5 py-2.5 rounded-md font-semibold text-sm bg-ink text-paper hover:bg-blueprint transition-colors duration-200">
+                <a href="/login" class="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors px-3 py-2">
                     Sign In
+                </a>
+                <a href="/register"
+                   class="inline-flex items-center justify-center px-5 py-2.5 rounded-full font-semibold text-sm bg-brand-600 text-white hover:bg-brand-500 transition-all duration-200 shadow-sm hover:shadow-md">
+                    Get Started Free
                 </a>
             @endauth
         </div>
@@ -91,138 +74,127 @@
 
 <main class="flex-grow">
 
-    <!-- HERO: a live blueprint sheet, not a generic gradient hero -->
-    <section class="relative overflow-hidden bg-ink text-paper">
-        <div class="grid-sheet absolute inset-0"></div>
-        <div class="absolute inset-0 bg-gradient-to-b from-ink/40 via-ink/70 to-ink"></div>
+    <!-- Hero Section -->
+    <section class="relative overflow-hidden pt-20 pb-24 md:pt-28 md:pb-32">
+        <!-- Minimal Ambient Gradient Glow -->
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-brand-500/10 via-blue-400/10 to-indigo-500/10 blur-[120px] rounded-full pointer-events-none -z-10"></div>
 
-        <div class="relative max-w-7xl mx-auto px-6 pt-16 pb-20 lg:pt-24 lg:pb-28">
-            <div class="flex items-center gap-3 font-mono text-xs text-line tracking-widest uppercase mb-8">
-                <span class="w-2 h-2 rounded-full bg-amber animate-pulse"></span>
-                Sheet 01 / Site Overview
+        <div class="max-w-7xl mx-auto px-6 text-center">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-50 border border-brand-100 text-brand-600 text-xs font-semibold tracking-wide uppercase mb-8">
+                <span class="w-2 h-2 rounded-full bg-brand-500"></span>
+                The Modern Business OS
             </div>
 
-            <h1 class="text-4xl sm:text-5xl md:text-6xl font-display font-bold tracking-tight leading-[1.1] max-w-3xl">
-                One plan for the job, the crew, and the paperwork.
+            <h1 class="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-slate-900 max-w-4xl mx-auto leading-[1.08]">
+                Run your entire operations on one platform.
             </h1>
-            <p class="mt-6 text-lg md:text-xl text-slate-300 max-w-2xl leading-relaxed">
-                METRO replaces the spreadsheet stack and the group chat with a single working sheet — projects, approvals, and field updates, drawn to scale and always current.
+            
+            <p class="mt-6 text-lg md:text-xl text-slate-600 font-body max-w-2xl mx-auto leading-relaxed">
+                METRO consolidates project management, team collaboration, and approval workflows into one seamless, real-time operating workspace.
             </p>
 
-            <div class="mt-10 flex flex-col sm:flex-row gap-4">
+            <div class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
                 @auth
                     <a href="{{ \App\Services\DashboardService::route(auth()->user()) }}"
-                       class="inline-flex items-center justify-center px-8 py-4 rounded-md font-bold text-ink bg-amber hover:bg-amber/90 shadow-xl shadow-amber/10 transition-all duration-200">
+                       class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 rounded-full font-semibold text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-500/20 transition-all duration-200">
                         Go to Dashboard
                     </a>
                 @else
                     <a href="/register"
-                       class="inline-flex items-center justify-center px-8 py-4 rounded-md font-bold text-ink bg-amber hover:bg-amber/90 shadow-xl shadow-amber/10 transition-all duration-200">
-                        Start free — create a workspace
+                       class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 rounded-full font-semibold text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-500/20 transition-all duration-200">
+                        Start your workspace free
                     </a>
                     <a href="/login"
-                       class="inline-flex items-center justify-center px-8 py-4 rounded-md font-semibold text-paper border border-white/20 hover:bg-white/5 transition-colors duration-200">
+                       class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 rounded-full font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors duration-200">
                         Sign in
                     </a>
                 @endauth
             </div>
 
-            <!-- Dimension-line stat strip -->
-            <div class="dim-line mt-16 pt-6 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-3xl font-mono text-sm">
+            <!-- Stats Bar -->
+            <div class="mt-20 pt-10 border-t border-slate-200/80 max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
                 <div>
-                    <div class="text-2xl font-display font-bold text-amber">01</div>
-                    <div class="text-slate-400 mt-1">Workspace, every crew</div>
+                    <div class="text-3xl font-bold text-slate-900">01</div>
+                    <div class="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Unified Platform</div>
                 </div>
                 <div>
-                    <div class="text-2xl font-display font-bold text-amber">24/7</div>
-                    <div class="text-slate-400 mt-1">Field-to-office sync</div>
+                    <div class="text-3xl font-bold text-slate-900">Real-Time</div>
+                    <div class="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Field Sync</div>
                 </div>
                 <div>
-                    <div class="text-2xl font-display font-bold text-amber">3</div>
-                    <div class="text-slate-400 mt-1">Access tiers, no overlap</div>
+                    <div class="text-3xl font-bold text-slate-900">3-Tier</div>
+                    <div class="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Access Control</div>
                 </div>
                 <div>
-                    <div class="text-2xl font-display font-bold text-amber">100%</div>
-                    <div class="text-slate-400 mt-1">Status, always current</div>
+                    <div class="text-3xl font-bold text-slate-900">99.9%</div>
+                    <div class="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Uptime Reliability</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- FEATURES: styled as three sheets from a drawing set -->
-    <section class="max-w-7xl mx-auto px-6 py-20 lg:py-28">
-        <div class="max-w-2xl mb-14">
-            <span class="font-mono text-xs text-line tracking-widest uppercase">Drawing set</span>
-            <h2 class="mt-3 text-3xl md:text-4xl font-display font-bold text-ink tracking-tight">Three sheets, one job.</h2>
-            <p class="mt-4 text-concrete leading-relaxed">Every workspace ships with these three views. Nothing to configure before your first project goes up.</p>
+    <!-- Features Section -->
+    <section class="max-w-7xl mx-auto px-6 py-20">
+        <div class="text-center max-w-2xl mx-auto mb-16">
+            <h2 class="text-xs font-semibold text-brand-600 uppercase tracking-widest">Everything You Need</h2>
+            <p class="mt-2 text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">Designed for complete clarity.</p>
         </div>
 
-        <div class="grid md:grid-cols-3 gap-6">
-
-            <div class="sheet-card bg-white p-8 border border-ink/10 hover:border-ink/30 hover:-translate-y-1 transition-all duration-200">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="w-11 h-11 bg-blueprint rounded-sm flex items-center justify-center text-paper">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.5a2.25 2.25 0 0 0 2.25 2.25h1.5A2.25 2.25 0 0 0 15 18.75v-1.5m-6 0h6m-6 0-1.5-9m7.5 9 1.5-9m-9 0h9M6 8.25h12" />
-                        </svg>
-                    </div>
-                    <span class="font-mono text-xs text-concrete">A-101</span>
+        <div class="grid md:grid-cols-3 gap-8">
+            <div class="bg-white p-8 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-shadow duration-200">
+                <div class="w-12 h-12 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600 mb-6">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
                 </div>
-                <h3 class="font-display font-bold text-xl text-ink tracking-tight">Project Tracking</h3>
-                <p class="text-concrete mt-3 leading-relaxed">
-                    Blueprint updates, field metrics, and milestones live in one project record — no separate log to reconcile at end of week.
+                <h3 class="font-bold text-lg text-slate-900 tracking-tight">Project Management</h3>
+                <p class="text-slate-600 font-body text-sm mt-2 leading-relaxed">
+                    Track milestones, resource distribution, and field logs from a central dashboard with zero configuration friction.
                 </p>
             </div>
 
-            <div class="sheet-card bg-white p-8 border border-ink/10 hover:border-ink/30 hover:-translate-y-1 transition-all duration-200">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="w-11 h-11 bg-blueprint rounded-sm flex items-center justify-center text-paper">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-                        </svg>
-                    </div>
-                    <span class="font-mono text-xs text-concrete">A-102</span>
+            <div class="bg-white p-8 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-shadow duration-200">
+                <div class="w-12 h-12 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600 mb-6">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
                 </div>
-                <h3 class="font-display font-bold text-xl text-ink tracking-tight">Role-Based Access</h3>
-                <p class="text-concrete mt-3 leading-relaxed">
-                    Admins, engineers, and subcontractors each get the module they need to do their job — and nothing they don't.
+                <h3 class="font-bold text-lg text-slate-900 tracking-tight">Role-Based Access</h3>
+                <p class="text-slate-600 font-body text-sm mt-2 leading-relaxed">
+                    Deliver tailor-made views for admins, managers, and external contractors ensuring high privacy and zero data overlap.
                 </p>
             </div>
 
-            <div class="sheet-card bg-white p-8 border border-ink/10 hover:border-ink/30 hover:-translate-y-1 transition-all duration-200">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="w-11 h-11 bg-blueprint rounded-sm flex items-center justify-center text-paper">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12c0 5.385 4.365 9.75 9.75 9.75s9.75-4.365 9.75-9.75S17.385 2.25 12 2.25 2.25 6.615 2.25 12ZM12 6v6l4 2" />
-                        </svg>
-                    </div>
-                    <span class="font-mono text-xs text-concrete">A-103</span>
+            <div class="bg-white p-8 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-shadow duration-200">
+                <div class="w-12 h-12 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600 mb-6">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
                 </div>
-                <h3 class="font-display font-bold text-xl text-ink tracking-tight">Real-Time Status</h3>
-                <p class="text-concrete mt-3 leading-relaxed">
-                    A task closed on-site shows as closed in the office within seconds — no delay between the field and the record.
+                <h3 class="font-bold text-lg text-slate-900 tracking-tight">Instant Updates</h3>
+                <p class="text-slate-600 font-body text-sm mt-2 leading-relaxed">
+                    Updates recorded on site immediately reflect across administrative views without lag or sheet reconciliation.
                 </p>
             </div>
-
         </div>
     </section>
 
-    <!-- CTA band -->
-    <section class="bg-blueprint text-paper">
-        <div class="max-w-7xl mx-auto px-6 py-16 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div>
-                <h2 class="text-2xl md:text-3xl font-display font-bold tracking-tight">Ready to put the job on one sheet?</h2>
-                <p class="mt-2 text-slate-200">Set up your workspace in a few minutes — no drawings required.</p>
+    <!-- Minimal CTA Box -->
+    <section class="max-w-7xl mx-auto px-6 py-12">
+        <div class="bg-slate-900 text-white rounded-3xl p-10 md:p-16 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div class="max-w-xl text-center md:text-left">
+                <h2 class="text-2xl md:text-3xl font-bold tracking-tight">Ready to streamline your workflow?</h2>
+                <p class="mt-2 text-slate-400 font-body text-sm md:text-base">Set up your workspace in minutes and connect your entire operation.</p>
             </div>
             @auth
                 <a href="{{ \App\Services\DashboardService::route(auth()->user()) }}"
-                   class="inline-flex items-center justify-center px-8 py-4 rounded-md font-bold text-ink bg-amber hover:bg-amber/90 transition-all duration-200 whitespace-nowrap">
+                   class="inline-flex items-center justify-center px-8 py-3.5 rounded-full font-semibold text-slate-900 bg-white hover:bg-slate-100 transition-all duration-200 whitespace-nowrap">
                     Go to Dashboard
                 </a>
             @else
                 <a href="/register"
-                   class="inline-flex items-center justify-center px-8 py-4 rounded-md font-bold text-ink bg-amber hover:bg-amber/90 transition-all duration-200 whitespace-nowrap">
-                    Create a workspace
+                   class="inline-flex items-center justify-center px-8 py-3.5 rounded-full font-semibold text-slate-900 bg-white hover:bg-slate-100 transition-all duration-200 whitespace-nowrap">
+                    Create a Free Workspace
                 </a>
             @endauth
         </div>
@@ -230,13 +202,14 @@
 
 </main>
 
-<footer class="border-t border-ink/10 bg-paper">
-    <div class="max-w-7xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-concrete font-mono">
+<!-- Footer -->
+<footer class="border-t border-slate-200/80 bg-surface mt-12">
+    <div class="max-w-7xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-body text-slate-500">
         <div>Metro-Mobilia Corporation &copy; {{ date('Y') }}</div>
         <div class="flex gap-6">
-            <a href="#" class="hover:text-ink transition-colors">Privacy Policy</a>
-            <a href="#" class="hover:text-ink transition-colors">Terms of Service</a>
-            <a href="#" class="hover:text-ink transition-colors">Support Contact</a>
+            <a href="#" class="hover:text-slate-900 transition-colors">Privacy Policy</a>
+            <a href="#" class="hover:text-slate-900 transition-colors">Terms of Service</a>
+            <a href="#" class="hover:text-slate-900 transition-colors">Support</a>
         </div>
     </div>
 </footer>

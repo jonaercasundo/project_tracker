@@ -69,7 +69,7 @@
             <span>Tracking Deliveries</span>
         </a>
 
-        <!-- Item List -->
+        <!-- Item List 
         <a href="{{ route('items.index') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
            {{ request()->routeIs('items.index') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
@@ -81,6 +81,7 @@
             </svg>
             <span>Item List</span>
         </a>
+        -->
 
         <!-- Inventory Dropdown Module -->
         <div x-data="{ open: {{ request()->routeIs('inventory.*') ? 'true' : 'false' }} }" class="block">

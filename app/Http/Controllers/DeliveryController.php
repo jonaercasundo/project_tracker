@@ -739,7 +739,7 @@ class DeliveryController extends Controller
     // =========================
 
 
-public function generateLabels(Request $request)
+    public function generateLabels(Request $request)
     {
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
@@ -950,15 +950,13 @@ public function generateLabels(Request $request)
         | 6. INITIAL DATA
         |--------------------------------------------------------------------------
         |
-        | Structure (keyed by DR NO — each DR is one printed/stapled unit
-        | and can carry its own project/school info, since one school can
-        | have multiple different DRs):
+        | Structure:
         |
-        | DR NO
-        |   INFO (dr_no, project, school, division, region, ...)
-        |   LOT
-        |      KEYSTAGE
-        |         ITEMS
+        | PROJECT
+        |   SCHOOL
+        |      LOT
+        |         KEYSTAGE
+        |            ITEMS
         |
         */
 
@@ -970,7 +968,7 @@ public function generateLabels(Request $request)
         | 6b. LOT QR CACHE
         |--------------------------------------------------------------------------
         |
-        | Same lot can appear under multiple DRs. Generate each lot's
+        | Same lot can appear under multiple schools. Generate each lot's
         | QR PNG only once and reuse it, keyed by lot_id (or lot name for
         | "no lot" deliveries). Same pattern/library as
         | DeliveryController@generate ($qrCodes).
@@ -988,36 +986,30 @@ public function generateLabels(Request $request)
 
         foreach ($deliveries as $delivery) {
 
-            $drNo = trim((string) ($delivery->dr_no ?? ''));
+            $deliveryProjectId = (int) $delivery->project_id;
             $schoolId = (int) $delivery->school_id;
             $deliveryId = (int) $delivery->delivery_id;
-
-            if ($drNo === '') {
+            if ($deliveryProjectId <= 0) {
                 continue;
             }
 
             if ($schoolId <= 0) {
                 continue;
             }
-
             if ($deliveryId <= 0) {
                 continue;
             }
-
             /*
             |--------------------------------------------------------------------------
-            | CREATE DR
+            | CREATE PROJECT
             |--------------------------------------------------------------------------
             */
 
-            if (!isset($data[$drNo])) {
+            if (!isset($data[$deliveryProjectId])) {
 
-                $data[$drNo] = [
+                $data[$deliveryProjectId] = [
 
                     'info' => [
-
-                        'dr_no' =>
-                            $drNo,
 
                         'project_id' =>
                             $delivery->project_id,
@@ -1026,23 +1018,6 @@ public function generateLabels(Request $request)
                             trim(
                                 (string) (
                                     $delivery->project_name ?? ''
-                                )
-                            ),
-
-                        'school_id' =>
-                            $delivery->school_id ?? '',
-
-                        'school_name' =>
-                            trim(
-                                (string) (
-                                    $delivery->school_name ?? ''
-                                )
-                            ),
-
-                        'municipality' =>
-                            trim(
-                                (string) (
-                                    $delivery->municipality ?? ''
                                 )
                             ),
 
@@ -1061,12 +1036,51 @@ public function generateLabels(Request $request)
                             ),
                     ],
 
-                    'lots' => [],
+                    'schools' => [],
                     'delivery_ids' => [],
                 ];
             }
 
-            $data[$drNo]['delivery_ids'][] = $deliveryId;
+            $data[$deliveryProjectId]['delivery_ids'][] = $deliveryId;
+
+            /*
+            |--------------------------------------------------------------------------
+            | CREATE SCHOOL (WITHIN PROJECT)
+            |--------------------------------------------------------------------------
+            */
+
+            if (!isset(
+                $data[$deliveryProjectId]
+                    ['schools'][$schoolId]
+            )) {
+
+                $data[$deliveryProjectId]
+                    ['schools'][$schoolId] = [
+
+                    'info' => [
+
+                        'school_name' =>
+                            trim(
+                                (string) (
+                                    $delivery->school_name ?? ''
+                                )
+                            ),
+
+                        'school_id' =>
+                            $delivery->school_id ?? '',
+
+                        'municipality' =>
+                            trim(
+                                (string) (
+                                    $delivery->municipality ?? ''
+                                )
+                            ),
+                    ],
+
+                    'lots' => [],
+                    'delivery_ids' => [],
+                ];
+            }
 
 
             /*
@@ -1125,7 +1139,8 @@ public function generateLabels(Request $request)
             */
 
             if (!isset(
-                $data[$drNo]
+                $data[$deliveryProjectId]
+                    ['schools'][$schoolId]
                     ['lots'][$lotKey]
             )) {
 
@@ -1137,7 +1152,7 @@ public function generateLabels(Request $request)
                 | Encoded value: lot_id, falling back to lot_name for
                 | deliveries with no lot. Cached by that same value so the
                 | PNG is only generated once even if the lot appears under
-                | several DRs.
+                | several schools.
                 |
                 */
 
@@ -1157,7 +1172,8 @@ public function generateLabels(Request $request)
                 }
 
 
-                $data[$drNo]
+                $data[$deliveryProjectId]
+                    ['schools'][$schoolId]
                     ['lots'][$lotKey] = [
 
                     'lot_id' =>
@@ -1411,12 +1427,14 @@ public function generateLabels(Request $request)
                 */
 
                 if (!isset(
-                    $data[$drNo]
+                    $data[$deliveryProjectId]
+                        ['schools'][$schoolId]
                         ['lots'][$lotKey]
                         ['keystages'][$keystageKey]
                 )) {
 
-                    $data[$drNo]
+                    $data[$deliveryProjectId]
+                        ['schools'][$schoolId]
                         ['lots'][$lotKey]
                         ['keystages'][$keystageKey] = [
 
@@ -1553,7 +1571,8 @@ public function generateLabels(Request $request)
                     */
 
                     $items =
-                        $data[$drNo]
+                        $data[$deliveryProjectId]
+                            ['schools'][$schoolId]
                             ['lots'][$lotKey]
                             ['keystages'][$keystageKey]
                             ['items'];
@@ -1566,7 +1585,8 @@ public function generateLabels(Request $request)
                     |
                     | Same item is merged ONLY within:
                     |
-                    | DR NO
+                    | PROJECT
+                    | SCHOOL
                     | LOT
                     | KEYSTAGE
                     |
@@ -1608,7 +1628,8 @@ public function generateLabels(Request $request)
                     |--------------------------------------------------------------------------
                     */
 
-                    $data[$drNo]
+                    $data[$deliveryProjectId]
+                        ['schools'][$schoolId]
                         ['lots'][$lotKey]
                         ['keystages'][$keystageKey]
                         ['items'] = $items;
@@ -1623,58 +1644,113 @@ public function generateLabels(Request $request)
         |--------------------------------------------------------------------------
         */
 
-        foreach (
-            $data
-            as $drNo => &$dr
-        ) {
+        foreach ($data as $projectId => &$project) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | SORT SCHOOLS BY SCHOOL ID
+            |--------------------------------------------------------------------------
+            */
+
+            uasort($project['schools'], function ($a, $b) {
+                $aDeliveryId = !empty($a['delivery_ids'])
+                    ? min($a['delivery_ids'])
+                    : PHP_INT_MAX;
+
+                $bDeliveryId = !empty($b['delivery_ids'])
+                    ? min($b['delivery_ids'])
+                    : PHP_INT_MAX;
+
+                return $aDeliveryId <=> $bDeliveryId;
+            });
 
             foreach (
-                $dr['lots']
-                as $lotKey => &$lot
+                $project['schools']
+                as $schoolId => &$school
             ) {
 
                 foreach (
-                    $lot['keystages']
-                    as $keystageKey => &$keystage
+                    $school['lots']
+                    as $lotKey => &$lot
                 ) {
+
+                    foreach (
+                        $lot['keystages']
+                        as $keystageKey => &$keystage
+                    ) {
+
+                        if (
+                            empty(
+                                $keystage['items']
+                            )
+                        ) {
+
+                            unset(
+                                $lot['keystages'][$keystageKey]
+                            );
+
+                            continue;
+                        }
+
+
+                        $keystage['items'] =
+                            array_values(
+                                $keystage['items']
+                            );
+                    }
+
+                    unset($keystage);
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | REMOVE EMPTY LOT
+                    |--------------------------------------------------------------------------
+                    */
 
                     if (
                         empty(
-                            $keystage['items']
+                            $lot['keystages']
                         )
                     ) {
 
                         unset(
-                            $lot['keystages'][$keystageKey]
+                            $school['lots'][$lotKey]
                         );
 
                         continue;
                     }
 
 
-                    $keystage['items'] =
+                    /*
+                    |--------------------------------------------------------------------------
+                    | REINDEX KEYSTAGES
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $lot['keystages'] =
                         array_values(
-                            $keystage['items']
+                            $lot['keystages']
                         );
                 }
 
-                unset($keystage);
+                unset($lot);
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | REMOVE EMPTY LOT
+                | REMOVE EMPTY SCHOOL
                 |--------------------------------------------------------------------------
                 */
 
                 if (
                     empty(
-                        $lot['keystages']
+                        $school['lots']
                     )
                 ) {
 
                     unset(
-                        $dr['lots'][$lotKey]
+                        $project['schools'][$schoolId]
                     );
 
                     continue;
@@ -1683,60 +1759,40 @@ public function generateLabels(Request $request)
 
                 /*
                 |--------------------------------------------------------------------------
-                | REINDEX KEYSTAGES
+                | REINDEX LOTS
                 |--------------------------------------------------------------------------
                 */
 
-                $lot['keystages'] =
+                $school['lots'] =
                     array_values(
-                        $lot['keystages']
+                        $school['lots']
                     );
             }
 
-            unset($lot);
+            unset($school);
 
 
             /*
             |--------------------------------------------------------------------------
-            | REMOVE EMPTY DR
+            | REMOVE EMPTY PROJECT
             |--------------------------------------------------------------------------
             */
 
             if (
                 empty(
-                    $dr['lots']
+                    $project['schools']
                 )
             ) {
 
                 unset(
-                    $data[$drNo]
+                    $data[$projectId]
                 );
 
                 continue;
             }
         }
 
-        unset($dr);
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | SORT DRs BY MIN DELIVERY ID
-        |--------------------------------------------------------------------------
-        */
-
-        uasort($data, function ($a, $b) {
-
-            $aDeliveryId = !empty($a['delivery_ids'])
-                ? min($a['delivery_ids'])
-                : PHP_INT_MAX;
-
-            $bDeliveryId = !empty($b['delivery_ids'])
-                ? min($b['delivery_ids'])
-                : PHP_INT_MAX;
-
-            return $aDeliveryId <=> $bDeliveryId;
-        });
+        unset($project);
 
 
         /*
@@ -1756,93 +1812,42 @@ public function generateLabels(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | 19b. DETERMINE WHICH DRs NEED A BLANK PAGE
-        |--------------------------------------------------------------------------
-        |
-        | Each DR is printed/stapled separately, so each DR's own section must
-        | end on an even page count. Since every DR always starts on a fresh
-        | page (page-break-before), rendering one DR in isolation gives the
-        | same page count it will have inside the full combined document.
-        | We use that to flag which DRs need a trailing blank page, then do
-        | ONE final render of everything together.
-        |
-        */
-
-        foreach ($data as $drNo => &$dr) {
-
-            $countViewData = [
-                'data' => [$drNo => $dr],
-                'showSchoolID' => $showSchoolID,
-                'showMunicipality' => $showMunicipality,
-                'showDivision' => $showDivision,
-                'showRegion' => $showRegion,
-            ];
-
-            $countPdf = Pdf::loadView(
-                'deliveries.label-layout',
-                $countViewData
-            )
-                ->setPaper('a4', 'portrait');
-
-            $countPdf->render();
-
-            $drPageCount = $countPdf->getDomPDF()
-                ->getCanvas()
-                ->get_page_count();
-
-            $dr['needs_blank_page'] = ($drPageCount % 2 !== 0);
-        }
-
-        unset($dr);
-
-
-        /*
-        |--------------------------------------------------------------------------
         | 20. GENERATE PDF
         |--------------------------------------------------------------------------
-        |
-        | Single final render. Each DR's own even-page padding is already
-        | baked into $data via 'needs_blank_page' (set in step 19b above),
-        | and the Blade view inserts the blank page right after that DR's
-        | content. No re-render or global page-count check needed here.
-        |
         */
 
-        $viewData = [
-
-            'data' =>
-                $data,
-
-            'showSchoolID' =>
-                $showSchoolID,
-
-            'showMunicipality' =>
-                $showMunicipality,
-
-            'showDivision' =>
-                $showDivision,
-
-            'showRegion' =>
-                $showRegion,
-        ];
-
-
-        $pdf = Pdf::loadView(
+        return Pdf::loadView(
             'deliveries.label-layout',
-            $viewData
+            [
+
+                'data' =>
+                    $data,
+
+                'showSchoolID' =>
+                    $showSchoolID,
+
+                'showMunicipality' =>
+                    $showMunicipality,
+
+                'showDivision' =>
+                    $showDivision,
+
+                'showRegion' =>
+                    $showRegion,
+
+            ]
         )
 
             ->setPaper(
                 'a4',
                 'portrait'
+            )
+
+            ->stream(
+                'Packing_List_' .
+                now()->format('Ymd_His') .
+                '.pdf'
             );
-
-
-        return $pdf->stream(
-            'Packing_List_' .
-            now()->format('Ymd_His') .
-            '.pdf'
-        );
     }
 
 

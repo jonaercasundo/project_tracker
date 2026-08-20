@@ -988,7 +988,7 @@ public function generateLabels(Request $request)
 
             $deliveryProjectId = (int) $delivery->project_id;
             $schoolId = (int) $delivery->school_id;
-
+            $deliveryId = (int) $delivery->delivery_id;
             if ($deliveryProjectId <= 0) {
                 continue;
             }
@@ -996,8 +996,9 @@ public function generateLabels(Request $request)
             if ($schoolId <= 0) {
                 continue;
             }
-
-
+            if ($deliveryId <= 0) {
+                continue;
+            }
             /*
             |--------------------------------------------------------------------------
             | CREATE PROJECT
@@ -1036,9 +1037,11 @@ public function generateLabels(Request $request)
                     ],
 
                     'schools' => [],
+                    'delivery_ids' => [],
                 ];
             }
 
+            $data[$deliveryProjectId]['delivery_ids'][] = $deliveryId;
 
             /*
             |--------------------------------------------------------------------------
@@ -1075,6 +1078,7 @@ public function generateLabels(Request $request)
                     ],
 
                     'lots' => [],
+                    'delivery_ids' => [],
                 ];
             }
 
@@ -1182,6 +1186,7 @@ public function generateLabels(Request $request)
                         $lotQrCache[$lotQrValue],
 
                     'keystages' => [],
+                    'delivery_ids' => [],
                 ];
             }
 
@@ -1440,6 +1445,7 @@ public function generateLabels(Request $request)
                             $keystageLabel,
 
                         'items' => [],
+                        'delivery_ids' => [],
                     ];
                 }
 
@@ -1646,7 +1652,17 @@ public function generateLabels(Request $request)
             |--------------------------------------------------------------------------
             */
 
-            ksort($project['schools']);
+            uasort($project['schools'], function ($a, $b) {
+                $aDeliveryId = !empty($a['delivery_ids'])
+                    ? min($a['delivery_ids'])
+                    : PHP_INT_MAX;
+
+                $bDeliveryId = !empty($b['delivery_ids'])
+                    ? min($b['delivery_ids'])
+                    : PHP_INT_MAX;
+
+                return $aDeliveryId <=> $bDeliveryId;
+            });
 
             foreach (
                 $project['schools']

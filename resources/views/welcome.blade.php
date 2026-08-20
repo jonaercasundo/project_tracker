@@ -176,19 +176,6 @@
         </div>
     </section>
 
-    <!-- Bottom CTA Banner -->
-    <section class="py-16 bg-gradient-to-r from-brand-700 to-brand-600 text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-3xl sm:text-5xl font-extrabold tracking-tight">Ready to streamline your operations?</h2>
-            <p class="mt-4 text-brand-100 text-base sm:text-lg max-w-xl mx-auto">Set up your pipeline rules in under 10 minutes. No credit card required.</p>
-            <div class="mt-8">
-                <a href="/register" class="inline-block px-8 py-4 rounded-xl text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-2xl">
-                    Start Your 14-Day Free Trial
-                </a>
-            </div>
-        </div>
-    </section>
-
     <!-- Footer -->
     <footer class="bg-slate-950 border-t border-slate-800 py-12 text-slate-500 text-xs">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">

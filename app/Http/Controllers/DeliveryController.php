@@ -887,11 +887,7 @@ public function generateLabels(Request $request)
                 'p.project_name'
             )
 
-            ->orderBy('d.project_id')
-            ->orderBy('s.school_id')
-            ->orderBy('d.lot_id')
-            ->orderBy('d.keystage_id')
-            ->orderBy('d.delivery_id')
+            ->orderBy('d.delivery_id', 'asc')
 
             ->get();
 

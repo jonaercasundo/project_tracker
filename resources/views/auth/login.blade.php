@@ -9,7 +9,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                 </div>
-                <span class="text-xl font-bold tracking-tight text-slate-900">MMC <span class="text-blue-600 font-medium">Tracker</span></span>
+                <span class="text-xl font-bold tracking-tight text-slate-900">METRO <span class="text-blue-600 font-medium">App</span></span>
             </div>
             
             <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Welcome Back</h2>
@@ -86,7 +86,7 @@
             <!-- Submit Button -->
             <div class="pt-2">
                 <x-primary-button class="w-full justify-center py-3.5 px-5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 hover:-translate-y-0.5 focus:ring-4 focus:ring-blue-500/20 border-0 transition-all duration-150">
-                    {{ __('Sign In to Tracker') }}
+                    {{ __('Sign In to METRO App') }}
                 </x-primary-button>
             </div>
         </form>

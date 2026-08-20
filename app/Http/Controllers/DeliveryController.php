@@ -173,7 +173,7 @@ class DeliveryController extends Controller
             $deliveryIds = (clone $baseQuery)
                 ->select('d.delivery_id')
                 ->distinct()
-                ->orderByRaw('d.delivery_id', 'asc')
+                ->orderByRaw('CAST(d.delivery_id AS UNSIGNED) ASC')
                 ->limit($limit)
                 ->offset($offset)
                 ->pluck('d.delivery_id');
@@ -227,7 +227,7 @@ class DeliveryController extends Controller
                 'i.item_name',
                 'pc.qty as content_qty'
             )
-            ->orderByRaw('d.delivery_id', 'asc')
+            ->orderByRaw('CAST(d.delivery_id AS UNSIGNED) ASC')
             ->orderBy('pk.package_id')
         ->get();
         // =========================

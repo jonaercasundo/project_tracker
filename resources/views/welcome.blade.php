@@ -37,8 +37,6 @@
             <nav class="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-400">
                 <a href="#features" class="hover:text-white transition-colors">Features</a>
                 <a href="#pipeline" class="hover:text-white transition-colors">Pipeline Flow</a>
-                <a href="#solutions" class="hover:text-white transition-colors">Solutions</a>
-                <a href="#pricing" class="hover:text-white transition-colors">Pricing</a>
             </nav>
 
             <div class="flex items-center gap-3">

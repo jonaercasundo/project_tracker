@@ -160,6 +160,45 @@
 
         /*
         |--------------------------------------------------------------------------
+        | TOP-LEFT LOT QR BADGE
+        |--------------------------------------------------------------------------
+        |
+        | Floats over the top-left corner of each school's block, stamp-style.
+        | Requires the wrapping .school-block to be position:relative.
+        */
+
+        .school-block {
+            position: relative;
+        }
+
+        .top-lot-badge {
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            text-align: center;
+            background: #fff;
+            border: 1px solid #000;
+            padding: 3px 4px;
+            z-index: 10;
+        }
+
+        .top-lot-badge img {
+            width: 42px;
+            height: 42px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .top-lot-badge span {
+            display: block;
+            font-size: 7px;
+            font-weight: bold;
+            margin-top: 2px;
+            white-space: nowrap;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | KEYSTAGE HEADER
         |--------------------------------------------------------------------------
         */
@@ -321,6 +360,22 @@
         {{-- ================================================================
              SCHOOL INFORMATION
         ================================================================= --}}
+
+        @php
+            // Badge shows the first lot on this school's page.
+            // If a school has multiple lots, only the first lot's QR is
+            // stamped here — let me know if you want one badge per lot instead.
+            $topLot = collect($lots)->first();
+        @endphp
+
+        <div class="school-block">
+
+            @if($topLot && !empty($topLot['lot_qr']))
+                <div class="top-lot-badge">
+                    <img src="{{ $topLot['lot_qr'] }}" alt="QR">
+                    <span>LOT {{ $topLot['lot_name'] ?? '' }}</span>
+                </div>
+            @endif
 
         <table class="school-table">
 
@@ -742,6 +797,8 @@
             </tbody>
 
         </table>
+
+        </div>{{-- /.school-block --}}
 
 
     @empty

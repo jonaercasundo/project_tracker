@@ -1810,44 +1810,85 @@ public function generateLabels(Request $request)
         }
 
 
+
         /*
         |--------------------------------------------------------------------------
         | 20. GENERATE PDF
         |--------------------------------------------------------------------------
+        |
+        | First pass: render to find the real page count (a school can spill
+        | across multiple physical pages, so we can't predict this from $data
+        | alone — only DomPDF knows after layout).
+        |
+        | If the count is odd, re-render once more with an extra blank page
+        | appended so duplex printing always ends on a full sheet.
+        |
         */
 
-        return Pdf::loadView(
+        $viewData = [
+
+            'data' =>
+                $data,
+
+            'showSchoolID' =>
+                $showSchoolID,
+
+            'showMunicipality' =>
+                $showMunicipality,
+
+            'showDivision' =>
+                $showDivision,
+
+            'showRegion' =>
+                $showRegion,
+
+            'forceBlankPage' =>
+                false,
+        ];
+
+
+        $pdf = Pdf::loadView(
             'deliveries.label-layout',
-            [
-
-                'data' =>
-                    $data,
-
-                'showSchoolID' =>
-                    $showSchoolID,
-
-                'showMunicipality' =>
-                    $showMunicipality,
-
-                'showDivision' =>
-                    $showDivision,
-
-                'showRegion' =>
-                    $showRegion,
-
-            ]
+            $viewData
         )
 
             ->setPaper(
                 'a4',
                 'portrait'
+            );
+
+
+        $pdf->render();
+
+
+        $pageCount = $pdf->getDomPDF()
+            ->getCanvas()
+            ->get_page_count();
+
+
+        if ($pageCount % 2 !== 0) {
+
+            $viewData['forceBlankPage'] = true;
+
+            $pdf = Pdf::loadView(
+                'deliveries.label-layout',
+                $viewData
             )
 
-            ->stream(
-                'Packing_List_' .
-                now()->format('Ymd_His') .
-                '.pdf'
-            );
+                ->setPaper(
+                    'a4',
+                    'portrait'
+                );
+
+            $pdf->render();
+        }
+
+
+        return $pdf->stream(
+            'Packing_List_' .
+            now()->format('Ymd_His') .
+            '.pdf'
+        );
     }
 
 

@@ -810,6 +810,24 @@
         </div>{{-- /.school-block --}}
 
 
+        {{-- ================================================================
+             PER-SCHOOL FORCED BLANK PAGE
+             ----------------------------------------------------------------
+             Set by the controller (step 19b) when this school's own
+             isolated page count is odd. Keeps each school ending on a
+             full duplex sheet regardless of how many pages the other
+             schools in this batch take.
+        ================================================================= --}}
+
+        @if(!empty($school['needs_blank_page']))
+
+            <div class="school-page blank-page">
+                &nbsp;
+            </div>
+
+        @endif
+
+
     @empty
 
         {{-- ================================================================
@@ -830,28 +848,6 @@
 
 
 @endforeach
-@php $drIndex = 0; @endphp
 
-@foreach($data as $drNo => $dr)
-
-    @php
-        $drIndex++;
-        $info = $dr['info'] ?? [];
-        $lots = $dr['lots'] ?? [];
-    @endphp
-
-    @if($drIndex > 1)
-        <div class="school-page"></div>
-    @endif
-
-    <div class="school-block">
-
-    </div>
-
-    @if(!empty($dr['needs_blank_page']))
-        <div class="school-page blank-page">&nbsp;</div>
-    @endif
-
-@endforeach
 </body>
 </html>

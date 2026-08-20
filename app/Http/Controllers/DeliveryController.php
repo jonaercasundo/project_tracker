@@ -1808,7 +1808,55 @@ class DeliveryController extends Controller
                 'No package items found for the selected project and school(s).'
             );
         }
+        /*
+        |--------------------------------------------------------------------------
+        | 19b. DETERMINE WHICH SCHOOLS NEED A BLANK PAGE
+        |--------------------------------------------------------------------------
+        |
+        | Each school prints as its own section (page-break-before on every new
+        | school), so each school's own page count must be even. Rendering one
+        | school in isolation gives the same page count it will have inside the
+        | full combined document, since nothing before or after it affects its
+        | own layout. We flag odd ones here, then do ONE final render.
+        |
+        */
 
+        foreach ($data as $projectId => &$project) {
+
+            foreach ($project['schools'] as $schoolId => &$school) {
+
+                $countViewData = [
+                    'data' => [
+                        $projectId => [
+                            'info' => $project['info'],
+                            'schools' => [$schoolId => $school],
+                        ],
+                    ],
+                    'showSchoolID' => $showSchoolID,
+                    'showMunicipality' => $showMunicipality,
+                    'showDivision' => $showDivision,
+                    'showRegion' => $showRegion,
+                ];
+
+                $countPdf = Pdf::loadView(
+                    'deliveries.label-layout',
+                    $countViewData
+                )
+                    ->setPaper('a4', 'portrait');
+
+                $countPdf->render();
+
+                $schoolPageCount = $countPdf->getDomPDF()
+                    ->getCanvas()
+                    ->get_page_count();
+
+                $school['needs_blank_page'] = ($schoolPageCount % 2 !== 0);
+            }
+
+            unset($school);
+        }
+
+        unset($project);
 
         /*
         |--------------------------------------------------------------------------
@@ -1816,38 +1864,20 @@ class DeliveryController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        return Pdf::loadView(
-            'deliveries.label-layout',
-            [
-
-                'data' =>
-                    $data,
-
-                'showSchoolID' =>
-                    $showSchoolID,
-
-                'showMunicipality' =>
-                    $showMunicipality,
-
-                'showDivision' =>
-                    $showDivision,
-
-                'showRegion' =>
-                    $showRegion,
-
-            ]
-        )
-
-            ->setPaper(
-                'a4',
-                'portrait'
+            return Pdf::loadView(
+                'deliveries.label-layout',
+                [
+                    'data' => $data,
+                    'showSchoolID' => $showSchoolID,
+                    'showMunicipality' => $showMunicipality,
+                    'showDivision' => $showDivision,
+                    'showRegion' => $showRegion,
+                ]
             )
-
-            ->stream(
-                'Packing_List_' .
-                now()->format('Ymd_His') .
-                '.pdf'
-            );
+                ->setPaper('a4', 'portrait')
+                ->stream(
+                    'Packing_List_' . now()->format('Ymd_His') . '.pdf'
+                );
     }
 
 

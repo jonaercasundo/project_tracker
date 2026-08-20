@@ -163,23 +163,16 @@
         | TOP-RIGHT LOT QR BADGES
         |--------------------------------------------------------------------------
         |
-        | Floats over the top-right corner of each school's block, one badge
-        | per lot in that project/school. Requires the wrapping .school-block
-        | to be position:relative. Uses inline-block (not flexbox) since
-        | dompdf does not support CSS flexbox.
+        | Sits in normal document flow, right-aligned, directly above the
+        | school table — one badge per lot. Avoids position:absolute since
+        | that was clipping above the page's top margin and overlapping
+        | the header text. Uses inline-block (not flexbox) since dompdf
+        | does not support CSS flexbox.
         */
 
-        .school-block {
-            position: relative;
-        }
-
         .top-lot-badges {
-            position: absolute;
-            top: -10px;
-            right: -10px;
             text-align: right;
-            max-width: 320px;
-            z-index: 10;
+            margin-bottom: 6px;
         }
 
         .top-lot-badge {
@@ -610,6 +603,16 @@
                 ========================================================== --}}
 
                 <tr class="lot-row">
+
+                    {{-- QR CODE --}}
+
+                    <td class="lot-qr">
+
+                        @if($lotQrSrc)
+                            <img src="{{ $lotQrSrc }}" alt="QR">
+                        @endif
+
+                    </td>
 
 
                     {{-- LOT NAME --}}

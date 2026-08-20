@@ -5,7 +5,10 @@
     <meta charset="utf-8">
 
     <style>
-
+        .blank-page {
+            width: 100%;
+            height: 100%;
+        }
         @page {
             margin: 18px 20px 18px 20px;
         }
@@ -829,7 +832,9 @@
 @endforeach
 @if(!empty($forceBlankPage))
 
-    <div class="school-page"></div>
+    <div class="school-page blank-page">
+        &nbsp;
+    </div>
 
 @endif
 </body>

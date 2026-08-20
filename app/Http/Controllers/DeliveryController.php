@@ -1811,90 +1811,84 @@ public function generateLabels(Request $request)
 
 
 
-/*
-|--------------------------------------------------------------------------
-| 20. GENERATE PDF
-|--------------------------------------------------------------------------
-|
-| First pass uses a throwaway PDF instance purely to detect the real
-| page count (rendering is required for DomPDF to know this — it can't
-| be predicted from $data alone since a school can spill across pages).
-|
-| We render THAT instance manually to inspect it, then discard it.
-| The final PDF instance is never manually rendered — stream() renders
-| it exactly once. Calling render() and then stream() on the same
-| instance can cause DomPDF to render (and duplicate) the content twice.
-|
-*/
+        /*
+        |--------------------------------------------------------------------------
+        | 20. GENERATE PDF
+        |--------------------------------------------------------------------------
+        |
+        | First pass: render to find the real page count (a school can spill
+        | across multiple physical pages, so we can't predict this from $data
+        | alone — only DomPDF knows after layout).
+        |
+        | If the count is odd, re-render once more with an extra blank page
+        | appended so duplex printing always ends on a full sheet.
+        |
+        */
 
-$viewData = [
+        $viewData = [
 
-    'data' =>
-        $data,
+            'data' =>
+                $data,
 
-    'showSchoolID' =>
-        $showSchoolID,
+            'showSchoolID' =>
+                $showSchoolID,
 
-    'showMunicipality' =>
-        $showMunicipality,
+            'showMunicipality' =>
+                $showMunicipality,
 
-    'showDivision' =>
-        $showDivision,
+            'showDivision' =>
+                $showDivision,
 
-    'showRegion' =>
-        $showRegion,
+            'showRegion' =>
+                $showRegion,
 
-    'forceBlankPage' =>
-        false,
-];
+            'forceBlankPage' =>
+                false,
+        ];
 
 
-$countPdf = Pdf::loadView(
-    'deliveries.label-layout',
-    $viewData
-)
+        $pdf = Pdf::loadView(
+            'deliveries.label-layout',
+            $viewData
+        )
 
-    ->setPaper(
-        'a4',
-        'portrait'
-    );
-
-
-$countPdf->render();
+            ->setPaper(
+                'a4',
+                'portrait'
+            );
 
 
-$pageCount = $countPdf->getDomPDF()
-    ->getCanvas()
-    ->get_page_count();
+        $pdf->render();
 
 
-$viewData['forceBlankPage'] =
-    ($pageCount % 2 !== 0);
+        $pageCount = $pdf->getDomPDF()
+            ->getCanvas()
+            ->get_page_count();
 
 
-// TEMPORARY DEBUG — remove after confirming
-dd([
-    'pageCount' => $pageCount,
-    'forceBlankPage' => $viewData['forceBlankPage'],
-]);
+        if ($pageCount % 2 !== 0) {
+
+            $viewData['forceBlankPage'] = true;
+
+            $pdf = Pdf::loadView(
+                'deliveries.label-layout',
+                $viewData
+            )
+
+                ->setPaper(
+                    'a4',
+                    'portrait'
+                );
+
+            $pdf->render();
+        }
 
 
-$pdf = Pdf::loadView(
-    'deliveries.label-layout',
-    $viewData
-)
-
-    ->setPaper(
-        'a4',
-        'portrait'
-    );
-
-
-return $pdf->stream(
-    'Packing_List_' .
-    now()->format('Ymd_His') .
-    '.pdf'
-);
+        return $pdf->stream(
+            'Packing_List_' .
+            now()->format('Ymd_His') .
+            '.pdf'
+        );
     }
 
 

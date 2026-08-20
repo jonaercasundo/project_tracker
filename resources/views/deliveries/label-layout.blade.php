@@ -160,31 +160,41 @@
 
         /*
         |--------------------------------------------------------------------------
-        | TOP-LEFT LOT QR BADGE
+        | TOP-RIGHT LOT QR BADGES
         |--------------------------------------------------------------------------
         |
-        | Floats over the top-left corner of each school's block, stamp-style.
-        | Requires the wrapping .school-block to be position:relative.
+        | Floats over the top-right corner of each school's block, one badge
+        | per lot in that project/school. Requires the wrapping .school-block
+        | to be position:relative. Uses inline-block (not flexbox) since
+        | dompdf does not support CSS flexbox.
         */
 
         .school-block {
             position: relative;
         }
 
-        .top-lot-badge {
+        .top-lot-badges {
             position: absolute;
             top: -10px;
-            left: -10px;
+            right: -10px;
+            text-align: right;
+            max-width: 320px;
+            z-index: 10;
+        }
+
+        .top-lot-badge {
+            display: inline-block;
+            vertical-align: top;
             text-align: center;
             background: #fff;
             border: 1px solid #000;
             padding: 3px 4px;
-            z-index: 10;
+            margin: 0 0 4px 4px;
         }
 
         .top-lot-badge img {
-            width: 42px;
-            height: 42px;
+            width: 36px;
+            height: 36px;
             display: block;
             margin: 0 auto;
         }
@@ -362,18 +372,21 @@
         ================================================================= --}}
 
         @php
-            // Badge shows the first lot on this school's page.
-            // If a school has multiple lots, only the first lot's QR is
-            // stamped here — let me know if you want one badge per lot instead.
-            $topLot = collect($lots)->first();
+            // One badge per lot on this school's page (not just the first).
         @endphp
 
         <div class="school-block">
 
-            @if($topLot && !empty($topLot['lot_qr']))
-                <div class="top-lot-badge">
-                    <img src="{{ $topLot['lot_qr'] }}" alt="QR">
-                    <span>LOT {{ $topLot['lot_name'] ?? '' }}</span>
+            @if(!empty($lots))
+                <div class="top-lot-badges">
+                    @foreach($lots as $lot)
+                        @if(!empty($lot['lot_qr']))
+                            <div class="top-lot-badge">
+                                <img src="{{ $lot['lot_qr'] }}" alt="QR">
+                                <span>LOT {{ $lot['lot_name'] ?? '' }}</span>
+                            </div>
+                        @endif
+                    @endforeach
                 </div>
             @endif
 
@@ -597,16 +610,6 @@
                 ========================================================== --}}
 
                 <tr class="lot-row">
-
-                    {{-- QR CODE --}}
-
-                    <td class="lot-qr">
-
-                        @if($lotQrSrc)
-                            <img src="{{ $lotQrSrc }}" alt="QR">
-                        @endif
-
-                    </td>
 
 
                     {{-- LOT NAME --}}

@@ -32,7 +32,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75c.621 0 1.125.504 1.125 1.125v1.875c0 .621-.504 1.125-1.125 1.125H5.625a1.125 1.125 0 0 1-1.125-1.125V5.625c0-.621.504-1.125 1.125-1.125Z" />
                 </svg>
             </div>
-            <span class="text-xl font-bold tracking-tight text-slate-900">MMC <span class="text-blue-600 font-medium">Tracker</span></span>
+            <span class="text-xl font-bold tracking-tight text-slate-900">METRO<span class="text-blue-600 font-medium">ALL IN ONE BUSINESS APP</span></span>
         </div>
 
         <div>
@@ -61,7 +61,7 @@
             </span>
             
             <h2 class="text-4xl sm:text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
-                Welcome to <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">MMC Project Tracker</span>
+                Welcome to <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">METRO ALL IN ONE BUSINESS APP</span>
             </h2>
 
             <p class="mt-6 text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">

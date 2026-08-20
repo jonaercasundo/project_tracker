@@ -143,6 +143,23 @@
 
         /*
         |--------------------------------------------------------------------------
+        | LOT QR CODE
+        |--------------------------------------------------------------------------
+        */
+
+        .lot-qr {
+            text-align: center;
+            vertical-align: middle;
+            padding: 3px;
+        }
+
+        .lot-qr img {
+            width: 40px;
+            height: 40px;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | KEYSTAGE HEADER
         |--------------------------------------------------------------------------
         */
@@ -511,6 +528,10 @@
                         $lotName = 'NO LOT';
                     }
 
+                    // Value encoded in the QR code for this lot.
+                    // Falls back to the lot name if no lot_id is present.
+                    $lotQrValue = $lotId ?: $lotName;
+
                     $keystages = $lot['keystages'] ?? [];
 
                 @endphp
@@ -522,8 +543,22 @@
 
                 <tr class="lot-row">
 
+                    {{-- QR CODE --}}
+
+                    <td class="lot-qr">
+
+                        <img
+                            src="data:image/png;base64,{{ base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(80)->margin(0)->generate((string) $lotQrValue)) }}"
+                            alt="QR"
+                        >
+
+                    </td>
+
+
+                    {{-- LOT NAME --}}
+
                     <td
-                        colspan="4"
+                        colspan="3"
                         class="lot-title"
                     >
 

@@ -80,17 +80,6 @@
                 </a>
             </div>
 
-            <!-- Social Proof Bar -->
-            <div class="mt-16 pt-10 border-t border-slate-800/80 max-w-5xl mx-auto">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Trusted by modern logistics & field operation teams</p>
-                <div class="mt-6 flex flex-wrap items-center justify-center gap-8 sm:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all">
-                    <span class="text-lg font-bold tracking-wider text-slate-400">APEX LOGISTICS</span>
-                    <span class="text-lg font-bold tracking-wider text-slate-400">VANGUARD FIELD</span>
-                    <span class="text-lg font-bold tracking-wider text-slate-400">ROUTEKIND</span>
-                    <span class="text-lg font-bold tracking-wider text-slate-400">NEXTFLOW</span>
-                </div>
-            </div>
-
         </div>
     </section>
 

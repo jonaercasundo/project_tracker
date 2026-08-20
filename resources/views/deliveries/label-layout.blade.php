@@ -833,7 +833,7 @@
 @if(!empty($forceBlankPage))
 
     <div class="school-page blank-page">
-        THIS IS THE FORCED BLANK PAGE
+        &nbsp;
     </div>
 
 @endif

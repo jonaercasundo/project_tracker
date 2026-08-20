@@ -171,7 +171,7 @@
         */
 
         .top-lot-badges {
-            text-align: right;
+            text-align: left;
             margin-bottom: 6px;
         }
 

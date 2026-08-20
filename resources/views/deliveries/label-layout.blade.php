@@ -280,11 +280,10 @@
 
         /*
         |--------------------------------------------------------------------------
-        | DR PAGE BREAK
+        | SCHOOL PAGE BREAK
         |--------------------------------------------------------------------------
         |
-        | Each DR starts on a new page, except the first DR.
-        | Reused for the trailing forced blank page too.
+        | Each school starts on a new page, except the first school.
         |
         */
 
@@ -308,80 +307,88 @@
 
 <body>
 
+@php
+
+    $totalSchools = 0;
+
+    foreach ($data as $project) {
+        $totalSchools += count($project['schools'] ?? []);
+    }
+
+    $schoolIndex = 0;
+
+@endphp
+
+
 {{-- ========================================================================
-     DR LOOP
-     ------------------------------------------------------------------------
-     $data is keyed by dr_no. Each DR = one printed/stapled unit, so each
-     DR's own section is padded independently to an even page count via
-     $dr['needs_blank_page'], computed in the controller before this final
-     render (see step 19b / step 20 in DeliveryController@generateLabels).
+     PROJECT LOOP
 ========================================================================= --}}
 
-@php $drIndex = 0; @endphp
-
-@foreach($data as $drNo => $dr)
+@foreach($data as $projectId => $project)
 
     @php
 
-        $drIndex++;
+        $projectInfo = $project['info'] ?? [];
 
-        $info = $dr['info'] ?? [];
-
-        $lots = $dr['lots'] ?? [];
+        $schools = $project['schools'] ?? [];
 
     @endphp
 
 
-    {{-- ================================================================
-         NEW DR
-    ================================================================= --}}
+    {{-- ====================================================================
+         SCHOOL LOOP
+    ===================================================================== --}}
 
-    @if($drIndex > 1)
+    @forelse($schools as $schoolId => $school)
 
-        <div class="school-page"></div>
+        @php
 
-    @endif
+            $schoolIndex++;
+
+            $info = $school['info'] ?? [];
+
+            $lots = $school['lots'] ?? [];
+
+        @endphp
 
 
-    {{-- ================================================================
-         DR / SCHOOL INFORMATION
-    ================================================================= --}}
+        {{-- ================================================================
+             NEW SCHOOL
+        ================================================================= --}}
 
-    <div class="school-block">
+        @if($schoolIndex > 1)
 
-        @if(!empty($lots))
-            <div class="top-lot-badges">
-                @foreach($lots as $lot)
-                    @if(!empty($lot['lot_qr']))
-                        <div class="top-lot-badge">
-                            <img src="{{ $lot['lot_qr'] }}" alt="QR">
-                            <span>LOT {{ $lot['lot_name'] ?? '' }}</span>
-                        </div>
-                    @endif
-                @endforeach
-            </div>
+            <div class="school-page"></div>
+
         @endif
+
+
+        {{-- ================================================================
+             SCHOOL INFORMATION
+        ================================================================= --}}
+
+        @php
+            // One badge per lot on this school's page (not just the first).
+        @endphp
+
+        <div class="school-block">
+
+            @if(!empty($lots))
+                <div class="top-lot-badges">
+                    @foreach($lots as $lot)
+                        @if(!empty($lot['lot_qr']))
+                            <div class="top-lot-badge">
+                                <img src="{{ $lot['lot_qr'] }}" alt="QR">
+                                <span>LOT {{ $lot['lot_name'] ?? '' }}</span>
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
 
         <table class="school-table">
 
             <tbody>
-
-                {{-- DR NO --}}
-
-                <tr>
-
-                    <td
-                        colspan="4"
-                        class="school-header"
-                    >
-
-                        DR NO:
-                        {{ $info['dr_no'] ?? 'N/A' }}
-
-                    </td>
-
-                </tr>
-
 
                 {{-- PROJECT NAME --}}
 
@@ -393,7 +400,7 @@
                     >
 
                         PROJECT:
-                        {{ $info['project_name'] ?? 'N/A' }}
+                        {{ $projectInfo['project_name'] ?? 'N/A' }}
 
                     </td>
 
@@ -480,7 +487,7 @@
                             class="school-info-value"
                         >
 
-                            {{ $info['division'] ?? 'N/A' }}
+                            {{ $projectInfo['division'] ?? 'N/A' }}
 
                         </td>
 
@@ -504,7 +511,7 @@
                             class="school-info-value"
                         >
 
-                            {{ $info['region'] ?? 'N/A' }}
+                            {{ $projectInfo['region'] ?? 'N/A' }}
 
                         </td>
 
@@ -532,6 +539,10 @@
 
             </colgroup>
 
+
+            {{-- =============================================================
+                 TABLE HEADER
+            ============================================================== --}}
 
             <thead>
 
@@ -581,6 +592,8 @@
                         $lotName = 'NO LOT';
                     }
 
+                    // Pre-generated by DeliveryController@generateLabels,
+                    // same pattern as $qrCodes in the AR flow.
                     $lotQrSrc = $lot['lot_qr'] ?? null;
 
                     $keystages = $lot['keystages'] ?? [];
@@ -594,6 +607,8 @@
 
                 <tr class="lot-row">
 
+                    {{-- QR CODE --}}
+
                     <td class="lot-qr">
 
                         @if($lotQrSrc)
@@ -602,6 +617,8 @@
 
                     </td>
 
+
+                    {{-- LOT NAME --}}
 
                     <td
                         colspan="3"
@@ -648,6 +665,10 @@
 
                     @endphp
 
+
+                    {{-- =====================================================
+                         KEYSTAGE HEADER
+                    ====================================================== --}}
 
                     <tr class="keystage-row">
 
@@ -696,12 +717,16 @@
 
                         <tr class="item-row">
 
+                            {{-- LOT --}}
+
                             <td class="item-lot">
 
                                 {{ $lotName }}
 
                             </td>
 
+
+                            {{-- ITEM --}}
 
                             <td class="item-name">
 
@@ -710,12 +735,16 @@
                             </td>
 
 
+                            {{-- QUANTITY --}}
+
                             <td class="item-qty">
 
                                 {{ number_format($itemQty) }}
 
                             </td>
 
+
+                            {{-- UNIT --}}
 
                             <td class="item-unit">
 
@@ -757,6 +786,10 @@
 
             @empty
 
+                {{-- =========================================================
+                     NO LOTS
+                ========================================================== --}}
+
                 <tr class="empty-row">
 
                     <td colspan="4">
@@ -774,24 +807,51 @@
 
         </table>
 
-    </div>{{-- /.school-block --}}
+        </div>{{-- /.school-block --}}
 
 
-    {{-- ================================================================
-         PER-DR FORCED BLANK PAGE
-         ------------------------------------------------------------------
-         Set by the controller (step 19b) when this DR's own isolated
-         page count is odd. Keeps each DR ending on a full duplex sheet
-         regardless of how many pages the other DRs in this batch take.
-    ================================================================= --}}
+    @empty
+
+        {{-- ================================================================
+             NO SCHOOLS
+        ================================================================= --}}
+
+        <tr class="empty-row">
+
+            <td colspan="4">
+
+                No schools found for this project.
+
+            </td>
+
+        </tr>
+
+    @endforelse
+
+
+@endforeach
+@php $drIndex = 0; @endphp
+
+@foreach($data as $drNo => $dr)
+
+    @php
+        $drIndex++;
+        $info = $dr['info'] ?? [];
+        $lots = $dr['lots'] ?? [];
+    @endphp
+
+    @if($drIndex > 1)
+        <div class="school-page"></div>
+    @endif
+
+    <div class="school-block">
+
+    </div>
 
     @if(!empty($dr['needs_blank_page']))
-
         <div class="school-page blank-page">&nbsp;</div>
-
     @endif
 
 @endforeach
-
 </body>
 </html>

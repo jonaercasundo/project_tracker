@@ -39,8 +39,9 @@
                         Launch App
                     </a>
                 @else
-                    <a href="/login" class="text-xs sm:text-sm font-semibold text-slate-300 hover:text-white px-3 py-2 transition-colors">Sign In</a>
-
+                    <a href="/login" class="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-lg shadow-brand-600/30">
+                        Sign In
+                    </a>
                 @endauth
             </div>
         </div>
@@ -65,11 +66,27 @@
                 Connect field teams, operation tracking, and quality approvals into one seamlessly automated operational pipeline. Stop bottlenecks before they start.
             </p>
 
+            <!-- Hero Action CTA -->
+            <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+                @auth
+                    <a href="{{ \App\Services\DashboardService::route(auth()->user()) }}" class="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-xl shadow-brand-600/30">
+                        Launch Dashboard
+                    </a>
+                @else
+                    <a href="/login" class="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-xl shadow-brand-600/30 flex items-center justify-center gap-2">
+                        <span>Sign In to METRO</span>
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                    </a>
+                @endauth
+            </div>
+
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="bg-slate-950 border-t border-slate-800 py-12 text-slate-500 text-xs">
+    <footer class="bg-slate-950 border-t border-slate-800 py-12 text-slate-500 text-xs mt-auto">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-2">
                 <span class="font-bold text-slate-200 text-sm">METRO</span>

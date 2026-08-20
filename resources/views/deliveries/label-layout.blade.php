@@ -827,6 +827,10 @@
 
 
 @endforeach
+@if(!empty($forceBlankPage))
 
+    <div class="school-page"></div>
+
+@endif
 </body>
 </html>

@@ -61,7 +61,7 @@
             </span>
             
             <h2 class="text-4xl sm:text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
-                Welcome to <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">METRO ALL IN ONE BUSINESS APP</span>
+                Welcome to <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">METRO APP</span>
             </h2>
 
             <p class="mt-6 text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">

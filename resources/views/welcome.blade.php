@@ -33,12 +33,6 @@
                 <span class="text-2xl font-bold tracking-tight text-white">METRO</span>
             </div>
 
-            <!-- Main Nav Links -->
-            <nav class="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-400">
-                <a href="#features" class="hover:text-white transition-colors">Features</a>
-                <a href="#pipeline" class="hover:text-white transition-colors">Pipeline Flow</a>
-            </nav>
-
             <div class="flex items-center gap-3">
                 @auth
                     <a href="{{ \App\Services\DashboardService::route(auth()->user()) }}" class="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-lg shadow-brand-600/30">

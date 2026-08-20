@@ -739,7 +739,7 @@ class DeliveryController extends Controller
     // =========================
 
 
-    public function generateLabels(Request $request)
+public function generateLabels(Request $request)
     {
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
@@ -969,6 +969,21 @@ class DeliveryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | 6b. LOT QR CACHE
+        |--------------------------------------------------------------------------
+        |
+        | Same lot can appear under multiple schools. Generate each lot's
+        | QR PNG only once and reuse it, keyed by lot_id (or lot name for
+        | "no lot" deliveries). Same pattern/library as
+        | DeliveryController@generate ($qrCodes).
+        |
+        */
+
+        $lotQrCache = [];
+
+
+        /*
+        |--------------------------------------------------------------------------
         | 7. PROCESS EACH DELIVERY
         |--------------------------------------------------------------------------
         */
@@ -1129,6 +1144,34 @@ class DeliveryController extends Controller
                     ['lots'][$lotKey]
             )) {
 
+                /*
+                |----------------------------------------------------------------
+                | LOT QR CODE
+                |----------------------------------------------------------------
+                |
+                | Encoded value: lot_id, falling back to lot_name for
+                | deliveries with no lot. Cached by that same value so the
+                | PNG is only generated once even if the lot appears under
+                | several schools.
+                |
+                */
+
+                $lotQrValue = ($lotId !== null && $lotId > 0)
+                    ? (string) $lotId
+                    : $lotName;
+
+                if (!isset($lotQrCache[$lotQrValue])) {
+
+                    $lotQrResult = (new PngWriter())->write(
+                        new QrCode($lotQrValue)
+                    );
+
+                    $lotQrCache[$lotQrValue] =
+                        'data:image/png;base64,' .
+                        base64_encode($lotQrResult->getString());
+                }
+
+
                 $data[$deliveryProjectId]
                     ['schools'][$schoolId]
                     ['lots'][$lotKey] = [
@@ -1138,6 +1181,9 @@ class DeliveryController extends Controller
 
                     'lot_name' =>
                         $lotName,
+
+                    'lot_qr' =>
+                        $lotQrCache[$lotQrValue],
 
                     'keystages' => [],
                 ];

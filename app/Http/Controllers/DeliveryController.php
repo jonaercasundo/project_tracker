@@ -613,26 +613,25 @@ class DeliveryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Generate PDF - PROJECT BY PROJECT, BACK TO BACK
+        | Generate PDF - DR BY DR, BACK TO BACK
         |--------------------------------------------------------------------------
         |
-        | Each project is rendered as its own standalone PDF using the
-        | existing 'deliveries.ar-layout' view (unchanged), so per-project
+        | Each DR # is rendered as its own standalone PDF using the
+        | existing 'deliveries.ar-layout' view (unchanged), so per-DR
         | page count can actually be measured.
         |
-        | ANY project that renders to an ODD page count automatically gets
+        | ANY DR that renders to an ODD page count automatically gets
         | ONE blank page appended - unconditionally, including the very
-        | last project in the batch. This guarantees every project's own
-        | block is always even, so each project always starts on an odd
-        | page number.
+        | last DR in the batch. This guarantees every DR's own block is
+        | always even, so each DR always starts on an odd page number.
         |
         | The individual PDFs are then merged into a single final PDF
         | using FPDI (composer require setasign/fpdi-fpdf).
         |
         */
 
-        $projectGroups = $deliveries->groupBy(
-            fn ($delivery) => $delivery->project_id
+        $drGroups = $deliveries->groupBy(
+            fn ($delivery) => $delivery->dr_no
         );
 
         $tempFiles = [];
@@ -643,26 +642,26 @@ class DeliveryController extends Controller
 
         try {
 
-            foreach ($projectGroups as $projectId => $projectDeliveries) {
+            foreach ($drGroups as $drNo => $drDeliveries) {
 
                 /*
                 |----------------------------------------------------------------
-                | RENDER THIS PROJECT'S PDF ALONE
+                | RENDER THIS DR'S PDF ALONE
                 |----------------------------------------------------------------
                 |
                 | IMPORTANT: Barryvdh\DomPDF's Pdf::loadView() facade is
                 | bound as a SINGLETON. Calling it repeatedly inside this
                 | loop reuses the SAME underlying Dompdf object across
-                | projects, which can carry over internal render state
-                | (counters/tree/canvas) from the previous project - this
-                | is why padding worked for a single project but silently
-                | broke for multiple. We build a brand new, fully isolated
-                | Dompdf instance per project instead.
+                | DRs, which can carry over internal render state
+                | (counters/tree/canvas) from the previous DR - this is
+                | why padding worked for a single DR but silently broke
+                | for multiple. We build a brand new, fully isolated
+                | Dompdf instance per DR instead.
                 |
                 */
 
                 $html = view('deliveries.ar-layout', [
-                    'deliveries' => $projectDeliveries->values(),
+                    'deliveries' => $drDeliveries->values(),
                     'qrCodes'    => $qrCodes,
                     'signerName' => Auth::user()?->name
                         ?? 'Authorized Representative',
@@ -691,14 +690,14 @@ class DeliveryController extends Controller
                 $dompdf->loadHtml($html);
                 $dompdf->render();
 
-                $projectPdfContent = $dompdf->output();
+                $drPdfContent = $dompdf->output();
 
                 unset($dompdf, $html);
 
 
-                $tempPath = tempnam(sys_get_temp_dir(), 'ar_project_') . '.pdf';
+                $tempPath = tempnam(sys_get_temp_dir(), 'ar_dr_') . '.pdf';
 
-                file_put_contents($tempPath, $projectPdfContent);
+                file_put_contents($tempPath, $drPdfContent);
 
                 $tempFiles[] = $tempPath;
 
@@ -739,12 +738,12 @@ class DeliveryController extends Controller
 
                 /*
                 |----------------------------------------------------------------
-                | ALWAYS PAD WITH A BLANK PAGE IF THIS PROJECT IS ODD
+                | ALWAYS PAD WITH A BLANK PAGE IF THIS DR IS ODD
                 |----------------------------------------------------------------
                 |
                 | Unconditional - applies even when this is the only /
-                | last project in the batch, so a single-project request
-                | still gets padded correctly.
+                | last DR in the batch, so a single-DR request still
+                | gets padded correctly.
                 |
                 */
 
@@ -767,8 +766,8 @@ class DeliveryController extends Controller
 
 
                 Log::info(sprintf(
-                    'AR generate(): project %s | own page count=%d | additional blank page=%d | total page (this project)=%d | running total=%d',
-                    $projectId,
+                    'AR generate(): DR %s | own page count=%d | additional blank page=%d | total page (this DR)=%d | running total=%d',
+                    $drNo,
                     $pageCount,
                     $blankPagesAdded,
                     $pageCount + $blankPagesAdded,

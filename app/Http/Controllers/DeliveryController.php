@@ -344,7 +344,7 @@ class DeliveryController extends Controller
     // GENERATE QR PDF
     // =========================
 
-public function generate(Request $request)
+    public function generate(Request $request)
     {
         $ids = collect(explode(',', $request->ids))
             ->map(fn($v) => trim($v))
@@ -674,6 +674,18 @@ public function generate(Request $request)
                 $dompdfOptions->set('defaultPaperSize', 'legal');
                 $dompdfOptions->set('defaultPaperOrientation', 'portrait');
 
+                // Without this, Dompdf blocks local file access (e.g. your
+                // logo image referenced via public_path() or a local asset
+                // path) outside its chroot. Laravel's Pdf::loadView()
+                // wrapper normally sets this for you from
+                // config/dompdf.php - since we're bypassing that wrapper,
+                // we need to set it ourselves.
+                $dompdfOptions->set('chroot', [
+                    base_path(),
+                    public_path(),
+                    storage_path(),
+                ]);
+
                 $dompdf = new \Dompdf\Dompdf($dompdfOptions);
                 $dompdf->setPaper('legal', 'portrait');
                 $dompdf->loadHtml($html);
@@ -789,6 +801,7 @@ public function generate(Request $request)
             'Content-Disposition' => 'inline; filename="deliveries-batch.pdf"',
         ]);
     }
+
 
     // =========================
     // GENERATE LABELS PDF

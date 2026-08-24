@@ -647,16 +647,39 @@ class DeliveryController extends Controller
                 |----------------------------------------------------------------
                 | RENDER THIS PROJECT'S PDF ALONE
                 |----------------------------------------------------------------
+                |
+                | IMPORTANT: Barryvdh\DomPDF's Pdf::loadView() facade is
+                | bound as a SINGLETON. Calling it repeatedly inside this
+                | loop reuses the SAME underlying Dompdf object across
+                | projects, which can carry over internal render state
+                | (counters/tree/canvas) from the previous project - this
+                | is why padding worked for a single project but silently
+                | broke for multiple. We build a brand new, fully isolated
+                | Dompdf instance per project instead.
+                |
                 */
 
-                $projectPdfContent = Pdf::loadView('deliveries.ar-layout', [
+                $html = view('deliveries.ar-layout', [
                     'deliveries' => $projectDeliveries->values(),
                     'qrCodes'    => $qrCodes,
                     'signerName' => Auth::user()?->name
                         ?? 'Authorized Representative',
-                ])
-                ->setPaper('legal', 'portrait')
-                ->output();
+                ])->render();
+
+                $dompdfOptions = new \Dompdf\Options();
+                $dompdfOptions->set('isHtml5ParserEnabled', true);
+                $dompdfOptions->set('isRemoteEnabled', true);
+                $dompdfOptions->set('defaultPaperSize', 'legal');
+                $dompdfOptions->set('defaultPaperOrientation', 'portrait');
+
+                $dompdf = new \Dompdf\Dompdf($dompdfOptions);
+                $dompdf->setPaper('legal', 'portrait');
+                $dompdf->loadHtml($html);
+                $dompdf->render();
+
+                $projectPdfContent = $dompdf->output();
+
+                unset($dompdf, $html);
 
 
                 $tempPath = tempnam(sys_get_temp_dir(), 'ar_project_') . '.pdf';

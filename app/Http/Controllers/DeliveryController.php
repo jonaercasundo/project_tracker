@@ -11,6 +11,7 @@ use App\Models\Delivery;
 use App\Models\ARSetting;
 use App\Models\PackageStatus;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class DeliveryController extends Controller
 {
@@ -343,43 +344,43 @@ class DeliveryController extends Controller
     // GENERATE QR PDF
     // =========================
 
-    public function generate(Request $request)
+public function generate(Request $request)
     {
         $ids = collect(explode(',', $request->ids))
             ->map(fn($v) => trim($v))
             ->filter(fn($v) => is_numeric($v) && $v > 0)
             ->values();
-    
+
         if ($ids->isEmpty()) {
             abort(422, 'Invalid DR numbers.');
         }
-    
+
         /*
         |--------------------------------------------------------------------------
         | Resolve DR numbers
         |--------------------------------------------------------------------------
         */
-    
+
         $drNos = Delivery::whereIn('delivery_id', $ids)
             ->pluck('dr_no')
             ->unique()
             ->values();
-    
+
         if ($drNos->isEmpty()) {
             abort(404, 'No deliveries found.');
         }
-    
+
         /*
         |--------------------------------------------------------------------------
         | Expand to ALL delivery rows belonging to the selected DR
         |--------------------------------------------------------------------------
         */
-    
+
         $ids = Delivery::whereIn('dr_no', $drNos)
             ->pluck('delivery_id')
             ->unique()
             ->values();
-    
+
         /*
         |--------------------------------------------------------------------------
         | Load deliveries
@@ -398,7 +399,7 @@ class DeliveryController extends Controller
         |         -> item
         |
         */
-    
+
         $deliveries = Delivery::with([
             'school',
             'project.arSetting',
@@ -410,48 +411,48 @@ class DeliveryController extends Controller
         ->orderBy('dr_no')
         ->orderBy('keystage_id')
         ->get();
-    
+
         if ($deliveries->isEmpty()) {
             abort(404, 'No deliveries found.');
         }
-    
+
         $qrCodes = [];
-    
+
         /*
         |--------------------------------------------------------------------------
         | Process each delivery / keystage
         |--------------------------------------------------------------------------
         */
-    
+
         foreach ($deliveries as $delivery) {
-    
+
             /*
             |--------------------------------------------------------------------------
             | Get packages belonging ONLY to this delivery's keystage
             |--------------------------------------------------------------------------
             */
-    
+
             $packageQuery = DB::table('package');
-    
+
             if (!empty($delivery->keystage_id)) {
-    
+
                 $packageQuery->where(
                     'keystage_id',
                     $delivery->keystage_id
                 );
-    
+
             } else {
-    
+
                 $packageQuery->where(
                     'lot_id',
                     $delivery->lot_id
                 );
             }
-    
+
             $packageIds = $packageQuery
                 ->pluck('package_id');
-    
-    
+
+
             /*
             |--------------------------------------------------------------------------
             | Create missing package_status rows
@@ -461,16 +462,16 @@ class DeliveryController extends Controller
             | Do NOT put item_id or qty here.
             |
             */
-    
+
             foreach ($packageIds as $packageId) {
-    
+
                 $exists = DB::table('package_status')
                     ->where('delivery_id', $delivery->delivery_id)
                     ->where('package_id', $packageId)
                     ->exists();
-    
+
                 if (!$exists) {
-    
+
                     DB::table('package_status')->insert([
                         'delivery_id' => $delivery->delivery_id,
                         'package_id'  => $packageId,
@@ -479,95 +480,95 @@ class DeliveryController extends Controller
                     ]);
                 }
             }
-    
-    
+
+
             /*
             |--------------------------------------------------------------------------
             | Reload package statuses with package contents
             |--------------------------------------------------------------------------
             */
-    
+
             $statuses = PackageStatus::with([
                 'package.packageContent.item',
             ])
             ->where('delivery_id', $delivery->delivery_id)
             ->get();
-    
-    
+
+
             /*
             |--------------------------------------------------------------------------
             | Remove package_status rows belonging to another keystage
             |--------------------------------------------------------------------------
             */
-    
+
             if (!empty($delivery->keystage_id)) {
-    
+
                 $statuses = $statuses
                     ->filter(function ($status) use ($delivery) {
-    
+
                         return $status->package
                             && (int) $status->package->keystage_id
                                 === (int) $delivery->keystage_id;
-    
+
                     })
                     ->values();
-    
+
             } else {
-    
+
                 $statuses = $statuses
                     ->filter(function ($status) use ($delivery) {
-    
+
                         return $status->package
                             && (int) $status->package->lot_id
                                 === (int) $delivery->lot_id;
-    
+
                     })
                     ->values();
             }
-    
-    
+
+
             /*
             |--------------------------------------------------------------------------
             | Set filtered statuses back onto delivery
             |--------------------------------------------------------------------------
             */
-    
+
             $delivery->setRelation(
                 'packageStatuses',
                 $statuses
             );
-    
+
             $delivery->ar =
                 $delivery->project->arSetting ?? null;
-    
-    
+
+
             /*
             |--------------------------------------------------------------------------
             | Generate QR codes
             |--------------------------------------------------------------------------
             */
-    
+
             foreach ($statuses as $status) {
-    
+
                 if (!$status->package_status_id) {
                     continue;
                 }
-    
+
                 $url = sprintf(
                     'https://mmc.metro-ltd.com/entry.php?id=%s&delivery_id=%s',
                     $status->package_status_id,
                     $delivery->delivery_id
                 );
-    
+
                 $result = (new PngWriter())->write(
                     new QrCode($url)
                 );
-    
+
                 $qrCodes[$status->package_status_id] =
                     'data:image/png;base64,' .
                     base64_encode($result->getString());
-    
-    
+
+
                 /*
                 |--------------------------------------------------------------------------
                 | QR LABEL
@@ -582,34 +583,34 @@ class DeliveryController extends Controller
                 | item
                 |
                 */
-    
+
                 $itemNames = collect();
-    
+
                 if ($status->package) {
-    
+
                     foreach (
                         $status->package->packageContent
                         as $content
                     ) {
-    
+
                         if ($content->item) {
-    
+
                             $itemName = $content->item->item_name;
-    
+
                             if ($itemName) {
                                 $itemNames->push($itemName);
                             }
                         }
                     }
                 }
-    
+
                 $status->qr_label = $itemNames->isNotEmpty()
                     ? $itemNames->unique()->implode(', ')
                     : 'Unknown Item';
             }
         }
-    
-    
+
+
         /*
         |--------------------------------------------------------------------------
         | Generate PDF - PROJECT BY PROJECT, BACK TO BACK
@@ -619,34 +620,35 @@ class DeliveryController extends Controller
         | existing 'deliveries.ar-layout' view (unchanged), so per-project
         | page count can actually be measured.
         |
-        | Every project must START on an odd page. Since projects are
-        | concatenated in order, this is guaranteed as long as EVERY
-        | project's own page count is even - so if a project renders to
-        | an odd number of pages, one blank page is appended to it before
-        | moving on to the next project.
+        | ANY project that renders to an ODD page count automatically gets
+        | ONE blank page appended - unconditionally, including the very
+        | last project in the batch. This guarantees every project's own
+        | block is always even, so each project always starts on an odd
+        | page number.
         |
         | The individual PDFs are then merged into a single final PDF
         | using FPDI (composer require setasign/fpdi-fpdf).
         |
         */
-    
+
         $projectGroups = $deliveries->groupBy(
             fn ($delivery) => $delivery->project_id
         );
-    
+
         $tempFiles = [];
-    
+
         $mergedPdf = new \setasign\Fpdi\Fpdi();
+
         try {
-    
+
             foreach ($projectGroups as $projectId => $projectDeliveries) {
-    
+
                 /*
                 |----------------------------------------------------------------
                 | RENDER THIS PROJECT'S PDF ALONE
                 |----------------------------------------------------------------
                 */
-    
+
                 $projectPdfContent = Pdf::loadView('deliveries.ar-layout', [
                     'deliveries' => $projectDeliveries->values(),
                     'qrCodes'    => $qrCodes,
@@ -655,79 +657,95 @@ class DeliveryController extends Controller
                 ])
                 ->setPaper('legal', 'portrait')
                 ->output();
-    
-    
+
+
                 $tempPath = tempnam(sys_get_temp_dir(), 'ar_project_') . '.pdf';
-    
+
                 file_put_contents($tempPath, $projectPdfContent);
-    
+
                 $tempFiles[] = $tempPath;
-    
-    
+
+
                 /*
                 |----------------------------------------------------------------
                 | IMPORT ITS PAGES INTO THE MERGED PDF
                 |----------------------------------------------------------------
                 */
-    
+
                 $pageCount = $mergedPdf->setSourceFile($tempPath);
-    
+
+                Log::info("AR generate(): project {$projectId} pageCount={$pageCount}");
+
                 $lastSize = null;
-    
+
                 for ($page = 1; $page <= $pageCount; $page++) {
-    
+
                     $templateId = $mergedPdf->importPage($page);
-    
+
                     $lastSize = $mergedPdf->getTemplateSize($templateId);
-    
+
+                    // Normalize orientation ('portrait'/'landscape' -> 'P'/'L')
+                    // so AddPage() always receives what FPDF/FPDI expects,
+                    // regardless of how getTemplateSize() reports it.
+                    $orientation = strtoupper(
+                        substr((string) $lastSize['orientation'], 0, 1)
+                    );
+
                     $mergedPdf->AddPage(
-                        $lastSize['orientation'],
+                        $orientation,
                         [$lastSize['width'], $lastSize['height']]
                     );
-    
+
                     $mergedPdf->useTemplate($templateId);
                 }
-    
-    
+
+
                 /*
                 |----------------------------------------------------------------
-                | PAD WITH A BLANK PAGE IF THIS PROJECT ENDED ON AN ODD PAGE
+                | ALWAYS PAD WITH A BLANK PAGE IF THIS PROJECT IS ODD
                 |----------------------------------------------------------------
                 |
-                | Keeping every project's own page count even guarantees the
-                | NEXT project always starts on an odd page.
+                | Unconditional - applies even when this is the only /
+                | last project in the batch, so a single-project request
+                | still gets padded correctly.
                 |
                 */
-    
+
                 if ($pageCount % 2 !== 0 && $lastSize) {
-    
+
+                    $orientation = strtoupper(
+                        substr((string) $lastSize['orientation'], 0, 1)
+                    );
+
                     $mergedPdf->AddPage(
-                        $lastSize['orientation'],
+                        $orientation,
                         [$lastSize['width'], $lastSize['height']]
                     );
+
+                    Log::info("AR generate(): project {$projectId} was odd, blank page appended");
                 }
             }
-    
-    
+
+
             $mergedOutput = $mergedPdf->Output('S');
-    
+
         } finally {
-    
+
             /*
             |--------------------------------------------------------------------------
             | CLEAN UP TEMP FILES
             |--------------------------------------------------------------------------
             */
-    
+
             foreach ($tempFiles as $tempFile) {
-    
+
                 if (file_exists($tempFile)) {
                     unlink($tempFile);
                 }
             }
         }
-    
-    
+
+
         return response($mergedOutput, 200, [
             'Content-Type'        => 'application/pdf',
             'Content-Disposition' => 'inline; filename="deliveries-batch.pdf"',

@@ -228,75 +228,103 @@
                     </div>
                 </div>
 
+                {{--
+                    User Directory table + modals.
+                    Modals are rendered OUTSIDE the <table>/<tbody>/<tr>/<td> structure
+                    (see below, after </table>) but still inside this x-data element,
+                    so Alpine's `activeModal` scope reaches them. A `position: fixed`
+                    modal nested inside a table cell is unreliable across browsers
+                    (WebKit especially can fail to position it against the viewport,
+                    and it can get clipped by this wrapper's overflow-x-auto) — that
+                    was why "Modify Role" wasn't opening correctly.
+                --}}
                 <div class="w-full overflow-x-auto rounded-2xl border border-slate-200/80 bg-white" x-data="{ activeModal: null }">
-    <table class="w-full text-left border-collapse table-auto">
-        <thead>
-            <tr class="bg-slate-50/70 border-b border-slate-200 text-slate-400 uppercase tracking-wider font-bold text-[10px] select-none">
-                <th class="py-3 px-6">User / Contact Details</th>
-                <th class="py-3 px-4">Emp_ID</th>
-                <th class="py-3 px-4">Department</th>
-                <th class="py-3 px-4">Role</th>
-                <th class="py-3 px-6 text-right">Actions</th>
-            </tr>
-        </thead>
-        
-        <tbody class="divide-y divide-slate-100 text-xs font-medium text-slate-700">
-            @forelse($users as $user)
-                <tr class="hover:bg-slate-50/60 transition-colors duration-150">
-                    <td class="py-3.5 px-6">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 border border-slate-200 shrink-0 select-none">
-                                {{ strtoupper(substr($user->name, 0, 2)) }}
-                            </div>
-                            <div class="truncate max-w-[180px]">
-                                <span class="text-slate-900 font-semibold block truncate">{{ $user->name }}</span>
-                                <span class="text-[11px] text-slate-400 block font-normal truncate mt-0.5">{{ $user->email }}</span>
-                            </div>
-                        </div>
-                    </td>
+                    <table class="w-full text-left border-collapse table-auto">
+                        <thead>
+                            <tr class="bg-slate-50/70 border-b border-slate-200 text-slate-400 uppercase tracking-wider font-bold text-[10px] select-none">
+                                <th class="py-3 px-6">User / Contact Details</th>
+                                <th class="py-3 px-4">Emp_ID</th>
+                                <th class="py-3 px-4">Department</th>
+                                <th class="py-3 px-4">Role</th>
+                                <th class="py-3 px-6 text-right">Actions</th>
+                            </tr>
+                        </thead>
 
-                    <td class="py-3.5 px-4 font-mono text-slate-500 text-[11px] tracking-tight">
-                        {{ $user->employee_id ?? 'N/A' }}
-                    </td>
+                        <tbody class="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+                            @forelse($users as $user)
+                                <tr class="hover:bg-slate-50/60 transition-colors duration-150">
+                                    <td class="py-3.5 px-6">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 border border-slate-200 shrink-0 select-none">
+                                                {{ strtoupper(substr($user->name, 0, 2)) }}
+                                            </div>
+                                            <div class="truncate max-w-[180px]">
+                                                <span class="text-slate-900 font-semibold block truncate">{{ $user->name }}</span>
+                                                <span class="text-[11px] text-slate-400 block font-normal truncate mt-0.5">{{ $user->email }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
 
-                    <td class="py-3.5 px-4">
-                        <span class="block text-slate-900 font-medium">{{ $user->department ?? 'N/A' }}</span>
-                        <span class="block text-[10px] text-slate-400 font-normal mt-0.5">{{ $user->position ?? 'Staff' }}</span>
-                    </td>
+                                    <td class="py-3.5 px-4 font-mono text-slate-500 text-[11px] tracking-tight">
+                                        {{ $user->employee_id ?? 'N/A' }}
+                                    </td>
 
-                    <td class="py-3.5 px-4">
-                        <div class="flex flex-wrap gap-1">
-                            @forelse($user->getRoleNames() as $role)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] uppercase font-bold tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100/80">
-                                    {{ $role }}
-                                </span>
+                                    <td class="py-3.5 px-4">
+                                        <span class="block text-slate-900 font-medium">{{ $user->department ?? 'N/A' }}</span>
+                                        <span class="block text-[10px] text-slate-400 font-normal mt-0.5">{{ $user->position ?? 'Staff' }}</span>
+                                    </td>
+
+                                    <td class="py-3.5 px-4">
+                                        <div class="flex flex-wrap gap-1">
+                                            @forelse($user->getRoleNames() as $role)
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] uppercase font-bold tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100/80">
+                                                    {{ $role }}
+                                                </span>
+                                            @empty
+                                                <span class="text-[11px] text-slate-400 font-normal italic">None Assigned</span>
+                                            @endforelse
+                                        </div>
+                                    </td>
+
+                                    {{-- Actions cell now ONLY holds the trigger buttons — modal markup lives outside the table --}}
+                                    <td class="py-3.5 px-6 text-right whitespace-nowrap">
+                                        <div class="flex justify-end items-center gap-3">
+                                            <button type="button" @click="activeModal = 'edit-{{ $user->id }}'" 
+                                                class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100/80 active:bg-blue-200/70 rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                                                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"></path>
+                                                    </svg>
+                                                    Modify Role
+                                            </button>
+                                            <span class="w-px h-3 bg-slate-200 select-none"></span>
+                                            <button type="button" @click="activeModal = 'delete-{{ $user->id }}'" 
+                                                class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-500/10">
+                                                <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"></path>
+                                                </svg>
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
                             @empty
-                                <span class="text-[11px] text-slate-400 font-normal italic">None Assigned</span>
+                                <tr>
+                                    <td colspan="5" class="py-12 text-center text-slate-400 font-normal select-none">
+                                        <svg class="w-8 h-8 text-slate-300 mx-auto mb-2.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.5H18a3 3 0 003-3v-4.5a3 3 0 00-3-3h-1.5m-6 9.5H4.5A2.25 2.25 0 012.25 15V11m0 0V4.5A2.25 2.25 0 014.5 2.25h15A2.25 2.25 0 0121.75 4.5V9m-19.5 2h19.5m-19.5 0l3-3m0 0l3 3m-3-3v12M21 9l-3 3m0 0l-3-3m3 3v7.5M10.5 5.25h3m-3 3h3"></path>
+                                        </svg>
+                                        <span class="text-xs font-medium text-slate-400">No matching directory records discovered.</span>
+                                    </td>
+                                </tr>
                             @endforelse
-                        </div>
-                    </td>
+                        </tbody>
+                    </table>
 
-                    <td class="py-3.5 px-6 text-right whitespace-nowrap">
-                        <div class="flex justify-end items-center gap-3">
-                            <button @click="activeModal = 'edit-{{ $user->id }}'" 
-                                class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100/80 active:bg-blue-200/70 rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"></path>
-                                    </svg>
-                                    Modify Role
-                            </button>
-                            <span class="w-px h-3 bg-slate-200 select-none"></span>
-                            <button @click="activeModal = 'delete-{{ $user->id }}'" 
-                                class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-500/10">
-                                <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"></path>
-                                </svg>
-                                Remove
-                            </button>
-                        </div>
-
+                    {{-- Per-user modals, rendered outside the table markup --}}
+                    @foreach($users as $user)
+                        {{-- Edit / Modify Role modal --}}
                         <div x-show="activeModal === 'edit-{{ $user->id }}'" x-cloak 
-                            class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 text-left font-normal"
+                            class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
                             x-transition:enter="transition ease-out duration-200"
                             x-transition:enter-start="opacity-0"
                             x-transition:enter-end="opacity-100"
@@ -357,8 +385,9 @@
                             </div>
                         </div>
 
+                        {{-- Delete / Remove modal --}}
                         <div x-show="activeModal === 'delete-{{ $user->id }}'" x-cloak 
-                            class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 text-left font-normal"
+                            class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
                             x-transition:enter="transition ease-out duration-200"
                             x-transition:enter-start="opacity-0"
                             x-transition:enter-end="opacity-100"
@@ -382,7 +411,7 @@
                                         class="px-4 py-2 text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-200 rounded-xl transition-all">
                                         Cancel
                                     </button>
-                                    <form method="POST" action="{{ route('users.destroy', $user->user_id) }}">
+                                    <form method="POST" action="{{ route('users.destroy', $user->id) }}">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" 
@@ -393,21 +422,8 @@
                                 </div>
                             </div>
                         </div>
-                    </td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="6" class="py-12 text-center text-slate-400 font-normal select-none">
-                        <svg class="w-8 h-8 text-slate-300 mx-auto mb-2.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.5H18a3 3 0 003-3v-4.5a3 3 0 00-3-3h-1.5m-6 9.5H4.5A2.25 2.25 0 012.25 15V11m0 0V4.5A2.25 2.25 0 014.5 2.25h15A2.25 2.25 0 0121.75 4.5V9m-19.5 2h19.5m-19.5 0l3-3m0 0l3 3m-3-3v12M21 9l-3 3m0 0l-3-3m3 3v7.5M10.5 5.25h3m-3 3h3"></path>
-                        </svg>
-                        <span class="text-xs font-medium text-slate-400">No matching directory records discovered.</span>
-                    </td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
-</div>
+                    @endforeach
+                </div>
                 
                 <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                     <span class="font-medium">Showing 2 profile resources</span>

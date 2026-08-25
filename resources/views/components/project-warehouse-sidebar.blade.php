@@ -98,7 +98,7 @@
 
                 <li>
 
-                    <a href="{{ route('warehouse.dashboard') }}"
+                    <a href="#"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
 
                         Inventory List
@@ -108,7 +108,7 @@
                 </li>
 
                 <li>
-                    <a href="{{ route('warehouse.adjustments.index') }}"
+                    <a href="#"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
                         Stock Adjustments
                     </a>
@@ -174,7 +174,7 @@
                 </li>
 
                 <li>
-                    <a href="{{ route('warehouse.transfer') }}"
+                    <a href="#"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
 
                         Transfer
@@ -183,7 +183,7 @@
                 </li>
 
                 <li>
-                    <a href="{{ route('warehouse.returns') }}"
+                    <a href="#"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
 
                         Returns
@@ -197,7 +197,7 @@
 
 
         {{-- Reports --}}
-        <a href="{{ route('warehouse.history') }}"
+        <a href="#"
            class="group flex items-center gap-3 whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
 
             📊
@@ -206,7 +206,7 @@
 
         </a>
 
-        <a href="{{ route('warehouse.transactions') }}"
+        <a href="#"
            class="group flex items-center gap-3 whitespace-nowrap  px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
 
             📑

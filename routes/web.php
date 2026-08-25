@@ -56,11 +56,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/users/{user}', [UserController::class, 'destroy'])
         ->name('users.destroy');
         // Dashboard
-        Route::get('/admin/dashboard', function () {
-            $users = User::with('roles')->get();
-            $roles = Role::all();
-            return view('admin.dashboard', compact('users', 'roles'));
-        })->name('admin.dashboard');
+        Route::get('/admin/dashboard', [RoleAccessPermissionController::class, 'index'])->name('admin.dashboard');
 
         /*
         |--------------------------------------------------------------------------

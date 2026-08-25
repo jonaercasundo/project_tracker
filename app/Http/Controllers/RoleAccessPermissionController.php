@@ -8,6 +8,24 @@ use Spatie\Permission\Models\Role;
 
 class RoleAccessPermissionController extends Controller
 {
+    public function index(Request $request)
+    {
+        $search = $request->input('search');
+
+        $users = User::with('roles')
+            ->when($search, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('department', 'like', "%{$search}%");
+            })
+            ->orderBy('name')
+            ->paginate(10)
+            ->withQueryString(); // keeps the search term in the pagination links
+
+        $roles = Role::all();
+
+        return view('your-view-name', compact('users', 'roles'));
+    }
        public function edit()
     {
         // Get all users WITH their roles (Spatie)

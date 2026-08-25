@@ -22,7 +22,7 @@ class RoleAccessPermissionController extends Controller
     public function update(Request $request)
     {
         $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'user_id' => 'required|exists:users,user_id',
             'role' => 'required|string|exists:roles,name',
         ]);
 
@@ -37,7 +37,7 @@ class RoleAccessPermissionController extends Controller
     public function destroy(Request $request)
     {
         $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'user_id' => 'required|exists:users,user_id',
         ]);
 
         $user = User::findOrFail($request->user_id);

@@ -430,12 +430,6 @@ public function validateScan(Request $request)
                     |--------------------------------------------------------------------------
                     */
 
-                    if ($status->status !== 'pending') {
-                        throw new \RuntimeException(
-                            'Package is not available in warehouse.'
-                        );
-                    }
-
                     /*
                     |--------------------------------------------------------------------------
                     | DELIVERY

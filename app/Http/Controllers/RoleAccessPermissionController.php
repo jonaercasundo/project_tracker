@@ -24,7 +24,7 @@ class RoleAccessPermissionController extends Controller
 
         $roles = Role::all();
 
-        return view('your-view-name', compact('users', 'roles'));
+        return view('admin.dashboard', compact('users', 'roles'));
     }
        public function edit()
     {

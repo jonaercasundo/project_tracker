@@ -213,7 +213,6 @@ public function validateScan(Request $request)
         }
 
         $firstItem = $contents->first();
-dd($firstItem->toArray());
         if (!$firstItem->item) {
             return response()->json([
                 'success' => false,

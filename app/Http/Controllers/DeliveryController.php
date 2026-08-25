@@ -354,8 +354,6 @@ public function index(Request $request)
         // e.g. a `billing` table keyed by delivery_id, or a `unit_price`
         // on `item` multiplied by qty. Placeholder below assumes columns
         // `d.collection_amount` / `d.billed_amount` on `deliveries`.
-        'total_collection' => (clone $baseQuery)->sum('d.collection_amount'),
-        'total_billed'     => (clone $baseQuery)->sum('d.billed_amount'),
     ];
 
     // =========================

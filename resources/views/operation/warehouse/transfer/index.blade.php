@@ -59,7 +59,7 @@
             <div class="flex items-center justify-between gap-4 mb-4">
                 <h3 class="text-lg font-semibold text-slate-900">Transfer List</h3>
 
-                <form method="GET" action="{{ route('warehouse.transfer.index') }}" class="flex items-center gap-2">
+                <form method="GET" action="{{ route('warehouse.transfer') }}" class="flex items-center gap-2">
                     <input
                         type="text"
                         name="search"
@@ -109,13 +109,14 @@
                                 </td>
                                 <td class="px-4 py-3">
                                     <div class="flex items-center justify-center gap-2">
-                                        <a href="{{ route('warehouse.transfer.show', $transfer->id) }}" class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                                        {{-- No show/edit/destroy routes defined yet — replace # with actual route() calls once added --}}
+                                        <a href="#" class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
                                             View
                                         </a>
-                                        <a href="{{ route('warehouse.transfer.edit', $transfer->id) }}" class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                                        <a href="#" class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
                                             Edit
                                         </a>
-                                        <form action="{{ route('warehouse.transfer.destroy', $transfer->id) }}" method="POST" onsubmit="return confirm('Delete this transfer?');">
+                                        <form action="#" method="POST" onsubmit="return confirm('Delete this transfer?');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">

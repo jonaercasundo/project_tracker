@@ -455,19 +455,19 @@
                 // ============================================================
                 if (response.ok && result.success && hasValidPackageName) {
 
-                    const scannedQty = Number(result.qty);
+                    // ============================================================
+                    // GET ITEMS FROM BACKEND RESPONSE
+                    // ============================================================
 
-                    console.log('Validated quantity:', scannedQty);
-
-                    if (!scannedQty || scannedQty <= 0) {
+                    if (!Array.isArray(result.items) || result.items.length === 0) {
 
                         failedCounter++;
 
                         addRow({
                             package: result.package_name || '-',
-                            item: result.item || '-',
+                            item: '-',
                             qty: '-',
-                            status: 'Invalid quantity'
+                            status: 'No item data'
                         });
 
                         updateDashboard();
@@ -475,67 +475,177 @@
                         return false;
                     }
 
-                    // Count only valid scans
-                    successCounter++;
 
-                    const itemNameKey = normalizeItemName(result.item);
+                    // ============================================================
+                    // PROCESS EACH ITEM
+                    // ============================================================
 
-                    const isMergeable =
-                        itemNameKey !== '' &&
-                        result.item_id !== null;
+                    let scanIsValid = true;
 
-                    // ========================================================
-                    // SAVE ACTUAL SCAN RECORD
-                    // ========================================================
-                    stagedItems.push({
-                        qr: qr,
-                        package_status_id: result.package_status_id,
-                        item_id: result.item_id,
-                        package: result.package_name,
-                        item: result.item,
-                        qty: scannedQty
-                    });
+                    result.items.forEach(item => {
 
-                    // ========================================================
-                    // MERGE DISPLAY ROW ONLY
-                    // ========================================================
-                    if (isMergeable && stagedByItemName.has(itemNameKey)) {
+                        const scannedQty = Number(item.required_qty);
 
-                        const existing = stagedByItemName.get(itemNameKey);
-
-                        existing.totalQty += scannedQty;
-                        existing.count++;
-
-                        updateRowQty(
-                            existing.rowEl,
-                            existing.totalQty
-                        );
-
-                    } else {
-
-                        const rowEl = addRow({
-                            package: result.package_name,
-                            item: result.item,
-                            qty: scannedQty,
-                            status: transactionType === 'IN'
-                                ? 'Stock In'
-                                : 'Stock Out'
+                        console.log('Validated Item:', {
+                            item_id: item.item_id,
+                            item: item.item,
+                            content_qty: item.content_qty,
+                            package_qty: item.package_qty,
+                            required_qty: item.required_qty,
+                            available_qty: item.available_qty
                         });
 
-                        if (isMergeable) {
 
-                            stagedByItemName.set(itemNameKey, {
-                                rowEl: rowEl,
-                                totalQty: scannedQty,
-                                count: 1
+                        // ========================================================
+                        // CHECK QUANTITY
+                        // ========================================================
+
+                        if (!Number.isFinite(scannedQty) || scannedQty <= 0) {
+
+                            scanIsValid = false;
+
+                            failedCounter++;
+
+                            addRow({
+                                package: result.package_name || '-',
+                                item: item.item || '-',
+                                qty: '-',
+                                status: 'Invalid quantity'
                             });
 
+                            return;
                         }
-                    }
+
+
+                        // ========================================================
+                        // INVENTORY CHECK
+                        // ========================================================
+
+                        const availableQty = Number(item.available_qty ?? 0);
+
+                        if (availableQty < scannedQty) {
+
+                            scanIsValid = false;
+
+                            failedCounter++;
+
+                            addRow({
+                                package: result.package_name || '-',
+                                item: item.item || '-',
+                                qty: scannedQty,
+                                status: `Insufficient stock (Available: ${availableQty})`
+                            });
+
+                            addReviewRow({
+                                package_status_id: result.package_status_id,
+                                package: result.package_name || '-',
+                                item: item.item || '-',
+                                reason: `Insufficient stock. Available: ${availableQty}`
+                            });
+
+                            return;
+                        }
+
+
+                        // ========================================================
+                        // SUCCESS
+                        // ========================================================
+
+                        successCounter++;
+
+                        const itemNameKey = normalizeItemName(item.item);
+
+                        const isMergeable =
+                            itemNameKey !== '' &&
+                            item.item_id !== null &&
+                            item.item_id !== undefined;
+
+
+                        // ========================================================
+                        // SAVE ACTUAL SCAN
+                        // ========================================================
+
+                        stagedItems.push({
+
+                            qr: qr,
+
+                            package_status_id:
+                                result.package_status_id,
+
+                            item_id:
+                                item.item_id,
+
+                            package:
+                                result.package_name,
+
+                            item:
+                                item.item,
+
+                            qty:
+                                scannedQty
+                        });
+
+
+                        // ========================================================
+                        // MERGE DISPLAY ROW
+                        // ========================================================
+
+                        if (
+                            isMergeable &&
+                            stagedByItemName.has(itemNameKey)
+                        ) {
+
+                            const existing =
+                                stagedByItemName.get(itemNameKey);
+
+                            existing.totalQty += scannedQty;
+                            existing.count++;
+
+                            updateRowQty(
+                                existing.rowEl,
+                                existing.totalQty
+                            );
+
+                        } else {
+
+                            const rowEl = addRow({
+
+                                package:
+                                    result.package_name,
+
+                                item:
+                                    item.item,
+
+                                qty:
+                                    scannedQty,
+
+                                status:
+                                    transactionType === 'IN'
+                                        ? 'Stock In'
+                                        : 'Stock Out'
+                            });
+
+
+                            if (isMergeable) {
+
+                                stagedByItemName.set(
+                                    itemNameKey,
+                                    {
+                                        rowEl: rowEl,
+                                        totalQty: scannedQty,
+                                        count: 1
+                                    }
+                                );
+
+                            }
+                        }
+
+                    });
+
 
                     updateDashboard();
 
-                    return true;
+                    return scanIsValid;
                 }
 
                 // ============================================================

@@ -59,7 +59,7 @@
                     <p class="font-semibold text-slate-800">Stock Out</p>
                     <p class="mt-1 text-sm text-slate-500">Process outbound stock using the scanner.</p>
                 </a>
-                <a href="{{ route('warehouse.history') }}" class="rounded-xl border border-slate-200 p-4 hover:bg-slate-50">
+                <a href="#" class="rounded-xl border border-slate-200 p-4 hover:bg-slate-50">
                     <p class="font-semibold text-slate-800">Delivery History</p>
                     <p class="mt-1 text-sm text-slate-500">Review recent warehouse movements and delivery status.</p>
                 </a>

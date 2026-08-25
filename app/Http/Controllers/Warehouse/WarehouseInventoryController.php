@@ -253,33 +253,30 @@ class WarehouseInventoryController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | ACTUAL QUANTITY
+            | ACTUAL ITEM QUANTITY
             |--------------------------------------------------------------------------
-            | Quantity comes from deliveries.package_qty.
+            | Quantity = package_content.qty × deliveries.package_qty
             |--------------------------------------------------------------------------
             */
-            dd([
-                'package_status_id' => $status->package_status_id,
-                'delivery_id_from_status' => $status->delivery_id,
-                'delivery_id_loaded' => $delivery->delivery_id ?? null,
-                'dr_no' => $delivery->dr_no ?? null,
-                'package_qty' => $delivery->package_qty ?? null,
-                'delivery_attributes' => $delivery->getAttributes(),
-            ]);
-            $qty = (int) ($delivery->package_qty ?? 0);
 
-            if ($qty <= 0) {
+            $contentQty = (int) ($firstItem->qty ?? 0);
+            $packageQty = (int) ($delivery->package_qty ?? 0);
+
+            if ($contentQty <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Package content quantity is missing.'
+                ]);
+            }
+
+            if ($packageQty <= 0) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Package quantity is missing.'
                 ]);
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | RESPONSE
-            |--------------------------------------------------------------------------
-            */
+            $qty = $contentQty * $packageQty;
 
             return response()->json([
                 'success'           => true,

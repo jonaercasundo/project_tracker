@@ -312,262 +312,281 @@ class WarehouseInventoryController extends Controller
     // Re-validates each package server-side before writing, so a
     // stale client-side staged list can't corrupt inventory.
     // ==========================================================
-    public function saveScan(Request $request)
-    {
-        Log::info('SAVE REQUEST', $request->all());
+public function saveScan(Request $request)
+{
+    Log::info('SAVE REQUEST', $request->all());
 
-        $request->validate([
-            'warehouse_id'               => 'required|exists:warehouse,warehouse_id',
-            'items'                      => 'required|array|min:1',
-            'items.*.package_status_id' => 'required|integer',
-        ]);
+    $request->validate([
+        'warehouse_id'               => 'required|exists:warehouse,warehouse_id',
+        'items'                      => 'required|array|min:1',
+        'items.*.package_status_id' => 'required|integer',
+    ]);
 
-        $batchNo = 'BATCH-' . now()->format('YmdHis');
+    $batchNo = 'BATCH-' . now()->format('YmdHis');
 
-        $results = [
-            'saved'  => [],
-            'failed' => [],
-        ];
+    $results = [
+        'saved'  => [],
+        'failed' => [],
+    ];
 
-        foreach ($request->items as $item) {
+    foreach ($request->items as $item) {
 
-            try {
+        try {
 
-                DB::transaction(function () use (
-                    $item,
-                    $request,
-                    &$results,
-                    $batchNo
-                ) {
+            DB::transaction(function () use (
+                $item,
+                $request,
+                &$results,
+                $batchNo
+            ) {
 
-                    $status = PackageStatus::with([
-                        'package.contents.item',
-                        'delivery'
-                    ])->findOrFail($item['package_status_id']);
+                /*
+                |--------------------------------------------------------------------------
+                | LOAD PACKAGE STATUS
+                |--------------------------------------------------------------------------
+                */
+
+                $status = PackageStatus::with([
+                    'package.contents.item',
+                    'delivery'
+                ])->findOrFail($item['package_status_id']);
+
+                /*
+                |--------------------------------------------------------------------------
+                | PACKAGE VALIDATION
+                |--------------------------------------------------------------------------
+                */
+
+                if (!$status->package) {
+                    throw new \RuntimeException(
+                        'Package not found.'
+                    );
+                }
+
+                if ($status->package->contents->isEmpty()) {
+                    throw new \RuntimeException(
+                        'Package has no contents.'
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | PACKAGE STATUS
+                |--------------------------------------------------------------------------
+                */
+
+                if ($status->status !== 'pending') {
+                    throw new \RuntimeException(
+                        'Package is not available in warehouse.'
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | DELIVERY
+                |--------------------------------------------------------------------------
+                */
+
+                $delivery = $status->delivery;
+
+                if (!$delivery) {
+                    throw new \RuntimeException(
+                        'Delivery record not found.'
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | DELIVERY PACKAGE QTY
+                |--------------------------------------------------------------------------
+                |
+                | Source:
+                | deliveries.package_qty
+                |
+                */
+
+                $packageQty = (int) ($delivery->package_qty ?? 0);
+
+                if ($packageQty <= 0) {
+                    throw new \RuntimeException(
+                        'Delivery package quantity is missing.'
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | PROCESS EACH PACKAGE CONTENT
+                |--------------------------------------------------------------------------
+                */
+
+                foreach ($status->package->contents as $content) {
 
                     /*
                     |--------------------------------------------------------------------------
-                    | PACKAGE VALIDATION
+                    | PACKAGE CONTENT QTY
                     |--------------------------------------------------------------------------
+                    |
+                    | Source:
+                    | package_content.qty
+                    |
                     */
 
-                    if (!$status->package) {
-                        throw new \Exception('Package not found.');
-                    }
+                    $contentQty = (int) ($content->qty ?? 0);
 
-                    if ($status->package->contents->isEmpty()) {
-                        throw new \Exception('Package has no contents.');
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | PACKAGE STATUS
-                    |--------------------------------------------------------------------------
-                    */
-
-                    if ($status->status !== 'pending') {
-                        throw new \RuntimeException(
-                            'Package is not available in warehouse.'
-                        );
+                    if ($contentQty <= 0) {
+                        $contentQty = 1;
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | DELIVERY
+                    | FINAL STOCK OUT QTY
                     |--------------------------------------------------------------------------
-                    */
-
-                    $delivery = $status->delivery;
-
-                    if (!$delivery) {
-                        throw new \RuntimeException(
-                            'Delivery record not found.'
-                        );
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | DELIVERY PACKAGE QTY
-                    |--------------------------------------------------------------------------
+                    |
+                    | package_content.qty × deliveries.package_qty
                     |
                     | Example:
                     |
-                    | deliveries.package_qty = 10
+                    | content qty = 2
+                    | package qty  = 5
+                    |
+                    | stock out = 10
                     |
                     */
 
-                    $packageQty = (int) ($delivery->package_qty ?? 0);
+                    $stockOutQty = $contentQty * $packageQty;
 
-                    if ($packageQty <= 0) {
+                    Log::info('PACKAGE CONTENT STOCK OUT', [
+                        'package_status_id' => $item['package_status_id'],
+                        'delivery_id'       => $delivery->delivery_id,
+                        'dr_no'             => $delivery->dr_no,
+                        'item_id'           => $content->item_id,
+                        'content_qty'       => $contentQty,
+                        'package_qty'       => $packageQty,
+                        'stock_out_qty'     => $stockOutQty,
+                    ]);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | FIND INVENTORY
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $inventory = Inventory::firstOrNew([
+                        'warehouse_id' => $request->warehouse_id,
+                        'item_id'      => $content->item_id,
+                    ]);
+
+                    $oldQty = $inventory->exists
+                        ? (int) $inventory->qty
+                        : 0;
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CHECK STOCK
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if ($oldQty < $stockOutQty) {
+
                         throw new \RuntimeException(
-                            'Delivery package quantity is missing.'
+                            "Insufficient stock for item {$content->item_id}. " .
+                            "Available: {$oldQty}"
                         );
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | PROCESS EACH PACKAGE CONTENT
+                    | STOCK OUT
                     |--------------------------------------------------------------------------
                     */
 
-                    foreach ($status->package->contents as $content) {
+                    $newQty = $oldQty - $stockOutQty;
 
-                        /*
-                        |--------------------------------------------------------------------------
-                        | CONTENT QTY
-                        |--------------------------------------------------------------------------
-                        |
-                        | Example:
-                        |
-                        | package_content.qty = 2
-                        |
-                        */
-
-                        $contentQty = (int) ($content->qty ?? 0);
-
-                        if ($contentQty <= 0) {
-                            $contentQty = 1;
-                        }
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | FINAL STOCK OUT QTY
-                        |--------------------------------------------------------------------------
-                        |
-                        | package_content.qty × deliveries.package_qty
-                        |
-                        | Example:
-                        |
-                        | 2 × 10 = 20
-                        |
-                        */
-
-                        $requiredQty = $contentQty * $packageQty;
-
-                        Log::info('PACKAGE CONTENT STOCK OUT', [
-                            'package_status_id' => $item['package_status_id'],
-                            'delivery_id'       => $delivery->delivery_id,
-                            'dr_no'             => $delivery->dr_no,
-                            'item_id'           => $content->item_id,
-                            'content_qty'       => $contentQty,
-                            'package_qty'       => $packageQty,
-                            'required_qty'      => $requiredQty,
-                        ]);
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | FIND INVENTORY
-                        |--------------------------------------------------------------------------
-                        */
-
-                        $inventory = Inventory::firstOrNew([
-                            'warehouse_id' => $request->warehouse_id,
-                            'item_id'      => $content->item_id,
-                        ]);
-
-                        $oldQty = $inventory->exists
-                            ? (int) $inventory->qty
-                            : 0;
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | CHECK STOCK
-                        |--------------------------------------------------------------------------
-                        */
-
-                        if ($oldQty < $requiredQty) {
-
-                            throw new \RuntimeException(
-                                "Insufficient stock for item {$content->item_id}. " .
-                                "Available: {$oldQty}, " .
-                                "Required: {$requiredQty}"
-                            );
-                        }
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | STOCK OUT
-                        |--------------------------------------------------------------------------
-                        */
-
-                        $newQty = $oldQty - $requiredQty;
-
-                        $inventory->withoutEvents(function () use (
-                            $inventory,
-                            $newQty
-                        ) {
-                            $inventory->qty = $newQty;
-                            $inventory->inventory_status = 'Approved';
-                            $inventory->save();
-                        });
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | INVENTORY HISTORY
-                        |--------------------------------------------------------------------------
-                        */
-
-                        InventoryHistory::create([
-                            'batch_no'     => $batchNo,
-                            'inventory_id' => $inventory->inventory_id,
-                            'item_id'      => $content->item_id,
-                            'warehouse_id' => $request->warehouse_id,
-                            'old_qty'      => $oldQty,
-                            'new_qty'      => $newQty,
-                            'changed_by'   => Auth::user()->name,
-                            'remarks'      =>
-                                'Stock Out via QR Scanner - ' .
-                                'Content Qty: ' . $contentQty .
-                                ' × Package Qty: ' . $packageQty .
-                                ' = Required Qty: ' . $requiredQty,
-                            'change_type'  => 'stock_out',
-                        ]);
-                    }
+                    $inventory->withoutEvents(function () use (
+                        $inventory,
+                        $newQty
+                    ) {
+                        $inventory->qty = $newQty;
+                        $inventory->inventory_status = 'Approved';
+                        $inventory->save();
+                    });
 
                     /*
                     |--------------------------------------------------------------------------
-                    | RELEASE PACKAGE
+                    | INVENTORY HISTORY
                     |--------------------------------------------------------------------------
                     */
 
-                    $status->status = 'released';
-                    $status->remarks = 'Released from Warehouse';
-                    $status->save();
+                    InventoryHistory::create([
+                        'batch_no'     => $batchNo,
+                        'inventory_id' => $inventory->inventory_id,
+                        'item_id'      => $content->item_id,
+                        'warehouse_id' => $request->warehouse_id,
+                        'old_qty'      => $oldQty,
+                        'new_qty'      => $newQty,
+                        'changed_by'   => Auth::user()->name,
+                        'remarks'      =>
+                            'Stock Out via QR Scanner - ' .
+                            'Content Qty: ' . $contentQty .
+                            ' × Package Qty: ' . $packageQty,
+                        'change_type'  => 'stock_out',
+                    ]);
+                }
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | MARK AS SAVED
-                    |--------------------------------------------------------------------------
-                    */
+                /*
+                |--------------------------------------------------------------------------
+                | RELEASE PACKAGE
+                |--------------------------------------------------------------------------
+                */
 
-                    $results['saved'][] = $item['package_status_id'];
-                });
+                $status->status = 'released';
+                $status->remarks = 'Released from Warehouse';
+                $status->save();
 
-            } catch (\Throwable $e) {
+                /*
+                |--------------------------------------------------------------------------
+                | SUCCESS
+                |--------------------------------------------------------------------------
+                */
 
-                Log::error('Warehouse Scan Error', [
-                    'package_status_id' => $item['package_status_id'],
-                    'message'           => $e->getMessage(),
-                    'line'              => $e->getLine(),
-                ]);
+                $results['saved'][] = $item['package_status_id'];
+            });
 
-                $results['failed'][] = [
-                    'package_status_id' => $item['package_status_id'],
-                    'message'           => $e->getMessage(),
-                ];
-            }
+        } catch (\Throwable $e) {
+
+            Log::error('Warehouse Scan Error', [
+                'package_status_id' => $item['package_status_id'],
+                'message'           => $e->getMessage(),
+                'line'              => $e->getLine(),
+            ]);
+
+            $results['failed'][] = [
+                'package_status_id' => $item['package_status_id'],
+                'message'           => $e->getMessage(),
+            ];
         }
-
-        return response()->json([
-            'success' => count($results['failed']) === 0,
-            'message' =>
-                count($results['saved']) . ' saved, ' .
-                count($results['failed']) . ' failed.',
-            'batch_no' => $batchNo,
-            'saved'    => $results['saved'],
-            'failed'   => $results['failed'],
-        ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESPONSE
+    |--------------------------------------------------------------------------
+    */
+
+    return response()->json([
+        'success' => count($results['failed']) === 0,
+
+        'message' =>
+            count($results['saved']) . ' saved, ' .
+            count($results['failed']) . ' failed.',
+
+        'batch_no' => $batchNo,
+
+        'saved' => $results['saved'],
+
+        'failed' => $results['failed'],
+    ]);
+}
 
     // ==========================================================
     // NEW: manual (non-QR) stock-in save, used by the Delivery

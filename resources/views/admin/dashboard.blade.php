@@ -243,9 +243,8 @@
         <tbody class="divide-y divide-slate-100 text-xs font-medium text-slate-700">
             @forelse($users as $user)
                 @php
-                    // Unique-per-row key regardless of $user->id being null/duplicated.
-                    // $loop->index is always unique within this render, so it can't collide.
-                    $rowKey = $user->id . '-' . $loop->index;
+                    // Unique-per-row key. Uses the real primary key column (user_id).
+                    $rowKey = $user->user_id . '-' . $loop->index;
                 @endphp
                 <tr class="hover:bg-slate-50/60 transition-colors duration-150">
                     <td class="py-3.5 px-6">
@@ -320,7 +319,7 @@
                                 <form method="POST" action="{{ route('roleaccess.update') }}" class="space-y-4">
                                     @csrf
                                     @method('PATCH')
-                                    <input type="hidden" name="user_id" value="{{ $user->id }}">
+                                    <input type="hidden" name="user_id" value="{{ $user->user_id }}">
                                     
                                     <div>
                                         <label class="block text-xs font-semibold text-slate-500 mb-1">Target Personnel</label>
@@ -383,7 +382,7 @@
                                         class="px-4 py-2 text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-200 rounded-xl transition-all">
                                         Cancel
                                     </button>
-                                    <form method="POST" action="{{ route('users.destroy', $user->id) }}">
+                                    <form method="POST" action="{{ route('users.destroy', $user->user_id) }}">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" 

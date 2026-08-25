@@ -81,7 +81,7 @@
             <span class="text-2xl font-extrabold text-slate-900">
                 {{ $stats['total_collection'] ?? 0 }}
             </span>
-            <span class="text-[11px] text-slate-400">amount collected</span>
+            <span class="text-[11px] text-slate-400">collected</span>
         </div>
 
         {{-- TOTAL BILLED --}}
@@ -93,7 +93,7 @@
             <span class="text-2xl font-extrabold text-slate-900">
                 {{$stats['total_billed'] ?? 0 }}
             </span>
-            <span class="text-[11px] text-slate-400">total amount billed</span>
+            <span class="text-[11px] text-slate-400">total billed</span>
         </div>
 
     </div>

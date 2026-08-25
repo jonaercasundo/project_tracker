@@ -268,7 +268,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('profile.update');
 
     Route::delete('/profile', [ProfileController::class, 'destroy'])
-        ->name('profile.destroy');});
+        ->name('profile.destroy');
     Route::get('/tiktok/trends', [TikTokController::class, 'fetchHomeDecorTrends'])
         ->name('tiktok.trends');
     Route::get('/pinterest/trends', [TikTokController::class, 'fetchHomePinterestTrends'])
@@ -371,7 +371,6 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/transfer', function () {
                 return view('operation.warehouse.transfer.index');
             })->name('transfer');
-            
 
             Route::get('/returns', function () {
                 return view('operation.warehouse.returns.index');
@@ -438,4 +437,5 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/test-drive', function () {
         return view('test');
     });
+});
 require __DIR__.'/auth.php';

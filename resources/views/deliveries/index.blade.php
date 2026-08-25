@@ -79,7 +79,7 @@
                 <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
             </div>
             <span class="text-2xl font-extrabold text-slate-900">
-                ₱{{ number_format($stats['total_collection'] ?? 0, 2) }}
+                {{ $stats['total_collection'] ?? 0 }}
             </span>
             <span class="text-[11px] text-slate-400">amount collected</span>
         </div>
@@ -91,7 +91,7 @@
                 <span class="w-2 h-2 rounded-full bg-slate-400"></span>
             </div>
             <span class="text-2xl font-extrabold text-slate-900">
-                ₱{{ number_format($stats['total_billed'] ?? 0, 2) }}
+                {{$stats['total_billed'] ?? 0 }}
             </span>
             <span class="text-[11px] text-slate-400">total amount billed</span>
         </div>

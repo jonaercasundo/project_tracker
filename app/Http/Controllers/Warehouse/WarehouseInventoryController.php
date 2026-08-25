@@ -166,136 +166,145 @@ class WarehouseInventoryController extends Controller
     // NEW: validate a single QR — lookup only, NO writes.
     // Used while the user is scanning, before they hit "Save".
     // ==========================================================
-    public function validateScan(Request $request)
-    {
-        try {
+public function validateScan(Request $request)
+{
+    try {
 
-            $request->validate([
-                'qr'           => 'required|string',
-                'warehouse_id' => 'required|integer',
-            ]);
+        $request->validate([
+            'qr'           => 'required|string',
+            'warehouse_id' => 'required|integer',
+        ]);
 
-            $packageStatusId = $this->extractPackageStatusId($request->qr);
+        $packageStatusId = $this->extractPackageStatusId($request->qr);
 
-            if (!$packageStatusId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid QR code.'
-                ]);
-            }
-
-            $status = PackageStatus::with([
-                'package.contents.item',
-                'delivery'
-            ])->find($packageStatusId);
-
-            if (!$status) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Package status not found.'
-                ]);
-            }
-
-            if (!$status->package) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Package information not found.'
-                ]);
-            }
-
-            $contents = $status->package->contents;
-
-            if (!$contents || $contents->isEmpty()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Package has no item contents.'
-                ]);
-            }
-
-            $firstItem = $contents->first();
-
-            if (!$firstItem->item) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Item information not found.'
-                ]);
-            }
-
-            $itemName = $firstItem->item->item_name ?? 'Unknown';
-
-            if ($status->status !== 'pending') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Package is not available in warehouse.'
-                ]);
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | DR BASED QUANTITY
-            |
-            | Example:
-            | DR C230
-            | QR Scan = 230 pcs
-            |
-            | Scanning a single package represents the full DR quantity, not
-            | just the contents of that one physical package — this must
-            | match the deduction logic in saveScan(). Uniform across all
-            | items, no per-item-name branching.
-            |--------------------------------------------------------------------------
-            */
-
-            $delivery = $status->delivery;
-
-            if (!$delivery) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Delivery record not found.'
-                ]);
-            }
-
-            $drQty = (int) ($delivery->package_qty ?? 0);
-
-            // Actual quantity from package_contents
-            $actualQty = (int) ($firstItem->package_qty ?? 0);
-
-            if ($actualQty <= 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Actual item quantity is missing.'
-                ]);
-            }
-
-            return response()->json([
-                'success' => true,
-                'package_status_id' => $status->package_status_id,
-                'package_id'        => $status->package_id,
-                'delivery_id'       => $status->delivery_id,
-                'dr_no'             => $status->delivery->dr_no ?? null,
-                'package_name'      => 'Package #' . $status->package->package_num,
-                'item'              => $itemName,
-                'item_id'           => $firstItem->item_id,
-                'qty'               => $actualQty,
-                'dr_qty'            => $drQty,
-            ]);
-
-        } catch (\Throwable $e) {
-
-            Log::error('validateScan failed', [
-                'message' => $e->getMessage(),
-                'line'    => $e->getLine(),
-                'file'    => $e->getFile(),
-            ]);
-
+        if (!$packageStatusId) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unexpected error validating scan.',
-                'debug'   => $e->getMessage(), // remove after debugging
-                'debug_line' => $e->getLine(),
-            ], 500);
-
+                'message' => 'Invalid QR code.'
+            ]);
         }
+
+        $status = PackageStatus::with([
+            'package.contents.item',
+            'delivery'
+        ])->find($packageStatusId);
+
+        if (!$status) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Package status not found.'
+            ]);
+        }
+
+        if (!$status->package) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Package information not found.'
+            ]);
+        }
+
+        $contents = $status->package->contents;
+
+        if (!$contents || $contents->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Package has no item contents.'
+            ]);
+        }
+
+        $firstItem = $contents->first();
+
+        if (!$firstItem->item) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Item information not found.'
+            ]);
+        }
+
+        $itemName = $firstItem->item->item_name ?? 'Unknown';
+
+        /*
+        |--------------------------------------------------------------------------
+        | PACKAGE STATUS
+        |--------------------------------------------------------------------------
+        */
+
+        if ($status->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Package is not available in warehouse.'
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | DELIVERY
+        |--------------------------------------------------------------------------
+        | Delivery is only used to get the DR number.
+        | Quantity comes directly from package_content.package_qty.
+        |--------------------------------------------------------------------------
+        */
+
+        $delivery = $status->delivery;
+
+        if (!$delivery) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Delivery record not found.'
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ACTUAL PACKAGE QUANTITY
+        |--------------------------------------------------------------------------
+        | Get the actual quantity from package_content.package_qty.
+        |--------------------------------------------------------------------------
+        */
+
+        $actualQty = (int) ($firstItem->package_qty ?? 0);
+
+        if ($actualQty <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Package quantity is missing.'
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSE
+        |--------------------------------------------------------------------------
+        */
+
+        return response()->json([
+            'success'           => true,
+            'package_status_id' => $status->package_status_id,
+            'package_id'        => $status->package_id,
+            'delivery_id'       => $status->delivery_id,
+            'dr_no'             => $delivery->dr_no ?? null,
+            'package_name'      => 'Package #' . $status->package->package_num,
+            'item'              => $itemName,
+            'item_id'           => $firstItem->item_id,
+            'qty'               => $actualQty,
+        ]);
+
+    } catch (\Throwable $e) {
+
+        Log::error('validateScan failed', [
+            'message' => $e->getMessage(),
+            'line'    => $e->getLine(),
+            'file'    => $e->getFile(),
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Unexpected error validating scan.',
+            'debug'   => $e->getMessage(),
+            'debug_line' => $e->getLine(),
+        ], 500);
     }
+}
 
     // ==========================================================
     // NEW: batch save — persists everything staged in the browser.

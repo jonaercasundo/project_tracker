@@ -75,13 +75,13 @@
         {{-- TOTAL COLLECTION --}}
         <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex flex-col gap-1">
             <div class="flex items-center justify-between">
-                <span class="text-[11px] font-bold uppercase tracking-wide text-cyan-600">Collection</span>
+                <span class="text-[11px] font-bold uppercase tracking-wide text-cyan-600">Billing</span>
                 <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
             </div>
             <span class="text-2xl font-extrabold text-slate-900">
                 {{ $stats['total_collection'] ?? 0 }}
             </span>
-            <span class="text-[11px] text-slate-400">collected</span>
+            <span class="text-[11px] text-slate-400">For Billing</span>
         </div>
 
         {{-- TOTAL BILLED --}}

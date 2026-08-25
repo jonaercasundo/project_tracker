@@ -21,6 +21,6 @@ class DashboardService
             }
         }
 
-        return route('dashboard');
+        return route('welcome');
     }
 }

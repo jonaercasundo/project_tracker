@@ -210,10 +210,6 @@
                                             Edit
                                         </button>
                                     @endif
-
-                                    <a href="{{ url('deliveries_details/'.$d->dr_no) }}" class="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200/60 hover:bg-blue-100 transition">
-                                        View
-                                    </a>
                                 </div>
 
                             </div>

@@ -109,28 +109,6 @@
 
                 <li>
 
-                    <a href="{{ route('warehouse.packages.index') }}"
-                       class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
-
-                        Packages
-
-                    </a>
-
-                </li>
-
-                <li>
-
-                    <a href="{{ route('warehouse.categories.index') }}"
-                       class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
-
-                        Categories
-
-                    </a>
-
-                </li>
-
-                <li>
-
                     <a href="{{ route('warehouse.adjustments.index') }}"
                        class="block rounded-lg px-3 py-2 text-xs font-bold hover:bg-slate-50">
 

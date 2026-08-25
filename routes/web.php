@@ -373,7 +373,7 @@ Route::middleware(['auth'])->group(function () {
             })->name('transfer');
             Route::get('/transfer/create', function () {
                 return view('operation.warehouse.transfer.create');
-            })->name('create');
+            })->name('transfer.create');
 
             Route::get('/returns', function () {
                 return view('operation.warehouse.returns.index');

@@ -19,20 +19,21 @@ class RoleAccessPermissionController extends Controller
         return view('roleaccess.edit', compact('users', 'roles'));
     }
 
-    public function update(Request $request)
-    {
-        $request->validate([
-            'user_id' => 'required|exists:users,user_id',
-            'role' => 'required|string|exists:roles,name',
-        ]);
+public function update(Request $request)
+{
+    $request->validate([
+        'user_id' => 'required|exists:users,user_id',
+        'roles' => 'required|array|min:1',
+        'roles.*' => 'string|exists:roles,name',
+    ]);
 
-        $user = User::findOrFail($request->user_id);
+    $user = User::findOrFail($request->user_id);
 
-        // Spatie way
-        $user->syncRoles([$request->role]);
+    // Spatie way — accepts an array of role names
+    $user->syncRoles($request->roles);
 
-        return back()->with('success', 'Role updated successfully.');
-    }
+    return back()->with('success', 'Role updated successfully.');
+}
 
     public function destroy(Request $request)
     {

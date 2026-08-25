@@ -13,6 +13,7 @@ class DashboardService
             'finance'       => 'finance.dashboard',
             'Administrator'       => 'admin.dashboard',
             'IT' => 'it.dashboard',
+            'Warehouse_officer' => 'warehouse.dashboard',
         ];
 
         foreach ($map as $role => $route) {

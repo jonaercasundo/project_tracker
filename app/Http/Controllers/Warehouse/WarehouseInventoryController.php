@@ -256,10 +256,13 @@ class WarehouseInventoryController extends Controller
 
             $drQty = (int) ($delivery->package_qty ?? 0);
 
-            if ($drQty <= 0) {
+            // Actual quantity from package_contents
+            $actualQty = (int) ($firstItem->package_qty ?? 0);
+
+            if ($actualQty <= 0) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'DR quantity is missing.'
+                    'message' => 'Actual item quantity is missing.'
                 ]);
             }
 
@@ -272,7 +275,7 @@ class WarehouseInventoryController extends Controller
                 'package_name'      => 'Package #' . $status->package->package_num,
                 'item'              => $itemName,
                 'item_id'           => $firstItem->item_id,
-                'qty'               => $drQty,
+                'qty'               => $actualQty,
                 'dr_qty'            => $drQty,
             ]);
 

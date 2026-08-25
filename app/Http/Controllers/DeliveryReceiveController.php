@@ -118,96 +118,100 @@ class DeliveryReceiveController extends Controller
         return $defaultQty * $multiplier;
     }
 
-public function store(Request $request, $packageStatusId)
-{
-    $packageStatus = PackageStatus::with([
-        'delivery',
-        'package.packageContent.item',
-    ])->findOrFail($packageStatusId);
+    public function store(Request $request, $packageStatusId)
+    {
+        $packageStatus = PackageStatus::with([
+            'delivery',
+            'package.packageContent.item',
+        ])->findOrFail($packageStatusId);
 
-    if ($packageStatus->status === 'delivered') {
-        return back()->withErrors([
-            'delivery' => 'This package has already been delivered.'
-        ]);
-    }
-
-    $request->validate([
-        'remarks' => 'nullable|string|max:500',
-    ]);
-
-    DB::beginTransaction();
-
-    try {
-
-        $packageStatus->status = 'delivered';
-        $packageStatus->remarks = $request->remarks;
-        $packageStatus->delivered_at = now();
-
-        // No Auth dependency
-        $packageStatus->receiver_name = 'Receiver';
-
-        // No Auth dependency
-        $packageStatus->delivered_by = null;
-
-        $packageStatus->save();
-        foreach ($packageStatus->package->packageContent as $content) {
-
-            $inventory = Inventory::where('item_id', $content->item_id)
-                ->first();
-
-            if (!$inventory) {
-                continue;
-            }
-
-            InventoryHistory::create([
-                'batch_no'     => 'DELIVERED-' . now()->format('YmdHis'),
-
-                'inventory_id' => $inventory->inventory_id,
-                'item_id'      => $inventory->item_id,
-                'warehouse_id' => $inventory->warehouse_id,
-
-                // Delivery does not change warehouse quantity because
-                // stock was already deducted during Stock Out.
-                'old_qty'      => $inventory->qty,
-                'new_qty'      => $inventory->qty,
-
-                'changed_by'   => 'Receiver',
-
-                'remarks'      => 'Package delivered'
-                    . ($request->remarks ? ' - ' . $request->remarks : ''),
-
-                'change_type'  => 'delivered',
+        if ($packageStatus->status === 'delivered') {
+            return back()->withErrors([
+                'delivery' => 'This package has already been delivered.'
             ]);
         }
-
-        DeliveryHistory::create([
-            'package_status_id' => $packageStatus->package_status_id,
-            'user_id'           => null,
-            'status'            => 'delivered',
-            'remarks'           => $request->remarks,
+        if ($packageStatus->status === 'pending') {
+            return back()->withErrors([
+                'delivery' => 'This package is still pending and cannot be marked as delivered.'
+            ]);
+        }
+        $request->validate([
+            'remarks' => 'nullable|string|max:500',
         ]);
 
+        DB::beginTransaction();
 
-        DB::commit();
+        try {
 
-        return redirect()
-            ->route('delivery.success')
-            ->with('success','Package delivered successfully.');
+            $packageStatus->status = 'delivered';
+            $packageStatus->remarks = $request->remarks;
+            $packageStatus->delivered_at = now();
+
+            // No Auth dependency
+            $packageStatus->receiver_name = 'Receiver';
+
+            // No Auth dependency
+            $packageStatus->delivered_by = null;
+
+            $packageStatus->save();
+            foreach ($packageStatus->package->packageContent as $content) {
+
+                $inventory = Inventory::where('item_id', $content->item_id)
+                    ->first();
+
+                if (!$inventory) {
+                    continue;
+                }
+
+                InventoryHistory::create([
+                    'batch_no'     => 'DELIVERED-' . now()->format('YmdHis'),
+
+                    'inventory_id' => $inventory->inventory_id,
+                    'item_id'      => $inventory->item_id,
+                    'warehouse_id' => $inventory->warehouse_id,
+
+                    // Delivery does not change warehouse quantity because
+                    // stock was already deducted during Stock Out.
+                    'old_qty'      => $inventory->qty,
+                    'new_qty'      => $inventory->qty,
+
+                    'changed_by'   => 'Receiver',
+
+                    'remarks'      => 'Package delivered'
+                        . ($request->remarks ? ' - ' . $request->remarks : ''),
+
+                    'change_type'  => 'delivered',
+                ]);
+            }
+
+            DeliveryHistory::create([
+                'package_status_id' => $packageStatus->package_status_id,
+                'user_id'           => null,
+                'status'            => 'delivered',
+                'remarks'           => $request->remarks,
+            ]);
 
 
-    } catch (\Exception $e) {
+            DB::commit();
 
-        DB::rollBack();
+            return redirect()
+                ->route('delivery.success')
+                ->with('success','Package delivered successfully.');
 
-        Log::error('Delivery Receive Failed', [
-            'message'=>$e->getMessage(),
-            'line'=>$e->getLine(),
-            'file'=>$e->getFile(),
-        ]);
 
-        return back()->withErrors([
-            'error'=>$e->getMessage()
-        ]);
+        } catch (\Exception $e) {
+
+            DB::rollBack();
+
+            Log::error('Delivery Receive Failed', [
+                'message'=>$e->getMessage(),
+                'line'=>$e->getLine(),
+                'file'=>$e->getFile(),
+            ]);
+
+            return back()->withErrors([
+                'error'=>$e->getMessage()
+            ]);
+        }
     }
-}
 }

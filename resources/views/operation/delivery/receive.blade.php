@@ -309,12 +309,6 @@
                     <dt>Address</dt>
                     <dd>{{ $packageStatus->delivery->school->address }}</dd>
 
-                    <dt>Division</dt>
-                    <dd>{{ optional($packageStatus->delivery->school->division)->division_name }}</dd>
-
-                    <dt>Region</dt>
-                    <dd>{{ optional($packageStatus->delivery->school->region)->region_name }}</dd>
-
                 </dl>
 
             </div>
@@ -351,15 +345,6 @@
 
                     <dt>Project</dt>
                     <dd>{{ $packageStatus->delivery->project->project_name }}</dd>
-
-                    <dt>Package</dt>
-                    <dd>{{ $packageStatus->package->package_name }}</dd>
-
-                    <dt>Package Type</dt>
-                    <dd>{{ $packageStatus->delivery->package_type }}</dd>
-
-                    <dt>Delivery Qty</dt>
-                    <dd>{{ $packageStatus->delivery->package_qty }}</dd>
 
                 </dl>
 

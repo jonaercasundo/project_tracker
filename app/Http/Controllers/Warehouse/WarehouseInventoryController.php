@@ -213,6 +213,7 @@ public function validateScan(Request $request)
         }
 
         $firstItem = $contents->first();
+
         if (!$firstItem->item) {
             return response()->json([
                 'success' => false,
@@ -239,9 +240,6 @@ public function validateScan(Request $request)
         |--------------------------------------------------------------------------
         | DELIVERY
         |--------------------------------------------------------------------------
-        | Delivery is only used to get the DR number.
-        | Quantity comes directly from package_content.package_qty.
-        |--------------------------------------------------------------------------
         */
 
         $delivery = $status->delivery;
@@ -255,15 +253,15 @@ public function validateScan(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | ACTUAL PACKAGE QUANTITY
+        | ACTUAL QUANTITY
         |--------------------------------------------------------------------------
-        | Get the actual quantity from package_content.package_qty.
+        | Quantity comes from deliveries.package_qty.
         |--------------------------------------------------------------------------
         */
 
-        $actualQty = (int) ($firstItem->package_qty ?? 0);
+        $qty = (int) ($delivery->package_qty ?? 0);
 
-        if ($actualQty <= 0) {
+        if ($qty <= 0) {
             return response()->json([
                 'success' => false,
                 'message' => 'Package quantity is missing.'
@@ -285,7 +283,7 @@ public function validateScan(Request $request)
             'package_name'      => 'Package #' . $status->package->package_num,
             'item'              => $itemName,
             'item_id'           => $firstItem->item_id,
-            'qty'               => $actualQty,
+            'qty'               => $qty,
         ]);
 
     } catch (\Throwable $e) {

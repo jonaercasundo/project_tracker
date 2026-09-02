@@ -52,6 +52,42 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+    /**
+     * Companies this user belongs to.
+    */
+    public function companies()
+    {
+        return $this->belongsToMany(
+            Company::class,
+            'company_user',
+            'user_id',
+            'company_id'
+        )->withTimestamps();
+    }
+    /**
+     * Check if user belongs to a company.
+    */
+    public function belongsToCompany($companyId): bool
+    {
+        return $this->companies()
+            ->where('companies.company_id', $companyId)
+            ->exists();
+    }
+    /**
+        * Get currently selected company.
+    */
+    public function currentCompany()
+    {
+        $companyId = session('company_id');
+
+        if (!$companyId) {
+            return null;
+        }
+
+        return $this->companies()
+            ->where('companies.company_id', $companyId)
+            ->first();
+    }
     public function edit()
     {
         $users = User::all(); // or paginate()

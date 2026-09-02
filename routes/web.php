@@ -333,10 +333,38 @@ use App\Http\Controllers\PublicProductController;
                 Route::get('/history', function () { return view('operation.warehouse.history.index'); })->name('history');
                 Route::get('/transactions', function () { return view('operation.warehouse.transactions.index');})->name('transactions');
         });  
+        /*
+            |--------------------------------------------------------------------------
+            | MI ROUTES
+            |--------------------------------------------------------------------------
+        */
+            Route::middleware([
+                'auth',
+                'company.context',
+                'company.role:Administrator',
+            ])->group(function () {
+
+            Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
+            Route::get('/mi/settings', [MIAppController::class, 'settings'])->name('mi_app.settings');
+            Route::get('/mi/designer', [MIAppController::class, 'index'])->name('mi_app.index');
+            Route::get('/mi/dashboard', [MIAppController::class, 'dashboard'])->name('mi_app.dashboard');
+            Route::post('/mi/setting_store', [MIAppController::class, 'setting_store'])->name('mi_app.store');
+            Route::post('/mi/store', [MIAppController::class, 'store'])->name('mi_app.store_1');
+            Route::get('/mi/{product}', [MIAppController::class, 'show'])->name('mi_app.show');
+            Route::get('/mi/{product}/edit', [MIAppController::class, 'edit'])->name('mi_app.edit');
+            Route::put('/mi/{product}', [MIAppController::class, 'update'])->name('mi_app.update');
+            Route::delete('/mi/{product}', [MIAppController::class, 'destroy'])->name('mi_app.destroy');
+            Route::get('/taxonomy/{type}/{product}/edit', [MIAppController::class, 'taxonomy_edit'])->name('taxonomy.edit');
+            Route::put('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_update'])->name('taxonomy.update');
+            Route::delete('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_destroy'])->name('taxonomy.destroy');
+            Route::get('/p/{product}', [PublicProductController::class, 'show'])->name('public.product.show');
+            Route::post('/p/{product}/quotation', [QuotationController::class, 'download'])->name('mi_app.quotation.download');
+            Route::post('/p/{product}/quotation/print', [QuotationController::class, 'print'])->name('mi_app.quotation.print');
+        });
     });
     
     Route::get('/it.assets/{asset}', [ITinventoryController::class, 'show'])->name('it.asset.show');
-    
+
     /*
         |--------------------------------------------------------------------------
         | Delivery Routes
@@ -345,27 +373,5 @@ use App\Http\Controllers\PublicProductController;
     Route::get('/receive-delivery/{packageStatus}', [DeliveryReceiveController::class, 'show'])->name('delivery.receive');
     Route::post('/receive-delivery/{packageStatus}', [DeliveryReceiveController::class,'store'])->name('delivery.receive.store');
     Route::get('/delivery-success', function () {return view('operation.delivery.success'); })->name('delivery.success');
-
-    /*
-        |--------------------------------------------------------------------------
-        | MI ROUTES
-        |--------------------------------------------------------------------------
-    */
-    Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
-    Route::get('/mi/settings', [MIAppController::class, 'settings'])->name('mi_app.settings');
-    Route::get('/mi/designer', [MIAppController::class, 'index'])->name('mi_app.index');
-    Route::get('/mi/dashboard', [MIAppController::class, 'dashboard'])->name('mi_app.dashboard');
-    Route::post('/mi/setting_store', [MIAppController::class, 'setting_store'])->name('mi_app.store');
-    Route::post('/mi/store', [MIAppController::class, 'store'])->name('mi_app.store_1');
-    Route::get('/mi/{product}', [MIAppController::class, 'show'])->name('mi_app.show');
-    Route::get('/mi/{product}/edit', [MIAppController::class, 'edit'])->name('mi_app.edit');
-    Route::put('/mi/{product}', [MIAppController::class, 'update'])->name('mi_app.update');
-    Route::delete('/mi/{product}', [MIAppController::class, 'destroy'])->name('mi_app.destroy');
-    Route::get('/taxonomy/{type}/{product}/edit', [MIAppController::class, 'taxonomy_edit'])->name('taxonomy.edit');
-    Route::put('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_update'])->name('taxonomy.update');
-    Route::delete('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_destroy'])->name('taxonomy.destroy');
-    Route::get('/p/{product}', [PublicProductController::class, 'show'])->name('public.product.show');
-    Route::post('/p/{product}/quotation', [QuotationController::class, 'download'])->name('mi_app.quotation.download');
-    Route::post('/p/{product}/quotation/print', [QuotationController::class, 'print'])->name('mi_app.quotation.print');
     Route::get('/test-drive', function () { return view('test'); });
 require __DIR__.'/auth.php';

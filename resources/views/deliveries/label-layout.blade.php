@@ -349,6 +349,15 @@
 
             $lots = $school['lots'] ?? [];
 
+            // Sort lots numerically by lot_name (e.g. 1, 2, 3 ... 11)
+            // instead of alphabetically (1, 10, 11, 2, 3 ...), so this
+            // order is used consistently by both the top QR badges and
+            // the items table below.
+            $lots = collect($lots)
+                ->sortBy(fn($lot) => (int) ($lot['lot_name'] ?? 0))
+                ->values()
+                ->all();
+
         @endphp
 
 

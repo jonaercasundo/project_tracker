@@ -13,7 +13,70 @@
             </div>
         </div>
     </div>
+    <!-- Current Company -->
+    @php
+        $currentUser = Auth::user();
+        $currentCompany = $currentUser?->currentCompany();
+        $companyId = $currentCompany?->company_id;
+    @endphp
 
+    @if($currentUser && $currentUser->companies->count() > 0)
+
+        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/40">
+
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                    <svg
+                        class="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M3 21h18M5 21V7a2 2 0 012-2h10a2 2 0 012 2v14M9 9h1m-1 4h1m4-4h1m-1 4h1M9 21v-4h6v4"
+                        />
+                    </svg>
+                </div>
+
+                <div class="min-w-0">
+                    <div class="text-[9px] uppercase tracking-wider font-bold text-slate-400">
+                        Current Company
+                    </div>
+                </div>
+            </div>
+
+            <form
+                method="POST"
+                action="{{ route('company.switch') }}"
+            >
+                @csrf
+
+                <select
+                    name="company_id"
+                    onchange="this.form.submit()"
+                    class="w-full text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-2 pr-8 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 cursor-pointer"
+                >
+
+                    @foreach($currentUser->companies->where('is_active', true) as $company)
+
+                        <option
+                            value="{{ $company->company_id }}"
+                            @selected($companyId == $company->company_id)
+                        >
+                            {{ $company->name }}
+                        </option>
+
+                    @endforeach
+
+                </select>
+            </form>
+
+        </div>
+
+    @endif
     <!-- Navigation Menu Items -->
     <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
 

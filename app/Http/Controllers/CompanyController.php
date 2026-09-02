@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 
 class CompanyController extends Controller
 {
@@ -108,7 +109,94 @@ class CompanyController extends Controller
             ->route('admin.companies.index')
             ->with('success', 'Company deleted successfully.');
     }
-    public function switch(Request $request)
+
+    /**
+     * Switch company while already logged in.
+     */
+public function switch(Request $request): RedirectResponse
+{
+    $validated = $request->validate([
+        'company_id' => [
+            'required',
+            'integer',
+            'exists:companies,company_id',
+        ],
+    ]);
+
+    $user = auth()->user();
+
+    $company = $user->companies()
+        ->where('companies.company_id', $validated['company_id'])
+        ->where('companies.is_active', true)
+        ->first();
+
+    if (!$company) {
+        abort(403, 'You do not have access to this company.');
+    }
+
+    session([
+        'company_id' => $company->company_id,
+    ]);
+
+    return $this->redirectForCompany($company, $user);
+}
+
+    /**
+     * Show company selection screen.
+     */
+    public function select(): RedirectResponse|\Illuminate\View\View
+    {
+        $user = auth()->user();
+
+        $companies = $user->companies()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | No active company
+        |--------------------------------------------------------------------------
+        */
+        if ($companies->isEmpty()) {
+
+            auth()->logout();
+
+            return redirect()
+                ->route('login')
+                ->withErrors([
+                    'email' => 'Your account is not assigned to any active company.',
+                ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Only one company
+        |--------------------------------------------------------------------------
+        */
+        if ($companies->count() === 1) {
+
+            $company = $companies->first();
+
+            session([
+                'company_id' => $company->company_id,
+            ]);
+
+            return $this->redirectForCompany($company, $user);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Multiple companies
+        |--------------------------------------------------------------------------
+        */
+        return view('admin.company.select', compact('companies'));
+    }
+
+    /**
+     * Store selected company.
+     */
+    public function selectStore(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'company_id' => [
@@ -120,19 +208,102 @@ class CompanyController extends Controller
 
         $user = auth()->user();
 
-        // Security check:
-        // The user can only switch to a company they belong to.
+        /*
+        |--------------------------------------------------------------------------
+        | Security check
+        |--------------------------------------------------------------------------
+        */
         if (!$user->belongsToCompany($validated['company_id'])) {
             abort(403, 'You do not have access to this company.');
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Get selected active company
+        |--------------------------------------------------------------------------
+        */
+        $company = Company::where('company_id', $validated['company_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (!$company) {
+            abort(403, 'This company is inactive.');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Save selected company
+        |--------------------------------------------------------------------------
+        */
         session([
-            'company_id' => $validated['company_id'],
+            'company_id' => $company->company_id,
         ]);
 
-        return back()->with(
-            'success',
-            'Company switched successfully.'
-        );
+        /*
+        |--------------------------------------------------------------------------
+        | Redirect according to company + role
+        |--------------------------------------------------------------------------
+        */
+        return $this->redirectForCompany($company, $user);
+    }
+
+    /**
+     * Determine where the user should go based on company and role.
+     */
+    private function redirectForCompany(
+        Company $company,
+        $user
+    ): RedirectResponse {
+
+        /*
+        |--------------------------------------------------------------------------
+        | MMC
+        |--------------------------------------------------------------------------
+        */
+        if ($company->code === 'MMC') {
+
+            if ($user->hasRole('user')) {
+                return redirect()->route('projects.dashboard');
+            }
+
+            if ($user->hasRole('Administrator')) {
+                return redirect()->route('admin.dashboard');
+            }
+
+            if ($user->hasRole('finance')) {
+                return redirect()->route('finance.dashboard');
+            }
+
+            if ($user->hasRole('IT')) {
+                return redirect()->route('it.dashboard');
+            }
+
+            if ($user->hasRole('Warehouse_officer')) {
+                return redirect()->route('warehouse.dashboard');
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Metroinc / MI
+        |--------------------------------------------------------------------------
+        */
+        if ($company->code === 'MI') {
+
+            if ($user->hasRole('user')) {
+                return redirect()->route('mi_app.dashboard');
+            }
+
+            if ($user->hasRole('Administrator')) {
+                return redirect()->route('admin.dashboard');
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | No available module
+        |--------------------------------------------------------------------------
+        */
+        return redirect()->route('site.maintenance');
     }
 }

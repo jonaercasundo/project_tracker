@@ -31,6 +31,7 @@ use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\RoleController;
+
     /*
     |--------------------------------------------------------------------------
     | PUBLIC ROUTE
@@ -38,13 +39,25 @@ use App\Http\Controllers\RoleController;
     */
     Route::get('/', function () {return view('welcome');})->name('welcome');
 
-    /*
-    |--------------------------------------------------------------------------
-    | AUTH ROUTES
-    |--------------------------------------------------------------------------
-    */
-    Route::middleware(['auth'])->group(function () {
+        /*
+        |--------------------------------------------------------------------------
+        | AUTH ROUTES
+        |--------------------------------------------------------------------------
+        */
+        Route::middleware(['auth'])->group(function () {
+            Route::get('/site-maintenance', function () {
+                return view('site.maintenance');
+            })->name('site.maintenance');
+           // Company selection after login
+            Route::get('/company/select', [CompanyController::class, 'select'])
+                ->name('company.select');
 
+            Route::post('/company/select', [CompanyController::class, 'selectStore'])
+                ->name('company.select.store');
+
+            // Switch company from dashboard
+            Route::post('/company/switch', [CompanyController::class, 'switch'])
+                ->name('company.switch');
         /*
         |--------------------------------------------------------------------------
         | ADMIN ROUTES
@@ -102,7 +115,6 @@ use App\Http\Controllers\RoleController;
             Route::put('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
             Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
 
-            Route::post('/company/switch', [CompanyController::class, 'switch'])->name('company.switch');
             Route::post('/users/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
         });
         /*
@@ -110,7 +122,11 @@ use App\Http\Controllers\RoleController;
             | PROJECTS
             |--------------------------------------------------------------------------
         */
-        Route::middleware(['role:user'])->group(function () {
+        Route::middleware([
+            'auth',
+            'company.context:MMC',
+            'role:user',
+        ])->group(function () {
 
             Route::get('/projects/dashboard', [ProjectDashboardController::class, 'index'])
             ->name('projects.dashboard');
@@ -373,11 +389,7 @@ use App\Http\Controllers\RoleController;
             | MI ROUTES
             |--------------------------------------------------------------------------
         */
-            Route::middleware([
-                'auth',
-                'company.context',
-                'company.role:Administrator',
-            ])->group(function () {
+            Route::middleware(['auth','company.context:MI','role:user'])->group(function () {
 
             Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
             Route::get('/mi/settings', [MIAppController::class, 'settings'])->name('mi_app.settings');

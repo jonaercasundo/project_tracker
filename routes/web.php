@@ -404,9 +404,6 @@ use App\Http\Controllers\RoleController;
             Route::get('/taxonomy/{type}/{product}/edit', [MIAppController::class, 'taxonomy_edit'])->name('taxonomy.edit');
             Route::put('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_update'])->name('taxonomy.update');
             Route::delete('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_destroy'])->name('taxonomy.destroy');
-            Route::get('/p/{product}', [PublicProductController::class, 'show'])->name('public.product.show');
-            Route::post('/p/{product}/quotation', [QuotationController::class, 'download'])->name('mi_app.quotation.download');
-            Route::post('/p/{product}/quotation/print', [QuotationController::class, 'print'])->name('mi_app.quotation.print');
         });
     });
     
@@ -421,4 +418,7 @@ use App\Http\Controllers\RoleController;
     Route::post('/receive-delivery/{packageStatus}', [DeliveryReceiveController::class,'store'])->name('delivery.receive.store');
     Route::get('/delivery-success', function () {return view('operation.delivery.success'); })->name('delivery.success');
     Route::get('/test-drive', function () { return view('test'); });
+    Route::get('/p/{product}', [PublicProductController::class, 'show'])->name('public.product.show');
+    Route::post('/p/{product}/quotation', [QuotationController::class, 'download'])->name('mi_app.quotation.download');
+    Route::post('/p/{product}/quotation/print', [QuotationController::class, 'print'])->name('mi_app.quotation.print');
 require __DIR__.'/auth.php';

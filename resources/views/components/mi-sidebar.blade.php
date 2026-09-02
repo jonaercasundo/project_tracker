@@ -148,6 +148,7 @@
                 </li> 
             </ul>
         </div>
+        
     </nav>
 
     <!-- Account Identity Panel Footer -->

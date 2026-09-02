@@ -854,8 +854,6 @@
         </tr>
 
     @endforelse
-
-
 @endforeach
 
 </body>

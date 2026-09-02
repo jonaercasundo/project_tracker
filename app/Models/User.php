@@ -2,18 +2,22 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
+use App\Models\Company;
 
 class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasRoles;
+
     protected $primaryKey = 'user_id';
+
     public $incrementing = true;
+
     protected $keyType = 'int';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -52,9 +56,10 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
     /**
      * Companies this user belongs to.
-    */
+     */
     public function companies()
     {
         return $this->belongsToMany(
@@ -64,18 +69,20 @@ class User extends Authenticatable
             'company_id'
         )->withTimestamps();
     }
+
     /**
      * Check if user belongs to a company.
-    */
+     */
     public function belongsToCompany($companyId): bool
     {
         return $this->companies()
             ->where('companies.company_id', $companyId)
             ->exists();
     }
+
     /**
-        * Get currently selected company.
-    */
+     * Get the currently selected company.
+     */
     public function currentCompany()
     {
         $companyId = session('company_id');
@@ -88,9 +95,13 @@ class User extends Authenticatable
             ->where('companies.company_id', $companyId)
             ->first();
     }
+
+    /**
+     * Get all users for role access management.
+     */
     public function edit()
     {
-        $users = User::all(); // or paginate()
+        $users = User::all();
 
         return view('roleaccess.edit', compact('users'));
     }

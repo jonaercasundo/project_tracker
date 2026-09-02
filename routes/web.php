@@ -29,7 +29,8 @@ use App\Http\Controllers\DeliveryReceiveController;
 use App\Http\Controllers\MIAppController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\PublicProductController;
-
+use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\RoleController;
     /*
     |--------------------------------------------------------------------------
     | PUBLIC ROUTE
@@ -50,25 +51,59 @@ use App\Http\Controllers\PublicProductController;
         |--------------------------------------------------------------------------
         */
         Route::middleware(['role:Administrator'])->group(function () {
+
             Route::post('/users', [UserController::class, 'store'])
-            ->name('users.store');
+                ->name('users.store');
+
             Route::delete('/users/{user}', [UserController::class, 'destroy'])
-            ->name('users.destroy');
-            // Dashboard
-            Route::get('/admin/dashboard', [RoleAccessPermissionController::class, 'index'])->name('admin.dashboard');
+                ->name('users.destroy');
+
+            /*
+            |--------------------------------------------------------------------------
+            | ADMIN DASHBOARD
+            |--------------------------------------------------------------------------
+            */
+
+            Route::get('/admin/dashboard', [
+                RoleAccessPermissionController::class,
+                'index'
+            ])->name('admin.dashboard');
+
 
             /*
             |--------------------------------------------------------------------------
             | ROLE ACCESS MANAGEMENT
             |--------------------------------------------------------------------------
             */
-            Route::get('/roleaccess', [RoleAccessPermissionController::class, 'edit'])
-                ->name('roleaccess.edit');
 
-            Route::patch('/roleaccess/update', [RoleAccessPermissionController::class, 'update'])
-            ->name('roleaccess.update');
-            Route::delete('/roleaccess', [RoleAccessPermissionController::class, 'destroy'])
-                ->name('roleaccess.destroy');
+            Route::get('/roleaccess', [
+                RoleAccessPermissionController::class,
+                'edit'
+            ])->name('roleaccess.index');
+
+            Route::patch('/roleaccess/update', [
+                RoleAccessPermissionController::class,
+                'update'
+            ])->name('roleaccess.update');
+
+            Route::delete('/roleaccess', [RoleAccessPermissionController::class, 'destroy'])->name('roleaccess.destroy');
+            
+            Route::get('/companies', [CompanyController::class, 'index'])->name('companies.index');
+            Route::get('/companies/create', [CompanyController::class, 'create'])->name('companies.create');
+            Route::post('/companies', [CompanyController::class, 'store'])->name('companies.store');
+            Route::get('/companies/{company}/edit', [CompanyController::class, 'edit'])->name('companies.edit');
+            Route::put('/companies/{company}', [CompanyController::class, 'update'])->name('companies.update');
+            Route::delete('/companies/{company}', [CompanyController::class, 'destroy'])->name('companies.destroy');
+                // Role Management
+            Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+            Route::get('/roles/create', [RoleController::class, 'create'])->name('roles.create');
+            Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
+            Route::get('/roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
+            Route::put('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+            Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
+
+            Route::post('/company/switch', [CompanyController::class, 'switch'])->name('company.switch');
+            Route::post('/users/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
         });
         /*
             |--------------------------------------------------------------------------

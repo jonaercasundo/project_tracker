@@ -10,52 +10,112 @@ class UserController extends Controller
 {
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6',
-            'role' => 'required|exists:roles,name',
-        ]);
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'unique:users,email'],
+            'employee_id' => ['required', 'string', 'max:255'],
+            'department' => ['required', 'string', 'max:255'],
 
-        // Always guarantee username exists
-        $username = $request->username 
-            ?? strtolower(str_replace(' ', '.', trim($request->name))) . rand(100, 999);
+            // MULTIPLE COMPANIES
+            'company_ids' => ['required', 'array', 'min:1'],
+            'company_ids.*' => ['integer', 'exists:companies,company_id'],
+
+            // ROLE
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => ['string', 'exists:roles,name'],
+
+            // PASSWORD
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
 
         try {
 
             $user = User::create([
-                'name'        => $request->name,
-                'email'       => $request->email,
-                'username'    => $request->email,
-                'employee_id' => $request->employee_id,
-                'department'  => $request->department,
-                'position'    => $request->position,
-                'role'        => $request->role,
-                'password'    => Hash::make($request->password),
-            ]);
-            $user->assignRole($request->role);
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'username' => $validated['email'],
+                'employee_id' => $validated['employee_id'],
+                'department' => $validated['department'],
+                'position' => 'Staff',
 
-            return back()->with('success', 'User created successfully.');
+                // Legacy users.role column
+                'role' => $validated['roles'][0],
+
+                'password' => Hash::make($validated['password']),
+            ]);
+
+            // Attach multiple companies
+            $user->companies()->attach($validated['company_ids']);
+
+            // Assign role
+            $user->assignRole($validated['roles']);
+
+            return back()->with(
+                'success',
+                'User created successfully.'
+            );
 
         } catch (\Exception $e) {
-            dd($e->getMessage(), $e->getTraceAsString());
+
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'error' => $e->getMessage()
+                ]);
         }
     }
 
+
     public function update(Request $request)
     {
-        $request->validate([
-            'user_id' => 'required|exists:users,user_id',
-            'role' => 'required|exists:roles,name',
+        $validated = $request->validate([
+            'user_id' => [
+                'required',
+                'exists:users,user_id',
+            ],
+
+            'company_ids' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'company_ids.*' => [
+                'integer',
+                'exists:companies,company_id',
+            ],
+
+            'roles' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'roles.*' => [
+                'string',
+                'exists:roles,name',
+            ],
         ]);
 
-        $user = User::findOrFail($request->user_id);
+        $user = User::findOrFail($validated['user_id']);
 
-        // Sync roles properly (Spatie handles everything)
-        $user->syncRoles([$request->role]);
+        // Update company access
+        $user->companies()->sync($validated['company_ids']);
 
-        return back()->with('success', 'Role updated successfully.');
+        // Update Spatie roles
+        $user->syncRoles($validated['roles']);
+
+        // Keep legacy users.role column synchronized
+        $user->update([
+            'role' => $validated['roles'][0],
+        ]);
+
+        return back()->with(
+            'success',
+            'User company access and role updated successfully.'
+        );
     }
+
     public function destroy($id)
     {
         $user = User::findOrFail($id);
@@ -64,6 +124,36 @@ class UserController extends Controller
 
         return redirect()
             ->route('admin.dashboard')
-            ->with('success', 'User deleted successfully.');
+            ->with(
+                'success',
+                'User deleted successfully.'
+            );
+    }
+    public function resetPassword(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => [
+                'required',
+                'exists:users,user_id',
+            ],
+
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+            ],
+        ]);
+
+        $user = User::findOrFail($validated['user_id']);
+
+        $user->update([
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        return back()->with(
+            'success',
+            'Password reset successfully for ' . $user->name . '.'
+        );
     }
 }

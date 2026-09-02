@@ -598,7 +598,7 @@ public function index(Request $request)
                 }
 
                 $url = sprintf(
-                    'https://mmc.metro-ltd.com/entry.php?id=%s&delivery_id=%s',
+                    'https://philgeps.metro-mobilia.com/entry.php?id=%s&delivery_id=%s',
                     $status->package_status_id,
                     $delivery->delivery_id
                 );

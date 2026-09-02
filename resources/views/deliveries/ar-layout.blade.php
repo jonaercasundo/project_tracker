@@ -210,154 +210,154 @@ td,th{
             <table>
             @foreach($delivery->packageStatuses as $i => $status)
 
-@php
-    $pkg = $status->package;
-@endphp
+    @php
+        $pkg = $status->package;
+    @endphp
 
-<tr class="package-row">
-    <td style="width:50%;">
-        <small>
-            Package {{ $i + 1 }} of {{ $packageCount }}
-        </small>
-    </td>
-
-    <td style="width:50%; text-align:center;">
-        @if($pkg)
+    <tr class="package-row">
+        <td style="width:50%;">
             <small>
-                {{ $pkg->length ?? 'N/A' }}
-                ×
-                {{ $pkg->width ?? 'N/A' }}
-                ×
-                {{ $pkg->height ?? 'N/A' }}
-                {{ $pkg->unit ?? 'cm' }}
+                Package {{ $i + 1 }} of {{ $packageCount }}
             </small>
-        @else
-            <small>Dimensions: N/A</small>
-        @endif
-    </td>
-</tr>
+        </td>
 
-@if($pkg)
+        <td style="width:50%; text-align:center;">
+            @if($pkg)
+                <small>
+                    {{ $pkg->length ?? 'N/A' }}
+                    ×
+                    {{ $pkg->width ?? 'N/A' }}
+                    ×
+                    {{ $pkg->height ?? 'N/A' }}
+                    {{ $pkg->unit ?? 'cm' }}
+                </small>
+            @else
+                <small>Dimensions: N/A</small>
+            @endif
+        </td>
+    </tr>
 
-    @foreach($pkg->packageContent as $content)
+    @if($pkg)
 
-        <tr>
-            <td style="width:80%;">
-                {{ $content->item->item_name ?? 'Unknown Item' }}
-            </td>
+        @foreach($pkg->packageContent as $content)
 
-            <td style="width:20%; text-align:center;">
-                {{ $content->qty ?? 0 }}
-            </td>
-        </tr>
+            <tr>
+                <td style="width:80%;">
+                    {{ $content->item->item_name ?? 'Unknown Item' }}
+                </td>
 
-    @endforeach
-
-@endif
-
-@endforeach
-</table>
+                <td style="width:20%; text-align:center;">
+                    {{ $content->qty ?? 0 }}
+                </td>
+            </tr>
 
         @endforeach
 
-        <div class="footer">
+    @endif
 
-            <table style="border:none;">
+    @endforeach
+    </table>
 
-                <tr>
+            @endforeach
 
-                    <td style="border:none;">
-                        Printed Name Over Signature
-                    </td>
+            <div class="footer">
 
-                    <td style="border:none;">
-                        {{ $signerName }}
-                        <br>
-                        {{ $ar->ar_company_footer ?? 'Metro Mobilia Corporation' }}
-                    </td>
+                <table style="border:none;">
 
-                </tr>
+                    <tr>
 
-            </table>
+                        <td style="border:none;">
+                            Printed Name Over Signature
+                        </td>
 
-            <small>
+                        <td style="border:none;">
+                            {{ $signerName }}
+                            <br>
+                            {{ $ar->ar_company_footer ?? 'Metro Mobilia Corporation' }}
+                        </td>
 
-                {{ $ar->ar_address_footer ?? '' }}
+                    </tr>
 
-                <br>
+                </table>
 
-                {{ $ar->ar_contact_footer ?? '' }}
+                <small>
 
-            </small>
+                    {{ $ar->ar_address_footer ?? '' }}
+
+                    <br>
+
+                    {{ $ar->ar_contact_footer ?? '' }}
+
+                </small>
+
+            </div>
 
         </div>
 
-    </div>
+        {{-- ========================================= --}}
+        {{-- PAGE 2 — QR Codes, grouped by keystage --}}
+        {{-- ========================================= --}}
 
-    {{-- ========================================= --}}
-    {{-- PAGE 2 — QR Codes, grouped by keystage --}}
-    {{-- ========================================= --}}
+        <div class="page-break"></div>
+        <div>
 
-    <div class="page-break"></div>
-    <div>
+            @foreach($drDeliveries as $delivery)
 
-        @foreach($drDeliveries as $delivery)
+                @php
+                    $keystageLabel = $delivery->keystage
+                        ? 'Keystage ' . $delivery->keystage->keystage_num . ' ' . strtok($delivery->keystage->description ?? '', ' ')
+                        : '';
+                @endphp
 
-            @php
-                $keystageLabel = $delivery->keystage
-                    ? 'Keystage ' . $delivery->keystage->keystage_num . ' ' . strtok($delivery->keystage->description ?? '', ' ')
-                    : '';
-            @endphp
-
-            @if($keystageLabel)
-                <table>
-                    <tr>
-                        <td class="keystage-header" colspan="2">
-                            {{ $keystageLabel }}
-                        </td>
-                    </tr>
-                </table>
-            @endif
-
-            <table>
-                @foreach($delivery->packageStatuses->chunk(2) as $chunk)
-
-                    <tr>
-
-                        @foreach($chunk as $status)
-                            <td class="qr">
-                                @if(isset($qrCodes[$status->package_status_id]))
-
-                                    <img
-                                        src="{{ $qrCodes[$status->package_status_id] }}"
-                                        width="150"
-                                    >
-
-                                @endif
-
-                                <br>
-                                    <small>
-                                        <strong>
-                                            {{ $status->qr_label ?? 'Unknown Item' }}
-                                        </strong>
-                                    </small>
+                @if($keystageLabel)
+                    <table>
+                        <tr>
+                            <td class="keystage-header" colspan="2">
+                                {{ $keystageLabel }}
                             </td>
-                        @endforeach
+                        </tr>
+                    </table>
+                @endif
 
-                        @if($chunk->count() == 1)
-                            <td></td>
-                        @endif
+                <table>
+                    @foreach($delivery->packageStatuses->chunk(2) as $chunk)
 
-                    </tr>
+                        <tr>
 
-                @endforeach
-            </table>
+                            @foreach($chunk as $status)
+                                <td class="qr">
+                                    @if(isset($qrCodes[$status->package_status_id]))
 
-        @endforeach
+                                        <img
+                                            src="{{ $qrCodes[$status->package_status_id] }}"
+                                            width="150"
+                                        >
 
-    </div>
+                                    @endif
 
-@endforeach
+                                    <br>
+                                        <small>
+                                            <strong>
+                                                {{ $status->qr_label ?? 'Unknown Item' }}
+                                            </strong>
+                                        </small>
+                                </td>
+                            @endforeach
+
+                            @if($chunk->count() == 1)
+                                <td></td>
+                            @endif
+
+                        </tr>
+
+                    @endforeach
+                </table>
+
+            @endforeach
+
+        </div>
+
+    @endforeach
 
 
 </body>

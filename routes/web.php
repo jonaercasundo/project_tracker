@@ -31,6 +31,7 @@ use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\LiquidationController;
 
     /*
     |--------------------------------------------------------------------------
@@ -404,6 +405,17 @@ use App\Http\Controllers\RoleController;
             Route::get('/taxonomy/{type}/{product}/edit', [MIAppController::class, 'taxonomy_edit'])->name('taxonomy.edit');
             Route::put('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_update'])->name('taxonomy.update');
             Route::delete('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_destroy'])->name('taxonomy.destroy');
+
+            Route::get('/liquidation', [LiquidationController::class, 'index'])->name('liquidation.index');
+            Route::get('/liquidation/create', [LiquidationController::class, 'create'])->name('liquidation.create');
+            Route::post('/liquidation', [LiquidationController::class, 'store'])->name('liquidation.store');
+            Route::get('/liquidation/{liquidation}', [LiquidationController::class, 'show'])->name('liquidation.show');
+            Route::get(
+                '/liquidation/{id}/edit',
+                [LiquidationController::class, 'edit']
+            )->name('liquidation.edit');
+            Route::put('/liquidation/{liquidation}', [LiquidationController::class, 'update'])->name('liquidation.update');
+            Route::delete('/liquidation/{liquidation}', [LiquidationController::class, 'destroy'])->name('liquidation.destroy');
         });
     });
     

@@ -1,687 +1,2727 @@
 <x-mi_app>
+
+    {{-- ============================================================
+        EXTERNAL ASSETS
+    ============================================================ --}}
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css" rel="stylesheet">
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap"
+        rel="stylesheet"
+    >
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css"
+        rel="stylesheet"
+    >
+
     <style>
+
         /* ============================================================
-   EXISTING IMAGES
-   ============================================================ */
+           PRODUCT EDIT CONSOLE
+        ============================================================ */
 
-.tx-existing-images {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-@media (max-width: 700px) {
-    .tx-existing-images {
-        grid-template-columns: 1fr;
-    }
-}
-
-.tx-existing-image {
-    position: relative;
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    padding: 1rem;
-    border: 1px solid var(--tx-line);
-    border-radius: 14px;
-    background: var(--tx-bg);
-    transition: all .15s ease;
-}
-
-.tx-existing-image:hover {
-    border-color: var(--tx-primary);
-}
-
-.tx-existing-image.removing {
-    opacity: .45;
-    transform: scale(.98);
-    border-color: var(--tx-danger);
-}
-
-.tx-existing-image-preview {
-    width: 90px;
-    height: 90px;
-    flex: 0 0 90px;
-    overflow: hidden;
-    border-radius: 12px;
-    border: 1px solid var(--tx-line);
-    background: var(--tx-surface);
-}
-
-.tx-existing-image-preview img {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: cover;
-}
-
-.tx-image-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--tx-ink-faint);
-    font-size: .7rem;
-}
-
-.tx-existing-image-info {
-    min-width: 0;
-    flex: 1;
-}
-
-.tx-existing-image-info strong {
-    display: block;
-    font-size: .8rem;
-    font-weight: 700;
-    color: var(--tx-ink);
-}
-
-.tx-primary-badge {
-    display: inline-flex;
-    margin-top: .35rem;
-    padding: .2rem .55rem;
-    border-radius: 999px;
-    background: var(--tx-primary-soft);
-    color: var(--tx-primary);
-    font-size: .65rem;
-    font-weight: 700;
-}
-
-.tx-image-url {
-    margin-top: .45rem;
-    color: var(--tx-ink-faint);
-    font-size: .68rem;
-    line-height: 1.4;
-    word-break: break-all;
-}
-
-.tx-remove-existing-image {
-    display: inline-flex;
-    align-items: center;
-    gap: .35rem;
-    flex-shrink: 0;
-    border: 1px solid var(--tx-line);
-    background: var(--tx-surface);
-    color: var(--tx-danger);
-    border-radius: 9px;
-    padding: .45rem .65rem;
-    font-size: .7rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all .15s ease;
-}
-
-.tx-remove-existing-image:hover {
-    border-color: var(--tx-danger);
-    background: var(--tx-accent-soft);
-}
-
-.tx-existing-image.removing .tx-remove-existing-image {
-    background: var(--tx-danger);
-    color: white;
-    border-color: var(--tx-danger);
-}
-
-
-/* ============================================================
-   IMAGE LINKS
-   ============================================================ */
-
-.tx-image-link-row {
-    display: flex;
-    align-items: center;
-    gap: .6rem;
-    margin-bottom: .6rem;
-}
-
-.tx-image-link-row .tx-field {
-    flex: 1;
-}
-
-.tx-image-remove-link {
-    flex-shrink: 0;
-    border: 1px solid var(--tx-line);
-    background: var(--tx-surface);
-    color: var(--tx-danger);
-    border-radius: 10px;
-    padding: .65rem .8rem;
-    font-size: .72rem;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.tx-image-remove-link:hover {
-    border-color: var(--tx-danger);
-    background: var(--tx-accent-soft);
-}
-
-
-/* ============================================================
-   NEW IMAGE PREVIEW
-   ============================================================ */
-
-.tx-new-image-preview {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: .75rem;
-    margin-top: 1rem;
-}
-
-.tx-new-image-preview:empty {
-    display: none;
-}
-
-.tx-new-image-item {
-    position: relative;
-    border: 1px solid var(--tx-line);
-    border-radius: 12px;
-    overflow: hidden;
-    background: var(--tx-bg);
-}
-
-.tx-new-image-item img {
-    display: block;
-    width: 100%;
-    height: 120px;
-    object-fit: cover;
-}
-
-.tx-new-image-name {
-    padding: .45rem .55rem;
-    font-size: .65rem;
-    color: var(--tx-ink-soft);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tx-no-images {
-    padding: 1rem;
-    border: 1px dashed var(--tx-line);
-    border-radius: 12px;
-    color: var(--tx-ink-faint);
-    font-size: .75rem;
-    text-align: center;
-}
         .tx-console {
-            --tx-bg: #F5F6F3;
-            --tx-surface: #FFFFFF;
-            --tx-ink: #171B1A;
-            --tx-ink-soft: #616B66;
-            --tx-ink-faint: #9AA39C;
-            --tx-line: #E2E5DF;
-            --tx-primary: #2F5D50;
-            --tx-primary-ink: #FFFFFF;
-            --tx-primary-soft: #E5EEE9;
-            --tx-accent: #C7703C;
-            --tx-accent-soft: #F5E7DB;
-            --tx-danger: #B3432E;
-            --tx-lvl-1:rgb(17, 104, 79);
-            --tx-lvl-1-soft: #E5EEE9;
-            --tx-lvl-2: #35618C;
-            --tx-lvl-2-soft: #E3EBF2;
-            --tx-lvl-3: #7A4F98;
-            --tx-lvl-3-soft: #ECE4F1;
-            --tx-lvl-4: #C7703C;
-            --tx-lvl-4-soft: #F5E7DB;
-            --tx-font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
-            --tx-font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
-            --tx-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+            --tx-bg: #f8fafc;
+            --tx-surface: #ffffff;
+
+            --tx-ink: #111827;
+            --tx-ink-soft: #64748b;
+            --tx-ink-faint: #94a3b8;
+
+            --tx-line: #e2e8f0;
+            --tx-soft: #f1f5f9;
+
+            --tx-primary: #2563eb;
+            --tx-primary-dark: #1d4ed8;
+            --tx-primary-ink: #ffffff;
+            --tx-primary-soft: #eff6ff;
+
+            --tx-green: #059669;
+            --tx-green-soft: #ecfdf5;
+
+            --tx-danger: #dc2626;
+            --tx-danger-soft: #fef2f2;
+
+            --tx-purple: #7c3aed;
+            --tx-purple-soft: #f5f3ff;
+
+            --tx-orange: #d97706;
+            --tx-orange-soft: #fffbeb;
+
+            --tx-font-display: 'Space Grotesk',
+                ui-sans-serif,
+                system-ui,
+                sans-serif;
+
+            --tx-font-body: 'Inter',
+                ui-sans-serif,
+                system-ui,
+                sans-serif;
+
+            --tx-font-mono: 'JetBrains Mono',
+                ui-monospace,
+                SFMono-Regular,
+                monospace;
+
             font-family: var(--tx-font-body);
+
             background: var(--tx-bg);
             color: var(--tx-ink);
-        }
-        .tx-console.dark {
-            --tx-bg: #12151A;
-            --tx-surface: #191D22;
-            --tx-ink: #EDEFEA;
-            --tx-ink-soft: #9AA39C;
-            --tx-ink-faint: #6B746E;
-            --tx-line: #262B31;
-            --tx-primary-soft: #1C2723;
-            --tx-lvl-1-soft: #1C2723;
-            --tx-lvl-2-soft: #1A222B;
-            --tx-lvl-3-soft: #221C29;
-            --tx-lvl-4-soft: #2A2019;
+
+            min-height: 100vh;
         }
 
-        .tx-display { font-family: var(--tx-font-display); letter-spacing: -0.01em; }
-        .tx-mono { font-family: var(--tx-font-mono); letter-spacing: 0.02em; }
 
-        .tx-shell { max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 8rem; }
+        /* ============================================================
+           SHELL
+        ============================================================ */
 
-        /* Header */
+        .tx-shell {
+
+            width: 100%;
+            max-width: 1450px;
+
+            margin: 0 auto;
+
+            padding:
+                28px
+                28px
+                100px;
+        }
+
+
+        .tx-display {
+            font-family: var(--tx-font-display);
+            letter-spacing: -0.015em;
+        }
+
+
+        .tx-mono {
+            font-family: var(--tx-font-mono);
+            letter-spacing: 0.015em;
+        }
+
+
+        /* ============================================================
+           HEADER
+        ============================================================ */
+
         .tx-header {
-            display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end;
-            justify-content: space-between; padding-bottom: 1.75rem;
-            border-bottom: 1px solid var(--tx-line); margin-bottom: 2rem;
+
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+
+            gap: 24px;
+
+            padding-bottom: 22px;
+            margin-bottom: 24px;
+
+            border-bottom: 1px solid var(--tx-line);
         }
-        .tx-title { font-size: 2rem; font-weight: 700; line-height: 1.1; }
-        .tx-subtitle { color: var(--tx-ink-soft); font-size: 0.925rem; margin-top: 0.5rem; }
+
+
+        .tx-header-main {
+            min-width: 0;
+        }
+
+
+        .tx-kicker {
+
+            display: flex;
+            align-items: center;
+
+            gap: 8px;
+
+            margin-bottom: 8px;
+
+            font-size: 11px;
+            font-weight: 700;
+
+            letter-spacing: .08em;
+            text-transform: uppercase;
+
+            color: var(--tx-primary);
+        }
+
+
+        .tx-live-dot {
+
+            width: 7px;
+            height: 7px;
+
+            border-radius: 999px;
+
+            background: var(--tx-green);
+
+            box-shadow:
+                0 0 0 4px var(--tx-green-soft);
+        }
+
+
+        .tx-title {
+
+            margin: 0;
+
+            font-size: 32px;
+            font-weight: 700;
+
+            line-height: 1.1;
+
+            color: var(--tx-ink);
+        }
+
+
+        .tx-subtitle {
+
+            margin-top: 8px;
+            margin-bottom: 0;
+
+            max-width: 760px;
+
+            color: var(--tx-ink-soft);
+
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+
+        .tx-header-actions {
+
+            display: flex;
+            align-items: center;
+
+            gap: 10px;
+
+            flex-shrink: 0;
+        }
+
+
         .tx-back {
-            display: inline-flex; align-items: center; gap: 0.5rem; border: 1px solid var(--tx-line);
-            background: var(--tx-surface); color: var(--tx-ink); font-size: 0.8125rem; font-weight: 600;
-            padding: 0.6rem 1.1rem; border-radius: 999px; text-decoration: none; transition: all .15s ease;
-        }
-        .tx-back:hover { border-color: var(--tx-primary); color: var(--tx-primary); transform: translateX(-2px); }
 
-        /* Cards */
-        .tx-card { background: var(--tx-surface); border: 1px solid var(--tx-line); border-radius: 20px; margin-bottom: 1.5rem; overflow: hidden; }
-        .tx-card-head { display: flex; align-items: center; gap: 0.85rem; padding: 1.35rem 1.75rem; border-bottom: 1px solid var(--tx-line); }
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            gap: 8px;
+
+            min-height: 40px;
+
+            padding:
+                0 15px;
+
+            border: 1px solid var(--tx-line);
+
+            border-radius: 10px;
+
+            background: var(--tx-surface);
+
+            color: var(--tx-ink-soft);
+
+            font-size: 13px;
+            font-weight: 600;
+
+            text-decoration: none;
+
+            transition:
+                border-color .15s ease,
+                color .15s ease,
+                background .15s ease,
+                transform .15s ease;
+        }
+
+
+        .tx-back:hover {
+
+            border-color: var(--tx-primary);
+
+            color: var(--tx-primary);
+
+            background: var(--tx-primary-soft);
+
+            transform: translateX(-2px);
+        }
+
+
+        /* ============================================================
+           ALERTS
+        ============================================================ */
+
+        .tx-alert {
+
+            display: flex;
+
+            gap: 12px;
+
+            margin-bottom: 20px;
+
+            padding: 14px 16px;
+
+            border-radius: 12px;
+
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+
+        .tx-alert-danger {
+
+            border: 1px solid #fecaca;
+
+            background: var(--tx-danger-soft);
+
+            color: #991b1b;
+        }
+
+
+        .tx-alert-icon {
+
+            flex-shrink: 0;
+
+            width: 20px;
+            height: 20px;
+        }
+
+
+        .tx-alert ul {
+
+            margin: 4px 0 0;
+            padding-left: 18px;
+        }
+
+
+        /* ============================================================
+           CARDS
+        ============================================================ */
+
+        .tx-card {
+
+            margin-bottom: 18px;
+
+            overflow: hidden;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 16px;
+
+            background: var(--tx-surface);
+
+            box-shadow:
+                0 8px 24px rgba(15, 23, 42, .045);
+        }
+
+
+        .tx-card-head {
+
+            display: flex;
+            align-items: center;
+
+            gap: 12px;
+
+            padding:
+                17px 20px;
+
+            border-bottom:
+                1px solid var(--tx-line);
+        }
+
+
         .tx-card-icon {
-            width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center;
-            border-radius: 10px; flex-shrink: 0; font-family: var(--tx-font-mono); font-weight: 600; font-size: 0.8rem;
+
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            width: 38px;
+            height: 38px;
+
+            flex-shrink: 0;
+
+            border-radius: 10px;
+
+            background: var(--tx-primary-soft);
+
+            color: var(--tx-primary);
+
+            font-family: var(--tx-font-mono);
+
+            font-size: 12px;
+            font-weight: 700;
         }
-        .tx-card-head h2 { font-family: var(--tx-font-display); font-size: 1.02rem; font-weight: 600; }
-        .tx-card-head p { font-size: 0.78rem; color: var(--tx-ink-soft); margin-top: 0.15rem; }
-        .tx-card-body { padding: 1.75rem; display: grid; grid-template-columns: repeat(1, minmax(0,1fr)); gap: 1.35rem; }
-        @media (min-width: 768px) { .tx-card-body.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-        @media (min-width: 1024px) { .tx-card-body.cols-4 { grid-template-columns: repeat(4, minmax(0,1fr)); } }
 
-        .lvl-1 .tx-card-icon { background: var(--tx-lvl-1-soft); color: var(--tx-lvl-1); }
-        .lvl-2 .tx-card-icon { background: var(--tx-lvl-2-soft); color: var(--tx-lvl-2); }
-        .lvl-3 .tx-card-icon { background: var(--tx-lvl-3-soft); color: var(--tx-lvl-3); }
 
-        /* Fields */
-        .tx-label { display: block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tx-ink-soft); margin-bottom: 0.55rem; }
-        .tx-lvl-dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 999px; margin-right: 0.4rem; }
+        .tx-card-head h2 {
+
+            margin: 0;
+
+            font-family: var(--tx-font-display);
+
+            font-size: 16px;
+            font-weight: 700;
+
+            color: var(--tx-ink);
+        }
+
+
+        .tx-card-head p {
+
+            margin: 3px 0 0;
+
+            color: var(--tx-ink-soft);
+
+            font-size: 12px;
+        }
+
+
+        .tx-card-body {
+
+            display: grid;
+
+            grid-template-columns:
+                minmax(0, 1fr);
+
+            gap: 18px;
+
+            padding: 22px;
+        }
+
+
+        .tx-card-body.cols-2 {
+
+            grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+        }
+
+
+        .tx-card-body.cols-4 {
+
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
+        }
+
+
+        /* ============================================================
+           FIELD
+        ============================================================ */
+
+        .tx-label {
+
+            display: block;
+
+            margin-bottom: 7px;
+
+            color: var(--tx-ink-soft);
+
+            font-size: 11px;
+            font-weight: 700;
+
+            letter-spacing: .07em;
+
+            text-transform: uppercase;
+        }
+
+
         .tx-field {
-            width: 100%; border: 1px solid var(--tx-line); background: var(--tx-bg); color: var(--tx-ink);
-            font-size: 0.875rem; padding: 0.72rem 1rem; border-radius: 12px; outline: none;
-            transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
-        }
-        .tx-field:focus { border-color: var(--tx-primary); background: var(--tx-surface); box-shadow: 0 0 0 4px var(--tx-primary-soft); }
-        .tx-field:disabled { background: var(--tx-line); color: var(--tx-ink-faint); cursor: not-allowed; }
-        .tx-hint { font-size: 0.7rem; color: var(--tx-ink-faint); margin-top: 0.4rem; }
-        .tx-multi-select-wrap { display: flex; flex-direction: column; gap: 0.6rem; }
-        .tx-multi-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
-        .tx-multi-hint { font-size: 0.72rem; color: var(--tx-ink-faint); }
-        .tx-multi-clear { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink-soft); border-radius: 999px; padding: 0.3rem 0.7rem; font-size: 0.7rem; font-weight: 600; cursor: pointer; }
-        .tx-multi-clear:hover { border-color: var(--tx-primary); color: var(--tx-primary); }
-        .tx-multi-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; min-height: 1.75rem; }
-        .tx-multi-chip { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.7rem; border-radius: 999px; background: var(--tx-primary-soft); color: var(--tx-primary); font-size: 0.74rem; font-weight: 600; }
-        .tx-multi-chip button { border: none; background: transparent; color: inherit; cursor: pointer; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
-        .tx-multi-chip button:hover { opacity: 0.75; }
-        .tx-multi-select { min-height: 10rem; }
-        .tx-select-wrap { position: relative; }
-        .tx-select-wrap select { appearance: none; padding-right: 2.5rem; }
-        .tx-select-wrap svg { position: absolute; right: 0.9rem; top: 50%; transform: translateY(-50%); width: 1rem; height: 1rem; color: var(--tx-ink-faint); pointer-events: none; }
 
-        .tx-taxonomy-preview {
-            display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
-            margin: 0 1.75rem 1.75rem; padding: 0.9rem 1.1rem;
-            border: 1px dashed var(--tx-line); border-radius: 12px; background: var(--tx-bg);
-        }
-        .tx-taxonomy-preview-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tx-ink-faint); }
-        #taxonomy-preview-path { font-size: 0.8rem; font-weight: 600; color: var(--tx-ink); }
+            width: 100%;
 
-        /* Sub-panels: product / carton dimensions */
-        .tx-subpanel { border: 1px solid var(--tx-line); border-radius: 16px; padding: 1.25rem; background: var(--tx-bg); }
-        .tx-subpanel + .tx-subpanel { margin-top: 1.25rem; }
-        .tx-subpanel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.1rem; }
-        .tx-subpanel-head h3 { font-family: var(--tx-font-display); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--tx-ink-soft); }
-        .tx-subpanel-tag {
-            display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 999px; background: var(--tx-surface);
-            border: 1px solid var(--tx-line); padding: 0.3rem 0.65rem; font-size: 0.68rem; font-weight: 600; color: var(--tx-ink-soft); white-space: nowrap;
-        }
-        .tx-dims-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; }
-        @media (min-width: 640px) { .tx-dims-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } }
-        .tx-dim-label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--tx-ink-soft); margin-bottom: 0.4rem; }
-        .tx-dim-input-wrap { position: relative; }
-        .tx-dim-input-wrap input { padding-right: 2.4rem; }
-        .tx-dim-unit { position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%); font-size: 0.7rem; font-weight: 600; color: var(--tx-ink-faint); }
+            box-sizing: border-box;
 
-        /* Current image preview */
-        .tx-current-image { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
-        .tx-current-image img { width: 6.5rem; height: 6.5rem; object-fit: cover; border-radius: 12px; border: 1px solid var(--tx-line); }
-        .tx-current-image-meta { font-size: 0.75rem; color: var(--tx-ink-faint); }
+            border:
+                1px solid var(--tx-line);
 
-        /* Footer */
-        .tx-footer { position: sticky; bottom: 1rem; z-index: 10; margin-top: 2rem; }
-        .tx-footer-inner {
-            display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem;
-            border: 1px solid var(--tx-line); background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
-            border-radius: 18px; padding: 1rem 1.25rem; box-shadow: 0 20px 45px -25px rgba(23,27,26,0.35);
+            border-radius: 10px;
+
+            background: var(--tx-bg);
+
+            color: var(--tx-ink);
+
+            outline: none;
+
+            padding:
+                10px 12px;
+
+            font-family: var(--tx-font-body);
+
+            font-size: 13px;
+
+            line-height: 1.4;
+
+            transition:
+                border-color .15s ease,
+                box-shadow .15s ease,
+                background .15s ease;
         }
-        .tx-console.dark .tx-footer-inner { background: rgba(25,29,34,0.92); }
-        .tx-btn-ghost { border-radius: 12px; padding: 0.65rem 1.25rem; font-size: 0.85rem; font-weight: 600; color: var(--tx-ink-soft); text-decoration: none; transition: all .15s ease; }
-        .tx-btn-ghost:hover { background: var(--tx-bg); color: var(--tx-ink); }
-        .tx-btn-submit {
-            display: inline-flex; align-items: center; gap: 0.55rem; border: none; cursor: pointer;
-            border-radius: 12px; padding: 0.75rem 1.5rem; font-size: 0.85rem; font-weight: 600;
-            background: var(--tx-primary); color: var(--tx-primary-ink); transition: all .15s ease;
+
+
+        .tx-field:hover {
+
+            border-color: #cbd5e1;
         }
-        .tx-btn-submit:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -10px var(--tx-primary); }
-        /* Price */
-        .tx-price-wrap {
+
+
+        .tx-field:focus {
+
+            border-color: var(--tx-primary);
+
+            background: var(--tx-surface);
+
+            box-shadow:
+                0 0 0 4px var(--tx-primary-soft);
+        }
+
+
+        .tx-field:disabled {
+
+            cursor: not-allowed;
+
+            background: var(--tx-soft);
+
+            color: var(--tx-ink-faint);
+        }
+
+
+        textarea.tx-field {
+
+            min-height: 110px;
+
+            resize: vertical;
+        }
+
+
+        .tx-hint {
+
+            margin:
+                5px 0 0;
+
+            color: var(--tx-ink-faint);
+
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+
+        .tx-error {
+
+            margin-top: 6px;
+
+            color: var(--tx-danger);
+
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+
+        /* ============================================================
+           SELECT
+        ============================================================ */
+
+        .tx-select-wrap {
+
             position: relative;
         }
 
-        .tx-price-prefix {
+
+        .tx-select-wrap select {
+
+            appearance: none;
+
+            padding-right: 38px;
+        }
+
+
+        .tx-select-wrap svg {
+
             position: absolute;
-            left: 1rem;
+
             top: 50%;
-            transform: translateY(-50%);
-            font-family: var(--tx-font-mono);
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--tx-ink-soft);
+            right: 12px;
+
+            width: 15px;
+            height: 15px;
+
+            transform:
+                translateY(-50%);
+
+            color: var(--tx-ink-faint);
+
             pointer-events: none;
         }
 
-        .tx-price-field {
-            padding-left: 2.75rem !important;
-            font-family: var(--tx-font-mono);
-            font-weight: 600;
-        }
 
-        .tx-price-preview {
+        /* ============================================================
+           TAXONOMY
+        ============================================================ */
+
+        .tx-taxonomy-preview {
+
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            padding: 1rem 1.15rem;
-            border: 1px solid var(--tx-line);
-            border-radius: 12px;
+
+            gap: 10px;
+
+            flex-wrap: wrap;
+
+            margin:
+                0 22px 22px;
+
+            padding:
+                12px 14px;
+
+            border:
+                1px dashed #cbd5e1;
+
+            border-radius: 11px;
+
             background: var(--tx-bg);
         }
 
-        .tx-price-preview-label {
-            font-size: 0.7rem;
+
+        .tx-taxonomy-preview-label {
+
+            color: var(--tx-ink-faint);
+
+            font-size: 10px;
             font-weight: 700;
-            letter-spacing: 0.06em;
+
+            letter-spacing: .08em;
+
             text-transform: uppercase;
+        }
+
+
+        #taxonomy-preview-path {
+
+            color: var(--tx-ink);
+
+            font-size: 12px;
+            font-weight: 600;
+
+            word-break: break-word;
+        }
+
+
+        .tx-lvl-1 .tx-card-icon {
+
+            background: var(--tx-primary-soft);
+            color: var(--tx-primary);
+        }
+
+
+        .tx-lvl-2 .tx-card-icon {
+
+            background: #ecfeff;
+            color: #0891b2;
+        }
+
+
+        .tx-lvl-3 .tx-card-icon {
+
+            background: var(--tx-purple-soft);
+            color: var(--tx-purple);
+        }
+
+
+        .tx-lvl-4 .tx-card-icon {
+
+            background: var(--tx-orange-soft);
+            color: var(--tx-orange);
+        }
+
+
+        .tx-lvl-dot {
+
+            display: inline-block;
+
+            width: 7px;
+            height: 7px;
+
+            margin-right: 6px;
+
+            border-radius: 999px;
+
+            vertical-align: middle;
+        }
+
+
+        /* ============================================================
+           DIMENSIONS
+        ============================================================ */
+
+        .tx-subpanel {
+
+            padding: 16px;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 13px;
+
+            background: var(--tx-bg);
+        }
+
+
+        .tx-subpanel-head {
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            gap: 12px;
+
+            margin-bottom: 14px;
+        }
+
+
+        .tx-subpanel-head h3 {
+
+            margin: 0;
+
+            font-family: var(--tx-font-display);
+
+            font-size: 12px;
+            font-weight: 700;
+
+            letter-spacing: .06em;
+
+            text-transform: uppercase;
+
             color: var(--tx-ink-soft);
         }
 
-        .tx-price-preview-value {
+
+        .tx-subpanel-tag {
+
+            display: inline-flex;
+            align-items: center;
+
+            gap: 6px;
+
+            padding:
+                5px 9px;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 999px;
+
+            background: var(--tx-surface);
+
+            color: var(--tx-ink-soft);
+
+            font-size: 10px;
+            font-weight: 600;
+
+            white-space: nowrap;
+        }
+
+
+        .tx-dims-grid {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
+
+            gap: 12px;
+        }
+
+
+        .tx-dim-label {
+
+            display: block;
+
+            margin-bottom: 6px;
+
+            color: var(--tx-ink-soft);
+
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+
+        .tx-dim-input-wrap {
+
+            position: relative;
+        }
+
+
+        .tx-dim-input-wrap input {
+
+            padding-right: 40px;
+        }
+
+
+        .tx-dim-unit {
+
+            position: absolute;
+
+            top: 50%;
+            right: 12px;
+
+            transform:
+                translateY(-50%);
+
+            color: var(--tx-ink-faint);
+
             font-family: var(--tx-font-mono);
-            font-size: 1.1rem;
+
+            font-size: 10px;
+            font-weight: 600;
+
+            pointer-events: none;
+        }
+
+
+        /* ============================================================
+           PRICE
+        ============================================================ */
+
+        .tx-price-wrap {
+
+            position: relative;
+        }
+
+
+        .tx-price-prefix {
+
+            position: absolute;
+
+            left: 13px;
+            top: 50%;
+
+            transform:
+                translateY(-50%);
+
+            color: var(--tx-ink-soft);
+
+            font-family: var(--tx-font-mono);
+
+            font-size: 13px;
+            font-weight: 600;
+
+            pointer-events: none;
+        }
+
+
+        .tx-price-field {
+
+            padding-left: 34px !important;
+
+            font-family: var(--tx-font-mono);
+
+            font-weight: 600;
+        }
+
+
+        .tx-price-preview {
+
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 15px;
+
+            min-height: 43px;
+
+            padding:
+                10px 13px;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 10px;
+
+            background: var(--tx-bg);
+        }
+
+
+        .tx-price-preview-label {
+
+            color: var(--tx-ink-soft);
+
+            font-size: 10px;
             font-weight: 700;
+
+            letter-spacing: .07em;
+
+            text-transform: uppercase;
+        }
+
+
+        .tx-price-preview-value {
+
+            color: var(--tx-primary);
+
+            font-family: var(--tx-font-mono);
+
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+
+        /* ============================================================
+           MULTI SELECT
+        ============================================================ */
+
+        .tx-multi-select-wrap {
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 8px;
+        }
+
+
+        .tx-multi-toolbar {
+
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 10px;
+        }
+
+
+        .tx-multi-hint {
+
+            color: var(--tx-ink-faint);
+
+            font-size: 11px;
+        }
+
+
+        .tx-multi-clear {
+
+            display: none;
+
+            align-items: center;
+            justify-content: center;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 999px;
+
+            background: var(--tx-surface);
+
+            color: var(--tx-ink-soft);
+
+            padding:
+                5px 9px;
+
+            font-size: 10px;
+            font-weight: 700;
+
+            cursor: pointer;
+
+            transition: all .15s ease;
+        }
+
+
+        .tx-multi-clear:hover {
+
+            border-color: var(--tx-primary);
+
+            color: var(--tx-primary);
+
+            background: var(--tx-primary-soft);
+        }
+
+
+        .tx-multi-select {
+
+            min-height: 150px;
+        }
+
+
+        .tx-multi-chips {
+
+            display: flex;
+
+            flex-wrap: wrap;
+
+            gap: 6px;
+
+            min-height: 20px;
+        }
+
+
+        .tx-multi-chip {
+
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 6px;
+
+            padding:
+                5px 8px;
+
+            border-radius: 999px;
+
+            background: var(--tx-primary-soft);
+
+            color: var(--tx-primary);
+
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+
+        .tx-multi-chip button {
+
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            width: 15px;
+            height: 15px;
+
+            padding: 0;
+
+            border: none;
+
+            background: transparent;
+
+            color: inherit;
+
+            cursor: pointer;
+        }
+
+
+        .tx-multi-chip button:hover {
+
+            opacity: .65;
+        }
+
+
+        /* ============================================================
+           TOM SELECT
+        ============================================================ */
+
+        .tx-console .ts-wrapper {
+
+            width: 100%;
+        }
+
+
+        .tx-console .ts-control {
+
+            min-height: 43px;
+
+            padding:
+                7px 10px;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 10px;
+
+            background: var(--tx-bg);
+
+            box-shadow: none;
+
+            font-size: 12px;
+        }
+
+
+        .tx-console .ts-control:focus,
+        .tx-console .ts-wrapper.focus .ts-control {
+
+            border-color: var(--tx-primary);
+
+            box-shadow:
+                0 0 0 4px var(--tx-primary-soft);
+        }
+
+
+        .tx-console .ts-dropdown {
+
+            z-index: 100;
+
+            overflow: hidden;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 10px;
+
+            box-shadow:
+                0 15px 35px rgba(15, 23, 42, .12);
+        }
+
+
+        .tx-console .ts-dropdown .option {
+
+            padding:
+                9px 12px;
+
+            font-size: 12px;
+        }
+
+
+        .tx-console .ts-dropdown .active {
+
+            background: var(--tx-primary-soft);
+
             color: var(--tx-primary);
         }
+
+
+        .tx-console .ts-control .item {
+
+            border-radius: 999px;
+
+            background: var(--tx-primary-soft);
+
+            color: var(--tx-primary);
+
+            padding:
+                4px 8px;
+
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+
+        .tx-console .ts-control .remove {
+
+            border-left: none;
+
+            color: inherit;
+        }
+
+
+        .tx-console .optgroup-header {
+
+            padding:
+                7px 10px;
+
+            background: var(--tx-soft);
+
+            color: var(--tx-ink-soft);
+
+            font-size: 10px;
+            font-weight: 700;
+
+            letter-spacing: .05em;
+
+            text-transform: uppercase;
+        }
+
+
+        /* ============================================================
+           IMAGE LINKS
+        ============================================================ */
+
+        .tx-image-link-row {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            margin-bottom: 8px;
+        }
+
+
+        .tx-image-link-row .tx-field {
+
+            flex: 1;
+        }
+
+
+        .tx-image-remove-link {
+
+            flex-shrink: 0;
+
+            min-height: 40px;
+
+            padding:
+                0 11px;
+
+            border:
+                1px solid #fecaca;
+
+            border-radius: 9px;
+
+            background: var(--tx-danger-soft);
+
+            color: var(--tx-danger);
+
+            font-size: 10px;
+            font-weight: 700;
+
+            cursor: pointer;
+
+            transition: all .15s ease;
+        }
+
+
+        .tx-image-remove-link:hover {
+
+            border-color: var(--tx-danger);
+
+            background: #fee2e2;
+        }
+
+
+        .tx-btn-ghost {
+
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            min-height: 40px;
+
+            padding:
+                0 13px;
+
+            border: none;
+
+            border-radius: 9px;
+
+            background: transparent;
+
+            color: var(--tx-ink-soft);
+
+            font-size: 12px;
+            font-weight: 600;
+
+            text-decoration: none;
+
+            cursor: pointer;
+
+            transition: all .15s ease;
+        }
+
+
+        .tx-btn-ghost:hover {
+
+            background: var(--tx-soft);
+
+            color: var(--tx-ink);
+        }
+
+
+        /* ============================================================
+           EXISTING IMAGES
+        ============================================================ */
+
+        .tx-existing-images {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+
+            gap: 12px;
+
+            margin-top: 12px;
+        }
+
+
+        .tx-existing-image {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 12px;
+
+            min-width: 0;
+
+            padding: 12px;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 12px;
+
+            background: var(--tx-bg);
+
+            transition:
+                opacity .15s ease,
+                border-color .15s ease,
+                transform .15s ease;
+        }
+
+
+        .tx-existing-image:hover {
+
+            border-color: #cbd5e1;
+        }
+
+
+        .tx-existing-image.removing {
+
+            opacity: .5;
+
+            border-color: var(--tx-danger);
+
+            transform: scale(.99);
+        }
+
+
+        .tx-existing-image-preview {
+
+            width: 82px;
+            height: 82px;
+
+            flex: 0 0 82px;
+
+            overflow: hidden;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 10px;
+
+            background: var(--tx-surface);
+        }
+
+
+        .tx-existing-image-preview img {
+
+            display: block;
+
+            width: 100%;
+            height: 100%;
+
+            object-fit: cover;
+        }
+
+
+        .tx-image-placeholder {
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            width: 100%;
+            height: 100%;
+
+            color: var(--tx-ink-faint);
+
+            font-size: 10px;
+        }
+
+
+        .tx-existing-image-info {
+
+            flex: 1;
+
+            min-width: 0;
+        }
+
+
+        .tx-existing-image-info strong {
+
+            display: block;
+
+            color: var(--tx-ink);
+
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+
+        .tx-primary-badge {
+
+            display: inline-flex;
+
+            margin-top: 5px;
+
+            padding:
+                3px 7px;
+
+            border-radius: 999px;
+
+            background: var(--tx-primary-soft);
+
+            color: var(--tx-primary);
+
+            font-size: 9px;
+            font-weight: 700;
+        }
+
+
+        .tx-image-url {
+
+            margin-top: 5px;
+
+            overflow: hidden;
+
+            color: var(--tx-ink-faint);
+
+            font-size: 9px;
+
+            line-height: 1.4;
+
+            word-break: break-all;
+
+            display: -webkit-box;
+
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+
+        .tx-remove-existing-image {
+
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            gap: 5px;
+
+            flex-shrink: 0;
+
+            min-height: 34px;
+
+            padding:
+                0 9px;
+
+            border:
+                1px solid #fecaca;
+
+            border-radius: 8px;
+
+            background: var(--tx-danger-soft);
+
+            color: var(--tx-danger);
+
+            font-size: 9px;
+            font-weight: 700;
+
+            cursor: pointer;
+
+            transition: all .15s ease;
+        }
+
+
+        .tx-remove-existing-image:hover {
+
+            border-color: var(--tx-danger);
+
+            background: #fee2e2;
+        }
+
+
+        .tx-existing-image.removing .tx-remove-existing-image {
+
+            border-color: var(--tx-danger);
+
+            background: var(--tx-danger);
+
+            color: white;
+        }
+
+
+        .tx-no-images {
+
+            grid-column: 1 / -1;
+
+            padding: 24px;
+
+            border:
+                1px dashed var(--tx-line);
+
+            border-radius: 12px;
+
+            color: var(--tx-ink-faint);
+
+            font-size: 11px;
+
+            text-align: center;
+        }
+
+
+        /* ============================================================
+           NEW IMAGE PREVIEW
+        ============================================================ */
+
+        .tx-new-image-preview {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(auto-fill, minmax(130px, 1fr));
+
+            gap: 10px;
+
+            margin-top: 12px;
+        }
+
+
+        .tx-new-image-preview:empty {
+
+            display: none;
+        }
+
+
+        .tx-new-image-item {
+
+            overflow: hidden;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 11px;
+
+            background: var(--tx-bg);
+        }
+
+
+        .tx-new-image-item img {
+
+            display: block;
+
+            width: 100%;
+            height: 120px;
+
+            object-fit: cover;
+        }
+
+
+        .tx-new-image-file {
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            height: 120px;
+
+            color: var(--tx-ink-faint);
+
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+
+        .tx-new-image-name {
+
+            padding:
+                7px 8px;
+
+            overflow: hidden;
+
+            color: var(--tx-ink-soft);
+
+            font-size: 9px;
+
+            white-space: nowrap;
+
+            text-overflow: ellipsis;
+        }
+
+
+        /* ============================================================
+           FOOTER
+        ============================================================ */
+
+        .tx-footer {
+
+            position: sticky;
+
+            bottom: 12px;
+
+            z-index: 20;
+
+            margin-top: 22px;
+        }
+
+
+        .tx-footer-inner {
+
+            display: flex;
+
+            align-items: center;
+            justify-content: flex-end;
+
+            gap: 8px;
+
+            padding:
+                10px;
+
+            border:
+                1px solid var(--tx-line);
+
+            border-radius: 13px;
+
+            background:
+                rgba(255, 255, 255, .94);
+
+            backdrop-filter: blur(12px);
+
+            box-shadow:
+                0 18px 40px rgba(15, 23, 42, .12);
+        }
+
+
+        .tx-btn-submit {
+
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            gap: 7px;
+
+            min-height: 40px;
+
+            padding:
+                0 17px;
+
+            border: none;
+
+            border-radius: 10px;
+
+            background: var(--tx-primary);
+
+            color: var(--tx-primary-ink);
+
+            font-size: 12px;
+            font-weight: 700;
+
+            cursor: pointer;
+
+            transition:
+                background .15s ease,
+                transform .15s ease,
+                box-shadow .15s ease;
+        }
+
+
+        .tx-btn-submit:hover {
+
+            background: var(--tx-primary-dark);
+
+            transform: translateY(-1px);
+
+            box-shadow:
+                0 10px 24px rgba(37, 99, 235, .25);
+        }
+
+
+        .tx-btn-submit:disabled {
+
+            opacity: .65;
+
+            cursor: not-allowed;
+
+            transform: none;
+
+            box-shadow: none;
+        }
+
+
+        /* ============================================================
+           RESPONSIVE
+        ============================================================ */
+
+        @media (max-width: 1100px) {
+
+            .tx-card-body.cols-4 {
+
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+
+            .tx-dims-grid {
+
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+        }
+
+
+        @media (max-width: 800px) {
+
+            .tx-shell {
+
+                padding:
+                    20px
+                    16px
+                    90px;
+            }
+
+
+            .tx-header {
+
+                align-items: flex-start;
+
+                flex-direction: column;
+            }
+
+
+            .tx-header-actions {
+
+                width: 100%;
+            }
+
+
+            .tx-back {
+
+                width: 100%;
+            }
+
+
+            .tx-card-body.cols-2 {
+
+                grid-template-columns:
+                    1fr;
+            }
+
+
+            .tx-existing-images {
+
+                grid-template-columns:
+                    1fr;
+            }
+
+        }
+
+
+        @media (max-width: 600px) {
+
+            .tx-title {
+
+                font-size: 26px;
+            }
+
+
+            .tx-card-head {
+
+                padding:
+                    14px 15px;
+            }
+
+
+            .tx-card-body {
+
+                padding:
+                    15px;
+            }
+
+
+            .tx-card-body.cols-4 {
+
+                grid-template-columns:
+                    1fr;
+            }
+
+
+            .tx-dims-grid {
+
+                grid-template-columns:
+                    1fr 1fr;
+            }
+
+
+            .tx-taxonomy-preview {
+
+                margin:
+                    0 15px 15px;
+            }
+
+
+            .tx-footer-inner {
+
+                justify-content: stretch;
+            }
+
+
+            .tx-footer-inner .tx-btn-ghost,
+            .tx-footer-inner .tx-btn-submit {
+
+                flex: 1;
+            }
+
+
+            .tx-existing-image {
+
+                align-items: flex-start;
+
+                flex-wrap: wrap;
+            }
+
+
+            .tx-remove-existing-image {
+
+                width: 100%;
+            }
+
+        }
+
+
+        @media (max-width: 420px) {
+
+            .tx-dims-grid {
+
+                grid-template-columns:
+                    1fr;
+            }
+
+        }
+
     </style>
 
+
+    {{-- ============================================================
+         PAGE
+    ============================================================ --}}
+
     <div class="tx-console">
+
         <div class="tx-shell">
 
-            {{-- Header --}}
+            {{-- ========================================================
+                 HEADER
+            ======================================================== --}}
+
             <div class="tx-header">
-                <div>
-                    <h1 class="tx-title tx-display">Edit Product</h1>
-                    <p class="tx-subtitle">Update product information.</p>
+
+                <div class="tx-header-main">
+
+                    <div class="tx-kicker">
+
+                        <span class="tx-live-dot"></span>
+
+                        Product Database
+
+                    </div>
+
+                    <h1 class="tx-title tx-display">
+                        Edit Product
+                    </h1>
+
+                    <p class="tx-subtitle">
+                        Update product information, taxonomy, dimensions,
+                        pricing, classification and product media.
+                    </p>
+
                 </div>
-                <a href="{{ route('mi_app.show', $product->product_id) }}" class="tx-back">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    Back
-                </a>
+
+
+                <div class="tx-header-actions">
+
+                    <a
+                        href="{{ route('mi_app.show', $product->product_id) }}"
+                        class="tx-back"
+                    >
+
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+                            />
+                        </svg>
+
+                        Back to Product
+
+                    </a>
+
+                </div>
+
             </div>
 
-            {{-- Form --}}
-            <form action="{{ route('mi_app.update', $product->product_id) }}" method="POST" enctype="multipart/form-data" id="edit_product_form">
+
+            {{-- ========================================================
+                 FORM
+            ======================================================== --}}
+
+            <form
+                action="{{ route('mi_app.update', $product->product_id) }}"
+                method="POST"
+                enctype="multipart/form-data"
+                id="edit_product_form"
+            >
+
                 @csrf
                 @method('PUT')
-                {{-- Existing images marked for deletion --}}
+
+
+                {{-- Hidden removed image container --}}
+
                 <div id="removedImagesContainer"></div>
+
+
+                {{-- ====================================================
+                     VALIDATION ERRORS
+                ==================================================== --}}
+
                 @php
                     $saveError = $errors->first('error') ?: session('error');
                 @endphp
+
+
                 @if($saveError)
-                    <div class="tx-error" style="margin: 0 0 1.5rem; padding: 0.85rem 1.1rem; border: 1px solid var(--tx-danger); border-radius: 12px; background: var(--tx-accent-soft);">
-                        <strong>Unable to update the product.</strong>
-                        <div style="margin-top: 0.35rem;">{{ $saveError }}</div>
+
+                    <div class="tx-alert tx-alert-danger">
+
+                        <svg
+                            class="tx-alert-icon"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M12 9v3.75m0 3h.008v.008H12v-.008ZM10.29 3.86l-7.1 12.28A2 2 0 004.92 19h14.16a2 2 0 001.73-2.86L13.71 3.86a2 2 0 00-3.42 0Z"
+                            />
+                        </svg>
+
+                        <div>
+
+                            <strong>
+                                Unable to update the product.
+                            </strong>
+
+                            <div>
+                                {{ $saveError }}
+                            </div>
+
+                        </div>
+
                     </div>
-                @endif
-                @if($errors->any() && !$saveError)
-                    <div class="tx-error" style="margin: 0 0 1.5rem; padding: 0.85rem 1.1rem; border: 1px solid var(--tx-danger); border-radius: 12px; background: var(--tx-accent-soft);">
-                        <ul style="margin: 0; padding-left: 1rem;">
-                            @foreach($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
+
                 @endif
 
-                {{-- SECTION 1: Identification --}}
+
+                @if($errors->any() && !$saveError)
+
+                    <div class="tx-alert tx-alert-danger">
+
+                        <svg
+                            class="tx-alert-icon"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M12 9v3.75m0 3h.008v.008H12v-.008ZM10.29 3.86l-7.1 12.28A2 2 0 004.92 19h14.16a2 2 0 001.73-2.86L13.71 3.86a2 2 0 00-3.42 0Z"
+                            />
+                        </svg>
+
+                        <div>
+
+                            <strong>
+                                Please check the following:
+                            </strong>
+
+                            <ul>
+
+                                @foreach($errors->all() as $error)
+
+                                    <li>
+                                        {{ $error }}
+                                    </li>
+
+                                @endforeach
+
+                            </ul>
+
+                        </div>
+
+                    </div>
+
+                @endif
+
+
+                {{-- ====================================================
+                     SECTION 01
+                     IDENTIFICATION
+                ==================================================== --}}
+
                 <div class="tx-card">
+
                     <div class="tx-card-head">
-                        <span class="tx-card-icon" style="background: var(--tx-line); color: var(--tx-ink-soft);">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+
+                        <span class="tx-card-icon">
+
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="17"
+                                height="17"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2Z"
+                                />
+                            </svg>
+
                         </span>
+
                         <div>
-                            <h2>Product Identification</h2>
-                            <p>Auto-generated reference numbers</p>
+
+                            <h2>
+                                Product Identification
+                            </h2>
+
+                            <p>
+                                System-generated product references
+                            </p>
+
                         </div>
+
                     </div>
+
+
                     <div class="tx-card-body cols-2">
+
                         <div>
-                            <label class="tx-label">SKU Number</label>
-                            <input type="text" value="{{ $product->sku }}" disabled class="tx-field tx-mono">
-                            <p class="tx-hint">Auto generated</p>
+
+                            <label class="tx-label">
+                                SKU Number
+                            </label>
+
+                            <input
+                                type="text"
+                                value="{{ $product->sku }}"
+                                disabled
+                                class="tx-field tx-mono"
+                            >
+
+                            <p class="tx-hint">
+                                Auto generated by the system.
+                            </p>
+
                         </div>
+
+
                         <div>
-                            <label class="tx-label">Draft Number</label>
-                            <input type="text" value="{{ $product->draft_number }}" disabled class="tx-field tx-mono">
-                            <p class="tx-hint">Auto generated</p>
+
+                            <label class="tx-label">
+                                Draft Number
+                            </label>
+
+                            <input
+                                type="text"
+                                value="{{ $product->draft_number }}"
+                                disabled
+                                class="tx-field tx-mono"
+                            >
+
+                            <p class="tx-hint">
+                                Auto generated by the system.
+                            </p>
+
                         </div>
+
                     </div>
+
                 </div>
 
-                {{-- SECTION 2: Taxonomy --}}
-                <div class="tx-card lvl-1" id="taxonomy-section">
+
+                {{-- ====================================================
+                     SECTION 02
+                     TAXONOMY
+                ==================================================== --}}
+
+                <div class="tx-card tx-lvl-1" id="taxonomy-section">
+
                     <div class="tx-card-head">
-                        <span class="tx-card-icon">01</span>
+
+                        <span class="tx-card-icon">
+                            02
+                        </span>
+
                         <div>
-                            <h2>Taxonomy</h2>
-                            <p>Category → Sub Category → Sub Sub Category → Collection</p>
+
+                            <h2>
+                                Taxonomy
+                            </h2>
+
+                            <p>
+                                Category → Sub Category → Sub Sub Category → Collection
+                            </p>
+
                         </div>
+
                     </div>
+
+
                     <div class="tx-card-body cols-4">
+
+                        {{-- Category --}}
+
                         <div>
-                            <label for="category_id" class="tx-label">
-                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-1);"></span>Category
+
+                            <label
+                                for="category_id"
+                                class="tx-label"
+                            >
+
+                                <span
+                                    class="tx-lvl-dot"
+                                    style="background:#2563eb;"
+                                ></span>
+
+                                Category
+
                             </label>
+
+
                             <div class="tx-select-wrap">
-                                <select name="category_id" id="category_id" data-cascade-target="sub_category_id" class="tx-field" required>
-                                    <option value="">-- Select Category --</option>
+
+                                <select
+                                    name="category_id"
+                                    id="category_id"
+                                    data-cascade-target="sub_category_id"
+                                    class="tx-field"
+                                    required
+                                >
+
+                                    <option value="">
+                                        -- Select Category --
+                                    </option>
+
                                     @foreach($categories as $category)
-                                        <option value="{{ $category->id }}"
-                                            {{ old('category_id', $product->category_id) == $category->id ? 'selected' : '' }}>
+
+                                        <option
+                                            value="{{ $category->id }}"
+                                            {{ old('category_id', $product->category_id) == $category->id ? 'selected' : '' }}
+                                        >
                                             {{ $category->code }} - {{ $category->name }}
                                         </option>
+
                                     @endforeach
+
                                 </select>
-                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+
+
+                                <svg
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M19 9l-7 7-7-7"
+                                    />
+                                </svg>
+
                             </div>
+
                         </div>
 
+
+                        {{-- Sub Category --}}
+
                         <div>
-                            <label for="sub_category_id" class="tx-label">
-                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-2);"></span>Sub Category
+
+                            <label
+                                for="sub_category_id"
+                                class="tx-label"
+                            >
+
+                                <span
+                                    class="tx-lvl-dot"
+                                    style="background:#0891b2;"
+                                ></span>
+
+                                Sub Category
+
                             </label>
+
+
                             <div class="tx-select-wrap">
-                                <select name="sub_category_id" id="sub_category_id" data-cascade-target="product_type_id" class="tx-field">
+
+                                <select
+                                    name="sub_category_id"
+                                    id="sub_category_id"
+                                    data-cascade-target="product_type_id"
+                                    class="tx-field"
+                                >
+
+                                    <option value="">
+                                        -- Select Sub Category --
+                                    </option>
+
                                     @foreach($subCategories as $sub)
-                                    <option value="{{ $sub->id }}"
-                                        data-parent="{{ $sub->category_id }}"
-                                        {{ old('sub_category_id', $product->sub_category_id) == $sub->id ? 'selected' : '' }}>
-                                        {{ $sub->code }} - {{ $sub->name }}
-                                    </option>
+
+                                        <option
+                                            value="{{ $sub->id }}"
+                                            data-parent="{{ $sub->category_id }}"
+                                            {{ old('sub_category_id', $product->sub_category_id) == $sub->id ? 'selected' : '' }}
+                                        >
+                                            {{ $sub->code }} - {{ $sub->name }}
+                                        </option>
+
                                     @endforeach
+
                                 </select>
-                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+
+
+                                <svg
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M19 9l-7 7-7-7"
+                                    />
+                                </svg>
+
                             </div>
+
                         </div>
 
+
+                        {{-- Product Type --}}
+
                         <div>
-                            <label for="product_type_id" class="tx-label">
-                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-3);"></span>Sub Sub Category
+
+                            <label
+                                for="product_type_id"
+                                class="tx-label"
+                            >
+
+                                <span
+                                    class="tx-lvl-dot"
+                                    style="background:#7c3aed;"
+                                ></span>
+
+                                Sub Sub Category
+
                             </label>
+
+
                             <div class="tx-select-wrap">
-                                <select name="product_type_id" id="product_type_id" data-cascade-target="collection_id" class="tx-field">
-                                    <option value="">Select</option>
+
+                                <select
+                                    name="product_type_id"
+                                    id="product_type_id"
+                                    data-cascade-target="collection_id"
+                                    class="tx-field"
+                                >
+
+                                    <option value="">
+                                        -- Select Sub Sub Category --
+                                    </option>
+
                                     @foreach($productTypes as $type)
-                                    <option value="{{ $type->id }}"
-                                        data-parent="{{ $type->sub_category_id }}"
-                                        {{ old('product_type_id', $product->product_type_id) == $type->id ? 'selected' : '' }}>
-                                        {{ $type->code }} - {{ $type->name }}
-                                    </option>
+
+                                        <option
+                                            value="{{ $type->id }}"
+                                            data-parent="{{ $type->sub_category_id }}"
+                                            {{ old('product_type_id', $product->product_type_id) == $type->id ? 'selected' : '' }}
+                                        >
+                                            {{ $type->code }} - {{ $type->name }}
+                                        </option>
+
                                     @endforeach
+
                                 </select>
-                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+
+
+                                <svg
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M19 9l-7 7-7-7"
+                                    />
+                                </svg>
+
                             </div>
+
                         </div>
 
+
+                        {{-- Collection --}}
+
                         <div>
-                            <label for="collection_id" class="tx-label">
-                                <span class="tx-lvl-dot" style="background: var(--tx-lvl-4);"></span>Collection
+
+                            <label
+                                for="collection_id"
+                                class="tx-label"
+                            >
+
+                                <span
+                                    class="tx-lvl-dot"
+                                    style="background:#d97706;"
+                                ></span>
+
+                                Collection
+
                             </label>
+
+
                             <div class="tx-select-wrap">
-                                <select name="collection_id" id="collection_id" class="tx-field">
-                                    <option value="">Select</option>
-                                    @foreach($collections as $collection)
-                                    <option value="{{ $collection->id }}"
-                                        data-parent="{{ $collection->product_type_id }}"
-                                        {{ old('collection_id', $product->collection_id) == $collection->id ? 'selected' : '' }}>
-                                        {{ $collection->code }} - {{ $collection->name }}
+
+                                <select
+                                    name="collection_id"
+                                    id="collection_id"
+                                    class="tx-field"
+                                >
+
+                                    <option value="">
+                                        -- Select Collection --
                                     </option>
+
+                                    @foreach($collections as $collection)
+
+                                        <option
+                                            value="{{ $collection->id }}"
+                                            data-parent="{{ $collection->product_type_id }}"
+                                            {{ old('collection_id', $product->collection_id) == $collection->id ? 'selected' : '' }}
+                                        >
+                                            {{ $collection->code }} - {{ $collection->name }}
+                                        </option>
+
                                     @endforeach
+
                                 </select>
-                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+
+
+                                <svg
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M19 9l-7 7-7-7"
+                                    />
+                                </svg>
+
                             </div>
+
                         </div>
+
                     </div>
+
 
                     <div class="tx-taxonomy-preview">
-                        <span class="tx-taxonomy-preview-label">SKU preview</span>
-                        <span id="taxonomy-preview-path" class="tx-mono">—</span>
+
+                        <span class="tx-taxonomy-preview-label">
+                            Taxonomy
+                        </span>
+
+                        <span
+                            id="taxonomy-preview-path"
+                            class="tx-mono"
+                        >
+                            —
+                        </span>
+
                     </div>
+
                 </div>
 
-                {{-- SECTION 3: General Information --}}
-                <div class="tx-card lvl-2">
+
+                {{-- ====================================================
+                     SECTION 03
+                     GENERAL INFORMATION
+                ==================================================== --}}
+
+                <div class="tx-card tx-lvl-2">
+
                     <div class="tx-card-head">
-                        <span class="tx-card-icon">02</span>
+
+                        <span class="tx-card-icon">
+                            03
+                        </span>
+
                         <div>
-                            <h2>General Information</h2>
-                            <p>Basic identity and product details</p>
+
+                            <h2>
+                                General Information
+                            </h2>
+
+                            <p>
+                                Basic identity and product details
+                            </p>
+
                         </div>
+
                     </div>
+
+
                     <div class="tx-card-body cols-2">
-                        <div style="grid-column: 1 / -1;">
-                            <label for="item_name" class="tx-label">Item Name</label>
-                            <input type="text" id="item_name" name="item_name" value="{{ old('item_name', $product->item_name) }}" class="tx-field" required>
+
+                        <div style="grid-column:1 / -1;">
+
+                            <label
+                                for="item_name"
+                                class="tx-label"
+                            >
+                                Item Name
+                            </label>
+
+                            <input
+                                type="text"
+                                id="item_name"
+                                name="item_name"
+                                value="{{ old('item_name', $product->item_name) }}"
+                                class="tx-field"
+                                required
+                            >
+
+                            @error('item_name')
+                                <p class="tx-error">{{ $message }}</p>
+                            @enderror
+
                         </div>
 
-                        <div>
-                            <label for="type_of_sample" class="tx-label">Type of Sample</label>
-                            <input type="text" id="type_of_sample" name="type_of_sample" value="{{ old('type_of_sample', $product->type_of_sample) }}" class="tx-field" required>
-                        </div>
 
                         <div>
-                            <label for="designed_by" class="tx-label">Designed By</label>
-                            <input type="text" id="designed_by" name="designed_by" value="{{ old('designed_by', $product->designed_by) }}" class="tx-field">
+
+                            <label
+                                for="type_of_sample"
+                                class="tx-label"
+                            >
+                                Type of Sample
+                            </label>
+
+                            <input
+                                type="text"
+                                id="type_of_sample"
+                                name="type_of_sample"
+                                value="{{ old('type_of_sample', $product->type_of_sample) }}"
+                                class="tx-field"
+                                required
+                            >
+
+                            @error('type_of_sample')
+                                <p class="tx-error">{{ $message }}</p>
+                            @enderror
+
                         </div>
+
+
+                        <div>
+
+                            <label
+                                for="designed_by"
+                                class="tx-label"
+                            >
+                                Designed By
+                            </label>
+
+                            <input
+                                type="text"
+                                id="designed_by"
+                                name="designed_by"
+                                value="{{ old('designed_by', $product->designed_by) }}"
+                                class="tx-field"
+                            >
+
+                            @error('designed_by')
+                                <p class="tx-error">{{ $message }}</p>
+                            @enderror
+
+                        </div>
+
                     </div>
+
                 </div>
 
-                {{-- SECTION 4: Dimensions --}}
-                <div class="tx-card lvl-3">
+
+                {{-- ====================================================
+                     SECTION 04
+                     DIMENSIONS
+                ==================================================== --}}
+
+                <div class="tx-card tx-lvl-3">
+
                     <div class="tx-card-head">
-                        <span class="tx-card-icon">03</span>
+
+                        <span class="tx-card-icon">
+                            04
+                        </span>
+
                         <div>
-                            <h2>Dimensions</h2>
-                            <p>Product and carton measurements</p>
+
+                            <h2>
+                                Dimensions
+                            </h2>
+
+                            <p>
+                                Product and carton measurements
+                            </p>
+
                         </div>
+
                     </div>
+
+
                     <div class="tx-card-body">
+
+
+                        {{-- PRODUCT DIMENSIONS --}}
+
                         <div class="tx-subpanel">
+
                             <div class="tx-subpanel-head">
-                                <div><h3>Product dimensions</h3></div>
+
+                                <div>
+
+                                    <h3>
+                                        Product Dimensions
+                                    </h3>
+
+                                </div>
+
+
                                 <span class="tx-subpanel-tag">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <path d="M6 24 6 10 14 6 26 10 26 24 18 28 6 24Z" stroke-linejoin="round"/>
-                                        <path d="M6 10 18 14 26 10" stroke-linejoin="round"/>
-                                        <path d="M18 14 18 28" stroke-linejoin="round"/>
+
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 32 32"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.5"
+                                    >
+                                        <path
+                                            d="M6 24 6 10 14 6 26 10 26 24 18 28 6 24Z"
+                                            stroke-linejoin="round"
+                                        />
+
+                                        <path
+                                            d="M6 10 18 14 26 10"
+                                            stroke-linejoin="round"
+                                        />
+
+                                        <path
+                                            d="M18 14 18 28"
+                                            stroke-linejoin="round"
+                                        />
                                     </svg>
+
                                     H × W × L × D
+
                                 </span>
+
                             </div>
+
+
                             <div class="tx-dims-grid">
+
                                 @foreach([
                                     'product_height' => 'Height',
                                     'product_width' => 'Width',
                                     'product_length' => 'Length',
                                     'product_depth' => 'Depth',
                                 ] as $field => $label)
+
                                     <div>
-                                        <label class="tx-dim-label">{{ $label }}</label>
+
+                                        <label class="tx-dim-label">
+                                            {{ $label }}
+                                        </label>
+
                                         <div class="tx-dim-input-wrap">
-                                            <input type="number" step="0.01" name="{{ $field }}" value="{{ old($field, $product->$field) }}" class="tx-field">
-                                            <span class="tx-dim-unit">cm</span>
+
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                name="{{ $field }}"
+                                                value="{{ old($field, $product->$field) }}"
+                                                class="tx-field"
+                                            >
+
+                                            <span class="tx-dim-unit">
+                                                cm
+                                            </span>
+
                                         </div>
+
                                     </div>
+
                                 @endforeach
+
                             </div>
+
                         </div>
 
+
+                        {{-- CARTON DIMENSIONS --}}
+
                         <div class="tx-subpanel">
+
                             <div class="tx-subpanel-head">
-                                <div><h3>Carton dimensions</h3></div>
+
+                                <div>
+
+                                    <h3>
+                                        Carton Dimensions
+                                    </h3>
+
+                                </div>
+
+
                                 <span class="tx-subpanel-tag">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 12 3l9 4.5M3 7.5v9l9 4.5 9-4.5v-9M3 7.5l9 4.5 9-4.5" />
+
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.6"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            d="M3 7.5 12 3l9 4.5M3 7.5v9l9 4.5 9-4.5v-9M3 7.5l9 4.5 9-4.5"
+                                        />
                                     </svg>
-                                    Box size
+
+                                    Box Size
+
                                 </span>
+
                             </div>
+
+
                             <div class="tx-dims-grid">
+
                                 @foreach([
                                     'carton_height' => 'Height',
                                     'carton_width' => 'Width',
                                     'carton_length' => 'Length',
                                     'carton_depth' => 'Depth',
                                 ] as $field => $label)
+
                                     <div>
-                                        <label class="tx-dim-label">{{ $label }}</label>
+
+                                        <label class="tx-dim-label">
+                                            {{ $label }}
+                                        </label>
+
                                         <div class="tx-dim-input-wrap">
-                                            <input type="number" step="0.01" name="{{ $field }}" value="{{ old($field, $product->$field) }}" class="tx-field">
-                                            <span class="tx-dim-unit">cm</span>
+
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                name="{{ $field }}"
+                                                value="{{ old($field, $product->$field) }}"
+                                                class="tx-field"
+                                            >
+
+                                            <span class="tx-dim-unit">
+                                                cm
+                                            </span>
+
                                         </div>
+
                                     </div>
+
                                 @endforeach
+
                             </div>
+
                         </div>
+
                     </div>
+
                 </div>
-                {{-- SECTION 5: Pricing --}}
-                <div class="tx-card lvl-3">
+
+
+                {{-- ====================================================
+                     SECTION 05
+                     PRICING
+                ==================================================== --}}
+
+                <div class="tx-card tx-lvl-3">
+
                     <div class="tx-card-head">
-                        <span class="tx-card-icon">05</span>
+
+                        <span class="tx-card-icon">
+                            05
+                        </span>
+
                         <div>
-                            <h2>Pricing</h2>
-                            <p>Set the selling price for this product</p>
+
+                            <h2>
+                                Pricing
+                            </h2>
+
+                            <p>
+                                Set the selling price for this product
+                            </p>
+
                         </div>
+
                     </div>
+
 
                     <div class="tx-card-body cols-2">
 
-                        {{-- Price --}}
                         <div>
-                            <label for="price" class="tx-label">
+
+                            <label
+                                for="price"
+                                class="tx-label"
+                            >
                                 Price
                             </label>
 
+
                             <div class="tx-price-wrap">
-                                <span class="tx-price-prefix">$</span>
+
+                                <span class="tx-price-prefix">
+                                    $
+                                </span>
 
                                 <input
                                     type="number"
@@ -694,20 +2734,31 @@
                                     placeholder="0.00"
                                     required
                                 >
+
                             </div>
+
 
                             <p class="tx-hint">
                                 Enter the selling price per unit.
                             </p>
+
+
+                            @error('price')
+                                <p class="tx-error">{{ $message }}</p>
+                            @enderror
+
                         </div>
 
-                        {{-- Price Preview --}}
+
                         <div>
+
                             <label class="tx-label">
                                 Current Price
                             </label>
 
+
                             <div class="tx-price-preview">
+
                                 <span class="tx-price-preview-label">
                                     Unit Price
                                 </span>
@@ -718,28 +2769,60 @@
                                 >
                                     ${{ number_format((float) old('price', $product->price), 2) }}
                                 </span>
+
                             </div>
 
+
                             <p class="tx-hint">
-                                Preview of the price that will be saved.
+                                Live preview of the price that will be saved.
                             </p>
+
                         </div>
 
                     </div>
+
                 </div>
-                {{-- SECTION 6: Attributes & Media --}}
-                <div class="tx-card">
+
+
+                {{-- ====================================================
+                     SECTION 06
+                     CLASSIFICATION & MEDIA
+                ==================================================== --}}
+
+                <div class="tx-card tx-lvl-4">
+
                     <div class="tx-card-head">
-                        <span class="tx-card-icon" style="background: var(--tx-accent-soft); color: var(--tx-accent);">06</span>
+
+                        <span class="tx-card-icon">
+                            06
+                        </span>
+
                         <div>
-                            <h2>Classification & Media</h2>
-                            <p>Classification and product images</p>
+
+                            <h2>
+                                Classification & Media
+                            </h2>
+
+                            <p>
+                                Materials, colors and product images
+                            </p>
+
                         </div>
+
                     </div>
+
+
                     <div class="tx-card-body cols-2">
+
+
+                        {{-- =================================================
+                             MATERIALS
+                        ================================================= --}}
+
                         <div>
-                            <label for="materials" class="tx-label">Materials</label>
+
                             @php
+
                                 $selectedMaterials = old(
                                     'materials',
                                     is_array($product->materials)
@@ -748,88 +2831,259 @@
                                 );
 
                                 $selectedMaterials = $selectedMaterials ?: [];
+
                             @endphp
+
+
+                            <label
+                                for="materials"
+                                class="tx-label"
+                            >
+                                Materials
+                            </label>
+
+
                             <div class="tx-multi-select-wrap">
+
                                 <div class="tx-multi-toolbar">
-                                    <span class="tx-multi-hint">Selected values appear below</span>
-                                    <button type="button" class="tx-multi-clear" data-target="materials">Clear</button>
+
+                                    <span class="tx-multi-hint">
+                                        Select one or more materials
+                                    </span>
+
+                                    <button
+                                        type="button"
+                                        class="tx-multi-clear"
+                                        data-target="materials"
+                                    >
+                                        Clear
+                                    </button>
+
                                 </div>
-                                <select id="materials" name="materials[]" multiple size="8" autocomplete="off" class="tx-field tx-multi-select">
+
+
+                                <select
+                                    id="materials"
+                                    name="materials[]"
+                                    multiple
+                                    size="8"
+                                    autocomplete="off"
+                                    class="tx-field tx-multi-select"
+                                >
+
                                     <optgroup label="Solid Wood">
-                                        <option value="Acacia Wood" {{ in_array('Acacia Wood', $selectedMaterials) ? 'selected' : '' }}>Acacia Wood</option>
-                                        <option value="Ash Wood" {{ in_array('Ash Wood', $selectedMaterials) ? 'selected' : '' }}>Ash Wood</option>
-                                        <option value="Beech Wood" {{ in_array('Beech Wood', $selectedMaterials) ? 'selected' : '' }}>Beech Wood</option>
-                                        <option value="Birch Wood" {{ in_array('Birch Wood', $selectedMaterials) ? 'selected' : '' }}>Birch Wood</option>
-                                        <option value="Mahogany" {{ in_array('Mahogany', $selectedMaterials) ? 'selected' : '' }}>Mahogany</option>
-                                        <option value="Mango Wood" {{ in_array('Mango Wood', $selectedMaterials) ? 'selected' : '' }}>Mango Wood</option>
-                                        <option value="Oak" {{ in_array('Oak', $selectedMaterials) ? 'selected' : '' }}>Oak</option>
-                                        <option value="Pine" {{ in_array('Pine', $selectedMaterials) ? 'selected' : '' }}>Pine</option>
-                                        <option value="Rubberwood" {{ in_array('Rubberwood', $selectedMaterials) ? 'selected' : '' }}>Rubberwood</option>
-                                        <option value="Teak" {{ in_array('Teak', $selectedMaterials) ? 'selected' : '' }}>Teak</option>
-                                        <option value="Walnut" {{ in_array('Walnut', $selectedMaterials) ? 'selected' : '' }}>Walnut</option>
+
+                                        @foreach([
+                                            'Acacia Wood',
+                                            'Ash Wood',
+                                            'Beech Wood',
+                                            'Birch Wood',
+                                            'Mahogany',
+                                            'Mango Wood',
+                                            'Oak',
+                                            'Pine',
+                                            'Rubberwood',
+                                            'Teak',
+                                            'Walnut'
+                                        ] as $material)
+
+                                            <option
+                                                value="{{ $material }}"
+                                                {{ in_array($material, $selectedMaterials) ? 'selected' : '' }}
+                                            >
+                                                {{ $material }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Engineered Wood">
-                                        <option value="MDF" {{ in_array('MDF', $selectedMaterials) ? 'selected' : '' }}>MDF</option>
-                                        <option value="Particle Board" {{ in_array('Particle Board', $selectedMaterials) ? 'selected' : '' }}>Particle Board</option>
-                                        <option value="Plywood" {{ in_array('Plywood', $selectedMaterials) ? 'selected' : '' }}>Plywood</option>
-                                        <option value="HDF" {{ in_array('HDF', $selectedMaterials) ? 'selected' : '' }}>HDF</option>
-                                        <option value="Melamine Board" {{ in_array('Melamine Board', $selectedMaterials) ? 'selected' : '' }}>Melamine Board</option>
+
+                                        @foreach([
+                                            'MDF',
+                                            'Particle Board',
+                                            'Plywood',
+                                            'HDF',
+                                            'Melamine Board'
+                                        ] as $material)
+
+                                            <option
+                                                value="{{ $material }}"
+                                                {{ in_array($material, $selectedMaterials) ? 'selected' : '' }}
+                                            >
+                                                {{ $material }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Metal">
-                                        <option value="Aluminum" {{ in_array('Aluminum', $selectedMaterials) ? 'selected' : '' }}>Aluminum</option>
-                                        <option value="Brass" {{ in_array('Brass', $selectedMaterials) ? 'selected' : '' }}>Brass</option>
-                                        <option value="Cast Iron" {{ in_array('Cast Iron', $selectedMaterials) ? 'selected' : '' }}>Cast Iron</option>
-                                        <option value="Iron" {{ in_array('Iron', $selectedMaterials) ? 'selected' : '' }}>Iron</option>
-                                        <option value="Stainless Steel" {{ in_array('Stainless Steel', $selectedMaterials) ? 'selected' : '' }}>Stainless Steel</option>
-                                        <option value="Steel" {{ in_array('Steel', $selectedMaterials) ? 'selected' : '' }}>Steel</option>
+
+                                        @foreach([
+                                            'Aluminum',
+                                            'Brass',
+                                            'Cast Iron',
+                                            'Iron',
+                                            'Stainless Steel',
+                                            'Steel'
+                                        ] as $material)
+
+                                            <option
+                                                value="{{ $material }}"
+                                                {{ in_array($material, $selectedMaterials) ? 'selected' : '' }}
+                                            >
+                                                {{ $material }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Glass & Stone">
-                                        <option value="Clear Glass" {{ in_array('Clear Glass', $selectedMaterials) ? 'selected' : '' }}>Clear Glass</option>
-                                        <option value="Tempered Glass" {{ in_array('Tempered Glass', $selectedMaterials) ? 'selected' : '' }}>Tempered Glass</option>
-                                        <option value="Marble" {{ in_array('Marble', $selectedMaterials) ? 'selected' : '' }}>Marble</option>
-                                        <option value="Granite" {{ in_array('Granite', $selectedMaterials) ? 'selected' : '' }}>Granite</option>
-                                        <option value="Ceramic" {{ in_array('Ceramic', $selectedMaterials) ? 'selected' : '' }}>Ceramic</option>
-                                        <option value="Concrete" {{ in_array('Concrete', $selectedMaterials) ? 'selected' : '' }}>Concrete</option>
+
+                                        @foreach([
+                                            'Clear Glass',
+                                            'Tempered Glass',
+                                            'Marble',
+                                            'Granite',
+                                            'Ceramic',
+                                            'Concrete'
+                                        ] as $material)
+
+                                            <option
+                                                value="{{ $material }}"
+                                                {{ in_array($material, $selectedMaterials) ? 'selected' : '' }}
+                                            >
+                                                {{ $material }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Natural Fibers">
-                                        <option value="Bamboo" {{ in_array('Bamboo', $selectedMaterials) ? 'selected' : '' }}>Bamboo</option>
-                                        <option value="Cane" {{ in_array('Cane', $selectedMaterials) ? 'selected' : '' }}>Cane</option>
-                                        <option value="Rattan" {{ in_array('Rattan', $selectedMaterials) ? 'selected' : '' }}>Rattan</option>
-                                        <option value="Seagrass" {{ in_array('Seagrass', $selectedMaterials) ? 'selected' : '' }}>Seagrass</option>
-                                        <option value="Water Hyacinth" {{ in_array('Water Hyacinth', $selectedMaterials) ? 'selected' : '' }}>Water Hyacinth</option>
-                                        <option value="Abaca" {{ in_array('Abaca', $selectedMaterials) ? 'selected' : '' }}>Abaca</option>
+
+                                        @foreach([
+                                            'Bamboo',
+                                            'Cane',
+                                            'Rattan',
+                                            'Seagrass',
+                                            'Water Hyacinth',
+                                            'Abaca'
+                                        ] as $material)
+
+                                            <option
+                                                value="{{ $material }}"
+                                                {{ in_array($material, $selectedMaterials) ? 'selected' : '' }}
+                                            >
+                                                {{ $material }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Fabric & Upholstery">
-                                        <option value="Boucle" {{ in_array('Boucle', $selectedMaterials) ? 'selected' : '' }}>Boucle</option>
-                                        <option value="Canvas" {{ in_array('Canvas', $selectedMaterials) ? 'selected' : '' }}>Canvas</option>
-                                        <option value="Cotton" {{ in_array('Cotton', $selectedMaterials) ? 'selected' : '' }}>Cotton</option>
-                                        <option value="Leather" {{ in_array('Leather', $selectedMaterials) ? 'selected' : '' }}>Leather</option>
-                                        <option value="PU Leather" {{ in_array('PU Leather', $selectedMaterials) ? 'selected' : '' }}>PU Leather</option>
-                                        <option value="Linen" {{ in_array('Linen', $selectedMaterials) ? 'selected' : '' }}>Linen</option>
-                                        <option value="Microfiber" {{ in_array('Microfiber', $selectedMaterials) ? 'selected' : '' }}>Microfiber</option>
-                                        <option value="Polyester" {{ in_array('Polyester', $selectedMaterials) ? 'selected' : '' }}>Polyester</option>
-                                        <option value="Velvet" {{ in_array('Velvet', $selectedMaterials) ? 'selected' : '' }}>Velvet</option>
+
+                                        @foreach([
+                                            'Boucle',
+                                            'Canvas',
+                                            'Cotton',
+                                            'Leather',
+                                            'PU Leather',
+                                            'Linen',
+                                            'Microfiber',
+                                            'Polyester',
+                                            'Velvet'
+                                        ] as $material)
+
+                                            <option
+                                                value="{{ $material }}"
+                                                {{ in_array($material, $selectedMaterials) ? 'selected' : '' }}
+                                            >
+                                                {{ $material }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Plastic & Synthetic">
-                                        <option value="ABS Plastic" {{ in_array('ABS Plastic', $selectedMaterials) ? 'selected' : '' }}>ABS Plastic</option>
-                                        <option value="Acrylic" {{ in_array('Acrylic', $selectedMaterials) ? 'selected' : '' }}>Acrylic</option>
-                                        <option value="Fiberglass" {{ in_array('Fiberglass', $selectedMaterials) ? 'selected' : '' }}>Fiberglass</option>
-                                        <option value="Polypropylene" {{ in_array('Polypropylene', $selectedMaterials) ? 'selected' : '' }}>Polypropylene</option>
-                                        <option value="PVC" {{ in_array('PVC', $selectedMaterials) ? 'selected' : '' }}>PVC</option>
-                                        <option value="Resin" {{ in_array('Resin', $selectedMaterials) ? 'selected' : '' }}>Resin</option>
+
+                                        @foreach([
+                                            'ABS Plastic',
+                                            'Acrylic',
+                                            'Fiberglass',
+                                            'Polypropylene',
+                                            'PVC',
+                                            'Resin'
+                                        ] as $material)
+
+                                            <option
+                                                value="{{ $material }}"
+                                                {{ in_array($material, $selectedMaterials) ? 'selected' : '' }}
+                                            >
+                                                {{ $material }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Other">
-                                        <option value="Composite" {{ in_array('Composite', $selectedMaterials) ? 'selected' : '' }}>Composite</option>
-                                        <option value="Mixed Materials" {{ in_array('Mixed Materials', $selectedMaterials) ? 'selected' : '' }}>Mixed Materials</option>
+
+                                        @foreach([
+                                            'Composite',
+                                            'Mixed Materials'
+                                        ] as $material)
+
+                                            <option
+                                                value="{{ $material }}"
+                                                {{ in_array($material, $selectedMaterials) ? 'selected' : '' }}
+                                            >
+                                                {{ $material }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
                                 </select>
-                                <div id="materials_chips" class="tx-multi-chips" aria-live="polite"></div>
+
+
+                                <div
+                                    id="materials_chips"
+                                    class="tx-multi-chips"
+                                    aria-live="polite"
+                                ></div>
+
                             </div>
-                            <p class="tx-hint">Select one or more materials.</p>
+
+
+                            @error('materials')
+                                <p class="tx-error">{{ $message }}</p>
+                            @enderror
+
                         </div>
 
+
+                        {{-- =================================================
+                             COLORS
+                        ================================================= --}}
+
                         <div>
+
                             @php
+
                                 $selectedColors = old(
                                     'color',
                                     is_array($product->color)
@@ -838,93 +3092,563 @@
                                 );
 
                                 $selectedColors = $selectedColors ?: [];
-                                @endphp
-                            <label for="color" class="tx-label">Color</label>
+
+                            @endphp
+
+
+                            <label
+                                for="color"
+                                class="tx-label"
+                            >
+                                Color
+                            </label>
+
+
                             <div class="tx-multi-select-wrap">
+
                                 <div class="tx-multi-toolbar">
-                                    <span class="tx-multi-hint">Selected values appear below</span>
-                                    <button type="button" class="tx-multi-clear" data-target="color">Clear</button>
+
+                                    <span class="tx-multi-hint">
+                                        Select one or more colors
+                                    </span>
+
+                                    <button
+                                        type="button"
+                                        class="tx-multi-clear"
+                                        data-target="color"
+                                    >
+                                        Clear
+                                    </button>
+
                                 </div>
-                                <select id="color" name="color[]" multiple size="8" class="tx-field tx-multi-select">
+
+
+                                <select
+                                    id="color"
+                                    name="color[]"
+                                    multiple
+                                    size="8"
+                                    class="tx-field tx-multi-select"
+                                >
+
                                     <optgroup label="Basic Colors">
-                                        <option value="Black" {{ in_array('Black', $selectedColors) ? 'selected' : '' }}>Black</option>
-                                        <option value="White" {{ in_array('White', $selectedColors) ? 'selected' : '' }}>White</option>
-                                        <option value="Gray" {{ in_array('Gray', $selectedColors) ? 'selected' : '' }}>Gray</option>
-                                        <option value="Silver" {{ in_array('Silver', $selectedColors) ? 'selected' : '' }}>Silver</option>
-                                        <option value="Gold" {{ in_array('Gold', $selectedColors) ? 'selected' : '' }}>Gold</option>
-                                        <option value="Bronze" {{ in_array('Bronze', $selectedColors) ? 'selected' : '' }}>Bronze</option>
+
+                                        @foreach([
+                                            'Black',
+                                            'White',
+                                            'Gray',
+                                            'Silver',
+                                            'Gold',
+                                            'Bronze'
+                                        ] as $color)
+
+                                            <option
+                                                value="{{ $color }}"
+                                                {{ in_array($color, $selectedColors) ? 'selected' : '' }}
+                                            >
+                                                {{ $color }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Wood Finishes">
-                                        <option value="Natural" {{ in_array('Natural', $selectedColors) ? 'selected' : '' }}>Natural</option>
-                                        <option value="Oak" {{ in_array('Oak', $selectedColors) ? 'selected' : '' }}>Oak</option>
-                                        <option value="Walnut" {{ in_array('Walnut', $selectedColors) ? 'selected' : '' }}>Walnut</option>
-                                        <option value="Teak" {{ in_array('Teak', $selectedColors) ? 'selected' : '' }}>Teak</option>
-                                        <option value="Mahogany" {{ in_array('Mahogany', $selectedColors) ? 'selected' : '' }}>Mahogany</option>
-                                        <option value="Espresso" {{ in_array('Espresso', $selectedColors) ? 'selected' : '' }}>Espresso</option>
+
+                                        @foreach([
+                                            'Natural',
+                                            'Oak',
+                                            'Walnut',
+                                            'Teak',
+                                            'Mahogany',
+                                            'Espresso'
+                                        ] as $color)
+
+                                            <option
+                                                value="{{ $color }}"
+                                                {{ in_array($color, $selectedColors) ? 'selected' : '' }}
+                                            >
+                                                {{ $color }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Neutral">
-                                        <option value="Beige" {{ in_array('Beige', $selectedColors) ? 'selected' : '' }}>Beige</option>
-                                        <option value="Cream" {{ in_array('Cream', $selectedColors) ? 'selected' : '' }}>Cream</option>
-                                        <option value="Ivory" {{ in_array('Ivory', $selectedColors) ? 'selected' : '' }}>Ivory</option>
-                                        <option value="Taupe" {{ in_array('Taupe', $selectedColors) ? 'selected' : '' }}>Taupe</option>
-                                        <option value="Brown" {{ in_array('Brown', $selectedColors) ? 'selected' : '' }}>Brown</option>
+
+                                        @foreach([
+                                            'Beige',
+                                            'Cream',
+                                            'Ivory',
+                                            'Taupe',
+                                            'Brown'
+                                        ] as $color)
+
+                                            <option
+                                                value="{{ $color }}"
+                                                {{ in_array($color, $selectedColors) ? 'selected' : '' }}
+                                            >
+                                                {{ $color }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Accent Colors">
-                                        <option value="Blue" {{ in_array('Blue', $selectedColors) ? 'selected' : '' }}>Blue</option>
-                                        <option value="Green" {{ in_array('Green', $selectedColors) ? 'selected' : '' }}>Green</option>
-                                        <option value="Red" {{ in_array('Red', $selectedColors) ? 'selected' : '' }}>Red</option>
-                                        <option value="Yellow" {{ in_array('Yellow', $selectedColors) ? 'selected' : '' }}>Yellow</option>
-                                        <option value="Orange" {{ in_array('Orange', $selectedColors) ? 'selected' : '' }}>Orange</option>
-                                        <option value="Pink" {{ in_array('Pink', $selectedColors) ? 'selected' : '' }}>Pink</option>
-                                        <option value="Purple" {{ in_array('Purple', $selectedColors) ? 'selected' : '' }}>Purple</option>
+
+                                        @foreach([
+                                            'Blue',
+                                            'Green',
+                                            'Red',
+                                            'Yellow',
+                                            'Orange',
+                                            'Pink',
+                                            'Purple'
+                                        ] as $color)
+
+                                            <option
+                                                value="{{ $color }}"
+                                                {{ in_array($color, $selectedColors) ? 'selected' : '' }}
+                                            >
+                                                {{ $color }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
+
                                     <optgroup label="Special Finishes">
-                                        <option value="Matte Black" {{ in_array('Matte Black', $selectedColors) ? 'selected' : '' }}>Matte Black</option>
-                                        <option value="Gloss White" {{ in_array('Gloss White', $selectedColors) ? 'selected' : '' }}>Gloss White</option>
-                                        <option value="Brushed Gold" {{ in_array('Brushed Gold', $selectedColors) ? 'selected' : '' }}>Brushed Gold</option>
-                                        <option value="Rose Gold" {{ in_array('Rose Gold', $selectedColors) ? 'selected' : '' }}>Rose Gold</option>
-                                        <option value="Chrome" {{ in_array('Chrome', $selectedColors) ? 'selected' : '' }}>Chrome</option>
+
+                                        @foreach([
+                                            'Matte Black',
+                                            'Gloss White',
+                                            'Brushed Gold',
+                                            'Rose Gold',
+                                            'Chrome'
+                                        ] as $color)
+
+                                            <option
+                                                value="{{ $color }}"
+                                                {{ in_array($color, $selectedColors) ? 'selected' : '' }}
+                                            >
+                                                {{ $color }}
+                                            </option>
+
+                                        @endforeach
+
                                     </optgroup>
+
                                 </select>
-                                <div id="color_chips" class="tx-multi-chips" aria-live="polite"></div>
+
+
+                                <div
+                                    id="color_chips"
+                                    class="tx-multi-chips"
+                                    aria-live="polite"
+                                ></div>
+
                             </div>
-                            <p class="tx-hint">Select one or more colors.</p>
+
+
+                            @error('color')
+                                <p class="tx-error">{{ $message }}</p>
+                            @enderror
+
                         </div>
 
-                        {{-- ============================================================
-     IMAGE LINKS
-     ============================================================ --}}
-<div>
-    <label for="image_links" class="tx-label">Image Links</label>
 
-    <p class="tx-hint">
-        Add one or more direct image URLs.
-    </p>
+                        {{-- =================================================
+                             IMAGE LINKS
+                        ================================================= --}}
 
-    <div id="imageLinks">
+                        <div>
 
-        @php
-            $imageLinks = old(
-                'image_links',
-                $product->images
-                    ->where('image_type', 'url')
-                    ->pluck('image_url')
-                    ->filter()
-                    ->values()
-                    ->all()
-            );
-        @endphp
+                            <label
+                                for="image_links"
+                                class="tx-label"
+                            >
+                                Image Links
+                            </label>
 
-        @if(is_array($imageLinks) && count($imageLinks))
+                            <p class="tx-hint">
+                                Add direct image URLs such as JPG, PNG or WEBP.
+                            </p>
 
-            @foreach($imageLinks as $link)
 
-                <div class="tx-image-link-row">
+                            <div id="imageLinks">
+
+                                @php
+
+                                    $imageLinks = old(
+                                        'image_links',
+                                        $product->images
+                                            ->where('image_type', 'url')
+                                            ->pluck('image_url')
+                                            ->filter()
+                                            ->values()
+                                            ->all()
+                                    );
+
+                                @endphp
+
+
+                                @if(is_array($imageLinks) && count($imageLinks))
+
+                                    @foreach($imageLinks as $link)
+
+                                        <div class="tx-image-link-row">
+
+                                            <input
+                                                type="url"
+                                                name="image_links[]"
+                                                value="{{ $link }}"
+                                                placeholder="https://example.com/image.jpg"
+                                                class="tx-field"
+                                            >
+
+
+                                            <button
+                                                type="button"
+                                                class="tx-image-remove-link"
+                                                onclick="removeImageLink(this)"
+                                            >
+                                                Remove
+                                            </button>
+
+                                        </div>
+
+                                    @endforeach
+
+                                @else
+
+                                    <div class="tx-image-link-row">
+
+                                        <input
+                                            type="url"
+                                            name="image_links[]"
+                                            value="{{ old('image_links.0') }}"
+                                            placeholder="https://example.com/image.jpg"
+                                            class="tx-field"
+                                        >
+
+
+                                        <button
+                                            type="button"
+                                            class="tx-image-remove-link"
+                                            onclick="removeImageLink(this)"
+                                        >
+                                            Remove
+                                        </button>
+
+                                    </div>
+
+                                @endif
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                onclick="addImageLink()"
+                                class="tx-btn-ghost"
+                                style="margin-top:4px;"
+                            >
+                                + Add Another Link
+                            </button>
+
+
+                            @if($errors->has('image_links') || $errors->has('image_links.*'))
+
+                                <p class="tx-error">
+
+                                    {{ $errors->first('image_links.*') ?? $errors->first('image_links') }}
+
+                                </p>
+
+                            @endif
+
+                        </div>
+
+
+                        {{-- =================================================
+                             EXISTING IMAGES
+                        ================================================= --}}
+
+                        <div style="grid-column:1 / -1;">
+
+                            <label class="tx-label">
+                                Existing Product Images
+                            </label>
+
+
+                            <p class="tx-hint">
+                                Remove images you no longer need. Changes are
+                                applied when you click Update Product.
+                            </p>
+
+
+                            <div
+                                id="existingImages"
+                                class="tx-existing-images"
+                            >
+
+                                @forelse($product->images as $image)
+
+                                    <div
+                                        class="tx-existing-image"
+                                        data-image-id="{{ $image->id }}"
+                                    >
+
+                                        <div class="tx-existing-image-preview">
+
+                                            @if($image->image_type === 'upload' && $image->image_path)
+
+                                                <img
+                                                    src="{{ asset('storage/' . $image->image_path) }}"
+                                                    alt="{{ $product->item_name }}"
+                                                >
+
+                                            @elseif($image->image_type === 'url' && $image->image_url)
+
+                                                <img
+                                                    src="{{ $image->image_url }}"
+                                                    alt="{{ $product->item_name }}"
+                                                >
+
+                                            @else
+
+                                                <div class="tx-image-placeholder">
+                                                    No Preview
+                                                </div>
+
+                                            @endif
+
+                                        </div>
+
+
+                                        <div class="tx-existing-image-info">
+
+                                            <strong>
+                                                {{ ucfirst($image->image_type) }} Image
+                                            </strong>
+
+
+                                            @if($image->is_primary)
+
+                                                <span class="tx-primary-badge">
+                                                    Primary
+                                                </span>
+
+                                            @endif
+
+
+                                            @if($image->image_type === 'url')
+
+                                                <div class="tx-image-url">
+                                                    {{ $image->image_url }}
+                                                </div>
+
+                                            @elseif($image->image_type === 'upload')
+
+                                                <div class="tx-image-url">
+                                                    {{ $image->image_path }}
+                                                </div>
+
+                                            @endif
+
+                                        </div>
+
+
+                                        <button
+                                            type="button"
+                                            class="tx-remove-existing-image"
+                                            onclick="removeExistingImage({{ $image->id }}, this)"
+                                        >
+
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    d="M6 6l12 12M18 6L6 18"
+                                                />
+                                            </svg>
+
+                                            Remove
+
+                                        </button>
+
+                                    </div>
+
+                                @empty
+
+                                    <div class="tx-no-images">
+                                        No existing product images found.
+                                    </div>
+
+                                @endforelse
+
+                            </div>
+
+                        </div>
+
+
+                        {{-- =================================================
+                             NEW UPLOADS
+                        ================================================= --}}
+
+                        <div style="grid-column:1 / -1;">
+
+                            <label
+                                for="product_images"
+                                class="tx-label"
+                            >
+                                Add New Product Images
+                            </label>
+
+
+                            <p class="tx-hint">
+                                Select one or more image files. New files will
+                                be added when you update the product.
+                            </p>
+
+
+                            <input
+                                type="file"
+                                id="product_images"
+                                name="product_images[]"
+                                accept="image/*,.pdf,.obj,.stl"
+                                multiple
+                                class="tx-field"
+                                style="padding:7px 9px;"
+                            >
+
+
+                            @if($errors->has('product_images') || $errors->has('product_images.*'))
+
+                                <p class="tx-error">
+                                    {{ $errors->first('product_images.*') ?? $errors->first('product_images') }}
+                                </p>
+
+                            @endif
+
+
+                            <div
+                                id="newImagePreview"
+                                class="tx-new-image-preview"
+                            ></div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                {{-- ========================================================
+                     FOOTER
+                ======================================================== --}}
+
+                <div class="tx-footer">
+
+                    <div class="tx-footer-inner">
+
+                        <a
+                            href="{{ route('mi_app.index') }}"
+                            class="tx-btn-ghost"
+                        >
+                            Cancel
+                        </a>
+
+
+                        <button
+                            type="submit"
+                            class="tx-btn-submit"
+                            id="updateProductButton"
+                        >
+
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="15"
+                                height="15"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                stroke-width="2.5"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M4.5 12.75l6 6 9-13.5"
+                                />
+                            </svg>
+
+                            Update Product
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+    {{-- ============================================================
+         TOM SELECT
+    ============================================================ --}}
+
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+
+
+    <script>
+
+        document.addEventListener('DOMContentLoaded', function () {
+
+
+            /* ========================================================
+               IMAGE LINKS
+            ======================================================== */
+
+            window.addImageLink = function () {
+
+                const container =
+                    document.getElementById('imageLinks');
+
+                if (!container) {
+                    return;
+                }
+
+
+                const row =
+                    document.createElement('div');
+
+                row.className =
+                    'tx-image-link-row';
+
+
+                row.innerHTML = `
 
                     <input
                         type="url"
                         name="image_links[]"
-                        value="{{ $link }}"
                         placeholder="https://example.com/image.jpg"
                         class="tx-field"
                     >
@@ -937,151 +3661,152 @@
                         Remove
                     </button>
 
-                </div>
-
-            @endforeach
-
-        @else
-
-            <div class="tx-image-link-row">
-
-                <input
-                    type="url"
-                    name="image_links[]"
-                    value="{{ old('image_links.0') }}"
-                    placeholder="https://example.com/image.jpg"
-                    class="tx-field"
-                >
-
-                <button
-                    type="button"
-                    class="tx-image-remove-link"
-                    onclick="removeImageLink(this)"
-                >
-                    Remove
-                </button>
-
-            </div>
-
-        @endif
-
-    </div>
-
-    <button
-        type="button"
-        onclick="addImageLink()"
-        class="tx-btn-ghost"
-        style="margin-top:0.6rem;"
-    >
-        + Add Another Link
-    </button>
-
-    @if ($errors->has('image_links') || $errors->has('image_links.*'))
-
-        <p class="tx-error">
-            {{ $errors->first('image_links.*') ?? $errors->first('image_links') }}
-        </p>
-
-    @endif
-</div>
+                `;
 
 
-{{-- ============================================================
-     EXISTING IMAGES
-     ============================================================ --}}
-<div style="grid-column:1 / -1;">
+                container.appendChild(row);
 
-    <label class="tx-label">
-        Existing Product Images
-    </label>
 
-    <p class="tx-hint">
-        Remove images you no longer want. Changes are applied when you click Update Product.
-    </p>
+                const input =
+                    row.querySelector('input');
 
-    <div
-        id="existingImages"
-        class="tx-existing-images"
-    >
+                if (input) {
+                    input.focus();
+                }
 
-        @forelse($product->images as $image)
+            };
 
-            <div
-                class="tx-existing-image"
-                data-image-id="{{ $image->id }}"
-            >
 
-                {{-- Image preview --}}
+            window.removeImageLink = function (button) {
 
-                <div class="tx-existing-image-preview">
+                if (!button) {
+                    return;
+                }
 
-                    @if($image->image_type === 'upload' && $image->image_path)
 
-                        <img
-                            src="{{ asset('storage/' . $image->image_path) }}"
-                            alt="{{ $product->item_name }}"
+                const row =
+                    button.closest('.tx-image-link-row');
+
+                if (!row) {
+                    return;
+                }
+
+
+                row.remove();
+
+            };
+
+
+            /* ========================================================
+               EXISTING IMAGE REMOVE / UNDO
+            ======================================================== */
+
+            window.removeExistingImage = function (imageId, button) {
+
+                if (!imageId || !button) {
+                    return;
+                }
+
+
+                const card =
+                    button.closest('.tx-existing-image');
+
+                if (!card) {
+                    return;
+                }
+
+
+                const container =
+                    document.getElementById(
+                        'removedImagesContainer'
+                    );
+
+                if (!container) {
+                    return;
+                }
+
+
+                /*
+                 * UNDO
+                 */
+
+                if (card.dataset.removing === '1') {
+
+                    card.dataset.removing = '0';
+
+                    card.classList.remove('removing');
+
+
+                    const hidden =
+                        container.querySelector(
+                            'input[data-image-id="' + imageId + '"]'
+                        );
+
+
+                    if (hidden) {
+                        hidden.remove();
+                    }
+
+
+                    button.innerHTML = `
+
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
                         >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M6 6l12 12M18 6L6 18"
+                            />
+                        </svg>
 
-                    @elseif($image->image_type === 'url' && $image->image_url)
+                        Remove
 
-                        <img
-                            src="{{ $image->image_url }}"
-                            alt="{{ $product->item_name }}"
-                        >
+                    `;
 
-                    @else
-
-                        <div class="tx-image-placeholder">
-                            No Preview
-                        </div>
-
-                    @endif
-
-                </div>
+                    return;
+                }
 
 
-                {{-- Image information --}}
+                /*
+                 * MARK FOR REMOVAL
+                 */
 
-                <div class="tx-existing-image-info">
+                card.dataset.removing = '1';
 
-                    <strong>
-                        {{ ucfirst($image->image_type) }} Image
-                    </strong>
-
-                    @if($image->is_primary)
-                        <span class="tx-primary-badge">
-                            Primary
-                        </span>
-                    @endif
-
-                    @if($image->image_type === 'url')
-
-                        <div class="tx-image-url">
-                            {{ $image->image_url }}
-                        </div>
-
-                    @elseif($image->image_type === 'upload')
-
-                        <div class="tx-image-url">
-                            {{ $image->image_path }}
-                        </div>
-
-                    @endif
-
-                </div>
+                card.classList.add('removing');
 
 
-                {{-- Remove button --}}
+                const input =
+                    document.createElement('input');
 
-                <button
-                    type="button"
-                    class="tx-remove-existing-image"
-                    onclick="removeExistingImage({{ $image->id }}, this)"
-                >
+                input.type = 'hidden';
+
+                input.name =
+                    'remove_image_ids[]';
+
+                input.value =
+                    imageId;
+
+                input.dataset.imageId =
+                    imageId;
+
+
+                container.appendChild(input);
+
+
+                button.innerHTML = `
+
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="15"
-                        height="15"
+                        width="14"
+                        height="14"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -1094,403 +3819,286 @@
                         />
                     </svg>
 
-                    Remove
-                </button>
+                    Undo
 
-            </div>
+                `;
 
-        @empty
+            };
 
-            <div class="tx-no-images">
-                No existing images found.
-            </div>
 
-        @endforelse
+            /* ========================================================
+               TAXONOMY CASCADE
+            ======================================================== */
 
-    </div>
+            const categorySelect =
+                document.getElementById('category_id');
 
-</div>
+            const subCategorySelect =
+                document.getElementById('sub_category_id');
 
+            const productTypeSelect =
+                document.getElementById('product_type_id');
 
-{{-- ============================================================
-     NEW UPLOADS
-     ============================================================ --}}
-<div style="grid-column:1 / -1;">
+            const collectionSelect =
+                document.getElementById('collection_id');
 
-    <label class="tx-label">
-        Add New Product Images
-    </label>
-
-    <p class="tx-hint">
-        Select one or more new files. They will be added when you update the product.
-    </p>
-
-    <input
-        type="file"
-        id="product_images"
-        name="product_images[]"
-        accept="image/*,.pdf,.obj,.stl"
-        multiple
-        class="tx-field"
-        style="padding:0.5rem 0.75rem;"
-    >
-
-    @if ($errors->has('product_images') || $errors->has('product_images.*'))
-
-        <p class="tx-error">
-            {{ $errors->first('product_images.*') ?? $errors->first('product_images') }}
-        </p>
-
-    @endif
-
-    {{-- New upload preview --}}
-
-    <div
-        id="newImagePreview"
-        class="tx-new-image-preview"
-    ></div>
-
-</div>
-                    </div>
-                </div>
-
-                {{-- Footer --}}
-                <div class="tx-footer">
-                    <div class="tx-footer-inner">
-                        <a href="{{ route('mi_app.index') }}" class="tx-btn-ghost">Cancel</a>
-                        <button type="submit" class="tx-btn-submit">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                            </svg>
-                            Update Product
-                        </button>
-                    </div>
-                </div>
-
-            </form>
-
-        </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-
-    /* ============================================================
-     * IMAGE LINKS
-     * ============================================================ */
-
-    window.addImageLink = function () {
-
-const container =
-    document.getElementById('imageLinks');
-
-if (!container) {
-    return;
-}
-
-const row =
-    document.createElement('div');
-
-row.className =
-    'tx-image-link-row';
-
-row.innerHTML = `
-    <input
-        type="url"
-        name="image_links[]"
-        placeholder="https://example.com/image.jpg"
-        class="tx-field"
-    >
-
-    <button
-        type="button"
-        class="tx-image-remove-link"
-        onclick="removeImageLink(this)"
-    >
-        Remove
-    </button>
-`;
-
-container.appendChild(row);
-
-const input =
-    row.querySelector('input');
-
-if (input) {
-    input.focus();
-}
-};
-window.removeImageLink = function (button) {
-
-    if (!button) {
-        return;
-    }
-
-    const row =
-        button.closest('.tx-image-link-row');
-
-    if (!row) {
-        return;
-    }
-
-    row.remove();
-};
-window.removeExistingImage = function (imageId, button) {
-
-    if (!imageId || !button) {
-        return;
-    }
-
-    const card =
-        button.closest('.tx-existing-image');
-
-    if (!card) {
-        return;
-    }
-
-    const container =
-        document.getElementById('removedImagesContainer');
-
-    if (!container) {
-        return;
-    }
-
-
-    /*
-     * If already marked for removal,
-     * allow the user to undo it.
-     */
-    if (card.dataset.removing === '1') {
-
-        card.dataset.removing = '0';
-
-        card.classList.remove('removing');
-
-        button.innerHTML = `
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M6 6l12 12M18 6L6 18"
-                />
-            </svg>
-
-            Remove
-        `;
-
-        const hidden =
-            container.querySelector(
-                'input[data-image-id="' + imageId + '"]'
-            );
-
-        if (hidden) {
-            hidden.remove();
-        }
-
-        return;
-    }
-
-
-    /*
-     * Mark image for removal.
-     */
-
-    card.dataset.removing = '1';
-
-    card.classList.add('removing');
-
-
-    /*
-     * Create hidden input.
-     */
-
-    const input =
-        document.createElement('input');
-
-    input.type = 'hidden';
-
-    input.name =
-        'remove_image_ids[]';
-
-    input.value =
-        imageId;
-
-    input.dataset.imageId =
-        imageId;
-
-    container.appendChild(input);
-
-
-    /*
-     * Change button.
-     */
-
-    button.innerHTML = `
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-        >
-            <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M6 6l12 12M18 6L6 18"
-            />
-        </svg>
-
-        Undo
-    `;
-};
-    /* ============================================================
-     * TAXONOMY CASCADE
-     *
-     * Category
-     *     ↓
-     * Sub Category
-     *     ↓
-     * Sub Sub Category
-     *     ↓
-     * Collection
-     * ============================================================ */
-
-    const categorySelect = document.getElementById('category_id');
-    const subCategorySelect = document.getElementById('sub_category_id');
-    const productTypeSelect = document.getElementById('product_type_id');
-    const collectionSelect = document.getElementById('collection_id');
-    const previewPath = document.getElementById('taxonomy-preview-path');
-
-    if (
-        categorySelect &&
-        subCategorySelect &&
-        productTypeSelect &&
-        collectionSelect
-    ) {
-
-        function filterSelect(select, parentValue, selectedValue = null) {
-
-            if (!select) {
-                return;
-            }
-
-            const options = Array.from(select.options);
-
-            options.forEach(function (option) {
-
-                // Placeholder
-                if (!option.value) {
-                    option.hidden = false;
-                    option.disabled = false;
-                    return;
-                }
-
-                const optionParent = option.getAttribute('data-parent');
-
-                const belongs =
-                    optionParent !== null &&
-                    String(optionParent) === String(parentValue);
-
-                option.hidden = !belongs;
-                option.disabled = !belongs;
-
-                /*
-                 * If the option does not belong to the selected parent,
-                 * make sure it cannot remain selected.
-                 */
-                if (!belongs && option.selected) {
-                    option.selected = false;
-                }
-            });
-
-            /*
-             * Restore selected value only if it belongs to the
-             * currently selected parent.
-             */
-            if (selectedValue !== null && selectedValue !== '') {
-
-                const matchingOption = options.find(function (option) {
-                    return (
-                        String(option.value) === String(selectedValue) &&
-                        String(option.getAttribute('data-parent')) === String(parentValue)
-                    );
-                });
-
-                if (matchingOption) {
-                    select.value = selectedValue;
-                }
-            }
-        }
-
-
-        function resetSelect(select, placeholder = 'Select') {
-
-            if (!select) {
-                return;
-            }
-
-            select.value = '';
-
-            Array.from(select.options).forEach(function (option) {
-
-                if (!option.value) {
-                    option.hidden = false;
-                    option.disabled = false;
-                    return;
-                }
-
-                option.hidden = true;
-                option.disabled = true;
-                option.selected = false;
-            });
-        }
-
-
-        /*
-         * Initial values from the existing product.
-         *
-         * These are used ONLY during page initialization.
-         */
-        const initialSubCategory = @json(old('sub_category_id', $product->sub_category_id));
-        const initialProductType = @json(old('product_type_id', $product->product_type_id));
-        const initialCollection = @json(old('collection_id', $product->collection_id));
-
-
-        /*
-         * Initialize taxonomy in the correct order.
-         */
-        function initializeTaxonomy() {
-
-            const categoryValue = categorySelect.value;
-
-            /*
-             * Category → Sub Category
-             */
-            if (categoryValue) {
-
-                filterSelect(
-                    subCategorySelect,
-                    categoryValue,
-                    initialSubCategory
+            const previewPath =
+                document.getElementById(
+                    'taxonomy-preview-path'
                 );
 
-                /*
-                 * Sub Category → Product Type
-                 */
-                const subCategoryValue = subCategorySelect.value;
 
-                if (subCategoryValue) {
+            if (
+                categorySelect &&
+                subCategorySelect &&
+                productTypeSelect &&
+                collectionSelect
+            ) {
+
+
+                const initialSubCategory =
+                    @json(old('sub_category_id', $product->sub_category_id));
+
+
+                const initialProductType =
+                    @json(old('product_type_id', $product->product_type_id));
+
+
+                const initialCollection =
+                    @json(old('collection_id', $product->collection_id));
+
+
+                /*
+                 * Filter child options based on parent.
+                 */
+
+                function filterSelect(
+                    select,
+                    parentValue,
+                    selectedValue = null
+                ) {
+
+                    if (!select) {
+                        return;
+                    }
+
+
+                    const options =
+                        Array.from(select.options);
+
+
+                    let foundSelected = false;
+
+
+                    options.forEach(function (option) {
+
+                        if (!option.value) {
+
+                            option.hidden = false;
+
+                            option.disabled = false;
+
+                            return;
+                        }
+
+
+                        const optionParent =
+                            option.getAttribute('data-parent');
+
+
+                        const belongs =
+                            optionParent !== null &&
+                            String(optionParent) ===
+                                String(parentValue);
+
+
+                        option.hidden =
+                            !belongs;
+
+                        option.disabled =
+                            !belongs;
+
+
+                        if (
+                            selectedValue !== null &&
+                            String(option.value) ===
+                                String(selectedValue) &&
+                            belongs
+                        ) {
+
+                            option.selected = true;
+
+                            foundSelected = true;
+
+                        } else if (!belongs) {
+
+                            option.selected = false;
+
+                        }
+
+                    });
+
+
+                    if (!foundSelected) {
+
+                        const current =
+                            Array.from(select.options)
+                                .find(option =>
+                                    option.selected &&
+                                    !option.disabled
+                                );
+
+
+                        if (!current) {
+                            select.value = '';
+                        }
+
+                    }
+
+                }
+
+
+                /*
+                 * Reset select.
+                 */
+
+                function resetSelect(select) {
+
+                    if (!select) {
+                        return;
+                    }
+
+
+                    select.value = '';
+
+
+                    Array.from(select.options)
+                        .forEach(function (option) {
+
+                            if (!option.value) {
+
+                                option.hidden = false;
+
+                                option.disabled = false;
+
+                                option.selected = true;
+
+                                return;
+                            }
+
+
+                            option.hidden = true;
+
+                            option.disabled = true;
+
+                            option.selected = false;
+
+                        });
+
+                }
+
+
+                /*
+                 * Get selected label.
+                 */
+
+                function labelOf(select) {
+
+                    if (!select || !select.value) {
+                        return null;
+                    }
+
+
+                    const option =
+                        select.options[
+                            select.selectedIndex
+                        ];
+
+
+                    return option
+                        ? option.textContent.trim()
+                        : null;
+
+                }
+
+
+                /*
+                 * Update taxonomy preview.
+                 */
+
+                function updateTaxonomyPreview() {
+
+                    if (!previewPath) {
+                        return;
+                    }
+
+
+                    const parts = [
+
+                        categorySelect,
+                        subCategorySelect,
+                        productTypeSelect,
+                        collectionSelect
+
+                    ]
+                        .map(labelOf)
+                        .filter(Boolean);
+
+
+                    previewPath.textContent =
+                        parts.length
+                            ? parts.join('  →  ')
+                            : 'Select a category to begin';
+
+                }
+
+
+                /*
+                 * INITIALIZE
+                 */
+
+                function initializeTaxonomy() {
+
+                    const categoryValue =
+                        categorySelect.value;
+
+
+                    if (!categoryValue) {
+
+                        resetSelect(subCategorySelect);
+
+                        resetSelect(productTypeSelect);
+
+                        resetSelect(collectionSelect);
+
+                        updateTaxonomyPreview();
+
+                        return;
+                    }
+
+
+                    filterSelect(
+                        subCategorySelect,
+                        categoryValue,
+                        initialSubCategory
+                    );
+
+
+                    const subCategoryValue =
+                        subCategorySelect.value;
+
+
+                    if (!subCategoryValue) {
+
+                        resetSelect(productTypeSelect);
+
+                        resetSelect(collectionSelect);
+
+                        updateTaxonomyPreview();
+
+                        return;
+                    }
+
 
                     filterSelect(
                         productTypeSelect,
@@ -1498,730 +4106,817 @@ window.removeExistingImage = function (imageId, button) {
                         initialProductType
                     );
 
-                    /*
-                     * Product Type → Collection
-                     */
-                    const productTypeValue = productTypeSelect.value;
 
-                    if (productTypeValue) {
+                    const productTypeValue =
+                        productTypeSelect.value;
 
-                        filterSelect(
-                            collectionSelect,
-                            productTypeValue,
-                            initialCollection
-                        );
 
-                    } else {
+                    if (!productTypeValue) {
+
                         resetSelect(collectionSelect);
+
+                        updateTaxonomyPreview();
+
+                        return;
                     }
 
-                } else {
 
-                    resetSelect(productTypeSelect);
-                    resetSelect(collectionSelect);
+                    filterSelect(
+                        collectionSelect,
+                        productTypeValue,
+                        initialCollection
+                    );
+
+
+                    updateTaxonomyPreview();
+
                 }
 
-            } else {
-
-                resetSelect(subCategorySelect);
-                resetSelect(productTypeSelect);
-                resetSelect(collectionSelect);
-            }
-
-            updateTaxonomyPreview();
-        }
-
-
-        /*
-         * Category changed
-         */
-        categorySelect.addEventListener('change', function () {
-
-            const categoryValue = this.value;
-
-            resetSelect(productTypeSelect);
-            resetSelect(collectionSelect);
-
-            if (categoryValue) {
-
-                filterSelect(
-                    subCategorySelect,
-                    categoryValue
-                );
-
-            } else {
-
-                resetSelect(subCategorySelect);
-            }
-
-            updateTaxonomyPreview();
-        });
-
-
-        /*
-         * Sub Category changed
-         */
-        subCategorySelect.addEventListener('change', function () {
-
-            const subCategoryValue = this.value;
-
-            resetSelect(collectionSelect);
-
-            if (subCategoryValue) {
-
-                filterSelect(
-                    productTypeSelect,
-                    subCategoryValue
-                );
-
-            } else {
-
-                resetSelect(productTypeSelect);
-            }
-
-            updateTaxonomyPreview();
-        });
-
-
-        /*
-         * Product Type changed
-         */
-        productTypeSelect.addEventListener('change', function () {
-
-            const productTypeValue = this.value;
-
-            if (productTypeValue) {
-
-                filterSelect(
-                    collectionSelect,
-                    productTypeValue
-                );
-
-            } else {
-
-                resetSelect(collectionSelect);
-            }
-
-            updateTaxonomyPreview();
-        });
-
-
-        /*
-         * Collection changed
-         */
-        collectionSelect.addEventListener('change', function () {
-            updateTaxonomyPreview();
-        });
-
-
-        /*
-         * Get selected option label.
-         */
-        function labelOf(select) {
-
-            if (!select || !select.value) {
-                return null;
-            }
-
-            const option =
-                select.options[select.selectedIndex];
-
-            if (!option) {
-                return null;
-            }
-
-            return option.textContent.trim();
-        }
-
-
-        /*
-         * Update taxonomy preview.
-         */
-        function updateTaxonomyPreview() {
-
-            if (!previewPath) {
-                return;
-            }
-
-            const parts = [
-                categorySelect,
-                subCategorySelect,
-                productTypeSelect,
-                collectionSelect
-            ]
-                .map(labelOf)
-                .filter(Boolean);
-
-            previewPath.textContent =
-                parts.length
-                    ? parts.join('  →  ')
-                    : 'Select a category to begin';
-        }
-
-
-        /*
-         * Initialize edit values.
-         */
-        initializeTaxonomy();
-    }
-
-
-    /* ============================================================
-     * TOM SELECT
-     * ============================================================ */
-
-    const materialsSelect =
-        document.getElementById('materials');
-
-    const colorSelect =
-        document.getElementById('color');
-
-
-    let materialsTomSelect = null;
-    let colorTomSelect = null;
-
-
-    if (materialsSelect) {
-
-        materialsTomSelect = new TomSelect(
-            materialsSelect,
-            {
-                plugins: {
-                    remove_button: {
-                        title: 'Remove this material'
-                    }
-                },
-
-                create: false,
-
-                maxItems: 100,
-
-                hideSelected: true,
-
-                closeAfterSelect: false,
-
-                allowEmptyOption: true,
-
-                placeholder:
-                    'Select one or more materials...',
 
                 /*
-                 * Keeps optgroups visible.
+                 * CATEGORY CHANGE
                  */
-                render: {
-                    optgroup_header: function (data, escape) {
 
-                        return `
-                            <div class="optgroup-header">
-                                ${escape(data.label)}
-                            </div>
-                        `;
-                    }
-                }
-            }
-        );
-    }
+                categorySelect.addEventListener(
+                    'change',
+                    function () {
+
+                        resetSelect(productTypeSelect);
+
+                        resetSelect(collectionSelect);
 
 
-    if (colorSelect) {
+                        if (this.value) {
 
-        colorTomSelect = new TomSelect(
-            colorSelect,
-            {
-                plugins: {
-                    remove_button: {
-                        title: 'Remove this color'
-                    }
-                },
-
-                create: false,
-
-                maxItems: 100,
-
-                hideSelected: true,
-
-                closeAfterSelect: false,
-
-                allowEmptyOption: true,
-
-                placeholder:
-                    'Select one or more colors...',
-
-                render: {
-                    optgroup_header: function (data, escape) {
-
-                        return `
-                            <div class="optgroup-header">
-                                ${escape(data.label)}
-                            </div>
-                        `;
-                    }
-                }
-            }
-        );
-    }
-
-
-    /* ============================================================
-     * CUSTOM CHIPS
-     * ============================================================ */
-
-    function initializeChips(select) {
-
-        if (!select) {
-            return;
-        }
-
-        const wrapper =
-            select.closest('.tx-multi-select-wrap');
-
-        if (!wrapper) {
-            return;
-        }
-
-        const chips =
-            wrapper.querySelector('.tx-multi-chips');
-
-        const clearButton =
-            wrapper.querySelector('.tx-multi-clear');
-
-        if (!chips) {
-            return;
-        }
-
-
-        function updateChips() {
-
-            const selectedValues =
-                Array.from(select.selectedOptions)
-                    .map(function (option) {
-                        return option.value;
-                    })
-                    .filter(Boolean);
-
-
-            chips.innerHTML = '';
-
-
-            selectedValues.forEach(function (value) {
-
-                const chip =
-                    document.createElement('span');
-
-                chip.className =
-                    'tx-multi-chip';
-
-
-                const text =
-                    document.createElement('span');
-
-                text.textContent = value;
-
-
-                const removeButton =
-                    document.createElement('button');
-
-                removeButton.type = 'button';
-
-                removeButton.innerHTML = '&times;';
-
-                removeButton.setAttribute(
-                    'aria-label',
-                    'Remove ' + value
-                );
-
-
-                removeButton.addEventListener(
-                    'click',
-                    function (event) {
-
-                        event.preventDefault();
-
-                        /*
-                         * Use TomSelect when available.
-                         */
-                        if (select.tomselect) {
-
-                            select.tomselect.removeItem(
-                                value
+                            filterSelect(
+                                subCategorySelect,
+                                this.value
                             );
 
                         } else {
 
-                            Array.from(
-                                select.options
-                            ).forEach(function (option) {
+                            resetSelect(subCategorySelect);
 
-                                if (
-                                    option.value === value
-                                ) {
-                                    option.selected = false;
-                                }
-
-                            });
-
-                            select.dispatchEvent(
-                                new Event('change', {
-                                    bubbles: true
-                                })
-                            );
                         }
+
+
+                        updateTaxonomyPreview();
+
                     }
                 );
 
 
-                chip.appendChild(text);
-                chip.appendChild(removeButton);
+                /*
+                 * SUB CATEGORY CHANGE
+                 */
 
-                chips.appendChild(chip);
-            });
+                subCategorySelect.addEventListener(
+                    'change',
+                    function () {
 
-
-            /*
-             * Show / hide Clear button.
-             */
-            if (clearButton) {
-
-                clearButton.style.display =
-                    selectedValues.length
-                        ? 'inline-flex'
-                        : 'none';
-            }
-        }
+                        resetSelect(collectionSelect);
 
 
-        /*
-         * Normal select change.
-         */
-        select.addEventListener(
-            'change',
-            updateChips
-        );
+                        if (this.value) {
+
+                            filterSelect(
+                                productTypeSelect,
+                                this.value
+                            );
+
+                        } else {
+
+                            resetSelect(productTypeSelect);
+
+                        }
 
 
-        /*
-         * TomSelect events.
-         */
-        if (select.tomselect) {
+                        updateTaxonomyPreview();
 
-            select.tomselect.on(
-                'item_add',
-                updateChips
-            );
-
-            select.tomselect.on(
-                'item_remove',
-                updateChips
-            );
-
-            select.tomselect.on(
-                'clear',
-                updateChips
-            );
-        }
-
-
-        /*
-         * Clear button.
-         */
-        if (clearButton) {
-
-            clearButton.addEventListener(
-                'click',
-                function (event) {
-
-                    event.preventDefault();
-
-                    if (select.tomselect) {
-
-                        select.tomselect.clear();
-
-                    } else {
-
-                        Array.from(
-                            select.options
-                        ).forEach(function (option) {
-
-                            option.selected = false;
-
-                        });
-
-                        select.dispatchEvent(
-                            new Event('change', {
-                                bubbles: true
-                            })
-                        );
                     }
-
-                    updateChips();
-                }
-            );
-        }
+                );
 
 
-        /*
-         * Initial render.
-         */
-        updateChips();
-    }
+                /*
+                 * PRODUCT TYPE CHANGE
+                 */
+
+                productTypeSelect.addEventListener(
+                    'change',
+                    function () {
+
+                        if (this.value) {
+
+                            filterSelect(
+                                collectionSelect,
+                                this.value
+                            );
+
+                        } else {
+
+                            resetSelect(collectionSelect);
+
+                        }
 
 
-    initializeChips(materialsSelect);
-    initializeChips(colorSelect);
+                        updateTaxonomyPreview();
+
+                    }
+                );
 
 
-    /* ============================================================
-     * PRICE PREVIEW
-     * ============================================================ */
+                /*
+                 * COLLECTION CHANGE
+                 */
 
-    const priceInput =
-        document.getElementById('price');
+                collectionSelect.addEventListener(
+                    'change',
+                    updateTaxonomyPreview
+                );
 
-    const pricePreview =
-        document.getElementById('price-preview');
+
+                initializeTaxonomy();
+
+            }
 
 
-    if (priceInput && pricePreview) {
+            /* ========================================================
+               TOM SELECT
+            ======================================================== */
 
-        function updatePricePreview() {
+            const materialsSelect =
+                document.getElementById('materials');
 
-            let value =
-                parseFloat(priceInput.value);
+            const colorSelect =
+                document.getElementById('color');
 
 
             if (
-                Number.isNaN(value) ||
-                value < 0
+                materialsSelect &&
+                typeof TomSelect !== 'undefined'
             ) {
-                value = 0;
-            }
 
-
-            pricePreview.textContent =
-                '$' +
-                value.toLocaleString(
-                    'en-PH',
+                new TomSelect(
+                    materialsSelect,
                     {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
+
+                        plugins: {
+
+                            remove_button: {
+                                title: 'Remove this material'
+                            }
+
+                        },
+
+                        create: false,
+
+                        maxItems: 100,
+
+                        hideSelected: true,
+
+                        closeAfterSelect: false,
+
+                        allowEmptyOption: true,
+
+                        placeholder:
+                            'Select one or more materials...',
+
+                        render: {
+
+                            optgroup_header:
+                                function(data, escape) {
+
+                                    return `
+                                        <div class="optgroup-header">
+                                            ${escape(data.label)}
+                                        </div>
+                                    `;
+
+                                }
+
+                        }
+
                     }
                 );
-        }
+
+            }
 
 
-        priceInput.addEventListener(
-            'input',
-            updatePricePreview
-        );
+            if (
+                colorSelect &&
+                typeof TomSelect !== 'undefined'
+            ) {
+
+                new TomSelect(
+                    colorSelect,
+                    {
+
+                        plugins: {
+
+                            remove_button: {
+                                title: 'Remove this color'
+                            }
+
+                        },
+
+                        create: false,
+
+                        maxItems: 100,
+
+                        hideSelected: true,
+
+                        closeAfterSelect: false,
+
+                        allowEmptyOption: true,
+
+                        placeholder:
+                            'Select one or more colors...',
+
+                        render: {
+
+                            optgroup_header:
+                                function(data, escape) {
+
+                                    return `
+                                        <div class="optgroup-header">
+                                            ${escape(data.label)}
+                                        </div>
+                                    `;
+
+                                }
+
+                        }
+
+                    }
+                );
+
+            }
 
 
-        priceInput.addEventListener(
-            'change',
-            updatePricePreview
-        );
+            /* ========================================================
+               CUSTOM CHIPS
+            ======================================================== */
+
+            function initializeChips(select) {
+
+                if (!select) {
+                    return;
+                }
 
 
-        updatePricePreview();
-    }
-
-
-    /* ============================================================
-     * FORM SUBMISSION PROTECTION
-     *
-     * Prevent accidental double submission.
-     * ============================================================ */
-
-    const form =
-        document.getElementById('edit_product_form');
-
-
-    if (form) {
-
-        form.addEventListener(
-            'submit',
-            function () {
-
-                const submitButton =
-                    form.querySelector(
-                        '.tx-btn-submit'
+                const wrapper =
+                    select.closest(
+                        '.tx-multi-select-wrap'
                     );
 
-                if (!submitButton) {
+
+                if (!wrapper) {
                     return;
                 }
 
 
-                /*
-                 * Prevent multiple clicks.
-                 */
-                if (submitButton.dataset.submitted === '1') {
+                const chips =
+                    wrapper.querySelector(
+                        '.tx-multi-chips'
+                    );
+
+
+                const clearButton =
+                    wrapper.querySelector(
+                        '.tx-multi-clear'
+                    );
+
+
+                if (!chips) {
                     return;
                 }
 
 
-                submitButton.dataset.submitted = '1';
+                function updateChips() {
 
-                submitButton.disabled = true;
-
-                submitButton.style.opacity = '0.7';
-
-                submitButton.style.cursor = 'not-allowed';
-
-
-                /*
-                 * Keep the icon and change text.
-                 */
-                const originalHtml =
-                    submitButton.innerHTML;
-
-                submitButton.dataset.originalHtml =
-                    originalHtml;
+                    const selectedValues =
+                        Array.from(
+                            select.selectedOptions
+                        )
+                        .map(option => option.value)
+                        .filter(Boolean);
 
 
-                submitButton.innerHTML = `
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M12 6v6l4 2"
-                        />
-                    </svg>
-                    Updating...
-                `;
-            }
-        );
-    }
+                    chips.innerHTML = '';
 
 
-    /* ============================================================
-     * IMAGE URL VALIDATION
-     * ============================================================ */
+                    selectedValues.forEach(
+                        function(value) {
 
-    const imageLinksContainer =
-        document.getElementById('imageLinks');
-
-
-    if (imageLinksContainer) {
-
-        imageLinksContainer.addEventListener(
-            'input',
-            function (event) {
-
-                if (
-                    event.target &&
-                    event.target.matches(
-                        'input[name="image_links[]"]'
-                    )
-                ) {
-
-                    /*
-                     * Remove accidental whitespace.
-                     */
-                    event.target.value =
-                        event.target.value.trim();
-                }
-            }
-        );
-    }
-
-});
-/* ============================================================
- * NEW IMAGE PREVIEW
- * ============================================================ */
-
-const productImagesInput =
-    document.getElementById('product_images');
-
-const newImagePreview =
-    document.getElementById('newImagePreview');
+                            const chip =
+                                document.createElement(
+                                    'span'
+                                );
 
 
-if (productImagesInput && newImagePreview) {
-
-    productImagesInput.addEventListener(
-        'change',
-        function () {
-
-            newImagePreview.innerHTML = '';
-
-            const files =
-                Array.from(this.files || []);
-
-            files.forEach(function (file) {
-
-                const item =
-                    document.createElement('div');
-
-                item.className =
-                    'tx-new-image-item';
+                            chip.className =
+                                'tx-multi-chip';
 
 
-                if (file.type.startsWith('image/')) {
+                            const text =
+                                document.createElement(
+                                    'span'
+                                );
 
-                    const img =
-                        document.createElement('img');
+                            text.textContent =
+                                value;
 
-                    const url =
-                        URL.createObjectURL(file);
 
-                    img.src = url;
+                            const removeButton =
+                                document.createElement(
+                                    'button'
+                                );
 
-                    img.onload = function () {
-                        URL.revokeObjectURL(url);
-                    };
 
-                    item.appendChild(img);
+                            removeButton.type =
+                                'button';
 
-                } else {
+                            removeButton.innerHTML =
+                                '&times;';
 
-                    const placeholder =
-                        document.createElement('div');
 
-                    placeholder.style.height = '120px';
+                            removeButton.setAttribute(
+                                'aria-label',
+                                'Remove ' + value
+                            );
 
-                    placeholder.style.display = 'flex';
 
-                    placeholder.style.alignItems = 'center';
+                            removeButton.addEventListener(
+                                'click',
+                                function(event) {
 
-                    placeholder.style.justifyContent = 'center';
+                                    event.preventDefault();
 
-                    placeholder.style.fontSize = '.7rem';
 
-                    placeholder.style.color =
-                        'var(--tx-ink-faint)';
+                                    if (
+                                        select.tomselect
+                                    ) {
 
-                    placeholder.textContent =
-                        'File';
+                                        select.tomselect
+                                            .removeItem(value);
 
-                    item.appendChild(placeholder);
+                                    } else {
+
+                                        Array.from(
+                                            select.options
+                                        )
+                                        .forEach(
+                                            function(option) {
+
+                                                if (
+                                                    option.value ===
+                                                    value
+                                                ) {
+
+                                                    option.selected =
+                                                        false;
+
+                                                }
+
+                                            }
+                                        );
+
+
+                                        select.dispatchEvent(
+                                            new Event(
+                                                'change',
+                                                {
+                                                    bubbles: true
+                                                }
+                                            )
+                                        );
+
+                                    }
+
+                                }
+                            );
+
+
+                            chip.appendChild(text);
+
+                            chip.appendChild(
+                                removeButton
+                            );
+
+                            chips.appendChild(chip);
+
+                        }
+                    );
+
+
+                    if (clearButton) {
+
+                        clearButton.style.display =
+                            selectedValues.length
+                                ? 'inline-flex'
+                                : 'none';
+
+                    }
+
                 }
 
 
-                const name =
-                    document.createElement('div');
-
-                name.className =
-                    'tx-new-image-name';
-
-                name.textContent =
-                    file.name;
+                select.addEventListener(
+                    'change',
+                    updateChips
+                );
 
 
-                item.appendChild(name);
+                if (select.tomselect) {
 
-                newImagePreview.appendChild(item);
+                    select.tomselect.on(
+                        'item_add',
+                        updateChips
+                    );
 
-            });
+                    select.tomselect.on(
+                        'item_remove',
+                        updateChips
+                    );
 
-        }
-    );
-}
-</script>
+                    select.tomselect.on(
+                        'clear',
+                        updateChips
+                    );
+
+                }
+
+
+                if (clearButton) {
+
+                    clearButton.addEventListener(
+                        'click',
+                        function(event) {
+
+                            event.preventDefault();
+
+
+                            if (select.tomselect) {
+
+                                select.tomselect.clear();
+
+                            } else {
+
+                                Array.from(
+                                    select.options
+                                )
+                                .forEach(
+                                    option => {
+                                        option.selected =
+                                            false;
+                                    }
+                                );
+
+
+                                select.dispatchEvent(
+                                    new Event(
+                                        'change',
+                                        {
+                                            bubbles: true
+                                        }
+                                    )
+                                );
+
+                            }
+
+
+                            updateChips();
+
+                        }
+                    );
+
+                }
+
+
+                updateChips();
+
+            }
+
+
+            initializeChips(materialsSelect);
+
+            initializeChips(colorSelect);
+
+
+            /* ========================================================
+               PRICE PREVIEW
+            ======================================================== */
+
+            const priceInput =
+                document.getElementById('price');
+
+            const pricePreview =
+                document.getElementById(
+                    'price-preview'
+                );
+
+
+            if (priceInput && pricePreview) {
+
+                function updatePricePreview() {
+
+                    let value =
+                        parseFloat(
+                            priceInput.value
+                        );
+
+
+                    if (
+                        Number.isNaN(value) ||
+                        value < 0
+                    ) {
+
+                        value = 0;
+
+                    }
+
+
+                    pricePreview.textContent =
+                        '$' +
+                        value.toLocaleString(
+                            'en-PH',
+                            {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                            }
+                        );
+
+                }
+
+
+                priceInput.addEventListener(
+                    'input',
+                    updatePricePreview
+                );
+
+
+                priceInput.addEventListener(
+                    'change',
+                    updatePricePreview
+                );
+
+
+                updatePricePreview();
+
+            }
+
+
+            /* ========================================================
+               NEW IMAGE PREVIEW
+            ======================================================== */
+
+            const productImagesInput =
+                document.getElementById(
+                    'product_images'
+                );
+
+            const newImagePreview =
+                document.getElementById(
+                    'newImagePreview'
+                );
+
+
+            if (
+                productImagesInput &&
+                newImagePreview
+            ) {
+
+                productImagesInput.addEventListener(
+                    'change',
+                    function() {
+
+                        newImagePreview.innerHTML =
+                            '';
+
+
+                        const files =
+                            Array.from(
+                                this.files || []
+                            );
+
+
+                        files.forEach(
+                            function(file) {
+
+                                const item =
+                                    document.createElement(
+                                        'div'
+                                    );
+
+
+                                item.className =
+                                    'tx-new-image-item';
+
+
+                                if (
+                                    file.type.startsWith(
+                                        'image/'
+                                    )
+                                ) {
+
+                                    const img =
+                                        document.createElement(
+                                            'img'
+                                        );
+
+
+                                    const url =
+                                        URL.createObjectURL(
+                                            file
+                                        );
+
+
+                                    img.src =
+                                        url;
+
+
+                                    img.alt =
+                                        file.name;
+
+
+                                    img.onload =
+                                        function() {
+
+                                            URL.revokeObjectURL(
+                                                url
+                                            );
+
+                                        };
+
+
+                                    item.appendChild(
+                                        img
+                                    );
+
+                                } else {
+
+                                    const placeholder =
+                                        document.createElement(
+                                            'div'
+                                        );
+
+
+                                    placeholder.className =
+                                        'tx-new-image-file';
+
+
+                                    placeholder.textContent =
+                                        'FILE';
+
+
+                                    item.appendChild(
+                                        placeholder
+                                    );
+
+                                }
+
+
+                                const name =
+                                    document.createElement(
+                                        'div'
+                                    );
+
+
+                                name.className =
+                                    'tx-new-image-name';
+
+
+                                name.textContent =
+                                    file.name;
+
+
+                                item.appendChild(
+                                    name
+                                );
+
+
+                                newImagePreview.appendChild(
+                                    item
+                                );
+
+                            }
+                        );
+
+                    }
+                );
+
+            }
+
+
+            /* ========================================================
+               IMAGE URL CLEANUP
+            ======================================================== */
+
+            const imageLinksContainer =
+                document.getElementById(
+                    'imageLinks'
+                );
+
+
+            if (imageLinksContainer) {
+
+                imageLinksContainer.addEventListener(
+                    'blur',
+                    function(event) {
+
+                        if (
+                            event.target &&
+                            event.target.matches(
+                                'input[name="image_links[]"]'
+                            )
+                        ) {
+
+                            event.target.value =
+                                event.target.value.trim();
+
+                        }
+
+                    },
+                    true
+                );
+
+            }
+
+
+            /* ========================================================
+               FORM DOUBLE SUBMISSION PROTECTION
+            ======================================================== */
+
+            const form =
+                document.getElementById(
+                    'edit_product_form'
+                );
+
+
+            if (form) {
+
+                form.addEventListener(
+                    'submit',
+                    function() {
+
+                        const submitButton =
+                            form.querySelector(
+                                '.tx-btn-submit'
+                            );
+
+
+                        if (!submitButton) {
+                            return;
+                        }
+
+
+                        if (
+                            submitButton.dataset.submitted ===
+                            '1'
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        submitButton.dataset.submitted =
+                            '1';
+
+
+                        submitButton.disabled =
+                            true;
+
+
+                        submitButton.innerHTML = `
+
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="15"
+                                height="15"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                stroke-width="2.5"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M12 6v6l4 2"
+                                />
+                            </svg>
+
+                            Updating...
+
+                        `;
+
+                    }
+                );
+
+            }
+
+        });
+
+    </script>
+
 </x-mi_app>

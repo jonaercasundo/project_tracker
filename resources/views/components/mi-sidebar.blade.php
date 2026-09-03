@@ -148,7 +148,52 @@
                 </li> 
             </ul>
         </div>
-        
+        <!-- Liquidation Dropdown Module -->
+        <div x-data="{ open: {{ request()->routeIs('liquidation.*') ? 'true' : 'false' }} }" class="block">
+            <button @click="open = !open"
+                    class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none
+                    {{ request()->routeIs('liquidation.*') ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                <div class="flex items-center gap-3">
+                    <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs('liquidation.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600' }}" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor" 
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Liquidation Form</span>
+                </div>
+                <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0" :class="open ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+
+            <ul x-show="open" 
+                x-collapse 
+                class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
+                
+                <li>
+                    <a href="{{ route('liquidation.index') }}"
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('liquidation.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('liquidation.index') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Liquidation List</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('liquidation.create') }}"
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('liquidation.create') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('liquidation.create') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>New Liquidation</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
     </nav>
 
     <!-- Account Identity Panel Footer -->

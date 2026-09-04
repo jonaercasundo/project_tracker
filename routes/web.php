@@ -441,6 +441,13 @@ use App\Http\Controllers\Accounting_DashboardController;
     Route::get('/delivery-success', function () {return view('operation.delivery.success'); })->name('delivery.success');
     Route::get('/test-drive', function () { return view('test'); });
     Route::get('/p/{product}', [PublicProductController::class, 'show'])->name('public.product.show');
-    Route::post('/p/{product}/quotation', [QuotationController::class, 'download'])->name('mi_app.quotation.download');
-    Route::post('/p/{product}/quotation/print', [QuotationController::class, 'print'])->name('mi_app.quotation.print');
+    Route::post(
+        '/quotation/download',
+        [QuotationController::class, 'download']
+    )->name('mi_app.quotation.download');
+
+    Route::post(
+        '/quotation/print',
+        [QuotationController::class, 'print']
+    )->name('mi_app.quotation.print');
 require __DIR__.'/auth.php';

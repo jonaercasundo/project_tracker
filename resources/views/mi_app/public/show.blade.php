@@ -983,10 +983,10 @@
     */
 
     const PD_DOWNLOAD_URL =
-        @json(route('mi_app.public.quotation-pdf'));
+        @json(route('mi_app.quotation.download'));
 
     const PD_PRINT_URL =
-        @json(route('mi_app.public.print'));
+        @json(route('mi_app.quotation.print'));
 
     /*
     |--------------------------------------------------------------------------

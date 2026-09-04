@@ -86,6 +86,15 @@ class ProductScanController extends Controller
      */
     private function resolveProductFromCode(string $code): ?MI_Product
     {
+        // If the scanned value is a full tracker URL, extract the trailing
+        // path segment (e.g. "https://tracker.metro-mobilia.com/p/20" -> "20")
+        // before attempting any lookup.
+        $code = $this->extractCodeFromInput($code);
+
+        if ($code === '') {
+            return null;
+        }
+
         $query = MI_Product::with([
             'category',
             'subCategory',
@@ -112,10 +121,6 @@ class ProductScanController extends Controller
         |--------------------------------------------------------------------------
         | Try Numeric Product ID
         |--------------------------------------------------------------------------
-        |
-        | Only attempted if the code is purely numeric, to avoid a wasted
-        | query (and to avoid accidentally matching "0" for garbage input).
-        |
         */
 
         if (ctype_digit($code)) {
@@ -130,5 +135,38 @@ class ProductScanController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Normalize a scanned value into a bare product code.
+     *
+     * Handles two input shapes:
+     *  - A bare code/SKU typed or scanned directly, e.g. "MI-1042"
+     *  - A full tracker URL, e.g. "https://tracker.metro-mobilia.com/p/20",
+     *    from which the trailing path segment ("20") is extracted.
+     */
+    private function extractCodeFromInput(string $input): string
+    {
+        $input = trim($input);
+
+        if ($input === '') {
+            return '';
+        }
+
+        // Only attempt URL parsing if this actually looks like a URL —
+        // avoids mangling a bare SKU that happens to contain a slash.
+        if (filter_var($input, FILTER_VALIDATE_URL)) {
+
+            $path = parse_url($input, PHP_URL_PATH) ?? '';
+            $segments = array_values(array_filter(explode('/', $path)));
+
+            if (!empty($segments)) {
+                return trim(end($segments));
+            }
+
+            return '';
+        }
+
+        return $input;
     }
 }

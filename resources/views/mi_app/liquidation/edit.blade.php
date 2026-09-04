@@ -129,6 +129,30 @@
 
         /*
         |--------------------------------------------------------------------------
+        | Requested By / Account-Buyer preset options
+        |--------------------------------------------------------------------------
+        |
+        | Each field also supports a manual "Other" entry for names/accounts
+        | that aren't in the preset list below.
+        |
+        */
+
+        $requestedByOptions = [
+            'Maizen Tabobo',
+            'Rose Ann Neis',
+            'Arthur Ballais',
+            'Marco Juan',
+        ];
+
+        $accountBuyerOptions = [
+            'Action',
+            'TJX',
+            'World Market',
+        ];
+
+
+        /*
+        |--------------------------------------------------------------------------
         | Existing items
         |--------------------------------------------------------------------------
         */
@@ -2181,14 +2205,19 @@
                                         $item['item_date'] ?? $datePrepared
                                     );
 
-                                    $requestedBy = old(
+                                    $requestedByValue = old(
                                         "items.$index.requested_by",
-                                        $item['requested_by'] ?? $currentUserId
+                                        $item['requested_by_name'] ?? $item['requested_by'] ?? $currentUserName
                                     );
 
-                                    $requestedByName =
-                                        $item['requested_by_name']
-                                        ?? $currentUserName;
+                                    $requestedByIsKnown = in_array($requestedByValue, $requestedByOptions, true);
+
+                                    $accountBuyerValue = old(
+                                        "items.$index.account_buyer",
+                                        $item['account_buyer'] ?? ''
+                                    );
+
+                                    $accountBuyerIsKnown = in_array($accountBuyerValue, $accountBuyerOptions, true);
 
                                 @endphp
 
@@ -2316,19 +2345,48 @@
                                                     Requested By
                                                 </label>
 
-                                                <input
-                                                    type="hidden"
-                                                    name="items[{{ $index }}][requested_by]"
-                                                    value="{{ $requestedBy }}"
-                                                    class="requested-by"
-                                                >
+                                                <div class="other-toggle-container">
 
-                                                <input
-                                                    type="text"
-                                                    class="liq-input requested-by-name"
-                                                    value="{{ $requestedByName }}"
-                                                    readonly
-                                                >
+                                                    <select
+                                                        name="items[{{ $index }}][requested_by]"
+                                                        class="liq-select other-toggle-select"
+                                                        data-field="requested_by"
+                                                        required
+                                                    >
+
+                                                        <option value="">
+                                                            Select requested by
+                                                        </option>
+
+                                                        @foreach($requestedByOptions as $name)
+
+                                                            <option
+                                                                value="{{ $name }}"
+                                                                @selected($requestedByValue === $name)
+                                                            >
+                                                                {{ $name }}
+                                                            </option>
+
+                                                        @endforeach
+
+                                                        <option
+                                                            value="__other__"
+                                                            @selected($requestedByValue !== '' && !$requestedByIsKnown)
+                                                        >
+                                                            Other (Manual Entry)
+                                                        </option>
+
+                                                    </select>
+
+                                                    <input
+                                                        type="text"
+                                                        class="liq-input other-toggle-input"
+                                                        placeholder="Enter name"
+                                                        value="{{ !$requestedByIsKnown ? $requestedByValue : '' }}"
+                                                        style="margin-top:8px; display:{{ !$requestedByIsKnown ? 'block' : 'none' }};"
+                                                    >
+
+                                                </div>
 
                                             </div>
 
@@ -2434,13 +2492,48 @@
                                                     Account / Buyer
                                                 </label>
 
-                                                <input
-                                                    type="text"
-                                                    name="items[{{ $index }}][account_buyer]"
-                                                    class="liq-input"
-                                                    value="{{ old("items.$index.account_buyer", $item['account_buyer'] ?? '') }}"
-                                                    placeholder="Account / buyer"
-                                                >
+                                                <div class="other-toggle-container">
+
+                                                    <select
+                                                        name="items[{{ $index }}][account_buyer]"
+                                                        class="liq-select other-toggle-select"
+                                                        data-field="account_buyer"
+                                                        required
+                                                    >
+
+                                                        <option value="">
+                                                            Select account / buyer
+                                                        </option>
+
+                                                        @foreach($accountBuyerOptions as $account)
+
+                                                            <option
+                                                                value="{{ $account }}"
+                                                                @selected($accountBuyerValue === $account)
+                                                            >
+                                                                {{ $account }}
+                                                            </option>
+
+                                                        @endforeach
+
+                                                        <option
+                                                            value="__other__"
+                                                            @selected($accountBuyerValue !== '' && !$accountBuyerIsKnown)
+                                                        >
+                                                            Other (Manual Entry)
+                                                        </option>
+
+                                                    </select>
+
+                                                    <input
+                                                        type="text"
+                                                        class="liq-input other-toggle-input"
+                                                        placeholder="Enter buyer / account"
+                                                        value="{{ ($accountBuyerValue !== '' && !$accountBuyerIsKnown) ? $accountBuyerValue : '' }}"
+                                                        style="margin-top:8px; display:{{ ($accountBuyerValue !== '' && !$accountBuyerIsKnown) ? 'block' : 'none' }};"
+                                                    >
+
+                                                </div>
 
                                             </div>
 
@@ -2954,6 +3047,14 @@
                     @json($expenseClassifications);
 
 
+                const requestedByOptions =
+                    @json($requestedByOptions);
+
+
+                const accountBuyerOptions =
+                    @json($accountBuyerOptions);
+
+
                 /* =========================================================
                    NUMBER
                 ========================================================== */
@@ -3032,6 +3133,126 @@
                     return number(
                         exchangeRateInput?.value
                     );
+
+                }
+
+
+                /* =========================================================
+                   OTHER / MANUAL-ENTRY TOGGLE
+                   (used by Requested By and Account / Buyer dropdowns)
+                ========================================================== */
+
+                function getRowIndex(el) {
+
+                    const row =
+                        el.closest('.expense-item');
+
+                    return row
+                        ? (parseInt(row.dataset.index, 10) || 0)
+                        : 0;
+
+                }
+
+
+                function bindOtherToggle(toggleContainer) {
+
+                    const select =
+                        toggleContainer.querySelector(
+                            '.other-toggle-select'
+                        );
+
+                    const otherInput =
+                        toggleContainer.querySelector(
+                            '.other-toggle-input'
+                        );
+
+                    if (!select || !otherInput) {
+
+                        return;
+
+                    }
+
+                    const field =
+                        select.dataset.field;
+
+                    function sync() {
+
+                        const idx =
+                            getRowIndex(select);
+
+                        const fieldName =
+                            `items[${idx}][${field}]`;
+
+                        if (select.value === '__other__') {
+
+                            select.removeAttribute('name');
+
+                            otherInput.name = fieldName;
+                            otherInput.style.display = 'block';
+                            otherInput.required = true;
+
+                        } else {
+
+                            select.name = fieldName;
+
+                            otherInput.removeAttribute('name');
+                            otherInput.style.display = 'none';
+                            otherInput.required = false;
+
+                        }
+
+                    }
+
+                    select.addEventListener(
+                        'change',
+                        function () {
+
+                            otherInput.value = '';
+
+                            sync();
+
+                        }
+                    );
+
+                    sync();
+
+                }
+
+
+                function bindOtherToggles(scope) {
+
+                    scope
+                        .querySelectorAll(
+                            '.other-toggle-container'
+                        )
+                        .forEach(bindOtherToggle);
+
+                }
+
+
+                function buildOtherToggleOptions(options) {
+
+                    let html =
+                        '';
+
+                    options.forEach(
+                        function (value) {
+
+                            html +=
+
+                                '<option value="' +
+                                escapeHtml(value) +
+                                '">' +
+                                escapeHtml(value) +
+                                '</option>';
+
+                        }
+                    );
+
+                    html +=
+                        '<option value="__other__">Other (Manual Entry)</option>';
+
+                    return html;
 
                 }
 
@@ -3530,19 +3751,29 @@
                                         Requested By
                                     </label>
 
-                                    <input
-                                        type="hidden"
-                                        name="items[${index}][requested_by]"
-                                        value="${escapeHtml(currentUserId || '')}"
-                                        class="requested-by"
-                                    >
+                                    <div class="other-toggle-container">
 
-                                    <input
-                                        type="text"
-                                        class="liq-input requested-by-name"
-                                        value="${escapeHtml(currentUserName)}"
-                                        readonly
-                                    >
+                                        <select
+                                            name="items[${index}][requested_by]"
+                                            class="liq-select other-toggle-select"
+                                            data-field="requested_by"
+                                            required
+                                        >
+
+                                            <option value="">Select requested by</option>
+
+                                            ${buildOtherToggleOptions(requestedByOptions)}
+
+                                        </select>
+
+                                        <input
+                                            type="text"
+                                            class="liq-input other-toggle-input"
+                                            placeholder="Enter name"
+                                            style="margin-top:8px; display:none;"
+                                        >
+
+                                    </div>
 
                                 </div>
 
@@ -3595,12 +3826,29 @@
                                         Account / Buyer
                                     </label>
 
-                                    <input
-                                        type="text"
-                                        name="items[${index}][account_buyer]"
-                                        class="liq-input"
-                                        placeholder="Account / buyer"
-                                    >
+                                    <div class="other-toggle-container">
+
+                                        <select
+                                            name="items[${index}][account_buyer]"
+                                            class="liq-select other-toggle-select"
+                                            data-field="account_buyer"
+                                            required
+                                        >
+
+                                            <option value="">Select account / buyer</option>
+
+                                            ${buildOtherToggleOptions(accountBuyerOptions)}
+
+                                        </select>
+
+                                        <input
+                                            type="text"
+                                            class="liq-input other-toggle-input"
+                                            placeholder="Enter buyer / account"
+                                            style="margin-top:8px; display:none;"
+                                        >
+
+                                    </div>
 
                                 </div>
 
@@ -3758,6 +4006,9 @@
                     container.appendChild(
                         wrapper
                     );
+
+
+                    bindOtherToggles(wrapper);
 
 
                     renumberExpenses();
@@ -4149,8 +4400,11 @@
 
 
                 /* =========================================================
-                   INITIAL CALCULATION
+                   INITIAL BIND + CALCULATION
                 ========================================================== */
+
+                bindOtherToggles(container);
+
 
                 container
                     .querySelectorAll(

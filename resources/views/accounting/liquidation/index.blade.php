@@ -1,4 +1,4 @@
-<x-mi_app>
+<x-accounting_app>
 
     {{-- =========================================================
         FONTS
@@ -884,32 +884,6 @@
 
                 </div>
 
-
-                <a
-                    href="{{ route('liquidation.create') }}"
-                    class="tx-btn-primary"
-                >
-
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M12 4.5v15m7.5-7.5h-15"
-                        />
-                    </svg>
-
-                    New Liquidation
-
-                </a>
-
             </div>
 
 
@@ -1030,7 +1004,7 @@
 
                 <form
                     method="GET"
-                    action="{{ route('liquidation.index') }}"
+                    action="{{ route('accounting.mi.liquidation.index') }}"
                     class="tx-filter-form"
                 >
 
@@ -1103,7 +1077,7 @@
                     @if(request()->filled('search') || request()->filled('status'))
 
                         <a
-                            href="{{ route('liquidation.index') }}"
+                            href="{{ route('accounting.mi.liquidation.index') }}"
                             class="tx-filter-clear"
                         >
                             Clear filters
@@ -1454,8 +1428,6 @@
                                             </div>
 
                                         </td>
-
-
                                         {{-- =================================================
                                             ACTIONS
                                         ================================================== --}}
@@ -1467,7 +1439,7 @@
                                                 {{-- VIEW --}}
 
                                                 <a
-                                                    href="{{ route('liquidation.show', $report->id) }}"
+                                                    href="{{ route('accounting.mi.liquidation.show', $report->id) }}"
                                                     class="tx-icon-btn"
                                                     title="View liquidation"
                                                     aria-label="View liquidation"
@@ -1498,78 +1470,6 @@
                                                     </svg>
 
                                                 </a>
-
-
-                                                {{-- EDIT --}}
-
-                                                <a
-                                                    href="{{ route('liquidation.edit', $report->id) }}"
-                                                    class="tx-icon-btn"
-                                                    title="Edit liquidation"
-                                                    aria-label="Edit liquidation"
-                                                >
-
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        width="15"
-                                                        height="15"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        stroke-width="2"
-                                                    >
-
-                                                        <path
-                                                            stroke-linecap="round"
-                                                            stroke-linejoin="round"
-                                                            d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
-                                                        />
-
-                                                    </svg>
-
-                                                </a>
-
-
-                                                {{-- DELETE --}}
-
-                                                <form
-                                                    method="POST"
-                                                    action="{{ route('liquidation.destroy', $report->id) }}"
-                                                    onsubmit="return confirm('Delete this liquidation report? This action cannot be undone.');"
-                                                >
-
-                                                    @csrf
-
-                                                    @method('DELETE')
-
-                                                    <button
-                                                        type="submit"
-                                                        class="tx-icon-btn danger"
-                                                        title="Delete liquidation"
-                                                        aria-label="Delete liquidation"
-                                                    >
-
-                                                        <svg
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            width="15"
-                                                            height="15"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                            stroke-width="2"
-                                                        >
-
-                                                            <path
-                                                                stroke-linecap="round"
-                                                                stroke-linejoin="round"
-                                                                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M4.772 5.79c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                                            />
-
-                                                        </svg>
-
-                                                    </button>
-
-                                                </form>
 
                                             </div>
 
@@ -1660,7 +1560,7 @@
                             </p>
 
                             <a
-                                href="{{ route('liquidation.index') }}"
+                                href="{{ route('accounting.mi.liquidation.index') }}"
                                 class="tx-btn-primary"
                                 style="margin-top: 14px;"
                             >
@@ -1680,34 +1580,6 @@
                                 and approval status.
                             </p>
 
-                            <a
-                                href="{{ route('liquidation.create') }}"
-                                class="tx-btn-primary"
-                                style="margin-top: 14px;"
-                            >
-
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="16"
-                                    height="16"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    stroke-width="2.5"
-                                >
-
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        d="M12 4.5v15m7.5-7.5h-15"
-                                    />
-
-                                </svg>
-
-                                Create First Report
-
-                            </a>
-
                         @endif
 
                     </div>
@@ -1720,4 +1592,4 @@
 
     </div>
 
-</x-mi_app>
+</x-accounting_app>

@@ -6,6 +6,7 @@ use App\Http\Controllers\RoleAccessPermissionController;
 use App\Http\Controllers\ProfileController;
 use Spatie\Permission\Models\Role;
 use App\Models\User;
+
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\PplFormController;
@@ -32,6 +33,8 @@ use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\LiquidationController;
+use App\Http\Controllers\Accounting_LiquidationController;
+use App\Http\Controllers\Accounting_DashboardController;
 
     /*
     |--------------------------------------------------------------------------
@@ -390,7 +393,7 @@ use App\Http\Controllers\LiquidationController;
             | MI ROUTES
             |--------------------------------------------------------------------------
         */
-            Route::middleware(['auth','company.context:MI','role:user'])->group(function () {
+        Route::middleware(['auth','company.context:MI','role:user'])->group(function () {
 
             Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
             Route::get('/mi/settings', [MIAppController::class, 'settings'])->name('mi_app.settings');
@@ -416,6 +419,13 @@ use App\Http\Controllers\LiquidationController;
             )->name('liquidation.edit');
             Route::put('/liquidation/{liquidation}', [LiquidationController::class, 'update'])->name('liquidation.update');
             Route::delete('/liquidation/{liquidation}', [LiquidationController::class, 'destroy'])->name('liquidation.destroy');
+            Route::get('/liquidation/{liquidation}/pdf', [LiquidationController::class, 'downloadPdf'])->name('liquidation.pdf');
+        });
+        Route::middleware(['auth','company.context:MI','role:accounting'])->group(function () {
+            Route::get('/accounting/dashboard', [Accounting_DashboardController::class, 'dashboard'])->name('accounting.mi.dashboard');
+            Route::get('/accounting/liquidation', [Accounting_LiquidationController::class, 'index'])->name('accounting.mi.liquidation.index');
+            Route::get('/accounting/liquidation/{liquidation}', [Accounting_LiquidationController::class, 'show'])->name('accounting.mi.liquidation.show');
+            Route::get('/accounting/liquidation/{liquidation}/pdf', [Accounting_LiquidationController::class, 'downloadPdf'])->name('accounting.mi.liquidation.pdf');
         });
     });
     

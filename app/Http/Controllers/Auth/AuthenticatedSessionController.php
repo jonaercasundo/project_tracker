@@ -39,9 +39,11 @@ class AuthenticatedSessionController extends Controller
             if ($user->hasRole('Administrator')) {
                 return redirect()->route('admin.dashboard');
             }
-
             if ($user->hasRole('user')) {
                 return redirect()->route('mi_app.dashboard');
+            }
+            if ($user->hasRole('accounting')) {
+                return redirect()->route('accounting.mi.dashboard');
             }
         }
 

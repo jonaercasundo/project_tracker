@@ -20,10 +20,33 @@
                 'payee'          => '',
                 'expense_type'   => '',
                 'account_buyer'  => '',
+                'requested_by'   => $currentUserName,
                 'amount_vnd'     => '',
                 'remarks'        => '',
             ],
         ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Requested By / Account-Buyer preset options
+        |--------------------------------------------------------------------------
+        |
+        | Each field also supports a manual "Other" entry for names/accounts
+        | that aren't in the preset list below.
+        |
+        */
+        $requestedByOptions = [
+            'Maizen Tabobo',
+            'Rose Ann Neis',
+            'Arthur Ballais',
+            'Marco Juan',
+        ];
+
+        $presetAccountBuyerOptions = [
+            'Action',
+            'TJX',
+            'World Market',
+        ];
 
         /*
         |--------------------------------------------------------------------------
@@ -91,9 +114,7 @@
             ->filter()
             ->values();
 
-        $accountBuyerOptions = collect($accountBuyerOptions ?? [])
-            ->filter()
-            ->values();
+        $accountBuyerOptions = $presetAccountBuyerOptions;
     @endphp
 
 
@@ -1174,26 +1195,60 @@
                                             </div>
 
 
-                                            {{-- Requested By (locked to current user) --}}
+                                            {{-- Requested By --}}
                                             <div class="tx-field">
 
                                                 <div class="tx-row-label">
                                                     Requested By
                                                 </div>
 
-                                                <div class="tx-readonly-box">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                                                    </svg>
-                                                    {{ $currentUserName }}
-                                                </div>
+                                                @php
+                                                    $requestedByValue = $item['requested_by'] ?? $currentUserName;
+                                                    $requestedByIsKnown = in_array($requestedByValue, $requestedByOptions, true);
+                                                @endphp
 
-                                                <input
-                                                    type="hidden"
-                                                    name="items[{{ $index }}][requested_by]"
-                                                    class="requested-by-input"
-                                                    value="{{ $currentUserName }}"
-                                                >
+                                                <div class="other-toggle-container">
+
+                                                    <select
+                                                        name="items[{{ $index }}][requested_by]"
+                                                        class="tx-select other-toggle-select"
+                                                        data-field="requested_by"
+                                                        required
+                                                    >
+
+                                                        <option value="">
+                                                            Select requested by
+                                                        </option>
+
+                                                        @foreach($requestedByOptions as $name)
+
+                                                            <option
+                                                                value="{{ $name }}"
+                                                                @selected($requestedByValue === $name)
+                                                            >
+                                                                {{ $name }}
+                                                            </option>
+
+                                                        @endforeach
+
+                                                        <option
+                                                            value="__other__"
+                                                            @selected($requestedByValue !== '' && !$requestedByIsKnown)
+                                                        >
+                                                            Other (Manual Entry)
+                                                        </option>
+
+                                                    </select>
+
+                                                    <input
+                                                        type="text"
+                                                        class="tx-input other-toggle-input"
+                                                        placeholder="Enter name"
+                                                        value="{{ !$requestedByIsKnown ? $requestedByValue : '' }}"
+                                                        style="margin-top:8px; display:{{ !$requestedByIsKnown ? 'block' : 'none' }};"
+                                                    >
+
+                                                </div>
 
                                             </div>
 
@@ -1310,11 +1365,17 @@
                                                     Account / Buyer
                                                 </div>
 
-                                                @if($accountBuyerOptions->count())
+                                                @php
+                                                    $accountBuyerValue = $item['account_buyer'] ?? '';
+                                                    $accountBuyerIsKnown = in_array($accountBuyerValue, $accountBuyerOptions, true);
+                                                @endphp
+
+                                                <div class="other-toggle-container">
 
                                                     <select
                                                         name="items[{{ $index }}][account_buyer]"
-                                                        class="tx-select"
+                                                        class="tx-select other-toggle-select"
+                                                        data-field="account_buyer"
                                                         required
                                                     >
 
@@ -1326,27 +1387,31 @@
 
                                                             <option
                                                                 value="{{ $account }}"
-                                                                @selected(($item['account_buyer'] ?? '') == $account)
+                                                                @selected($accountBuyerValue === $account)
                                                             >
                                                                 {{ $account }}
                                                             </option>
 
                                                         @endforeach
 
-                                                    </select>
+                                                        <option
+                                                            value="__other__"
+                                                            @selected($accountBuyerValue !== '' && !$accountBuyerIsKnown)
+                                                        >
+                                                            Other (Manual Entry)
+                                                        </option>
 
-                                                @else
+                                                    </select>
 
                                                     <input
                                                         type="text"
-                                                        name="items[{{ $index }}][account_buyer]"
-                                                        value="{{ $item['account_buyer'] ?? '' }}"
-                                                        class="tx-input"
-                                                        placeholder="e.g. Buyer name / account"
-                                                        required
+                                                        class="tx-input other-toggle-input"
+                                                        placeholder="Enter buyer / account"
+                                                        value="{{ ($accountBuyerValue !== '' && !$accountBuyerIsKnown) ? $accountBuyerValue : '' }}"
+                                                        style="margin-top:8px; display:{{ ($accountBuyerValue !== '' && !$accountBuyerIsKnown) ? 'block' : 'none' }};"
                                                     >
 
-                                                @endif
+                                                </div>
 
                                                 <div class="tx-help">
                                                     Use this field to identify who or which account should be charged.
@@ -1766,18 +1831,6 @@
 
                     if (refInput) {
                         refInput.value = refNumber;
-                    }
-
-
-                    /* ---------------------------------------------
-                       Requested By is always the current user
-                    --------------------------------------------- */
-
-                    const requestedByInput =
-                        row.querySelector('.requested-by-input');
-
-                    if (requestedByInput) {
-                        requestedByInput.value = CURRENT_USER_NAME;
                     }
 
 
@@ -2223,7 +2276,7 @@
                             </div>
 
 
-                            <!-- REQUESTED BY (locked to current user) -->
+                            <!-- REQUESTED BY -->
 
                             <div class="tx-field">
 
@@ -2231,19 +2284,31 @@
                                     Requested By
                                 </div>
 
-                                <div class="tx-readonly-box">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                                    </svg>
-                                    ${escapeHtml(CURRENT_USER_NAME)}
-                                </div>
+                                <div class="other-toggle-container">
 
-                                <input
-                                    type="hidden"
-                                    name="items[${index}][requested_by]"
-                                    class="requested-by-input"
-                                    value="${escapeHtml(CURRENT_USER_NAME)}"
-                                >
+                                    <select
+                                        name="items[${index}][requested_by]"
+                                        class="tx-select other-toggle-select"
+                                        data-field="requested_by"
+                                        required
+                                    >
+
+                                        <option value="">Select requested by</option>
+                                        @foreach($requestedByOptions as $name)
+                                            <option value="{{ $name }}">{{ $name }}</option>
+                                        @endforeach
+                                        <option value="__other__">Other (Manual Entry)</option>
+
+                                    </select>
+
+                                    <input
+                                        type="text"
+                                        class="tx-input other-toggle-input"
+                                        placeholder="Enter name"
+                                        style="margin-top:8px; display:none;"
+                                    >
+
+                                </div>
 
                             </div>
 
@@ -2323,13 +2388,31 @@
                                     Account / Buyer
                                 </div>
 
-                                <input
-                                    type="text"
-                                    name="items[${index}][account_buyer]"
-                                    class="tx-input"
-                                    placeholder="Buyer / account to charge"
-                                    required
-                                >
+                                <div class="other-toggle-container">
+
+                                    <select
+                                        name="items[${index}][account_buyer]"
+                                        class="tx-select other-toggle-select"
+                                        data-field="account_buyer"
+                                        required
+                                    >
+
+                                        <option value="">Select account / buyer</option>
+                                        @foreach($accountBuyerOptions as $account)
+                                            <option value="{{ $account }}">{{ $account }}</option>
+                                        @endforeach
+                                        <option value="__other__">Other (Manual Entry)</option>
+
+                                    </select>
+
+                                    <input
+                                        type="text"
+                                        class="tx-input other-toggle-input"
+                                        placeholder="Enter buyer / account"
+                                        style="margin-top:8px; display:none;"
+                                    >
+
+                                </div>
 
                             </div>
 
@@ -2646,10 +2729,76 @@
 
 
             /* ============================================================
+               OTHER / MANUAL-ENTRY TOGGLE
+               (used by Requested By and Account / Buyer dropdowns)
+            ============================================================ */
+
+            function getRowIndex(el) {
+
+                const row = el.closest('.expense-row');
+
+                return row ? parseInt(row.dataset.index, 10) || 0 : 0;
+
+            }
+
+            function bindOtherToggle(container) {
+
+                const select =
+                    container.querySelector('.other-toggle-select');
+
+                const otherInput =
+                    container.querySelector('.other-toggle-input');
+
+                if (!select || !otherInput) {
+                    return;
+                }
+
+                const field = select.dataset.field;
+
+                function sync() {
+
+                    const idx = getRowIndex(select);
+                    const fieldName = `items[${idx}][${field}]`;
+
+                    if (select.value === '__other__') {
+
+                        select.removeAttribute('name');
+
+                        otherInput.name = fieldName;
+                        otherInput.style.display = 'block';
+                        otherInput.required = true;
+
+                    } else {
+
+                        select.name = fieldName;
+
+                        otherInput.removeAttribute('name');
+                        otherInput.style.display = 'none';
+                        otherInput.required = false;
+
+                    }
+
+                }
+
+                select.addEventListener('change', function () {
+                    otherInput.value = '';
+                    sync();
+                });
+
+                sync();
+
+            }
+
+
+            /* ============================================================
                BIND ROW
             ============================================================ */
 
             function bindRow(row) {
+
+                row.querySelectorAll('.other-toggle-container')
+                    .forEach(bindOtherToggle);
+
 
                 const amountVnd =
                     row.querySelector('.amount-vnd');

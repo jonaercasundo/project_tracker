@@ -1,4 +1,4 @@
-<x-mi_app>
+<x-accounting_app>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -9,6 +9,271 @@
 >
 
 <style>
+    /* ============================================================
+   RECEIPT MODAL
+============================================================ */
+
+.liq-receipt-preview-btn {
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+
+    padding: 0;
+    border: 0;
+    background: transparent;
+
+    cursor: pointer;
+}
+
+.liq-receipt-preview-btn .liq-receipt-preview {
+    display: block;
+    width: 52px;
+    height: 52px;
+
+    object-fit: cover;
+
+    border: 1px solid #dbe3ed;
+    border-radius: 8px;
+
+    background: white;
+
+    transition:
+        transform .15s ease,
+        box-shadow .15s ease;
+}
+
+.liq-receipt-preview-btn:hover .liq-receipt-preview {
+    transform: scale(1.05);
+
+    box-shadow:
+        0 5px 15px rgba(15, 23, 42, .12);
+}
+
+
+/* Modal Overlay */
+
+.liq-receipt-modal {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 99999;
+
+    display: none;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 25px;
+
+    background: rgba(15, 23, 42, .78);
+
+    backdrop-filter: blur(4px);
+}
+
+
+/* Show Modal */
+
+.liq-receipt-modal.active {
+    display: flex;
+}
+
+
+/* Modal Container */
+
+.liq-receipt-modal-content {
+    width: min(100%, 1000px);
+    max-height: 94vh;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+
+    border-radius: 16px;
+
+    background: white;
+
+    box-shadow:
+        0 25px 70px rgba(0, 0, 0, .30);
+
+    animation: receiptModalIn .18s ease-out;
+}
+
+
+@keyframes receiptModalIn {
+
+    from {
+        opacity: 0;
+        transform: scale(.97) translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+
+}
+
+
+/* Modal Header */
+
+.liq-receipt-modal-header {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 15px;
+
+    padding: 15px 18px;
+
+    border-bottom: 1px solid #e2e8f0;
+
+    background: #f8fafc;
+}
+
+
+.liq-receipt-modal-title {
+    color: #1e293b;
+
+    font-family: "Space Grotesk", sans-serif;
+
+    font-size: 15px;
+    font-weight: 700;
+}
+
+
+.liq-receipt-modal-ref {
+    margin-top: 3px;
+
+    color: #94a3b8;
+
+    font-family: "JetBrains Mono", monospace;
+
+    font-size: 10px;
+}
+
+
+/* Close Button */
+
+.liq-receipt-modal-close {
+    width: 36px;
+    height: 36px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+
+    background: white;
+    color: #475569;
+
+    font-size: 25px;
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition: .15s ease;
+}
+
+
+.liq-receipt-modal-close:hover {
+    background: #f1f5f9;
+
+    color: #dc2626;
+
+    border-color: #fca5a5;
+}
+
+
+/* Modal Body */
+
+.liq-receipt-modal-body {
+    min-height: 200px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    overflow: auto;
+
+    background: #0f172a;
+}
+
+
+/* Receipt Image */
+
+.liq-receipt-modal-image {
+    display: block;
+
+    max-width: 100%;
+    max-height: 70vh;
+
+    width: auto;
+    height: auto;
+
+    object-fit: contain;
+
+    border-radius: 5px;
+
+    background: white;
+
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, .20);
+}
+
+
+/* Modal Footer */
+
+.liq-receipt-modal-footer {
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 8px;
+
+    padding: 12px 18px;
+
+    border-top: 1px solid #e2e8f0;
+
+    background: white;
+}
+
+
+/* Mobile */
+
+@media (max-width: 700px) {
+
+    .liq-receipt-modal {
+        padding: 10px;
+    }
+
+    .liq-receipt-modal-content {
+        max-height: 96vh;
+
+        border-radius: 12px;
+    }
+
+    .liq-receipt-modal-body {
+        padding: 10px;
+    }
+
+    .liq-receipt-modal-image {
+        max-height: 72vh;
+    }
+
+    .liq-receipt-modal-footer {
+        padding: 10px;
+    }
+
+}
     /* ============================================================
        LIQUIDATION SHOW
     ============================================================ */
@@ -1188,7 +1453,7 @@
             <div class="liq-header-actions pdf-hide">
 
                 <a
-                    href="{{ route('liquidation.index') }}"
+                    href="{{ route('accounting.mi.liquidation.index') }}"
                     class="liq-btn"
                 >
 
@@ -1219,7 +1484,7 @@
                 --}}
 
                 <a
-                    href="{{ route('liquidation.pdf', $liquidation->id) }}"
+                    href="{{ route('accounting.mi.liquidation.pdf', $liquidation->id) }}"
                     class="liq-btn"
                     id="downloadPdfBtnTop"
                 >
@@ -1240,31 +1505,6 @@
                     </svg>
 
                     Download PDF
-
-                </a>
-
-
-                <a
-                    href="{{ route('liquidation.edit', $liquidation->id) }}"
-                    class="liq-btn liq-btn-primary"
-                >
-
-                    <svg
-                        width="15"
-                        height="15"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
-                        />
-                    </svg>
-
-                    Edit Report
 
                 </a>
 
@@ -1933,69 +2173,166 @@
 
 
                                 {{-- ==================================================
-                                     RECEIPT
+                                    RECEIPT
                                 =================================================== --}}
 
-@if($item->receipt_image)
+                                @if($item->receipt_image)
 
-    @php
-        $receiptPath = ltrim($item->receipt_image, '/');
-        $receiptUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($receiptPath);
-    @endphp
+                                    @php
+                                        $receiptPath = ltrim($item->receipt_image, '/');
+                                        $receiptUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($receiptPath);
+                                        $receiptModalId = 'receiptModal-' . $item->id;
+                                    @endphp
 
-    <div class="liq-receipt">
+                                    <div class="liq-receipt">
 
-        {{-- Receipt Preview --}}
-        <a
-            href="{{ $receiptUrl }}"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open receipt"
-        >
-            <img
-                src="{{ $receiptUrl }}"
-                alt="Receipt for {{ $item->ref_no }}"
-                class="liq-receipt-preview"
-            >
-        </a>
+                                        {{-- Receipt Preview --}}
+                                        <button
+                                            type="button"
+                                            class="liq-receipt-preview-btn"
+                                            onclick="openReceiptModal('{{ $receiptModalId }}')"
+                                            title="View receipt"
+                                        >
+                                            <img
+                                                src="{{ $receiptUrl }}"
+                                                alt="Receipt for {{ $item->ref_no }}"
+                                                class="liq-receipt-preview"
+                                            >
+                                        </button>
 
+                                        <div class="liq-receipt-info">
 
-        <div class="liq-receipt-info">
+                                            <div class="liq-receipt-title">
+                                                Receipt Attached
+                                            </div>
 
-            <div class="liq-receipt-title">
-                Receipt Attached
-            </div>
+                                            <div class="liq-receipt-sub">
+                                                {{ $item->ref_no }}
+                                            </div>
 
-            <div class="liq-receipt-sub">
-                {{ $item->ref_no }}
-            </div>
+                                            <button
+                                                type="button"
+                                                class="liq-receipt-link"
+                                                onclick="openReceiptModal('{{ $receiptModalId }}')"
+                                            >
+                                                View Full Receipt →
+                                            </button>
+                                        </div>
 
-            <a
-                href="{{ $receiptUrl }}"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="liq-receipt-link"
-            >
-                View Full Receipt →
-            </a>
+                                    </div>
 
-        </div>
+                                    {{-- ==================================================
+                                        RECEIPT MODAL
+                                    =================================================== --}}
 
-    </div>
+                                    <div
+                                        id="{{ $receiptModalId }}"
+                                        class="liq-receipt-modal"
+                                        onclick="closeReceiptModalOnBackdrop(event, '{{ $receiptModalId }}')"
+                                    >
 
-@else
+                                        <div class="liq-receipt-modal-content">
 
-    <div class="liq-no-receipt">
+                                            {{-- Modal Header --}}
+                                            <div class="liq-receipt-modal-header">
 
-        <span>📎</span>
+                                                <div>
+                                                    <div class="liq-receipt-modal-title">
+                                                        Receipt
+                                                    </div>
 
-        <span>
-            No receipt image attached for this expense.
-        </span>
+                                                    <div class="liq-receipt-modal-ref">
+                                                        {{ $item->ref_no }}
+                                                    </div>
+                                                </div>
 
-    </div>
+                                                <button
+                                                    type="button"
+                                                    class="liq-receipt-modal-close"
+                                                    onclick="closeReceiptModal('{{ $receiptModalId }}')"
+                                                    aria-label="Close"
+                                                >
+                                                    &times;
+                                                </button>
 
-@endif
+                                            </div>
+
+                                            {{-- Receipt Image --}}
+                                            <div class="liq-receipt-modal-body">
+
+                                                <img
+                                                    src="{{ $receiptUrl }}"
+                                                    alt="Receipt for {{ $item->ref_no }}"
+                                                    class="liq-receipt-modal-image"
+                                                >
+
+                                            </div>
+
+                                            {{-- Modal Footer --}}
+                                            <div class="liq-receipt-modal-footer">
+
+                                                <a
+                                                    href="{{ $receiptUrl }}"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="liq-btn"
+                                                >
+                                                    Open Original
+                                                </a>
+
+                                                <button
+                                                    type="button"
+                                                    class="liq-btn"
+                                                    onclick="downloadReceiptPdf(
+                                                        '{{ $receiptUrl }}',
+                                                        '{{ $item->ref_no }}'
+                                                    )"
+                                                >
+                                                    <svg
+                                                        width="15"
+                                                        height="15"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                        stroke-width="2"
+                                                    >
+                                                        <path
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                                                        />
+                                                    </svg>
+
+                                                    Download PDF
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="liq-btn liq-btn-primary"
+                                                    onclick="closeReceiptModal('{{ $receiptModalId }}')"
+                                                >
+                                                    Close
+                                                </button>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                @else
+
+                                    <div class="liq-no-receipt">
+
+                                        <span>📎</span>
+
+                                        <span>
+                                            No receipt image attached for this expense.
+                                        </span>
+
+                                    </div>
+
+                                @endif
 
 
                             </div>
@@ -2120,7 +2457,7 @@
 
 
             <a
-                href="{{ route('liquidation.index') }}"
+                href="{{ route('accounting.mi.liquidation.index') }}"
                 class="liq-btn"
             >
 
@@ -2133,7 +2470,7 @@
 
 
                 <a
-                    href="{{ route('liquidation.pdf', $liquidation->id) }}"
+                    href="{{ route('accounting.mi.liquidation.pdf', $liquidation->id) }}"
                     class="liq-btn"
                     id="downloadPdfBtnBottom"
                 >
@@ -2158,39 +2495,6 @@
                 </a>
 
 
-                <a
-                    href="{{ route('liquidation.edit', $liquidation->id) }}"
-                    class="liq-btn liq-btn-primary"
-                >
-
-                    Edit Report
-
-                </a>
-
-
-                <form
-                    method="POST"
-                    action="{{ route('liquidation.destroy', $liquidation->id) }}"
-                    onsubmit="return confirm('Delete this liquidation report? This action cannot be undone.');"
-                >
-
-                    @csrf
-
-                    @method('DELETE')
-
-
-                    <button
-                        type="submit"
-                        class="liq-btn liq-btn-danger"
-                    >
-
-                        Delete
-
-                    </button>
-
-                </form>
-
-
             </div>
 
         </div>
@@ -2200,4 +2504,285 @@
 
 </div>
 
-</x-mi_app>
+        </div>
+
+    </div>
+
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function () {
+    'use strict';
+
+    window.openReceiptModal = function (modalId) {
+        const modal = document.getElementById(modalId);
+
+        if (!modal) {
+            console.error('Receipt modal not found:', modalId);
+            return;
+        }
+
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        const closeButton = modal.querySelector('.liq-receipt-modal-close');
+
+        if (closeButton) {
+            setTimeout(function () {
+                closeButton.focus();
+            }, 50);
+        }
+    };
+
+    window.closeReceiptModal = function (modalId) {
+        const modal = document.getElementById(modalId);
+
+        if (!modal) {
+            return;
+        }
+
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    };
+
+    window.closeReceiptModalOnBackdrop = function (event, modalId) {
+        if (event.target === event.currentTarget) {
+            window.closeReceiptModal(modalId);
+        }
+    };
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') {
+            return;
+        }
+
+        const activeModal = document.querySelector(
+            '.liq-receipt-modal.active'
+        );
+
+        if (activeModal) {
+            window.closeReceiptModal(activeModal.id);
+        }
+    });
+
+})();
+window.downloadReceiptPdf = async function (imageUrl, refNo, button) {
+
+    try {
+
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('PDF library is not loaded. Please refresh the page and try again.');
+            return;
+        }
+
+
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = 'Creating PDF...';
+        }
+
+        const response = await fetch(imageUrl);
+
+        if (!response.ok) {
+            throw new Error('Unable to load receipt image.');
+        }
+
+        const blob = await response.blob();
+
+        const imageData = await new Promise((resolve, reject) => {
+
+            const reader = new FileReader();
+
+            reader.onload = function () {
+                resolve(reader.result);
+            };
+
+            reader.onerror = reject;
+
+            reader.readAsDataURL(blob);
+        });
+
+        const image = await new Promise((resolve, reject) => {
+
+            const img = new Image();
+
+            img.onload = function () {
+                resolve(img);
+            };
+
+            img.onerror = reject;
+
+            img.src = imageData;
+        });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Determine image orientation
+        |--------------------------------------------------------------------------
+        */
+
+        const imageWidth = image.naturalWidth;
+        const imageHeight = image.naturalHeight;
+
+        const landscape = imageWidth > imageHeight;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create PDF
+        |--------------------------------------------------------------------------
+        */
+
+        const { jsPDF } = window.jspdf;
+
+        const pdf = new jsPDF({
+            orientation: landscape ? 'landscape' : 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | A4 dimensions
+        |--------------------------------------------------------------------------
+        */
+
+        const pageWidth = landscape ? 297 : 210;
+        const pageHeight = landscape ? 210 : 297;
+
+        const margin = 10;
+
+        const maxWidth = pageWidth - (margin * 2);
+        const maxHeight = pageHeight - (margin * 2);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Calculate image size while keeping aspect ratio
+        |--------------------------------------------------------------------------
+        */
+
+        const imageRatio = imageWidth / imageHeight;
+
+        let pdfWidth = maxWidth;
+        let pdfHeight = pdfWidth / imageRatio;
+
+        if (pdfHeight > maxHeight) {
+
+            pdfHeight = maxHeight;
+            pdfWidth = pdfHeight * imageRatio;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Center image on page
+        |--------------------------------------------------------------------------
+        */
+
+        const x = (pageWidth - pdfWidth) / 2;
+        const y = (pageHeight - pdfHeight) / 2;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Detect image type
+        |--------------------------------------------------------------------------
+        */
+
+        let imageFormat = 'JPEG';
+
+        if (blob.type === 'image/png') {
+            imageFormat = 'PNG';
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Add receipt image
+        |--------------------------------------------------------------------------
+        */
+
+        pdf.addImage(
+            imageData,
+            imageFormat,
+            x,
+            y,
+            pdfWidth,
+            pdfHeight
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Download
+        |--------------------------------------------------------------------------
+        */
+
+        const safeRef = String(refNo || 'receipt')
+            .replace(/[^a-z0-9_-]/gi, '_');
+
+        pdf.save(`Receipt_${safeRef}.pdf`);
+
+    } catch (error) {
+
+        console.error('Receipt PDF error:', error);
+
+        alert(
+            'Unable to create the PDF. Please make sure the receipt image is accessible.'
+        );
+
+    } finally {
+
+        const activeModal = document.querySelector(
+            '.liq-receipt-modal.active'
+        );
+
+        if (activeModal) {
+
+            const buttons = activeModal.querySelectorAll(
+                '.liq-receipt-modal-footer button'
+            );
+
+            buttons.forEach(function (button) {
+
+                if (
+                    button.textContent.includes('Creating PDF')
+                ) {
+
+                    button.disabled = false;
+
+                    button.innerHTML = `
+                        <svg
+                            width="15"
+                            height="15"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                            />
+                        </svg>
+
+                        Download PDF
+                    `;
+
+                }
+
+            });
+
+        }
+
+    }
+
+};
+</script>
+
+</x-accounting_app>

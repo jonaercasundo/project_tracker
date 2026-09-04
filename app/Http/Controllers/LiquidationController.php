@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Throwable;
 
 class LiquidationController extends Controller
@@ -18,6 +19,15 @@ class LiquidationController extends Controller
     /**
      * Display liquidation reports.
      */
+    public function downloadPdf(MI_Liquidation $liquidation)
+    {
+        $liquidation->load('items', 'preparer', 'company');
+
+        $pdf = Pdf::loadView('mi_app.liquidation.liquidation_pdf', compact('liquidation'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('Liquidation-' . str_pad($liquidation->id, 6, '0', STR_PAD_LEFT) . '.pdf');
+    }
     public function index(Request $request): View
     {
         $query = MI_Liquidation::query()

@@ -443,27 +443,28 @@ use App\Http\Controllers\ProductScanController;
     Route::get('/test-drive', function () { return view('test'); });
     Route::get('/p/{product}', [PublicProductController::class, 'show'])->name('public.product.show');
     Route::prefix('mi-app')
-        ->name('mi_app.')
-        ->group(function () {
+    ->name('mi_app.')
+    ->group(function () {
 
-            Route::middleware(['throttle:10,1'])
-                ->group(function () {
+        Route::middleware(['throttle:10,1'])
+            ->group(function () {
 
-                    Route::post(
-                        '/quotation/download',
-                        [QuotationController::class, 'download']
-                    )->name('quotation.download');
+                Route::post(
+                    '/quotation/download',
+                    [QuotationController::class, 'download']
+                )->name('quotation.download');
 
-                    Route::post(
-                        '/quotation/print',
-                        [QuotationController::class, 'print']
-                    )->name('quotation.print');
+                Route::post(
+                    '/quotation/print',
+                    [QuotationController::class, 'print']
+                )->name('quotation.print');
 
-                    Route::post(
-                        '/quotation/scan',
-                        [ProductScanController::class, 'scan']
-                    )->name('mi_app.scan');
-                });
+            });
 
-        });
+        Route::get(
+            '/scan',
+            [ProductScanController::class, 'scan']
+        )->name('scan');
+
+    });
 require __DIR__.'/auth.php';

@@ -265,7 +265,11 @@ class LiquidationController extends Controller
                     'required',
                     'date',
                 ],
-
+                'items.*.requested_by' => [
+                    'required',
+                    'string',
+                    'max:255',
+                ],
                 'items.*.payee' => [
                     'required',
                     'string',
@@ -445,12 +449,8 @@ class LiquidationController extends Controller
                             'item_date' =>
                                 $item['item_date'],
 
-                            /*
-                            | IMPORTANT:
-                            | Never trust requested_by from frontend.
-                            */
                             'requested_by' =>
-                                $user->user_id,
+                                $item['requested_by'],
 
                             'payee' =>
                                 $item['payee'],
@@ -885,7 +885,7 @@ public function edit($id): View
                             | Server-side user.
                             */
                             'requested_by' =>
-                                $user->user_id,
+                                $item['requested_by'],
 
                             'payee' =>
                                 $item['payee'],

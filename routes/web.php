@@ -35,6 +35,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\LiquidationController;
 use App\Http\Controllers\Accounting_LiquidationController;
 use App\Http\Controllers\Accounting_DashboardController;
+use App\Http\Controllers\ProductScanController;
 
     /*
     |--------------------------------------------------------------------------
@@ -441,17 +442,29 @@ use App\Http\Controllers\Accounting_DashboardController;
     Route::get('/delivery-success', function () {return view('operation.delivery.success'); })->name('delivery.success');
     Route::get('/test-drive', function () { return view('test'); });
     Route::get('/p/{product}', [PublicProductController::class, 'show'])->name('public.product.show');
-    Route::post(
-        '/quotation/download',
-        [QuotationController::class, 'download']
-    )->name('mi_app.quotation.download');
+    Route::prefix('mi-app')
+        ->name('mi_app.')
+        ->group(function () {
 
-    Route::post(
-        '/quotation/print',
-        [QuotationController::class, 'print']
-    )->name('mi_app.quotation.print');
-    Route::get(
-    '/mi-app/scan',
-    [QuotationController::class, 'scan']
-)->name('mi_app.scan');
+            Route::middleware(['throttle:10,1'])
+                ->group(function () {
+
+                    Route::post(
+                        '/quotation/download',
+                        [QuotationController::class, 'download']
+                    )->name('quotation.download');
+
+                    Route::post(
+                        '/quotation/print',
+                        [QuotationController::class, 'print']
+                    )->name('quotation.print');
+
+                });
+
+            Route::get(
+                '/scan',
+                [ProductScanController::class, 'scan'] // TODO: replace with the actual controller that resolves a scanned product tag and renders the product-detail view
+            )->name('mi_app.scan');
+
+        });
 require __DIR__.'/auth.php';

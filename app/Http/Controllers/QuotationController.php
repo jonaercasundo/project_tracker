@@ -7,14 +7,32 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class QuotationController extends Controller
 {
+    /**
+     * Maximum number of distinct products allowed in a single quotation.
+     * Prevents abuse via oversized payloads (each product may trigger
+     * a DB lookup and one or more image downloads).
+     */
+    private const MAX_PRODUCTS_PER_QUOTATION = 100;
+
+    /**
+     * How long to cache a converted (or failed) product image lookup,
+     * so repeated quotation generation for the same product doesn't
+     * re-download/re-convert images every time.
+     */
+    private const IMAGE_CACHE_TTL_SECONDS = 3600;
+
     /**
      * Generate and download a multi-product quotation PDF.
      */
     public function download(Request $request)
     {
+        // TODO: add your authorization check here, e.g.:
+        // abort_unless($request->user()?->can('create-quotations'), 403);
+
         $quotation = $this->buildQuotation($request);
 
         $pdf = Pdf::loadView(
@@ -41,6 +59,9 @@ class QuotationController extends Controller
      */
     public function print(Request $request)
     {
+        // TODO: add your authorization check here, e.g.:
+        // abort_unless($request->user()?->can('create-quotations'), 403);
+
         $quotation = $this->buildQuotation($request);
 
         return view(
@@ -104,6 +125,26 @@ class QuotationController extends Controller
             abort(
                 422,
                 'Please add at least one product to the quotation.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Enforce Maximum Product Count
+        |--------------------------------------------------------------------------
+        |
+        | Guards against oversized payloads that would otherwise trigger
+        | a very large number of DB lookups / image downloads.
+        |
+        */
+
+        if (count($productsInput) > self::MAX_PRODUCTS_PER_QUOTATION) {
+
+            abort(
+                422,
+                'A quotation can include at most ' .
+                self::MAX_PRODUCTS_PER_QUOTATION .
+                ' products.'
             );
         }
 
@@ -235,7 +276,7 @@ class QuotationController extends Controller
                 */
 
                 $productImage =
-                    $this->getProductImageForPdf(
+                    $this->getCachedProductImageForPdf(
                         $product
                     );
 
@@ -263,11 +304,23 @@ class QuotationController extends Controller
         |--------------------------------------------------------------------------
         | Quote Number
         |--------------------------------------------------------------------------
+        |
+        | Includes a short random suffix to avoid collisions when two
+        | quotations are generated within the same second.
+        |
         */
 
         $quoteNumber =
             'Q-' .
-            now()->format('Ymd-His');
+            now()->format('Ymd-His') .
+            '-' .
+            strtoupper(
+                substr(
+                    bin2hex(random_bytes(2)),
+                    0,
+                    4
+                )
+            );
 
         /*
         |--------------------------------------------------------------------------
@@ -301,6 +354,37 @@ class QuotationController extends Controller
             'quote_number'   => $quoteNumber,
             'issued_at'      => $issuedAt,
         ];
+    }
+
+    /**
+     * Get a Dompdf-safe image for a product, cached to avoid re-fetching
+     * external images (or re-processing large uploads) on every
+     * quotation generated for the same product.
+     */
+    private function getCachedProductImageForPdf(
+        MI_Product $product
+    ): ?string {
+
+        $cacheKey = 'quotation_pdf_image:' . $product->product_id;
+
+        // Cache::rememberForever-style but with a TTL, and caching
+        // the "no image available" result too (as an empty string
+        // sentinel) so failed lookups aren't retried every request.
+        $cached = Cache::get($cacheKey);
+
+        if ($cached !== null) {
+            return $cached === '' ? null : $cached;
+        }
+
+        $result = $this->getProductImageForPdf($product);
+
+        Cache::put(
+            $cacheKey,
+            $result ?? '',
+            self::IMAGE_CACHE_TTL_SECONDS
+        );
+
+        return $result;
     }
 
     /**
@@ -449,9 +533,6 @@ class QuotationController extends Controller
 
                     $response =
                         Http::timeout(15)
-                            ->withOptions([
-                                'verify' => false,
-                            ])
                             ->get($imageUrl);
 
                     if (

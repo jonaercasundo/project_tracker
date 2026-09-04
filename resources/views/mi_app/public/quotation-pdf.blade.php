@@ -539,28 +539,15 @@
         @foreach($quotationItems as $item)
 
             @php
-
-                $itemProduct =
-                    $item->product
-                    ?? $item;
-
-                $itemQuantity =
-                    (int) (
-                        $item->quantity
-                        ?? 1
-                    );
-
-                $itemUnitPrice =
-                    (float) (
-                        $item->unit_price
-                        ?? $itemProduct->price
-                        ?? 0
-                    );
-
-                $itemSubtotal =
-                    $itemQuantity
-                    * $itemUnitPrice;
-
+                // The controller (QuotationController::buildQuotation) is the
+                // single source of truth for quantity, unit price, and subtotal.
+                // Do not re-derive these from the product record here — that
+                // would let the view silently diverge from the authoritative
+                // numbers if either side changes independently.
+                $itemProduct   = $item->product;
+                $itemQuantity  = (int) $item->quantity;
+                $itemUnitPrice = (float) $item->unit_price;
+                $itemSubtotal  = (float) $item->subtotal;
             @endphp
 
 
@@ -675,48 +662,14 @@
 
         @php
 
-            $itemProduct =
-                $item->product
-                ?? $item;
+            $itemProduct = $item->product;
 
-            $itemImage = null;
-
-            /*
-            |--------------------------------------------------------------------------
-            | Resolve product image
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                isset($itemProduct->images)
-                && $itemProduct->images->count()
-            ) {
-
-                $firstImage =
-                    $itemProduct->images->first();
-
-                if (
-                    $firstImage->image_type
-                    === 'upload'
-                    && !empty($firstImage->image_path)
-                ) {
-
-                    $itemImage =
-                        public_path(
-                            'storage/'
-                            . $firstImage->image_path
-                        );
-
-                } elseif (
-                    !empty($firstImage->image_url)
-                ) {
-
-                    $itemImage =
-                        $firstImage->image_url;
-
-                }
-
-            }
+            // Use the image the controller already fetched, converted
+            // (Google Drive URLs resolved, GIF/WEBP normalized to JPEG,
+            // MIME-sniffed) and cached — never re-derive it in the view.
+            // This is always either a ready-to-embed data URI or null,
+            // so no filesystem/network access is needed here at all.
+            $itemImage = $item->product_image ?? null;
 
         @endphp
 
@@ -731,24 +684,7 @@
 
                     <td class="product-image-cell">
 
-                        @if(
-                            !empty($itemImage)
-                            && filter_var(
-                                $itemImage,
-                                FILTER_VALIDATE_URL
-                            )
-                        )
-
-                            <img
-                                src="{{ $itemImage }}"
-                                class="product-image"
-                                alt="Product Image"
-                            >
-
-                        @elseif(
-                            !empty($itemImage)
-                            && file_exists($itemImage)
-                        )
+                        @if(!empty($itemImage))
 
                             <img
                                 src="{{ $itemImage }}"
@@ -829,7 +765,7 @@
                         </span>
 
                         <span class="detail-value">
-                            {{ $itemProduct->category->name ?? '—' }}
+                            {{ $itemProduct->category?->name ?? '—' }}
                         </span>
 
                     </td>
@@ -842,7 +778,7 @@
                         </span>
 
                         <span class="detail-value">
-                            {{ $itemProduct->subCategory->name ?? '—' }}
+                            {{ $itemProduct->subCategory?->name ?? '—' }}
                         </span>
 
                     </td>
@@ -855,7 +791,7 @@
                         </span>
 
                         <span class="detail-value">
-                            {{ $itemProduct->productType->name ?? '—' }}
+                            {{ $itemProduct->productType?->name ?? '—' }}
                         </span>
 
                     </td>
@@ -868,7 +804,7 @@
                         </span>
 
                         <span class="detail-value">
-                            {{ $itemProduct->collection->name ?? '—' }}
+                            {{ $itemProduct->collection?->name ?? '—' }}
                         </span>
 
                     </td>
@@ -947,9 +883,24 @@
                         </div>
 
                         @php
-                            $materials =
-                                $itemProduct->materials
-                                ?? [];
+                            // Normalize to an array regardless of whether the
+                            // model casts this column to array or stores it
+                            // as a JSON/comma-separated string, so this never
+                            // throws a "foreach() argument must be of type
+                            // array|object" error.
+                            $materials = $itemProduct->materials ?? [];
+
+                            if (is_string($materials)) {
+                                $decoded = json_decode($materials, true);
+
+                                $materials = is_array($decoded)
+                                    ? $decoded
+                                    : array_filter(array_map('trim', explode(',', $materials)));
+                            }
+
+                            if (!is_array($materials)) {
+                                $materials = [];
+                            }
                         @endphp
 
 
@@ -985,9 +936,20 @@
                         </div>
 
                         @php
-                            $colors =
-                                $itemProduct->color
-                                ?? [];
+                            // Same normalization as materials above.
+                            $colors = $itemProduct->color ?? [];
+
+                            if (is_string($colors)) {
+                                $decoded = json_decode($colors, true);
+
+                                $colors = is_array($decoded)
+                                    ? $decoded
+                                    : array_filter(array_map('trim', explode(',', $colors)));
+                            }
+
+                            if (!is_array($colors)) {
+                                $colors = [];
+                            }
                         @endphp
 
 

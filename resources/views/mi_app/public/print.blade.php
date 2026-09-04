@@ -543,46 +543,15 @@
         @forelse($quotationItems as $index => $quotationItem)
 
             @php
-
-                /*
-                |--------------------------------------------------------------------------
-                | Resolve Product
-                |--------------------------------------------------------------------------
-                */
-
-                $itemProduct = $quotationItem->product ?? $quotationItem;
-
-                /*
-                |--------------------------------------------------------------------------
-                | Quantity
-                |--------------------------------------------------------------------------
-                */
-
-                $itemQuantity = (int) (
-                    $quotationItem->quantity
-                    ?? 1
-                );
-
-                /*
-                |--------------------------------------------------------------------------
-                | Unit Price
-                |--------------------------------------------------------------------------
-                */
-
-                $itemUnitPrice = (float) (
-                    $quotationItem->unit_price
-                    ?? $itemProduct->price
-                    ?? 0
-                );
-
-                /*
-                |--------------------------------------------------------------------------
-                | Subtotal
-                |--------------------------------------------------------------------------
-                */
-
-                $itemSubtotal = $itemQuantity * $itemUnitPrice;
-
+                // The controller (QuotationController::buildQuotation) is the
+                // single source of truth for quantity, unit price, and
+                // subtotal. Trust those fields directly rather than falling
+                // back to $product->price, which would let the printed
+                // numbers silently diverge from what was actually quoted.
+                $itemProduct   = $quotationItem->product;
+                $itemQuantity  = (int) $quotationItem->quantity;
+                $itemUnitPrice = (float) $quotationItem->unit_price;
+                $itemSubtotal  = (float) $quotationItem->subtotal;
             @endphp
 
             <tr>
@@ -682,90 +651,53 @@
 
         @php
 
-            /*
-            |--------------------------------------------------------------------------
-            | Resolve Product
-            |--------------------------------------------------------------------------
-            */
-
-            $product = $quotationItem->product ?? $quotationItem;
-
-            /*
-            |--------------------------------------------------------------------------
-            | Quantity / Pricing
-            |--------------------------------------------------------------------------
-            */
-
-            $quantity = (int) (
-                $quotationItem->quantity
-                ?? 1
-            );
-
-            $unitPrice = (float) (
-                $quotationItem->unit_price
-                ?? $product->price
-                ?? 0
-            );
-
-            $subtotal = $quantity * $unitPrice;
+            // Reuse the same authoritative values as the items table above —
+            // do not recompute them a second time in this loop.
+            $product   = $quotationItem->product;
+            $quantity  = (int) $quotationItem->quantity;
+            $unitPrice = (float) $quotationItem->unit_price;
+            $subtotal  = (float) $quotationItem->subtotal;
 
             /*
             |--------------------------------------------------------------------------
             | Product Image
             |--------------------------------------------------------------------------
+            |
+            | Use the image the controller already fetched, converted
+            | (Google Drive URLs resolved, GIF/WEBP normalized to JPEG,
+            | MIME-sniffed) and cached. Never re-derive it here — that
+            | duplicates network/filesystem work and bypasses the
+            | conversion + caching the controller already did.
+            |
             */
 
-            $productImage = null;
-
-            if (
-                isset($product->images)
-                && $product->images->count()
-            ) {
-
-                $firstImage = $product->images->first();
-
-                if (
-                    $firstImage->image_type === 'upload'
-                    && !empty($firstImage->image_path)
-                ) {
-
-                    $possiblePath = public_path(
-                        'storage/' . $firstImage->image_path
-                    );
-
-                    if (file_exists($possiblePath)) {
-
-                        $productImage = $possiblePath;
-
-                    }
-
-                } elseif (!empty($firstImage->image_url)) {
-
-                    $productImage = $firstImage->image_url;
-
-                }
-
-            }
+            $productImage = $quotationItem->product_image ?? null;
 
             /*
             |--------------------------------------------------------------------------
             | Materials
             |--------------------------------------------------------------------------
+            |
+            | Normalize to an array regardless of whether the model casts
+            | this column to array, stores JSON, or stores a plain
+            | comma-separated string.
+            |
             */
 
             $materials = $product->materials ?? [];
 
             if (is_string($materials)) {
 
-                $decodedMaterials = json_decode(
-                    $materials,
-                    true
-                );
+                $decodedMaterials = json_decode($materials, true);
 
                 $materials = is_array($decodedMaterials)
                     ? $decodedMaterials
-                    : [$materials];
+                    : array_filter(array_map('trim', explode(',', $materials)));
 
+            }
+
+            if (!is_array($materials)) {
+                $materials = [];
             }
 
             /*
@@ -778,15 +710,16 @@
 
             if (is_string($colors)) {
 
-                $decodedColors = json_decode(
-                    $colors,
-                    true
-                );
+                $decodedColors = json_decode($colors, true);
 
                 $colors = is_array($decodedColors)
                     ? $decodedColors
-                    : [$colors];
+                    : array_filter(array_map('trim', explode(',', $colors)));
 
+            }
+
+            if (!is_array($colors)) {
+                $colors = [];
             }
 
         @endphp
@@ -932,7 +865,7 @@
                         </span>
 
                         <span class="detail-value">
-                            {{ $product->category->name ?? '—' }}
+                            {{ $product->category?->name ?? '—' }}
                         </span>
 
                     </td>
@@ -945,7 +878,7 @@
                         </span>
 
                         <span class="detail-value">
-                            {{ $product->subCategory->name ?? '—' }}
+                            {{ $product->subCategory?->name ?? '—' }}
                         </span>
 
                     </td>
@@ -958,7 +891,7 @@
                         </span>
 
                         <span class="detail-value">
-                            {{ $product->productType->name ?? '—' }}
+                            {{ $product->productType?->name ?? '—' }}
                         </span>
 
                     </td>
@@ -971,7 +904,7 @@
                         </span>
 
                         <span class="detail-value">
-                            {{ $product->collection->name ?? '—' }}
+                            {{ $product->collection?->name ?? '—' }}
                         </span>
 
                     </td>
@@ -1374,7 +1307,12 @@
     | Auto Print
     |--------------------------------------------------------------------------
     |
-    | Only needed when this Blade is used for the PRINT route.
+    | This view is only ever returned by QuotationController::print(),
+    | which is rendered as a normal HTML response opened in a new tab —
+    | it is never passed through Dompdf, so the browser JS below is safe
+    | to rely on. Do not reuse this same Blade file for the PDF download
+    | route, or this script will attempt to fire in a context where
+    | window.print() has no effect (Dompdf does not execute JS).
     |
     */
 

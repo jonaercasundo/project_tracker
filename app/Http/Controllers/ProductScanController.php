@@ -75,7 +75,7 @@ class ProductScanController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        return view('mi_app.public.product-detail', [
+        return view('mi_app.public.show', [
             'product' => $product,
         ]);
     }

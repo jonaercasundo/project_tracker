@@ -450,4 +450,8 @@ use App\Http\Controllers\Accounting_DashboardController;
         '/quotation/print',
         [QuotationController::class, 'print']
     )->name('mi_app.quotation.print');
+    Route::get(
+    '/mi-app/scan',
+    [QuotationController::class, 'scan']
+)->name('mi_app.scan');
 require __DIR__.'/auth.php';

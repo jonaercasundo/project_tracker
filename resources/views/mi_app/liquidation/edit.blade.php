@@ -166,41 +166,23 @@
                 ->map(function ($item) {
 
                     return [
-
                         'id' => $item->id,
-
                         'line_no' => $item->line_no,
-
                         'ref_no' => $item->ref_no,
 
                         'item_date' => $item->item_date
                             ? \Carbon\Carbon::parse($item->item_date)->format('Y-m-d')
                             : '',
 
-                        'requested_by' => $item->requested_by,
-
-                        'requested_by_name'
-                            => $item->requestedBy?->name,
+                        'requested_by' => $item->requested_by ?? '',
 
                         'payee' => $item->payee,
-
-                        'expense_type'
-                            => $item->expense_type,
-
-                        'account_buyer'
-                            => $item->account_buyer,
-
-                        'remarks'
-                            => $item->remarks,
-
-                        'amount_vnd'
-                            => $item->amount_vnd,
-
-                        'amount_usd'
-                            => $item->amount_usd,
-
-                        'receipt_image'
-                            => $item->receipt_image,
+                        'expense_type' => $item->expense_type,
+                        'account_buyer' => $item->account_buyer,
+                        'remarks' => $item->remarks,
+                        'amount_vnd' => $item->amount_vnd,
+                        'amount_usd' => $item->amount_usd,
+                        'receipt_image' => $item->receipt_image,
                     ];
 
                 })
@@ -226,10 +208,7 @@
 
                 'item_date' => $datePrepared,
 
-                'requested_by' => $currentUserId,
-
-                'requested_by_name'
-                    => $currentUserName,
+                'requested_by' => $currentUserName,
 
                 'payee' => '',
 
@@ -2207,7 +2186,7 @@
 
                                     $requestedByValue = old(
                                         "items.$index.requested_by",
-                                        $item['requested_by_name'] ?? $item['requested_by'] ?? $currentUserName
+                                        $item['requested_by'] ?? $currentUserName
                                     );
 
                                     $requestedByIsKnown = in_array($requestedByValue, $requestedByOptions, true);
@@ -3167,9 +3146,7 @@
                         );
 
                     if (!select || !otherInput) {
-
                         return;
-
                     }
 
                     const field =
@@ -3188,7 +3165,9 @@
                             select.removeAttribute('name');
 
                             otherInput.name = fieldName;
+
                             otherInput.style.display = 'block';
+
                             otherInput.required = true;
 
                         } else {
@@ -3196,26 +3175,45 @@
                             select.name = fieldName;
 
                             otherInput.removeAttribute('name');
+
                             otherInput.style.display = 'none';
+
                             otherInput.required = false;
-
                         }
-
                     }
 
                     select.addEventListener(
                         'change',
                         function () {
 
-                            otherInput.value = '';
+                            /*
+                            * Only clear the manual field when switching
+                            * to a normal preset.
+                            */
+                            if (select.value !== '__other__') {
+                                otherInput.value = '';
+                            }
 
                             sync();
+                        }
+                    );
 
+                    otherInput.addEventListener(
+                        'input',
+                        function () {
+
+                            /*
+                            * Make sure the manual value is submitted.
+                            */
+                            const idx =
+                                getRowIndex(select);
+
+                            otherInput.name =
+                                `items[${idx}][${field}]`;
                         }
                     );
 
                     sync();
-
                 }
 
 
@@ -3500,86 +3498,106 @@
                             '.expense-item'
                         );
 
-
                     items.forEach(
                         function (item, index) {
 
-                            item.dataset.index =
-                                index;
-
+                            item.dataset.index = index;
 
                             const number =
                                 item.querySelector(
                                     '.expense-number'
                                 );
 
-
                             if (number) {
-
                                 number.textContent =
                                     index + 1;
-
                             }
-
 
                             const title =
                                 item.querySelector(
                                     '.expense-title > span:nth-child(2)'
                                 );
 
-
                             if (title) {
-
                                 title.textContent =
-                                    'Expense ' +
-                                    (index + 1);
-
+                                    'Expense ' + (index + 1);
                             }
 
-
+                            /*
+                            * Update ALL named fields.
+                            */
                             item.querySelectorAll(
                                 '[name]'
                             ).forEach(
                                 function (field) {
 
                                     const name =
-                                        field.getAttribute(
-                                            'name'
-                                        );
-
+                                        field.getAttribute('name');
 
                                     if (!name) {
-
                                         return;
-
                                     }
 
-
                                     field.setAttribute(
-
                                         'name',
-
                                         name.replace(
-
                                             /items\[\d+\]/,
-
-                                            'items[' +
-                                            index +
-                                            ']'
-
+                                            'items[' + index + ']'
                                         )
-
                                     );
-
                                 }
                             );
 
+                            /*
+                            * Also update manual-entry fields
+                            * even though they may currently have no name.
+                            */
+                            item.querySelectorAll(
+                                '.other-toggle-container'
+                            ).forEach(
+                                function (toggleContainer) {
+
+                                    const select =
+                                        toggleContainer.querySelector(
+                                            '.other-toggle-select'
+                                        );
+
+                                    const otherInput =
+                                        toggleContainer.querySelector(
+                                            '.other-toggle-input'
+                                        );
+
+                                    if (!select || !otherInput) {
+                                        return;
+                                    }
+
+                                    const field =
+                                        select.dataset.field;
+
+                                    const fieldName =
+                                        `items[${index}][${field}]`;
+
+                                    if (select.value === '__other__') {
+
+                                        select.removeAttribute('name');
+
+                                        otherInput.name =
+                                            fieldName;
+
+                                    } else {
+
+                                        select.name =
+                                            fieldName;
+
+                                        otherInput.removeAttribute(
+                                            'name'
+                                        );
+                                    }
+                                }
+                            );
                         }
                     );
-
                 }
-
-
                 /* =========================================================
                    CLASSIFICATION OPTIONS
                 ========================================================== */

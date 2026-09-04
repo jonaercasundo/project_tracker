@@ -662,6 +662,12 @@ public function edit($id): View
                     'date',
                 ],
 
+                'items.*.requested_by' => [
+                    'required',
+                    'string',
+                    'max:255',
+                ],
+                
                 'items.*.payee' => [
                     'required',
                     'string',

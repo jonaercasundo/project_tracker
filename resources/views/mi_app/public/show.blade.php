@@ -961,58 +961,53 @@
 <script>
     /*
     |--------------------------------------------------------------------------
-    | Laravel Data
+    | PRODUCT DATA FROM LARAVEL
     |--------------------------------------------------------------------------
     */
 
-    const PD_CONFIG = @json([
-        'product' => [
-            'id'       => (int) $product->product_id,
-            'sku'      => $pdRef,
-            'name'     => $product->item_name,
-            'price'    => (float) $product->price,
-        ],
-
-        'downloadUrl' => route(
-            'mi_app.quotation.download',
-            $product->product_id
-        ),
-
-        'printUrl' => route(
-            'mi_app.quotation.print',
-            $product->product_id
-        ),
-
-        'csrfToken' => csrf_token(),
-
-        'cartKey' => 'mi_product_quotation_cart',
-
-        'scannerUrl' => url('/mi-app/scan'),
-    ]);
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CURRENT PRODUCT
-    |--------------------------------------------------------------------------
-    */
-
-    const PD_CURRENT_PRODUCT =
-        PD_CONFIG.product;
-
+    const PD_CURRENT_PRODUCT = {
+        id: {{ (int) $product->product_id }},
+        sku: @json($pdRef),
+        name: @json($product->item_name),
+        price: {{ (float) $product->price }}
+    };
 
     /*
     |--------------------------------------------------------------------------
     | ROUTES
     |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    | These route names must exist in routes/web.php
+    |
     */
 
     const PD_DOWNLOAD_URL =
-        PD_CONFIG.downloadUrl;
+        @json(route('mi_app.quotation.download'));
 
     const PD_PRINT_URL =
-        PD_CONFIG.printUrl;
+        @json(route('mi_app.quotation.print'));
 
+    /*
+    |--------------------------------------------------------------------------
+    | SCANNER URL
+    |--------------------------------------------------------------------------
+    |
+    | CHANGE mi_app.scan if your scanner route has a different name.
+    |
+    */
+
+    const PD_SCANNER_URL =
+        @json(route('mi_app.scan'));
+
+    /*
+    |--------------------------------------------------------------------------
+    | CSRF TOKEN
+    |--------------------------------------------------------------------------
+    */
+
+    const PD_CSRF_TOKEN =
+        @json(csrf_token());
 
     /*
     |--------------------------------------------------------------------------
@@ -1021,7 +1016,7 @@
     */
 
     const PD_CART_KEY =
-        PD_CONFIG.cartKey;
+        'mi_product_quotation_cart';
 
 
     /*
@@ -1110,7 +1105,7 @@
             Math.max(
                 1,
                 parseInt(
-                    quantityInput.value || '1',
+                    quantityInput?.value || '1',
                     10
                 )
             );
@@ -1122,9 +1117,14 @@
 
         const existingIndex =
             cart.findIndex(
-                item =>
-                    Number(item.id)
-                    === Number(PD_CURRENT_PRODUCT.id)
+                function (item) {
+
+                    return Number(item.id)
+                        === Number(
+                            PD_CURRENT_PRODUCT.id
+                        );
+
+                }
             );
 
 
@@ -1132,7 +1132,7 @@
 
             cart[existingIndex].quantity =
                 Number(
-                    cart[existingIndex].quantity
+                    cart[existingIndex].quantity || 0
                 ) + quantity;
 
         } else {
@@ -1168,6 +1168,12 @@
         pdRenderCart();
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | BUTTON FEEDBACK
+        |--------------------------------------------------------------------------
+        */
+
         const button =
             document.getElementById(
                 'pdAddProductBtn'
@@ -1183,7 +1189,9 @@
             button.innerHTML =
                 '✓ Added to Quotation';
 
-            button.classList.add('added');
+            button.classList.add(
+                'added'
+            );
 
 
             setTimeout(
@@ -1201,7 +1209,6 @@
             );
 
         }
-
     }
 
 
@@ -1222,12 +1229,10 @@
                 'pdCartItems'
             );
 
-
         const count =
             document.getElementById(
                 'pdCartCount'
             );
-
 
         const totalElement =
             document.getElementById(
@@ -1235,10 +1240,20 @@
             );
 
 
-        if (!container || !count || !totalElement) {
+        if (
+            !container ||
+            !count ||
+            !totalElement
+        ) {
             return;
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | EMPTY CART
+        |--------------------------------------------------------------------------
+        */
 
         if (!cart.length) {
 
@@ -1263,33 +1278,50 @@
         let html = '';
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCTS
+        |--------------------------------------------------------------------------
+        */
+
         cart.forEach(
             function (item, index) {
 
+                const quantity =
+                    Math.max(
+                        1,
+                        Number(item.quantity || 1)
+                    );
+
+                const price =
+                    Number(item.price || 0);
+
                 const itemTotal =
-                    Number(item.price)
-                    * Number(item.quantity);
+                    price * quantity;
 
 
                 total += itemTotal;
 
 
                 html += `
-
                     <div class="pd-cart-item">
 
                         <div class="pd-cart-item-info">
 
                             <div class="pd-cart-item-name">
-                                ${pdEscapeHtml(item.name)}
+                                ${pdEscapeHtml(
+                                    item.name || 'Product'
+                                )}
                             </div>
 
                             <div class="pd-cart-item-ref">
-                                ${pdEscapeHtml(item.sku || '')}
+                                ${pdEscapeHtml(
+                                    item.sku || ''
+                                )}
                             </div>
 
                             <div class="pd-cart-item-price">
-                                ${pdFormatCurrency(item.price)}
+                                ${pdFormatCurrency(price)}
                                 / unit
                             </div>
 
@@ -1304,7 +1336,7 @@
                                 </button>
 
                                 <span class="pd-qty-value">
-                                    ${item.quantity}
+                                    ${quantity}
                                 </span>
 
                                 <button
@@ -1332,9 +1364,7 @@
                         </div>
 
                     </div>
-
                 `;
-
             }
         );
 
@@ -1375,13 +1405,25 @@
 
 
         cart[index].quantity =
-            Number(cart[index].quantity)
-            + Number(change);
+            Number(
+                cart[index].quantity || 1
+            ) + Number(change);
 
 
-        if (cart[index].quantity <= 0) {
+        /*
+        |--------------------------------------------------------------------------
+        | REMOVE WHEN QUANTITY REACHES ZERO
+        |--------------------------------------------------------------------------
+        */
 
-            cart.splice(index, 1);
+        if (
+            cart[index].quantity <= 0
+        ) {
+
+            cart.splice(
+                index,
+                1
+            );
 
         }
 
@@ -1409,7 +1451,10 @@
         }
 
 
-        cart.splice(index, 1);
+        cart.splice(
+            index,
+            1
+        );
 
 
         pdSaveCart(cart);
@@ -1426,9 +1471,11 @@
 
     function pdClearQuotation()
     {
-        if (!confirm(
-            'Clear all products from this quotation?'
-        )) {
+        if (
+            !confirm(
+                'Clear all products from this quotation?'
+            )
+        ) {
             return;
         }
 
@@ -1451,7 +1498,7 @@
     function pdScanAnotherProduct()
     {
         window.location.href =
-            PD_CONFIG.scannerUrl;
+            PD_SCANNER_URL;
     }
 
 
@@ -1487,11 +1534,26 @@
     function pdEscapeHtml(value)
     {
         return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
+            .replace(
+                /&/g,
+                '&amp;'
+            )
+            .replace(
+                /</g,
+                '&lt;'
+            )
+            .replace(
+                />/g,
+                '&gt;'
+            )
+            .replace(
+                /"/g,
+                '&quot;'
+            )
+            .replace(
+                /'/g,
+                '&#039;'
+            );
     }
 
 
@@ -1507,6 +1569,12 @@
             pdGetCart();
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | CART VALIDATION
+        |--------------------------------------------------------------------------
+        */
+
         if (!cart.length) {
 
             alert(
@@ -1517,6 +1585,12 @@
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | CUSTOMER VALIDATION
+        |--------------------------------------------------------------------------
+        */
+
         const customerName =
             pdGetCustomerName();
 
@@ -1526,6 +1600,7 @@
             alert(
                 'Please enter the customer name.'
             );
+
 
             const customerInput =
                 document.getElementById(
@@ -1542,13 +1617,20 @@
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | CREATE FORM
+        |--------------------------------------------------------------------------
+        */
+
         const form =
-            document.createElement('form');
+            document.createElement(
+                'form'
+            );
 
 
         form.method =
             'POST';
-
 
         form.action =
             action;
@@ -1561,7 +1643,9 @@
         */
 
         const csrf =
-            document.createElement('input');
+            document.createElement(
+                'input'
+            );
 
 
         csrf.type =
@@ -1571,20 +1655,24 @@
             '_token';
 
         csrf.value =
-            PD_CONFIG.csrfToken;
+            PD_CSRF_TOKEN;
 
 
-        form.appendChild(csrf);
+        form.appendChild(
+            csrf
+        );
 
 
         /*
         |--------------------------------------------------------------------------
-        | CUSTOMER
+        | CUSTOMER NAME
         |--------------------------------------------------------------------------
         */
 
         const customer =
-            document.createElement('input');
+            document.createElement(
+                'input'
+            );
 
 
         customer.type =
@@ -1597,17 +1685,32 @@
             customerName;
 
 
-        form.appendChild(customer);
+        form.appendChild(
+            customer
+        );
 
 
         /*
         |--------------------------------------------------------------------------
         | PRODUCTS
         |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        | Only send product ID and quantity.
+        |
+        | The server should get the actual:
+        | - name
+        | - SKU
+        | - price
+        | - image
+        | from the database.
+        |
         */
 
         const products =
-            document.createElement('input');
+            document.createElement(
+                'input'
+            );
 
 
         products.type =
@@ -1617,14 +1720,6 @@
             'products';
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Only send ID + quantity.
-        |
-        | Do NOT trust price/name from localStorage.
-        |--------------------------------------------------------------------------
-        */
-
         const cleanCart =
             cart.map(
                 function (item) {
@@ -1632,12 +1727,16 @@
                     return {
 
                         id:
-                            Number(item.id),
+                            Number(
+                                item.id
+                            ),
 
                         quantity:
                             Math.max(
                                 1,
-                                Number(item.quantity)
+                                Number(
+                                    item.quantity || 1
+                                )
                             )
 
                     };
@@ -1647,10 +1746,14 @@
 
 
         products.value =
-            JSON.stringify(cleanCart);
+            JSON.stringify(
+                cleanCart
+            );
 
 
-        form.appendChild(products);
+        form.appendChild(
+            products
+        );
 
 
         return form;
@@ -1676,9 +1779,13 @@
         }
 
 
-        document.body.appendChild(form);
+        document.body.appendChild(
+            form
+        );
+
 
         form.submit();
+
 
         form.remove();
     }
@@ -1707,9 +1814,13 @@
             '_blank';
 
 
-        document.body.appendChild(form);
+        document.body.appendChild(
+            form
+        );
+
 
         form.submit();
+
 
         form.remove();
     }

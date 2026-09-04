@@ -8,12 +8,6 @@
 
     <style>
 
-        /*
-        |--------------------------------------------------------------------------
-        | DOMPDF-SAFE DESIGN
-        |--------------------------------------------------------------------------
-        */
-
         @page {
             margin: 35px 40px;
         }
@@ -26,10 +20,9 @@
             padding: 0;
         }
 
-
         /*
         |--------------------------------------------------------------------------
-        | Header
+        | HEADER
         |--------------------------------------------------------------------------
         */
 
@@ -70,10 +63,9 @@
             margin-top: 3px;
         }
 
-
         /*
         |--------------------------------------------------------------------------
-        | Meta Information
+        | META
         |--------------------------------------------------------------------------
         */
 
@@ -97,10 +89,9 @@
             font-weight: bold;
         }
 
-
         /*
         |--------------------------------------------------------------------------
-        | Section Headers
+        | SECTION
         |--------------------------------------------------------------------------
         */
 
@@ -115,192 +106,9 @@
             margin-bottom: 10px;
         }
 
-
         /*
         |--------------------------------------------------------------------------
-        | Product Information
-        |--------------------------------------------------------------------------
-        */
-
-        .product-info-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-
-        .product-info-table td {
-            vertical-align: top;
-        }
-
-        .product-image-cell {
-            width: 175px;
-            padding-right: 20px;
-        }
-
-        .product-image {
-            width: 160px;
-            height: 160px;
-            object-fit: contain;
-            border: 1px solid #ddd;
-            padding: 6px;
-        }
-
-        .no-image {
-            width: 160px;
-            height: 160px;
-            border: 1px solid #ddd;
-            background: #F7F8F8;
-            text-align: center;
-            vertical-align: middle;
-            color: #999;
-            font-size: 9px;
-        }
-
-        .product-name {
-            font-size: 16px;
-            font-weight: bold;
-            color: #1a1a1a;
-            margin-bottom: 6px;
-        }
-
-        .product-sku {
-            font-family: 'Courier New', monospace;
-            color: #2C6E8C;
-            font-size: 10px;
-            margin-bottom: 10px;
-        }
-
-        .description {
-            color: #555;
-            line-height: 1.5;
-            font-size: 10px;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Product Details
-        |--------------------------------------------------------------------------
-        */
-
-        .details-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-
-        .details-table td {
-            width: 25%;
-            padding: 7px 8px;
-            border-bottom: 1px solid #eee;
-            vertical-align: top;
-        }
-
-        .detail-label {
-            display: block;
-            color: #888;
-            font-size: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin-bottom: 3px;
-        }
-
-        .detail-value {
-            font-size: 10px;
-            font-weight: bold;
-            color: #222;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Materials / Colors
-        |--------------------------------------------------------------------------
-        */
-
-        .tags-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-
-        .tags-table td {
-            width: 50%;
-            vertical-align: top;
-            padding-right: 15px;
-        }
-
-        .tag-label {
-            color: #777;
-            font-size: 9px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .tag {
-            display: inline-block;
-            background: #F4F6F7;
-            border: 1px solid #ddd;
-            color: #444;
-            padding: 4px 7px;
-            margin-right: 4px;
-            margin-bottom: 4px;
-            font-size: 8px;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Dimensions
-        |--------------------------------------------------------------------------
-        */
-
-        .dimensions-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-
-        .dimensions-table td {
-            width: 50%;
-            vertical-align: top;
-            padding-right: 10px;
-        }
-
-        .dimension-box {
-            border: 1px solid #ddd;
-            padding: 10px;
-        }
-
-        .dimension-title {
-            font-size: 10px;
-            font-weight: bold;
-            color: #2C6E8C;
-            margin-bottom: 8px;
-        }
-
-        .dimension-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .dimension-table td {
-            width: auto;
-            padding: 4px 0;
-            border-bottom: 1px solid #eee;
-            font-size: 9px;
-        }
-
-        .dimension-table td:last-child {
-            text-align: right;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Items Table
+        | QUOTATION SUMMARY
         |--------------------------------------------------------------------------
         */
 
@@ -325,6 +133,7 @@
             padding: 10px;
             border-bottom: 1px solid #eee;
             font-size: 10px;
+            vertical-align: top;
         }
 
         .items-table .num {
@@ -337,10 +146,20 @@
             color: #2C6E8C;
         }
 
+        .item-name {
+            font-weight: bold;
+            color: #222;
+        }
+
+        .item-description {
+            color: #777;
+            font-size: 8px;
+            margin-top: 3px;
+        }
 
         /*
         |--------------------------------------------------------------------------
-        | Totals
+        | TOTALS
         |--------------------------------------------------------------------------
         */
 
@@ -374,10 +193,204 @@
             padding-top: 10px;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | INDIVIDUAL PRODUCT INFORMATION
+        |--------------------------------------------------------------------------
+        */
+
+        .product-block {
+            page-break-inside: avoid;
+            margin-bottom: 22px;
+        }
+
+        .product-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+
+        .product-info-table td {
+            vertical-align: top;
+        }
+
+        .product-image-cell {
+            width: 145px;
+            padding-right: 15px;
+        }
+
+        .product-image {
+            width: 125px;
+            height: 125px;
+            object-fit: contain;
+            border: 1px solid #ddd;
+            padding: 5px;
+        }
+
+        .no-image {
+            width: 125px;
+            height: 125px;
+            border: 1px solid #ddd;
+            background: #F7F8F8;
+            text-align: center;
+            vertical-align: middle;
+            color: #999;
+            font-size: 9px;
+        }
+
+        .product-name {
+            font-size: 15px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin-bottom: 5px;
+        }
+
+        .product-sku {
+            font-family: 'Courier New', monospace;
+            color: #2C6E8C;
+            font-size: 9px;
+            margin-bottom: 7px;
+        }
+
+        .description {
+            color: #555;
+            line-height: 1.5;
+            font-size: 9px;
+        }
 
         /*
         |--------------------------------------------------------------------------
-        | Footer
+        | PRODUCT DETAILS
+        |--------------------------------------------------------------------------
+        */
+
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+
+        .details-table td {
+            width: 25%;
+            padding: 6px 7px;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+
+        .detail-label {
+            display: block;
+            color: #888;
+            font-size: 7px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 2px;
+        }
+
+        .detail-value {
+            font-size: 9px;
+            font-weight: bold;
+            color: #222;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | MATERIALS / COLORS
+        |--------------------------------------------------------------------------
+        */
+
+        .tags-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+
+        .tags-table td {
+            width: 50%;
+            vertical-align: top;
+            padding-right: 15px;
+        }
+
+        .tag-label {
+            color: #777;
+            font-size: 8px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #F4F6F7;
+            border: 1px solid #ddd;
+            color: #444;
+            padding: 3px 6px;
+            margin-right: 3px;
+            margin-bottom: 3px;
+            font-size: 7px;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | DIMENSIONS
+        |--------------------------------------------------------------------------
+        */
+
+        .dimensions-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+
+        .dimensions-table td {
+            width: 50%;
+            vertical-align: top;
+            padding-right: 8px;
+        }
+
+        .dimension-box {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+
+        .dimension-title {
+            font-size: 9px;
+            font-weight: bold;
+            color: #2C6E8C;
+            margin-bottom: 5px;
+        }
+
+        .dimension-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .dimension-table td {
+            width: auto;
+            padding: 3px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 8px;
+        }
+
+        .dimension-table td:last-child {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCT SEPARATOR
+        |--------------------------------------------------------------------------
+        */
+
+        .product-separator {
+            border-top: 1px dashed #ccc;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | FOOTER
         |--------------------------------------------------------------------------
         */
 
@@ -482,390 +495,6 @@
 
 
 {{-- ========================================================================= --}}
-{{-- PRODUCT INFORMATION --}}
-{{-- ========================================================================= --}}
-
-<div class="section-title">
-    Product Information
-</div>
-
-<table class="product-info-table">
-
-    <tr>
-
-        {{-- Product Image --}}
-        <td class="product-image-cell">
-
-            @if(!empty($product_image))
-
-                <img
-                    src="{{ $product_image }}"
-                    class="product-image"
-                    alt="Product Image"
-                >
-
-            @else
-
-                <table class="no-image">
-                    <tr>
-                        <td>
-                            No Image Available
-                        </td>
-                    </tr>
-                </table>
-
-            @endif
-
-        </td>
-
-
-        {{-- Product Details --}}
-        <td>
-
-            <div class="product-name">
-                {{ $product->item_name }}
-            </div>
-
-            <div class="product-sku">
-                SKU: {{ $product->sku ?? '—' }}
-            </div>
-
-            @if(!empty($product->description))
-
-                <div class="description">
-                    {{ $product->description }}
-                </div>
-
-            @else
-
-                <div class="description">
-                    Product quotation for
-                    {{ $product->item_name }}.
-                </div>
-
-            @endif
-
-        </td>
-
-    </tr>
-
-</table>
-
-
-{{-- ========================================================================= --}}
-{{-- PRODUCT CLASSIFICATION --}}
-{{-- ========================================================================= --}}
-
-<div class="section-title">
-    Product Classification
-</div>
-
-
-<table class="details-table">
-
-    <tr>
-
-        <td>
-
-            <span class="detail-label">
-                Category
-            </span>
-
-            <span class="detail-value">
-                {{ $product->category->name ?? '—' }}
-            </span>
-
-        </td>
-
-
-        <td>
-
-            <span class="detail-label">
-                Sub Category
-            </span>
-
-            <span class="detail-value">
-                {{ $product->subCategory->name ?? '—' }}
-            </span>
-
-        </td>
-
-
-        <td>
-
-            <span class="detail-label">
-                Product Type
-            </span>
-
-            <span class="detail-value">
-                {{ $product->productType->name ?? '—' }}
-            </span>
-
-        </td>
-
-
-        <td>
-
-            <span class="detail-label">
-                Collection
-            </span>
-
-            <span class="detail-value">
-                {{ $product->collection->name ?? '—' }}
-            </span>
-
-        </td>
-
-    </tr>
-
-
-    <tr>
-
-        <td>
-
-            <span class="detail-label">
-                Type of Sample
-            </span>
-
-            <span class="detail-value">
-                {{ $product->type_of_sample ?? '—' }}
-            </span>
-
-        </td>
-
-
-        <td>
-
-            <span class="detail-label">
-                Classification
-            </span>
-
-            <span class="detail-value">
-                {{ $product->classification ?? '—' }}
-            </span>
-
-        </td>
-
-
-        <td>
-
-            <span class="detail-label">
-                Designed By
-            </span>
-
-            <span class="detail-value">
-                {{ $product->designed_by ?? '—' }}
-            </span>
-
-        </td>
-
-
-        <td>
-
-            <span class="detail-label">
-                Product Type
-            </span>
-
-            <span class="detail-value">
-                {{ $product->type ?? '—' }}
-            </span>
-
-        </td>
-
-    </tr>
-
-</table>
-
-
-{{-- ========================================================================= --}}
-{{-- MATERIALS AND COLORS --}}
-{{-- ========================================================================= --}}
-
-<div class="section-title">
-    Materials &amp; Colors
-</div>
-
-
-<table class="tags-table">
-
-    <tr>
-
-        <td>
-
-            <div class="tag-label">
-                Materials
-            </div>
-
-            @php
-                $materials = $product->materials ?? [];
-            @endphp
-
-            @forelse($materials as $material)
-
-                <span class="tag">
-                    {{ $material }}
-                </span>
-
-            @empty
-
-                <span style="font-size:9px;color:#999;">
-                    No materials specified
-                </span>
-
-            @endforelse
-
-        </td>
-
-
-        <td>
-
-            <div class="tag-label">
-                Colors
-            </div>
-
-            @php
-                $colors = $product->color ?? [];
-            @endphp
-
-            @forelse($colors as $color)
-
-                <span class="tag">
-                    {{ $color }}
-                </span>
-
-            @empty
-
-                <span style="font-size:9px;color:#999;">
-                    No colors specified
-                </span>
-
-            @endforelse
-
-        </td>
-
-    </tr>
-
-</table>
-
-
-{{-- ========================================================================= --}}
-{{-- DIMENSIONS --}}
-{{-- ========================================================================= --}}
-
-<div class="section-title">
-    Product &amp; Packaging Dimensions
-</div>
-
-
-<table class="dimensions-table">
-
-    <tr>
-
-        {{-- Product Dimensions --}}
-        <td>
-
-            <div class="dimension-box">
-
-                <div class="dimension-title">
-                    Product Dimensions
-                </div>
-
-                <table class="dimension-table">
-
-                    <tr>
-                        <td>Height</td>
-                        <td>
-                            {{ $product->product_height ?? '—' }}
-                            {{ $product->product_height !== null ? 'cm' : '' }}
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>Width</td>
-                        <td>
-                            {{ $product->product_width ?? '—' }}
-                            {{ $product->product_width !== null ? 'cm' : '' }}
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>Length</td>
-                        <td>
-                            {{ $product->product_length ?? '—' }}
-                            {{ $product->product_length !== null ? 'cm' : '' }}
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>Depth</td>
-                        <td>
-                            {{ $product->product_depth ?? '—' }}
-                            {{ $product->product_depth !== null ? 'cm' : '' }}
-                        </td>
-                    </tr>
-
-                </table>
-
-            </div>
-
-        </td>
-
-
-        {{-- Carton Dimensions --}}
-        <td>
-
-            <div class="dimension-box">
-
-                <div class="dimension-title">
-                    Carton Dimensions
-                </div>
-
-                <table class="dimension-table">
-
-                    <tr>
-                        <td>Height</td>
-                        <td>
-                            {{ $product->carton_height ?? '—' }}
-                            {{ $product->carton_height !== null ? 'cm' : '' }}
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>Width</td>
-                        <td>
-                            {{ $product->carton_width ?? '—' }}
-                            {{ $product->carton_width !== null ? 'cm' : '' }}
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>Length</td>
-                        <td>
-                            {{ $product->carton_length ?? '—' }}
-                            {{ $product->carton_length !== null ? 'cm' : '' }}
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>Depth</td>
-                        <td>
-                            {{ $product->carton_depth ?? '—' }}
-                            {{ $product->carton_depth !== null ? 'cm' : '' }}
-                        </td>
-                    </tr>
-
-                </table>
-
-            </div>
-
-        </td>
-
-    </tr>
-
-</table>
-
-
-{{-- ========================================================================= --}}
 {{-- QUOTATION ITEMS --}}
 {{-- ========================================================================= --}}
 
@@ -880,23 +509,23 @@
 
         <tr>
 
-            <th>
+            <th style="width:35%;">
                 Item
             </th>
 
-            <th>
+            <th style="width:18%;">
                 SKU
             </th>
 
-            <th class="num">
+            <th class="num" style="width:10%;">
                 Qty
             </th>
 
-            <th class="num">
+            <th class="num" style="width:18%;">
                 Unit Price
             </th>
 
-            <th class="num">
+            <th class="num" style="width:19%;">
                 Subtotal
             </th>
 
@@ -907,31 +536,84 @@
 
     <tbody>
 
-        <tr>
+        @foreach($quotationItems as $item)
 
-            <td>
-                <strong>
-                    {{ $product->item_name }}
-                </strong>
-            </td>
+            @php
 
-            <td class="sku-chip">
-                {{ $product->sku ?? '—' }}
-            </td>
+                $itemProduct =
+                    $item->product
+                    ?? $item;
 
-            <td class="num">
-                {{ number_format($quantity) }}
-            </td>
+                $itemQuantity =
+                    (int) (
+                        $item->quantity
+                        ?? 1
+                    );
 
-            <td class="num">
-                ${{ number_format((float) $unit_price, 2) }}
-            </td>
+                $itemUnitPrice =
+                    (float) (
+                        $item->unit_price
+                        ?? $itemProduct->price
+                        ?? 0
+                    );
 
-            <td class="num">
-                ${{ number_format((float) $subtotal, 2) }}
-            </td>
+                $itemSubtotal =
+                    $itemQuantity
+                    * $itemUnitPrice;
 
-        </tr>
+            @endphp
+
+
+            <tr>
+
+                <td>
+
+                    <div class="item-name">
+                        {{ $itemProduct->item_name }}
+                    </div>
+
+                    @if(!empty($itemProduct->description))
+
+                        <div class="item-description">
+                            {{ \Illuminate\Support\Str::limit(
+                                $itemProduct->description,
+                                100
+                            ) }}
+                        </div>
+
+                    @endif
+
+                </td>
+
+
+                <td class="sku-chip">
+                    {{ $itemProduct->sku ?? '—' }}
+                </td>
+
+
+                <td class="num">
+                    {{ number_format($itemQuantity) }}
+                </td>
+
+
+                <td class="num">
+                    ${{ number_format(
+                        $itemUnitPrice,
+                        2
+                    ) }}
+                </td>
+
+
+                <td class="num">
+                    ${{ number_format(
+                        $itemSubtotal,
+                        2
+                    ) }}
+                </td>
+
+            </tr>
+
+        @endforeach
 
     </tbody>
 
@@ -951,7 +633,10 @@
         </td>
 
         <td class="value">
-            ${{ number_format($total, 2) }}
+            ${{ number_format(
+                (float) $total,
+                2
+            ) }}
         </td>
 
     </tr>
@@ -964,12 +649,550 @@
         </td>
 
         <td class="value">
-            ${{ number_format((float) $total, 2) }}
+            ${{ number_format(
+                (float) $total,
+                2
+            ) }}
         </td>
 
     </tr>
 
 </table>
+
+
+{{-- ========================================================================= --}}
+{{-- PRODUCT INFORMATION --}}
+{{-- ========================================================================= --}}
+
+<div style="margin-top:25px;">
+
+    <div class="section-title">
+        Product Information
+    </div>
+
+
+    @foreach($quotationItems as $index => $item)
+
+        @php
+
+            $itemProduct =
+                $item->product
+                ?? $item;
+
+            $itemImage = null;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Resolve product image
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                isset($itemProduct->images)
+                && $itemProduct->images->count()
+            ) {
+
+                $firstImage =
+                    $itemProduct->images->first();
+
+                if (
+                    $firstImage->image_type
+                    === 'upload'
+                    && !empty($firstImage->image_path)
+                ) {
+
+                    $itemImage =
+                        public_path(
+                            'storage/'
+                            . $firstImage->image_path
+                        );
+
+                } elseif (
+                    !empty($firstImage->image_url)
+                ) {
+
+                    $itemImage =
+                        $firstImage->image_url;
+
+                }
+
+            }
+
+        @endphp
+
+
+        <div class="product-block">
+
+            <table class="product-info-table">
+
+                <tr>
+
+                    {{-- PRODUCT IMAGE --}}
+
+                    <td class="product-image-cell">
+
+                        @if(
+                            !empty($itemImage)
+                            && filter_var(
+                                $itemImage,
+                                FILTER_VALIDATE_URL
+                            )
+                        )
+
+                            <img
+                                src="{{ $itemImage }}"
+                                class="product-image"
+                                alt="Product Image"
+                            >
+
+                        @elseif(
+                            !empty($itemImage)
+                            && file_exists($itemImage)
+                        )
+
+                            <img
+                                src="{{ $itemImage }}"
+                                class="product-image"
+                                alt="Product Image"
+                            >
+
+                        @else
+
+                            <table class="no-image">
+
+                                <tr>
+
+                                    <td>
+                                        No Image Available
+                                    </td>
+
+                                </tr>
+
+                            </table>
+
+                        @endif
+
+                    </td>
+
+
+                    {{-- PRODUCT DETAILS --}}
+
+                    <td>
+
+                        <div class="product-name">
+                            {{ $itemProduct->item_name }}
+                        </div>
+
+
+                        <div class="product-sku">
+                            SKU:
+                            {{ $itemProduct->sku ?? '—' }}
+                        </div>
+
+
+                        @if(
+                            !empty(
+                                $itemProduct->description
+                            )
+                        )
+
+                            <div class="description">
+                                {{ $itemProduct->description }}
+                            </div>
+
+                        @else
+
+                            <div class="description">
+                                Product quotation for
+                                {{ $itemProduct->item_name }}.
+                            </div>
+
+                        @endif
+
+                    </td>
+
+                </tr>
+
+            </table>
+
+
+            {{-- PRODUCT CLASSIFICATION --}}
+
+            <table class="details-table">
+
+                <tr>
+
+                    <td>
+
+                        <span class="detail-label">
+                            Category
+                        </span>
+
+                        <span class="detail-value">
+                            {{ $itemProduct->category->name ?? '—' }}
+                        </span>
+
+                    </td>
+
+
+                    <td>
+
+                        <span class="detail-label">
+                            Sub Category
+                        </span>
+
+                        <span class="detail-value">
+                            {{ $itemProduct->subCategory->name ?? '—' }}
+                        </span>
+
+                    </td>
+
+
+                    <td>
+
+                        <span class="detail-label">
+                            Product Type
+                        </span>
+
+                        <span class="detail-value">
+                            {{ $itemProduct->productType->name ?? '—' }}
+                        </span>
+
+                    </td>
+
+
+                    <td>
+
+                        <span class="detail-label">
+                            Collection
+                        </span>
+
+                        <span class="detail-value">
+                            {{ $itemProduct->collection->name ?? '—' }}
+                        </span>
+
+                    </td>
+
+                </tr>
+
+
+                <tr>
+
+                    <td>
+
+                        <span class="detail-label">
+                            Type of Sample
+                        </span>
+
+                        <span class="detail-value">
+                            {{ $itemProduct->type_of_sample ?? '—' }}
+                        </span>
+
+                    </td>
+
+
+                    <td>
+
+                        <span class="detail-label">
+                            Classification
+                        </span>
+
+                        <span class="detail-value">
+                            {{ $itemProduct->classification ?? '—' }}
+                        </span>
+
+                    </td>
+
+
+                    <td>
+
+                        <span class="detail-label">
+                            Designed By
+                        </span>
+
+                        <span class="detail-value">
+                            {{ $itemProduct->designed_by ?? '—' }}
+                        </span>
+
+                    </td>
+
+
+                    <td>
+
+                        <span class="detail-label">
+                            Type
+                        </span>
+
+                        <span class="detail-value">
+                            {{ $itemProduct->type ?? '—' }}
+                        </span>
+
+                    </td>
+
+                </tr>
+
+            </table>
+
+
+            {{-- MATERIALS / COLORS --}}
+
+            <table class="tags-table">
+
+                <tr>
+
+                    <td>
+
+                        <div class="tag-label">
+                            Materials
+                        </div>
+
+                        @php
+                            $materials =
+                                $itemProduct->materials
+                                ?? [];
+                        @endphp
+
+
+                        @forelse(
+                            $materials
+                            as $material
+                        )
+
+                            <span class="tag">
+                                {{ $material }}
+                            </span>
+
+                        @empty
+
+                            <span
+                                style="
+                                    font-size:8px;
+                                    color:#999;
+                                "
+                            >
+                                No materials specified
+                            </span>
+
+                        @endforelse
+
+                    </td>
+
+
+                    <td>
+
+                        <div class="tag-label">
+                            Colors
+                        </div>
+
+                        @php
+                            $colors =
+                                $itemProduct->color
+                                ?? [];
+                        @endphp
+
+
+                        @forelse(
+                            $colors
+                            as $color
+                        )
+
+                            <span class="tag">
+                                {{ $color }}
+                            </span>
+
+                        @empty
+
+                            <span
+                                style="
+                                    font-size:8px;
+                                    color:#999;
+                                "
+                            >
+                                No colors specified
+                            </span>
+
+                        @endforelse
+
+                    </td>
+
+                </tr>
+
+            </table>
+
+
+            {{-- DIMENSIONS --}}
+
+            <table class="dimensions-table">
+
+                <tr>
+
+                    {{-- PRODUCT DIMENSIONS --}}
+
+                    <td>
+
+                        <div class="dimension-box">
+
+                            <div class="dimension-title">
+                                Product Dimensions
+                            </div>
+
+
+                            <table class="dimension-table">
+
+                                <tr>
+                                    <td>Height</td>
+
+                                    <td>
+                                        {{ $itemProduct->product_height ?? '—' }}
+
+                                        {{ $itemProduct->product_height !== null
+                                            ? 'cm'
+                                            : ''
+                                        }}
+                                    </td>
+                                </tr>
+
+
+                                <tr>
+                                    <td>Width</td>
+
+                                    <td>
+                                        {{ $itemProduct->product_width ?? '—' }}
+
+                                        {{ $itemProduct->product_width !== null
+                                            ? 'cm'
+                                            : ''
+                                        }}
+                                    </td>
+                                </tr>
+
+
+                                <tr>
+                                    <td>Length</td>
+
+                                    <td>
+                                        {{ $itemProduct->product_length ?? '—' }}
+
+                                        {{ $itemProduct->product_length !== null
+                                            ? 'cm'
+                                            : ''
+                                        }}
+                                    </td>
+                                </tr>
+
+
+                                <tr>
+                                    <td>Depth</td>
+
+                                    <td>
+                                        {{ $itemProduct->product_depth ?? '—' }}
+
+                                        {{ $itemProduct->product_depth !== null
+                                            ? 'cm'
+                                            : ''
+                                        }}
+                                    </td>
+                                </tr>
+
+                            </table>
+
+                        </div>
+
+                    </td>
+
+
+                    {{-- CARTON DIMENSIONS --}}
+
+                    <td>
+
+                        <div class="dimension-box">
+
+                            <div class="dimension-title">
+                                Carton Dimensions
+                            </div>
+
+
+                            <table class="dimension-table">
+
+                                <tr>
+                                    <td>Height</td>
+
+                                    <td>
+                                        {{ $itemProduct->carton_height ?? '—' }}
+
+                                        {{ $itemProduct->carton_height !== null
+                                            ? 'cm'
+                                            : ''
+                                        }}
+                                    </td>
+                                </tr>
+
+
+                                <tr>
+                                    <td>Width</td>
+
+                                    <td>
+                                        {{ $itemProduct->carton_width ?? '—' }}
+
+                                        {{ $itemProduct->carton_width !== null
+                                            ? 'cm'
+                                            : ''
+                                        }}
+                                    </td>
+                                </tr>
+
+
+                                <tr>
+                                    <td>Length</td>
+
+                                    <td>
+                                        {{ $itemProduct->carton_length ?? '—' }}
+
+                                        {{ $itemProduct->carton_length !== null
+                                            ? 'cm'
+                                            : ''
+                                        }}
+                                    </td>
+                                </tr>
+
+
+                                <tr>
+                                    <td>Depth</td>
+
+                                    <td>
+                                        {{ $itemProduct->carton_depth ?? '—' }}
+
+                                        {{ $itemProduct->carton_depth !== null
+                                            ? 'cm'
+                                            : ''
+                                        }}
+                                    </td>
+                                </tr>
+
+                            </table>
+
+                        </div>
+
+                    </td>
+
+                </tr>
+
+            </table>
+
+
+            {{-- SEPARATOR --}}
+
+            @if(!$loop->last)
+
+                <div class="product-separator"></div>
+
+            @endif
+
+        </div>
+
+    @endforeach
+
+</div>
 
 
 {{-- ========================================================================= --}}
@@ -994,5 +1217,4 @@
 
 
 </body>
-
 </html>

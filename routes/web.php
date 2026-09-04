@@ -459,12 +459,11 @@ use App\Http\Controllers\ProductScanController;
                         [QuotationController::class, 'print']
                     )->name('quotation.print');
 
+                    Route::post(
+                        '/quotation/scan',
+                        [ProductScanController::class, 'scan']
+                    )->name('mi_app.scan');
                 });
-
-            Route::get(
-                '/scan',
-                [ProductScanController::class, 'scan'] // TODO: replace with the actual controller that resolves a scanned product tag and renders the product-detail view
-            )->name('mi_app.scan');
 
         });
 require __DIR__.'/auth.php';

@@ -14,6 +14,7 @@
             --pd-line: #e5e5e5;
             --pd-bg: #f7f8f9;
             --pd-danger: #dc2626;
+            --pd-success: #166534;
         }
 
         * {
@@ -153,8 +154,13 @@
         }
 
         .pd-no-price {
-            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            padding: 0.45rem 0.7rem;
+            border-radius: 7px;
+            background: #f5f5f5;
             color: var(--pd-ink-faint);
+            font-size: 0.85rem;
             font-style: italic;
         }
 
@@ -275,6 +281,11 @@
             color: var(--pd-ink-faint);
         }
 
+        .pd-cart-item-price.no-price {
+            color: var(--pd-ink-faint);
+            font-style: italic;
+        }
+
         .pd-cart-item-controls {
             display: flex;
             align-items: center;
@@ -290,6 +301,10 @@
             border-radius: 6px;
             cursor: pointer;
             font-weight: 700;
+        }
+
+        .pd-qty-btn:hover {
+            background: var(--pd-bg);
         }
 
         .pd-qty-value {
@@ -315,6 +330,12 @@
             text-align: right;
         }
 
+        .pd-cart-item-total.no-price {
+            color: var(--pd-ink-faint);
+            font-style: italic;
+            font-size: 0.72rem;
+        }
+
         .pd-total-row {
             display: flex;
             justify-content: space-between;
@@ -328,6 +349,14 @@
 
         .pd-total-row span.amt {
             font-size: 1.1rem;
+        }
+
+        .pd-price-note {
+            margin-top: 0.45rem;
+            font-size: 0.7rem;
+            color: var(--pd-ink-faint);
+            text-align: right;
+            font-style: italic;
         }
 
         .pd-btn-row {
@@ -381,7 +410,7 @@
         }
 
         .pd-btn.added {
-            background: #166534;
+            background: var(--pd-success);
         }
 
         .pd-note {
@@ -428,6 +457,12 @@
 
 @php
 
+    /*
+    |--------------------------------------------------------------------------
+    | IMAGE URL CONVERTER
+    |--------------------------------------------------------------------------
+    */
+
     $convertImageUrl = function ($url) {
 
         if (empty($url)) {
@@ -449,6 +484,13 @@
         return trim($url);
     };
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCT IMAGES
+    |--------------------------------------------------------------------------
+    */
+
     $pdImages = $product->images
         ->map(function ($image) use ($convertImageUrl) {
 
@@ -462,7 +504,23 @@
         ->filter(fn ($img) => !empty($img['url']))
         ->values();
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCT REFERENCE
+    |--------------------------------------------------------------------------
+    */
+
     $pdRef = $product->sku ?: ('PID-' . $product->product_id);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRICE STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    $pdHasPrice = !is_null($product->price);
 
 @endphp
 
@@ -498,9 +556,11 @@
                              viewBox="0 0 24 24"
                              stroke="currentColor"
                              stroke-width="2">
-                            <path stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  d="M15 19l-7-7 7-7" />
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M15 19l-7-7 7-7"
+                            />
                         </svg>
                     </button>
 
@@ -515,9 +575,11 @@
                              viewBox="0 0 24 24"
                              stroke="currentColor"
                              stroke-width="2">
-                            <path stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  d="M9 5l7 7-7 7" />
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M9 5l7 7-7 7"
+                            />
                         </svg>
                     </button>
 
@@ -547,9 +609,11 @@
                 {{ $pdRef }}
             </span>
 
+
             <h1 class="pd-title">
                 {{ $product->item_name }}
             </h1>
+
 
             <p class="pd-taxo">
                 {{
@@ -564,6 +628,7 @@
                 }}
             </p>
 
+
             @if($product->description)
 
                 <p class="pd-description">
@@ -573,11 +638,17 @@
             @endif
 
 
-            @if(!is_null($product->price ?? null))
+            {{-- =====================================================
+                 PRICE
+            ====================================================== --}}
+
+            @if($pdHasPrice)
 
                 <div class="pd-price">
                     ${{ number_format($product->price, 2) }}
-                    <span class="unit">/ unit</span>
+                    <span class="unit">
+                        / unit
+                    </span>
                 </div>
 
             @else
@@ -589,6 +660,10 @@
             @endif
 
 
+            {{-- =====================================================
+                 SPECIFICATIONS
+            ====================================================== --}}
+
             @if(
                 $product->product_height ||
                 $product->product_width ||
@@ -599,31 +674,62 @@
                 <div class="pd-specs">
 
                     @if($product->product_height)
+
                         <div class="pd-spec-item">
-                            <span class="pd-spec-label">Height</span>
+
+                            <span class="pd-spec-label">
+                                Height
+                            </span>
+
                             {{ $product->product_height }} cm
+
                         </div>
+
                     @endif
+
 
                     @if($product->product_width)
+
                         <div class="pd-spec-item">
-                            <span class="pd-spec-label">Width</span>
+
+                            <span class="pd-spec-label">
+                                Width
+                            </span>
+
                             {{ $product->product_width }} cm
+
                         </div>
+
                     @endif
+
 
                     @if($product->product_length)
+
                         <div class="pd-spec-item">
-                            <span class="pd-spec-label">Length</span>
+
+                            <span class="pd-spec-label">
+                                Length
+                            </span>
+
                             {{ $product->product_length }} cm
+
                         </div>
+
                     @endif
 
+
                     @if($product->product_depth)
+
                         <div class="pd-spec-item">
-                            <span class="pd-spec-label">Depth</span>
+
+                            <span class="pd-spec-label">
+                                Depth
+                            </span>
+
                             {{ $product->product_depth }} cm
+
                         </div>
+
                     @endif
 
                 </div>
@@ -637,69 +743,75 @@
 
     {{-- =========================================================
          ADD CURRENT PRODUCT
+         IMPORTANT:
+         This is ALWAYS visible, even if price is NULL.
     ========================================================== --}}
 
-    @if(!is_null($product->price ?? null))
+    <div class="pd-card">
 
-        <div class="pd-card">
+        <div class="pd-body">
 
-            <div class="pd-body">
-
-                <p class="pd-section-title">
-                    Add Product
-                </p>
-
-                <div class="pd-field">
-
-                    <label for="pdCurrentQuantity">
-                        Quantity
-                    </label>
-
-                    <input
-                        type="number"
-                        id="pdCurrentQuantity"
-                        value="1"
-                        min="1"
-                        inputmode="numeric"
-                    >
-
-                </div>
+            <p class="pd-section-title">
+                Add Product
+            </p>
 
 
-                <button
-                    type="button"
-                    id="pdAddProductBtn"
-                    class="pd-btn primary full"
-                    onclick="pdAddCurrentProduct()"
+            <div class="pd-field">
+
+                <label for="pdCurrentQuantity">
+                    Quantity
+                </label>
+
+                <input
+                    type="number"
+                    id="pdCurrentQuantity"
+                    value="1"
+                    min="1"
+                    step="1"
+                    inputmode="numeric"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                         fill="none"
-                         viewBox="0 0 24 24"
-                         stroke="currentColor"
-                         stroke-width="2">
-                        <path stroke-linecap="round"
-                              stroke-linejoin="round"
-                              d="M12 4v16m8-8H4"/>
-                    </svg>
-
-                    Add to Quotation
-                </button>
-
-
-                <button
-                    type="button"
-                    class="pd-btn secondary full"
-                    style="margin-top:0.6rem;"
-                    onclick="pdScanAnotherProduct()"
-                >
-                    Scan Another Product
-                </button>
 
             </div>
 
+
+            <button
+                type="button"
+                id="pdAddProductBtn"
+                class="pd-btn primary full"
+                onclick="pdAddCurrentProduct()"
+            >
+
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2">
+
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M12 4v16m8-8H4"
+                    />
+
+                </svg>
+
+                Add to Quotation
+
+            </button>
+
+
+            <button
+                type="button"
+                class="pd-btn secondary full"
+                style="margin-top:0.6rem;"
+                onclick="pdScanAnotherProduct()"
+            >
+                Scan Another Product
+            </button>
+
         </div>
 
-    @endif
+    </div>
 
 
     {{-- =========================================================
@@ -712,9 +824,13 @@
 
             <div class="pd-cart-header">
 
-                <p class="pd-section-title" style="margin:0;">
+                <p
+                    class="pd-section-title"
+                    style="margin:0;"
+                >
                     Quotation
                 </p>
+
 
                 <span
                     class="pd-cart-count"
@@ -752,6 +868,19 @@
 
 
             <div
+                id="pdPriceNote"
+                class="pd-price-note"
+                style="display:none;"
+            >
+                Some products are priced upon request.
+            </div>
+
+
+            {{-- =====================================================
+                 CUSTOMER
+            ====================================================== --}}
+
+            <div
                 class="pd-field"
                 style="margin-top:1rem;"
             >
@@ -769,6 +898,10 @@
             </div>
 
 
+            {{-- =====================================================
+                 PRINT / PDF
+            ====================================================== --}}
+
             <div class="pd-btn-row">
 
                 <button
@@ -778,6 +911,7 @@
                 >
                     Print
                 </button>
+
 
                 <button
                     type="button"
@@ -789,6 +923,10 @@
 
             </div>
 
+
+            {{-- =====================================================
+                 CLEAR
+            ====================================================== --}}
 
             <button
                 type="button"
@@ -825,6 +963,7 @@
     <h2 style="margin:0 0 4px;">
         Product Quotation
     </h2>
+
 
     <p
         style="
@@ -870,7 +1009,9 @@
 
         </thead>
 
+
         <tbody id="pdPrintItems"></tbody>
+
 
         <tfoot>
 
@@ -883,8 +1024,9 @@
                         font-weight:bold;
                     "
                 >
-                    TOTAL
+                    ESTIMATED TOTAL
                 </td>
+
 
                 <td
                     id="pdPrintTotal"
@@ -901,8 +1043,26 @@
 
     </table>
 
+
+    <p
+        id="pdPrintPriceNote"
+        style="
+            display:none;
+            margin-top:12px;
+            font-size:11px;
+            color:#666;
+            font-style:italic;
+        "
+    >
+        * Some products are priced upon request.
+    </p>
+
 </div>
 
+
+{{-- =========================================================
+     IMAGE GALLERY
+========================================================== --}}
 
 @if($pdImages->count() > 1)
 
@@ -911,10 +1071,13 @@
     const pdGalleryImages =
         @json($pdImages->pluck('url'));
 
+
     let pdCurrentImage = 0;
+
 
     const pdGalleryImg =
         document.getElementById('pdGalleryImg');
+
 
     const pdGalleryCounter =
         document.getElementById('pdGalleryCounter');
@@ -922,13 +1085,22 @@
 
     function pdUpdateGallery()
     {
+        if (!pdGalleryImg) {
+            return;
+        }
+
         pdGalleryImg.src =
             pdGalleryImages[pdCurrentImage];
 
-        pdGalleryCounter.textContent =
-            (pdCurrentImage + 1)
-            + ' / '
-            + pdGalleryImages.length;
+
+        if (pdGalleryCounter) {
+
+            pdGalleryCounter.textContent =
+                (pdCurrentImage + 1)
+                + ' / '
+                + pdGalleryImages.length;
+
+        }
     }
 
 
@@ -956,49 +1128,68 @@
 @endif
 
 
-@if(!is_null($product->price ?? null))
+{{-- =========================================================
+     QUOTATION JAVASCRIPT
+     
+     IMPORTANT:
+     DO NOT wrap this script inside:
+     
+     @if(!is_null($product->price))
+     
+     The script must always exist.
+========================================================== --}}
 
 <script>
+
     /*
     |--------------------------------------------------------------------------
     | PRODUCT DATA FROM LARAVEL
     |--------------------------------------------------------------------------
+    |
+    | price can be:
+    |
+    |     1500
+    |
+    | OR
+    |
+    |     null
+    |
     */
 
     const PD_CURRENT_PRODUCT = {
-        id: {{ (int) $product->product_id }},
-        sku: @json($pdRef),
-        name: @json($product->item_name),
-        price: {{ (float) $product->price }}
+
+        id:
+            {{ (int) $product->product_id }},
+
+        sku:
+            @json($pdRef),
+
+        name:
+            @json($product->item_name),
+
+        price:
+            @json($product->price)
+
     };
+
 
     /*
     |--------------------------------------------------------------------------
     | ROUTES
     |--------------------------------------------------------------------------
-    |
-    | IMPORTANT:
-    | These route names must exist in routes/web.php
-    |
     */
 
     const PD_DOWNLOAD_URL =
         @json(route('mi_app.quotation.download'));
 
+
     const PD_PRINT_URL =
         @json(route('mi_app.quotation.print'));
 
-    /*
-    |--------------------------------------------------------------------------
-    | SCANNER URL
-    |--------------------------------------------------------------------------
-    |
-    | CHANGE mi_app.scan if your scanner route has a different name.
-    |
-    */
 
     const PD_SCANNER_URL =
         @json(route('mi_app.scan'));
+
 
     /*
     |--------------------------------------------------------------------------
@@ -1009,9 +1200,10 @@
     const PD_CSRF_TOKEN =
         @json(csrf_token());
 
+
     /*
     |--------------------------------------------------------------------------
-    | LOCAL STORAGE KEY
+    | LOCAL STORAGE
     |--------------------------------------------------------------------------
     */
 
@@ -1030,18 +1222,24 @@
         try {
 
             const stored =
-                localStorage.getItem(PD_CART_KEY);
+                localStorage.getItem(
+                    PD_CART_KEY
+                );
+
 
             if (!stored) {
                 return [];
             }
 
+
             const cart =
                 JSON.parse(stored);
+
 
             return Array.isArray(cart)
                 ? cart
                 : [];
+
 
         } catch (error) {
 
@@ -1049,6 +1247,7 @@
                 'Unable to read quotation cart:',
                 error
             );
+
 
             return [];
         }
@@ -1066,6 +1265,22 @@
         localStorage.setItem(
             PD_CART_KEY,
             JSON.stringify(cart)
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | HAS PRICE
+    |--------------------------------------------------------------------------
+    */
+
+    function pdHasPrice(item)
+    {
+        return (
+            item.price !== null &&
+            item.price !== undefined &&
+            item.price !== ''
         );
     }
 
@@ -1101,19 +1316,33 @@
                 'pdCurrentQuantity'
             );
 
-        const quantity =
-            Math.max(
-                1,
-                parseInt(
-                    quantityInput?.value || '1',
-                    10
-                )
+
+        let quantity =
+            parseInt(
+                quantityInput?.value || '1',
+                10
             );
+
+
+        if (
+            !Number.isFinite(quantity) ||
+            quantity < 1
+        ) {
+
+            quantity = 1;
+
+        }
 
 
         let cart =
             pdGetCart();
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | FIND EXISTING PRODUCT
+        |--------------------------------------------------------------------------
+        */
 
         const existingIndex =
             cart.findIndex(
@@ -1128,6 +1357,12 @@
             );
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | EXISTING PRODUCT
+        |--------------------------------------------------------------------------
+        */
+
         if (existingIndex >= 0) {
 
             cart[existingIndex].quantity =
@@ -1135,7 +1370,35 @@
                     cart[existingIndex].quantity || 0
                 ) + quantity;
 
-        } else {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update price/name/SKU in case current database
+            | information changed.
+            |--------------------------------------------------------------------------
+            */
+
+            cart[existingIndex].sku =
+                PD_CURRENT_PRODUCT.sku;
+
+
+            cart[existingIndex].name =
+                PD_CURRENT_PRODUCT.name;
+
+
+            cart[existingIndex].price =
+                PD_CURRENT_PRODUCT.price;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | NEW PRODUCT
+        |--------------------------------------------------------------------------
+        */
+
+        else {
 
             cart.push({
 
@@ -1150,10 +1413,24 @@
                 name:
                     PD_CURRENT_PRODUCT.name,
 
+                /*
+                |--------------------------------------------------------------------------
+                | IMPORTANT:
+                | Keep NULL as NULL.
+                |
+                | Do NOT use:
+                |
+                | Number(null)
+                |
+                |--------------------------------------------------------------------------
+                */
+
                 price:
-                    Number(
-                        PD_CURRENT_PRODUCT.price
-                    ),
+                    PD_CURRENT_PRODUCT.price !== null
+                        ? Number(
+                            PD_CURRENT_PRODUCT.price
+                        )
+                        : null,
 
                 quantity:
                     quantity
@@ -1163,7 +1440,20 @@
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | SAVE
+        |--------------------------------------------------------------------------
+        */
+
         pdSaveCart(cart);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RENDER
+        |--------------------------------------------------------------------------
+        */
 
         pdRenderCart();
 
@@ -1189,6 +1479,7 @@
             button.innerHTML =
                 '✓ Added to Quotation';
 
+
             button.classList.add(
                 'added'
             );
@@ -1199,6 +1490,7 @@
 
                     button.innerHTML =
                         originalText;
+
 
                     button.classList.remove(
                         'added'
@@ -1229,14 +1521,22 @@
                 'pdCartItems'
             );
 
+
         const count =
             document.getElementById(
                 'pdCartCount'
             );
 
+
         const totalElement =
             document.getElementById(
                 'pdCartTotal'
+            );
+
+
+        const priceNote =
+            document.getElementById(
+                'pdPriceNote'
             );
 
 
@@ -1263,17 +1563,30 @@
                 </div>
             `;
 
+
             count.textContent =
                 '0 Products';
 
+
             totalElement.textContent =
                 '$0.00';
+
+
+            if (priceNote) {
+
+                priceNote.style.display =
+                    'none';
+
+            }
+
 
             return;
         }
 
 
         let total = 0;
+
+        let hasUnpricedProduct = false;
 
         let html = '';
 
@@ -1290,20 +1603,82 @@
                 const quantity =
                     Math.max(
                         1,
-                        Number(item.quantity || 1)
+                        Number(
+                            item.quantity || 1
+                        )
                     );
 
+
+                const hasPrice =
+                    pdHasPrice(item);
+
+
                 const price =
-                    Number(item.price || 0);
+                    hasPrice
+                        ? Number(item.price)
+                        : null;
+
 
                 const itemTotal =
-                    price * quantity;
+                    hasPrice
+                        ? price * quantity
+                        : null;
 
 
-                total += itemTotal;
+                /*
+                |--------------------------------------------------------------------------
+                | TOTAL
+                |--------------------------------------------------------------------------
+                */
+
+                if (hasPrice) {
+
+                    total += itemTotal;
+
+                } else {
+
+                    hasUnpricedProduct = true;
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | PRICE DISPLAY
+                |--------------------------------------------------------------------------
+                */
+
+                const priceDisplay =
+                    hasPrice
+                        ? `
+                            ${pdFormatCurrency(price)}
+                            / unit
+                          `
+                        : `
+                            <span class="no-price">
+                                Price upon request
+                            </span>
+                          `;
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | ITEM TOTAL DISPLAY
+                |--------------------------------------------------------------------------
+                */
+
+                const totalDisplay =
+                    hasPrice
+                        ? pdFormatCurrency(itemTotal)
+                        : `
+                            <span class="no-price">
+                                Upon request
+                            </span>
+                          `;
 
 
                 html += `
+
                     <div class="pd-cart-item">
 
                         <div class="pd-cart-item-info">
@@ -1314,16 +1689,24 @@
                                 )}
                             </div>
 
+
                             <div class="pd-cart-item-ref">
                                 ${pdEscapeHtml(
                                     item.sku || ''
                                 )}
                             </div>
 
-                            <div class="pd-cart-item-price">
-                                ${pdFormatCurrency(price)}
-                                / unit
+
+                            <div
+                                class="pd-cart-item-price ${
+                                    hasPrice
+                                        ? ''
+                                        : 'no-price'
+                                }"
+                            >
+                                ${priceDisplay}
                             </div>
+
 
                             <div class="pd-cart-item-controls">
 
@@ -1335,9 +1718,11 @@
                                     −
                                 </button>
 
+
                                 <span class="pd-qty-value">
                                     ${quantity}
                                 </span>
+
 
                                 <button
                                     type="button"
@@ -1346,6 +1731,7 @@
                                 >
                                     +
                                 </button>
+
 
                                 <button
                                     type="button"
@@ -1359,19 +1745,39 @@
 
                         </div>
 
-                        <div class="pd-cart-item-total">
-                            ${pdFormatCurrency(itemTotal)}
+
+                        <div
+                            class="pd-cart-item-total ${
+                                hasPrice
+                                    ? ''
+                                    : 'no-price'
+                            }"
+                        >
+                            ${totalDisplay}
                         </div>
 
                     </div>
+
                 `;
             }
         );
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | INSERT CART
+        |--------------------------------------------------------------------------
+        */
+
         container.innerHTML =
             html;
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCT COUNT
+        |--------------------------------------------------------------------------
+        */
 
         count.textContent =
             cart.length
@@ -1382,8 +1788,30 @@
             );
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL
+        |--------------------------------------------------------------------------
+        */
+
         totalElement.textContent =
             pdFormatCurrency(total);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRICE NOTE
+        |--------------------------------------------------------------------------
+        */
+
+        if (priceNote) {
+
+            priceNote.style.display =
+                hasUnpricedProduct
+                    ? 'block'
+                    : 'none';
+
+        }
     }
 
 
@@ -1407,12 +1835,13 @@
         cart[index].quantity =
             Number(
                 cart[index].quantity || 1
-            ) + Number(change);
+            )
+            + Number(change);
 
 
         /*
         |--------------------------------------------------------------------------
-        | REMOVE WHEN QUANTITY REACHES ZERO
+        | REMOVE IF ZERO
         |--------------------------------------------------------------------------
         */
 
@@ -1429,6 +1858,7 @@
 
 
         pdSaveCart(cart);
+
 
         pdRenderCart();
     }
@@ -1458,6 +1888,7 @@
 
 
         pdSaveCart(cart);
+
 
         pdRenderCart();
     }
@@ -1581,6 +2012,7 @@
                 'Please add at least one product to the quotation.'
             );
 
+
             return null;
         }
 
@@ -1609,7 +2041,9 @@
 
 
             if (customerInput) {
+
                 customerInput.focus();
+
             }
 
 
@@ -1632,6 +2066,7 @@
         form.method =
             'POST';
 
+
         form.action =
             action;
 
@@ -1651,8 +2086,10 @@
         csrf.type =
             'hidden';
 
+
         csrf.name =
             '_token';
+
 
         csrf.value =
             PD_CSRF_TOKEN;
@@ -1678,8 +2115,10 @@
         customer.type =
             'hidden';
 
+
         customer.name =
             'customer_name';
+
 
         customer.value =
             customerName;
@@ -1696,15 +2135,20 @@
         |--------------------------------------------------------------------------
         |
         | IMPORTANT:
-        | Only send product ID and quantity.
+        | We ONLY send:
         |
-        | The server should get the actual:
+        | - product ID
+        | - quantity
+        |
+        | Laravel retrieves:
+        |
         | - name
         | - SKU
         | - price
         | - image
-        | from the database.
         |
+        | from the database.
+        |--------------------------------------------------------------------------
         */
 
         const products =
@@ -1715,6 +2159,7 @@
 
         products.type =
             'hidden';
+
 
         products.name =
             'products';
@@ -1843,6 +2288,6 @@
 
 </script>
 
-@endif
+
 </body>
 </html>

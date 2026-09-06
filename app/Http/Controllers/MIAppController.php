@@ -331,6 +331,36 @@ public function dashboard()
 
         return $candidate;
     }
+
+    /**
+     * Store an uploaded file safely.
+     *
+     * Validates the file arrived intact and that the storage write
+     * actually succeeded, throwing a clear exception otherwise instead
+     * of silently saving a broken path (e.g. `false` cast to `0`).
+     *
+     * @throws \RuntimeException
+     */
+    private function storeUploadedFile(\Illuminate\Http\UploadedFile $file, string $directory, string $disk = 'public'): string
+    {
+        if (!$file->isValid()) {
+            throw new \RuntimeException(
+                'Upload failed for "' . $file->getClientOriginalName()
+                . '" (error code: ' . $file->getError() . '). Please try uploading the file again.'
+            );
+        }
+
+        $path = $file->store($directory, $disk);
+
+        if ($path === false || $path === null || $path === '') {
+            throw new \RuntimeException(
+                'Failed to save uploaded file "' . $file->getClientOriginalName() . '" to storage. Please try again.'
+            );
+        }
+
+        return $path;
+    }
+
     public function store(Request $request)
     {
         // Remove blank image link values before validation so optional empty inputs do not fail the URL rule.
@@ -419,7 +449,12 @@ public function dashboard()
 
         if ($request->hasFile('product_images')) {
             foreach ($request->file('product_images') as $index => $file) {
-                $path = $file->store('product_images', 'public');
+
+                // Throws \RuntimeException if the upload is invalid or the
+                // storage write fails — caught below, which rolls back the
+                // DB transaction and cleans up any files already stored.
+                $path = $this->storeUploadedFile($file, 'product_images');
+
                 $uploadedPaths[] = $path;
 
                 MI_Product_Image::create([
@@ -573,7 +608,11 @@ public function dashboard()
     public function update(Request $request, $id)
     {
         $product = MI_Product::with('images')->findOrFail($id);
-    
+
+        // Uploaded files stored on disk during this request, tracked here
+        // so they can be cleaned up if anything fails after they're written.
+        $uploadedPaths = [];
+
         try {
     
             /*
@@ -882,7 +921,8 @@ public function dashboard()
             DB::transaction(function () use (
                 $product,
                 $validated,
-                $request
+                $request,
+                &$uploadedPaths
             ) {
     
                 /*
@@ -916,6 +956,27 @@ public function dashboard()
     
                     'price'           => $validated['price'],
                 ]);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Validate New Uploads BEFORE Deleting Old Images
+                |--------------------------------------------------------------------------
+                | Fail fast if any new file is invalid, so we never delete the
+                | existing images unless we know the replacements are good.
+                |--------------------------------------------------------------------------
+                */
+
+                if ($request->hasFile('product_images')) {
+                    foreach ($request->file('product_images') as $file) {
+                        if (!$file->isValid()) {
+                            throw new \RuntimeException(
+                                'Upload failed for "' . $file->getClientOriginalName()
+                                . '" (error code: ' . $file->getError() . '). Please try uploading the file again.'
+                            );
+                        }
+                    }
+                }
     
     
                 /*
@@ -975,11 +1036,13 @@ public function dashboard()
                         $request->file('product_images')
                         as $index => $file
                     ) {
-    
-                        $path = $file->store(
-                            'product_images',
-                            'public'
-                        );
+
+                        // Throws \RuntimeException if the storage write
+                        // fails — caught by the outer try/catch below,
+                        // which rolls back this whole transaction.
+                        $path = $this->storeUploadedFile($file, 'product_images');
+
+                        $uploadedPaths[] = $path;
     
                         MI_Product_Image::create([
                             'product_id' => $product->product_id,
@@ -1013,11 +1076,23 @@ public function dashboard()
     
     
         } catch (ValidationException $e) {
-    
+
+            foreach ($uploadedPaths as $path) {
+                if (!empty($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+
             throw $e;
     
     
         } catch (\Throwable $e) {
+
+            foreach ($uploadedPaths as $path) {
+                if (!empty($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
     
             Log::error(
                 'Product update failed',

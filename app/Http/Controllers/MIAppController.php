@@ -821,6 +821,22 @@ public function dashboard()
                     'mimes:jpeg,png,jpg,webp,pdf,obj,stl',
                     'max:20480',
                 ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Existing Images Marked For Removal
+                |--------------------------------------------------------------------------
+                */
+
+                'remove_image_ids' => [
+                    'nullable',
+                    'array',
+                ],
+
+                'remove_image_ids.*' => [
+                    'integer',
+                    'exists:mi_product_images,id',
+                ],
             ]);
     
     
@@ -981,25 +997,47 @@ public function dashboard()
     
                 /*
                 |--------------------------------------------------------------------------
-                | Delete Old Image Records + Uploaded Files
+                | Delete Only Explicitly-Removed Uploaded Images
+                |--------------------------------------------------------------------------
+                | Existing uploaded-file images are shown as read-only
+                | previews in the form (no re-submittable input for their
+                | path), so they must be preserved unless the user clicked
+                | "Remove" on them — which populates remove_image_ids[].
+                |
+                | URL-type images ARE fully re-submitted via image_links[]
+                | text inputs on every save, so those are always replaced
+                | wholesale below, same as before.
                 |--------------------------------------------------------------------------
                 */
-    
+
+                $removeIds = collect($request->input('remove_image_ids', []))
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->all();
+
                 foreach ($product->images as $oldImage) {
-    
-                    if (
-                        $oldImage->image_type === 'upload' &&
-                        $oldImage->image_path
-                    ) {
-                        Storage::disk('public')->delete(
-                            $oldImage->image_path
-                        );
+
+                    if ($oldImage->image_type === 'url') {
+                        $oldImage->delete();
+                        continue;
                     }
-    
-                    $oldImage->delete();
+
+                    // image_type === 'upload'
+                    if (in_array((int) $oldImage->id, $removeIds, true)) {
+
+                        if ($oldImage->image_path) {
+                            Storage::disk('public')->delete(
+                                $oldImage->image_path
+                            );
+                        }
+
+                        $oldImage->delete();
+                    }
+
+                    // Otherwise: leave this uploaded image untouched.
                 }
-    
-    
+
+
                 /*
                 |--------------------------------------------------------------------------
                 | Save Image URLs
@@ -1019,19 +1057,31 @@ public function dashboard()
                         'sort_order' => $index,
                     ]);
                 }
-    
-    
+
+
                 /*
                 |--------------------------------------------------------------------------
                 | Save Uploaded Files
                 |--------------------------------------------------------------------------
+                | Sort order continues after both the URL images above and
+                | whatever uploaded images survived the removal step, so
+                | new images are appended rather than overlapping.
+                |--------------------------------------------------------------------------
                 */
-    
+
                 if ($request->hasFile('product_images')) {
-    
+
+                    $remainingUploadCount = $product->images()
+                        ->where('image_type', 'upload')
+                        ->whereNotIn('id', $removeIds)
+                        ->count();
+
                     $startingSortOrder =
-                        count($validated['image_links']);
-    
+                        count($validated['image_links']) + $remainingUploadCount;
+
+                    $hasAnyExistingImage =
+                        !empty($validated['image_links']) || $remainingUploadCount > 0;
+
                     foreach (
                         $request->file('product_images')
                         as $index => $file
@@ -1050,7 +1100,7 @@ public function dashboard()
                             'image_path' => $path,
     
                             'is_primary' =>
-                                empty($validated['image_links']) &&
+                                !$hasAnyExistingImage &&
                                 $index === 0,
     
                             'sort_order' =>

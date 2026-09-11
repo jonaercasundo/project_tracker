@@ -286,7 +286,8 @@ public function index(Request $request)
     }
 
     // =========================
-    // FINALIZE: package rn/total, clean items, reindex
+    // FINALIZE: package rn/total, clean items, reindex,
+    // and DERIVE the DR-level status from its packages.
     // =========================
     foreach ($grouped as &$g) {
 
@@ -310,31 +311,95 @@ public function index(Request $request)
         }
 
         $g['deliveries'] = array_values($g['deliveries']);
+
+        // -------------------------
+        // DERIVE DR-LEVEL STATUS
+        // A DR only advances to the next stage once ALL its packages
+        // (across all deliveries/lots under it) have reached that stage.
+        // billing/billed are manual downstream stages with no package
+        // equivalent, so they pass through as-is once set.
+        // -------------------------
+        $rankMap = ['pending' => 0, 'released' => 1, 'delivered' => 2];
+        $minRank = null;
+        $hasPackages = false;
+
+        foreach ($g['deliveries'] as $delivery) {
+            foreach ($delivery->packages as $pkg) {
+                $hasPackages = true;
+                $rank = $rankMap[strtolower($pkg['status'])] ?? 0;
+                $minRank = is_null($minRank) ? $rank : min($minRank, $rank);
+            }
+        }
+
+        if (in_array(strtolower($g['status']), ['billing', 'billed'])) {
+            // keep manual stage as-is
+        } elseif (!$hasPackages) {
+            $g['status'] = 'pending';
+        } else {
+            $g['status'] = array_search($minRank, $rankMap);
+        }
     }
     unset($g, $delivery);
 
-        // =========================
-        // SUMMARY CARDS
-        // Count of DISTINCT DR#s per status, scoped to full filtered set (no pagination)
-        // =========================
+    // =========================
+    // SUMMARY CARDS
+    // DR-level status is DERIVED from its packages, not read straight off d.status:
+    //   - any package not yet released  -> DR is "pending"
+    //   - all packages released, not all delivered -> DR is "released"
+    //   - all packages delivered -> DR is "delivered"
+    // billing / billed are manual stages (no package-level equivalent) and pass through as-is.
+    // Count is of DISTINCT DR#s per derived status, scoped to the full filtered set (no pagination).
+    // =========================
 
-        $drStatusSub = (clone $baseQuery)
-            ->select('d.dr_no', 'd.status')
-            ->distinct();
+    $drPackageRankSub = (clone $baseQuery)
+        ->leftJoin('package as pk', function ($join) {
+            $join->where(function ($j) {
+                $j->whereNotNull('d.keystage_id')
+                ->whereColumn('pk.keystage_id', '=', 'd.keystage_id');
+            })->orWhere(function ($j) {
+                $j->whereNull('d.keystage_id')
+                ->whereColumn('pk.lot_id', '=', 'd.lot_id');
+            });
+        })
+        ->leftJoin('package_status as ps', function ($join) {
+            $join->on('ps.delivery_id', '=', 'd.delivery_id')
+                ->on('ps.package_id',  '=', 'pk.package_id');
+        })
+        ->select(
+            'd.dr_no',
+            'd.status as dr_status',
+            DB::raw("MIN(CASE COALESCE(ps.status, 'pending')
+                        WHEN 'delivered' THEN 2
+                        WHEN 'released'  THEN 1
+                        ELSE 0
+                    END) as pkg_rank")
+        )
+        ->groupBy('d.dr_no', 'd.status');
 
-        $statusCounts = DB::table(DB::raw("({$drStatusSub->toSql()}) as dr_status"))
-            ->mergeBindings($drStatusSub)
-            ->select('status', DB::raw('COUNT(*) as total'))
-            ->groupBy('status')
-            ->pluck('total', 'status');
+    $drDerivedStatusSub = DB::table(DB::raw("({$drPackageRankSub->toSql()}) as dr_pkg_scope"))
+        ->mergeBindings($drPackageRankSub)
+        ->select(DB::raw("
+            CASE
+                WHEN dr_status IN ('billing', 'billed') THEN dr_status
+                WHEN pkg_rank = 2 THEN 'delivered'
+                WHEN pkg_rank = 1 THEN 'released'
+                ELSE 'pending'
+            END as derived_status
+        "));
 
-        $stats = [
-            'total_pending'   => $statusCounts['pending']   ?? 0,
-            'total_released'  => $statusCounts['released']  ?? 0,
-            'total_delivered' => $statusCounts['delivered'] ?? 0,
-            'total_billing'   => $statusCounts['billing']   ?? 0,
-            'total_billed'    => $statusCounts['billed']    ?? 0,
-        ];
+    $statusCounts = DB::table(DB::raw("({$drDerivedStatusSub->toSql()}) as dr_final_scope"))
+        ->mergeBindings($drDerivedStatusSub)
+        ->select('derived_status', DB::raw('COUNT(*) as total'))
+        ->groupBy('derived_status')
+        ->pluck('total', 'derived_status');
+
+    $stats = [
+        'total_pending'   => $statusCounts['pending']   ?? 0,
+        'total_released'  => $statusCounts['released']  ?? 0,
+        'total_delivered' => $statusCounts['delivered'] ?? 0,
+        'total_billing'   => $statusCounts['billing']   ?? 0,
+        'total_billed'    => $statusCounts['billed']    ?? 0,
+    ];
 
     // =========================
     // DROPDOWNS

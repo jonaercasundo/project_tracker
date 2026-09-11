@@ -72,14 +72,14 @@
             <span class="text-[11px] text-slate-400">items delivered to school</span>
         </div>
 
-        {{-- TOTAL COLLECTION --}}
+        {{-- TOTAL BILLING --}}
         <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex flex-col gap-1">
             <div class="flex items-center justify-between">
                 <span class="text-[11px] font-bold uppercase tracking-wide text-cyan-600">Billing</span>
                 <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
             </div>
             <span class="text-2xl font-extrabold text-slate-900">
-                {{ $stats['total_collection'] ?? 0 }}
+                {{ $stats['total_billing'] ?? 0 }}
             </span>
             <span class="text-[11px] text-slate-400">For Billing</span>
         </div>
@@ -135,6 +135,22 @@
                         </div>
 
                         <div class="flex items-center gap-2 self-end sm:self-auto">
+                            @php
+                                $drStatusStyles = [
+                                    'delivered' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                    'released'  => 'bg-blue-50 text-blue-700 border-blue-200',
+                                    'billing'   => 'bg-cyan-50 text-cyan-700 border-cyan-200',
+                                    'billed'    => 'bg-slate-100 text-slate-700 border-slate-200',
+                                    'pending'   => 'bg-amber-50 text-amber-700 border-amber-200',
+                                ];
+                                $drStatusKey = strtolower($dr_group['status'] ?? 'pending');
+                                $drStatusClass = $drStatusStyles[$drStatusKey] ?? $drStatusStyles['pending'];
+                            @endphp
+
+                            <span class="px-3 py-1.5 text-[11px] font-bold rounded-lg border {{ $drStatusClass }}">
+                                {{ strtoupper($dr_group['status'] ?? 'pending') }}
+                            </span>
+
                             <button type="button"
                                 onclick="generateQR()"
                                 class="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-white border">

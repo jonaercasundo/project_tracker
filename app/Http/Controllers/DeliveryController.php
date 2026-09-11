@@ -313,48 +313,28 @@ public function index(Request $request)
     }
     unset($g, $delivery);
 
-    // =========================
-    // SUMMARY CARDS
-    // scoped to the SAME filters as $baseQuery (project/year/lot/region/etc),
-    // but NOT paginated — these are totals across the full filtered set.
-    // =========================
+        // =========================
+        // SUMMARY CARDS
+        // Count of DISTINCT DR#s per status, scoped to full filtered set (no pagination)
+        // =========================
 
-    // Pending / Released / Delivered are counted at PACKAGE level,
-    // joined the same way packages are resolved above (via keystage, else lot).
-    $packageStatusQuery = (clone $baseQuery)
-        ->join('package as pk', function ($join) {
-            $join->where(function ($j) {
-                $j->whereNotNull('d.keystage_id')
-                  ->whereColumn('pk.keystage_id', '=', 'd.keystage_id');
-            })->orWhere(function ($j) {
-                $j->whereNull('d.keystage_id')
-                  ->whereColumn('pk.lot_id', '=', 'd.lot_id');
-            });
-        })
-        ->leftJoin('package_status as ps', function ($join) {
-            $join->on('ps.delivery_id', '=', 'd.delivery_id')
-                 ->on('ps.package_id',  '=', 'pk.package_id');
-        })
-        ->select('pk.package_id', 'd.delivery_id', DB::raw('COALESCE(ps.status, "pending") as pkg_status'))
-        ->distinct();
+        $drStatusSub = (clone $baseQuery)
+            ->select('d.dr_no', 'd.status')
+            ->distinct();
 
-    $statusCounts = DB::table(DB::raw("({$packageStatusQuery->toSql()}) as pkg_scope"))
-        ->mergeBindings($packageStatusQuery)
-        ->select('pkg_status', DB::raw('COUNT(*) as total'))
-        ->groupBy('pkg_status')
-        ->pluck('total', 'pkg_status');
+        $statusCounts = DB::table(DB::raw("({$drStatusSub->toSql()}) as dr_status"))
+            ->mergeBindings($drStatusSub)
+            ->select('status', DB::raw('COUNT(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status');
 
-    $stats = [
-        'total_pending'    => $statusCounts['pending']   ?? 0,
-        'total_released'   => $statusCounts['released']  ?? 0,
-        'total_delivered'  => $statusCounts['delivered'] ?? 0,
-
-        // TODO: no collection/billing columns exist in the schema you shared.
-        // Swap this in once you point me at the right table/columns —
-        // e.g. a `billing` table keyed by delivery_id, or a `unit_price`
-        // on `item` multiplied by qty. Placeholder below assumes columns
-        // `d.collection_amount` / `d.billed_amount` on `deliveries`.
-    ];
+        $stats = [
+            'total_pending'   => $statusCounts['pending']   ?? 0,
+            'total_released'  => $statusCounts['released']  ?? 0,
+            'total_delivered' => $statusCounts['delivered'] ?? 0,
+            'total_billing'   => $statusCounts['billing']   ?? 0,
+            'total_billed'    => $statusCounts['billed']    ?? 0,
+        ];
 
     // =========================
     // DROPDOWNS

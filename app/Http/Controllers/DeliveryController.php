@@ -121,594 +121,730 @@ class DeliveryController extends Controller
     // INDEX
     // =========================
 
-public function index(Request $request)
-{
-    $limit = (int) $request->input('per_page', 10);
+    public function index(Request $request)
+    {
+        $limit = (int) $request->input('per_page', 10);
 
-    if (!in_array($limit, [10, 20, 30, 50, 100])) {
-        $limit = 10;
-    }
+        if (!in_array($limit, [10, 20, 30, 50, 100])) {
+            $limit = 10;
+        }
 
-    $page   = max(1, (int) $request->get('page', 1));
-    $offset = ($page - 1) * $limit;
+        $page   = max(1, (int) $request->get('page', 1));
+        $offset = ($page - 1) * $limit;
 
-    // =========================================================
-    // BASE QUERY
-    // =========================================================
-    $baseQuery = DB::table('deliveries as d')
-        ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
-        ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
-        ->join('projects as p', 'p.project_id', '=', 'd.project_id')
-        ->join('school as s', 's.school_id', '=', 'd.school_id');
+        // =========================================================
+        // BASE QUERY
+        // =========================================================
+        $baseQuery = DB::table('deliveries as d')
+            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
+            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
+            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
+            ->join('school as s', 's.school_id', '=', 'd.school_id');
 
-    // =========================================================
-    // SEARCH
-    // =========================================================
-    if ($request->filled('search')) {
+        // =========================================================
+        // SEARCH
+        // =========================================================
+        if ($request->filled('search')) {
 
-        $search = $request->search;
+            $search = $request->search;
 
-        $baseQuery->where(function ($q) use ($search) {
+            $baseQuery->where(function ($q) use ($search) {
 
-            $q->where('d.dr_no', 'like', "%{$search}%")
-                ->orWhere('p.project_name', 'like', "%{$search}%")
-                ->orWhere('s.school_name', 'like', "%{$search}%")
-                ->orWhere('l.lot_name', 'like', "%{$search}%");
-
-        });
-    }
-
-    // =========================================================
-    // FILTERS
-    // =========================================================
-    if ($request->filled('status')) {
-        $baseQuery->where('d.status', $request->status);
-    }
-
-    if ($request->filled('project')) {
-        $baseQuery->where('d.project_id', $request->project);
-    }
-
-    if ($request->filled('lot')) {
-        $baseQuery->where('d.lot_id', $request->lot);
-    }
-
-    if ($request->filled('region')) {
-        $baseQuery->where('s.region', $request->region);
-    }
-
-    if ($request->filled('division')) {
-        $baseQuery->where('s.division', $request->division);
-    }
-
-    if ($request->filled('municipality')) {
-        $baseQuery->where('s.municipality', $request->municipality);
-    }
-
-    if ($request->filled('year')) {
-        $baseQuery->whereYear('d.delivery_date', $request->year);
-    }
-
-    // =========================================================
-    // TOTAL
-    // =========================================================
-    $total_rows = (clone $baseQuery)
-        ->distinct()
-        ->count('d.delivery_id');
-
-    $total_pages = (int) ceil($total_rows / $limit);
-
-    // =========================================================
-    // PAGINATED DELIVERY IDs
-    // =========================================================
-    $deliveryIds = (clone $baseQuery)
-        ->select('d.delivery_id')
-        ->distinct()
-        ->orderByRaw('CAST(d.delivery_id AS UNSIGNED) ASC')
-        ->limit($limit)
-        ->offset($offset)
-        ->pluck('d.delivery_id');
-
-    // =========================================================
-    // FULL DATA WITH PACKAGES + ITEMS
-    // =========================================================
-    $rows = DB::table('deliveries as d')
-
-        ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
-
-        ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
-
-        ->join('projects as p', 'p.project_id', '=', 'd.project_id')
-
-        ->join('school as s', 's.school_id', '=', 'd.school_id')
-
-        ->leftJoin('package as pk', function ($join) {
-
-            $join->where(function ($j) {
-
-                $j->whereNotNull('d.keystage_id')
-                    ->whereColumn(
-                        'pk.keystage_id',
-                        '=',
-                        'd.keystage_id'
-                    );
-
-            })->orWhere(function ($j) {
-
-                $j->whereNull('d.keystage_id')
-                    ->whereColumn(
-                        'pk.lot_id',
-                        '=',
-                        'd.lot_id'
-                    );
+                $q->where('d.dr_no', 'like', "%{$search}%")
+                    ->orWhere('p.project_name', 'like', "%{$search}%")
+                    ->orWhere('s.school_name', 'like', "%{$search}%")
+                    ->orWhere('l.lot_name', 'like', "%{$search}%");
 
             });
+        }
 
-        })
+        // =========================================================
+        // FILTERS
+        // =========================================================
+        if ($request->filled('status')) {
+            $baseQuery->where('d.status', $request->status);
+        }
 
-        ->leftJoin(
-            'package_content as pc',
-            'pc.package_id',
-            '=',
-            'pk.package_id'
-        )
+        if ($request->filled('project')) {
+            $baseQuery->where('d.project_id', $request->project);
+        }
 
-        ->leftJoin(
-            'item as i',
-            'i.item_id',
-            '=',
-            'pc.item_id'
-        )
+        if ($request->filled('lot')) {
+            $baseQuery->where('d.lot_id', $request->lot);
+        }
 
-        ->leftJoin('package_status as ps', function ($join) {
+        if ($request->filled('region')) {
+            $baseQuery->where('s.region', $request->region);
+        }
 
-            $join->on(
-                'ps.delivery_id',
-                '=',
-                'd.delivery_id'
-            )->on(
-                'ps.package_id',
+        if ($request->filled('division')) {
+            $baseQuery->where('s.division', $request->division);
+        }
+
+        if ($request->filled('municipality')) {
+            $baseQuery->where('s.municipality', $request->municipality);
+        }
+
+        if ($request->filled('year')) {
+            $baseQuery->whereYear('d.delivery_date', $request->year);
+        }
+
+        // =========================================================
+        // TOTAL
+        // =========================================================
+        $total_rows = (clone $baseQuery)
+            ->distinct()
+            ->count('d.delivery_id');
+
+        $total_pages = (int) ceil($total_rows / $limit);
+
+        // =========================================================
+        // PAGINATED DELIVERY IDs
+        // =========================================================
+        $deliveryIds = (clone $baseQuery)
+            ->select('d.delivery_id')
+            ->distinct()
+            ->orderByRaw('CAST(d.delivery_id AS UNSIGNED) ASC')
+            ->limit($limit)
+            ->offset($offset)
+            ->pluck('d.delivery_id');
+
+        // =========================================================
+        // FULL DATA WITH PACKAGES + ITEMS
+        // =========================================================
+        $rows = DB::table('deliveries as d')
+
+            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
+
+            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
+
+            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
+
+            ->join('school as s', 's.school_id', '=', 'd.school_id')
+
+            ->leftJoin('package as pk', function ($join) {
+
+                $join->where(function ($j) {
+
+                    $j->whereNotNull('d.keystage_id')
+                        ->whereColumn(
+                            'pk.keystage_id',
+                            '=',
+                            'd.keystage_id'
+                        );
+
+                })->orWhere(function ($j) {
+
+                    $j->whereNull('d.keystage_id')
+                        ->whereColumn(
+                            'pk.lot_id',
+                            '=',
+                            'd.lot_id'
+                        );
+
+                });
+
+            })
+
+            ->leftJoin(
+                'package_content as pc',
+                'pc.package_id',
                 '=',
                 'pk.package_id'
-            );
+            )
 
-        })
+            ->leftJoin(
+                'item as i',
+                'i.item_id',
+                '=',
+                'pc.item_id'
+            )
 
-        ->whereIn('d.delivery_id', $deliveryIds)
+            ->leftJoin('package_status as ps', function ($join) {
 
-        ->select(
-            'd.delivery_id',
-            'd.dr_no',
-            'd.delivery_date',
-            'd.status',
-            'd.school_id',
-            'd.project_id',
-            'd.package_qty',
+                $join->on(
+                    'ps.delivery_id',
+                    '=',
+                    'd.delivery_id'
+                )->on(
+                    'ps.package_id',
+                    '=',
+                    'pk.package_id'
+                );
 
-            'p.project_name',
+            })
 
-            's.school_name',
-            's.address',
-            's.region',
-            's.division',
-            's.municipality',
+            ->whereIn('d.delivery_id', $deliveryIds)
 
-            'k.keystage_num',
-            'k.description',
+            ->select(
+                'd.delivery_id',
+                'd.dr_no',
+                'd.delivery_date',
+                'd.status',
+                'd.school_id',
+                'd.project_id',
+                'd.package_qty',
 
-            'l.lot_name',
+                'p.project_name',
 
-            'pk.package_id',
+                's.school_name',
+                's.address',
+                's.region',
+                's.division',
+                's.municipality',
 
-            'ps.status as package_status',
+                'k.keystage_num',
+                'k.description',
 
-            'i.item_name',
-            'pc.qty as content_qty'
-        )
+                'l.lot_name',
 
-        ->orderByRaw(
-            'CAST(d.delivery_id AS UNSIGNED) ASC'
-        )
+                'pk.package_id',
 
-        ->orderBy('pk.package_id')
+                'ps.status as package_status',
 
-        ->get();
+                'i.item_name',
+                'pc.qty as content_qty'
+            )
 
-    // =========================================================
-    // GROUP BY DR
-    // =========================================================
-    $grouped = [];
+            ->orderByRaw(
+                'CAST(d.delivery_id AS UNSIGNED) ASC'
+            )
 
-    foreach ($rows as $row) {
+            ->orderBy('pk.package_id')
 
-        $dr = $row->dr_no;
+            ->get();
 
-        // -----------------------------------------------------
-        // CREATE DR GROUP
-        // -----------------------------------------------------
-        if (!isset($grouped[$dr])) {
+        // =========================================================
+        // GROUP BY DR
+        // =========================================================
+        $grouped = [];
 
-            $grouped[$dr] = [
+        foreach ($rows as $row) {
 
-                'dr_no'         => $dr,
+            $dr = $row->dr_no;
 
-                'delivery_id'   => $row->delivery_id,
+            // -----------------------------------------------------
+            // CREATE DR GROUP
+            // -----------------------------------------------------
+            if (!isset($grouped[$dr])) {
 
-                'project_id'    => $row->project_id,
+                $grouped[$dr] = [
 
-                'project_name'  => $row->project_name,
+                    'dr_no'         => $dr,
 
-                'school_id'     => $row->school_id,
+                    'delivery_id'   => $row->delivery_id,
 
-                'school_name'   => $row->school_name,
+                    'project_id'    => $row->project_id,
 
-                'address'       => $row->address,
+                    'project_name'  => $row->project_name,
 
-                'region'        => $row->region,
+                    'school_id'     => $row->school_id,
 
-                'division'      => $row->division,
+                    'school_name'   => $row->school_name,
 
-                'municipality'  => $row->municipality,
+                    'address'       => $row->address,
 
-                'delivery_date' => $row->delivery_date,
+                    'region'        => $row->region,
 
-                // IMPORTANT:
-                // Keep original delivery status.
-                'status'        => $row->status,
+                    'division'      => $row->division,
 
-                'deliveries'    => [],
+                    'municipality'  => $row->municipality,
 
-            ];
-        }
+                    'delivery_date' => $row->delivery_date,
 
-        // -----------------------------------------------------
-        // DELIVERY
-        // -----------------------------------------------------
-        $deliveryId = $row->delivery_id;
+                    // IMPORTANT:
+                    // Keep original delivery status.
+                    'status'        => $row->status,
 
-        if (!isset(
-            $grouped[$dr]['deliveries'][$deliveryId]
-        )) {
-
-            $delivery = clone $row;
-
-            $delivery->packages = [];
-
-            $grouped[$dr]['deliveries'][$deliveryId] = $delivery;
-        }
-
-        $delivery =
-            $grouped[$dr]['deliveries'][$deliveryId];
-
-        // -----------------------------------------------------
-        // PACKAGE
-        // -----------------------------------------------------
-        if (!empty($row->package_id)) {
-
-            if (!isset(
-                $delivery->packages[$row->package_id]
-            )) {
-
-                $delivery->packages[$row->package_id] = [
-
-                    'package_id' =>
-                        $row->package_id,
-
-                    'status' =>
-                        $row->package_status ?: 'pending',
-
-                    'items' => [],
+                    'deliveries'    => [],
 
                 ];
             }
 
-            // -------------------------------------------------
-            // ITEMS
-            // -------------------------------------------------
-            if (!empty($row->item_name)) {
+            // -----------------------------------------------------
+            // DELIVERY
+            // -----------------------------------------------------
+            $deliveryId = $row->delivery_id;
 
-                $qty =
-                    (int) ($row->content_qty ?? 1)
-                    *
-                    (int) ($row->package_qty ?? 1);
+            if (!isset(
+                $grouped[$dr]['deliveries'][$deliveryId]
+            )) {
 
-                $delivery
-                    ->packages[$row->package_id]
-                    ['items'][$row->item_name] =
-                        $row->item_name
-                        . ' ('
-                        . $qty
-                        . ')';
+                $delivery = clone $row;
+
+                $delivery->packages = [];
+
+                $grouped[$dr]['deliveries'][$deliveryId] = $delivery;
+            }
+
+            $delivery =
+                $grouped[$dr]['deliveries'][$deliveryId];
+
+            // -----------------------------------------------------
+            // PACKAGE
+            // -----------------------------------------------------
+            if (!empty($row->package_id)) {
+
+                if (!isset(
+                    $delivery->packages[$row->package_id]
+                )) {
+
+                    $delivery->packages[$row->package_id] = [
+
+                        'package_id' =>
+                            $row->package_id,
+
+                        'status' =>
+                            $row->package_status ?: 'pending',
+
+                        'items' => [],
+
+                    ];
+                }
+
+                // -------------------------------------------------
+                // ITEMS
+                // -------------------------------------------------
+                if (!empty($row->item_name)) {
+
+                    $qty =
+                        (int) ($row->content_qty ?? 1)
+                        *
+                        (int) ($row->package_qty ?? 1);
+
+                    $delivery
+                        ->packages[$row->package_id]
+                        ['items'][$row->item_name] =
+                            $row->item_name
+                            . ' ('
+                            . $qty
+                            . ')';
+                }
             }
         }
-    }
 
-    // =========================================================
-    // FINALIZE
-    // =========================================================
-    foreach ($grouped as &$g) {
+        // =========================================================
+        // FINALIZE
+        // =========================================================
+        foreach ($grouped as &$g) {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Track whether ALL packages have completed their status transition
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | Track whether ALL packages have completed their status transition
+            |--------------------------------------------------------------------------
+            */
 
-        $allPackagesComplete = true;
+            $allPackagesComplete = true;
 
-        $hasPackages = false;
+            $hasPackages = false;
 
-        $drStatuses = [];
+            $drStatuses = [];
 
-        // -----------------------------------------------------
-        // LOOP THROUGH DELIVERIES
-        // -----------------------------------------------------
-        foreach ($g['deliveries'] as &$delivery) {
+            // -----------------------------------------------------
+            // LOOP THROUGH DELIVERIES
+            // -----------------------------------------------------
+            foreach ($g['deliveries'] as &$delivery) {
 
-            $packages = array_values(
-                $delivery->packages
+                $packages = array_values(
+                    $delivery->packages
+                );
+
+                usort(
+                    $packages,
+                    fn ($a, $b) =>
+                        $a['package_id'] <=> $b['package_id']
+                );
+
+                $total = count($packages);
+
+                // -------------------------------------------------
+                // CHECK PACKAGE STATUS
+                // -------------------------------------------------
+                foreach ($packages as $pkg) {
+
+                    $hasPackages = true;
+
+                    $packageStatus =
+                        strtolower(
+                            trim(
+                                $pkg['status'] ?? 'pending'
+                            )
+                        );
+
+                    $drStatuses[] = $packageStatus;
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | If ANY package is still pending,
+                    | the DR must NOT move forward.
+                    |--------------------------------------------------------------------------
+                    */
+                    if ($packageStatus !== 'delivered') {
+                        $allPackagesComplete = false;
+                    }
+                }
+
+                // -------------------------------------------------
+                // FORMAT PACKAGES
+                // -------------------------------------------------
+                $delivery->packages = array_values(
+                    array_map(
+                        function ($pkg, $i) use ($total) {
+
+                            return [
+
+                                'package_num' =>
+                                    $i + 1,
+
+                                'total_packages' =>
+                                    $total,
+
+                                'status' =>
+                                    $pkg['status'],
+
+                                'items' =>
+                                    array_values(
+                                        $pkg['items']
+                                    ),
+
+                            ];
+
+                        },
+                        $packages,
+                        array_keys($packages)
+                    )
+                );
+
+                unset($delivery->items_list);
+            }
+
+            unset($delivery);
+
+            // =====================================================
+            // DETERMINE DR STATUS
+            // =====================================================
+
+            /*
+            |--------------------------------------------------------------------------
+            | IMPORTANT LOGIC
+            |
+            | If there are packages:
+            |
+            | ALL packages = delivered
+            |     => DR becomes delivered
+            |
+            | ANY package != delivered
+            |     => keep original DR status
+            |
+            |--------------------------------------------------------------------------
+            */
+
+            // =========================================================
+            // DETERMINE DR STATUS
+            // =========================================================
+
+            $originalStatus = strtolower(
+                trim($g['status'] ?? 'pending')
             );
 
-            usort(
-                $packages,
-                fn ($a, $b) =>
-                    $a['package_id'] <=> $b['package_id']
-            );
+            $packageStatuses = [];
 
-            $total = count($packages);
+            // Collect all package statuses
+            foreach ($g['deliveries'] as $delivery) {
 
-            // -------------------------------------------------
-            // CHECK PACKAGE STATUS
-            // -------------------------------------------------
-            foreach ($packages as $pkg) {
+                foreach ($delivery->packages as $package) {
 
-                $hasPackages = true;
-
-                $packageStatus =
-                    strtolower(
-                        trim(
-                            $pkg['status'] ?? 'pending'
-                        )
+                    $packageStatuses[] = strtolower(
+                        trim($package['status'] ?? 'pending')
                     );
-
-                $drStatuses[] = $packageStatus;
-
-                /*
-                |--------------------------------------------------------------------------
-                | If ANY package is still pending,
-                | the DR must NOT move forward.
-                |--------------------------------------------------------------------------
-                */
-                if ($packageStatus !== 'delivered') {
-                    $allPackagesComplete = false;
                 }
             }
 
-            // -------------------------------------------------
-            // FORMAT PACKAGES
-            // -------------------------------------------------
-            $delivery->packages = array_values(
-                array_map(
-                    function ($pkg, $i) use ($total) {
+            // If there are packages
+            if (!empty($packageStatuses)) {
 
-                        return [
+                // Check if ALL packages have exactly the same status
+                $uniqueStatuses = array_unique($packageStatuses);
 
-                            'package_num' =>
-                                $i + 1,
+                if (count($uniqueStatuses) === 1) {
 
-                            'total_packages' =>
-                                $total,
+                    // All packages have the same status
+                    $g['status'] = $uniqueStatuses[0];
 
-                            'status' =>
-                                $pkg['status'],
+                } else {
 
-                            'items' =>
-                                array_values(
-                                    $pkg['items']
-                                ),
-
-                        ];
-
-                    },
-                    $packages,
-                    array_keys($packages)
-                )
-            );
-
-            unset($delivery->items_list);
-        }
-
-        unset($delivery);
-
-        // =====================================================
-        // DETERMINE DR STATUS
-        // =====================================================
-
-        /*
-        |--------------------------------------------------------------------------
-        | IMPORTANT LOGIC
-        |
-        | If there are packages:
-        |
-        | ALL packages = delivered
-        |     => DR becomes delivered
-        |
-        | ANY package != delivered
-        |     => keep original DR status
-        |
-        |--------------------------------------------------------------------------
-        */
-
-        // =========================================================
-        // DETERMINE DR STATUS
-        // =========================================================
-
-        $originalStatus = strtolower(
-            trim($g['status'] ?? 'pending')
-        );
-
-        $packageStatuses = [];
-
-        // Collect all package statuses
-        foreach ($g['deliveries'] as $delivery) {
-
-            foreach ($delivery->packages as $package) {
-
-                $packageStatuses[] = strtolower(
-                    trim($package['status'] ?? 'pending')
-                );
-            }
-        }
-
-        // If there are packages
-        if (!empty($packageStatuses)) {
-
-            // Check if ALL packages have exactly the same status
-            $uniqueStatuses = array_unique($packageStatuses);
-
-            if (count($uniqueStatuses) === 1) {
-
-                // All packages have the same status
-                $g['status'] = $uniqueStatuses[0];
+                    // Packages have different statuses
+                    // Keep the original DR status
+                    $g['status'] = $originalStatus;
+                }
 
             } else {
 
-                // Packages have different statuses
-                // Keep the original DR status
+                // No packages found
                 $g['status'] = $originalStatus;
             }
 
-        } else {
-
-            // No packages found
-            $g['status'] = $originalStatus;
+            // Re-index deliveries
+            $g['deliveries'] =
+                array_values($g['deliveries']);
         }
 
-        // Re-index deliveries
-        $g['deliveries'] =
-            array_values($g['deliveries']);
-    }
+        unset($g);
 
-    unset($g);
+        // =========================================================
+        // SUMMARY CARDS
+        // DR status is determined by ALL package statuses
+        //
+        // ALL packages have the same status
+        //     -> DR gets that status
+        //
+        // Packages have different statuses
+        //     -> DR keeps its existing delivery status
+        // =========================================================
 
-    // =========================================================
-    // SUMMARY CARDS
-    // =========================================================
-    $drStatusSub = (clone $baseQuery)
-        ->select(
-            'd.dr_no',
-            'd.status'
-        )
-        ->distinct();
+        $stats = [
+            'total_pending'   => 0,
+            'total_released'  => 0,
+            'total_delivered' => 0,
+            'total_billing'   => 0,
+            'total_billed'    => 0,
+        ];
 
-    $statusCounts = DB::table(
-        DB::raw(
-            "({$drStatusSub->toSql()}) as dr_status"
-        )
-    )
+        // Get ALL deliveries matching current filters.
+        // No pagination here.
+        $allDeliveryIds = (clone $baseQuery)
+            ->select('d.delivery_id')
+            ->distinct()
+            ->pluck('d.delivery_id');
 
-        ->mergeBindings($drStatusSub)
+        if ($allDeliveryIds->isNotEmpty()) {
 
-        ->select(
-            'status',
-            DB::raw('COUNT(*) as total')
-        )
+            $statusRows = DB::table('deliveries as d')
 
-        ->groupBy('status')
+                ->leftJoin('package as pk', function ($join) {
 
-        ->pluck(
-            'total',
-            'status'
-        );
+                    $join->where(function ($j) {
 
-    $stats = [
+                        $j->whereNotNull('d.keystage_id')
+                            ->whereColumn(
+                                'pk.keystage_id',
+                                '=',
+                                'd.keystage_id'
+                            );
 
-        'total_pending' =>
-            $statusCounts['pending'] ?? 0,
+                    })->orWhere(function ($j) {
 
-        'total_released' =>
-            $statusCounts['released'] ?? 0,
+                        $j->whereNull('d.keystage_id')
+                            ->whereColumn(
+                                'pk.lot_id',
+                                '=',
+                                'd.lot_id'
+                            );
 
-        'total_delivered' =>
-            $statusCounts['delivered'] ?? 0,
+                    });
 
-        'total_billing' =>
-            $statusCounts['billing'] ?? 0,
+                })
 
-        'total_billed' =>
-            $statusCounts['billed'] ?? 0,
+                ->leftJoin('package_status as ps', function ($join) {
 
-    ];
+                    $join->on(
+                        'ps.delivery_id',
+                        '=',
+                        'd.delivery_id'
+                    )->on(
+                        'ps.package_id',
+                        '=',
+                        'pk.package_id'
+                    );
 
-    // =========================================================
-    // DROPDOWNS
-    // =========================================================
-    $years = DB::table('deliveries')
+                })
 
-        ->selectRaw(
-            'YEAR(delivery_date) as year'
-        )
+                ->whereIn(
+                    'd.delivery_id',
+                    $allDeliveryIds
+                )
 
-        ->distinct()
+                ->select(
+                    'd.dr_no',
+                    'd.status as delivery_status',
+                    'pk.package_id',
+                    'ps.status as package_status'
+                )
 
-        ->orderBy(
-            'year',
-            'desc'
-        )
+                ->get();
 
-        ->pluck('year');
+            // =========================================================
+            // GROUP BY DR
+            // =========================================================
 
-    $projects =
-        DB::table('projects')->get();
+            $drData = [];
 
-    $lots = $request->filled('project')
+            foreach ($statusRows as $row) {
 
-        ? DB::table('lot')
-            ->where(
-                'project_id',
-                $request->project
+                $dr = $row->dr_no;
+
+                if (!isset($drData[$dr])) {
+
+                    $drData[$dr] = [
+                        'original_status' =>
+                            strtolower(
+                                trim(
+                                    $row->delivery_status ?? 'pending'
+                                )
+                            ),
+
+                        'packages' => [],
+                    ];
+                }
+
+                if (!empty($row->package_id)) {
+
+                    $drData[$dr]['packages'][] =
+                        strtolower(
+                            trim(
+                                $row->package_status ?? 'pending'
+                            )
+                        );
+                }
+            }
+
+            // =========================================================
+            // DETERMINE FINAL DR STATUS
+            // =========================================================
+
+            foreach ($drData as $dr => $data) {
+
+                $packageStatuses = $data['packages'];
+
+                if (empty($packageStatuses)) {
+
+                    $drStatus =
+                        $data['original_status'];
+
+                } else {
+
+                    $uniqueStatuses =
+                        array_unique($packageStatuses);
+
+                    // -----------------------------------------------
+                    // ALL PACKAGES HAVE SAME STATUS
+                    // -----------------------------------------------
+
+                    if (count($uniqueStatuses) === 1) {
+
+                        $drStatus =
+                            $uniqueStatuses[0];
+
+                    } else {
+
+                        // -------------------------------------------
+                        // MIXED PACKAGE STATUSES
+                        // KEEP ORIGINAL DR STATUS
+                        // -------------------------------------------
+
+                        $drStatus =
+                            $data['original_status'];
+                    }
+                }
+
+                // =====================================================
+                // COUNT DR
+                // =====================================================
+
+                switch ($drStatus) {
+
+                    case 'pending':
+                        $stats['total_pending']++;
+                        break;
+
+                    case 'released':
+                        $stats['total_released']++;
+                        break;
+
+                    case 'delivered':
+                        $stats['total_delivered']++;
+                        break;
+
+                    case 'billing':
+                        $stats['total_billing']++;
+                        break;
+
+                    case 'billed':
+                        $stats['total_billed']++;
+                        break;
+                }
+            }
+        }
+
+        // =========================================================
+        // DROPDOWNS
+        // =========================================================
+        $years = DB::table('deliveries')
+
+            ->selectRaw(
+                'YEAR(delivery_date) as year'
             )
+
+            ->distinct()
+
             ->orderBy(
-                'lot_name'
+                'year',
+                'desc'
             )
-            ->get()
 
-        : collect();
+            ->pluck('year');
 
-    // =========================================================
-    // RETURN VIEW
-    // =========================================================
-    return view(
-        'deliveries.index',
-        [
+        $projects =
+            DB::table('projects')->get();
 
-            'grouped_deliveries' =>
-                $grouped,
+        $lots = $request->filled('project')
 
-            'projects' =>
-                $projects,
+            ? DB::table('lot')
+                ->where(
+                    'project_id',
+                    $request->project
+                )
+                ->orderBy(
+                    'lot_name'
+                )
+                ->get()
 
-            'lots' =>
-                $lots,
+            : collect();
 
-            'years' =>
-                $years,
+        // =========================================================
+        // RETURN VIEW
+        // =========================================================
+        return view(
+            'deliveries.index',
+            [
 
-            'page' =>
-                $page,
+                'grouped_deliveries' =>
+                    $grouped,
 
-            'total_pages' =>
-                $total_pages,
+                'projects' =>
+                    $projects,
 
-            'total_rows' =>
-                $total_rows,
+                'lots' =>
+                    $lots,
 
-            'stats' =>
-                $stats,
+                'years' =>
+                    $years,
 
-        ]
-    );
-}
+                'page' =>
+                    $page,
+
+                'total_pages' =>
+                    $total_pages,
+
+                'total_rows' =>
+                    $total_rows,
+
+                'stats' =>
+                    $stats,
+
+            ]
+        );
+    }
 
     // =========================
     // GENERATE QR PDF

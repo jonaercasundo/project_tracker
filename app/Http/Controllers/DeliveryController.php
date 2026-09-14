@@ -163,25 +163,26 @@ public function index(Request $request)
     if ($request->filled('year'))         $baseQuery->whereYear('d.delivery_date', $request->year);
 
     // =========================
-    // TOTAL
+    // TOTAL (DISTINCT DR NUMBERS, not delivery rows)
+    // Pagination is now per DR# group, so count distinct dr_no.
     // =========================
-    $total_rows  = (clone $baseQuery)->distinct()->count('d.delivery_id');
+    $total_rows  = (clone $baseQuery)->distinct()->count('d.dr_no');
     $total_pages = (int) ceil($total_rows / $limit);
 
     // =========================
-    // PAGINATED IDs ONLY
+    // PAGINATED DR NUMBERS ONLY
     // =========================
-    $deliveryIds = (clone $baseQuery)
-        ->select('d.delivery_id')
+    $drNos = (clone $baseQuery)
+        ->select('d.dr_no')
         ->distinct()
-        ->orderByRaw('CAST(d.delivery_id AS UNSIGNED) ASC')
+        ->orderBy('d.dr_no', 'asc')
         ->limit($limit)
         ->offset($offset)
-        ->pluck('d.delivery_id');
+        ->pluck('d.dr_no');
 
     // =========================
     // FULL DATA WITH ITEMS
-    // only for paginated IDs
+    // only for paginated DR numbers
     // =========================
     $rows = DB::table('deliveries as d')
     ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
@@ -203,7 +204,7 @@ public function index(Request $request)
         $join->on('ps.delivery_id', '=', 'd.delivery_id')
             ->on('ps.package_id',  '=', 'pk.package_id');
     })
-    ->whereIn('d.delivery_id', $deliveryIds)
+    ->whereIn('d.dr_no', $drNos)
     ->select(
         'd.delivery_id',
         'd.dr_no',
@@ -226,7 +227,7 @@ public function index(Request $request)
         'i.item_name',
         'pc.qty as content_qty'
     )
-    ->orderByRaw('CAST(d.delivery_id AS UNSIGNED) ASC')
+    ->orderByRaw('CAST(d.dr_no AS UNSIGNED) ASC')
     ->orderBy('pk.package_id')
     ->get();
 
@@ -286,9 +287,14 @@ public function index(Request $request)
     }
 
     // =========================
-    // FINALIZE: package rn/total, clean items, reindex
+    // FINALIZE: package rn/total, clean items, reindex,
+    // AND compute each DR group's overall status
+    // (uniform across every package in every delivery under that DR;
+    //  otherwise flagged as 'mixed').
     // =========================
     foreach ($grouped as &$g) {
+
+        $allStatusesInGroup = [];
 
         foreach ($g['deliveries'] as &$delivery) {
 
@@ -306,21 +312,37 @@ public function index(Request $request)
                 ];
             }, $packages, array_keys($packages)));
 
+            foreach ($delivery->packages as $pkg) {
+                $allStatusesInGroup[] = strtolower($pkg['status']);
+            }
+
             unset($delivery->items_list);
         }
+        unset($delivery);
 
         $g['deliveries'] = array_values($g['deliveries']);
+
+        // Overall DR status: uniform status if every package agrees, else 'mixed'.
+        // No packages at all -> null (nothing to report).
+        if (empty($allStatusesInGroup)) {
+            $g['overall_status'] = null;
+        } else {
+            $unique = array_unique($allStatusesInGroup);
+            $g['overall_status'] = count($unique) === 1 ? $unique[0] : 'mixed';
+        }
     }
-    unset($g, $delivery);
+    unset($g);
 
     // =========================
     // SUMMARY CARDS
     // scoped to the SAME filters as $baseQuery (project/year/lot/region/etc),
-    // but NOT paginated — these are totals across the full filtered set.
+    // but NOT paginated — these are DR-level totals across the full filtered set.
+    //
+    // Pending / Released / Delivered now reflect DR#s where ALL packages
+    // across ALL of that DR's deliveries (every lot/keystage) share the
+    // same status. A DR with mixed package statuses is not counted in
+    // any of the three buckets (it's "in progress").
     // =========================
-
-    // Pending / Released / Delivered are counted at PACKAGE level,
-    // joined the same way packages are resolved above (via keystage, else lot).
     $packageStatusQuery = (clone $baseQuery)
         ->join('package as pk', function ($join) {
             $join->where(function ($j) {
@@ -335,19 +357,42 @@ public function index(Request $request)
             $join->on('ps.delivery_id', '=', 'd.delivery_id')
                  ->on('ps.package_id',  '=', 'pk.package_id');
         })
-        ->select('pk.package_id', 'd.delivery_id', DB::raw('COALESCE(ps.status, "pending") as pkg_status'))
-        ->distinct();
+        ->select('d.dr_no', 'pk.package_id', 'd.delivery_id', DB::raw('COALESCE(ps.status, "pending") as pkg_status'))
+        ->distinct()
+        ->get();
 
-    $statusCounts = DB::table(DB::raw("({$packageStatusQuery->toSql()}) as pkg_scope"))
-        ->mergeBindings($packageStatusQuery)
-        ->select('pkg_status', DB::raw('COUNT(*) as total'))
-        ->groupBy('pkg_status')
-        ->pluck('total', 'pkg_status');
+    $drStatusMap = [];
+    foreach ($packageStatusQuery as $row) {
+        $drStatusMap[$row->dr_no][] = strtolower($row->pkg_status);
+    }
+
+    $dr_status_counts = [
+        'pending'   => 0,
+        'released'  => 0,
+        'delivered' => 0,
+        'warehouse' => 0,
+        'mixed'     => 0,
+    ];
+
+    foreach ($drStatusMap as $drNo => $statuses) {
+        $unique = array_unique($statuses);
+
+        if (count($unique) === 1) {
+            $status = $unique[0];
+            if (array_key_exists($status, $dr_status_counts)) {
+                $dr_status_counts[$status]++;
+            }
+        } else {
+            $dr_status_counts['mixed']++;
+        }
+    }
 
     $stats = [
-        'total_pending'    => $statusCounts['pending']   ?? 0,
-        'total_released'   => $statusCounts['released']  ?? 0,
-        'total_delivered'  => $statusCounts['delivered'] ?? 0,
+        'total_pending'    => $dr_status_counts['pending'],
+        'total_released'   => $dr_status_counts['released'],
+        'total_delivered'  => $dr_status_counts['delivered'],
+        'total_warehouse'  => $dr_status_counts['warehouse'],
+        'total_mixed'      => $dr_status_counts['mixed'],
 
         // TODO: no collection/billing columns exist in the schema you shared.
         // Swap this in once you point me at the right table/columns —

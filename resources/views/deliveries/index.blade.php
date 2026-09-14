@@ -36,7 +36,7 @@
     {{-- SUMMARY CARDS (scoped to project / year / lot / region filters) --}}
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
 
-        {{-- TOTAL PENDING --}}
+        {{-- TOTAL PENDING (DR-level) --}}
         <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex flex-col gap-1">
             <div class="flex items-center justify-between">
                 <span class="text-[11px] font-bold uppercase tracking-wide text-amber-600">Pending</span>
@@ -45,10 +45,10 @@
             <span class="text-2xl font-extrabold text-slate-900">
                 {{ $stats['total_pending'] ?? 0 }}
             </span>
-            <span class="text-[11px] text-slate-400">items awaiting release</span>
+            <span class="text-[11px] text-slate-400">DRs fully pending</span>
         </div>
 
-        {{-- TOTAL RELEASED --}}
+        {{-- TOTAL RELEASED (DR-level) --}}
         <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex flex-col gap-1">
             <div class="flex items-center justify-between">
                 <span class="text-[11px] font-bold uppercase tracking-wide text-blue-600">Released</span>
@@ -57,10 +57,10 @@
             <span class="text-2xl font-extrabold text-slate-900">
                 {{ $stats['total_released'] ?? 0 }}
             </span>
-            <span class="text-[11px] text-slate-400">items released from warehouse</span>
+            <span class="text-[11px] text-slate-400">DRs fully released</span>
         </div>
 
-        {{-- TOTAL DELIVERED --}}
+        {{-- TOTAL DELIVERED (DR-level) --}}
         <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex flex-col gap-1">
             <div class="flex items-center justify-between">
                 <span class="text-[11px] font-bold uppercase tracking-wide text-emerald-600">Delivered</span>
@@ -69,7 +69,7 @@
             <span class="text-2xl font-extrabold text-slate-900">
                 {{ $stats['total_delivered'] ?? 0 }}
             </span>
-            <span class="text-[11px] text-slate-400">items delivered to school</span>
+            <span class="text-[11px] text-slate-400">DRs fully delivered to school</span>
         </div>
 
         {{-- TOTAL COLLECTION --}}
@@ -111,19 +111,43 @@
 
         <div class="space-y-5">
             @foreach($grouped_deliveries as $dr_group)
+                @php
+                    // Determine this DR's overall status
+                    $drStatuses = [];
+                    foreach ($dr_group['deliveries'] as $delivery) {
+                        foreach ($delivery->packages ?? [] as $pkg) {
+                            $drStatuses[] = strtolower($pkg['status']);
+                        }
+                    }
 
+                    if (empty($drStatuses)) {
+                        $drOverallStatus = null; // no packages at all
+                    } elseif (count(array_unique($drStatuses)) === 1) {
+                        $drOverallStatus = $drStatuses[0]; // uniform status
+                    } else {
+                        $drOverallStatus = 'mixed'; // packages differ
+                    }
+
+                    $drStatusStyles = [
+                        'delivered' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                        'released'  => 'bg-blue-50 text-blue-700 border-blue-200',
+                        'warehouse' => 'bg-cyan-50 text-cyan-700 border-cyan-200',
+                        'pending'   => 'bg-amber-50 text-amber-700 border-amber-200',
+                        'mixed'     => 'bg-slate-100 text-slate-600 border-slate-300',
+                    ];
+                    $drStatusClass = $drStatusStyles[$drOverallStatus] ?? $drStatusStyles['mixed'];
+                @endphp
                 {{-- DR CARD --}}
                 <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden transition hover:shadow-md">
 
                     {{-- DR HEADER --}}
                     <div class="px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50/70 border-b border-slate-100">
-                        
+                                    
                         <div class="flex items-center gap-3">
                             <input type="checkbox"
-                                   class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dr-checkbox"
-                                   value="{{ $dr_group['delivery_id'] }}"
-                                   data-school-id="{{ $dr_group['school_id'] }}">
-
+                                class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dr-checkbox"
+                                value="{{ $dr_group['delivery_id'] }}"
+                                data-school-id="{{ $dr_group['school_id'] }}">
                             <div>
                                 <div class="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
                                     <span>DR #{{ $dr_group['dr_no'] }}</span>
@@ -135,6 +159,11 @@
                         </div>
 
                         <div class="flex items-center gap-2 self-end sm:self-auto">
+                            @if($drOverallStatus)
+                                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold border {{ $drStatusClass }}">
+                                    {{ $drOverallStatus === 'mixed' ? 'IN PROGRESS' : strtoupper($drOverallStatus) }}
+                                </span>
+                            @endif
                             <button type="button"
                                 onclick="generateQR()"
                                 class="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-white border">

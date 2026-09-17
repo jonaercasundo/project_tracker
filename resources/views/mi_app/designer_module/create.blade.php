@@ -2864,7 +2864,7 @@
                                             />
                                         </svg>
 
-                                        H × W × L × D
+                                        L × W × H × D
 
                                     </span>
 
@@ -2874,9 +2874,9 @@
                                 <div class="tx-dims-grid">
 
                                     @foreach([
-                                        'product_height' => ['Height', '45', true],
-                                        'product_width'  => ['Width', '60', false],
                                         'product_length' => ['Length', '120', false],
+                                        'product_width'  => ['Width', '60', false],
+                                        'product_height' => ['Height', '45', true],
                                         'product_depth'  => ['Depth', '30', false],
                                     ] as $field => $config)
 
@@ -2905,6 +2905,7 @@
                                                     value="{{ old($field) }}"
                                                     placeholder="{{ $config[1] }}"
                                                     class="tx-field"
+                                                    data-unit-source="cm"
                                                     @if($config[2])
                                                         required
                                                         data-required
@@ -2913,6 +2914,14 @@
 
                                                 <span class="tx-dim-unit">
                                                     cm
+                                                </span>
+
+                                                <span
+                                                    class="tx-dim-inches"
+                                                    id="{{ $field }}_in"
+                                                    data-inches-for="{{ $field }}"
+                                                >
+                                                    — in
                                                 </span>
 
                                             </div>
@@ -2976,9 +2985,9 @@
                                 <div class="tx-dims-grid">
 
                                     @foreach([
-                                        'carton_height' => ['Height', '50'],
-                                        'carton_width'  => ['Width', '65'],
                                         'carton_length' => ['Length', '125'],
+                                        'carton_width'  => ['Width', '65'],
+                                        'carton_height' => ['Height', '50'],
                                         'carton_depth'  => ['Depth', '35'],
                                     ] as $field => $config)
 
@@ -3003,10 +3012,19 @@
                                                     value="{{ old($field) }}"
                                                     placeholder="{{ $config[1] }}"
                                                     class="tx-field"
+                                                    data-unit-source="cm"
                                                 >
 
                                                 <span class="tx-dim-unit">
                                                     cm
+                                                </span>
+
+                                                <span
+                                                    class="tx-dim-inches"
+                                                    id="{{ $field }}_in"
+                                                    data-inches-for="{{ $field }}"
+                                                >
+                                                    — in
                                                 </span>
 
                                             </div>
@@ -3026,6 +3044,38 @@
                                 </div>
 
                             </div>
+
+                            <script>
+                                (function () {
+                                    const CM_TO_IN = 2.54;
+
+                                    function updateInches(input) {
+                                        const display = document.getElementById(input.id + '_in');
+                                        if (!display) return;
+
+                                        const cm = parseFloat(input.value);
+
+                                        if (isNaN(cm) || cm <= 0) {
+                                            display.textContent = '— in';
+                                            return;
+                                        }
+
+                                        const inches = cm / CM_TO_IN;
+                                        display.textContent = inches.toFixed(2) + ' in';
+                                    }
+
+                                    document
+                                        .querySelectorAll('.tx-field[data-unit-source="cm"]')
+                                        .forEach(function (input) {
+                                            // convert on page load in case of old() values
+                                            updateInches(input);
+
+                                            input.addEventListener('input', function () {
+                                                updateInches(input);
+                                            });
+                                        });
+                                })();
+                            </script>
 
                         </div>
 

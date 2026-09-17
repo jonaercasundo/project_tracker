@@ -2363,333 +2363,390 @@
                         {{-- Material / Color --}}
                         <div class="tx-card-body cols-2" style="padding:0;">
 
-{{-- ================================================================
-    MATERIALS MULTI-SELECT
-    Single source of truth: $materialGroups
-    Near-duplicate names have been collapsed to one canonical value
-    per material. See materials-migration-mapping.md if you have
-    existing product data using the old names.
-================================================================= --}}
+                            {{-- ================================================================
+                                MATERIALS MULTI-SELECT
+                                Single source of truth: $materialGroups
+                                Near-duplicate names have been collapsed to one canonical value
+                                per material. See materials-migration-mapping.md if you have
+                                existing product data using the old names.
+                            ================================================================= --}}
 
-@php
-    $materialGroups = [
+                            @php
+                                $materialGroups = [
 
-        'Solid Wood' => [
-            'Solid Wood',
-            'Acacia Wood',
-            'Ash Wood',
-            'Beech Wood',
-            'Birch Wood',
-            'Mahogany Wood',
-            'Mango Wood',
-            'Oak Wood',
-            'Pine Wood',
-            'Rubberwood',
-            'Teak Wood',
-            'Walnut Wood',
-        ],
+                                    'Solid Wood' => [
+                                        'Solid Wood',
+                                        'Acacia Wood',
+                                        'Ash Wood',
+                                        'Beech Wood',
+                                        'Birch Wood',
+                                        'Mahogany Wood',
+                                        'Mango Wood',
+                                        'Oak Wood',
+                                        'Pine Wood',
+                                        'Rubberwood',
+                                        'Teak Wood',
+                                        'Walnut Wood',
+                                    ],
 
-        'Wood Veneer' => [
-            'Veneer',
-            'Acacia Veneer',
-            'Ash Veneer',
-            'Birch Veneer',
-            'Burl Veneer',
-            'Oak Veneer',
-            'Rubberwood Veneer',
-            'Walnut Veneer',
-            'White Mango Veneer',
-            'Veneered MDF',
-            'Acacia Veneered MDF',
-            'Ash Veneered MDF',
-            'Oak Veneered MDF',
-        ],
+                                    'Wood Veneer' => [
+                                        'Veneer',
+                                        'Acacia Veneer',
+                                        'Ash Veneer',
+                                        'Birch Veneer',
+                                        'Burl Veneer',
+                                        'Oak Veneer',
+                                        'Rubberwood Veneer',
+                                        'Walnut Veneer',
+                                        'White Mango Veneer',
+                                        'Veneered MDF',
+                                        'Acacia Veneered MDF',
+                                        'Ash Veneered MDF',
+                                        'Oak Veneered MDF',
+                                    ],
 
-        'Engineered Wood' => [
-            'MDF',
-            'HDF',
-            'Particle Board',
-            'Plywood',
-            'Pine Plywood',
-            'Melamine Board',
-            'Wood Panel',
-        ],
+                                    'Engineered Wood' => [
+                                        'MDF',
+                                        'HDF',
+                                        'Particle Board',
+                                        'Plywood',
+                                        'Pine Plywood',
+                                        'Melamine Board',
+                                        'Wood Panel',
+                                    ],
 
-        'Metal' => [
-            'Metal',
-            'Steel',
-            'Stainless Steel',
-            'Iron',
-            'Cast Iron',
-            'Aluminum',
-            'Brass',
-            'Metal Frame',
-            'Steel Frame',
-            'Metal Base',
-            'Metal Plate',
-            'Metal Bar',
-            'Metal Tube',
-            'Metal Round Bar',
-            'Metal Round Tube',
-            'Ordinary Square Tube Metal',
-            'Powdercoated Metal',
-            'Black Powdercoated Metal',
-            'Powdercoated Metal Frame',
-            'Powdercoated Metal Base',
-            'Powdercoated Round Bar Metal Frame',
-            'Powdercoated Round Tube Metal Frame',
-        ],
+                                    'Metal' => [
+                                        'Metal',
+                                        'Steel',
+                                        'Stainless Steel',
+                                        'Iron',
+                                        'Cast Iron',
+                                        'Aluminum',
+                                        'Brass',
+                                        'Metal Frame',
+                                        'Steel Frame',
+                                        'Metal Base',
+                                        'Metal Plate',
+                                        'Metal Bar',
+                                        'Metal Tube',
+                                        'Metal Round Bar',
+                                        'Metal Round Tube',
+                                        'Ordinary Square Tube Metal',
+                                        'Powdercoated Metal',
+                                        'Black Powdercoated Metal',
+                                        'Powdercoated Metal Frame',
+                                        'Powdercoated Metal Base',
+                                        'Powdercoated Round Bar Metal Frame',
+                                        'Powdercoated Round Tube Metal Frame',
+                                    ],
 
-        'Metal Hardware & Fittings' => [
-            'Metal Hardware',
-            'Metal Hinges',
-            'Metal Door Handle',
-            'Metal Knob',
-            'Metal Ring Handle',
-            'Metal Holder',
-            'Metal Drawer Slides',
-            'Locks',
-            'Casters',
-        ],
+                                    'Metal Hardware & Fittings' => [
+                                        'Metal Hardware',
+                                        'Metal Hinges',
+                                        'Metal Door Handle',
+                                        'Metal Knob',
+                                        'Metal Ring Handle',
+                                        'Metal Holder',
+                                        'Metal Drawer Slides',
+                                        'Locks',
+                                        'Casters',
+                                    ],
 
-        'Glass' => [
-            'Glass',
-            'Clear Glass',
-            'Tempered Glass',
-            'Embossed Clear Glass',
-            'Glass Panel',
-            'Glass Window Panel',
-        ],
+                                    'Glass' => [
+                                        'Glass',
+                                        'Clear Glass',
+                                        'Tempered Glass',
+                                        'Embossed Clear Glass',
+                                        'Glass Panel',
+                                        'Glass Window Panel',
+                                    ],
 
-        'Stone, Marble & Ceramic' => [
-            'Natural Stone',
-            'Stone Cast',
-            'Marble',
-            'Faux Marble',
-            'Granite',
-            'Ceramic',
-            'Concrete',
-        ],
+                                    'Stone, Marble & Ceramic' => [
+                                        'Natural Stone',
+                                        'Stone Cast',
+                                        'Marble',
+                                        'Faux Marble',
+                                        'Granite',
+                                        'Ceramic',
+                                        'Concrete',
+                                    ],
 
-        'Rattan' => [
-            'Rattan',
-            'Rattan Pole',
-            'Rattan Core',
-            'Rattan Splits',
-            'Rattan Frame',
-            'Rattan Weave',
-            'Rattan Cane',
-            'Rattan Cane Mat',
-            'Natural Rattan Cane Mat',
-            'Open Mesh Rattan Cane',
-        ],
+                                    'Rattan' => [
+                                        'Rattan',
+                                        'Rattan Pole',
+                                        'Rattan Core',
+                                        'Rattan Splits',
+                                        'Rattan Frame',
+                                        'Rattan Weave',
+                                        'Rattan Cane',
+                                        'Rattan Cane Mat',
+                                        'Natural Rattan Cane Mat',
+                                        'Open Mesh Rattan Cane',
+                                    ],
 
-        'Wicker & Cane' => [
-            'Wicker',
-            'Cane',
-            'Natural Cane',
-            'Cane Weave',
-            'Woven Cane',
-            'Open Mesh Cane',
-        ],
+                                    'Wicker & Cane' => [
+                                        'Wicker',
+                                        'Cane',
+                                        'Natural Cane',
+                                        'Cane Weave',
+                                        'Woven Cane',
+                                        'Open Mesh Cane',
+                                    ],
 
-        'Seagrass' => [
-            'Seagrass',
-            'Seagrass Weave',
-            'Seagrass Mat',
-            'Seagrass Cover',
-            'Twisted Seagrass',
-        ],
+                                    'Seagrass' => [
+                                        'Seagrass',
+                                        'Seagrass Weave',
+                                        'Seagrass Mat',
+                                        'Seagrass Cover',
+                                        'Twisted Seagrass',
+                                    ],
 
-        'Water Hyacinth' => [
-            'Water Hyacinth',
-            'Water Hyacinth Weave',
-            'Water Hyacinth Braided Weave',
-            'Water Hyacinth Cane Weave',
-            'Water Hyacinth Mat',
-        ],
+                                    'Water Hyacinth' => [
+                                        'Water Hyacinth',
+                                        'Water Hyacinth Weave',
+                                        'Water Hyacinth Braided Weave',
+                                        'Water Hyacinth Cane Weave',
+                                        'Water Hyacinth Mat',
+                                    ],
 
-        'Abaca' => [
-            'Abaca',
-            'Abaca Fiber',
-            'Abaca Weave',
-            'Abaca Mat',
-        ],
+                                    'Abaca' => [
+                                        'Abaca',
+                                        'Abaca Fiber',
+                                        'Abaca Weave',
+                                        'Abaca Mat',
+                                    ],
 
-        'Bamboo' => [
-            'Bamboo',
-            'Bamboo Pole',
-            'Bamboo Weave',
-        ],
+                                    'Bamboo' => [
+                                        'Bamboo',
+                                        'Bamboo Pole',
+                                        'Bamboo Weave',
+                                    ],
 
-        'Paper & Natural Fiber' => [
-            'Paper',
-            'Paper Weave',
-            'Natural Fiber',
-            'Raffia',
-            'Raffia Mat',
-            'Banana Leaf',
-            'Corn Husk',
-            'Twisted Grass',
-        ],
+                                    'Paper & Natural Fiber' => [
+                                        'Paper',
+                                        'Paper Weave',
+                                        'Natural Fiber',
+                                        'Raffia',
+                                        'Raffia Mat',
+                                        'Banana Leaf',
+                                        'Corn Husk',
+                                        'Twisted Grass',
+                                    ],
 
-        'Rope' => [
-            'Natural Fiber Rope',
-            'Twisted Paper Rope',
-            'Seagrass Rope',
-            'Water Hyacinth Rope',
-            'Abaca Rope',
-        ],
+                                    'Rope' => [
+                                        'Natural Fiber Rope',
+                                        'Twisted Paper Rope',
+                                        'Seagrass Rope',
+                                        'Water Hyacinth Rope',
+                                        'Abaca Rope',
+                                    ],
 
-        'Fabric & Upholstery' => [
-            'Fabric',
-            'Boucle',
-            'Canvas',
-            'Cotton',
-            'Linen',
-            'Microfiber',
-            'Polyester',
-            'Velvet',
-            'Leather',
-            'PU Leather',
-        ],
+                                    'Fabric & Upholstery' => [
+                                        'Fabric',
+                                        'Boucle',
+                                        'Canvas',
+                                        'Cotton',
+                                        'Linen',
+                                        'Microfiber',
+                                        'Polyester',
+                                        'Velvet',
+                                        'Leather',
+                                        'PU Leather',
+                                    ],
 
-        'Padding & Filling' => [
-            'Foam',
-            'FR Foam',
-            'Cushion',
-        ],
+                                    'Padding & Filling' => [
+                                        'Foam',
+                                        'FR Foam',
+                                        'Cushion',
+                                    ],
 
-        'Plastic & Synthetic' => [
-            'Plastic',
-            'ABS Plastic',
-            'Acrylic',
-            'Fiberglass',
-            'Polypropylene',
-            'PVC',
-            'Plastic Strips',
-            'Synthetic Material',
-        ],
+                                    'Plastic & Synthetic' => [
+                                        'Plastic',
+                                        'ABS Plastic',
+                                        'Acrylic',
+                                        'Fiberglass',
+                                        'Polypropylene',
+                                        'PVC',
+                                        'Plastic Strips',
+                                        'Synthetic Material',
+                                    ],
 
-        'Resin' => [
-            'Resin',
-            'Resin Cast',
-        ],
+                                    'Resin' => [
+                                        'Resin',
+                                        'Resin Cast',
+                                    ],
 
-        'Shell & Decorative Inlay' => [
-            'Shell',
-            'Capiz Shell',
-            'Capiz Inlay',
-            'Mother of Pearl',
-            'MOP Inlay',
-        ],
+                                    'Shell & Decorative Inlay' => [
+                                        'Shell',
+                                        'Capiz Shell',
+                                        'Capiz Inlay',
+                                        'Mother of Pearl',
+                                        'MOP Inlay',
+                                    ],
 
-        'Laminate & Finish' => [
-            'Laminate',
-            'PVC Laminate',
-            'Painted Finish',
-            'Glossy Lacquer',
-            'White Glossy Lacquer',
-            'Powdercoated Finish',
-            'Wood Stain',
-            'Gold Leaf',
-        ],
+                                    'Laminate & Finish' => [
+                                        'Laminate',
+                                        'PVC Laminate',
+                                        'Painted Finish',
+                                        'Glossy Lacquer',
+                                        'White Glossy Lacquer',
+                                        'Powdercoated Finish',
+                                        'Wood Stain',
+                                        'Gold Leaf',
+                                    ],
 
-        'Other' => [
-            'Composite',
-            'Mixed Materials',
-        ],
+                                    'Other' => [
+                                        'Composite',
+                                        'Mixed Materials',
+                                    ],
 
-    ];
+                                ];
 
-    // Values already chosen: old input first, then the model when editing.
-    $selectedMaterials = collect(old('materials', $materials ?? []))
-        ->map(fn ($m) => (string) $m)
-        ->all();
-@endphp
+                                // Values already chosen: old input first, then the model when editing.
+                                $selectedMaterials = collect(old('materials', $materials ?? []))
+                                    ->map(fn ($m) => (string) $m)
+                                    ->all();
+                            @endphp
 
-{{-- Materials --}}
-<div>
+                            {{-- Materials --}}
+                            <div>
 
-    <label for="materials" class="tx-label">
-        Materials
-        <span class="tx-required">*</span>
-    </label>
+                                <label for="materials" class="tx-label">
+                                    Materials
+                                    <span class="tx-required">*</span>
+                                </label>
 
-    <div class="tx-multi-select-wrap">
+                                <div class="tx-multi-select-wrap">
 
-        <div class="tx-multi-toolbar">
+                                    <div class="tx-multi-toolbar">
 
-            <span class="tx-multi-hint">
-                Select one or more materials
-            </span>
+                                        <span class="tx-multi-hint">
+                                            Select one or more materials
+                                        </span>
 
-            <button
-                type="button"
-                class="tx-multi-clear"
-                data-target="materials"
-            >
-                Clear
-            </button>
+                                        <button
+                                            type="button"
+                                            class="tx-multi-clear"
+                                            data-target="materials"
+                                        >
+                                            Clear
+                                        </button>
 
-        </div>
+                                    </div>
 
-        <select
-            id="materials"
-            name="materials[]"
-            multiple
-            size="12"
-            required
-            data-required
-            class="tx-field tx-multi-select materials-select"
-            @error('materials') aria-invalid="true" aria-describedby="materials_error" @enderror
-        >
+                                    <select
+                                        id="materials"
+                                        name="materials[]"
+                                        multiple
+                                        size="12"
+                                        required
+                                        data-required
+                                        class="tx-field tx-multi-select materials-select"
+                                        @error('materials') aria-invalid="true" aria-describedby="materials_error" @enderror
+                                    >
 
-            @foreach ($materialGroups as $groupLabel => $groupMaterials)
+                                        @foreach ($materialGroups as $groupLabel => $groupMaterials)
 
-                <optgroup label="{{ $groupLabel }}">
+                                            <optgroup label="{{ $groupLabel }}">
 
-                    @foreach ($groupMaterials as $material)
+                                                @foreach ($groupMaterials as $material)
 
-                        <option
-                            value="{{ $material }}"
-                            @selected(in_array($material, $selectedMaterials, true))
-                        >
-                            {{ $material }}
-                        </option>
+                                                    <option
+                                                        value="{{ $material }}"
+                                                        @selected(in_array($material, $selectedMaterials, true))
+                                                    >
+                                                        {{ $material }}
+                                                    </option>
 
-                    @endforeach
+                                                @endforeach
 
-                </optgroup>
+                                            </optgroup>
 
-            @endforeach
+                                        @endforeach
 
-        </select>
+                                    </select>
 
-        <div
-            id="materials_chips"
-            class="tx-multi-chips"
-            aria-live="polite"
-        ></div>
+                                    <div
+                                        id="materials_chips"
+                                        class="tx-multi-chips"
+                                        aria-live="polite"
+                                    ></div>
 
-    </div>
+                                </div>
 
-    @error('materials')
-        <p id="materials_error" class="tx-error">
-            {{ $message }}
-        </p>
-    @enderror
+                                @error('materials')
+                                    <p id="materials_error" class="tx-error">
+                                        {{ $message }}
+                                    </p>
+                                @enderror
 
-</div>
+                            </div>
 
+
+                            {{-- ================================================================
+                                COLOR MULTI-SELECT
+                                Single source of truth: $colorGroups
+                            ================================================================= --}}
+
+                            @php
+                                $colorGroups = [
+
+                                    'Basic Colors' => [
+                                        'Black',
+                                        'White',
+                                        'Gray',
+                                        'Silver',
+                                        'Gold',
+                                        'Bronze',
+                                    ],
+
+                                    'Wood Finishes' => [
+                                        'Natural',
+                                        'Oak',
+                                        'Walnut',
+                                        'Teak',
+                                        'Mahogany',
+                                        'Espresso',
+                                    ],
+
+                                    'Neutral' => [
+                                        'Beige',
+                                        'Cream',
+                                        'Ivory',
+                                        'Taupe',
+                                        'Brown',
+                                    ],
+
+                                    'Accent Colors' => [
+                                        'Blue',
+                                        'Green',
+                                        'Red',
+                                        'Yellow',
+                                        'Orange',
+                                        'Pink',
+                                        'Purple',
+                                    ],
+
+                                    'Special Finishes' => [
+                                        'Matte Black',
+                                        'Gloss White',
+                                        'Brushed Gold',
+                                        'Rose Gold',
+                                        'Chrome',
+                                    ],
+
+                                ];
+
+                                // Values already chosen: old input first, then the model when editing.
+                                $selectedColors = collect(old('color', $color ?? []))
+                                    ->map(fn ($c) => (string) $c)
+                                    ->all();
+                            @endphp
 
                             {{-- Color --}}
                             <div>
 
-                                <label
-                                    for="color"
-                                    class="tx-label"
-                                >
+                                <label for="color" class="tx-label">
                                     Color
                                 </label>
 
@@ -2717,116 +2774,27 @@
                                         multiple
                                         size="8"
                                         class="tx-field tx-multi-select"
+                                        @error('color') aria-invalid="true" aria-describedby="color_error" @enderror
                                     >
 
-                                        <optgroup label="Basic Colors">
+                                        @foreach ($colorGroups as $groupLabel => $groupColors)
 
-                                            @foreach([
-                                                'Black',
-                                                'White',
-                                                'Gray',
-                                                'Silver',
-                                                'Gold',
-                                                'Bronze'
-                                            ] as $color)
+                                            <optgroup label="{{ $groupLabel }}">
 
-                                                <option
-                                                    value="{{ $color }}"
-                                                    {{ in_array($color, old('color', [])) ? 'selected' : '' }}
-                                                >
-                                                    {{ $color }}
-                                                </option>
+                                                @foreach ($groupColors as $colorOption)
 
-                                            @endforeach
+                                                    <option
+                                                        value="{{ $colorOption }}"
+                                                        @selected(in_array($colorOption, $selectedColors, true))
+                                                    >
+                                                        {{ $colorOption }}
+                                                    </option>
 
-                                        </optgroup>
+                                                @endforeach
 
-                                        <optgroup label="Wood Finishes">
+                                            </optgroup>
 
-                                            @foreach([
-                                                'Natural',
-                                                'Oak',
-                                                'Walnut',
-                                                'Teak',
-                                                'Mahogany',
-                                                'Espresso'
-                                            ] as $color)
-
-                                                <option
-                                                    value="{{ $color }}"
-                                                    {{ in_array($color, old('color', [])) ? 'selected' : '' }}
-                                                >
-                                                    {{ $color }}
-                                                </option>
-
-                                            @endforeach
-
-                                        </optgroup>
-
-                                        <optgroup label="Neutral">
-
-                                            @foreach([
-                                                'Beige',
-                                                'Cream',
-                                                'Ivory',
-                                                'Taupe',
-                                                'Brown'
-                                            ] as $color)
-
-                                                <option
-                                                    value="{{ $color }}"
-                                                    {{ in_array($color, old('color', [])) ? 'selected' : '' }}
-                                                >
-                                                    {{ $color }}
-                                                </option>
-
-                                            @endforeach
-
-                                        </optgroup>
-
-                                        <optgroup label="Accent Colors">
-
-                                            @foreach([
-                                                'Blue',
-                                                'Green',
-                                                'Red',
-                                                'Yellow',
-                                                'Orange',
-                                                'Pink',
-                                                'Purple'
-                                            ] as $color)
-
-                                                <option
-                                                    value="{{ $color }}"
-                                                    {{ in_array($color, old('color', [])) ? 'selected' : '' }}
-                                                >
-                                                    {{ $color }}
-                                                </option>
-
-                                            @endforeach
-
-                                        </optgroup>
-
-                                        <optgroup label="Special Finishes">
-
-                                            @foreach([
-                                                'Matte Black',
-                                                'Gloss White',
-                                                'Brushed Gold',
-                                                'Rose Gold',
-                                                'Chrome'
-                                            ] as $color)
-
-                                                <option
-                                                    value="{{ $color }}"
-                                                    {{ in_array($color, old('color', [])) ? 'selected' : '' }}
-                                                >
-                                                    {{ $color }}
-                                                </option>
-
-                                            @endforeach
-
-                                        </optgroup>
+                                        @endforeach
 
                                     </select>
 
@@ -2839,11 +2807,9 @@
                                 </div>
 
                                 @error('color')
-
-                                    <p class="tx-error">
+                                    <p id="color_error" class="tx-error">
                                         {{ $message }}
                                     </p>
-
                                 @enderror
 
                             </div>

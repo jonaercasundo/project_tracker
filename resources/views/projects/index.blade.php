@@ -1,5 +1,9 @@
 <x-project_app-layout>
-<div class="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-5 text-slate-800">
+<div
+    x-data="{ addProjectOpen: false }"
+    @keydown.escape.window="addProjectOpen = false"
+    class="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-5 text-slate-800"
+>
 
     {{-- HEADER --}}
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -9,8 +13,8 @@
         </div>
 
         <button
-            data-modal-target="addProjectModal"
-            data-modal-toggle="addProjectModal"
+            @click="addProjectOpen = true"
+            type="button"
             class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
@@ -121,12 +125,6 @@
                     </th>
 
                     <th class="py-3 px-4">
-                        <a href="{{ $buildSortUrl('agency') }}" class="inline-flex items-center hover:text-slate-800 transition-colors">
-                            Agency {!! $sortIcon('agency') !!}
-                        </a>
-                    </th>
-
-                    <th class="py-3 px-4">
                         <a href="{{ $buildSortUrl('project_name') }}" class="inline-flex items-center hover:text-slate-800 transition-colors">
                             Project Title {!! $sortIcon('project_name') !!}
                         </a>
@@ -162,10 +160,6 @@
                             <span class="font-mono text-slate-500 bg-slate-100 text-xs px-2 py-0.5 rounded-md">
                                 {{ $project->ref_no }}
                             </span>
-                        </td>
-
-                        <td class="py-3 px-4 font-medium text-slate-900 max-w-[140px] truncate">
-                            {{ $project->agency }}
                         </td>
 
                         <td class="py-3 px-4">
@@ -238,6 +232,167 @@
             {{ $projects->links() }}
         </div>
     @endif
+
+    {{-- ADD PROJECT MODAL (Alpine.js) --}}
+    <div
+        x-show="addProjectOpen"
+        x-cloak
+        style="display: none;"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
+        {{-- backdrop --}}
+        <div
+            x-show="addProjectOpen"
+            x-transition.opacity
+            @click="addProjectOpen = false"
+            class="fixed inset-0 bg-slate-900/50"
+        ></div>
+
+        {{-- panel --}}
+        <div
+            x-show="addProjectOpen"
+            x-transition
+            @click.outside="addProjectOpen = false"
+            x-data="{ agency: '', rawAmount: '', rawAbc: '' }"
+            class="relative bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        >
+            <form
+                id="addProjectForm"
+                method="POST"
+                action="{{ route('projects.store') }}"
+                enctype="multipart/form-data"
+            >
+                @csrf
+
+                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                    <h3 class="text-base font-semibold text-slate-900">New Project</h3>
+                    <button type="button" @click="addProjectOpen = false" class="text-slate-400 hover:text-slate-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="px-6 py-5 space-y-4">
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">PhilGEPS Ref No</label>
+                        <input type="text" name="ref_no" required
+                            class="w-full text-sm rounded-lg border-slate-200 py-2 focus:ring-1 focus:ring-slate-400 focus:border-slate-400">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">Project Name</label>
+                        <input type="text" name="project_name" required
+                            class="w-full text-sm rounded-lg border-slate-200 py-2 focus:ring-1 focus:ring-slate-400 focus:border-slate-400">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">Contract Amount</label>
+                            <input type="text" inputmode="decimal" x-model="rawAmount"
+                                @input="
+                                    let v = $event.target.value.replace(/,/g, '');
+                                    if (!/^\d*\.?\d*$/.test(v)) { $event.target.value = rawAmount; return; }
+                                    let parts = v.split('.');
+                                    let formatted = parts[0] ? Number(parts[0]).toLocaleString() : '';
+                                    $event.target.value = parts.length > 1 ? formatted + '.' + parts[1] : formatted;
+                                    rawAmount = v;
+                                "
+                                required
+                                class="w-full text-sm rounded-lg border-slate-200 py-2 focus:ring-1 focus:ring-slate-400 focus:border-slate-400">
+                            <input type="hidden" name="contract_amount" :value="rawAmount">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">ABC</label>
+                            <input type="text" inputmode="decimal" x-model="rawAbc"
+                                @input="
+                                    let v = $event.target.value.replace(/,/g, '');
+                                    if (!/^\d*\.?\d*$/.test(v)) { $event.target.value = rawAbc; return; }
+                                    let parts = v.split('.');
+                                    let formatted = parts[0] ? Number(parts[0]).toLocaleString() : '';
+                                    $event.target.value = parts.length > 1 ? formatted + '.' + parts[1] : formatted;
+                                    rawAbc = v;
+                                "
+                                required
+                                class="w-full text-sm rounded-lg border-slate-200 py-2 focus:ring-1 focus:ring-slate-400 focus:border-slate-400">
+                            <input type="hidden" name="ABC" :value="rawAbc">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">Agency</label>
+                        <select name="agency" x-model="agency" required
+                            class="w-full text-sm rounded-lg border-slate-200 py-2 focus:ring-1 focus:ring-slate-400 focus:border-slate-400">
+                            <option value="">Select Agency</option>
+                            <option value="Deped">Deped</option>
+                            <option value="Dpwh">Dpwh</option>
+                        </select>
+                    </div>
+
+                    <div x-show="agency === 'Deped'" x-cloak class="flex items-center gap-2">
+                        <input type="checkbox" name="keystage" value="1" id="keystage"
+                            class="rounded border-slate-300 text-slate-900 focus:ring-slate-400">
+                        <label for="keystage" class="text-sm text-slate-600">Include Keystage</label>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">Start Date</label>
+                            <input type="date" name="start_date" required
+                                class="w-full text-sm rounded-lg border-slate-200 py-2 focus:ring-1 focus:ring-slate-400 focus:border-slate-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">End Date</label>
+                            <input type="date" name="end_date" required
+                                class="w-full text-sm rounded-lg border-slate-200 py-2 focus:ring-1 focus:ring-slate-400 focus:border-slate-400">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
+                        <select name="status" required
+                            class="w-full text-sm rounded-lg border-slate-200 py-2 focus:ring-1 focus:ring-slate-400 focus:border-slate-400">
+                            <option value="">Select Status</option>
+                            <option value="Pending" selected>Pending</option>
+                            <option value="Ongoing">Ongoing</option>
+                            <option value="Completed">Awarded</option>
+                            <option value="For NOA">For NOA</option>
+                            <option value="For RTA">For RTA</option>
+                            <option value="For Contract Signing">For Contract Signing</option>
+                            <option value="For NTP">For NTP</option>
+                            <option value="Bid Evaluation">Bid Evaluation</option>
+                            <option value="Bidding">Bidding</option>
+                            <option value="Post Qualification">Post Qualification</option>
+                            <option value="Implementation">Implementation</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="For Billing">For Billing</option>
+                            <option value="For Collection">For Collection</option>
+                            <option value="Collected">Collected</option>
+                            <option value="For Development">For Development</option>
+                            <option value="For Procurement">Pre Procurement</option>
+                            <option value="Upcoming">Upcoming</option>
+                            <option value="On Going">On Going</option>
+                            <option value="For Rebid">For Rebid</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                <div class="flex justify-end gap-2 px-6 py-4 border-t border-slate-200">
+                    <button type="button" @click="addProjectOpen = false"
+                        class="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors">
+                        Save
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
 
 </div>
 </x-project_app-layout>

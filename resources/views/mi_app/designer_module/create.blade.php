@@ -2399,26 +2399,43 @@
                                         id="materials"
                                         name="materials[]"
                                         multiple
-                                        size="8"
+                                        size="12"
                                         required
                                         data-required
                                         class="tx-field tx-multi-select materials-select"
                                     >
 
+                                        {{-- ============================================================
+                                            SOLID WOOD
+                                        ============================================================= --}}
+
                                         <optgroup label="Solid Wood">
 
                                             @foreach([
+                                                'Solid Wood',
+                                                'Solidwood',
+                                                'Acacia',
                                                 'Acacia Wood',
+                                                'Acacia Solid Wood',
                                                 'Ash Wood',
+                                                'Ash Solid Wood',
                                                 'Beech Wood',
                                                 'Birch Wood',
                                                 'Mahogany',
+                                                'Mahogany Wood',
+                                                'Mahogany Solid Wood',
+                                                'Mango Solid Wood',
                                                 'Mango Wood',
                                                 'Oak',
+                                                'Solid Oak',
                                                 'Pine',
+                                                'Pine Solid Wood',
                                                 'Rubberwood',
+                                                'Solid Rubberwood',
+                                                'Solid Rubber Wood',
                                                 'Teak',
-                                                'Walnut'
+                                                'Walnut',
+                                                'Solid Walnut Wood'
                                             ] as $material)
 
                                                 <option
@@ -2431,15 +2448,63 @@
                                             @endforeach
 
                                         </optgroup>
+
+
+                                        {{-- ============================================================
+                                            WOOD VENEER
+                                        ============================================================= --}}
+
+                                        <optgroup label="Wood Veneer">
+
+                                            @foreach([
+                                                'Birch Veneer',
+                                                'Oak Veneer',
+                                                'Ash Veneer',
+                                                'Acacia Veneer',
+                                                'Walnut Veneer',
+                                                'Burl Veneer',
+                                                'MDF Veneer',
+                                                'Rubberwood Veneer',
+                                                'Veneer',
+                                                'Veneered MDF',
+                                                'Veneer MDF',
+                                                'Oak VMDF',
+                                                'Ash Veneer MDF',
+                                                'Ash Veneer MDF',
+                                                'Acacia Veneer MDF',
+                                                'White Mango Veneer'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            ENGINEERED WOOD
+                                        ============================================================= --}}
 
                                         <optgroup label="Engineered Wood">
 
                                             @foreach([
                                                 'MDF',
+                                                'MDF Panel',
+                                                'VMDF',
                                                 'Particle Board',
+                                                'PB',
                                                 'Plywood',
+                                                'Pine Plywood',
                                                 'HDF',
-                                                'Melamine Board'
+                                                'Melamine Board',
+                                                'Panel',
+                                                'Wood Panel'
                                             ] as $material)
 
                                                 <option
@@ -2452,16 +2517,45 @@
                                             @endforeach
 
                                         </optgroup>
+
+
+                                        {{-- ============================================================
+                                            METAL
+                                        ============================================================= --}}
 
                                         <optgroup label="Metal">
 
                                             @foreach([
+                                                'Metal',
+                                                'Steel',
+                                                'Steel Frame',
+                                                'Stainless Steel',
+                                                'Iron',
+                                                'Cast Iron',
                                                 'Aluminum',
                                                 'Brass',
-                                                'Cast Iron',
-                                                'Iron',
-                                                'Stainless Steel',
-                                                'Steel'
+                                                'Metal Frame',
+                                                'Metal Base',
+                                                'Metal Plate',
+                                                'Metal Bar',
+                                                'Metal Tube',
+                                                'Metal Round Tube',
+                                                'Metal Round Bar',
+                                                'Ordinary Square Tube Metal',
+                                                'Powdercoated Metal',
+                                                'Black Powdercoated Metal',
+                                                'Powdercoated Metal Frame',
+                                                'Powdercoated Round Tube Metal Frame',
+                                                'Powdercoated Round Bar Metal Frame',
+                                                'Powdercoated Metal Base',
+                                                'Metal Hardware',
+                                                'Metal Hinge',
+                                                'Metal Handle',
+                                                'Metal Knob',
+                                                'Metal Ring Handle',
+                                                'Metal Slides',
+                                                'Metal Pull-out Slides',
+                                                'Metal Holder'
                                             ] as $material)
 
                                                 <option
@@ -2475,12 +2569,49 @@
 
                                         </optgroup>
 
-                                        <optgroup label="Glass & Stone">
+
+                                        {{-- ============================================================
+                                            GLASS
+                                        ============================================================= --}}
+
+                                        <optgroup label="Glass">
 
                                             @foreach([
+                                                'Glass',
                                                 'Clear Glass',
                                                 'Tempered Glass',
+                                                'Glass Panel',
+                                                'Clear Glass Cylinder',
+                                                'Glass Window Panel',
+                                                'Embossed Clear Glass'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            STONE / MARBLE / CERAMIC
+                                        ============================================================= --}}
+
+                                        <optgroup label="Stone, Marble & Ceramic">
+
+                                            @foreach([
+                                                'Stone',
+                                                'Stone Top',
+                                                'Stone Cast',
+                                                'Natural Stone',
                                                 'Marble',
+                                                'Faux Marble',
+                                                'Faux Marble Top',
                                                 'Granite',
                                                 'Ceramic',
                                                 'Concrete'
@@ -2497,15 +2628,29 @@
 
                                         </optgroup>
 
-                                        <optgroup label="Natural Fibers">
+
+                                        {{-- ============================================================
+                                            RATTAN
+                                        ============================================================= --}}
+
+                                        <optgroup label="Rattan">
 
                                             @foreach([
-                                                'Bamboo',
-                                                'Cane',
                                                 'Rattan',
-                                                'Seagrass',
-                                                'Water Hyacinth',
-                                                'Abaca'
+                                                'Rattan Pole',
+                                                'Rattan Poles',
+                                                'Rattan Core',
+                                                'Rattan Splits',
+                                                'Rattan Wicker',
+                                                'Rattan Weave',
+                                                'Rattan Cane',
+                                                'Rattan Cane Mat',
+                                                'Natural Rattan Mat',
+                                                'Natural Rattan Cane Mat',
+                                                'Open Mesh Rattan Cane',
+                                                'Open Mesh Woven Cane',
+                                                'Rattan Frame',
+                                                'Rattan Wicker Weave'
                                             ] as $material)
 
                                                 <option
@@ -2518,19 +2663,194 @@
                                             @endforeach
 
                                         </optgroup>
+
+
+                                        {{-- ============================================================
+                                            SEAGRASS
+                                        ============================================================= --}}
+
+                                        <optgroup label="Seagrass">
+
+                                            @foreach([
+                                                'Seagrass',
+                                                'Sea Grass',
+                                                'Seagrass Weave',
+                                                'Seagrass Mat',
+                                                'Seagrass Rope',
+                                                'Seagrass Cover',
+                                                'Seagrass and Twisted Grass',
+                                                'Sea Grass Twisted'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            WATER HYACINTH
+                                        ============================================================= --}}
+
+                                        <optgroup label="Water Hyacinth">
+
+                                            @foreach([
+                                                'Water Hyacinth',
+                                                'Water Hyacinth Rope',
+                                                'Water Hyacinth Weave',
+                                                'Water Hyacinth Braided Weave',
+                                                'Water Hyacinth Mat',
+                                                'Water Hyacinth Cane Weave'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            BAMBOO
+                                        ============================================================= --}}
+
+                                        <optgroup label="Bamboo">
+
+                                            @foreach([
+                                                'Bamboo',
+                                                'Bamboo Pole',
+                                                'Bamboo Weave'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            WICKER / CANE
+                                        ============================================================= --}}
+
+                                        <optgroup label="Wicker & Cane">
+
+                                            @foreach([
+                                                'Wicker',
+                                                'Wicker Weave',
+                                                'Cane',
+                                                'Cane Weave',
+                                                'Natural Cane',
+                                                'Woven Cane',
+                                                'Open Mesh Cane'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            PAPER / NATURAL FIBER
+                                        ============================================================= --}}
+
+                                        <optgroup label="Paper & Natural Fiber">
+
+                                            @foreach([
+                                                'Paper',
+                                                'Paper Weave',
+                                                'Paper Rope',
+                                                'Twisted Paper Rope',
+                                                'Natural Fiber',
+                                                'Raffia',
+                                                'Raffia Mat',
+                                                'Natural Raffia Mat',
+                                                'Banana Leaf',
+                                                'Corn Husk',
+                                                'Twisted Grass'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            ABACA
+                                        ============================================================= --}}
+
+                                        <optgroup label="Abaca">
+
+                                            @foreach([
+                                                'Abaca',
+                                                'Abaca Fiber',
+                                                'Abaca Weave',
+                                                'Abaca Mat',
+                                                'Abaca Rope'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            FABRIC / UPHOLSTERY
+                                        ============================================================= --}}
 
                                         <optgroup label="Fabric & Upholstery">
 
                                             @foreach([
+                                                'Fabric',
                                                 'Boucle',
                                                 'Canvas',
                                                 'Cotton',
-                                                'Leather',
-                                                'PU Leather',
                                                 'Linen',
                                                 'Microfiber',
                                                 'Polyester',
-                                                'Velvet'
+                                                'Velvet',
+                                                'Leather',
+                                                'PU Leather',
+                                                'Foam',
+                                                'FR Foam',
+                                                'Cushion'
                                             ] as $material)
 
                                                 <option
@@ -2543,6 +2863,11 @@
                                             @endforeach
 
                                         </optgroup>
+
+
+                                        {{-- ============================================================
+                                            PLASTIC / SYNTHETIC
+                                        ============================================================= --}}
 
                                         <optgroup label="Plastic & Synthetic">
 
@@ -2552,7 +2877,10 @@
                                                 'Fiberglass',
                                                 'Polypropylene',
                                                 'PVC',
-                                                'Resin'
+                                                'PVC Laminate',
+                                                'Plastic',
+                                                'Plastic Strips',
+                                                'Synthetic Material'
                                             ] as $material)
 
                                                 <option
@@ -2566,11 +2894,130 @@
 
                                         </optgroup>
 
+
+                                        {{-- ============================================================
+                                            RESIN
+                                        ============================================================= --}}
+
+                                        <optgroup label="Resin">
+
+                                            @foreach([
+                                                'Resin',
+                                                'Resin Cast'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            SHELL / CAPIZ / MOP
+                                        ============================================================= --}}
+
+                                        <optgroup label="Shell & Decorative Inlay">
+
+                                            @foreach([
+                                                'Shell',
+                                                'Capiz Shell',
+                                                'Capiz',
+                                                'Capiz Inlay',
+                                                'MOP',
+                                                'MOP Inlay',
+                                                'Mother of Pearl',
+                                                'Gold Leaf'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            ROPE
+                                        ============================================================= --}}
+
+                                        <optgroup label="Rope">
+
+                                            @foreach([
+                                                'Natural Rope',
+                                                'Paper Rope',
+                                                'Twisted Paper Rope',
+                                                'Seagrass Rope',
+                                                'Natural Fiber Rope'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            LAMINATE / FINISH
+                                        ============================================================= --}}
+
+                                        <optgroup label="Laminate & Finish">
+
+                                            @foreach([
+                                                'Laminate',
+                                                'PVC Laminate',
+                                                'Laminated Top',
+                                                'Painted Finish',
+                                                'White Glossy Lacquer',
+                                                'Glossy Lacquer',
+                                                'Powdercoated Finish',
+                                                'Wood Stain'
+                                            ] as $material)
+
+                                                <option
+                                                    value="{{ $material }}"
+                                                    {{ in_array($material, old('materials', [])) ? 'selected' : '' }}
+                                                >
+                                                    {{ $material }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </optgroup>
+
+
+                                        {{-- ============================================================
+                                            OTHER
+                                        ============================================================= --}}
+
                                         <optgroup label="Other">
 
                                             @foreach([
                                                 'Composite',
-                                                'Mixed Materials'
+                                                'Mixed Materials',
+                                                'Hardware',
+                                                'Hinges',
+                                                'Door Handle',
+                                                'Drawer Slides',
+                                                'Metal Slides',
+                                                'Locks',
+                                                'Casters'
                                             ] as $material)
 
                                                 <option
@@ -2595,11 +3042,9 @@
                                 </div>
 
                                 @error('materials')
-
                                     <p class="tx-error">
                                         {{ $message }}
                                     </p>
-
                                 @enderror
 
                             </div>

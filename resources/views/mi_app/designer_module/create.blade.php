@@ -2366,7 +2366,9 @@
 {{-- ================================================================
     MATERIALS MULTI-SELECT
     Single source of truth: $materialGroups
-    To add a material, add one line to the relevant group below.
+    Near-duplicate names have been collapsed to one canonical value
+    per material. See materials-migration-mapping.md if you have
+    existing product data using the old names.
 ================================================================= --}}
 
 @php
@@ -2375,24 +2377,16 @@
         'Solid Wood' => [
             'Solid Wood',
             'Acacia Wood',
-            'Acacia Solid Wood',
-            'Ash Solid Wood',
+            'Ash Wood',
             'Beech Wood',
             'Birch Wood',
-            'Mahogany',
             'Mahogany Wood',
-            'Mahogany Solid Wood',
             'Mango Wood',
-            'Mango Solid Wood',
-            'Oak',
-            'Solid Oak',
-            'Pine',
-            'Pine Solid Wood',
+            'Oak Wood',
+            'Pine Wood',
             'Rubberwood',
-            'Solid Rubberwood',
-            'Teak',
-            'Walnut',
-            'Solid Walnut Wood',
+            'Teak Wood',
+            'Walnut Wood',
         ],
 
         'Wood Veneer' => [
@@ -2405,25 +2399,19 @@
             'Rubberwood Veneer',
             'Walnut Veneer',
             'White Mango Veneer',
-            'MDF Veneer',
             'Veneered MDF',
-            'Veneer MDF',
-            'Acacia Veneer MDF',
-            'Ash Veneer MDF',
-            'Oak VMDF',
+            'Acacia Veneered MDF',
+            'Ash Veneered MDF',
+            'Oak Veneered MDF',
         ],
 
         'Engineered Wood' => [
             'MDF',
-            'MDF Panel',
-            'VMDF',
             'HDF',
             'Particle Board',
-            'PB',
             'Plywood',
             'Pine Plywood',
             'Melamine Board',
-            'Panel',
             'Wood Panel',
         ],
 
@@ -2453,18 +2441,13 @@
         ],
 
         'Metal Hardware & Fittings' => [
-            'Hardware',
             'Metal Hardware',
-            'Hinges',
-            'Metal Hinge',
-            'Door Handle',
-            'Metal Handle',
+            'Metal Hinges',
+            'Metal Door Handle',
             'Metal Knob',
             'Metal Ring Handle',
             'Metal Holder',
-            'Drawer Slides',
-            'Metal Slides',
-            'Metal Pull-out Slides',
+            'Metal Drawer Slides',
             'Locks',
             'Casters',
         ],
@@ -2476,17 +2459,13 @@
             'Embossed Clear Glass',
             'Glass Panel',
             'Glass Window Panel',
-            'Clear Glass Cylinder',
         ],
 
         'Stone, Marble & Ceramic' => [
-            'Stone',
             'Natural Stone',
-            'Stone Top',
             'Stone Cast',
             'Marble',
             'Faux Marble',
-            'Faux Marble Top',
             'Granite',
             'Ceramic',
             'Concrete',
@@ -2495,24 +2474,18 @@
         'Rattan' => [
             'Rattan',
             'Rattan Pole',
-            'Rattan Poles',
             'Rattan Core',
             'Rattan Splits',
             'Rattan Frame',
             'Rattan Weave',
-            'Rattan Wicker',
-            'Rattan Wicker Weave',
             'Rattan Cane',
             'Rattan Cane Mat',
-            'Natural Rattan Mat',
             'Natural Rattan Cane Mat',
             'Open Mesh Rattan Cane',
-            'Open Mesh Woven Cane',
         ],
 
         'Wicker & Cane' => [
             'Wicker',
-            'Wicker Weave',
             'Cane',
             'Natural Cane',
             'Cane Weave',
@@ -2522,12 +2495,10 @@
 
         'Seagrass' => [
             'Seagrass',
-            'Sea Grass',
             'Seagrass Weave',
             'Seagrass Mat',
             'Seagrass Cover',
-            'Sea Grass Twisted',
-            'Seagrass and Twisted Grass',
+            'Twisted Seagrass',
         ],
 
         'Water Hyacinth' => [
@@ -2557,16 +2528,13 @@
             'Natural Fiber',
             'Raffia',
             'Raffia Mat',
-            'Natural Raffia Mat',
             'Banana Leaf',
             'Corn Husk',
             'Twisted Grass',
         ],
 
         'Rope' => [
-            'Natural Rope',
             'Natural Fiber Rope',
-            'Paper Rope',
             'Twisted Paper Rope',
             'Seagrass Rope',
             'Water Hyacinth Rope',
@@ -2584,6 +2552,9 @@
             'Velvet',
             'Leather',
             'PU Leather',
+        ],
+
+        'Padding & Filling' => [
             'Foam',
             'FR Foam',
             'Cushion',
@@ -2607,24 +2578,21 @@
 
         'Shell & Decorative Inlay' => [
             'Shell',
-            'Capiz',
             'Capiz Shell',
             'Capiz Inlay',
-            'MOP',
             'Mother of Pearl',
             'MOP Inlay',
-            'Gold Leaf',
         ],
 
         'Laminate & Finish' => [
             'Laminate',
             'PVC Laminate',
-            'Laminated Top',
             'Painted Finish',
             'Glossy Lacquer',
             'White Glossy Lacquer',
             'Powdercoated Finish',
             'Wood Stain',
+            'Gold Leaf',
         ],
 
         'Other' => [

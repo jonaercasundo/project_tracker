@@ -31,7 +31,6 @@ class ProjectController extends Controller
         ]);
     }
 
-
     public function store(Request $request)
     {
         $request->validate([
@@ -42,7 +41,7 @@ class ProjectController extends Controller
             'ABC' => 'required|numeric',
             'start_date' => 'required',
             'end_date' => 'required',
-            'status' => 'required'
+            'status' => 'required',
         ]);
 
         Project::create($request->all());
@@ -53,7 +52,6 @@ class ProjectController extends Controller
         );
     }
 
-
     public function update(Request $request, Project $project)
     {
         $request->validate([
@@ -63,16 +61,15 @@ class ProjectController extends Controller
             'ABC' => 'required|numeric',
             'start_date' => 'required',
             'end_date' => 'required',
-            'status' => 'required'
+            'status' => 'required',
         ]);
 
         $project->update($request->all());
 
         return response()->json([
-            'success' => true
+            'success' => true,
         ]);
     }
-
 
     public function filter(Request $request)
     {
@@ -166,14 +163,13 @@ class ProjectController extends Controller
             ])
             ->first();
 
-
         /*
         |--------------------------------------------------------------------------
         | CREATE DEFAULT AR SETTINGS IF NONE EXIST
         |--------------------------------------------------------------------------
         */
 
-        if (!$arSettings) {
+        if (! $arSettings) {
 
             $arSettings = (object) [
                 'project_name' => $project->project_name,
@@ -196,7 +192,6 @@ class ProjectController extends Controller
                 'label_region' => 0,
             ];
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -237,7 +232,7 @@ class ProjectController extends Controller
                             'png',
                             'jpg',
                             'jpeg',
-                            'webp'
+                            'webp',
                         ]
                     )
                 ) {
@@ -246,6 +241,74 @@ class ProjectController extends Controller
             }
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | PROJECT STRUCTURE
+        |--------------------------------------------------------------------------
+        */
+
+        $schools = DB::table('school as s')
+            ->where('s.project_id', $project->project_id)
+            ->orWhereIn(
+                's.school_id',
+                DB::table('deliveries')
+                    ->where('project_id', $project->project_id)
+                    ->select('school_id')
+            )
+            ->orderBy('s.school_name')
+            ->get();
+
+        $lots = DB::table('lot as l')
+            ->where('l.project_id', $project->project_id)
+            ->select('l.*')
+            ->selectSub(function ($query) {
+                $query->from('package as p')
+                    ->leftJoin('keystage as k', 'k.keystage_id', '=', 'p.keystage_id')
+                    ->where(function ($query) {
+                        $query->whereColumn('p.lot_id', 'l.lot_id')
+                            ->orWhereColumn('k.lot_id', 'l.lot_id');
+                    })
+                    ->selectRaw('count(*)');
+            }, 'packages_count')
+            ->orderBy('l.lot_name')
+            ->get();
+
+        $keystages = DB::table('keystage as k')
+            ->join('lot as l', 'l.lot_id', '=', 'k.lot_id')
+            ->where('l.project_id', $project->project_id)
+            ->select('k.*', 'l.lot_name')
+            ->orderBy('l.lot_name')
+            ->orderBy('k.keystage_num')
+            ->get();
+
+        $lots->each(function ($lot) use ($keystages) {
+            $lot->keystages = $keystages
+                ->where('lot_id', $lot->lot_id)
+                ->values();
+        });
+
+        $items = DB::table('item')
+            ->where('project_id', $project->project_id)
+            ->orderBy('item_name')
+            ->get();
+
+        $packages = DB::table('package as p')
+            ->leftJoin('lot as l', 'l.lot_id', '=', 'p.lot_id')
+            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'p.keystage_id')
+            ->leftJoin('lot as keystage_lot', 'keystage_lot.lot_id', '=', 'k.lot_id')
+            ->where(function ($query) use ($project) {
+                $query->where('l.project_id', $project->project_id)
+                    ->orWhere('keystage_lot.project_id', $project->project_id);
+            })
+            ->select([
+                'p.*',
+                'l.lot_name',
+                'k.keystage_num',
+                'k.description as keystage_description',
+                DB::raw("CONCAT('Package ', p.package_num) as package_name"),
+            ])
+            ->orderBy('p.package_num')
+            ->get();
 
         /*
         |--------------------------------------------------------------------------
@@ -255,9 +318,13 @@ class ProjectController extends Controller
 
         return view('projects.show', [
             'project' => $project,
+            'schools' => $schools,
+            'lots' => $lots,
+            'keystages' => $keystages,
+            'items' => $items,
+            'packages' => $packages,
             'arSettings' => $arSettings,
             'logoFiles' => $logoFiles,
         ]);
     }
-
 }

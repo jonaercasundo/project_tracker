@@ -14,8 +14,145 @@
 
     <style>
         /* =========================================================
-           DESIGN SYSTEM
-           ========================================================= */
+        PAGINATION
+        ========================================================= */
+
+        .tx-pagination-panel {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 14px 18px;
+            border-top: 1px solid var(--tx-line);
+            background: var(--tx-surface);
+        }
+
+        .tx-pagination-info {
+            color: var(--tx-ink-faint);
+            font-size: 11px;
+            line-height: 1.5;
+            white-space: nowrap;
+        }
+
+        .tx-pagination-strong {
+            color: var(--tx-ink-soft);
+            font-family: var(--tx-font-mono);
+            font-weight: 600;
+        }
+
+        .tx-pagination {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tx-page-numbers {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tx-page-btn,
+        .tx-page-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 34px;
+            border: 1px solid var(--tx-line);
+            border-radius: 8px;
+            background: var(--tx-surface);
+            color: var(--tx-ink-soft);
+            font-size: 11px;
+            font-weight: 600;
+            text-decoration: none;
+            transition:
+                background .15s ease,
+                border-color .15s ease,
+                color .15s ease;
+        }
+
+        .tx-page-btn {
+            gap: 6px;
+            padding: 0 11px;
+        }
+
+        .tx-page-number {
+            width: 34px;
+        }
+
+        .tx-page-btn:hover,
+        .tx-page-number:hover {
+            border-color: var(--tx-primary);
+            background: var(--tx-primary-soft);
+            color: var(--tx-primary);
+        }
+
+        .tx-page-current {
+            border-color: var(--tx-primary);
+            background: var(--tx-primary);
+            color: #ffffff;
+        }
+
+        .tx-page-current:hover {
+            background: var(--tx-primary-hover);
+            border-color: var(--tx-primary-hover);
+            color: #ffffff;
+        }
+
+        .tx-page-disabled {
+            opacity: .45;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* =========================================================
+        PAGINATION ICONS
+        ========================================================= */
+
+        .tx-page-btn svg {
+            width: 13px;
+            height: 13px;
+        }
+
+        /* =========================================================
+        RESPONSIVE PAGINATION
+        ========================================================= */
+
+        @media (max-width: 700px) {
+
+            .tx-pagination-panel {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .tx-pagination-info {
+                text-align: center;
+            }
+
+            .tx-pagination {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+
+            .tx-page-btn span {
+                display: none;
+            }
+
+            .tx-page-btn {
+                width: 34px;
+                padding: 0;
+            }
+
+            .tx-page-numbers {
+                gap: 3px;
+            }
+
+            .tx-page-number {
+                width: 32px;
+            }
+        }
 
         .tx-console {
             --tx-bg: #f8fafc;
@@ -711,40 +848,212 @@
                 </a>
 
             </header>
-
-
             {{-- =====================================================
                 MAIN CONTENT
                 ===================================================== --}}
-
             <main class="tx-main-card">
 
                 {{-- =================================================
                     SEARCH / FILTER AREA
                     ================================================= --}}
-
                 <section class="tx-toolbar-panel">
-
                     @include(
                         'mi_app.designer_module.partials._search'
                     )
-
                 </section>
-
 
                 {{-- =================================================
                     DATA TABLE
                     ================================================= --}}
-
                 <section class="tx-table-panel">
-
                     @include(
                         'mi_app.designer_module.partials._table'
                     )
-
                 </section>
 
+                {{-- =================================================
+                    PAGINATION
+                    ================================================= --}}
+                @if ($products instanceof \Illuminate\Pagination\LengthAwarePaginator && $products->hasPages())
+                    <div class="tx-pagination-panel">
+
+                        <div class="tx-pagination-info">
+                            Showing
+                            <span class="tx-pagination-strong">
+                                {{ $products->firstItem() ?? 0 }}
+                            </span>
+                            to
+                            <span class="tx-pagination-strong">
+                                {{ $products->lastItem() ?? 0 }}
+                            </span>
+                            of
+                            <span class="tx-pagination-strong">
+                                {{ $products->total() }}
+                            </span>
+                            products
+                        </div>
+
+                        <nav class="tx-pagination" aria-label="Product pagination">
+
+                            @if ($products->onFirstPage())
+                                <span class="tx-page-btn tx-page-disabled">
+                                    ← Previous
+                                </span>
+                            @else
+                                <a href="{{ $products->previousPageUrl() }}"
+                                    class="tx-page-btn">
+                                    ← Previous
+                                </a>
+                            @endif
+
+                            <div class="tx-page-numbers">
+                                @foreach ($products->getUrlRange(
+                                    max(1, $products->currentPage() - 2),
+                                    min($products->lastPage(), $products->currentPage() + 2)
+                                ) as $page => $url)
+
+                                    @if ($page == $products->currentPage())
+                                        <span class="tx-page-number tx-page-current">
+                                            {{ $page }}
+                                        </span>
+                                    @else
+                                        <a href="{{ $url }}"
+                                            class="tx-page-number">
+                                            {{ $page }}
+                                        </a>
+                                    @endif
+
+                                @endforeach
+                            </div>
+
+                            @if ($products->hasMorePages())
+                                <a href="{{ $products->nextPageUrl() }}"
+                                    class="tx-page-btn">
+                                    Next →
+                                </a>
+                            @else
+                                <span class="tx-page-btn tx-page-disabled">
+                                    Next →
+                                </span>
+                            @endif
+
+                        </nav>
+                    </div>
+                @endif
+
             </main>
+            {{-- =================================================
+                PAGINATION
+                ================================================= --}}
+            @if ($products instanceof \Illuminate\Pagination\LengthAwarePaginator && $products->hasPages())
+                <div class="tx-pagination-panel">
+
+                    {{-- Result Summary --}}
+                    <div class="tx-pagination-info">
+                        Showing
+                        <span class="tx-pagination-strong">
+                            {{ $products->firstItem() ?? 0 }}
+                        </span>
+                        to
+                        <span class="tx-pagination-strong">
+                            {{ $products->lastItem() ?? 0 }}
+                        </span>
+                        of
+                        <span class="tx-pagination-strong">
+                            {{ $products->total() }}
+                        </span>
+                        products
+                    </div>
+
+                    {{-- Pagination --}}
+                    <nav class="tx-pagination" aria-label="Product pagination">
+
+                        {{-- Previous --}}
+                        @if ($products->onFirstPage())
+                            <span class="tx-page-btn tx-page-disabled" aria-disabled="true">
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M15 19l-7-7 7-7" />
+                                </svg>
+                                <span>Previous</span>
+                            </span>
+                        @else
+                            <a href="{{ $products->previousPageUrl() }}"
+                                class="tx-page-btn">
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M15 19l-7-7 7-7" />
+                                </svg>
+                                <span>Previous</span>
+                            </a>
+                        @endif
+
+                        {{-- Page Numbers --}}
+                        <div class="tx-page-numbers">
+                            @foreach ($products->getUrlRange(
+                                max(1, $products->currentPage() - 2),
+                                min($products->lastPage(), $products->currentPage() + 2)
+                            ) as $page => $url)
+
+                                @if ($page == $products->currentPage())
+                                    <span class="tx-page-number tx-page-current"
+                                        aria-current="page">
+                                        {{ $page }}
+                                    </span>
+                                @else
+                                    <a href="{{ $url }}"
+                                        class="tx-page-number">
+                                        {{ $page }}
+                                    </a>
+                                @endif
+
+                            @endforeach
+                        </div>
+
+                        {{-- Next --}}
+                        @if ($products->hasMorePages())
+                            <a href="{{ $products->nextPageUrl() }}"
+                                class="tx-page-btn">
+                                <span>Next</span>
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M9 5l7 7-7 7" />
+                                </svg>
+                            </a>
+                        @else
+                            <span class="tx-page-btn tx-page-disabled"
+                                aria-disabled="true">
+                                <span>Next</span>
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M9 5l7 7-7 7" />
+                                </svg>
+                            </span>
+                        @endif
+
+                    </nav>
+                </div>
+            @endif
 
         </div>
 

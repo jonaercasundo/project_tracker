@@ -45,18 +45,21 @@
 
         .pd-image-wrap {
             width: 100%;
-            aspect-ratio: 4 / 3;
-            background: var(--pd-bg);
+            min-height: 300px;
+            background: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
+            overflow: hidden;
         }
 
         .pd-image-wrap img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            max-width: 100%;
+            max-height: 600px;
+            object-fit: contain;
             display: block;
         }
 

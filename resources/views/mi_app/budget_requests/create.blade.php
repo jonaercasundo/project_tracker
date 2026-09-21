@@ -24,8 +24,8 @@
         <form method="POST" action="{{ route('budget_requests.store') }}" id="budget-form">
             @csrf
 
-            <div class="grid grid-cols-2 gap-4 mb-6 p-4 border border-slate-200 rounded-xl">
-                <div>
+            <div class="grid grid-cols-3 gap-4 mb-6 p-4 border border-slate-200 rounded-xl">
+                <div class="col-span-1">
                     <label for="department" class="block text-xs font-bold text-slate-600 mb-1">
                         Department
                     </label>
@@ -69,7 +69,7 @@
                         </option>
                     </select>
                 </div>
-                <div>
+                <div class="col-span-2">
                     <label class="block text-xs font-bold text-slate-600 mb-1">
                         Place / City, Country
                     </label>

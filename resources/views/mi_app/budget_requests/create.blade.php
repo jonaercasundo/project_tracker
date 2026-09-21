@@ -444,20 +444,6 @@
 
                             </td>
 
-
-                            {{-- PARTICULAR --}}
-                            <td class="p-1.5">
-
-                                <input
-                                    name="items[0][particular]"
-                                    class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100"
-                                    placeholder="Enter particular"
-                                    required
-                                >
-
-                            </td>
-
-
                             {{-- CASH --}}
                             <td class="p-1.5">
 
@@ -846,18 +832,6 @@
 
                     </td>
 
-
-                    {{-- PARTICULAR --}}
-                    <td class="p-1.5">
-
-                        <input
-                            name="items[${i}][particular]"
-                            class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100"
-                            placeholder="Enter particular"
-                            required
-                        >
-
-                    </td>
 
 
                     {{-- CASH --}}

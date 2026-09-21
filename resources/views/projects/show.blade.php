@@ -1141,11 +1141,6 @@
                                     </th>
 
                                     <th class="px-4 py-3 text-[10px] font-extrabold uppercase
-                                            tracking-wider text-slate-500 whitespace-nowrap">
-                                        Telephone
-                                    </th>
-
-                                    <th class="px-4 py-3 text-[10px] font-extrabold uppercase
                                             tracking-wider text-slate-500 text-right whitespace-nowrap">
                                         Action
                                     </th>
@@ -1293,50 +1288,6 @@
                                                 </span>
 
                                             </div>
-
-                                        </td>
-
-
-                                        {{-- TELEPHONE --}}
-                                        <td class="px-4 py-3 align-middle whitespace-nowrap">
-
-                                            @php
-                                                $telephone = $school->telephone
-                                                    ?? $school->telephone_no
-                                                    ?? $school->contact_number
-                                                    ?? $school->phone
-                                                    ?? null;
-                                            @endphp
-
-                                            @if($telephone)
-
-                                                <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-
-                                                    <svg class="w-3.5 h-3.5 text-slate-400"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        stroke-width="1.8">
-                                                        <path
-                                                            stroke-linecap="round"
-                                                            stroke-linejoin="round"
-                                                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.95.68
-                                                            l1.5 4.49a1 1 0 01-.5 1.18l-2.12
-                                                            1.06a11.04 11.04 0 005.46 5.46l1.06
-                                                            -2.12a1 1 0 011.18-.5l4.49 1.5a1
-                                                            1 0 01.68.95V19a2 2 0 01-2 2h-1
-                                                            C10.61 21 3 13.39 3 4V5z" />
-                                                    </svg>
-
-                                                    {{ $telephone }}
-
-                                                </div>
-
-                                            @else
-
-                                                <span class="text-xs text-slate-400">—</span>
-
-                                            @endif
 
                                         </td>
 

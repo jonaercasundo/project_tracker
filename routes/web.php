@@ -36,6 +36,8 @@ use App\Http\Controllers\LiquidationController;
 use App\Http\Controllers\Accounting_LiquidationController;
 use App\Http\Controllers\Accounting_DashboardController;
 use App\Http\Controllers\ProductScanController;
+use App\Http\Controllers\TravelLiquidationController;
+use App\Http\Controllers\BudgetRequestController;
 
     /*
     |--------------------------------------------------------------------------
@@ -421,6 +423,35 @@ use App\Http\Controllers\ProductScanController;
             Route::put('/liquidation/{liquidation}', [LiquidationController::class, 'update'])->name('liquidation.update');
             Route::delete('/liquidation/{liquidation}', [LiquidationController::class, 'destroy'])->name('liquidation.destroy');
             Route::get('/liquidation/{liquidation}/pdf', [LiquidationController::class, 'downloadPdf'])->name('liquidation.pdf');
+
+                // --- Budget Request (employee submits, approver/accounting/release workflow) ---
+            Route::get('/budget-requests', [BudgetRequestController::class, 'index'])->name('budget_requests.index');
+            Route::get('/budget-requests/create', [BudgetRequestController::class, 'create'])->name('budget_requests.create');
+            Route::post('/budget-requests', [BudgetRequestController::class, 'store'])->name('budget_requests.store');
+            Route::get('/budget-requests/{budgetRequest}', [BudgetRequestController::class, 'show'])->name('budget_requests.show');
+            Route::get('/budget-requests/{budgetRequest}/edit', [BudgetRequestController::class, 'edit'])->name('budget_requests.edit');
+            Route::put('/budget-requests/{budgetRequest}', [BudgetRequestController::class, 'update'])->name('budget_requests.update');
+            Route::delete('/budget-requests/{budgetRequest}', [BudgetRequestController::class, 'destroy'])->name('budget_requests.destroy');
+
+            // Workflow transitions - one per box in the diagram
+            Route::post('/budget-requests/{budgetRequest}/approve', [BudgetRequestController::class, 'approve'])->name('budget_requests.approve');
+            Route::post('/budget-requests/{budgetRequest}/note', [BudgetRequestController::class, 'noteByAccounting'])->name('budget_requests.note');
+            Route::post('/budget-requests/{budgetRequest}/release', [BudgetRequestController::class, 'release'])->name('budget_requests.release');
+            Route::post('/budget-requests/{budgetRequest}/received', [BudgetRequestController::class, 'markReceived'])->name('budget_requests.received');
+
+            // --- Liquidation (your existing routes, unchanged, plus review/approve) ---
+            Route::get('/travel_liquidation', [TravelLiquidationController::class, 'index'])->name('liquidation.index');
+            Route::get('/travel_liquidation/create', [TravelLiquidationController::class, 'create'])->name('liquidation.create');
+            Route::post('/travel_liquidation', [TravelLiquidationController::class, 'store'])->name('liquidation.store');
+            Route::get('/travel_liquidation/{liquidation}', [TravelLiquidationController::class, 'show'])->name('liquidation.show');
+            Route::get('/travel_liquidation/{id}/edit', [TravelLiquidationController::class, 'edit'])->name('liquidation.edit');
+            Route::put('/travel_liquidation/{liquidation}', [TravelLiquidationController::class, 'update'])->name('liquidation.update');
+            Route::delete('/travel_liquidation/{liquidation}', [TravelLiquidationController::class, 'destroy'])->name('liquidation.destroy');
+            Route::get('/travel_liquidation/{liquidation}/pdf', [TravelLiquidationController::class, 'downloadPdf'])->name('liquidation.pdf');
+
+            // Balance-check sign-off (the dashed box in your diagram)
+            Route::post('/travel_liquidation/{liquidation}/note', [TravelLiquidationController::class, 'noteByAccounting'])->name('liquidation.note');
+            Route::post('/travel_liquidation/{liquidation}/approve', [TravelLiquidationController::class, 'approve'])->name('liquidation.approve');
         });
         Route::middleware(['auth','company.context:MI','role:accounting'])->group(function () {
             Route::get('/accounting/dashboard', [Accounting_DashboardController::class, 'dashboard'])->name('accounting.mi.dashboard');

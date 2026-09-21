@@ -26,10 +26,48 @@
 
             <div class="grid grid-cols-2 gap-4 mb-6 p-4 border border-slate-200 rounded-xl">
                 <div>
-                    <label for="department" class="block text-xs font-bold text-slate-600 mb-1">Department</label>
-                    <input id="department" type="text" name="department" value="{{ old('department') }}"
-                           class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-                           required>
+                    <label for="department" class="block text-xs font-bold text-slate-600 mb-1">
+                        Department
+                    </label>
+
+                    <select
+                        id="department"
+                        name="department"
+                        class="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        required
+                    >
+                        <option value="" disabled {{ old('department') ? '' : 'selected' }}>
+                            Select Department
+                        </option>
+
+                        <option value="Design" {{ old('department') == 'Design' ? 'selected' : '' }}>
+                            Design
+                        </option>
+
+                        <option value="Sourcing" {{ old('department') == 'Sourcing' ? 'selected' : '' }}>
+                            Sourcing
+                        </option>
+
+                        <option value="Trading" {{ old('department') == 'Trading' ? 'selected' : '' }}>
+                            Trading
+                        </option>
+
+                        <option value="Sales / Merchandising" {{ old('department') == 'Sales / Merchandising' ? 'selected' : '' }}>
+                            Sales / Merchandising
+                        </option>
+
+                        <option value="Accounting" {{ old('department') == 'Accounting' ? 'selected' : '' }}>
+                            Accounting
+                        </option>
+
+                        <option value="Management" {{ old('department') == 'Management' ? 'selected' : '' }}>
+                            Management
+                        </option>
+
+                        <option value="Other" {{ old('department') == 'Other' ? 'selected' : '' }}>
+                            Other
+                        </option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">Place / City, Country</label>

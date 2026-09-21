@@ -24,10 +24,8 @@
         <form method="POST" action="{{ route('budget_requests.store') }}" id="budget-form">
             @csrf
 
-            <div class="grid grid-cols-3 gap-4 mb-6 p-4 border border-slate-200 rounded-xl">
-
-                {{-- Department --}}
-                <div class="col-span-1">
+            <div class="grid grid-cols-2 gap-4 mb-6 p-4 border border-slate-200 rounded-xl">
+                <div>
                     <label for="department" class="block text-xs font-bold text-slate-600 mb-1">
                         Department
                     </label>
@@ -71,140 +69,203 @@
                         </option>
                     </select>
                 </div>
-
-
-                {{-- Place / City / Country --}}
-                <div class="col-span-2">
+                <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">
                         Place / City, Country
                     </label>
 
-                    <div class="grid grid-cols-2 gap-2">
-
-                        {{-- City / Place --}}
-                        <select
-                            id="place"
-                            name="place"
-                            class="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-                        >
-                            <option value="">Select City / Place</option>
-                        </select>
-
+                    <div class="flex gap-2">
                         {{-- Country --}}
                         <select
                             id="country"
                             name="country"
-                            class="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                            class="w-1/2 border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                         >
                             <option value="">Select Country</option>
-
                             <option value="Philippines" {{ old('country') == 'Philippines' ? 'selected' : '' }}>
                                 Philippines
                             </option>
-
                             <option value="United States" {{ old('country') == 'United States' ? 'selected' : '' }}>
                                 United States
                             </option>
-
                             <option value="Canada" {{ old('country') == 'Canada' ? 'selected' : '' }}>
                                 Canada
                             </option>
-
                             <option value="United Kingdom" {{ old('country') == 'United Kingdom' ? 'selected' : '' }}>
                                 United Kingdom
                             </option>
-
                             <option value="Japan" {{ old('country') == 'Japan' ? 'selected' : '' }}>
                                 Japan
                             </option>
-
                             <option value="China" {{ old('country') == 'China' ? 'selected' : '' }}>
                                 China
                             </option>
-
                             <option value="South Korea" {{ old('country') == 'South Korea' ? 'selected' : '' }}>
                                 South Korea
                             </option>
-
                             <option value="Singapore" {{ old('country') == 'Singapore' ? 'selected' : '' }}>
                                 Singapore
                             </option>
-
                             <option value="Australia" {{ old('country') == 'Australia' ? 'selected' : '' }}>
                                 Australia
                             </option>
-
                             <option value="Other" {{ old('country') == 'Other' ? 'selected' : '' }}>
                                 Other
                             </option>
+                        </select>
+                        {{-- City / Place --}}
+                        <select
+                            id="place"
+                            name="place"
+                            class="w-1/2 border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        >
+                            <option value="">Select City / Place</option>
                         </select>
 
                     </div>
                 </div>
 
+                <script>
+                    const cities = {
+                        "Philippines": [
+                            "Manila",
+                            "Quezon City",
+                            "Makati",
+                            "Pasig",
+                            "Taguig",
+                            "Parañaque",
+                            "Pasay",
+                            "Las Piñas",
+                            "Muntinlupa",
+                            "Caloocan",
+                            "Cavite",
+                            "Bacoor",
+                            "Imus",
+                            "Dasmariñas",
+                            "Cebu City",
+                            "Davao City",
+                            "Iloilo City",
+                            "Other"
+                        ],
 
-                {{-- Travel Date From --}}
+                        "United States": [
+                            "New York",
+                            "Los Angeles",
+                            "Chicago",
+                            "Houston",
+                            "San Francisco",
+                            "Seattle",
+                            "Other"
+                        ],
+
+                        "Canada": [
+                            "Toronto",
+                            "Vancouver",
+                            "Montreal",
+                            "Calgary",
+                            "Ottawa",
+                            "Other"
+                        ],
+
+                        "United Kingdom": [
+                            "London",
+                            "Manchester",
+                            "Birmingham",
+                            "Liverpool",
+                            "Edinburgh",
+                            "Other"
+                        ],
+
+                        "Japan": [
+                            "Tokyo",
+                            "Osaka",
+                            "Kyoto",
+                            "Yokohama",
+                            "Nagoya",
+                            "Other"
+                        ],
+
+                        "China": [
+                            "Shanghai",
+                            "Beijing",
+                            "Guangzhou",
+                            "Shenzhen",
+                            "Hong Kong",
+                            "Other"
+                        ],
+
+                        "South Korea": [
+                            "Seoul",
+                            "Busan",
+                            "Incheon",
+                            "Daegu",
+                            "Daejeon",
+                            "Other"
+                        ],
+
+                        "Singapore": [
+                            "Singapore",
+                            "Other"
+                        ],
+
+                        "Australia": [
+                            "Sydney",
+                            "Melbourne",
+                            "Brisbane",
+                            "Perth",
+                            "Adelaide",
+                            "Other"
+                        ]
+                    };
+
+                    const countrySelect = document.getElementById('country');
+                    const placeSelect = document.getElementById('place');
+
+                    const oldPlace = @json(old('place'));
+
+                    function updateCities() {
+                        const country = countrySelect.value;
+
+                        placeSelect.innerHTML =
+                            '<option value="">Select City / Place</option>';
+
+                        if (cities[country]) {
+                            cities[country].forEach(city => {
+                                const option = document.createElement('option');
+
+                                option.value = city;
+                                option.textContent = city;
+
+                                if (city === oldPlace) {
+                                    option.selected = true;
+                                }
+
+                                placeSelect.appendChild(option);
+                            });
+                        }
+                    }
+
+                    countrySelect.addEventListener('change', updateCities);
+
+                    // Load cities automatically when editing/validation fails
+                    updateCities();
+                </script>
                 <div>
-                    <label
-                        for="travel_date_from"
-                        class="block text-xs font-bold text-slate-600 mb-1"
-                    >
-                        Travel Date From
-                    </label>
-
-                    <input
-                        id="travel_date_from"
-                        type="date"
-                        name="travel_date_from"
-                        value="{{ old('travel_date_from') }}"
-                        class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-                    >
+                    <label for="travel_date_from" class="block text-xs font-bold text-slate-600 mb-1">Travel Date From</label>
+                    <input id="travel_date_from" type="date" name="travel_date_from" value="{{ old('travel_date_from') }}"
+                           class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
                 </div>
-
-
-                {{-- Travel Date To --}}
                 <div>
-                    <label
-                        for="travel_date_to"
-                        class="block text-xs font-bold text-slate-600 mb-1"
-                    >
-                        Travel Date To
-                    </label>
-
-                    <input
-                        id="travel_date_to"
-                        type="date"
-                        name="travel_date_to"
-                        value="{{ old('travel_date_to') }}"
-                        class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-                    >
-
-                    <p
-                        id="date-range-error"
-                        class="hidden text-[11px] text-red-600 mt-1"
-                    >
-                        Return date can't be before the departure date.
-                    </p>
+                    <label for="travel_date_to" class="block text-xs font-bold text-slate-600 mb-1">Travel Date To</label>
+                    <input id="travel_date_to" type="date" name="travel_date_to" value="{{ old('travel_date_to') }}"
+                           class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
+                    <p id="date-range-error" class="hidden text-[11px] text-red-600 mt-1">Return date can't be before the departure date.</p>
                 </div>
-
-
-                {{-- Objectives --}}
-                <div class="col-span-3">
-                    <label
-                        for="objectives"
-                        class="block text-xs font-bold text-slate-600 mb-1"
-                    >
-                        Objectives
-                    </label>
-
-                    <textarea
-                        id="objectives"
-                        name="objectives"
-                        rows="2"
-                        class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-                    >{{ old('objectives') }}</textarea>
+                <div class="col-span-2">
+                    <label for="objectives" class="block text-xs font-bold text-slate-600 mb-1">Objectives</label>
+                    <textarea id="objectives" name="objectives" rows="2"
+                              class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">{{ old('objectives') }}</textarea>
                 </div>
-
             </div>
 
             <h2 class="text-sm font-bold text-slate-700 mb-2">Budget Breakdown</h2>

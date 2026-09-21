@@ -1,10 +1,11 @@
 <x-mi_app>
 
-    <div class="max-w-4xl mx-auto py-6">
+    <div class="max-w-5xl mx-auto py-6">
 
         {{-- =========================================================
             HEADER
         ========================================================== --}}
+
         <div class="flex items-center gap-3 mb-6">
 
             <a
@@ -26,9 +27,15 @@
                 </svg>
             </a>
 
-            <h1 class="text-xl font-bold text-slate-900">
-                New Budget Request
-            </h1>
+            <div>
+                <h1 class="text-xl font-bold text-slate-900">
+                    New Budget Request
+                </h1>
+
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Create a new travel budget request
+                </p>
+            </div>
 
         </div>
 
@@ -36,6 +43,7 @@
         {{-- =========================================================
             VALIDATION ERRORS
         ========================================================== --}}
+
         @if ($errors->any())
 
             <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
@@ -47,7 +55,11 @@
                 <ul class="list-disc list-inside space-y-0.5">
 
                     @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
+
+                        <li>
+                            {{ $error }}
+                        </li>
+
                     @endforeach
 
                 </ul>
@@ -60,6 +72,7 @@
         {{-- =========================================================
             FORM
         ========================================================== --}}
+
         <form
             method="POST"
             action="{{ route('budget_requests.store') }}"
@@ -72,9 +85,11 @@
             {{-- =====================================================
                 REQUEST INFORMATION
             ====================================================== --}}
+
             <div class="grid grid-cols-3 gap-4 mb-6 p-4 border border-slate-200 rounded-xl">
 
                 {{-- DEPARTMENT --}}
+
                 <div class="col-span-1">
 
                     <label
@@ -154,6 +169,7 @@
 
 
                 {{-- COUNTRY / PLACE --}}
+
                 <div class="col-span-2">
 
                     <label class="block text-xs font-bold text-slate-600 mb-1">
@@ -163,6 +179,7 @@
                     <div class="grid grid-cols-2 gap-2">
 
                         {{-- COUNTRY --}}
+
                         <select
                             id="country"
                             name="country"
@@ -247,6 +264,7 @@
 
 
                         {{-- CITY / PLACE --}}
+
                         <select
                             id="place"
                             name="place"
@@ -265,6 +283,7 @@
 
 
                 {{-- TRAVEL DATE FROM --}}
+
                 <div>
 
                     <label
@@ -286,6 +305,7 @@
 
 
                 {{-- TRAVEL DATE TO --}}
+
                 <div>
 
                     <label
@@ -314,6 +334,7 @@
 
 
                 {{-- OBJECTIVES --}}
+
                 <div class="col-span-3">
 
                     <label
@@ -338,201 +359,340 @@
             {{-- =====================================================
                 BUDGET BREAKDOWN
             ====================================================== --}}
-            <h2 class="text-sm font-bold text-slate-700 mb-2">
-                Budget Breakdown
-            </h2>
+
+            <div class="flex items-center justify-between mb-2">
+
+                <h2 class="text-sm font-bold text-slate-700">
+                    Budget Breakdown
+                </h2>
+
+                {{-- FX STATUS --}}
+
+                <div
+                    id="fx-status"
+                    class="text-[11px] text-slate-400"
+                >
+                    Loading exchange rates...
+                </div>
+
+            </div>
+
+
+            {{-- =====================================================
+                FX RATE INFORMATION
+            ====================================================== --}}
+
+            <div
+                id="fx-rates"
+                class="mb-3 p-3 bg-slate-50 border border-slate-200 rounded-xl"
+            >
+
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+
+                    <div>
+
+                        <span class="text-slate-400">
+                            USD → PHP
+                        </span>
+
+                        <span
+                            id="usd-rate"
+                            class="font-bold text-slate-700 ml-1"
+                        >
+                            Loading...
+                        </span>
+
+                    </div>
+
+
+                    <div>
+
+                        <span class="text-slate-400">
+                            VND → PHP
+                        </span>
+
+                        <span
+                            id="vnd-rate"
+                            class="font-bold text-slate-700 ml-1"
+                        >
+                            Loading...
+                        </span>
+
+                    </div>
+
+
+                    <div
+                        id="fx-updated"
+                        class="text-slate-400"
+                    >
+                    </div>
+
+                </div>
+
+            </div>
 
 
             {{-- =====================================================
                 ITEMS TABLE
             ====================================================== --}}
+
             <div class="border border-slate-200 rounded-xl overflow-hidden mb-2">
-                <table
-                    class="w-full text-sm"
-                    id="items-table"
-                >
-                    <thead>
 
-                        <tr class="bg-slate-50 border-b border-slate-200">
+                <div class="overflow-x-auto">
 
-                            <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">
-                                Expense Category
-                            </th>
+                    <table
+                        class="w-full text-sm min-w-[1000px]"
+                        id="items-table"
+                    >
 
-                            <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
-                                Cash
-                            </th>
+                        <thead>
 
-                            <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
-                                Credit Card
-                            </th>
+                            <tr class="bg-slate-50 border-b border-slate-200">
 
-                            <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
-                                Travel Agent
-                            </th>
+                                <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                    Expense Category
+                                </th>
 
-                            <th class="p-2.5 w-10"></th>
+                                <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-28">
+                                    Currency
+                                </th>
 
-                        </tr>
+                                <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                    Cash
+                                </th>
 
-                    </thead>
+                                <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                    Credit Card
+                                </th>
 
-                    <tbody class="divide-y divide-slate-100">
+                                <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                    Travel Agent
+                                </th>
 
-                        <tr class="item-row">
+                                <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide w-36">
+                                    PHP Equivalent
+                                </th>
 
-                            {{-- EXPENSE CATEGORY --}}
-                            <td class="p-1.5">
+                                <th class="p-2.5 w-10">
+                                </th>
 
-                                <select
-                                    name="items[0][expense_category]"
-                                    class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                                    required
-                                >
+                            </tr>
 
-                                    <option value="">
-                                        Select Expense Category
-                                    </option>
-
-                                    <option value="Airfare">
-                                        Airfare
-                                    </option>
-
-                                    <option value="Airport Tax">
-                                        Airport Tax
-                                    </option>
-
-                                    <option value="Hotel And Accommodation">
-                                        Hotel And Accommodation
-                                    </option>
-
-                                    <option value="Per Diem">
-                                        Per Diem
-                                    </option>
-
-                                    <option value="Transportation">
-                                        Transportation
-                                    </option>
-
-                                    <option value="Communication And Petty Cash">
-                                        Communication And Petty Cash
-                                    </option>
-
-                                    <option value="Travel Insurance">
-                                        Travel Insurance
-                                    </option>
-
-                                    <option value="Visa And Permit">
-                                        Visa And Permit
-                                    </option>
-
-                                    <option value="Other">
-                                        Other
-                                    </option>
-
-                                </select>
-
-                            </td>
+                        </thead>
 
 
-                            {{-- CASH --}}
-                            <td class="p-1.5">
+                        <tbody class="divide-y divide-slate-100">
 
-                                <div class="relative">
+                            <tr class="item-row">
 
-                                    <span
-                                        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                {{-- EXPENSE CATEGORY --}}
+
+                                <td class="p-1.5">
+
+                                    <select
+                                        name="items[0][expense_category]"
+                                        class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                        required
                                     >
-                                        ₱
-                                    </span>
+
+                                        <option value="">
+                                            Select Expense Category
+                                        </option>
+
+                                        <option value="Airfare">
+                                            Airfare
+                                        </option>
+
+                                        <option value="Airport Tax">
+                                            Airport Tax
+                                        </option>
+
+                                        <option value="Hotel And Accommodation">
+                                            Hotel And Accommodation
+                                        </option>
+
+                                        <option value="Per Diem">
+                                            Per Diem
+                                        </option>
+
+                                        <option value="Transportation">
+                                            Transportation
+                                        </option>
+
+                                        <option value="Communication And Petty Cash">
+                                            Communication And Petty Cash
+                                        </option>
+
+                                        <option value="Travel Insurance">
+                                            Travel Insurance
+                                        </option>
+
+                                        <option value="Visa And Permit">
+                                            Visa And Permit
+                                        </option>
+
+                                        <option value="Other">
+                                            Other
+                                        </option>
+
+                                    </select>
+
+                                </td>
+
+
+                                {{-- CURRENCY --}}
+
+                                <td class="p-1.5">
+
+                                    <select
+                                        name="items[0][currency]"
+                                        class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 currency-select"
+                                    >
+
+                                        <option value="PHP">
+                                            PHP ₱
+                                        </option>
+
+                                        <option value="USD">
+                                            USD $
+                                        </option>
+
+                                        <option value="VND">
+                                            VND ₫
+                                        </option>
+
+                                    </select>
+
+                                </td>
+
+
+                                {{-- CASH --}}
+
+                                <td class="p-1.5">
+
+                                    <div class="relative">
+
+                                        <span
+                                            class="currency-symbol absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                        >
+                                            ₱
+                                        </span>
+
+                                        <input
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="items[0][budget_cash]"
+                                            class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                            placeholder="0.00"
+                                            autocomplete="off"
+                                        >
+
+                                    </div>
+
+                                </td>
+
+
+                                {{-- CREDIT CARD --}}
+
+                                <td class="p-1.5">
+
+                                    <div class="relative">
+
+                                        <span
+                                            class="currency-symbol absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                        >
+                                            ₱
+                                        </span>
+
+                                        <input
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="items[0][budget_credit_card]"
+                                            class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                            placeholder="0.00"
+                                            autocomplete="off"
+                                        >
+
+                                    </div>
+
+                                </td>
+
+
+                                {{-- TRAVEL AGENT --}}
+
+                                <td class="p-1.5">
+
+                                    <div class="relative">
+
+                                        <span
+                                            class="currency-symbol absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                        >
+                                            ₱
+                                        </span>
+
+                                        <input
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="items[0][budget_travel_agent]"
+                                            class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                            placeholder="0.00"
+                                            autocomplete="off"
+                                        >
+
+                                    </div>
+
+                                </td>
+
+
+                                {{-- PHP EQUIVALENT --}}
+
+                                <td class="p-1.5 text-right">
 
                                     <input
-                                        type="text"
-                                        inputmode="decimal"
-                                        name="items[0][budget_cash]"
-                                        class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
-                                        placeholder="0.00"
-                                        autocomplete="off"
+                                        type="hidden"
+                                        name="items[0][php_equivalent]"
+                                        class="php-equivalent-input"
+                                        value="0"
                                     >
-
-                                </div>
-
-                            </td>
-
-
-                            {{-- CREDIT CARD --}}
-                            <td class="p-1.5">
-
-                                <div class="relative">
 
                                     <span
-                                        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                        class="php-equivalent font-bold text-slate-700"
                                     >
-                                        ₱
+                                        ₱0.00
                                     </span>
 
-                                    <input
-                                        type="text"
-                                        inputmode="decimal"
-                                        name="items[0][budget_credit_card]"
-                                        class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
-                                        placeholder="0.00"
-                                        autocomplete="off"
+                                </td>
+
+
+                                {{-- REMOVE --}}
+
+                                <td class="p-1.5 text-center">
+
+                                    <button
+                                        type="button"
+                                        class="remove-row text-red-500 hover:text-red-700 text-lg leading-none"
+                                        aria-label="Remove line"
                                     >
+                                        &times;
+                                    </button>
 
-                                </div>
+                                </td>
 
-                            </td>
+                            </tr>
 
+                        </tbody>
 
-                            {{-- TRAVEL AGENT --}}
-                            <td class="p-1.5">
+                    </table>
 
-                                <div class="relative">
-
-                                    <span
-                                        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
-                                    >
-                                        ₱
-                                    </span>
-
-                                    <input
-                                        type="text"
-                                        inputmode="decimal"
-                                        name="items[0][budget_travel_agent]"
-                                        class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
-                                        placeholder="0.00"
-                                        autocomplete="off"
-                                    >
-
-                                </div>
-
-                            </td>
-
-
-                            {{-- REMOVE --}}
-                            <td class="p-1.5 text-center">
-
-                                <button
-                                    type="button"
-                                    class="remove-row text-red-500 hover:text-red-700 text-lg leading-none"
-                                    aria-label="Remove line"
-                                >
-                                    &times;
-                                </button>
-
-                            </td>
-
-                        </tr>
-
-                    </tbody>
-
-                </table>
+                </div>
 
             </div>
 
 
-            {{-- ADD LINE --}}
+            {{-- =====================================================
+                ADD LINE
+            ====================================================== --}}
+
             <button
                 type="button"
                 id="add-row"
@@ -561,12 +721,13 @@
             {{-- =====================================================
                 TOTAL
             ====================================================== --}}
+
             <div class="flex justify-end mb-6 p-3 bg-slate-50 rounded-xl">
 
                 <div class="text-sm">
 
                     <span class="text-slate-500">
-                        Total:
+                        Total PHP:
                     </span>
 
                     <span
@@ -584,6 +745,7 @@
             {{-- =====================================================
                 REMARKS
             ====================================================== --}}
+
             <div class="mb-6">
 
                 <label
@@ -606,6 +768,7 @@
             {{-- =====================================================
                 ACTIONS
             ====================================================== --}}
+
             <div class="flex items-center gap-3">
 
                 <button
@@ -633,6 +796,7 @@
     {{-- =============================================================
         JAVASCRIPT
     ============================================================= --}}
+
     <script>
 
         /* =========================================================
@@ -734,15 +898,20 @@
         };
 
 
-        const countrySelect = document.getElementById('country');
-        const placeSelect = document.getElementById('place');
+        const countrySelect =
+            document.getElementById('country');
 
-        const oldPlace = @json(old('place'));
+        const placeSelect =
+            document.getElementById('place');
+
+        const oldPlace =
+            @json(old('place'));
 
 
         function updateCities() {
 
-            const country = countrySelect.value;
+            const country =
+                countrySelect.value;
 
             placeSelect.innerHTML =
                 '<option value="">Select City / Place</option>';
@@ -755,6 +924,7 @@
                         document.createElement('option');
 
                     option.value = city;
+
                     option.textContent = city;
 
                     if (city === oldPlace) {
@@ -798,10 +968,6 @@
         ];
 
 
-        /* =========================================================
-           CREATE CATEGORY DROPDOWN
-        ========================================================== */
-
         function categoryOptions() {
 
             let options =
@@ -823,6 +989,492 @@
 
 
         /* =========================================================
+           CURRENCY OPTIONS
+        ========================================================== */
+
+        function currencyOptions() {
+
+            return `
+                <option value="PHP">
+                    PHP ₱
+                </option>
+
+                <option value="USD">
+                    USD $
+                </option>
+
+                <option value="VND">
+                    VND ₫
+                </option>
+            `;
+
+        }
+
+
+        /* =========================================================
+           CURRENCY SYMBOL
+        ========================================================== */
+
+        const currencySymbols = {
+
+            PHP: '₱',
+            USD: '$',
+            VND: '₫'
+
+        };
+
+
+        /* =========================================================
+           FX RATES
+        ========================================================== */
+
+        let fxRates = {
+
+            PHP: 1,
+            USD: null,
+            VND: null
+
+        };
+
+
+        let fxReady = false;
+
+
+        /* =========================================================
+           LOAD FX RATES
+        ========================================================== */
+
+        async function loadExchangeRates() {
+
+            const status =
+                document.getElementById('fx-status');
+
+            const usdRate =
+                document.getElementById('usd-rate');
+
+            const vndRate =
+                document.getElementById('vnd-rate');
+
+            const updated =
+                document.getElementById('fx-updated');
+
+
+            status.textContent =
+                'Updating exchange rates...';
+
+
+            try {
+
+                const [usdResponse, vndResponse] =
+                    await Promise.all([
+
+                        fetch(
+                            'https://api.frankfurter.dev/v2/rate/usd/php'
+                        ),
+
+                        fetch(
+                            'https://api.frankfurter.dev/v2/rate/vnd/php'
+                        )
+
+                    ]);
+
+
+                if (
+                    !usdResponse.ok ||
+                    !vndResponse.ok
+                ) {
+
+                    throw new Error(
+                        'Unable to retrieve exchange rates.'
+                    );
+
+                }
+
+
+                const usdData =
+                    await usdResponse.json();
+
+                const vndData =
+                    await vndResponse.json();
+
+
+                fxRates.USD =
+                    Number(usdData.rate);
+
+                fxRates.VND =
+                    Number(vndData.rate);
+
+
+                fxReady = true;
+
+
+                usdRate.textContent =
+                    '₱' +
+                    fxRates.USD.toLocaleString(
+                        'en-US',
+                        {
+                            minimumFractionDigits: 4,
+                            maximumFractionDigits: 4
+                        }
+                    );
+
+
+                vndRate.textContent =
+                    '₱' +
+                    fxRates.VND.toLocaleString(
+                        'en-US',
+                        {
+                            minimumFractionDigits: 6,
+                            maximumFractionDigits: 6
+                        }
+                    );
+
+
+                updated.textContent =
+                    'Rate date: ' +
+                    (
+                        usdData.date ||
+                        vndData.date ||
+                        'Latest'
+                    );
+
+
+                status.textContent =
+                    'FX rates loaded';
+
+
+                status.classList.remove(
+                    'text-red-500'
+                );
+
+                status.classList.add(
+                    'text-emerald-600'
+                );
+
+
+                recalcAllRows();
+
+            } catch (error) {
+
+                console.error(
+                    'FX Error:',
+                    error
+                );
+
+
+                fxReady = false;
+
+
+                status.textContent =
+                    'Unable to load FX rates';
+
+
+                status.classList.remove(
+                    'text-slate-400',
+                    'text-emerald-600'
+                );
+
+                status.classList.add(
+                    'text-red-500'
+                );
+
+
+                usdRate.textContent =
+                    'Unavailable';
+
+                vndRate.textContent =
+                    'Unavailable';
+
+            }
+
+        }
+
+
+        /* =========================================================
+           CONVERT CURRENCY → PHP
+        ========================================================== */
+
+        function convertToPHP(
+            amount,
+            currency
+        ) {
+
+            if (!amount) {
+                return 0;
+            }
+
+
+            if (currency === 'PHP') {
+                return amount;
+            }
+
+
+            if (!fxRates[currency]) {
+                return 0;
+            }
+
+
+            return amount *
+                fxRates[currency];
+
+        }
+
+
+        /* =========================================================
+           FORMAT NUMBER
+        ========================================================== */
+
+        function formatNumber(
+            number,
+            decimals = 2
+        ) {
+
+            return Number(number || 0)
+                .toLocaleString(
+                    'en-US',
+                    {
+                        minimumFractionDigits: decimals,
+                        maximumFractionDigits: decimals
+                    }
+                );
+
+        }
+
+
+        /* =========================================================
+           GET RAW AMOUNT
+        ========================================================== */
+
+        function getRawAmount(input) {
+
+            if (!input) {
+                return 0;
+            }
+
+
+            const value =
+                input.value
+                    .replace(/,/g, '')
+                    .replace(/[^\d.]/g, '');
+
+
+            return parseFloat(value) || 0;
+
+        }
+
+
+        /* =========================================================
+           FORMAT AMOUNT INPUT
+        ========================================================== */
+
+        function formatAmountInput(input) {
+
+            let value =
+                input.value
+                    .replace(/,/g, '')
+                    .replace(/[^\d.]/g, '');
+
+
+            const parts =
+                value.split('.');
+
+
+            if (parts.length > 2) {
+
+                value =
+                    parts[0] +
+                    '.' +
+                    parts.slice(1).join('');
+
+            }
+
+
+            const formattedParts =
+                value.split('.');
+
+
+            if (formattedParts[0]) {
+
+                formattedParts[0] =
+                    Number(
+                        formattedParts[0]
+                    ).toLocaleString('en-US');
+
+
+                value =
+                    formattedParts.length > 1
+                        ? formattedParts[0] +
+                          '.' +
+                          formattedParts[1]
+                        : formattedParts[0];
+
+            }
+
+
+            input.value = value;
+
+        }
+
+
+        /* =========================================================
+           UPDATE ROW CURRENCY SYMBOLS
+        ========================================================== */
+
+        function updateRowCurrency(row) {
+
+            const currencySelect =
+                row.querySelector(
+                    '.currency-select'
+                );
+
+
+            const currency =
+                currencySelect.value;
+
+
+            const symbol =
+                currencySymbols[currency] || '₱';
+
+
+            row.querySelectorAll(
+                '.currency-symbol'
+            ).forEach(element => {
+
+                element.textContent =
+                    symbol;
+
+            });
+
+
+            recalcRow(row);
+
+        }
+
+
+        /* =========================================================
+           CALCULATE ROW PHP EQUIVALENT
+        ========================================================== */
+
+        function recalcRow(row) {
+
+            const currencySelect =
+                row.querySelector(
+                    '.currency-select'
+                );
+
+
+            const currency =
+                currencySelect.value;
+
+
+            const cash =
+                getRawAmount(
+                    row.querySelector(
+                        '[name*="[budget_cash]"]'
+                    )
+                );
+
+
+            const creditCard =
+                getRawAmount(
+                    row.querySelector(
+                        '[name*="[budget_credit_card]"]'
+                    )
+                );
+
+
+            const travelAgent =
+                getRawAmount(
+                    row.querySelector(
+                        '[name*="[budget_travel_agent]"]'
+                    )
+                );
+
+
+            const rowTotal =
+                cash +
+                creditCard +
+                travelAgent;
+
+
+            const phpEquivalent =
+                convertToPHP(
+                    rowTotal,
+                    currency
+                );
+
+
+            const display =
+                row.querySelector(
+                    '.php-equivalent'
+                );
+
+
+            const hidden =
+                row.querySelector(
+                    '.php-equivalent-input'
+                );
+
+
+            if (display) {
+
+                display.textContent =
+                    '₱' +
+                    formatNumber(
+                        phpEquivalent
+                    );
+
+            }
+
+
+            if (hidden) {
+
+                hidden.value =
+                    phpEquivalent.toFixed(2);
+
+            }
+
+
+            return phpEquivalent;
+
+        }
+
+
+        /* =========================================================
+           RECALCULATE ALL ROWS
+        ========================================================== */
+
+        function recalcAllRows() {
+
+            let grandTotal = 0;
+
+
+            document
+                .querySelectorAll(
+                    '#items-table tbody .item-row'
+                )
+                .forEach(row => {
+
+                    grandTotal +=
+                        recalcRow(row);
+
+                });
+
+
+            document
+                .getElementById(
+                    'grand-total'
+                )
+                .textContent =
+                    '₱' +
+                    formatNumber(
+                        grandTotal
+                    );
+
+        }
+
+
+        /* =========================================================
            ROW INDEX
         ========================================================== */
 
@@ -836,9 +1488,11 @@
         function rowTemplate(i) {
 
             return `
+
                 <tr class="item-row">
 
                     {{-- EXPENSE CATEGORY --}}
+
                     <td class="p-1.5">
 
                         <select
@@ -854,13 +1508,30 @@
                     </td>
 
 
+                    {{-- CURRENCY --}}
+
+                    <td class="p-1.5">
+
+                        <select
+                            name="items[${i}][currency]"
+                            class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 currency-select"
+                        >
+
+                            ${currencyOptions()}
+
+                        </select>
+
+                    </td>
+
+
                     {{-- CASH --}}
+
                     <td class="p-1.5">
 
                         <div class="relative">
 
                             <span
-                                class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                class="currency-symbol absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
                             >
                                 ₱
                             </span>
@@ -871,6 +1542,7 @@
                                 name="items[${i}][budget_cash]"
                                 class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                 placeholder="0.00"
+                                autocomplete="off"
                             >
 
                         </div>
@@ -879,12 +1551,13 @@
 
 
                     {{-- CREDIT CARD --}}
+
                     <td class="p-1.5">
 
                         <div class="relative">
 
                             <span
-                                class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                class="currency-symbol absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
                             >
                                 ₱
                             </span>
@@ -895,6 +1568,7 @@
                                 name="items[${i}][budget_credit_card]"
                                 class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                 placeholder="0.00"
+                                autocomplete="off"
                             >
 
                         </div>
@@ -903,12 +1577,13 @@
 
 
                     {{-- TRAVEL AGENT --}}
+
                     <td class="p-1.5">
 
                         <div class="relative">
 
                             <span
-                                class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                class="currency-symbol absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
                             >
                                 ₱
                             </span>
@@ -919,6 +1594,7 @@
                                 name="items[${i}][budget_travel_agent]"
                                 class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                 placeholder="0.00"
+                                autocomplete="off"
                             >
 
                         </div>
@@ -926,7 +1602,28 @@
                     </td>
 
 
+                    {{-- PHP EQUIVALENT --}}
+
+                    <td class="p-1.5 text-right">
+
+                        <input
+                            type="hidden"
+                            name="items[${i}][php_equivalent]"
+                            class="php-equivalent-input"
+                            value="0"
+                        >
+
+                        <span
+                            class="php-equivalent font-bold text-slate-700"
+                        >
+                            ₱0.00
+                        </span>
+
+                    </td>
+
+
                     {{-- REMOVE --}}
+
                     <td class="p-1.5 text-center">
 
                         <button
@@ -940,9 +1637,11 @@
                     </td>
 
                 </tr>
+
             `;
 
         }
+
 
         /* =========================================================
            REMOVE BUTTONS
@@ -955,15 +1654,20 @@
                     '#items-table tbody .item-row'
                 );
 
-            document.querySelectorAll('.remove-row')
+
+            document
+                .querySelectorAll('.remove-row')
                 .forEach(btn => {
 
-                    btn.disabled = rows.length <= 1;
+                    btn.disabled =
+                        rows.length <= 1;
+
 
                     btn.classList.toggle(
                         'opacity-30',
                         rows.length <= 1
                     );
+
 
                     btn.classList.toggle(
                         'cursor-not-allowed',
@@ -981,18 +1685,28 @@
 
         document
             .getElementById('add-row')
-            .addEventListener('click', () => {
+            .addEventListener(
+                'click',
+                () => {
 
-                document
-                    .querySelector('#items-table tbody')
-                    .insertAdjacentHTML(
-                        'beforeend',
-                        rowTemplate(rowIndex++)
-                    );
+                    document
+                        .querySelector(
+                            '#items-table tbody'
+                        )
+                        .insertAdjacentHTML(
+                            'beforeend',
+                            rowTemplate(
+                                rowIndex++
+                            )
+                        );
 
-                updateRemoveButtons();
 
-            });
+                    updateRemoveButtons();
+
+                    recalcAllRows();
+
+                }
+            );
 
 
         /* =========================================================
@@ -1001,105 +1715,123 @@
 
         document
             .getElementById('items-table')
-            .addEventListener('click', e => {
+            .addEventListener(
+                'click',
+                e => {
 
-                if (
-                    e.target.classList.contains('remove-row') &&
-                    !e.target.disabled
-                ) {
+                    if (
+                        e.target.classList.contains(
+                            'remove-row'
+                        ) &&
+                        !e.target.disabled
+                    ) {
 
-                    const rows =
-                        document.querySelectorAll(
-                            '#items-table tbody .item-row'
-                        );
+                        const rows =
+                            document.querySelectorAll(
+                                '#items-table tbody .item-row'
+                            );
 
-                    if (rows.length > 1) {
 
-                        e.target
-                            .closest('tr')
-                            .remove();
+                        if (rows.length > 1) {
 
-                        recalcTotal();
+                            e.target
+                                .closest('tr')
+                                .remove();
 
-                        updateRemoveButtons();
+
+                            recalcAllRows();
+
+                            updateRemoveButtons();
+
+                        }
 
                     }
 
                 }
+            );
 
-            });
 
         /* =========================================================
-        AMOUNT FORMATTING + CALCULATE TOTAL
+           AMOUNT INPUT
         ========================================================== */
 
         document
             .getElementById('items-table')
-            .addEventListener('input', e => {
+            .addEventListener(
+                'input',
+                e => {
 
-                if (!e.target.classList.contains('amount')) {
-                    return;
+                    if (
+                        !e.target.classList.contains(
+                            'amount'
+                        )
+                    ) {
+                        return;
+                    }
+
+
+                    formatAmountInput(
+                        e.target
+                    );
+
+
+                    const row =
+                        e.target.closest(
+                            '.item-row'
+                        );
+
+
+                    if (row) {
+
+                        recalcRow(row);
+
+                    }
+
+
+                    recalcAllRows();
+
                 }
+            );
 
-                // Remove existing commas
-                let value = e.target.value.replace(/,/g, '');
 
-                // Allow numbers and decimal point only
-                value = value.replace(/[^\d.]/g, '');
+        /* =========================================================
+           CURRENCY CHANGE
+        ========================================================== */
 
-                // Allow only one decimal point
-                const parts = value.split('.');
+        document
+            .getElementById('items-table')
+            .addEventListener(
+                'change',
+                e => {
 
-                if (parts.length > 2) {
-                    value = parts[0] + '.' + parts.slice(1).join('');
+                    if (
+                        !e.target.classList.contains(
+                            'currency-select'
+                        )
+                    ) {
+                        return;
+                    }
+
+
+                    const row =
+                        e.target.closest(
+                            '.item-row'
+                        );
+
+
+                    if (row) {
+
+                        updateRowCurrency(
+                            row
+                        );
+
+                    }
+
+
+                    recalcAllRows();
+
                 }
-
-                // Format with commas
-                const formattedParts = value.split('.');
-
-                if (formattedParts[0]) {
-
-                    formattedParts[0] =
-                        Number(formattedParts[0]).toLocaleString('en-US');
-
-                    value = formattedParts.length > 1
-                        ? formattedParts[0] + '.' + formattedParts[1]
-                        : formattedParts[0];
-                }
-
-                e.target.value = value;
-
-                // Recalculate total
-                recalcTotal();
-            });
-
-
-        function recalcTotal() {
-
-            let total = 0;
-
-            document
-                .querySelectorAll('.amount')
-                .forEach(el => {
-
-                    // Remove commas before converting to number
-                    const value = el.value
-                        .replace(/,/g, '');
-
-                    const amount = parseFloat(value) || 0;
-
-                    total += amount;
-                });
-
-            document
-                .getElementById('grand-total')
-                .textContent =
-                    '₱' + total.toLocaleString('en-US', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    });
-        }
-
+            );
 
 
         /* =========================================================
@@ -1111,10 +1843,12 @@
                 'travel_date_from'
             );
 
+
         const dateTo =
             document.getElementById(
                 'travel_date_to'
             );
+
 
         const dateRangeError =
             document.getElementById(
@@ -1134,9 +1868,11 @@
                     .classList
                     .remove('hidden');
 
+
                 dateTo.setCustomValidity(
                     "Return date can't be before the departure date."
                 );
+
 
                 return false;
 
@@ -1147,7 +1883,9 @@
                 .classList
                 .add('hidden');
 
+
             dateTo.setCustomValidity('');
+
 
             return true;
 
@@ -1158,6 +1896,7 @@
             'change',
             validateDateRange
         );
+
 
         dateTo.addEventListener(
             'change',
@@ -1171,29 +1910,62 @@
 
         document
             .getElementById('budget-form')
-            .addEventListener('submit', function(e) {
+            .addEventListener(
+                'submit',
+                function(e) {
 
-                if (!validateDateRange()) {
+                    if (!validateDateRange()) {
 
-                    e.preventDefault();
+                        e.preventDefault();
 
-                    return;
+                        return;
+
+                    }
+
+
+                    /*
+                     * Make sure every PHP equivalent
+                     * is updated before submitting.
+                     */
+
+                    recalcAllRows();
+
+
+                    /*
+                     * Remove commas from amounts
+                     * before Laravel receives them.
+                     */
+
+                    this
+                        .querySelectorAll(
+                            '.amount'
+                        )
+                        .forEach(input => {
+
+                            input.value =
+                                input.value
+                                    .replace(
+                                        /,/g,
+                                        ''
+                                    );
+
+                        });
+
+
+                    const btn =
+                        document.getElementById(
+                            'submit-btn'
+                        );
+
+
+                    btn.disabled = true;
+
+
+                    btn.textContent =
+                        'Submitting...';
 
                 }
-
-
-                const btn =
-                    document.getElementById(
-                        'submit-btn'
-                    );
-
-
-                btn.disabled = true;
-
-                btn.textContent =
-                    'Submitting...';
-
-            });
+            );
 
 
         /* =========================================================
@@ -1202,8 +1974,20 @@
 
         updateRemoveButtons();
 
-        recalcTotal();
+        recalcAllRows();
 
+        loadExchangeRates();
+
+
+        /*
+         * Refresh latest published FX rates
+         * every 60 minutes.
+         */
+
+        setInterval(
+            loadExchangeRates,
+            60 * 60 * 1000
+        );
 
     </script>
 

@@ -82,26 +82,30 @@
 
         <!-- Dashboard Overview -->
         <a href="{{ route('mi_app.dashboard') }}"
-           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
-           {{ request()->routeIs('projects.dashboard') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
-            @if(request()->routeIs('projects.dashboard'))
+        class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
+        {{ request()->routeIs('mi_app.dashboard') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+            @if(request()->routeIs('mi_app.dashboard'))
                 <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
             @endif
-            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('projects.dashboard') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('mi_app.dashboard') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z"></path>
             </svg>
             <span>Dashboard Overview</span>
         </a>
+
         <!-- Inventory Dropdown Module -->
-        <div x-data="{ open: {{ request()->routeIs('inventory.*') ? 'true' : 'false' }} }" class="block">
+        <div x-data="{ open: {{ request()->routeIs(['mi_app.index', 'mi_app.create', 'mi_app.show', 'mi_app.edit', 'mi_app.settings', 'taxonomy.*']) ? 'true' : 'false' }} }" class="block">
             <button @click="open = !open"
-                    class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none
-                    {{ request()->routeIs('inventory.*') ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                    type="button"
+                    :aria-expanded="open"
+                    aria-controls="inventory-submenu"
+                    class="group w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none
+                    {{ request()->routeIs(['mi_app.index', 'mi_app.create', 'mi_app.show', 'mi_app.edit', 'mi_app.settings', 'taxonomy.*']) ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
                 <div class="flex items-center gap-3">
-                    <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs('inventory.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600' }}" 
-                        fill="none" 
-                        viewBox="0 0 24 24" 
-                        stroke="currentColor" 
+                    <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs(['mi_app.index', 'mi_app.create', 'mi_app.show', 'mi_app.edit', 'mi_app.settings', 'taxonomy.*']) ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600' }}"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
                         stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                     </svg>
@@ -112,10 +116,11 @@
                 </svg>
             </button>
 
-            <ul x-show="open" 
-                x-collapse 
+            <ul id="inventory-submenu"
+                x-show="open"
+                x-collapse
                 class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
-                
+
                 <li>
                     <a href="{{ route('mi_app.index') }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
@@ -125,7 +130,7 @@
                         </svg>
                         <span>Product List</span>
                     </a>
-                </li> 
+                </li>
                 <li>
                     <a href="{{ route('mi_app.create') }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
@@ -135,7 +140,7 @@
                         </svg>
                         <span>Upload New Product</span>
                     </a>
-                </li> 
+                </li>
                 <li>
                     <a href="{{ route('mi_app.settings') }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
@@ -145,19 +150,23 @@
                         </svg>
                         <span>Taxonomy Management</span>
                     </a>
-                </li> 
+                </li>
             </ul>
         </div>
+
         <!-- Liquidation Dropdown Module -->
         <div x-data="{ open: {{ request()->routeIs('liquidation.*') ? 'true' : 'false' }} }" class="block">
             <button @click="open = !open"
-                    class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none
+                    type="button"
+                    :aria-expanded="open"
+                    aria-controls="liquidation-submenu"
+                    class="group w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none
                     {{ request()->routeIs('liquidation.*') ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
                 <div class="flex items-center gap-3">
-                    <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs('liquidation.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600' }}" 
-                        fill="none" 
-                        viewBox="0 0 24 24" 
-                        stroke="currentColor" 
+                    <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs('liquidation.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600' }}"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
                         stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -168,10 +177,11 @@
                 </svg>
             </button>
 
-            <ul x-show="open" 
-                x-collapse 
+            <ul id="liquidation-submenu"
+                x-show="open"
+                x-collapse
                 class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
-                
+
                 <li>
                     <a href="{{ route('liquidation.index') }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
@@ -194,6 +204,7 @@
                 </li>
             </ul>
         </div>
+
         <!-- Travel Liquidation Dropdown Module -->
         <div x-data="{ open: {{ request()->routeIs('travel_liquidation.*') ? 'true' : 'false' }} }" class="block">
             <button @click="open = !open"
@@ -216,12 +227,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                 </svg>
             </button>
-        
+
             <ul id="travel-liquidation-submenu"
                 x-show="open"
                 x-collapse
                 class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
-        
+
                 <li>
                     <a href="{{ route('travel_liquidation.index') }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors

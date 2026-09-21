@@ -284,45 +284,115 @@
             </datalist>
 
             <div class="border border-slate-200 rounded-xl overflow-hidden mb-2">
+
                 <table class="w-full text-sm" id="items-table">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200">
-                            <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Category</th>
-                            <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Particular</th>
-                            <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">Cash</th>
-                            <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">Credit Card</th>
-                            <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">Travel Agent</th>
+                            <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                Category
+                            </th>
+                            <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                Particular
+                            </th>
+                            <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                Cash
+                            </th>
+                            <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                Credit Card
+                            </th>
+                            <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                Travel Agent
+                            </th>
                             <th class="p-2.5 w-10"></th>
                         </tr>
                     </thead>
+
                     <tbody class="divide-y divide-slate-100">
+
                         <tr class="item-row">
+
+                            {{-- CATEGORY --}}
                             <td class="p-1.5">
-                                <input list="expense-category-options" name="items[0][expense_category]"
-                                       class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100" required>
+                                <select
+                                    name="items[0][expense_category]"
+                                    class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                    required
+                                >
+                                    <option value="">Select Category</option>
+
+                                    <option value="Food">Food</option>
+                                    <option value="Transportation">Transportation</option>
+                                    <option value="Accommodation">Accommodation</option>
+                                    <option value="Office Supplies">Office Supplies</option>
+                                    <option value="Communication">Communication</option>
+                                    <option value="Utilities">Utilities</option>
+                                    <option value="Entertainment">Entertainment</option>
+                                    <option value="Miscellaneous">Miscellaneous</option>
+                                </select>
                             </td>
+
+                            {{-- PARTICULAR --}}
                             <td class="p-1.5">
-                                <input name="items[0][particular]"
-                                       class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100" required>
+                                <input
+                                    name="items[0][particular]"
+                                    class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                    placeholder="Enter particular"
+                                    required
+                                >
                             </td>
+
+                            {{-- CASH --}}
                             <td class="p-1.5">
-                                <input type="number" step="0.01" min="0" name="items[0][budget_cash]"
-                                       class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount">
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    name="items[0][budget_cash]"
+                                    class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                    placeholder="0.00"
+                                >
                             </td>
+
+                            {{-- CREDIT CARD --}}
                             <td class="p-1.5">
-                                <input type="number" step="0.01" min="0" name="items[0][budget_credit_card]"
-                                       class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount">
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    name="items[0][budget_credit_card]"
+                                    class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                    placeholder="0.00"
+                                >
                             </td>
+
+                            {{-- TRAVEL AGENT --}}
                             <td class="p-1.5">
-                                <input type="number" step="0.01" min="0" name="items[0][budget_travel_agent]"
-                                       class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount">
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    name="items[0][budget_travel_agent]"
+                                    class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                    placeholder="0.00"
+                                >
                             </td>
+
+                            {{-- REMOVE --}}
                             <td class="p-1.5 text-center">
-                                <button type="button" class="remove-row text-red-500 hover:text-red-700 text-lg leading-none" aria-label="Remove line">&times;</button>
+                                <button
+                                    type="button"
+                                    class="remove-row text-red-500 hover:text-red-700 text-lg leading-none"
+                                    aria-label="Remove line"
+                                >
+                                    &times;
+                                </button>
                             </td>
+
                         </tr>
+
                     </tbody>
                 </table>
+
             </div>
 
             <button type="button" id="add-row"

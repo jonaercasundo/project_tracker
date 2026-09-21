@@ -261,7 +261,7 @@
                            class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
                     <p id="date-range-error" class="hidden text-[11px] text-red-600 mt-1">Return date can't be before the departure date.</p>
                 </div>
-                <div class="col-span-2">
+                <div class="col-span-3">
                     <label for="objectives" class="block text-xs font-bold text-slate-600 mb-1">Objectives</label>
                     <textarea id="objectives" name="objectives" rows="2"
                               class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">{{ old('objectives') }}</textarea>

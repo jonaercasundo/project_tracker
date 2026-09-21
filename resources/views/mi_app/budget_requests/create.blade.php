@@ -1029,23 +1029,48 @@
 
             });
 
-
         /* =========================================================
-           CALCULATE TOTAL
+        AMOUNT FORMATTING + CALCULATE TOTAL
         ========================================================== */
 
         document
             .getElementById('items-table')
             .addEventListener('input', e => {
 
-                if (
-                    e.target.classList.contains('amount')
-                ) {
-
-                    recalcTotal();
-
+                if (!e.target.classList.contains('amount')) {
+                    return;
                 }
 
+                // Remove existing commas
+                let value = e.target.value.replace(/,/g, '');
+
+                // Allow numbers and decimal point only
+                value = value.replace(/[^\d.]/g, '');
+
+                // Allow only one decimal point
+                const parts = value.split('.');
+
+                if (parts.length > 2) {
+                    value = parts[0] + '.' + parts.slice(1).join('');
+                }
+
+                // Format with commas
+                const formattedParts = value.split('.');
+
+                if (formattedParts[0]) {
+
+                    formattedParts[0] =
+                        Number(formattedParts[0]).toLocaleString('en-US');
+
+                    value = formattedParts.length > 1
+                        ? formattedParts[0] + '.' + formattedParts[1]
+                        : formattedParts[0];
+                }
+
+                e.target.value = value;
+
+                // Recalculate total
+                recalcTotal();
             });
 
 
@@ -1057,19 +1082,24 @@
                 .querySelectorAll('.amount')
                 .forEach(el => {
 
-                    total += parseFloat(
-                        el.value || 0
-                    );
+                    // Remove commas before converting to number
+                    const value = el.value
+                        .replace(/,/g, '');
 
+                    const amount = parseFloat(value) || 0;
+
+                    total += amount;
                 });
-
 
             document
                 .getElementById('grand-total')
                 .textContent =
-                    '₱' + total.toFixed(2);
-
+                    '₱' + total.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
         }
+
 
 
         /* =========================================================
@@ -1173,33 +1203,7 @@
         updateRemoveButtons();
 
         recalcTotal();
-        document.addEventListener('input', function (e) {
 
-            if (!e.target.classList.contains('amount')) {
-                return;
-            }
-
-            let value = e.target.value.replace(/,/g, '');
-
-            // Allow only numbers and decimal point
-            value = value.replace(/[^\d.]/g, '');
-
-            // Allow only one decimal point
-            const parts = value.split('.');
-            if (parts.length > 2) {
-                value = parts[0] + '.' + parts.slice(1).join('');
-            }
-
-            // Add comma separators
-            if (parts[0]) {
-                parts[0] = Number(parts[0]).toLocaleString('en-US');
-                value = parts.length > 1
-                    ? parts[0] + '.' + parts[1]
-                    : parts[0];
-            }
-
-            e.target.value = value;
-        });
 
     </script>
 

@@ -82,8 +82,8 @@
 
         <!-- Dashboard Overview -->
         <a href="{{ route('mi_app.dashboard') }}"
-        class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
-        {{ request()->routeIs('mi_app.dashboard') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
+           {{ request()->routeIs('mi_app.dashboard') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
             @if(request()->routeIs('mi_app.dashboard'))
                 <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
             @endif
@@ -154,6 +154,108 @@
             </ul>
         </div>
 
+        <!-- Budget Request Dropdown Module -->
+        <div x-data="{ open: {{ request()->routeIs('budget_requests.*') ? 'true' : 'false' }} }" class="block">
+            <button @click="open = !open"
+                    type="button"
+                    :aria-expanded="open"
+                    aria-controls="budget-requests-submenu"
+                    class="group w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none
+                    {{ request()->routeIs('budget_requests.*') ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                <div class="flex items-center gap-3">
+                    <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs('budget_requests.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600' }}"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m-6 4h6m-6 4h4M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span>Budget Request</span>
+                </div>
+                <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0" :class="open ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+
+            <ul id="budget-requests-submenu"
+                x-show="open"
+                x-collapse
+                class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
+
+                <li>
+                    <a href="{{ route('budget_requests.index') }}"
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('budget_requests.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('budget_requests.index') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Budget Request List</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('budget_requests.create') }}"
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('budget_requests.create') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('budget_requests.create') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>New Budget Request</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Travel Liquidation Dropdown Module -->
+        <div x-data="{ open: {{ request()->routeIs('travel_liquidation.*') ? 'true' : 'false' }} }" class="block">
+            <button @click="open = !open"
+                    type="button"
+                    :aria-expanded="open"
+                    aria-controls="travel-liquidation-submenu"
+                    class="group w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none
+                    {{ request()->routeIs('travel_liquidation.*') ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                <div class="flex items-center gap-3">
+                    <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs('travel_liquidation.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600' }}"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0M12 12.75h.008v.008H12v-.008z" />
+                    </svg>
+                    <span>Travel Liquidation</span>
+                </div>
+                <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0" :class="open ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+
+            <ul id="travel-liquidation-submenu"
+                x-show="open"
+                x-collapse
+                class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
+
+                <li>
+                    <a href="{{ route('travel_liquidation.index') }}"
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('travel_liquidation.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('travel_liquidation.index') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Travel Liquidation List</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('travel_liquidation.create') }}"
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('travel_liquidation.create') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('travel_liquidation.create') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>New Travel Liquidation</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
         <!-- Liquidation Dropdown Module -->
         <div x-data="{ open: {{ request()->routeIs('liquidation.*') ? 'true' : 'false' }} }" class="block">
             <button @click="open = !open"
@@ -200,57 +302,6 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                         </svg>
                         <span>New Liquidation</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- Travel Liquidation Dropdown Module -->
-        <div x-data="{ open: {{ request()->routeIs('travel_liquidation.*') ? 'true' : 'false' }} }" class="block">
-            <button @click="open = !open"
-                    type="button"
-                    :aria-expanded="open"
-                    aria-controls="travel-liquidation-submenu"
-                    class="group w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none
-                    {{ request()->routeIs('travel_liquidation.*') ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-                <div class="flex items-center gap-3">
-                    <svg class="w-4 h-4 shrink-0 transition-colors {{ request()->routeIs('travel_liquidation.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600' }}"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Travel Liquidation</span>
-                </div>
-                <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0" :class="open ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                </svg>
-            </button>
-
-            <ul id="travel-liquidation-submenu"
-                x-show="open"
-                x-collapse
-                class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
-
-                <li>
-                    <a href="{{ route('travel_liquidation.index') }}"
-                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
-                    {{ request()->routeIs('travel_liquidation.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('travel_liquidation.index') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span>Travel Liquidation List</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ route('travel_liquidation.create') }}"
-                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
-                    {{ request()->routeIs('travel_liquidation.create') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('travel_liquidation.create') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span>New Travel Liquidation</span>
                     </a>
                 </li>
             </ul>

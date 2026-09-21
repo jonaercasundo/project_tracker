@@ -1,32 +1,86 @@
 <x-mi_app>
+
     <div class="max-w-4xl mx-auto py-6">
 
+        {{-- =========================================================
+            HEADER
+        ========================================================== --}}
         <div class="flex items-center gap-3 mb-6">
-            <a href="{{ route('budget_requests.index') }}" class="text-slate-400 hover:text-slate-600 transition-colors">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+
+            <a
+                href="{{ route('budget_requests.index') }}"
+                class="text-slate-400 hover:text-slate-600 transition-colors"
+            >
+                <svg
+                    class="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M15 19l-7-7 7-7"
+                    />
                 </svg>
             </a>
-            <h1 class="text-xl font-bold text-slate-900">New Budget Request</h1>
+
+            <h1 class="text-xl font-bold text-slate-900">
+                New Budget Request
+            </h1>
+
         </div>
 
+
+        {{-- =========================================================
+            VALIDATION ERRORS
+        ========================================================== --}}
         @if ($errors->any())
+
             <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
-                <p class="font-bold mb-1">Please fix the following:</p>
+
+                <p class="font-bold mb-1">
+                    Please fix the following:
+                </p>
+
                 <ul class="list-disc list-inside space-y-0.5">
+
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
+
                 </ul>
+
             </div>
+
         @endif
 
-        <form method="POST" action="{{ route('budget_requests.store') }}" id="budget-form">
+
+        {{-- =========================================================
+            FORM
+        ========================================================== --}}
+        <form
+            method="POST"
+            action="{{ route('budget_requests.store') }}"
+            id="budget-form"
+        >
+
             @csrf
 
+
+            {{-- =====================================================
+                REQUEST INFORMATION
+            ====================================================== --}}
             <div class="grid grid-cols-3 gap-4 mb-6 p-4 border border-slate-200 rounded-xl">
+
+                {{-- DEPARTMENT --}}
                 <div class="col-span-1">
-                    <label for="department" class="block text-xs font-bold text-slate-600 mb-1">
+
+                    <label
+                        for="department"
+                        class="block text-xs font-bold text-slate-600 mb-1"
+                    >
                         Department
                     </label>
 
@@ -36,316 +90,377 @@
                         class="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                         required
                     >
-                        <option value="" disabled {{ old('department') ? '' : 'selected' }}>
+
+                        <option
+                            value=""
+                            disabled
+                            {{ old('department') ? '' : 'selected' }}
+                        >
                             Select Department
                         </option>
 
-                        <option value="Design" {{ old('department') == 'Design' ? 'selected' : '' }}>
+                        <option
+                            value="Design"
+                            {{ old('department') == 'Design' ? 'selected' : '' }}
+                        >
                             Design
                         </option>
 
-                        <option value="Sourcing" {{ old('department') == 'Sourcing' ? 'selected' : '' }}>
+                        <option
+                            value="Sourcing"
+                            {{ old('department') == 'Sourcing' ? 'selected' : '' }}
+                        >
                             Sourcing
                         </option>
 
-                        <option value="Trading" {{ old('department') == 'Trading' ? 'selected' : '' }}>
+                        <option
+                            value="Trading"
+                            {{ old('department') == 'Trading' ? 'selected' : '' }}
+                        >
                             Trading
                         </option>
 
-                        <option value="Sales / Merchandising" {{ old('department') == 'Sales / Merchandising' ? 'selected' : '' }}>
+                        <option
+                            value="Sales / Merchandising"
+                            {{ old('department') == 'Sales / Merchandising' ? 'selected' : '' }}
+                        >
                             Sales / Merchandising
                         </option>
 
-                        <option value="Accounting" {{ old('department') == 'Accounting' ? 'selected' : '' }}>
+                        <option
+                            value="Accounting"
+                            {{ old('department') == 'Accounting' ? 'selected' : '' }}
+                        >
                             Accounting
                         </option>
 
-                        <option value="Management" {{ old('department') == 'Management' ? 'selected' : '' }}>
+                        <option
+                            value="Management"
+                            {{ old('department') == 'Management' ? 'selected' : '' }}
+                        >
                             Management
                         </option>
 
-                        <option value="Other" {{ old('department') == 'Other' ? 'selected' : '' }}>
+                        <option
+                            value="Other"
+                            {{ old('department') == 'Other' ? 'selected' : '' }}
+                        >
                             Other
                         </option>
+
                     </select>
+
                 </div>
+
+
+                {{-- COUNTRY / PLACE --}}
                 <div class="col-span-2">
+
                     <label class="block text-xs font-bold text-slate-600 mb-1">
-                       Country,  Place / City
+                        Country, Place / City
                     </label>
 
                     <div class="grid grid-cols-2 gap-2">
-                        {{-- Country --}}
+
+                        {{-- COUNTRY --}}
                         <select
                             id="country"
                             name="country"
-                            class="w-1/2 border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                            class="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                         >
-                            <option value="">Select Country</option>
-                            <option value="Philippines" {{ old('country') == 'Philippines' ? 'selected' : '' }}>
+
+                            <option value="">
+                                Select Country
+                            </option>
+
+                            <option
+                                value="Philippines"
+                                {{ old('country') == 'Philippines' ? 'selected' : '' }}
+                            >
                                 Philippines
                             </option>
-                            <option value="United States" {{ old('country') == 'United States' ? 'selected' : '' }}>
+
+                            <option
+                                value="United States"
+                                {{ old('country') == 'United States' ? 'selected' : '' }}
+                            >
                                 United States
                             </option>
-                            <option value="Canada" {{ old('country') == 'Canada' ? 'selected' : '' }}>
+
+                            <option
+                                value="Canada"
+                                {{ old('country') == 'Canada' ? 'selected' : '' }}
+                            >
                                 Canada
                             </option>
-                            <option value="United Kingdom" {{ old('country') == 'United Kingdom' ? 'selected' : '' }}>
+
+                            <option
+                                value="United Kingdom"
+                                {{ old('country') == 'United Kingdom' ? 'selected' : '' }}
+                            >
                                 United Kingdom
                             </option>
-                            <option value="Japan" {{ old('country') == 'Japan' ? 'selected' : '' }}>
+
+                            <option
+                                value="Japan"
+                                {{ old('country') == 'Japan' ? 'selected' : '' }}
+                            >
                                 Japan
                             </option>
-                            <option value="China" {{ old('country') == 'China' ? 'selected' : '' }}>
+
+                            <option
+                                value="China"
+                                {{ old('country') == 'China' ? 'selected' : '' }}
+                            >
                                 China
                             </option>
-                            <option value="South Korea" {{ old('country') == 'South Korea' ? 'selected' : '' }}>
+
+                            <option
+                                value="South Korea"
+                                {{ old('country') == 'South Korea' ? 'selected' : '' }}
+                            >
                                 South Korea
                             </option>
-                            <option value="Singapore" {{ old('country') == 'Singapore' ? 'selected' : '' }}>
+
+                            <option
+                                value="Singapore"
+                                {{ old('country') == 'Singapore' ? 'selected' : '' }}
+                            >
                                 Singapore
                             </option>
-                            <option value="Australia" {{ old('country') == 'Australia' ? 'selected' : '' }}>
+
+                            <option
+                                value="Australia"
+                                {{ old('country') == 'Australia' ? 'selected' : '' }}
+                            >
                                 Australia
                             </option>
-                            <option value="Other" {{ old('country') == 'Other' ? 'selected' : '' }}>
+
+                            <option
+                                value="Other"
+                                {{ old('country') == 'Other' ? 'selected' : '' }}
+                            >
                                 Other
                             </option>
+
                         </select>
-                        {{-- City / Place --}}
+
+
+                        {{-- CITY / PLACE --}}
                         <select
                             id="place"
                             name="place"
-                            class="w-1/2 border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                            class="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                         >
-                            <option value="">Select City / Place</option>
+
+                            <option value="">
+                                Select City / Place
+                            </option>
+
                         </select>
 
                     </div>
+
                 </div>
 
-                <script>
-                    const cities = {
-                        "Philippines": [
-                            "Manila",
-                            "Quezon City",
-                            "Makati",
-                            "Pasig",
-                            "Taguig",
-                            "Parañaque",
-                            "Pasay",
-                            "Las Piñas",
-                            "Muntinlupa",
-                            "Caloocan",
-                            "Cavite",
-                            "Bacoor",
-                            "Imus",
-                            "Dasmariñas",
-                            "Cebu City",
-                            "Davao City",
-                            "Iloilo City",
-                            "Other"
-                        ],
 
-                        "United States": [
-                            "New York",
-                            "Los Angeles",
-                            "Chicago",
-                            "Houston",
-                            "San Francisco",
-                            "Seattle",
-                            "Other"
-                        ],
-
-                        "Canada": [
-                            "Toronto",
-                            "Vancouver",
-                            "Montreal",
-                            "Calgary",
-                            "Ottawa",
-                            "Other"
-                        ],
-
-                        "United Kingdom": [
-                            "London",
-                            "Manchester",
-                            "Birmingham",
-                            "Liverpool",
-                            "Edinburgh",
-                            "Other"
-                        ],
-
-                        "Japan": [
-                            "Tokyo",
-                            "Osaka",
-                            "Kyoto",
-                            "Yokohama",
-                            "Nagoya",
-                            "Other"
-                        ],
-
-                        "China": [
-                            "Shanghai",
-                            "Beijing",
-                            "Guangzhou",
-                            "Shenzhen",
-                            "Hong Kong",
-                            "Other"
-                        ],
-
-                        "South Korea": [
-                            "Seoul",
-                            "Busan",
-                            "Incheon",
-                            "Daegu",
-                            "Daejeon",
-                            "Other"
-                        ],
-
-                        "Singapore": [
-                            "Singapore",
-                            "Other"
-                        ],
-
-                        "Australia": [
-                            "Sydney",
-                            "Melbourne",
-                            "Brisbane",
-                            "Perth",
-                            "Adelaide",
-                            "Other"
-                        ]
-                    };
-
-                    const countrySelect = document.getElementById('country');
-                    const placeSelect = document.getElementById('place');
-
-                    const oldPlace = @json(old('place'));
-
-                    function updateCities() {
-                        const country = countrySelect.value;
-
-                        placeSelect.innerHTML =
-                            '<option value="">Select City / Place</option>';
-
-                        if (cities[country]) {
-                            cities[country].forEach(city => {
-                                const option = document.createElement('option');
-
-                                option.value = city;
-                                option.textContent = city;
-
-                                if (city === oldPlace) {
-                                    option.selected = true;
-                                }
-
-                                placeSelect.appendChild(option);
-                            });
-                        }
-                    }
-
-                    countrySelect.addEventListener('change', updateCities);
-
-                    // Load cities automatically when editing/validation fails
-                    updateCities();
-                </script>
+                {{-- TRAVEL DATE FROM --}}
                 <div>
-                    <label for="travel_date_from" class="block text-xs font-bold text-slate-600 mb-1">Travel Date From</label>
-                    <input id="travel_date_from" type="date" name="travel_date_from" value="{{ old('travel_date_from') }}"
-                           class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
+
+                    <label
+                        for="travel_date_from"
+                        class="block text-xs font-bold text-slate-600 mb-1"
+                    >
+                        Travel Date From
+                    </label>
+
+                    <input
+                        id="travel_date_from"
+                        type="date"
+                        name="travel_date_from"
+                        value="{{ old('travel_date_from') }}"
+                        class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    >
+
                 </div>
+
+
+                {{-- TRAVEL DATE TO --}}
                 <div>
-                    <label for="travel_date_to" class="block text-xs font-bold text-slate-600 mb-1">Travel Date To</label>
-                    <input id="travel_date_to" type="date" name="travel_date_to" value="{{ old('travel_date_to') }}"
-                           class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
-                    <p id="date-range-error" class="hidden text-[11px] text-red-600 mt-1">Return date can't be before the departure date.</p>
+
+                    <label
+                        for="travel_date_to"
+                        class="block text-xs font-bold text-slate-600 mb-1"
+                    >
+                        Travel Date To
+                    </label>
+
+                    <input
+                        id="travel_date_to"
+                        type="date"
+                        name="travel_date_to"
+                        value="{{ old('travel_date_to') }}"
+                        class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    >
+
+                    <p
+                        id="date-range-error"
+                        class="hidden text-[11px] text-red-600 mt-1"
+                    >
+                        Return date can't be before the departure date.
+                    </p>
+
                 </div>
+
+
+                {{-- OBJECTIVES --}}
                 <div class="col-span-3">
-                    <label for="objectives" class="block text-xs font-bold text-slate-600 mb-1">Objectives</label>
-                    <textarea id="objectives" name="objectives" rows="2"
-                              class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">{{ old('objectives') }}</textarea>
+
+                    <label
+                        for="objectives"
+                        class="block text-xs font-bold text-slate-600 mb-1"
+                    >
+                        Objectives
+                    </label>
+
+                    <textarea
+                        id="objectives"
+                        name="objectives"
+                        rows="2"
+                        class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    >{{ old('objectives') }}</textarea>
+
                 </div>
+
             </div>
 
-            <h2 class="text-sm font-bold text-slate-700 mb-2">Budget Breakdown</h2>
-            <select
-                id="expense-category-options"
-                class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-                <option value="">Select Expense Category</option>
 
-                <option value="Airfare">Airfare</option>
-                <option value="Airport Tax">Airport Tax</option>
-                <option value="Hotel And Accommodation">Hotel And Accommodation</option>
-                <option value="Per Diem">Per Diem</option>
-                <option value="Transportation">Transportation</option>
-                <option value="Communication And Petty Cash">Communication And Petty Cash</option>
-                <option value="Travel Insurance">Travel Insurance</option>
-                <option value="Visa And Permit">Visa And Permit</option>
-                <option value="Other">Other</option>
-            </select>
+            {{-- =====================================================
+                BUDGET BREAKDOWN
+            ====================================================== --}}
+            <h2 class="text-sm font-bold text-slate-700 mb-2">
+                Budget Breakdown
+            </h2>
+
+
+            {{-- =====================================================
+                ITEMS TABLE
+            ====================================================== --}}
             <div class="border border-slate-200 rounded-xl overflow-hidden mb-2">
 
-                <table class="w-full text-sm" id="items-table">
+                <table
+                    class="w-full text-sm"
+                    id="items-table"
+                >
+
                     <thead>
+
                         <tr class="bg-slate-50 border-b border-slate-200">
+
                             <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">
                                 Expense Category
                             </th>
+
                             <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">
                                 Particular
                             </th>
+
                             <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
                                 Cash
                             </th>
+
                             <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
                                 Credit Card
                             </th>
+
                             <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
                                 Travel Agent
                             </th>
+
                             <th class="p-2.5 w-10"></th>
+
                         </tr>
+
                     </thead>
+
 
                     <tbody class="divide-y divide-slate-100">
 
+                        {{-- =================================================
+                            FIRST ROW
+                        ================================================== --}}
                         <tr class="item-row">
 
-                            {{-- CATEGORY --}}
+                            {{-- EXPENSE CATEGORY --}}
                             <td class="p-1.5">
+
                                 <select
                                     name="items[0][expense_category]"
                                     class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                                     required
                                 >
-                                    <option value="">Select Expense Category</option>
 
-                                    <option value="Airfare">Airfare</option>
-                                    <option value="Airport Tax">Airport Tax</option>
-                                    <option value="Hotel And Accommodation">Hotel And Accommodation</option>
-                                    <option value="Per Diem">Per Diem</option>
-                                    <option value="Transportation">Transportation</option>
-                                    <option value="Communication And Petty Cash">Communication And Petty Cash</option>
-                                    <option value="Travel Insurance">Travel Insurance</option>
-                                    <option value="Visa And Permit">Visa And Permit</option>
-                                    <option value="Other">Other</option>
+                                    <option value="">
+                                        Select Expense Category
+                                    </option>
+
+                                    <option value="Airfare">
+                                        Airfare
+                                    </option>
+
+                                    <option value="Airport Tax">
+                                        Airport Tax
+                                    </option>
+
+                                    <option value="Hotel And Accommodation">
+                                        Hotel And Accommodation
+                                    </option>
+
+                                    <option value="Per Diem">
+                                        Per Diem
+                                    </option>
+
+                                    <option value="Transportation">
+                                        Transportation
+                                    </option>
+
+                                    <option value="Communication And Petty Cash">
+                                        Communication And Petty Cash
+                                    </option>
+
+                                    <option value="Travel Insurance">
+                                        Travel Insurance
+                                    </option>
+
+                                    <option value="Visa And Permit">
+                                        Visa And Permit
+                                    </option>
+
+                                    <option value="Other">
+                                        Other
+                                    </option>
+
                                 </select>
+
                             </td>
+
 
                             {{-- PARTICULAR --}}
                             <td class="p-1.5">
+
                                 <input
                                     name="items[0][particular]"
                                     class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100"
                                     placeholder="Enter particular"
                                     required
                                 >
+
                             </td>
+
 
                             {{-- CASH --}}
                             <td class="p-1.5">
+
                                 <input
                                     type="number"
                                     step="0.01"
@@ -354,10 +469,13 @@
                                     class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                     placeholder="0.00"
                                 >
+
                             </td>
+
 
                             {{-- CREDIT CARD --}}
                             <td class="p-1.5">
+
                                 <input
                                     type="number"
                                     step="0.01"
@@ -366,10 +484,13 @@
                                     class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                     placeholder="0.00"
                                 >
+
                             </td>
+
 
                             {{-- TRAVEL AGENT --}}
                             <td class="p-1.5">
+
                                 <input
                                     type="number"
                                     step="0.01"
@@ -378,10 +499,13 @@
                                     class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                     placeholder="0.00"
                                 >
+
                             </td>
+
 
                             {{-- REMOVE --}}
                             <td class="p-1.5 text-center">
+
                                 <button
                                     type="button"
                                     class="remove-row text-red-500 hover:text-red-700 text-lg leading-none"
@@ -389,144 +513,647 @@
                                 >
                                     &times;
                                 </button>
+
                             </td>
 
                         </tr>
 
                     </tbody>
+
                 </table>
 
             </div>
 
-            <button type="button" id="add-row"
-                    class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 mb-6 transition-colors">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+
+            {{-- ADD LINE --}}
+            <button
+                type="button"
+                id="add-row"
+                class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 mb-6 transition-colors"
+            >
+
+                <svg
+                    class="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M12 4v16m8-8H4"
+                    />
                 </svg>
+
                 Add line
+
             </button>
 
+
+            {{-- =====================================================
+                TOTAL
+            ====================================================== --}}
             <div class="flex justify-end mb-6 p-3 bg-slate-50 rounded-xl">
+
                 <div class="text-sm">
-                    <span class="text-slate-500">Total:</span>
-                    <span id="grand-total" class="font-bold text-slate-900 ml-1">₱0.00</span>
+
+                    <span class="text-slate-500">
+                        Total:
+                    </span>
+
+                    <span
+                        id="grand-total"
+                        class="font-bold text-slate-900 ml-1"
+                    >
+                        ₱0.00
+                    </span>
+
                 </div>
+
             </div>
 
+
+            {{-- =====================================================
+                REMARKS
+            ====================================================== --}}
             <div class="mb-6">
-                <label for="remarks" class="block text-xs font-bold text-slate-600 mb-1">Remarks</label>
-                <textarea id="remarks" name="remarks" rows="2"
-                          class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">{{ old('remarks') }}</textarea>
+
+                <label
+                    for="remarks"
+                    class="block text-xs font-bold text-slate-600 mb-1"
+                >
+                    Remarks
+                </label>
+
+                <textarea
+                    id="remarks"
+                    name="remarks"
+                    rows="2"
+                    class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                >{{ old('remarks') }}</textarea>
+
             </div>
 
+
+            {{-- =====================================================
+                ACTIONS
+            ====================================================== --}}
             <div class="flex items-center gap-3">
-                <button type="submit" id="submit-btn"
-                        class="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors">
+
+                <button
+                    type="submit"
+                    id="submit-btn"
+                    class="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors"
+                >
                     Submit Request
                 </button>
-                <a href="{{ route('budget_requests.index') }}" class="text-sm text-slate-500 hover:text-slate-700 transition-colors">
+
+                <a
+                    href="{{ route('budget_requests.index') }}"
+                    class="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                >
                     Cancel
                 </a>
+
             </div>
+
         </form>
+
     </div>
 
+
+    {{-- =============================================================
+        JAVASCRIPT
+    ============================================================= --}}
     <script>
-    let rowIndex = 1;
 
-    function rowTemplate(i) {
-        return `<tr class="item-row">
-            <td class="p-1.5">
-                <input list="expense-category-options" name="items[${i}][expense_category]"
-                       class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100" required>
-            </td>
-            <td class="p-1.5">
-                <input name="items[${i}][particular]"
-                       class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100" required>
-            </td>
-            <td class="p-1.5">
-                <input type="number" step="0.01" min="0" name="items[${i}][budget_cash]"
-                       class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount">
-            </td>
-            <td class="p-1.5">
-                <input type="number" step="0.01" min="0" name="items[${i}][budget_credit_card]"
-                       class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount">
-            </td>
-            <td class="p-1.5">
-                <input type="number" step="0.01" min="0" name="items[${i}][budget_travel_agent]"
-                       class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount">
-            </td>
-            <td class="p-1.5 text-center">
-                <button type="button" class="remove-row text-red-500 hover:text-red-700 text-lg leading-none" aria-label="Remove line">&times;</button>
-            </td>
-        </tr>`;
-    }
+        /* =========================================================
+           COUNTRY → CITY
+        ========================================================== */
 
-    function updateRemoveButtons() {
-        const rows = document.querySelectorAll('#items-table tbody .item-row');
-        document.querySelectorAll('.remove-row').forEach(btn => {
-            btn.disabled = rows.length <= 1;
-            btn.classList.toggle('opacity-30', rows.length <= 1);
-            btn.classList.toggle('cursor-not-allowed', rows.length <= 1);
-        });
-    }
+        const cities = {
 
-    document.getElementById('add-row').addEventListener('click', () => {
-        document.querySelector('#items-table tbody').insertAdjacentHTML('beforeend', rowTemplate(rowIndex++));
-        updateRemoveButtons();
-    });
+            "Philippines": [
+                "Manila",
+                "Quezon City",
+                "Makati",
+                "Pasig",
+                "Taguig",
+                "Parañaque",
+                "Pasay",
+                "Las Piñas",
+                "Muntinlupa",
+                "Caloocan",
+                "Cavite",
+                "Bacoor",
+                "Imus",
+                "Dasmariñas",
+                "Cebu City",
+                "Davao City",
+                "Iloilo City",
+                "Other"
+            ],
 
-    document.getElementById('items-table').addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-row') && !e.target.disabled) {
-            const rows = document.querySelectorAll('#items-table tbody .item-row');
-            if (rows.length > 1) {
-                e.target.closest('tr').remove();
-                recalcTotal();
-                updateRemoveButtons();
+            "United States": [
+                "New York",
+                "Los Angeles",
+                "Chicago",
+                "Houston",
+                "San Francisco",
+                "Seattle",
+                "Other"
+            ],
+
+            "Canada": [
+                "Toronto",
+                "Vancouver",
+                "Montreal",
+                "Calgary",
+                "Ottawa",
+                "Other"
+            ],
+
+            "United Kingdom": [
+                "London",
+                "Manchester",
+                "Birmingham",
+                "Liverpool",
+                "Edinburgh",
+                "Other"
+            ],
+
+            "Japan": [
+                "Tokyo",
+                "Osaka",
+                "Kyoto",
+                "Yokohama",
+                "Nagoya",
+                "Other"
+            ],
+
+            "China": [
+                "Shanghai",
+                "Beijing",
+                "Guangzhou",
+                "Shenzhen",
+                "Hong Kong",
+                "Other"
+            ],
+
+            "South Korea": [
+                "Seoul",
+                "Busan",
+                "Incheon",
+                "Daegu",
+                "Daejeon",
+                "Other"
+            ],
+
+            "Singapore": [
+                "Singapore",
+                "Other"
+            ],
+
+            "Australia": [
+                "Sydney",
+                "Melbourne",
+                "Brisbane",
+                "Perth",
+                "Adelaide",
+                "Other"
+            ]
+
+        };
+
+
+        const countrySelect = document.getElementById('country');
+        const placeSelect = document.getElementById('place');
+
+        const oldPlace = @json(old('place'));
+
+
+        function updateCities() {
+
+            const country = countrySelect.value;
+
+            placeSelect.innerHTML =
+                '<option value="">Select City / Place</option>';
+
+            if (cities[country]) {
+
+                cities[country].forEach(city => {
+
+                    const option =
+                        document.createElement('option');
+
+                    option.value = city;
+                    option.textContent = city;
+
+                    if (city === oldPlace) {
+                        option.selected = true;
+                    }
+
+                    placeSelect.appendChild(option);
+
+                });
+
             }
+
         }
-    });
 
-    document.getElementById('items-table').addEventListener('input', (e) => {
-        if (e.target.classList.contains('amount')) recalcTotal();
-    });
 
-    function recalcTotal() {
-        let total = 0;
-        document.querySelectorAll('.amount').forEach(el => total += parseFloat(el.value || 0));
-        document.getElementById('grand-total').textContent = '₱' + total.toFixed(2);
-    }
+        countrySelect.addEventListener(
+            'change',
+            updateCities
+        );
 
-    // Travel date range validation
-    const dateFrom = document.getElementById('travel_date_from');
-    const dateTo = document.getElementById('travel_date_to');
-    const dateRangeError = document.getElementById('date-range-error');
 
-    function validateDateRange() {
-        if (dateFrom.value && dateTo.value && dateTo.value < dateFrom.value) {
-            dateRangeError.classList.remove('hidden');
-            dateTo.setCustomValidity("Return date can't be before the departure date.");
-            return false;
+        updateCities();
+
+
+        /* =========================================================
+           EXPENSE CATEGORY OPTIONS
+        ========================================================== */
+
+        const expenseCategories = [
+
+            "Airfare",
+            "Airport Tax",
+            "Hotel And Accommodation",
+            "Per Diem",
+            "Transportation",
+            "Communication And Petty Cash",
+            "Travel Insurance",
+            "Visa And Permit",
+            "Other"
+
+        ];
+
+
+        /* =========================================================
+           CREATE CATEGORY DROPDOWN
+        ========================================================== */
+
+        function categoryOptions() {
+
+            let options =
+                '<option value="">Select Expense Category</option>';
+
+            expenseCategories.forEach(category => {
+
+                options += `
+                    <option value="${category}">
+                        ${category}
+                    </option>
+                `;
+
+            });
+
+            return options;
+
         }
-        dateRangeError.classList.add('hidden');
-        dateTo.setCustomValidity('');
-        return true;
-    }
 
-    dateFrom.addEventListener('change', validateDateRange);
-    dateTo.addEventListener('change', validateDateRange);
 
-    // Prevent double submit
-    document.getElementById('budget-form').addEventListener('submit', function (e) {
-        if (!validateDateRange()) {
-            e.preventDefault();
-            return;
+        /* =========================================================
+           ROW INDEX
+        ========================================================== */
+
+        let rowIndex = 1;
+
+
+        /* =========================================================
+           CREATE NEW ROW
+        ========================================================== */
+
+        function rowTemplate(i) {
+
+            return `
+                <tr class="item-row">
+
+                    {{-- EXPENSE CATEGORY --}}
+                    <td class="p-1.5">
+
+                        <select
+                            name="items[${i}][expense_category]"
+                            class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            required
+                        >
+
+                            ${categoryOptions()}
+
+                        </select>
+
+                    </td>
+
+
+                    {{-- PARTICULAR --}}
+                    <td class="p-1.5">
+
+                        <input
+                            name="items[${i}][particular]"
+                            class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            placeholder="Enter particular"
+                            required
+                        >
+
+                    </td>
+
+
+                    {{-- CASH --}}
+                    <td class="p-1.5">
+
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            name="items[${i}][budget_cash]"
+                            class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                            placeholder="0.00"
+                        >
+
+                    </td>
+
+
+                    {{-- CREDIT CARD --}}
+                    <td class="p-1.5">
+
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            name="items[${i}][budget_credit_card]"
+                            class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                            placeholder="0.00"
+                        >
+
+                    </td>
+
+
+                    {{-- TRAVEL AGENT --}}
+                    <td class="p-1.5">
+
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            name="items[${i}][budget_travel_agent]"
+                            class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                            placeholder="0.00"
+                        >
+
+                    </td>
+
+
+                    {{-- REMOVE --}}
+                    <td class="p-1.5 text-center">
+
+                        <button
+                            type="button"
+                            class="remove-row text-red-500 hover:text-red-700 text-lg leading-none"
+                            aria-label="Remove line"
+                        >
+                            &times;
+                        </button>
+
+                    </td>
+
+                </tr>
+            `;
+
         }
-        const btn = document.getElementById('submit-btn');
-        btn.disabled = true;
-        btn.textContent = 'Submitting...';
-    });
 
-    updateRemoveButtons();
+
+        /* =========================================================
+           REMOVE BUTTONS
+        ========================================================== */
+
+        function updateRemoveButtons() {
+
+            const rows =
+                document.querySelectorAll(
+                    '#items-table tbody .item-row'
+                );
+
+            document.querySelectorAll('.remove-row')
+                .forEach(btn => {
+
+                    btn.disabled = rows.length <= 1;
+
+                    btn.classList.toggle(
+                        'opacity-30',
+                        rows.length <= 1
+                    );
+
+                    btn.classList.toggle(
+                        'cursor-not-allowed',
+                        rows.length <= 1
+                    );
+
+                });
+
+        }
+
+
+        /* =========================================================
+           ADD ROW
+        ========================================================== */
+
+        document
+            .getElementById('add-row')
+            .addEventListener('click', () => {
+
+                document
+                    .querySelector('#items-table tbody')
+                    .insertAdjacentHTML(
+                        'beforeend',
+                        rowTemplate(rowIndex++)
+                    );
+
+                updateRemoveButtons();
+
+            });
+
+
+        /* =========================================================
+           REMOVE ROW
+        ========================================================== */
+
+        document
+            .getElementById('items-table')
+            .addEventListener('click', e => {
+
+                if (
+                    e.target.classList.contains('remove-row') &&
+                    !e.target.disabled
+                ) {
+
+                    const rows =
+                        document.querySelectorAll(
+                            '#items-table tbody .item-row'
+                        );
+
+                    if (rows.length > 1) {
+
+                        e.target
+                            .closest('tr')
+                            .remove();
+
+                        recalcTotal();
+
+                        updateRemoveButtons();
+
+                    }
+
+                }
+
+            });
+
+
+        /* =========================================================
+           CALCULATE TOTAL
+        ========================================================== */
+
+        document
+            .getElementById('items-table')
+            .addEventListener('input', e => {
+
+                if (
+                    e.target.classList.contains('amount')
+                ) {
+
+                    recalcTotal();
+
+                }
+
+            });
+
+
+        function recalcTotal() {
+
+            let total = 0;
+
+            document
+                .querySelectorAll('.amount')
+                .forEach(el => {
+
+                    total += parseFloat(
+                        el.value || 0
+                    );
+
+                });
+
+
+            document
+                .getElementById('grand-total')
+                .textContent =
+                    '₱' + total.toFixed(2);
+
+        }
+
+
+        /* =========================================================
+           TRAVEL DATE VALIDATION
+        ========================================================== */
+
+        const dateFrom =
+            document.getElementById(
+                'travel_date_from'
+            );
+
+        const dateTo =
+            document.getElementById(
+                'travel_date_to'
+            );
+
+        const dateRangeError =
+            document.getElementById(
+                'date-range-error'
+            );
+
+
+        function validateDateRange() {
+
+            if (
+                dateFrom.value &&
+                dateTo.value &&
+                dateTo.value < dateFrom.value
+            ) {
+
+                dateRangeError
+                    .classList
+                    .remove('hidden');
+
+                dateTo.setCustomValidity(
+                    "Return date can't be before the departure date."
+                );
+
+                return false;
+
+            }
+
+
+            dateRangeError
+                .classList
+                .add('hidden');
+
+            dateTo.setCustomValidity('');
+
+            return true;
+
+        }
+
+
+        dateFrom.addEventListener(
+            'change',
+            validateDateRange
+        );
+
+        dateTo.addEventListener(
+            'change',
+            validateDateRange
+        );
+
+
+        /* =========================================================
+           PREVENT DOUBLE SUBMIT
+        ========================================================== */
+
+        document
+            .getElementById('budget-form')
+            .addEventListener('submit', function(e) {
+
+                if (!validateDateRange()) {
+
+                    e.preventDefault();
+
+                    return;
+
+                }
+
+
+                const btn =
+                    document.getElementById(
+                        'submit-btn'
+                    );
+
+
+                btn.disabled = true;
+
+                btn.textContent =
+                    'Submitting...';
+
+            });
+
+
+        /* =========================================================
+           INITIALIZE
+        ========================================================== */
+
+        updateRemoveButtons();
+
+        recalcTotal();
+
     </script>
+
 </x-mi_app>

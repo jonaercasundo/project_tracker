@@ -347,7 +347,6 @@
                 ITEMS TABLE
             ====================================================== --}}
             <div class="border border-slate-200 rounded-xl overflow-hidden mb-2">
-
                 <table
                     class="w-full text-sm"
                     id="items-table"
@@ -382,9 +381,6 @@
 
                     <tbody class="divide-y divide-slate-100">
 
-                        {{-- =================================================
-                            FIRST ROW
-                        ================================================== --}}
                         <tr class="item-row">
 
                             {{-- EXPENSE CATEGORY --}}
@@ -440,17 +436,28 @@
 
                             </td>
 
+
                             {{-- CASH --}}
                             <td class="p-1.5">
 
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    name="items[0][budget_cash]"
-                                    class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
-                                    placeholder="0.00"
-                                >
+                                <div class="relative">
+
+                                    <span
+                                        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                    >
+                                        ₱
+                                    </span>
+
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        name="items[0][budget_cash]"
+                                        class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                        placeholder="0.00"
+                                    >
+
+                                </div>
 
                             </td>
 
@@ -458,14 +465,24 @@
                             {{-- CREDIT CARD --}}
                             <td class="p-1.5">
 
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    name="items[0][budget_credit_card]"
-                                    class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
-                                    placeholder="0.00"
-                                >
+                                <div class="relative">
+
+                                    <span
+                                        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                    >
+                                        ₱
+                                    </span>
+
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        name="items[0][budget_credit_card]"
+                                        class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                        placeholder="0.00"
+                                    >
+
+                                </div>
 
                             </td>
 
@@ -473,14 +490,24 @@
                             {{-- TRAVEL AGENT --}}
                             <td class="p-1.5">
 
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    name="items[0][budget_travel_agent]"
-                                    class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
-                                    placeholder="0.00"
-                                >
+                                <div class="relative">
+
+                                    <span
+                                        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                                    >
+                                        ₱
+                                    </span>
+
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        name="items[0][budget_travel_agent]"
+                                        class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                        placeholder="0.00"
+                                    >
+
+                                </div>
 
                             </td>
 
@@ -503,7 +530,6 @@
                     </tbody>
 
                 </table>
-
             </div>
 
 
@@ -829,18 +855,27 @@
                     </td>
 
 
-
                     {{-- CASH --}}
                     <td class="p-1.5">
 
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            name="items[${i}][budget_cash]"
-                            class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
-                            placeholder="0.00"
-                        >
+                        <div class="relative">
+
+                            <span
+                                class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                            >
+                                ₱
+                            </span>
+
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="items[${i}][budget_cash]"
+                                class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                placeholder="0.00"
+                            >
+
+                        </div>
 
                     </td>
 
@@ -848,14 +883,24 @@
                     {{-- CREDIT CARD --}}
                     <td class="p-1.5">
 
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            name="items[${i}][budget_credit_card]"
-                            class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
-                            placeholder="0.00"
-                        >
+                        <div class="relative">
+
+                            <span
+                                class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                            >
+                                ₱
+                            </span>
+
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="items[${i}][budget_credit_card]"
+                                class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                placeholder="0.00"
+                            >
+
+                        </div>
 
                     </td>
 
@@ -863,14 +908,24 @@
                     {{-- TRAVEL AGENT --}}
                     <td class="p-1.5">
 
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            name="items[${i}][budget_travel_agent]"
-                            class="w-full p-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
-                            placeholder="0.00"
-                        >
+                        <div class="relative">
+
+                            <span
+                                class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
+                            >
+                                ₱
+                            </span>
+
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="items[${i}][budget_travel_agent]"
+                                class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
+                                placeholder="0.00"
+                            >
+
+                        </div>
 
                     </td>
 

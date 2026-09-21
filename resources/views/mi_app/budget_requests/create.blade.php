@@ -75,16 +75,6 @@
                     </label>
 
                     <div class="flex gap-2">
-
-                        {{-- City / Place --}}
-                        <select
-                            id="place"
-                            name="place"
-                            class="w-1/2 border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-                        >
-                            <option value="">Select City / Place</option>
-                        </select>
-
                         {{-- Country --}}
                         <select
                             id="country"
@@ -123,6 +113,16 @@
                                 Other
                             </option>
                         </select>
+                        {{-- City / Place --}}
+                        <select
+                            id="place"
+                            name="place"
+                            class="w-1/2 border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        >
+                            <option value="">Select City / Place</option>
+                        </select>
+
+
 
                     </div>
                 </div>

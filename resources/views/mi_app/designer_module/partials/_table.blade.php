@@ -709,9 +709,9 @@
                     {{-- Item Name --}}
                     <td
                         class="tx-row-item"
-                        title="{{ $itemName }}"
+                        title="{{ strtoupper($itemName) }}"
                     >
-                        {{ $itemName }}
+                        {{ strtoupper($itemName) }}
                     </td>
 
 

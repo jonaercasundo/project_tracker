@@ -71,10 +71,10 @@
                 </div>
                 <div class="col-span-2">
                     <label class="block text-xs font-bold text-slate-600 mb-1">
-                        Place / City, Country
+                       Country,  Place / City
                     </label>
 
-                    <div class="flex gap-2">
+                    <div class="grid grid-cols-2 gap-2">
                         {{-- Country --}}
                         <select
                             id="country"

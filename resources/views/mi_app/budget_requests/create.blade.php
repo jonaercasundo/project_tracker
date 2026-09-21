@@ -361,10 +361,6 @@
                                 Expense Category
                             </th>
 
-                            <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">
-                                Particular
-                            </th>
-
                             <th class="p-2.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wide">
                                 Cash
                             </th>

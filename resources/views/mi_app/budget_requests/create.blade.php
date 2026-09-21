@@ -351,7 +351,6 @@
                     class="w-full text-sm"
                     id="items-table"
                 >
-
                     <thead>
 
                         <tr class="bg-slate-50 border-b border-slate-200">
@@ -377,7 +376,6 @@
                         </tr>
 
                     </thead>
-
 
                     <tbody class="divide-y divide-slate-100">
 
@@ -449,12 +447,12 @@
                                     </span>
 
                                     <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
+                                        type="text"
+                                        inputmode="decimal"
                                         name="items[0][budget_cash]"
                                         class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                         placeholder="0.00"
+                                        autocomplete="off"
                                     >
 
                                 </div>
@@ -474,12 +472,12 @@
                                     </span>
 
                                     <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
+                                        type="text"
+                                        inputmode="decimal"
                                         name="items[0][budget_credit_card]"
                                         class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                         placeholder="0.00"
+                                        autocomplete="off"
                                     >
 
                                 </div>
@@ -499,12 +497,12 @@
                                     </span>
 
                                     <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
+                                        type="text"
+                                        inputmode="decimal"
                                         name="items[0][budget_travel_agent]"
                                         class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                         placeholder="0.00"
+                                        autocomplete="off"
                                     >
 
                                 </div>
@@ -530,6 +528,7 @@
                     </tbody>
 
                 </table>
+
             </div>
 
 
@@ -867,9 +866,8 @@
                             </span>
 
                             <input
-                                type="number"
-                                step="0.01"
-                                min="0"
+                                type="text"
+                                inputmode="decimal"
                                 name="items[${i}][budget_cash]"
                                 class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                 placeholder="0.00"
@@ -892,9 +890,8 @@
                             </span>
 
                             <input
-                                type="number"
-                                step="0.01"
-                                min="0"
+                                type="text"
+                                inputmode="decimal"
                                 name="items[${i}][budget_credit_card]"
                                 class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                 placeholder="0.00"
@@ -917,9 +914,8 @@
                             </span>
 
                             <input
-                                type="number"
-                                step="0.01"
-                                min="0"
+                                type="text"
+                                inputmode="decimal"
                                 name="items[${i}][budget_travel_agent]"
                                 class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                 placeholder="0.00"
@@ -947,7 +943,6 @@
             `;
 
         }
-
 
         /* =========================================================
            REMOVE BUTTONS
@@ -1178,6 +1173,33 @@
         updateRemoveButtons();
 
         recalcTotal();
+        document.addEventListener('input', function (e) {
+
+            if (!e.target.classList.contains('amount')) {
+                return;
+            }
+
+            let value = e.target.value.replace(/,/g, '');
+
+            // Allow only numbers and decimal point
+            value = value.replace(/[^\d.]/g, '');
+
+            // Allow only one decimal point
+            const parts = value.split('.');
+            if (parts.length > 2) {
+                value = parts[0] + '.' + parts.slice(1).join('');
+            }
+
+            // Add comma separators
+            if (parts[0]) {
+                parts[0] = Number(parts[0]).toLocaleString('en-US');
+                value = parts.length > 1
+                    ? parts[0] + '.' + parts[1]
+                    : parts[0];
+            }
+
+            e.target.value = value;
+        });
 
     </script>
 

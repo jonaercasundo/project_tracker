@@ -269,27 +269,29 @@
             </div>
 
             <h2 class="text-sm font-bold text-slate-700 mb-2">Budget Breakdown</h2>
+            <select
+                id="expense-category-options"
+                class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+                <option value="">Select Expense Category</option>
 
-            {{-- Suggested categories -- items.*.expense_category stays a free-text field in the DB,
-                 this just nudges toward consistent naming without restricting input. --}}
-            <datalist id="expense-category-options">
-                <option value="Airfare">
-                <option value="Hotel / Accommodation">
-                <option value="Per Diem">
-                <option value="Transportation">
-                <option value="Meals">
-                <option value="Visa / Travel Documents">
-                <option value="Communication">
-                <option value="Other">
-            </datalist>
-
+                <option value="Airfare">Airfare</option>
+                <option value="Airport Tax">Airport Tax</option>
+                <option value="Hotel And Accommodation">Hotel And Accommodation</option>
+                <option value="Per Diem">Per Diem</option>
+                <option value="Transportation">Transportation</option>
+                <option value="Communication And Petty Cash">Communication And Petty Cash</option>
+                <option value="Travel Insurance">Travel Insurance</option>
+                <option value="Visa And Permit">Visa And Permit</option>
+                <option value="Other">Other</option>
+            </select>
             <div class="border border-slate-200 rounded-xl overflow-hidden mb-2">
 
                 <table class="w-full text-sm" id="items-table">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200">
                             <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">
-                                Category
+                                Expense Category
                             </th>
                             <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">
                                 Particular
@@ -318,16 +320,17 @@
                                     class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                                     required
                                 >
-                                    <option value="">Select Category</option>
+                                    <option value="">Select Expense Category</option>
 
-                                    <option value="Food">Food</option>
+                                    <option value="Airfare">Airfare</option>
+                                    <option value="Airport Tax">Airport Tax</option>
+                                    <option value="Hotel And Accommodation">Hotel And Accommodation</option>
+                                    <option value="Per Diem">Per Diem</option>
                                     <option value="Transportation">Transportation</option>
-                                    <option value="Accommodation">Accommodation</option>
-                                    <option value="Office Supplies">Office Supplies</option>
-                                    <option value="Communication">Communication</option>
-                                    <option value="Utilities">Utilities</option>
-                                    <option value="Entertainment">Entertainment</option>
-                                    <option value="Miscellaneous">Miscellaneous</option>
+                                    <option value="Communication And Petty Cash">Communication And Petty Cash</option>
+                                    <option value="Travel Insurance">Travel Insurance</option>
+                                    <option value="Visa And Permit">Visa And Permit</option>
+                                    <option value="Other">Other</option>
                                 </select>
                             </td>
 

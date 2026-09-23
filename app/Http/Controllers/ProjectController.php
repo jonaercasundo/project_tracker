@@ -33,18 +33,32 @@ class ProjectController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
-            'ref_no' => 'required',
-            'project_name' => 'required',
-            'agency' => 'required',
-            'contract_amount' => 'required|numeric',
-            'ABC' => 'required|numeric',
-            'start_date' => 'required',
-            'end_date' => 'required',
-            'status' => 'required',
+        $validated = $request->validate([
+            'ref_no' => 'required|string|max:255|unique:projects,ref_no',
+            'project_name' => 'required|string|max:255',
+            'agency' => 'required|string',
+            'contract_amount' => 'required|numeric|min:0.01',
+            'ABC' => 'required|numeric|min:0.01',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'status' => 'required|string',
+        ], [
+            'ref_no.unique' => 'A project with this Reference No. already exists.',
         ]);
 
-        Project::create($request->all());
+        try {
+            Project::create($validated);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Fallback in case two submissions race each other and both
+            // pass the validation check above before either one inserts.
+            if ($e->errorInfo[1] == 1062) {
+                return back()->withInput()->withErrors([
+                    'ref_no' => 'A project with this Reference No. already exists.',
+                ]);
+            }
+
+            throw $e;
+        }
 
         return back()->with(
             'success',

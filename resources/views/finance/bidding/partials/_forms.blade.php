@@ -488,16 +488,16 @@
             </div>
 
             <div class="bf-field">
-                <label class="bf-label"><i class="ti ti-hash"></i> Project ID No.</label>
-                <input class="bf-input" type="text" name="project_id"
-                       value="{{ old('project_id', $project->project_id ?? '') }}"
-                       placeholder="Project ID No.">
-            </div>
-            <div class="bf-field">
                 <label class="bf-label"><i class="ti ti-building-bank"></i> Procuring entity / Agency</label>
                 <input class="bf-input" type="text" name="procuring_entity"
                        value="{{ old('procuring_entity', $project->procuring_entity ?? '') }}"
                        placeholder="Agency or office">
+            </div>
+            <div class="bf-field">
+                <label class="bf-label"><i class="ti ti-hash"></i> Project ID No.</label>
+                <input class="bf-input" type="text" name="project_id"
+                       value="{{ old('project_id', $project->project_id ?? '') }}"
+                       placeholder="Project ID No.">
             </div>
             <div class="bf-field">
                 <label class="bf-label"><i class="ti ti-file-description"></i> Project name</label>

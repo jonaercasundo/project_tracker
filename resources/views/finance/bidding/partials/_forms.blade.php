@@ -494,7 +494,7 @@
                        placeholder="Agency or office">
             </div>
             <div class="bf-field">
-                <label class="bf-label"><i class="ti ti-hash"></i> Project ID No.</label>
+                <label class="bf-label"><i class="ti ti-hash"></i> Project IDs No.</label>
                 <input class="bf-input" type="text" name="project_id"
                        value="{{ old('project_id', $project->project_id ?? '') }}"
                        placeholder="Project ID No.">

@@ -277,7 +277,7 @@
             x-show="addProjectOpen"
             x-transition
             @click.outside="addProjectOpen = false"
-            x-data="{ agency: '', rawAmount: '', rawAbc: '' }"
+            x-data="projectForm()"
             class="relative bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         >
             <form
@@ -285,6 +285,7 @@
                 method="POST"
                 action="{{ route('projects.store') }}"
                 enctype="multipart/form-data"
+                @submit="onSubmit($event)"
             >
                 @csrf
 
@@ -318,37 +319,75 @@
                             class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                     </div>
 
+                    {{-- ===================================================== --}}
+                    {{-- CURRENCY FIELDS --}}
+                    {{-- ===================================================== --}}
                     <div class="grid grid-cols-2 gap-4">
+
+                        {{-- CONTRACT AMOUNT --}}
                         <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Contract Amount</label>
-                            <input type="text" inputmode="decimal" x-model="rawAmount"
-                                @input="
-                                    let v = $event.target.value.replace(/,/g, '');
-                                    if (!/^\d*\.?\d*$/.test(v)) { $event.target.value = rawAmount; return; }
-                                    let parts = v.split('.');
-                                    let formatted = parts[0] ? Number(parts[0]).toLocaleString() : '';
-                                    $event.target.value = parts.length > 1 ? formatted + '.' + parts[1] : formatted;
-                                    rawAmount = v;
-                                "
-                                required
-                                class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
-                            <input type="hidden" name="contract_amount" :value="rawAmount">
+                            <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+                                Contract Amount <span class="text-rose-500">*</span>
+                            </label>
+
+                            <div class="relative">
+                                <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">
+                                    ₱
+                                </span>
+
+                                <input
+                                    type="text"
+                                    inputmode="decimal"
+                                    autocomplete="off"
+                                    placeholder="0.00"
+                                    x-ref="amountInput"
+                                    @input="formatCurrencyInput('amount', $event)"
+                                    @blur="formatCurrencyBlur('amount', $event)"
+                                    @focus="selectAllOnFocus($event)"
+                                    class="w-full text-sm rounded-xl border-slate-200 py-2 pl-7 pr-3
+                                           tabular-nums
+                                           focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                    :class="errors.amount && 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'">
+
+                                <input type="hidden" name="contract_amount" :value="amount.raw">
+                            </div>
+
+                            <p x-show="errors.amount" x-cloak x-text="errors.amount"
+                               class="mt-1 text-[11px] font-semibold text-rose-500"></p>
                         </div>
+
+                        {{-- ABC --}}
                         <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">ABC</label>
-                            <input type="text" inputmode="decimal" x-model="rawAbc"
-                                @input="
-                                    let v = $event.target.value.replace(/,/g, '');
-                                    if (!/^\d*\.?\d*$/.test(v)) { $event.target.value = rawAbc; return; }
-                                    let parts = v.split('.');
-                                    let formatted = parts[0] ? Number(parts[0]).toLocaleString() : '';
-                                    $event.target.value = parts.length > 1 ? formatted + '.' + parts[1] : formatted;
-                                    rawAbc = v;
-                                "
-                                required
-                                class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
-                            <input type="hidden" name="ABC" :value="rawAbc">
+                            <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+                                ABC <span class="text-rose-500">*</span>
+                            </label>
+
+                            <div class="relative">
+                                <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">
+                                    ₱
+                                </span>
+
+                                <input
+                                    type="text"
+                                    inputmode="decimal"
+                                    autocomplete="off"
+                                    placeholder="0.00"
+                                    x-ref="abcInput"
+                                    @input="formatCurrencyInput('abc', $event)"
+                                    @blur="formatCurrencyBlur('abc', $event)"
+                                    @focus="selectAllOnFocus($event)"
+                                    class="w-full text-sm rounded-xl border-slate-200 py-2 pl-7 pr-3
+                                           tabular-nums
+                                           focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                    :class="errors.abc && 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'">
+
+                                <input type="hidden" name="ABC" :value="abc.raw">
+                            </div>
+
+                            <p x-show="errors.abc" x-cloak x-text="errors.abc"
+                               class="mt-1 text-[11px] font-semibold text-rose-500"></p>
                         </div>
+
                     </div>
 
                     <div>
@@ -432,4 +471,139 @@
     </div>
 
 </div>
+
+{{-- ============================================================= --}}
+{{-- ADD PROJECT FORM / CURRENCY INPUT LOGIC --}}
+{{-- ============================================================= --}}
+<script>
+    /**
+     * Shared Alpine component for the "New Project" modal.
+     * Handles live currency formatting for Contract Amount and ABC:
+     *  - digits + a single decimal point only
+     *  - max 2 decimal places
+     *  - thousands separators as you type
+     *  - cursor position preserved while typing (no jump-to-end)
+     *  - normalizes to X.XX on blur
+     *  - hidden inputs always carry the clean numeric value the server expects
+     */
+    function projectForm() {
+        return {
+            agency: '',
+            amount: { raw: '', display: '' },
+            abc: { raw: '', display: '' },
+            errors: { amount: '', abc: '' },
+
+            selectAllOnFocus(event) {
+                event.target.select();
+            },
+
+            // Formats live as the user types, preserving cursor position.
+            formatCurrencyInput(field, event) {
+                const input = event.target;
+                const cursorPos = input.selectionStart;
+
+                // How many digits sit before the caret, so we can restore
+                // the caret to the same "digit position" after reformatting.
+                const digitsBeforeCursor =
+                    input.value.slice(0, cursorPos).replace(/[^\d]/g, '').length;
+
+                // Strip everything except digits and dots.
+                let value = input.value.replace(/[^\d.]/g, '');
+
+                // Keep only the first decimal point.
+                const firstDot = value.indexOf('.');
+                if (firstDot !== -1) {
+                    value =
+                        value.slice(0, firstDot + 1) +
+                        value.slice(firstDot + 1).replace(/\./g, '');
+                }
+
+                // Limit to 2 decimal places.
+                let [wholePart, decimalPart] = value.split('.');
+                if (decimalPart !== undefined) {
+                    decimalPart = decimalPart.slice(0, 2);
+                }
+
+                // Strip leading zeros on the whole part (but allow "0" itself).
+                wholePart = wholePart ? wholePart.replace(/^0+(?=\d)/, '') : '';
+
+                const cleanRaw =
+                    decimalPart !== undefined ? `${wholePart}.${decimalPart}` : wholePart;
+
+                const formattedWhole = wholePart
+                    ? Number(wholePart).toLocaleString('en-US')
+                    : '';
+
+                const formatted =
+                    decimalPart !== undefined
+                        ? `${formattedWhole}.${decimalPart}`
+                        : formattedWhole;
+
+                this[field] = { raw: cleanRaw, display: formatted };
+                input.value = formatted;
+                this.errors[field] = '';
+
+                // Restore cursor to the same digit position.
+                let digitCount = 0;
+                let newPos = formatted.length;
+                for (let i = 0; i < formatted.length; i++) {
+                    if (/\d/.test(formatted[i])) digitCount++;
+                    if (digitCount >= digitsBeforeCursor) {
+                        newPos = i + 1;
+                        break;
+                    }
+                }
+                requestAnimationFrame(() => input.setSelectionRange(newPos, newPos));
+            },
+
+            // Normalizes the value to always show 2 decimal places once the
+            // user leaves the field, e.g. "500" -> "500.00", "12." -> "12.00".
+            formatCurrencyBlur(field, event) {
+                const raw = this[field].raw;
+
+                if (raw === '' || raw === '.') {
+                    this[field] = { raw: '', display: '' };
+                    event.target.value = '';
+                    return;
+                }
+
+                const num = Number(raw);
+
+                if (isNaN(num)) {
+                    this[field] = { raw: '', display: '' };
+                    event.target.value = '';
+                    return;
+                }
+
+                const fixedRaw = num.toFixed(2);
+                const display = num.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                });
+
+                this[field] = { raw: fixedRaw, display };
+                event.target.value = display;
+            },
+
+            onSubmit(event) {
+                this.errors = { amount: '', abc: '' };
+                let hasError = false;
+
+                if (!this.amount.raw || Number(this.amount.raw) <= 0) {
+                    this.errors.amount = 'Enter a contract amount greater than ₱0.00';
+                    hasError = true;
+                }
+
+                if (!this.abc.raw || Number(this.abc.raw) <= 0) {
+                    this.errors.abc = 'Enter an ABC greater than ₱0.00';
+                    hasError = true;
+                }
+
+                if (hasError) {
+                    event.preventDefault();
+                }
+            },
+        };
+    }
+</script>
 </x-project_app-layout>

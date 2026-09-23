@@ -520,6 +520,7 @@
                             type="number"
                             id="approved_budget_contract_abc"
                             name="approved_budget_contract_abc"
+                            class="bf-input"
                         >
                 </div>
             </div>

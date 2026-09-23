@@ -517,10 +517,10 @@
                 <div class=" flex items-center gap-2">
                     <span class="text-slate-600 font-medium">₱</span>
                         <input
-                            type="text"
+                            type="number"
                             id="approved_budget_contract_abc"
                             name="approved_budget_contract_abc"
-                            class="bf-input currency"
+                            class="bf-input"
                         >
                 </div>
             </div>

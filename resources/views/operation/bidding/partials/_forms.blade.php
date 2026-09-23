@@ -521,7 +521,6 @@
                             id="approved_budget_contract_abc"
                             name="approved_budget_contract_abc"
                             class="bf-input currency"
-                            placeholder="0.00"
                         >
                 </div>
             </div>

@@ -29,27 +29,6 @@
         $totalValue = $inventories->sum(fn($inv) => ($inv->qty ?? 0) * ($inv->item->price ?? 0));
     @endphp
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-        <div class="bg-white border border-slate-100 rounded-xl p-5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]">
-            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Items on page</div>
-            <div class="text-xl font-bold text-slate-900 mt-2 tabular-nums tracking-tight">{{ $totalItems }}</div>
-        </div>
-
-        <div class="bg-white border border-slate-100 rounded-xl p-5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]">
-            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Approved</div>
-            <div class="text-xl font-bold text-emerald-600 mt-2 tabular-nums tracking-tight">{{ $approvedCount }}</div>
-        </div>
-
-        <div class="bg-white border border-slate-100 rounded-xl p-5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]">
-            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">For approval</div>
-            <div class="text-xl font-bold text-amber-500 mt-2 tabular-nums tracking-tight">{{ $pendingCount }}</div>
-        </div>
-
-        <div class="bg-white border border-slate-100 rounded-xl p-5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]">
-            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total value</div>
-            <div class="text-xl font-bold text-slate-900 mt-2 tabular-nums tracking-tight">₱{{ number_format($totalValue, 2) }}</div>
-        </div>
-    </div>
 
     {{-- FILTERS --}}
     <form method="GET" action="{{ route('inventory.index') }}" class="mt-8">

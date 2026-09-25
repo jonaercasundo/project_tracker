@@ -388,7 +388,21 @@ use App\Http\Controllers\BudgetRequestController;
                 Route::get('/returns', function () { return view('operation.warehouse.returns.index');})->name('returns');
                 Route::get('/history', function () { return view('operation.warehouse.history.index'); })->name('history');
                 Route::get('/transactions', function () { return view('operation.warehouse.transactions.index');})->name('transactions');
-        });  
+            });
+
+        // Inventory List — kept outside the 'warehouse.' name prefix so routes resolve
+        // as inventory.index / inventory.show / etc., matching the view's route() calls.
+        Route::middleware(['role:Warehouse_officer'])
+            ->prefix('warehouse/inventory')
+            ->name('inventory.')
+            ->group(function () {
+                Route::get('/', [InventoryController::class, 'index'])->name('index');
+                Route::get('/create', [InventoryController::class, 'create'])->name('create');
+                Route::post('/', [InventoryController::class, 'store'])->name('store');
+                Route::get('/{inventory}', [InventoryController::class, 'show'])->name('show');
+                Route::get('/{inventory}/edit', [InventoryController::class, 'edit'])->name('edit');
+                Route::put('/{inventory}', [InventoryController::class, 'update'])->name('update');
+            });
         /*
             |--------------------------------------------------------------------------
             | MI ROUTES

@@ -23,7 +23,7 @@ class InventoryController extends Controller
 
         // Search by related item's name
         if ($request->filled('search')) {
-            $search = $request->string('search');
+            $search = trim($request->input('search'));
             $query->whereHas('item', function ($q) use ($search) {
                 $q->where('item_name', 'like', "%{$search}%");
             });

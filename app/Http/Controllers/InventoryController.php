@@ -38,7 +38,7 @@ class InventoryController extends Controller
 
         $projects = \App\Models\Project::orderBy('project_name')->get();
 
-        return view('inventory.index', compact('inventories', 'projects'));
+        return view('operation.warehouse.inventory.index', compact('inventories', 'projects'));
     }
 
     public function create()

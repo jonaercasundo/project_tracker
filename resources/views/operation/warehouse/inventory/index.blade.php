@@ -19,40 +19,6 @@
                 </p>
             </div>
         </div>
-
-        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <a href="{{ route('inventory.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-500 active:bg-blue-700 transition shadow-sm shadow-blue-600/10 tracking-wide">
-
-                    <svg class="h-3.5 w-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2.5">
-
-                        <path stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M12 4v16m8-8H4" />
-
-                    </svg>
-
-                    Add Item
-
-            </a>
-
-            <button
-                class="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800 active:bg-slate-950 transition tracking-wide">
-                Categories
-            </button>
-
-            <button
-                class="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition tracking-wide">
-                <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-                </svg>
-                Import
-            </button>
-        </div>
     </div>
 
     {{-- QUICK STATS --}}

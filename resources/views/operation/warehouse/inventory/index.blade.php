@@ -31,7 +31,7 @@
 
 
     {{-- FILTERS --}}
-    <form method="GET" action="{{ route('inventory.index') }}" class="mt-8">
+    <form method="GET" action="{{ route('warehouse.inventory.index') }}" class="mt-8">
         <div class="bg-slate-50 border border-slate-200/60 rounded-xl p-3">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 {{-- Project --}}

@@ -34,7 +34,9 @@ class InventoryController extends Controller
             $query->where('inventory_status', $request->inventory_status);
         }
 
-        $inventories = $query->latest('created_at')->get();
+        $inventories = $query->latest('created_at')
+            ->paginate(15)
+            ->withQueryString();
 
         $projects = \App\Models\Project::orderBy('project_name')->get();
 

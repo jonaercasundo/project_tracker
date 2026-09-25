@@ -96,8 +96,8 @@
                 x-collapse
                 class="ml-6 mt-1 space-y-1 border-l border-slate-200 pl-4">
                 <li>
-                    <a href="{{ route('warehouse.packages.index') }}"
-                    class="block rounded-lg px-3 py-2 text-xs font-bold {{ request()->routeIs('warehouse.packages.*') ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-slate-50' }}">
+                    <a href="{{ route('inventory.index') }}"
+                    class="block rounded-lg px-3 py-2 text-xs font-bold {{ request()->routeIs('inventory.index.*') ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-slate-50' }}">
                         Inventory List
                     </a>
                 </li>

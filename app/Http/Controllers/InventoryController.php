@@ -35,7 +35,7 @@ class InventoryController extends Controller
         }
 
         $inventories = $query->latest('created_at')
-            ->paginate(15)
+            ->paginate(10)
             ->withQueryString();
 
         $projects = \App\Models\Project::orderBy('project_name')->get();

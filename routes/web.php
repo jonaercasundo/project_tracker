@@ -394,7 +394,7 @@ use App\Http\Controllers\BudgetRequestController;
         // as inventory.index / inventory.show / etc., matching the view's route() calls.
         Route::middleware(['role:Warehouse_officer'])
             ->prefix('warehouse/inventory')
-            ->name('inventory.')
+            ->name('warehouse.inventory.')
             ->group(function () {
                 Route::get('/', [InventoryController::class, 'index'])->name('index');
                 Route::get('/create', [InventoryController::class, 'create'])->name('create');

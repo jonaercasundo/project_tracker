@@ -38,7 +38,6 @@ use App\Http\Controllers\Accounting_DashboardController;
 use App\Http\Controllers\ProductScanController;
 use App\Http\Controllers\TravelLiquidationController;
 use App\Http\Controllers\BudgetRequestController;
-
     /*
     |--------------------------------------------------------------------------
     | PUBLIC ROUTE
@@ -378,7 +377,6 @@ use App\Http\Controllers\BudgetRequestController;
                 Route::post('/warehouse/inventory/scan/save', [WarehouseInventoryController::class, 'saveScan'])->name('inventory.scan.save');
                 Route::get('/dashboard', [WarehouseInventoryController::class, 'dashboard'])->name('dashboard');
                 Route::get('/stock-out', [WarehouseInventoryController::class, 'scanner'])->name('stock-out');
-                Route::get('/packages', function () { return view('operation.warehouse.packages.index'); })->name('packages.index');
                 Route::get('/categories', function () { return view('operation.warehouse.categories.index'); })->name('categories.index');
                 Route::get('/adjustments', function () { return view('operation.warehouse.adjustments.index'); })->name('adjustments.index');
                 Route::get('/stock-in', [WarehouseInventoryController::class, 'stockInIndex'])->name('stock-in');

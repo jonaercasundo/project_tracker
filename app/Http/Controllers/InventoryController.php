@@ -83,6 +83,7 @@ class InventoryController extends Controller
             'warehouses' => $warehouses
         ]);
     }
+    
     public function store(Request $request)
     {
         $request->validate([
@@ -184,183 +185,183 @@ class InventoryController extends Controller
         return redirect()->route('inventory.index')
             ->with('success', 'Inventory updated successfully.');
     }
-public function summary(Request $request)
-{
-    $query = Inventory::with([
-        'item',
-        'warehouse'
-    ]);
-
-
-    // Search Item
-    if ($request->filled('search')) {
-
-        $search = $request->search;
-
-        $query->whereHas('item', function ($q) use ($search) {
-
-            $q->where('item_name', 'like', "%{$search}%");
-
-        });
-
-    }
-
-
-    // Warehouse Filter
-    if ($request->filled('warehouse_id')) {
-
-        $query->where(
-            'warehouse_id',
-            $request->warehouse_id
-        );
-
-    }
-
-
-    // Status Filter
-    if ($request->filled('inventory_status')) {
-
-        $query->where(
-            'inventory_status',
-            $request->inventory_status
-        );
-
-    }
-
-
-    $inventories = $query
-        ->latest()
-        ->paginate(50)
-        ->withQueryString();
-
-
-    $warehouses = \App\Models\Warehouse::orderBy('warehouse_name')
-        ->get();
-
-
-    $statuses = Inventory::select('inventory_status')
-        ->distinct()
-        ->pluck('inventory_status');
-
-
-    return view('inventory.summary', compact(
-        'inventories',
-        'warehouses',
-        'statuses'
-    ));
-}
-public function history(Request $request)
-{
-    $batchExpr = "IFNULL(batch_no, CONCAT('IND-', history_id))";
-
-    $query = InventoryHistory::query()
-        ->select([
-            DB::raw("$batchExpr AS batch_key"),
-
-            DB::raw('MIN(history_id) AS first_history_id'),
-            DB::raw('MAX(history_id) AS last_history_id'),
-
-            DB::raw('MAX(history_id) AS history_id'),
-            DB::raw('MAX(batch_no) AS batch_no'),
-            DB::raw('MAX(item_id) AS item_id'),
-            DB::raw('MAX(warehouse_id) AS warehouse_id'),
-            DB::raw('MAX(change_type) AS change_type'),
-            DB::raw('MAX(changed_by) AS changed_by'),
-            DB::raw('MAX(remarks) AS remarks'),
-            DB::raw('MAX(changed_at) AS changed_at'),
-        ])
-        ->groupBy(
-            DB::raw($batchExpr),
-            'item_id'
-        )
-        ->with([
+    public function summary(Request $request)
+    {
+        $query = Inventory::with([
             'item',
             'warehouse'
         ]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Search
-    |--------------------------------------------------------------------------
-    */
 
-    if ($request->filled('search')) {
-        $search = $request->search;
+        // Search Item
+        if ($request->filled('search')) {
 
-        $query->where(function ($q) use ($search) {
-            $q->where('changed_by', 'like', "%{$search}%")
-                ->orWhere('remarks', 'like', "%{$search}%")
-                ->orWhereHas('item', function ($item) use ($search) {
-                    $item->where('item_name', 'like', "%{$search}%");
-                });
-        });
-    }
+            $search = $request->search;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Filters
-    |--------------------------------------------------------------------------
-    */
+            $query->whereHas('item', function ($q) use ($search) {
 
-    if ($request->filled('change_type')) {
-        $query->where('change_type', $request->change_type);
-    }
+                $q->where('item_name', 'like', "%{$search}%");
 
-    if ($request->filled('warehouse_id')) {
-        $query->where('warehouse_id', $request->warehouse_id);
-    }
+            });
 
-    if ($request->filled('date_from')) {
-        $query->whereDate('changed_at', '>=', $request->date_from);
-    }
-
-    if ($request->filled('date_to')) {
-        $query->whereDate('changed_at', '<=', $request->date_to);
-    }
-
-    $histories = $query
-        ->orderByDesc('changed_at')
-        ->paginate(50)
-        ->withQueryString();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Load first & last history
-    |--------------------------------------------------------------------------
-    */
-
-    $ids = collect();
-
-    foreach ($histories as $history) {
-        $ids->push($history->first_history_id);
-        $ids->push($history->last_history_id);
-    }
-
-    $historyMap = InventoryHistory::whereIn('history_id', $ids)
-        ->get()
-        ->keyBy('history_id');
-
-    $histories->getCollection()->transform(function ($history) use ($historyMap) {
-
-        $first = $historyMap[$history->first_history_id] ?? null;
-        $last  = $historyMap[$history->last_history_id] ?? null;
-
-        if ($first && $last) {
-            $history->old_qty = $first->old_qty;
-            $history->new_qty = $last->new_qty;
-            $history->qty_change = $last->new_qty - $first->old_qty;
         }
 
-        return $history;
-    });
 
-    $warehouses = Warehouse::orderBy('warehouse_name')->get();
+        // Warehouse Filter
+        if ($request->filled('warehouse_id')) {
 
-    return view('inventory.history', compact(
-        'histories',
-        'warehouses'
-    ));
-}
+            $query->where(
+                'warehouse_id',
+                $request->warehouse_id
+            );
+
+        }
+
+
+        // Status Filter
+        if ($request->filled('inventory_status')) {
+
+            $query->where(
+                'inventory_status',
+                $request->inventory_status
+            );
+
+        }
+
+
+        $inventories = $query
+            ->latest()
+            ->paginate(50)
+            ->withQueryString();
+
+
+        $warehouses = \App\Models\Warehouse::orderBy('warehouse_name')
+            ->get();
+
+
+        $statuses = Inventory::select('inventory_status')
+            ->distinct()
+            ->pluck('inventory_status');
+
+
+        return view('inventory.summary', compact(
+            'inventories',
+            'warehouses',
+            'statuses'
+        ));
+    }
+    public function history(Request $request)
+    {
+        $batchExpr = "IFNULL(batch_no, CONCAT('IND-', history_id))";
+
+        $query = InventoryHistory::query()
+            ->select([
+                DB::raw("$batchExpr AS batch_key"),
+
+                DB::raw('MIN(history_id) AS first_history_id'),
+                DB::raw('MAX(history_id) AS last_history_id'),
+
+                DB::raw('MAX(history_id) AS history_id'),
+                DB::raw('MAX(batch_no) AS batch_no'),
+                DB::raw('MAX(item_id) AS item_id'),
+                DB::raw('MAX(warehouse_id) AS warehouse_id'),
+                DB::raw('MAX(change_type) AS change_type'),
+                DB::raw('MAX(changed_by) AS changed_by'),
+                DB::raw('MAX(remarks) AS remarks'),
+                DB::raw('MAX(changed_at) AS changed_at'),
+            ])
+            ->groupBy(
+                DB::raw($batchExpr),
+                'item_id'
+            )
+            ->with([
+                'item',
+                'warehouse'
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Search
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('changed_by', 'like', "%{$search}%")
+                    ->orWhere('remarks', 'like', "%{$search}%")
+                    ->orWhereHas('item', function ($item) use ($search) {
+                        $item->where('item_name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Filters
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('change_type')) {
+            $query->where('change_type', $request->change_type);
+        }
+
+        if ($request->filled('warehouse_id')) {
+            $query->where('warehouse_id', $request->warehouse_id);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('changed_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('changed_at', '<=', $request->date_to);
+        }
+
+        $histories = $query
+            ->orderByDesc('changed_at')
+            ->paginate(50)
+            ->withQueryString();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Load first & last history
+        |--------------------------------------------------------------------------
+        */
+
+        $ids = collect();
+
+        foreach ($histories as $history) {
+            $ids->push($history->first_history_id);
+            $ids->push($history->last_history_id);
+        }
+
+        $historyMap = InventoryHistory::whereIn('history_id', $ids)
+            ->get()
+            ->keyBy('history_id');
+
+        $histories->getCollection()->transform(function ($history) use ($historyMap) {
+
+            $first = $historyMap[$history->first_history_id] ?? null;
+            $last  = $historyMap[$history->last_history_id] ?? null;
+
+            if ($first && $last) {
+                $history->old_qty = $first->old_qty;
+                $history->new_qty = $last->new_qty;
+                $history->qty_change = $last->new_qty - $first->old_qty;
+            }
+
+            return $history;
+        });
+
+        $warehouses = Warehouse::orderBy('warehouse_name')->get();
+
+        return view('inventory.history', compact(
+            'histories',
+            'warehouses'
+        ));
+    }
     public function destroy($id)
     {
         //

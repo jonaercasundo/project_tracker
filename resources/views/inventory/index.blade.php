@@ -86,7 +86,7 @@
     </div>
 
     {{-- FILTERS --}}
-    <form method="GET" action="{{ route('inventory.index') }}" class="mt-8">
+    <form method="GET" action="{{ route('operation_inventory.index') }}" class="mt-8">
         <div class="bg-slate-50 border border-slate-200/60 rounded-xl p-3">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 {{-- Project --}}
@@ -134,7 +134,7 @@
                         class="flex-1 h-9 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 active:bg-slate-950 transition tracking-wide">
                         Search
                     </button>
-                    <a href="{{ route('inventory.index') }}"
+                    <a href="{{ route('operation_inventory.index') }}"
                         class="px-4 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition">
                         Reset
                     </a>

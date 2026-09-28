@@ -216,6 +216,8 @@ use App\Http\Controllers\BudgetRequestController;
             Route::get('/inventories/create', [InventoryController::class, 'create'])
             ->name('inventory.create');
             Route::get('/inventories', [InventoryController::class, 'index'])
+                ->name('operation_index.index');
+            Route::get('/inventories', [InventoryController::class, 'index'])
                 ->name('inventory.index');
             Route::get('/inventories/{inventory}/edit', [InventoryController::class, 'edit'])
                 ->name('inventory.edit');

@@ -42,7 +42,36 @@ class InventoryController extends Controller
 
         return view('operation.warehouse.inventory.index', compact('inventories', 'projects'));
     }
+    public function operation_index(Request $request)
+    {
+        $query = Inventory::with('item');
 
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->whereHas('item', function ($q) use ($search) {
+                $q->where('item_name', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('project_id')) {
+            $query->whereHas('item', function ($q) use ($request) {
+                $q->where('project_id', $request->project_id);
+            });
+        }
+
+        if ($request->filled('inventory_status')) {
+            $query->where('inventory_status', $request->inventory_status);
+        }
+
+        $inventories = $query->latest('created_at')
+            ->paginate(10)
+            ->withQueryString();
+
+        $projects = \App\Models\Project::orderBy('project_name')->get();
+
+        return view('inventory.index', compact('inventories', 'projects'));
+    }
     public function create()
     {
         $items = Item::orderBy('item_name')->get();

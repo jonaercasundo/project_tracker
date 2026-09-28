@@ -174,10 +174,10 @@
                 class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
                 
                 <li>
-                    <a href="{{ route('inventory.index') }}"
+                    <a href="{{ route('operation_inventory.index') }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
-                    {{ request()->routeIs('inventory.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('inventory.index') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    {{ request()->routeIs('operation_inventory.index') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('operation_inventory.index') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         <span>Inventory List</span>

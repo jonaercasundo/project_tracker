@@ -79,7 +79,7 @@
                         class="flex-1 h-9 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 active:bg-slate-950 transition tracking-wide">
                         Search
                     </button>
-                    <a href="{{ route('inventory.index') }}"
+                    <a href="{{ route('warehouse.inventory.index') }}"
                         class="px-4 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition">
                         Reset
                     </a>

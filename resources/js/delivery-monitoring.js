@@ -112,6 +112,10 @@ if (monitoring) {
     monitoring.addEventListener('click', event => {
         const button = event.target.closest('[data-expand-project]');
         if (!button) {
+            const row = event.target.closest('[data-project-url]');
+            if (row && !event.target.closest('a, button, input, select')) {
+                window.location.assign(row.dataset.projectUrl);
+            }
             return;
         }
         const details = document.getElementById(button.getAttribute('aria-controls'));

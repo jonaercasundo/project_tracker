@@ -4,7 +4,7 @@
     </thead>
     <tbody class="divide-y divide-slate-100">
         @forelse($report['projects'] as $project)
-            <tr class="align-top hover:bg-blue-50/30" data-project-row="{{ $project['project_id'] }}">
+            <tr class="cursor-pointer align-top hover:bg-blue-50/30" data-project-row="{{ $project['project_id'] }}" data-project-url="{{ route('projects.show', $project['project_id']) }}">
                 <td class="px-5 py-4">
                     <a href="{{ route('projects.show', $project['project_id']) }}" class="font-bold text-slate-900 hover:text-blue-600">{{ $project['project_name'] }}</a>
                     <p class="mt-1 text-xs text-slate-500">{{ $project['ref_no'] ?: 'No reference recorded' }}</p>

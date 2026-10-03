@@ -27,6 +27,11 @@
                     </x-slot>
 
                     <x-slot name="content">
+                        @role('Administrator')
+                            <x-dropdown-link :href="route('integrations.jarvis.index')">
+                                {{ __('API Access / Integrations') }}
+                            </x-dropdown-link>
+                        @endrole
                         <x-dropdown-link :href="route('profile.edit')">
                             {{ __('Profile') }}
                         </x-dropdown-link>
@@ -73,6 +78,11 @@
             </div>
 
             <div class="mt-3 space-y-1">
+                @role('Administrator')
+                    <x-responsive-nav-link :href="route('integrations.jarvis.index')">
+                        {{ __('API Access / Integrations') }}
+                    </x-responsive-nav-link>
+                @endrole
                 <x-responsive-nav-link :href="route('profile.edit')">
                     {{ __('Profile') }}
                 </x-responsive-nav-link>

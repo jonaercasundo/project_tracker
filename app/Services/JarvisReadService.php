@@ -1,0 +1,323 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Facades\DB;
+
+class JarvisReadService
+{
+    /** @param array<string, mixed> $filters */
+    public function projects(array $filters): Builder
+    {
+        $query = DB::table('projects as p');
+        $this->equals($query, $filters, ['project_id' => 'p.project_id', 'status' => 'p.status', 'agency' => 'p.agency', 'ref_no' => 'p.ref_no']);
+        if (isset($filters['year'])) {
+            $query->whereYear('p.created_at', $filters['year']);
+        }
+        $this->search($query, $filters, ['p.project_name', 'p.project_code', 'p.ref_no']);
+        if (isset($filters['has_pending_deliveries'])) {
+            $pending = $this->pendingDeliveries()->whereColumn('pd.project_id', 'p.project_id');
+            $query->whereExists($pending, 'and', ! (bool) $filters['has_pending_deliveries']);
+        }
+
+        return $query;
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function projectRecords(array $filters): Builder
+    {
+        return $this->projects($filters)
+            ->select(['p.project_id', 'p.project_code', 'p.ref_no', 'p.project_name', 'p.agency', 'p.status', 'p.contract_amount', 'p.start_date', 'p.end_date', 'p.created_at'])
+            ->selectSub(DB::table('lot')->whereColumn('lot.project_id', 'p.project_id')->selectRaw('COUNT(*)'), 'lots_count')
+            ->selectSub(DB::table('deliveries')->whereColumn('deliveries.project_id', 'p.project_id')->selectRaw('COUNT(*)'), 'delivery_rows_count')
+            ->selectSub($this->pendingDeliveries()->whereColumn('pd.project_id', 'p.project_id')->selectRaw('COUNT(*)'), 'pending_delivery_rows_count');
+    }
+
+    /**
+     * A pending delivery has a pending row or an expected pending package.
+     * Missing/null package status is pending, as in DeliveryController.
+     */
+    private function pendingDeliveries(): Builder
+    {
+        return DB::table('deliveries as pd')->where('pd.status', '!=', 'cancelled')
+            ->where(function (Builder $query): void {
+                $query->where('pd.status', 'pending')
+                    ->orWhereExists($this->allocations('pd')->whereRaw("COALESCE(ps.status, 'pending') = ?", ['pending']));
+            });
+    }
+
+    /**
+     * Match package definitions by keystage when present, otherwise by lot.
+     * Only select allocations; never call DeliveryController::generate, which writes.
+     */
+    private function allocations(string $deliveryAlias = 'd'): Builder
+    {
+        return DB::table('package as pk')
+            ->leftJoin('package_status as ps', function (JoinClause $join) use ($deliveryAlias): void {
+                $join->on('ps.package_id', '=', 'pk.package_id')
+                    ->on('ps.delivery_id', '=', $deliveryAlias.'.delivery_id');
+            })
+            ->where(function (Builder $query) use ($deliveryAlias): void {
+                $query->where(function (Builder $query) use ($deliveryAlias): void {
+                    $query->whereNotNull($deliveryAlias.'.keystage_id')->whereColumn('pk.keystage_id', $deliveryAlias.'.keystage_id');
+                })->orWhere(function (Builder $query) use ($deliveryAlias): void {
+                    $query->whereNull($deliveryAlias.'.keystage_id')->whereColumn('pk.lot_id', $deliveryAlias.'.lot_id');
+                });
+            });
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function deliveries(array $filters): Builder
+    {
+        $query = DB::table('deliveries as d')
+            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
+            ->leftJoin('school as s', 's.school_id', '=', 'd.school_id')
+            ->leftJoin('logistics_location as ll', 'll.logistics_location_id', '=', 'd.logistics_location_id');
+        $this->equals($query, $filters, [
+            'project_id' => 'd.project_id', 'lot_id' => 'd.lot_id',
+            'delivery_id' => 'd.delivery_id', 'delivery_status' => 'd.status',
+            'warehouse_id' => 'll.warehouse_id', 'region' => 's.region',
+            'division' => 's.division', 'municipality' => 's.municipality',
+        ]);
+        $dateColumn = 'd.'.($filters['date_field'] ?? 'delivery_date');
+        if (isset($filters['year'])) {
+            $query->whereYear($dateColumn, $filters['year']);
+        }
+        if (isset($filters['date_from'])) {
+            $query->whereDate($dateColumn, '>=', $filters['date_from']);
+        }
+        if (isset($filters['date_to'])) {
+            $query->whereDate($dateColumn, '<=', $filters['date_to']);
+        }
+        $this->search($query, $filters, ['d.dr_no', 'p.project_name', 'p.ref_no', 's.school_name']);
+        if (isset($filters['package_status'])) {
+            $query->whereExists($this->allocations()->whereRaw("COALESCE(ps.status, 'pending') = ?", [$filters['package_status']]));
+        }
+        if (isset($filters['billing_status'])) {
+            $billing = $this->billingGroups();
+            if ($filters['billing_status'] === 'unknown') {
+                $query->whereNotExists($billing);
+            } else {
+                $query->whereExists($billing->where('bg_status.status', $filters['billing_status']));
+            }
+        }
+
+        return $query;
+    }
+
+    /**
+     * Billing uses receipt numbers, not delivery IDs. Compare strings exactly;
+     * MySQL numeric coercion would incorrectly associate "3502-X" with 3502.
+     */
+    private function billingGroups(): Builder
+    {
+        $comparison = DB::connection()->getDriverName() === 'mysql'
+            ? 'CAST(bg.dr_no AS BINARY) = CAST(d.dr_no AS BINARY)'
+            : 'CAST(bg.dr_no AS TEXT) = CAST(d.dr_no AS TEXT)';
+
+        return DB::table('billing_grouped as bg')
+            ->join('grouping as bg_status', 'bg_status.group_id', '=', 'bg.group_id')
+            ->whereRaw($comparison);
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function deliveryRecords(array $filters): Builder
+    {
+        return $this->deliveries($filters)->select([
+            'd.delivery_id', 'd.project_id', 'p.project_name', 'p.ref_no', 'd.dr_no',
+            'd.lot_id', 'd.keystage_id', 'd.status as delivery_status', 'd.delivery_date',
+            'd.delivered_date', 'd.accepted_date', 'd.package_qty', 'd.received_qty',
+            'd.school_id', 's.school_name', 's.region', 's.division', 's.municipality',
+            'll.warehouse_id',
+        ])->selectSub($this->allocations()->selectRaw('COUNT(*)'), 'package_allocations_count')
+            ->selectSub($this->allocations()->whereRaw("COALESCE(ps.status, 'pending') = ?", ['pending'])->selectRaw('COUNT(*)'), 'pending_packages_count')
+            ->selectSub($this->allocations()->where('ps.status', 'released')->selectRaw('COUNT(*)'), 'released_packages_count')
+            ->selectSub($this->allocations()->where('ps.status', 'delivered')->selectRaw('COUNT(*)'), 'delivered_packages_count')
+            ->selectSub($this->allocations()->where('ps.status', 'accepted')->selectRaw('COUNT(*)'), 'accepted_packages_count')
+            ->selectSub($this->allocations()->where('ps.status', 'warehouse')->selectRaw('COUNT(*)'), 'warehouse_packages_count')
+            ->selectSub($this->billingGroups()->selectRaw('COUNT(*)'), 'billing_groups_count')
+            ->selectSub($this->billingGroups()->where('bg_status.status', 'billed')->selectRaw('COUNT(*)'), 'billed_groups_count')
+            ->selectSub($this->billingGroups()->where('bg_status.status', 'paid')->selectRaw('COUNT(*)'), 'paid_groups_count')
+            ->selectSub($this->billingGroups()->where('bg_status.status', 'for billing')->selectRaw('COUNT(*)'), 'for_billing_groups_count');
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function packages(array $filters): Builder
+    {
+        $query = $this->deliveries($filters)
+            ->join('package as pk', function (JoinClause $join): void {
+                $join->on(function (JoinClause $join): void {
+                    $join->whereNotNull('d.keystage_id')->on('pk.keystage_id', '=', 'd.keystage_id');
+                })->orOn(function (JoinClause $join): void {
+                    $join->whereNull('d.keystage_id')->on('pk.lot_id', '=', 'd.lot_id');
+                });
+            })
+            ->leftJoin('package_status as ps', function (JoinClause $join): void {
+                $join->on('ps.delivery_id', '=', 'd.delivery_id')->on('ps.package_id', '=', 'pk.package_id');
+            });
+        if (isset($filters['package_status'])) {
+            $query->whereRaw("COALESCE(ps.status, 'pending') = ?", [$filters['package_status']]);
+        }
+        $this->equals($query, $filters, ['package_id' => 'pk.package_id']);
+
+        return $query->select([
+            'pk.package_id', 'pk.package_num', 'pk.lot_id', 'pk.keystage_id',
+            'pk.length', 'pk.width', 'pk.height', 'd.delivery_id', 'd.project_id',
+            'p.project_name', 'd.dr_no', 'd.package_qty', 'd.status as delivery_status',
+            'd.school_id', 's.school_name', 's.region', 's.division', 's.municipality',
+            'ps.package_status_id', 'ps.delivered_at',
+        ])->selectRaw("COALESCE(ps.status, 'pending') as package_status")
+            ->selectSub(DB::table('package_content as pc')->whereColumn('pc.package_id', 'pk.package_id')->selectRaw('COUNT(*)'), 'content_rows_count');
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function inventory(array $filters): Builder
+    {
+        $query = DB::table('inventory as inv')
+            ->join('item as i', 'i.item_id', '=', 'inv.item_id')
+            ->join('warehouse as w', 'w.warehouse_id', '=', 'inv.warehouse_id')
+            ->leftJoin('projects as p', 'p.project_id', '=', 'i.project_id');
+        $this->equals($query, $filters, [
+            'project_id' => 'i.project_id', 'warehouse_id' => 'inv.warehouse_id',
+            'item_id' => 'inv.item_id', 'inventory_status' => 'inv.inventory_status',
+        ]);
+        if (isset($filters['available_only']) && (bool) $filters['available_only']) {
+            $query->where('inv.qty', '>', 0);
+        }
+        $this->search($query, $filters, ['i.item_name', 'w.warehouse_name', 'p.project_name']);
+
+        return $query;
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function inventoryRecords(array $filters): Builder
+    {
+        return $this->inventory($filters)->select([
+            'inv.inventory_id', 'inv.item_id', 'i.item_name', 'i.unit', 'i.project_id',
+            'p.project_name', 'inv.warehouse_id', 'w.warehouse_name', 'inv.qty',
+            'inv.inventory_status', 'inv.created_at',
+        ]);
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function warehouses(array $filters): Builder
+    {
+        $stock = $this->inventory($filters)->select('inv.warehouse_id')
+            ->selectRaw("COUNT(*) as inventory_rows_count, COUNT(DISTINCT inv.item_id) as distinct_items_count, COALESCE(SUM(inv.qty), 0) as recorded_qty, COALESCE(SUM(CASE WHEN inv.inventory_status = 'Approved' THEN inv.qty ELSE 0 END), 0) as approved_qty")
+            ->groupBy('inv.warehouse_id');
+        $query = DB::table('warehouse as w')->leftJoinSub($stock, 'stock', 'stock.warehouse_id', '=', 'w.warehouse_id');
+        $this->equals($query, $filters, ['warehouse_id' => 'w.warehouse_id']);
+        if (array_intersect(array_keys($filters), ['project_id', 'item_id', 'inventory_status', 'available_only', 'search'])) {
+            $query->whereNotNull('stock.warehouse_id');
+        }
+
+        return $query->select(['w.warehouse_id', 'w.warehouse_name', 'w.warehouse_address'])
+            ->selectRaw('COALESCE(stock.inventory_rows_count, 0) as inventory_rows_count, COALESCE(stock.distinct_items_count, 0) as distinct_items_count, COALESCE(stock.recorded_qty, 0) as recorded_qty, COALESCE(stock.approved_qty, 0) as approved_qty');
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function lots(array $filters): Builder
+    {
+        $query = DB::table('lot as l')->join('projects as p', 'p.project_id', '=', 'l.project_id');
+        $this->equals($query, $filters, ['project_id' => 'l.project_id', 'lot_id' => 'l.lot_id', 'lot_name' => 'l.lot_name']);
+        $this->search($query, $filters, ['l.lot_name', 'l.contract_no', 'p.project_name']);
+
+        return $query->select(['l.lot_id', 'l.lot_name', 'l.project_id', 'p.project_name', 'l.contract_no'])
+            ->selectSub(DB::table('deliveries')->whereColumn('deliveries.lot_id', 'l.lot_id')->selectRaw('COUNT(*)'), 'delivery_rows_count');
+    }
+
+    /**
+     * Operational package items are linked through package_content, not ProjectItem
+     * (which belongs to the separate bidding lots table).
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    public function masterlist(array $filters): Builder
+    {
+        if (($filters['source'] ?? 'catalog') === 'catalog') {
+            $query = DB::table('items as i');
+            $this->equals($query, $filters, ['catalog_project_id' => 'i.project_id', 'catalog_lot_id' => 'i.lot_id', 'active' => 'i.active', 'code_prefix' => 'i.code_prefix']);
+            $this->search($query, $filters, ['i.item_id', 'i.item_name', 'i.code_prefix']);
+
+            return $query->select(['i.id', 'i.item_id', 'i.code_prefix', 'i.item_name', 'i.description', 'i.unit', 'i.price', 'i.active', 'i.project_id as catalog_project_id', 'i.lot_id as catalog_lot_id']);
+        }
+
+        $query = DB::table('item as i');
+        $this->equals($query, $filters, ['project_id' => 'i.project_id', 'item_id' => 'i.item_id']);
+        $this->search($query, $filters, ['i.item_name']);
+        if (isset($filters['lot_id']) || isset($filters['package_id'])) {
+            $contents = DB::table('package_content as pc')
+                ->join('package as pk', 'pk.package_id', '=', 'pc.package_id')
+                ->leftJoin('keystage as k', 'k.keystage_id', '=', 'pk.keystage_id')
+                ->whereColumn('pc.item_id', 'i.item_id');
+            $this->equals($contents, $filters, ['package_id' => 'pk.package_id']);
+            if (isset($filters['lot_id'])) {
+                $contents->whereRaw('COALESCE(pk.lot_id, k.lot_id) = ?', [(int) $filters['lot_id']]);
+            }
+            $query->whereExists($contents);
+        }
+
+        return $query->select(['i.item_id', 'i.item_name', 'i.unit', 'i.project_id', 'i.price']);
+    }
+
+    /**
+     * All summary queries use the same selected project set. Year is project
+     * creation year here, rather than delivery year.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function dashboard(array $filters): array
+    {
+        $projects = $this->projects($filters);
+        $projectIds = (clone $projects)->select('p.project_id');
+        $deliveries = $this->deliveries([])->whereIn('d.project_id', $projectIds);
+        $inventory = $this->inventory([])->whereIn('i.project_id', $projectIds);
+        $packages = $this->packages([])->whereIn('d.project_id', $projectIds);
+        $deliverySummary = (clone $deliveries)->selectRaw("COUNT(*) as delivery_rows_count, COUNT(DISTINCT d.dr_no) as delivery_receipts_count, COUNT(DISTINCT CASE WHEN d.status IN ('delivered', 'accepted') THEN d.school_id END) as schools_with_delivered_or_accepted_rows")->first();
+        $inventorySummary = (clone $inventory)->selectRaw("COUNT(*) as inventory_rows_count, COALESCE(SUM(inv.qty), 0) as recorded_qty, COALESCE(SUM(CASE WHEN inv.inventory_status = 'Approved' THEN inv.qty ELSE 0 END), 0) as approved_qty")->first();
+        $deliverySummary->schools_with_delivered_or_accepted_packages = (clone $deliveries)
+            ->whereExists($this->allocations()->whereIn('ps.status', ['delivered', 'accepted']))
+            ->distinct()->count('d.school_id');
+        $inventorySummary->recorded_qty = (int) $inventorySummary->recorded_qty;
+        $inventorySummary->approved_qty = (int) $inventorySummary->approved_qty;
+        $packageCounts = (clone $packages)->select(DB::raw("COALESCE(ps.status, 'pending') as package_status"));
+        $packageCounts = DB::query()->fromSub($packageCounts, 'allocations')->select('package_status')->selectRaw('COUNT(*) as count')->groupBy('package_status')->orderBy('package_status')->get();
+
+        return [
+            'projects_count' => (clone $projects)->count(),
+            'projects_by_status' => (clone $projects)->select('p.status')->selectRaw('COUNT(*) as count')->groupBy('p.status')->orderBy('p.status')->get(),
+            'projects_with_pending_deliveries_count' => (clone $projects)->whereExists($this->pendingDeliveries()->whereColumn('pd.project_id', 'p.project_id'))->count(),
+            'deliveries' => $deliverySummary,
+            'delivery_rows_by_status' => (clone $deliveries)->select('d.status')->selectRaw('COUNT(*) as count')->groupBy('d.status')->orderBy('d.status')->get(),
+            'package_allocations_by_status' => $packageCounts,
+            'inventory' => $inventorySummary,
+        ];
+    }
+
+    /** @param array<string, mixed> $filters @param array<string, string> $columns */
+    private function equals(Builder $query, array $filters, array $columns): void
+    {
+        foreach ($columns as $filter => $column) {
+            if (isset($filters[$filter])) {
+                $query->where($column, $filters[$filter]);
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $filters @param list<string> $columns */
+    private function search(Builder $query, array $filters, array $columns): void
+    {
+        if (! isset($filters['search'])) {
+            return;
+        }
+
+        $query->where(function (Builder $query) use ($filters, $columns): void {
+            foreach ($columns as $column) {
+                $query->orWhere($column, 'like', '%'.$filters['search'].'%');
+            }
+        });
+    }
+}

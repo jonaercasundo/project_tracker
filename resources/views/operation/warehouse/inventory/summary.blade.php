@@ -195,4 +195,4 @@
 
 </div>
 
-</x-project_app-layout>
+</x-project_warehouse_app>

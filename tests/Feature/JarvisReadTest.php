@@ -360,7 +360,7 @@ it('counts shared DR receipts once and does not multiply billing across allocati
         ->assertJsonPath('data.projects.0.billing_groups_count', 2);
 });
 
-it('uses receipt progress without package definitions and keeps awarded projects active', function () {
+it('shows neutral package progress without allocations and keeps awarded projects active', function () {
     jarvisOperations();
     DB::table('projects')->where('project_id', 1)->update(['status' => 'Completed']);
     DB::table('deliveries')->where('project_id', 1)->update(['lot_id' => null, 'keystage_id' => null]);
@@ -370,10 +370,10 @@ it('uses receipt progress without package definitions and keeps awarded projects
 
     jarvisRead('projects/delivery-progress', $token)
         ->assertOk()->assertJsonCount(1, 'data.projects')
-        ->assertJsonPath('data.projects.0.progress_basis', 'delivery_receipts')
+        ->assertJsonPath('data.projects.0.progress_basis', 'no_package_allocations')
         ->assertJsonPath('data.projects.0.total_packages_count', 0)
         ->assertJsonPath('data.projects.0.completed_deliveries_count', 2)
-        ->assertJsonPath('data.projects.0.delivery_progress_percent', 100)
+        ->assertJsonPath('data.projects.0.delivery_progress_percent', null)
         ->assertJsonPath('data.projects.0.billing_progress_percent', 50);
 });
 
@@ -401,9 +401,62 @@ it('uses a fixed number of database queries for project progress regardless of p
     DB::flushQueryLog();
     DB::enableQueryLog();
     $service->report([]);
-    expect(count(DB::getQueryLog()))->toBe($firstQueryCount)->toBeLessThanOrEqual(3);
+    expect(count(DB::getQueryLog()))->toBe($firstQueryCount)->toBe(1);
     DB::disableQueryLog();
 });
+
+it('counts DR allocations rather than definitions and uses one current status per delivery package pair', function () {
+    jarvisOperations();
+    DB::table('package')->insert(['package_id' => 4, 'lot_id' => 99]);
+    DB::table('package_status')->insert([
+        ['package_status_id' => 4, 'delivery_id' => 1, 'package_id' => 1, 'status' => 'accepted'],
+        ['package_status_id' => 5, 'delivery_id' => 1, 'package_id' => 3, 'status' => 'delivered'],
+    ]);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
+        ->assertOk()->assertJsonPath('data.projects.0.total_deliveries_count', 2)
+        ->assertJsonPath('data.projects.0.total_package_allocations_count', 4)
+        ->assertJsonPath('data.projects.0.total_packages_count', 4)
+        ->assertJsonPath('data.projects.0.pending_packages_count', 1)
+        ->assertJsonPath('data.projects.0.released_packages_count', 0)
+        ->assertJsonPath('data.projects.0.delivered_packages_count', 1)
+        ->assertJsonPath('data.projects.0.accepted_packages_count', 2)
+        ->assertJsonPath('data.projects.0.completed_packages_count', 3)
+        ->assertJsonPath('data.projects.0.remaining_packages_count', 1)
+        ->assertJsonPath('data.projects.0.delivery_progress_percent', 75);
+    expect(DB::table('package')->where('lot_id', 1)->count())->toBe(2);
+});
+
+it('searches progress by project name or reference on the server', function (string $search) {
+    jarvisOperations();
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['active_only' => 0, 'search' => $search])
+        ->assertOk()->assertJsonCount(1, 'data.projects')
+        ->assertJsonPath('data.projects.0.project_id', 1)
+        ->assertJsonPath('data.summary.total_package_allocations_count', 4);
+})->with(['Science', 'REF-001']);
+
+it('sorts project progress using the requested metric', function (string $sort) {
+    jarvisOperations();
+    DB::table('projects')->where('project_id', 1)->update(['end_date' => '2027-01-01']);
+    DB::table('projects')->where('project_id', 2)->update(['end_date' => '2026-01-01']);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['active_only' => 0, 'sort' => $sort, 'direction' => 'desc'])
+        ->assertOk()->assertJsonPath('data.projects.0.project_id', 1);
+})->with(['project', 'progress', 'total_drs', 'total_dr_packages', 'last_delivery', 'end_date']);
+
+it('rejects invalid progress search and ordering options', function (array $filters, string $field) {
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, $filters)->assertUnprocessable()->assertJsonValidationErrors($field);
+})->with([
+    [['sort' => 'dr_no'], 'sort'],
+    [['direction' => 'sideways'], 'direction'],
+    [['search' => str_repeat('x', 256)], 'search'],
+]);
 
 it('returns one project row with exact DR counts under strict MariaDB grouping', function () {
     if (getenv('JARVIS_MYSQL_TESTS') !== '1') {
@@ -424,6 +477,8 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
         ['project_id' => 1, 'delivery_status' => 'mixed'],
         ['project_id' => 1, 'delivery_status' => 'pending'],
         ['active_only' => 0, 'region' => 'Region II'],
+        ['active_only' => 0, 'sort' => 'progress', 'direction' => 'desc'],
+        ['search' => 'REF-001', 'sort' => 'total_dr_packages'],
     ];
     $service = app(ProjectDeliveryProgressService::class);
     $expectedReports = array_map(fn (array $filter): array => $service->report($filter), $filters);
@@ -433,7 +488,7 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
     $companyId = $user->companies->first()->company_id;
     $token = $user->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
     $mysql = DB::connection('mysql');
-    $tables = ['projects', 'deliveries', 'school', 'package', 'package_status', 'billing_grouped', 'grouping'];
+    $tables = ['projects', 'deliveries', 'school', 'lot', 'package', 'package_status', 'billing_grouped', 'grouping'];
     $createdTables = [];
 
     try {
@@ -475,22 +530,33 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
         expect($projects->first()['total_deliveries_count'])->toBe(4);
 
         Sanctum::usePersonalAccessTokenModel(JarvisReadSqliteToken::class);
+        $mysql->flushQueryLog();
+        $mysql->enableQueryLog();
         $startedAt = microtime(true);
         $api = jarvisRead('projects/delivery-progress', $token, ['active_only' => 0]);
         $apiSeconds = microtime(true) - $startedAt;
+        $apiQueryCount = count($mysql->getQueryLog());
+        $mysql->disableQueryLog();
         $api->assertOk()->assertJsonCount(3, 'data.projects');
         jarvisRead('projects/delivery-progress', $token)->assertOk()->assertJsonCount(2, 'data.projects');
         $this->withoutVite();
         $this->actingAs($user)->withSession(['company_id' => $companyId]);
+        $mysql->flushQueryLog();
+        $mysql->enableQueryLog();
         $startedAt = microtime(true);
         $page = $this->get('/deliveries/monitoring?active_only=0');
         $pageSeconds = microtime(true) - $startedAt;
+        $pageQueryCount = count($mysql->getQueryLog());
+        $mysql->disableQueryLog();
         $page->assertOk()->assertSee('Project Delivery Progress')->assertSee('No allocations');
+        if ($htmlPath = getenv('JARVIS_MONITORING_HTML_PATH')) {
+            file_put_contents($htmlPath, $page->getContent());
+        }
         $this->get('/deliveries/monitoring')->assertOk();
         $dashboard = $this->getJson('/deliveries/monitoring?active_only=0')->assertOk();
         expect($dashboard->json('summary'))->toBe($api->json('data.summary'));
         expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
-        fwrite(STDOUT, PHP_EOL.json_encode(['strict_mariadb_fixture' => ['project_rows' => $queryRows->count(), 'query_seconds' => round($querySeconds, 4), 'api_seconds' => round($apiSeconds, 4), 'page_seconds' => round($pageSeconds, 4)]]).PHP_EOL);
+        fwrite(STDOUT, PHP_EOL.json_encode(['strict_mariadb_fixture' => ['project_rows' => $queryRows->count(), 'query_seconds' => round($querySeconds, 4), 'api_seconds' => round($apiSeconds, 4), 'page_seconds' => round($pageSeconds, 4), 'api_operations_queries' => $apiQueryCount, 'page_operations_queries' => $pageQueryCount]]).PHP_EOL);
     } finally {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
         DB::setDefaultConnection('sqlite');
@@ -507,7 +573,8 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
 
     $this->get('/deliveries/monitoring')->assertOk()->assertSee('Project Delivery Progress')
-        ->assertSee('Delivery Monitoring')->assertSee('Science Kits');
+        ->assertSee('Delivery Monitoring')->assertSee('Science Kits')->assertSee('DR Packages')
+        ->assertSee('Delivery Receipts')->assertSee('Timeline')->assertSee('Oct 03, 2026');
     $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()
         ->assertJsonPath('projects.0.delivery_progress_percent', 50)
         ->assertJsonPath('summary.total_packages_count', 4)->assertJsonStructure(['summary_html', 'projects_html']);
@@ -515,6 +582,10 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
     $user->assignRole(Role::findOrCreate('Administrator', 'web'));
     jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
         ->assertJsonPath('data.projects.0.delivery_progress_percent', 50);
+    $dashboard = $this->getJson('/deliveries/monitoring?search=REF-001&sort=progress&direction=desc');
+    $api = jarvisRead('projects/delivery-progress', $token, ['search' => 'REF-001', 'sort' => 'progress', 'direction' => 'desc']);
+    expect($dashboard->json('summary'))->toBe($api->json('data.summary'));
+    expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
 });
 
 it('returns 403 on Operations monitoring without the existing role or selected MMC company', function (string $condition) {

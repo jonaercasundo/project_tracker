@@ -37,6 +37,9 @@ class DeliveryMonitoringRequest extends FormRequest
             'division' => ['nullable', 'string', 'max:255'],
             'municipality' => ['nullable', 'string', 'max:255'],
             'active_only' => ['nullable', 'boolean'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'sort' => ['nullable', Rule::in(['project', 'progress', 'total_drs', 'total_dr_packages', 'last_delivery', 'end_date'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ];
     }
 }

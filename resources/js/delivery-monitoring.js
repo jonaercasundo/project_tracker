@@ -90,9 +90,10 @@ if (monitoring) {
 
     function restoreFilters(url) {
         const filters = new URL(url).searchParams;
-        for (const name of ['year', 'project_id', 'delivery_status', 'region']) {
+        for (const name of ['year', 'project_id', 'delivery_status', 'region', 'search', 'sort']) {
             form.elements[name].value = filters.get(name) ?? '';
         }
+        form.elements.direction.value = filters.get('direction') ?? 'asc';
         document.getElementById('monitoring-active').checked = filters.get('active_only') !== '0';
         fillLocations(division, 'division', locations, filters.get('division') ?? '');
         fillLocations(municipality, 'municipality', locations, filters.get('municipality') ?? '');
@@ -112,14 +113,46 @@ if (monitoring) {
     monitoring.addEventListener('click', event => {
         const button = event.target.closest('[data-expand-project]');
         if (!button) {
-            const row = event.target.closest('[data-project-url]');
-            if (row && !event.target.closest('a, button, input, select')) {
-                window.location.assign(row.dataset.projectUrl);
-            }
             return;
         }
         const details = document.getElementById(button.getAttribute('aria-controls'));
         details.hidden = !details.hidden;
-        button.setAttribute('aria-expanded', String(!details.hidden));
+        for (const control of monitoring.querySelectorAll('[data-expand-project]')) {
+            if (control.getAttribute('aria-controls') === details.id) {
+                control.setAttribute('aria-expanded', String(!details.hidden));
+                const chevron = control.querySelector('[data-chevron]');
+                if (chevron) {
+                    chevron.textContent = details.hidden ? '\u25B8' : '\u25BE';
+                }
+            }
+        }
+        button.closest('[data-actions-menu]')?.removeAttribute('open');
+    });
+    monitoring.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            monitoring.querySelectorAll('[data-actions-menu][open]').forEach(menu => menu.removeAttribute('open'));
+        }
+    });
+    monitoring.addEventListener('toggle', event => {
+        const menu = event.target;
+        if (!menu.matches('[data-actions-menu]') || !menu.open) {
+            return;
+        }
+        monitoring.querySelectorAll('[data-actions-menu][open]').forEach(other => {
+            if (other !== menu) {
+                other.removeAttribute('open');
+            }
+        });
+        const bounds = menu.querySelector('summary').getBoundingClientRect();
+        const popover = menu.querySelector('[data-actions-popover]');
+        popover.style.position = 'fixed';
+        popover.style.right = 'auto';
+        popover.style.left = `${Math.max(8, Math.min(bounds.right - 160, window.innerWidth - 168))}px`;
+        popover.style.top = `${Math.max(8, Math.min(bounds.bottom, window.innerHeight - popover.offsetHeight - 8))}px`;
+    }, true);
+    document.addEventListener('click', event => {
+        if (!event.target.closest('[data-actions-menu]')) {
+            monitoring.querySelectorAll('[data-actions-menu][open]').forEach(menu => menu.removeAttribute('open'));
+        }
     });
 }

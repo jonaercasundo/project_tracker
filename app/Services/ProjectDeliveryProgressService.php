@@ -26,6 +26,12 @@ class ProjectDeliveryProgressService
         if (isset($filters['project_id'])) {
             $query->where('p.project_id', $filters['project_id']);
         }
+        if (isset($filters['search'])) {
+            $query->where(function (Builder $query) use ($filters): void {
+                $query->where('p.project_name', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('p.ref_no', 'like', '%'.$filters['search'].'%');
+            });
+        }
 
         return $query;
     }
@@ -57,11 +63,17 @@ class ProjectDeliveryProgressService
      */
     private function allocations(array $filters, string $key): Builder
     {
+        $latestStatuses = DB::table('package_status as history')
+            ->joinSub($this->deliveries($filters)->select('d.delivery_id'), 'status_deliveries', 'status_deliveries.delivery_id', '=', 'history.delivery_id')
+            ->select(['history.delivery_id', 'history.package_id'])
+            ->selectRaw('MAX(history.package_status_id) as package_status_id')
+            ->groupBy('history.delivery_id', 'history.package_id');
         $query = $this->deliveries($filters)
             ->join('package as pk', 'pk.'.$key, '=', 'd.'.$key)
-            ->leftJoin('package_status as ps', function (JoinClause $join): void {
-                $join->on('ps.delivery_id', '=', 'd.delivery_id')->on('ps.package_id', '=', 'pk.package_id');
+            ->leftJoinSub($latestStatuses, 'latest_status', function (JoinClause $join): void {
+                $join->on('latest_status.delivery_id', '=', 'd.delivery_id')->on('latest_status.package_id', '=', 'pk.package_id');
             })
+            ->leftJoin('package_status as ps', 'ps.package_status_id', '=', 'latest_status.package_status_id')
             ->select(['d.project_id', 'd.delivery_id', 'pk.package_id'])
             ->selectRaw($this->receiptExpression('d').' as dr_no')
             ->selectRaw("COALESCE(ps.status, 'pending') as package_status");
@@ -223,11 +235,17 @@ class ProjectDeliveryProgressService
     /** Each join is already reduced to at most one row per project. @param array<string, mixed> $filters */
     public function recordsQuery(array $filters): Builder
     {
+        $lotNames = $this->deliveries($filters)
+            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
+            ->select('d.project_id')
+            ->selectRaw('GROUP_CONCAT(DISTINCT l.lot_name) as lot_names')
+            ->groupBy('d.project_id');
         $query = $this->projects($filters)
             ->leftJoinSub($this->deliveryStats($filters), 'delivery_stats', 'delivery_stats.project_id', '=', 'p.project_id')
             ->leftJoinSub($this->packageStats($filters), 'package_stats', 'package_stats.project_id', '=', 'p.project_id')
             ->leftJoinSub($this->billingStats($filters), 'billing_stats', 'billing_stats.project_id', '=', 'p.project_id')
-            ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'delivery_stats.last_delivery_date']);
+            ->leftJoinSub($lotNames, 'project_lots', 'project_lots.project_id', '=', 'p.project_id')
+            ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'delivery_stats.last_delivery_date', 'project_lots.lot_names']);
         if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status'])) {
             $query->whereNotNull('delivery_stats.project_id');
         }
@@ -239,6 +257,21 @@ class ProjectDeliveryProgressService
         }
         foreach (['billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count'] as $column) {
             $query->selectRaw("COALESCE(billing_stats.{$column}, 0) as {$column}");
+        }
+
+        $sortColumns = [
+            'project' => 'p.project_name',
+            'total_drs' => 'total_deliveries_count',
+            'total_dr_packages' => 'total_packages_count',
+            'last_delivery' => 'delivery_stats.last_delivery_date',
+            'end_date' => 'p.end_date',
+        ];
+        $sort = $filters['sort'] ?? null;
+        $direction = ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+        if ($sort === 'progress') {
+            $query->orderByRaw('(COALESCE(package_stats.delivered_packages_count, 0) + COALESCE(package_stats.accepted_packages_count, 0)) * 1.0 / NULLIF(package_stats.total_packages_count, 0) '.$direction);
+        } elseif (isset($sortColumns[$sort])) {
+            $query->orderBy($sortColumns[$sort], $direction);
         }
 
         return $query->orderBy('p.project_id');
@@ -266,7 +299,8 @@ class ProjectDeliveryProgressService
             $project['completed_packages_count'] = $project['delivered_packages_count'] + $project['accepted_packages_count'];
             $project['remaining_packages_count'] = $project['total_packages_count'] - $project['completed_packages_count'];
             $project['remaining_deliveries_count'] = $project['total_deliveries_count'] - $project['completed_deliveries_count'] - $project['cancelled_deliveries_count'];
-            $project['progress_basis'] = $project['total_packages_count'] > 0 ? 'package_allocations' : 'delivery_receipts';
+            $project['total_package_allocations_count'] = $project['total_packages_count'];
+            $project['progress_basis'] = $project['total_packages_count'] > 0 ? 'package_allocations' : 'no_package_allocations';
             $project['delivery_progress_percent'] = $this->deliveryProgress($project);
             $project['billing_progress_percent'] = $this->percentage($project['billed_groups_count'] + $project['paid_groups_count'], $project['billing_groups_count']);
 
@@ -278,10 +312,10 @@ class ProjectDeliveryProgressService
                 $summary[$column] = (int) $projects->sum($column);
             }
         }
-        foreach (['total_deliveries_count', 'delivery_rows_count', 'total_packages_count', 'completed_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count'] as $column) {
+        foreach (['total_deliveries_count', 'delivery_rows_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count'] as $column) {
             $summary[$column] ??= 0;
         }
-        $summary['progress_basis'] = $summary['total_packages_count'] > 0 ? 'package_allocations' : 'delivery_receipts';
+        $summary['progress_basis'] = $summary['total_packages_count'] > 0 ? 'package_allocations' : 'no_package_allocations';
         $summary['delivery_progress_percent'] = $this->deliveryProgress($summary);
 
         return ['projects' => $projects, 'summary' => $summary, 'definitions' => $this->definitions()];
@@ -290,9 +324,7 @@ class ProjectDeliveryProgressService
     /** @param array<string, mixed> $counts */
     private function deliveryProgress(array $counts): ?float
     {
-        return $counts['total_packages_count'] > 0
-            ? $this->percentage($counts['completed_packages_count'], $counts['total_packages_count'])
-            : $this->percentage($counts['completed_deliveries_count'], $counts['total_deliveries_count'] - $counts['cancelled_deliveries_count']);
+        return $this->percentage($counts['completed_packages_count'], $counts['total_packages_count']);
     }
 
     private function percentage(int $completed, int $total): ?float
@@ -305,7 +337,8 @@ class ProjectDeliveryProgressService
     {
         return [
             'deliveries' => 'Distinct exact DR receipts per project, rather than delivery rows. Receipt status is uniform expected package status, otherwise mixed; delivery row status is the fallback when no packages are defined.',
-            'delivery_progress' => '(Delivered + accepted expected package allocations) / all expected allocations x 100. Missing/null package status is pending. Without packages, use delivered + accepted receipts / non-cancelled receipts. No denominator means unavailable.',
+            'package_allocations' => 'Each delivery_id + package_id is one DR package allocation. Use delivery keystage when present, otherwise lot. Repeated package definitions across delivery records count as separate allocations. The newest package_status_id supplies the status if duplicate status rows exist; missing/null status is pending.',
+            'delivery_progress' => '(Delivered + accepted DR package allocations) / total DR package allocations x 100. Zero allocations means unavailable, displayed as No package allocations.',
             'completed_deliveries' => 'Receipts whose expected allocations are all delivered or accepted, including mixed delivered/accepted receipts. Without package definitions, all receipt delivery rows must be delivered or accepted.',
             'billing_progress' => '(Billed + paid recorded billing groups) / all recorded billing groups matching exact DR receipts x 100. Paid is a later stage than billed; no groups means unavailable.',
             'year' => 'Scheduled delivery_date year, consistent with delivery tracking. Location and delivery-status filters restrict the receipts and their allocations counted.',

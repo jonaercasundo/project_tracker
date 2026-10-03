@@ -13,11 +13,8 @@
             @include('operation.delivery.partials.monitoring-results', ['report' => $report])
         </div>
 
-        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="filter-heading">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <h2 id="filter-heading" class="text-sm font-bold text-slate-900">Filter progress</h2>
-                <p class="text-xs text-slate-500">Year applies to the scheduled delivery date.</p>
-            </div>
+        <details open class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <summary class="cursor-pointer text-sm font-bold text-slate-900">Filter progress <span class="ml-2 text-xs font-normal text-slate-500">Year applies to scheduled delivery date</span></summary>
             <form id="monitoring-filters" method="GET" action="{{ route('deliveries.monitoring') }}" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <div>
                     <label for="monitoring-year" class="mb-1 block text-xs font-semibold text-slate-600">Year</label>
@@ -73,15 +70,31 @@
             @if($errors->any())
                 <p class="mt-3 text-sm text-rose-600">{{ $errors->first() }}</p>
             @endif
-        </section>
+        </details>
 
         <section id="monitoring-projects" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="projects-heading">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
                 <div>
                     <h2 id="projects-heading" class="font-bold text-slate-900">Project delivery progress</h2>
-                    <p class="mt-1 text-xs text-slate-500">Delivery totals count DR receipts. Expand a project to see every stage.</p>
+                    <p class="mt-1 text-xs text-slate-500">Expand a project for DR, package allocation, billing and timeline details.</p>
                 </div>
-                <span class="text-xs font-medium text-blue-600">Delivered + accepted packages count as complete</span>
+                <div class="flex flex-wrap items-center gap-2">
+                    <label class="sr-only" for="monitoring-search">Search project or reference</label>
+                    <input form="monitoring-filters" id="monitoring-search" name="search" type="search" maxlength="255" value="{{ $filters['search'] ?? '' }}" placeholder="Search project or reference..." class="w-64 max-w-full rounded-lg border-slate-200 text-sm">
+                    <label class="sr-only" for="monitoring-sort">Sort projects</label>
+                    <select form="monitoring-filters" id="monitoring-sort" name="sort" class="rounded-lg border-slate-200 text-sm">
+                        <option value="">Default order</option>
+                        @foreach(['project' => 'Project', 'progress' => 'Progress', 'total_drs' => 'Total DRs', 'total_dr_packages' => 'Total DR Packages', 'last_delivery' => 'Last Delivery', 'end_date' => 'End Date'] as $value => $label)
+                            <option value="{{ $value }}" @selected(($filters['sort'] ?? '') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <label class="sr-only" for="monitoring-direction">Sort direction</label>
+                    <select form="monitoring-filters" id="monitoring-direction" name="direction" class="rounded-lg border-slate-200 text-sm">
+                        <option value="asc" @selected(($filters['direction'] ?? 'asc') === 'asc')>Ascending</option>
+                        <option value="desc" @selected(($filters['direction'] ?? '') === 'desc')>Descending</option>
+                    </select>
+                    <button form="monitoring-filters" type="submit" class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Search / Sort</button>
+                </div>
             </div>
             <div id="monitoring-table" class="overflow-x-auto">
                 @include('operation.delivery.partials.monitoring-projects', ['report' => $report])

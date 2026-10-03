@@ -10,6 +10,8 @@ use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
+use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -59,6 +61,14 @@ class JarvisReadTestCase extends TestCase
 class JarvisReadConsoleKernel extends Illuminate\Foundation\Console\Kernel
 {
     protected function discoverCommands(): void {}
+}
+
+/** Keep authentication fixtures in SQLite while operational SQL runs on temporary MariaDB tables. */
+class JarvisReadSqliteToken extends PersonalAccessToken
+{
+    protected $connection = 'sqlite';
+
+    protected $table = 'personal_access_tokens';
 }
 
 pest()->extend(JarvisReadTestCase::class);
@@ -393,6 +403,101 @@ it('uses a fixed number of database queries for project progress regardless of p
     $service->report([]);
     expect(count(DB::getQueryLog()))->toBe($firstQueryCount)->toBeLessThanOrEqual(3);
     DB::disableQueryLog();
+});
+
+it('returns one project row with exact DR counts under strict MariaDB grouping', function () {
+    if (getenv('JARVIS_MYSQL_TESTS') !== '1') {
+        $this->markTestSkipped('Set JARVIS_MYSQL_TESTS=1 to use connection-local temporary MariaDB fixture tables.');
+    }
+
+    jarvisOperations();
+    DB::table('projects')->insert(['project_id' => 3, 'project_name' => 'No allocations', 'status' => 'Pending']);
+    DB::table('deliveries')->insert([
+        ['delivery_id' => 4, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3502', 'status' => 'pending', 'delivery_date' => '2026-10-02'],
+        ['delivery_id' => 5, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3502-x', 'status' => 'pending', 'delivery_date' => '2026-10-02'],
+        ['delivery_id' => 6, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3502-X ', 'status' => 'pending', 'delivery_date' => '2026-10-02'],
+    ]);
+    DB::table('billing_grouped')->insert(['dr_no' => '3502-X', 'group_id' => 1]);
+    $filters = [
+        ['active_only' => 0],
+        ['project_id' => 1, 'year' => 2026, 'region' => 'Region I', 'division' => 'North', 'municipality' => 'Town A'],
+        ['project_id' => 1, 'delivery_status' => 'mixed'],
+        ['project_id' => 1, 'delivery_status' => 'pending'],
+        ['active_only' => 0, 'region' => 'Region II'],
+    ];
+    $service = app(ProjectDeliveryProgressService::class);
+    $expectedReports = array_map(fn (array $filter): array => $service->report($filter), $filters);
+    $user = jarvisReader();
+    $user->setConnection('sqlite');
+    $user->load('roles', 'companies');
+    $companyId = $user->companies->first()->company_id;
+    $token = $user->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+    $mysql = DB::connection('mysql');
+    $tables = ['projects', 'deliveries', 'school', 'package', 'package_status', 'billing_grouped', 'grouping'];
+    $createdTables = [];
+
+    try {
+        expect($mysql->selectOne('SELECT @@SESSION.sql_mode as sql_mode')->sql_mode)->toContain('ONLY_FULL_GROUP_BY');
+        foreach ($tables as $table) {
+            $columns = DB::connection('sqlite')->getSchemaBuilder()->getColumns($table);
+            $definitions = array_map(function (array $column) use ($table): string {
+                $type = $column['type_name'] === 'integer' ? 'BIGINT' : 'VARCHAR(255)';
+                if ($column['name'] === 'dr_no') {
+                    $type = 'VARCHAR(100) COLLATE '.($table === 'billing_grouped' ? 'utf8mb4_bin' : 'utf8mb4_general_ci');
+                }
+
+                return '`'.$column['name'].'` '.$type.' NULL';
+            }, $columns);
+            $mysql->statement('CREATE TEMPORARY TABLE `'.$table.'` ('.implode(', ', $definitions).') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci');
+            $createdTables[] = $table;
+            $rows = DB::connection('sqlite')->table($table)->get()->map(fn (object $row): array => (array) $row)->all();
+            if ($rows !== []) {
+                $mysql->table($table)->insert($rows);
+            }
+        }
+        DB::setDefaultConnection('mysql');
+        $query = $service->recordsQuery(['active_only' => 0]);
+        if ($sqlPath = getenv('JARVIS_PROGRESS_SQL_PATH')) {
+            file_put_contents($sqlPath, $query->toRawSql().';'.PHP_EOL);
+        }
+        $startedAt = microtime(true);
+        $queryRows = $query->get();
+        $querySeconds = microtime(true) - $startedAt;
+        foreach ($filters as $index => $filter) {
+            $actual = $service->report($filter);
+            expect($actual['projects']->all())->toBe($expectedReports[$index]['projects']->all());
+            expect($actual['summary'])->toBe($expectedReports[$index]['summary']);
+        }
+        $projects = $service->report(['active_only' => 0])['projects'];
+        expect($projects)->toHaveCount(3);
+        expect($projects->pluck('project_id')->unique())->toHaveCount(3);
+        expect($projects->first()['billing_groups_count'])->toBe(2);
+        expect($projects->first()['total_deliveries_count'])->toBe(4);
+
+        Sanctum::usePersonalAccessTokenModel(JarvisReadSqliteToken::class);
+        $startedAt = microtime(true);
+        $api = jarvisRead('projects/delivery-progress', $token, ['active_only' => 0]);
+        $apiSeconds = microtime(true) - $startedAt;
+        $api->assertOk()->assertJsonCount(3, 'data.projects');
+        jarvisRead('projects/delivery-progress', $token)->assertOk()->assertJsonCount(2, 'data.projects');
+        $this->withoutVite();
+        $this->actingAs($user)->withSession(['company_id' => $companyId]);
+        $startedAt = microtime(true);
+        $page = $this->get('/deliveries/monitoring?active_only=0');
+        $pageSeconds = microtime(true) - $startedAt;
+        $page->assertOk()->assertSee('Project Delivery Progress')->assertSee('No allocations');
+        $this->get('/deliveries/monitoring')->assertOk();
+        $dashboard = $this->getJson('/deliveries/monitoring?active_only=0')->assertOk();
+        expect($dashboard->json('summary'))->toBe($api->json('data.summary'));
+        expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
+        fwrite(STDOUT, PHP_EOL.json_encode(['strict_mariadb_fixture' => ['project_rows' => $queryRows->count(), 'query_seconds' => round($querySeconds, 4), 'api_seconds' => round($apiSeconds, 4), 'page_seconds' => round($pageSeconds, 4)]]).PHP_EOL);
+    } finally {
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        DB::setDefaultConnection('sqlite');
+        foreach ($createdTables as $table) {
+            $mysql->statement('DROP TEMPORARY TABLE `'.$table.'`');
+        }
+    }
 });
 
 it('serves the Operations page and AJAX filters using the same report as JARVIS', function () {

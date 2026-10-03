@@ -50,45 +50,45 @@ class ProjectDeliveryProgressService
     }
 
     /**
-     * Count expected allocations, including absent/null status as pending. Each
+     * Select expected allocations, including absent/null status as pending. Each
      * delivery takes exactly one path: keystage when present, otherwise lot.
      *
      * @param  array<string, mixed>  $filters
      */
-    private function receiptAllocations(array $filters, string $key): Builder
+    private function allocations(array $filters, string $key): Builder
     {
         $query = $this->deliveries($filters)
-            ->leftJoin('package as pk', 'pk.'.$key, '=', 'd.'.$key)
+            ->join('package as pk', 'pk.'.$key, '=', 'd.'.$key)
             ->leftJoin('package_status as ps', function (JoinClause $join): void {
                 $join->on('ps.delivery_id', '=', 'd.delivery_id')->on('ps.package_id', '=', 'pk.package_id');
             })
-            ->select('d.project_id')->selectRaw($this->receiptExpression('d').' as dr_no')
-            ->selectRaw('COUNT(DISTINCT d.delivery_id) as delivery_rows_count, COUNT(pk.package_id) as total_packages_count, MAX(d.delivered_date) as last_delivery_date');
+            ->select(['d.project_id', 'd.delivery_id', 'pk.package_id'])
+            ->selectRaw($this->receiptExpression('d').' as dr_no')
+            ->selectRaw("COALESCE(ps.status, 'pending') as package_status");
         if ($key === 'keystage_id') {
             $query->whereNotNull('d.keystage_id');
         } else {
             $query->whereNull('d.keystage_id');
         }
-        foreach (self::PACKAGE_STATUSES as $status) {
-            $query->selectRaw("COUNT(CASE WHEN pk.package_id IS NOT NULL AND COALESCE(ps.status, 'pending') = ? THEN 1 END) as {$status}_packages_count", [$status]);
-        }
-        foreach (self::DELIVERY_STATUSES as $status) {
-            $column = str_replace(' ', '_', $status);
-            $query->selectRaw("COUNT(DISTINCT CASE WHEN d.status = ? THEN d.delivery_id END) as {$column}_rows_count", [$status]);
-        }
 
-        return $this->groupReceipts($query, 'd');
+        return $query;
     }
 
     private function receiptExpression(string $alias): string
     {
-        return DB::connection()->getDriverName() === 'mysql' ? $alias.'.dr_no COLLATE utf8mb4_bin' : $alias.'.dr_no';
+        return $this->usesMysql() ? $alias.'.dr_no COLLATE utf8mb4_bin' : $alias.'.dr_no';
     }
 
+    private function usesMysql(): bool
+    {
+        return in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true);
+    }
+
+    /** Group only materialized receipt columns, whose collation was set before aggregation. */
     private function groupReceipts(Builder $query, string $alias): Builder
     {
-        $query->groupBy($alias.'.project_id')->groupByRaw($this->receiptExpression($alias));
-        if (DB::connection()->getDriverName() === 'mysql') {
+        $query->groupBy($alias.'.project_id', $alias.'.dr_no');
+        if ($this->usesMysql()) {
             $query->groupByRaw('OCTET_LENGTH('.$alias.'.dr_no)');
         }
 
@@ -96,20 +96,59 @@ class ProjectDeliveryProgressService
     }
 
     /** @param array<string, mixed> $filters */
-    private function receipts(array $filters): Builder
+    private function packageAllocations(array $filters): Builder
     {
-        $allocations = $this->receiptAllocations($filters, 'keystage_id')
-            ->unionAll($this->receiptAllocations($filters, 'lot_id'));
-        $totals = DB::query()->fromSub($allocations, 'a')->select('a.project_id', 'a.dr_no')
-            ->selectRaw('SUM(a.delivery_rows_count) as delivery_rows_count, SUM(a.total_packages_count) as total_packages_count, MAX(a.last_delivery_date) as last_delivery_date');
+        return $this->allocations($filters, 'keystage_id')->unionAll($this->allocations($filters, 'lot_id'));
+    }
+
+    private function countPackages(Builder $query, string $alias): Builder
+    {
+        $query->selectRaw('COUNT(*) as total_packages_count');
         foreach (self::PACKAGE_STATUSES as $status) {
-            $totals->selectRaw("SUM(a.{$status}_packages_count) as {$status}_packages_count");
+            $query->selectRaw("COUNT(CASE WHEN {$alias}.package_status = ? THEN 1 END) as {$status}_packages_count", [$status]);
         }
+
+        return $query;
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function receiptRows(array $filters): Builder
+    {
+        $deliveries = $this->deliveries($filters)
+            ->select(['d.project_id', 'd.delivery_id', 'd.status', 'd.delivered_date'])
+            ->selectRaw($this->receiptExpression('d').' as dr_no');
+        $rows = DB::query()->fromSub($deliveries, 'dr')->select('dr.project_id', 'dr.dr_no')
+            ->selectRaw('COUNT(*) as delivery_rows_count, MAX(dr.delivered_date) as last_delivery_date');
         foreach (self::DELIVERY_STATUSES as $status) {
             $column = str_replace(' ', '_', $status);
-            $totals->selectRaw("SUM(a.{$column}_rows_count) as {$column}_rows_count");
+            $rows->selectRaw("COUNT(CASE WHEN dr.status = ? THEN 1 END) as {$column}_rows_count", [$status]);
         }
-        $this->groupReceipts($totals, 'a');
+
+        return $this->groupReceipts($rows, 'dr');
+    }
+
+    private function matchReceipt(JoinClause $join, string $leftAlias, string $rightAlias): void
+    {
+        $join->on($leftAlias.'.project_id', '=', $rightAlias.'.project_id')
+            ->on($leftAlias.'.dr_no', '=', $rightAlias.'.dr_no');
+        if ($this->usesMysql()) {
+            $join->whereRaw('OCTET_LENGTH('.$leftAlias.'.dr_no) = OCTET_LENGTH('.$rightAlias.'.dr_no)');
+        }
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function receipts(array $filters): Builder
+    {
+        $packages = DB::query()->fromSub($this->packageAllocations($filters), 'a')->select('a.project_id', 'a.dr_no');
+        $this->countPackages($packages, 'a');
+        $this->groupReceipts($packages, 'a');
+        $totals = DB::query()->fromSub($this->receiptRows($filters), 'dr')
+            ->leftJoinSub($packages, 'pk', function (JoinClause $join): void {
+                $this->matchReceipt($join, 'pk', 'dr');
+            })->select('dr.*')->selectRaw('COALESCE(pk.total_packages_count, 0) as total_packages_count');
+        foreach (self::PACKAGE_STATUSES as $status) {
+            $totals->selectRaw("COALESCE(pk.{$status}_packages_count, 0) as {$status}_packages_count");
+        }
 
         $statusExpression = 'CASE WHEN r.total_packages_count > 0 THEN CASE';
         foreach (self::PACKAGE_STATUSES as $status) {
@@ -131,28 +170,75 @@ class ProjectDeliveryProgressService
     }
 
     /** @param array<string, mixed> $filters */
-    public function recordsQuery(array $filters): Builder
+    private function deliveryStats(array $filters): Builder
     {
         $receipts = $this->receipts($filters);
         $deliveryCounts = DB::query()->fromSub($receipts, 'receipt')->select('receipt.project_id')
-            ->selectRaw('COUNT(*) as total_deliveries_count, SUM(receipt.delivery_rows_count) as delivery_rows_count, SUM(receipt.total_packages_count) as total_packages_count, MAX(receipt.last_delivery_date) as last_delivery_date')
+            ->selectRaw('COUNT(*) as total_deliveries_count, SUM(receipt.delivery_rows_count) as delivery_rows_count, MAX(receipt.last_delivery_date) as last_delivery_date')
             ->selectRaw('COUNT(CASE WHEN receipt.total_packages_count > 0 AND receipt.delivered_packages_count + receipt.accepted_packages_count = receipt.total_packages_count THEN 1 WHEN receipt.total_packages_count = 0 AND receipt.delivered_rows_count + receipt.accepted_rows_count = receipt.delivery_rows_count THEN 1 END) as completed_deliveries_count')
             ->groupBy('receipt.project_id');
-        foreach (self::PACKAGE_STATUSES as $status) {
-            $deliveryCounts->selectRaw("SUM(receipt.{$status}_packages_count) as {$status}_packages_count");
-        }
         foreach (self::DELIVERY_STATUSES as $status) {
             $column = str_replace(' ', '_', $status);
             $deliveryCounts->selectRaw("COUNT(CASE WHEN receipt.delivery_status = ? THEN 1 END) as {$column}_deliveries_count", [$status]);
         }
-        $query = $this->projects($filters)
-            ->leftJoinSub($deliveryCounts, 'progress', 'progress.project_id', '=', 'p.project_id')
-            ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'progress.last_delivery_date']);
-        if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status'])) {
-            $query->whereNotNull('progress.project_id');
+
+        return $deliveryCounts;
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function packageStats(array $filters): Builder
+    {
+        $query = DB::query()->fromSub($this->packageAllocations($filters), 'a');
+        if (isset($filters['delivery_status'])) {
+            $query->joinSub($this->receipts($filters)->select('receipt.project_id', 'receipt.dr_no'), 'selected_receipts', function (JoinClause $join): void {
+                $this->matchReceipt($join, 'a', 'selected_receipts');
+            });
         }
-        foreach (array_merge(['total_deliveries_count', 'completed_deliveries_count', 'delivery_rows_count', 'total_packages_count'], array_map(fn (string $status): string => $status.'_packages_count', self::PACKAGE_STATUSES), array_map(fn (string $status): string => str_replace(' ', '_', $status).'_deliveries_count', self::DELIVERY_STATUSES)) as $column) {
-            $query->selectRaw("COALESCE(progress.{$column}, 0) as {$column}");
+
+        return $this->countPackages($query->select('a.project_id'), 'a')->groupBy('a.project_id');
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function billingStats(array $filters): Builder
+    {
+        $receipts = isset($filters['delivery_status'])
+            ? $this->receipts($filters)->select('receipt.project_id', 'receipt.dr_no')
+            : DB::query()->fromSub($this->receiptRows($filters), 'dr')->select('dr.project_id', 'dr.dr_no');
+
+        return DB::query()->fromSub($receipts, 'receipt')
+            ->join('billing_grouped as bg', function (JoinClause $join): void {
+                $join->on('bg.dr_no', '=', 'receipt.dr_no');
+                if ($this->usesMysql()) {
+                    $join->whereRaw('OCTET_LENGTH(bg.dr_no) = OCTET_LENGTH(receipt.dr_no)');
+                }
+            })
+            ->join('grouping as g', 'g.group_id', '=', 'bg.group_id')
+            ->select('receipt.project_id')->selectRaw('COUNT(*) as billing_groups_count')
+            ->selectRaw("COUNT(CASE WHEN g.status = 'for billing' THEN 1 END) as for_billing_groups_count")
+            ->selectRaw("COUNT(CASE WHEN g.status = 'billed' THEN 1 END) as billed_groups_count")
+            ->selectRaw("COUNT(CASE WHEN g.status = 'paid' THEN 1 END) as paid_groups_count")
+            ->groupBy('receipt.project_id');
+    }
+
+    /** Each join is already reduced to at most one row per project. @param array<string, mixed> $filters */
+    public function recordsQuery(array $filters): Builder
+    {
+        $query = $this->projects($filters)
+            ->leftJoinSub($this->deliveryStats($filters), 'delivery_stats', 'delivery_stats.project_id', '=', 'p.project_id')
+            ->leftJoinSub($this->packageStats($filters), 'package_stats', 'package_stats.project_id', '=', 'p.project_id')
+            ->leftJoinSub($this->billingStats($filters), 'billing_stats', 'billing_stats.project_id', '=', 'p.project_id')
+            ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'delivery_stats.last_delivery_date']);
+        if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status'])) {
+            $query->whereNotNull('delivery_stats.project_id');
+        }
+        foreach (array_merge(['total_deliveries_count', 'completed_deliveries_count', 'delivery_rows_count'], array_map(fn (string $status): string => str_replace(' ', '_', $status).'_deliveries_count', self::DELIVERY_STATUSES)) as $column) {
+            $query->selectRaw("COALESCE(delivery_stats.{$column}, 0) as {$column}");
+        }
+        foreach (array_merge(['total_packages_count'], array_map(fn (string $status): string => $status.'_packages_count', self::PACKAGE_STATUSES)) as $column) {
+            $query->selectRaw("COALESCE(package_stats.{$column}, 0) as {$column}");
+        }
+        foreach (['billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count'] as $column) {
+            $query->selectRaw("COALESCE(billing_stats.{$column}, 0) as {$column}");
         }
 
         return $query->orderBy('p.project_id');
@@ -169,33 +255,12 @@ class ProjectDeliveryProgressService
     public function report(array $filters): array
     {
         $records = $this->recordsQuery($filters)->get();
-        $receipts = $this->deliveries($filters)->select('d.project_id')->selectRaw($this->receiptExpression('d').' as dr_no');
-        $this->groupReceipts($receipts, 'd');
-        if (isset($filters['delivery_status'])) {
-            $receipts = $this->receipts($filters)->select('receipt.project_id', 'receipt.dr_no');
-        }
-        $billing = DB::query()->fromSub($receipts, 'receipt')
-            ->join('billing_grouped as bg', function (JoinClause $join): void {
-                $join->on('bg.dr_no', '=', 'receipt.dr_no');
-                if (DB::connection()->getDriverName() === 'mysql') {
-                    $join->whereRaw('OCTET_LENGTH(bg.dr_no) = OCTET_LENGTH(receipt.dr_no)');
-                }
-            })
-            ->join('grouping as g', 'g.group_id', '=', 'bg.group_id')
-            ->select('receipt.project_id')->selectRaw('COUNT(*) as billing_groups_count')
-            ->selectRaw("COUNT(CASE WHEN g.status = 'for billing' THEN 1 END) as for_billing_groups_count")
-            ->selectRaw("COUNT(CASE WHEN g.status = 'billed' THEN 1 END) as billed_groups_count")
-            ->selectRaw("COUNT(CASE WHEN g.status = 'paid' THEN 1 END) as paid_groups_count")
-            ->groupBy('receipt.project_id')->get()->keyBy('project_id');
-        $projects = $records->map(function (object $record) use ($billing): array {
+        $projects = $records->map(function (object $record): array {
             $project = (array) $record;
             foreach ($project as $column => $value) {
                 if (str_ends_with($column, '_count') || $column === 'project_id') {
                     $project[$column] = (int) $value;
                 }
-            }
-            foreach (['billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count'] as $column) {
-                $project[$column] = (int) ($billing->get($record->project_id)?->{$column} ?? 0);
             }
             $project['is_active'] = ! in_array(strtolower($project['project_status'] ?? ''), array_map('strtolower', self::INACTIVE_PROJECT_STATUSES), true);
             $project['completed_packages_count'] = $project['delivered_packages_count'] + $project['accepted_packages_count'];

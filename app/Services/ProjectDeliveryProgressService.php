@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
@@ -317,20 +318,90 @@ class ProjectDeliveryProgressService
             ->orderBy('i.item_id');
     }
 
+    /** @param array<string, mixed> $filters */
+    private function warehouseItemTotals(array $filters): Builder
+    {
+        $unitExpression = "CASE WHEN unit IS NULL OR LENGTH(unit) = 0 OR (LENGTH(unit) = 1 AND unit = '0') THEN 'Unit unspecified' ELSE unit END";
+        if ($this->usesMysql()) {
+            $unitExpression .= ' COLLATE utf8mb4_bin';
+        }
+
+        return DB::query()->fromSub($this->warehouseItemsQuery($filters)->reorder(), 'item_totals')
+            ->select('item_totals.*')
+            ->selectRaw($unitExpression.' as quantity_unit')
+            ->selectRaw('CASE WHEN available < 0 THEN 0 WHEN available > required THEN required ELSE available END as covered')
+            ->selectRaw('CASE WHEN missing_quantity_count = 0 AND required > 0 THEN ROUND(100.0 * CASE WHEN available < 0 THEN 0 WHEN available > required THEN required ELSE available END / required, 2) ELSE NULL END as percent')
+            ->selectRaw('available - history_balance as balance_difference');
+    }
+
+    /** Return only one summary row per project/unit, never inventory item records. @param array<string, mixed> $filters */
+    public function warehouseSummaryQuery(array $filters): Builder
+    {
+        $query = DB::query()->fromSub($this->warehouseItemTotals($filters), 'w')
+            ->select('w.project_id', 'w.quantity_unit as unit')
+            ->selectRaw('SUM(w.missing_quantity_count) as missing_quantity_count, MAX(w.last_inventory_date) as last_inventory_date')
+            ->selectRaw('SUM(CASE WHEN ABS(w.balance_difference) > 0.00001 THEN 1 ELSE 0 END) as balance_mismatch_count')
+            ->selectRaw('SUM(CASE WHEN w.available < 0 OR w.stock_in < 0 OR w.stock_out < 0 THEN 1 ELSE 0 END) as negative_quantity_count')
+            ->groupBy('w.project_id', 'w.quantity_unit')->orderByRaw('MIN(w.item_id)');
+        if ($this->usesMysql()) {
+            $query->groupByRaw('OCTET_LENGTH(w.quantity_unit)');
+        }
+        foreach (['required', 'stock_in', 'stock_out', 'opening', 'history_balance', 'available', 'covered', 'balance_difference'] as $column) {
+            $query->selectRaw('SUM(w.'.$column.') as '.$column);
+        }
+
+        return $query;
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function detailRecords(array $filters, string $section, int $perPage, int $page): LengthAwarePaginator
+    {
+        abort_unless($this->projects($filters)->exists(), 404);
+        if ($section === 'warehouse') {
+            $query = $this->warehouseItemTotals($filters)->orderBy('item_totals.item_id');
+        } elseif ($section === 'stock-out') {
+            $query = DB::table('inventory_history as h')->join('item as i', 'i.item_id', '=', 'h.item_id')
+                ->where('i.project_id', $filters['project_id'])->where('h.change_type', 'stock_out')
+                ->select(['h.history_id', 'i.item_name', 'i.unit', 'h.warehouse_id', 'h.old_qty', 'h.new_qty', 'h.changed_at'])
+                ->selectRaw('1.0 * h.old_qty - h.new_qty as stock_out')->orderByDesc('h.history_id');
+        } elseif ($section === 'delivered') {
+            $query = DB::query()->fromSub($this->packageAllocations($filters), 'a')
+                ->whereIn('a.package_status', ['delivered', 'accepted'])->select('a.*');
+            if (isset($filters['delivery_status'])) {
+                $query->joinSub($this->receipts($filters)->select('receipt.project_id', 'receipt.dr_no'), 'selected_receipts', function (JoinClause $join): void {
+                    $this->matchReceipt($join, 'a', 'selected_receipts');
+                });
+            }
+            $query->orderBy('a.delivery_id')->orderBy('a.package_id');
+        } elseif ($section === 'billing') {
+            $receipts = isset($filters['delivery_status'])
+                ? $this->receipts($filters)->select('receipt.project_id', 'receipt.dr_no')
+                : DB::query()->fromSub($this->receiptRows($filters), 'dr')->select('dr.project_id', 'dr.dr_no');
+            $query = DB::query()->fromSub($receipts, 'receipt')->join('billing_grouped as bg', function (JoinClause $join): void {
+                $join->on('bg.dr_no', '=', 'receipt.dr_no');
+                if ($this->usesMysql()) {
+                    $join->whereRaw('OCTET_LENGTH(bg.dr_no) = OCTET_LENGTH(receipt.dr_no)');
+                }
+            })->join('grouping as g', 'g.group_id', '=', 'bg.group_id')
+                ->select(['receipt.dr_no', 'bg.group_id', 'g.status', 'bg.created_at'])->orderBy('receipt.dr_no')->orderBy('bg.group_id');
+        } else {
+            $query = $this->receipts($filters)->orderBy('receipt.dr_no');
+        }
+
+        return $query->paginate($perPage, ['*'], 'page', $page);
+    }
+
     /** @param Collection<int, object> $rows @return array<string, mixed> */
     private function warehouseReadiness(Collection $rows): array
     {
         $items = $rows->map(function (object $row): array {
             $item = (array) $row;
-            foreach (['project_id', 'item_id', 'missing_quantity_count'] as $key) {
+            foreach (['project_id', 'missing_quantity_count', 'balance_mismatch_count', 'negative_quantity_count'] as $key) {
                 $item[$key] = (int) $item[$key];
             }
-            foreach (['required', 'stock_in', 'stock_out', 'opening', 'history_balance', 'available'] as $key) {
+            foreach (['required', 'stock_in', 'stock_out', 'opening', 'history_balance', 'available', 'covered', 'balance_difference'] as $key) {
                 $item[$key] = (float) $item[$key];
             }
-            $item['covered'] = min(max(0, $item['available']), $item['required']);
-            $item['balance_difference'] = $item['available'] - $item['history_balance'];
-            $item['percent'] = $item['missing_quantity_count'] === 0 && $item['required'] > 0 ? round($item['covered'] / $item['required'] * 100, 2) : null;
 
             return $item;
         });
@@ -354,20 +425,20 @@ class ProjectDeliveryProgressService
             'percent' => null, 'stock_out_percent' => null, 'requirements_complete' => $units->isEmpty(),
         ];
         $flags = [];
-        if ($items->contains(fn (array $item): bool => abs($item['balance_difference']) > 0.00001)) {
+        if ($items->sum('balance_mismatch_count') > 0) {
             $flags[] = 'Inventory balances differ from recorded history; inspect opening stock or unlogged adjustments.';
         }
         if ($items->contains(fn (array $item): bool => $item['missing_quantity_count'] > 0)) {
             $flags[] = 'Some DR item requirements lack a positive package quantity.';
         }
-        if ($items->contains(fn (array $item): bool => $item['available'] < 0 || $item['stock_in'] < 0 || $item['stock_out'] < 0)) {
+        if ($items->sum('negative_quantity_count') > 0) {
             $flags[] = 'Inventory contains negative balances or reversed stock transaction quantities.';
         }
         if ($totals['stock_out_percent'] !== null && $totals['stock_out_percent'] > 100) {
             $flags[] = 'Recorded Stock Out exceeds planned DR item requirements; inspect repeated releases or requirement changes.';
         }
 
-        return $totals + ['current_stock' => $totals['available'], 'scope' => 'Whole-project item inventory and lifetime history; requirements use all project DR allocations.', 'by_unit' => $units->all(), 'items' => $items->all(), 'integrity_flags' => $flags];
+        return $totals + ['current_stock' => $totals['available'], 'scope' => 'Whole-project item inventory and lifetime history; requirements use all project DR allocations.', 'by_unit' => $units->all(), 'items' => [], 'integrity_flags' => $flags];
     }
 
     /**
@@ -381,7 +452,7 @@ class ProjectDeliveryProgressService
     public function report(array $filters): array
     {
         $records = $this->recordsQuery($filters)->get();
-        $warehouseRows = $this->warehouseItemsQuery($filters)->get()->groupBy('project_id');
+        $warehouseRows = $this->warehouseSummaryQuery($filters)->get()->groupBy('project_id');
         $projects = $records->map(function (object $record) use ($warehouseRows, $filters): array {
             $project = (array) $record;
             foreach ($project as $column => $value) {

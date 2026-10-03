@@ -29,18 +29,21 @@
         <div class="flex justify-between gap-3"><dt class="text-slate-600">Project Status</dt><dd class="font-semibold">{{ $project['project_status'] }}</dd></div>
     </dl></section>
 </div>
-<div class="mt-5 overflow-x-auto">
-    <table class="w-full min-w-[650px] text-left text-xs">
-        <caption class="mb-3 text-left font-bold text-slate-600">Warehouse readiness by item</caption>
-        <thead class="text-slate-500"><tr><th class="p-2">Item / Unit</th><th class="p-2">Required</th><th class="p-2">Stock In</th><th class="p-2">Stock Out</th><th class="p-2">Current Stock</th><th class="p-2">Covered</th><th class="p-2">Readiness</th></tr></thead>
-        <tbody class="divide-y divide-slate-200">
-            @forelse($project['warehouse_readiness']['items'] as $item)
-                <tr><td class="p-2">{{ $item['item_name'] }} <span class="text-slate-500">({{ $item['unit'] ?: 'Unit unspecified' }})</span></td>
-                    @foreach(['required', 'stock_in', 'stock_out', 'available', 'covered'] as $key)<td class="p-2 font-semibold tabular-nums">{{ number_format($item[$key]) }}</td>@endforeach
-                    <td class="p-2">{{ $item['percent'] === null ? 'No complete requirements' : number_format($item['percent'], 1).'%' }}</td>
-                </tr>
-            @empty<tr><td colspan="7" class="p-2 text-slate-500">No inventory items recorded for this project.</td></tr>@endforelse
-        </tbody>
-    </table>
+<div class="mt-5" data-lazy-details data-endpoint="{{ route('deliveries.monitoring.details', ['project' => $project['project_id']]) }}">
+    <div class="flex flex-wrap items-center gap-3">
+        <label class="text-xs font-semibold text-slate-600">Records
+            <select data-detail-section class="ml-2 rounded border-slate-300 text-xs">
+                @foreach(['warehouse' => 'Warehouse items', 'dr' => 'DR receipts', 'stock-out' => 'Stock Out transactions', 'delivered' => 'Delivered packages', 'billing' => 'Billing records'] as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </select>
+        </label>
+        <label class="text-xs text-slate-600">Rows
+            <select data-detail-per-page class="ml-2 rounded border-slate-300 text-xs">
+                @foreach([25, 50, 100] as $size)<option value="{{ $size }}">{{ $size }}</option>@endforeach
+            </select>
+        </label>
+    </div>
+    <div data-detail-content class="mt-3" aria-live="polite">Expand details to load records.</div>
 </div>
 <p class="mt-4 border-t border-slate-200 pt-3 text-xs text-slate-500">Billing entry includes for billing, billed and paid. Billed shows only the current billed status. Billing dates reflect recorded DR/group links, not status-update dates.</p>

@@ -9,6 +9,44 @@ if (monitoring) {
     const apply = document.getElementById('monitoring-apply');
     const error = document.getElementById('monitoring-error');
     let currentRequest;
+    const detailRequests = new Map();
+    let appliedFilters = new URL(window.location.href).searchParams;
+
+    async function loadDetails(panel, page = 1) {
+        detailRequests.get(panel)?.abort();
+        const request = new AbortController();
+        detailRequests.set(panel, request);
+        const content = panel.querySelector('[data-detail-content]');
+        const url = new URL(panel.dataset.endpoint);
+        url.search = appliedFilters.toString();
+        url.searchParams.set('section', panel.querySelector('[data-detail-section]').value);
+        url.searchParams.set('per_page', panel.querySelector('[data-detail-per-page]').value);
+        url.searchParams.set('page', page);
+        panel.setAttribute('aria-busy', 'true');
+        content.textContent = 'Loading records…';
+        try {
+            const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal: request.signal });
+            if (!response.headers.get('content-type')?.includes('application/json')) {
+                throw new Error('Your session has expired. Sign in again to load records.');
+            }
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(Object.values(result.errors ?? {}).flat()[0] ?? 'Records could not be loaded. Expand details again to retry.');
+            }
+            content.innerHTML = result.html;
+            panel.dataset.loaded = 'true';
+        } catch (exception) {
+            if (exception.name !== 'AbortError') {
+                panel.dataset.loaded = '';
+                content.textContent = exception.message;
+            }
+        } finally {
+            if (detailRequests.get(panel) === request) {
+                detailRequests.delete(panel);
+                panel.removeAttribute('aria-busy');
+            }
+        }
+    }
 
     function fillLocations(select, field, rows, selected = '') {
         const values = [...new Set(rows.map(row => row[field]).filter(Boolean))].sort();
@@ -56,6 +94,9 @@ if (monitoring) {
             if (!response.ok) {
                 throw new Error(Object.values(report.errors ?? {}).flat()[0] ?? 'Progress could not be refreshed. Please try again.');
             }
+            detailRequests.forEach(request => request.abort());
+            detailRequests.clear();
+            appliedFilters = new URL(url).searchParams;
             document.getElementById('monitoring-results').innerHTML = report.summary_html;
             document.getElementById('monitoring-table').innerHTML = report.projects_html;
             document.getElementById('monitoring-project-count').textContent = report.summary.projects_count;
@@ -111,12 +152,21 @@ if (monitoring) {
         loadReport(new URL(window.location.href), false);
     });
     monitoring.addEventListener('click', event => {
+        const pageButton = event.target.closest('[data-detail-page]');
+        if (pageButton && !pageButton.disabled) {
+            loadDetails(pageButton.closest('[data-lazy-details]'), Number(pageButton.dataset.detailPage));
+            return;
+        }
         const button = event.target.closest('[data-expand-project]');
         if (!button) {
             return;
         }
         const details = document.getElementById(button.getAttribute('aria-controls'));
         details.hidden = !details.hidden;
+        const panel = details.querySelector('[data-lazy-details]');
+        if (!details.hidden && panel && !panel.dataset.loaded) {
+            loadDetails(panel);
+        }
         for (const control of monitoring.querySelectorAll('[data-expand-project]')) {
             if (control.getAttribute('aria-controls') === details.id) {
                 control.setAttribute('aria-expanded', String(!details.hidden));
@@ -127,6 +177,11 @@ if (monitoring) {
             }
         }
         button.closest('[data-actions-menu]')?.removeAttribute('open');
+    });
+    monitoring.addEventListener('change', event => {
+        if (event.target.matches('[data-detail-section], [data-detail-per-page]')) {
+            loadDetails(event.target.closest('[data-lazy-details]'));
+        }
     });
     monitoring.addEventListener('keydown', event => {
         if (event.key === 'Escape') {

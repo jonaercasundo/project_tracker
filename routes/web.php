@@ -54,6 +54,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/deliveries/monitoring', [DeliveryMonitoringController::class, 'index'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring');
+    Route::get('/deliveries/monitoring/{project}/details', [DeliveryMonitoringController::class, 'details'])
+        ->whereNumber('project')
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.monitoring.details');
     Route::get('/site-maintenance', function () {
         return view('site.maintenance');
     })->name('site.maintenance');

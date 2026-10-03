@@ -517,7 +517,13 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
         DB::setDefaultConnection('mysql');
         $query = $service->recordsQuery(['active_only' => 0]);
         if ($sqlPath = getenv('JARVIS_PROGRESS_SQL_PATH')) {
-            file_put_contents($sqlPath, $query->toRawSql().';'.PHP_EOL.$service->warehouseItemsQuery(['active_only' => 0])->toRawSql().';'.PHP_EOL);
+            $warehouseQuery = $service->warehouseSummaryQuery(['project_id' => 502698, 'year' => 2026, 'active_only' => 1]);
+            file_put_contents($sqlPath, $service->recordsQuery(['project_id' => 502698, 'year' => 2026, 'active_only' => 1])->toRawSql().';'.PHP_EOL.$warehouseQuery->toRawSql().';'.PHP_EOL);
+            file_put_contents($sqlPath.'.explain.json', json_encode([
+                'scope' => 'Connection-local fixture tables without operational indexes; not a production index assessment.',
+                'projects' => $mysql->select('EXPLAIN '.$query->toSql(), $query->getBindings()),
+                'warehouse' => $mysql->select('EXPLAIN '.$warehouseQuery->toSql(), $warehouseQuery->getBindings()),
+            ], JSON_PRETTY_PRINT));
         }
         $startedAt = microtime(true);
         $queryRows = $query->get();
@@ -557,6 +563,9 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
             file_put_contents($htmlPath, $page->getContent());
         }
         $this->get('/deliveries/monitoring')->assertOk();
+        foreach (['warehouse' => 1, 'dr' => 4, 'delivered' => 2, 'billing' => 2, 'stock-out' => 0] as $section => $count) {
+            $this->getJson('/deliveries/monitoring/1/details?section='.$section)->assertOk()->assertJsonPath('records.total', $count);
+        }
         $dashboard = $this->getJson('/deliveries/monitoring?active_only=0')->assertOk();
         expect($dashboard->json('summary'))->toBe($api->json('data.summary'));
         expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
@@ -756,6 +765,132 @@ it('allows administrators with selected MMC access and requires login for Operat
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id])
         ->get('/deliveries/monitoring')->assertOk();
 });
+
+it('keeps monitoring memory bounded for a project with many inventory items', function () {
+    jarvisOperations();
+    foreach (['projects', 'deliveries', 'lot', 'item'] as $table) {
+        DB::table($table)->where('project_id', 1)->update(['project_id' => 502698]);
+    }
+    for ($batch = 0; $batch < 6; $batch++) {
+        $items = [];
+        for ($offset = 0; $offset < 500; $offset++) {
+            $items[] = ['item_id' => 100 + $batch * 500 + $offset, 'project_id' => 502698, 'item_name' => 'Detail-only item '.($batch * 500 + $offset), 'unit' => 'pcs'];
+        }
+        DB::table('item')->insert($items);
+    }
+    $user = jarvisReader();
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    memory_reset_peak_usage();
+    $before = memory_get_usage(true);
+    $started = microtime(true);
+    $page = $this->get('/deliveries/monitoring?year=2026&project_id=502698&active_only=1&direction=asc');
+    $seconds = microtime(true) - $started;
+    $peak = memory_get_peak_usage(true);
+    $queries = count(DB::getQueryLog());
+    DB::disableQueryLog();
+    $page->assertOk()->assertSee('Science Kits')->assertDontSee('Detail-only item')->assertSee('data-lazy-details');
+    expect(strlen($page->getContent()))->toBeLessThan(150000);
+    expect($peak)->toBeLessThan(128 * 1048576);
+    fwrite(STDOUT, PHP_EOL.json_encode(['monitoring_3001_item_fixture' => ['seconds' => round($seconds, 4), 'usage_before_mb' => $before / 1048576, 'usage_after_mb' => memory_get_usage(true) / 1048576, 'peak_mb' => $peak / 1048576, 'queries' => $queries, 'html_bytes' => strlen($page->getContent())]]).PHP_EOL);
+    $token = $user->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 502698, 'year' => 2026])
+        ->assertOk()->assertJsonCount(1, 'data.projects')->assertJsonCount(0, 'data.projects.0.warehouse_readiness.items')
+        ->assertJsonPath('data.projects.0.warehouse_readiness.required', 15)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.covered', 10);
+    expect(app(ProjectDeliveryProgressService::class)->warehouseSummaryQuery(['project_id' => 502698])->get())->toHaveCount(1);
+    foreach ([25, 50, 100] as $perPage) {
+        $this->getJson('/deliveries/monitoring/502698/details?section=warehouse&per_page='.$perPage.'&page=2')
+            ->assertOk()->assertJsonCount($perPage, 'records.data')->assertJsonPath('records.total', 3001)
+            ->assertJsonPath('records.current_page', 2)->assertJsonPath('records.per_page', $perPage);
+    }
+    if ($previewPath = getenv('JARVIS_LAZY_PREVIEW_PATH')) {
+        file_put_contents($previewPath.'.html', $page->getContent());
+        $responses = [];
+        foreach ([25, 50, 100] as $size) {
+            foreach ([1, 2] as $detailPage) {
+                $responses['warehouse-'.$size.'-'.$detailPage] = $this->getJson('/deliveries/monitoring/502698/details?section=warehouse&per_page='.$size.'&page='.$detailPage)->assertOk()->json();
+            }
+        }
+        $responses['dr-25-1'] = $this->getJson('/deliveries/monitoring/502698/details?section=dr')->assertOk()->json();
+        file_put_contents($previewPath.'.json', json_encode($responses));
+    }
+    memory_reset_peak_usage();
+    $started = microtime(true);
+    $this->get('/deliveries/monitoring?project_id=2&active_only=0')->assertOk()->assertSee('Furniture');
+    fwrite(STDOUT, PHP_EOL.json_encode(['smaller_project_fixture' => ['seconds' => round(microtime(true) - $started, 4), 'peak_mb' => memory_get_peak_usage(true) / 1048576]]).PHP_EOL);
+});
+
+it('summarizes twenty thousand delivery receipts without loading detail records', function () {
+    jarvisOperations();
+    for ($batch = 0; $batch < 40; $batch++) {
+        $deliveries = [];
+        for ($offset = 0; $offset < 500; $offset++) {
+            $deliveries[] = ['delivery_id' => 100 + $batch * 500 + $offset, 'project_id' => 1, 'lot_id' => 1, 'dr_no' => 'SCALE-'.($batch * 500 + $offset), 'delivery_date' => '2026-10-01', 'package_qty' => 1, 'status' => 'pending'];
+        }
+        DB::table('deliveries')->insert($deliveries);
+    }
+    memory_reset_peak_usage();
+    $started = microtime(true);
+    $report = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1, 'year' => 2026]);
+    $seconds = microtime(true) - $started;
+    $peak = memory_get_peak_usage(true);
+
+    expect($report['projects'])->toHaveCount(1);
+    expect($report['projects']->first()['total_deliveries_count'])->toBe(20002);
+    expect($report['projects']->first()['total_package_allocations_count'])->toBe(40004);
+    expect($report['projects']->first()['warehouse_readiness']['required'])->toBe(100015.0);
+    expect($report['projects']->first()['warehouse_readiness']['items'])->toBe([]);
+    expect($peak)->toBeLessThan(128 * 1048576);
+    fwrite(STDOUT, PHP_EOL.json_encode(['large_delivery_sqlite_fixture' => ['delivery_rows' => 20002, 'allocation_rows' => 40004, 'summary_rows' => 1, 'seconds' => round($seconds, 4), 'peak_mb' => $peak / 1048576]]).PHP_EOL);
+});
+
+it('loads filtered monitoring detail sections with exact DR matching and lifetime Stock Out', function () {
+    jarvisOperations();
+    DB::table('inventory_history')->insert(['item_id' => 1, 'change_type' => 'stock_out', 'old_qty' => 10, 'new_qty' => 7, 'changed_at' => '2025-01-01']);
+    $user = jarvisReader();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->getJson('/deliveries/monitoring/1/details?section=dr&year=2026')->assertOk()->assertJsonPath('records.total', 2);
+    $this->getJson('/deliveries/monitoring/1/details?section=dr&delivery_status=mixed')->assertOk()->assertJsonPath('records.total', 2);
+    $this->getJson('/deliveries/monitoring/1/details?section=dr&region=Region%20II')->assertOk()->assertJsonPath('records.total', 0);
+    $this->getJson('/deliveries/monitoring/1/details?section=delivered&year=2026')->assertOk()->assertJsonPath('records.total', 2);
+    $this->getJson('/deliveries/monitoring/1/details?section=delivered&delivery_status=pending')->assertOk()->assertJsonPath('records.total', 0);
+    $this->getJson('/deliveries/monitoring/1/details?section=billing')->assertOk()->assertJsonPath('records.total', 1)->assertJsonPath('records.data.0.dr_no', '3502');
+    $this->getJson('/deliveries/monitoring/1/details?section=stock-out&year=2026')->assertOk()->assertJsonPath('records.total', 1)->assertJsonPath('records.data.0.stock_out', 3);
+    $this->getJson('/deliveries/monitoring/2/details?section=warehouse&active_only=0&project_id=1')->assertOk()->assertJsonPath('records.total', 1)->assertJsonPath('records.data.0.item_name', 'Desk');
+    $this->getJson('/deliveries/monitoring/999/details?section=warehouse')->assertNotFound();
+    $this->getJson('/deliveries/monitoring/2/details?section=warehouse')->assertNotFound();
+});
+
+it('rejects invalid detail section and pagination inputs', function (array $parameters, string $field) {
+    $user = jarvisReader();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->getJson('/deliveries/monitoring/1/details?'.http_build_query($parameters))->assertUnprocessable()->assertJsonValidationErrors($field);
+})->with([
+    [[], 'section'],
+    [['section' => 'unknown'], 'section'],
+    [['section' => 'dr', 'per_page' => 10000], 'per_page'],
+    [['section' => 'dr', 'page' => 0], 'page'],
+]);
+
+it('protects lazy monitoring details with the same login company and role boundary', function (string $condition) {
+    if ($condition === 'guest') {
+        $this->get('/deliveries/monitoring/1/details?section=dr')->assertRedirect('/login');
+
+        return;
+    }
+    $user = jarvisReader($condition !== 'other company', true, false);
+    if ($condition === 'wrong role') {
+        $user->syncRoles(Role::findOrCreate('finance', 'web'));
+    }
+    $this->actingAs($user)->withSession(['company_id' => $condition === 'no selected company' ? null : $user->companies()->first()->company_id]);
+
+    $this->getJson('/deliveries/monitoring/1/details?section=dr')->assertForbidden();
+})->with(['guest', 'wrong role', 'other company', 'no selected company']);
 
 it('returns zero counts for deliveries without matching packages or billing groups', function () {
     jarvisOperations();

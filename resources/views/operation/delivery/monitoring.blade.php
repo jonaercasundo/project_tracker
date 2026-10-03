@@ -4,7 +4,7 @@
             <div>
                 <p class="text-xs font-bold uppercase tracking-widest text-blue-600">Operations / Delivery Monitoring</p>
                 <h1 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-900">Project Delivery Monitoring</h1>
-                <p class="mt-2 text-sm text-slate-500">Follow each project from DR through Stock In, Delivered, Billing and Billed.</p>
+                <p class="mt-2 text-sm text-slate-500">Check warehouse readiness, then follow DR, Stock Out, Delivered, Billing and Billed.</p>
             </div>
             <span class="text-xs text-slate-500">Live Tracker records · <span id="monitoring-project-count">{{ $report['summary']['projects_count'] }}</span> projects</span>
         </div>
@@ -14,7 +14,7 @@
         </div>
 
         <details open class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <summary class="cursor-pointer text-sm font-bold text-slate-900">Filter progress <span class="ml-2 text-xs font-normal text-slate-500">Year applies to scheduled delivery date</span></summary>
+            <summary class="cursor-pointer text-sm font-bold text-slate-900">Filter progress <span class="ml-2 text-xs font-normal text-slate-500">DR filters apply to delivery/billing; warehouse inventory remains project-wide</span></summary>
             <form id="monitoring-filters" method="GET" action="{{ route('deliveries.monitoring') }}" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <div>
                     <label for="monitoring-year" class="mb-1 block text-xs font-semibold text-slate-600">Year</label>
@@ -76,7 +76,7 @@
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
                 <div>
                     <h2 id="projects-heading" class="font-bold text-slate-900">Operational pipeline</h2>
-                    <p class="mt-1 text-xs text-slate-500">View Details for DR, Stock In, delivery, billing and timeline breakdowns.</p>
+                    <p class="mt-1 text-xs text-slate-500">View Details for inventory quantities, DR allocations, delivery and billing.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <label class="sr-only" for="monitoring-search">Search project or reference</label>

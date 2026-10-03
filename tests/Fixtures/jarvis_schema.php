@@ -89,6 +89,18 @@ Schema::create('item', function (Blueprint $table): void {
     $table->decimal('supplier_price')->nullable();
 });
 
+Schema::create('inventory_history', function (Blueprint $table): void {
+    $table->increments('history_id');
+    $table->integer('inventory_id')->nullable();
+    $table->integer('item_id')->nullable();
+    $table->integer('warehouse_id')->nullable();
+    $table->integer('old_qty')->nullable();
+    $table->integer('new_qty')->nullable();
+    $table->string('change_type')->nullable();
+    $table->string('batch_no')->nullable();
+    $table->dateTime('changed_at')->nullable();
+});
+
 Schema::create('lot', function (Blueprint $table): void {
     $table->increments('lot_id');
     $table->string('lot_name')->nullable();

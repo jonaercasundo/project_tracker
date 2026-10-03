@@ -61,22 +61,23 @@ class ProjectDeliveryProgressService
      *
      * @param  array<string, mixed>  $filters
      */
-    private function allocations(array $filters, string $key): Builder
+    private function allocations(array $filters, string $key, bool $includeStatus = true): Builder
     {
-        $latestStatuses = DB::table('package_status as history')
-            ->joinSub($this->deliveries($filters)->select('d.delivery_id'), 'status_deliveries', 'status_deliveries.delivery_id', '=', 'history.delivery_id')
-            ->select(['history.delivery_id', 'history.package_id'])
-            ->selectRaw('MAX(history.package_status_id) as package_status_id')
-            ->groupBy('history.delivery_id', 'history.package_id');
         $query = $this->deliveries($filters)
             ->join('package as pk', 'pk.'.$key, '=', 'd.'.$key)
-            ->leftJoinSub($latestStatuses, 'latest_status', function (JoinClause $join): void {
+            ->select(['d.project_id', 'd.delivery_id', 'd.package_qty', 'pk.package_id'])
+            ->selectRaw($this->receiptExpression('d').' as dr_no');
+        if ($includeStatus) {
+            $latestStatuses = DB::table('package_status as history')
+                ->joinSub($this->deliveries($filters)->select('d.delivery_id'), 'status_deliveries', 'status_deliveries.delivery_id', '=', 'history.delivery_id')
+                ->select(['history.delivery_id', 'history.package_id'])
+                ->selectRaw('MAX(history.package_status_id) as package_status_id')
+                ->groupBy('history.delivery_id', 'history.package_id');
+            $query->leftJoinSub($latestStatuses, 'latest_status', function (JoinClause $join): void {
                 $join->on('latest_status.delivery_id', '=', 'd.delivery_id')->on('latest_status.package_id', '=', 'pk.package_id');
-            })
-            ->leftJoin('package_status as ps', 'ps.package_status_id', '=', 'latest_status.package_status_id')
-            ->select(['d.project_id', 'd.delivery_id', 'pk.package_id'])
-            ->selectRaw($this->receiptExpression('d').' as dr_no')
-            ->selectRaw("COALESCE(ps.status, 'pending') as package_status");
+            })->leftJoin('package_status as ps', 'ps.package_status_id', '=', 'latest_status.package_status_id')
+                ->selectRaw("COALESCE(ps.status, 'pending') as package_status");
+        }
         if ($key === 'keystage_id') {
             $query->whereNotNull('d.keystage_id');
         } else {
@@ -108,9 +109,9 @@ class ProjectDeliveryProgressService
     }
 
     /** @param array<string, mixed> $filters */
-    private function packageAllocations(array $filters): Builder
+    private function packageAllocations(array $filters, bool $includeStatus = true): Builder
     {
-        return $this->allocations($filters, 'keystage_id')->unionAll($this->allocations($filters, 'lot_id'));
+        return $this->allocations($filters, 'keystage_id', $includeStatus)->unionAll($this->allocations($filters, 'lot_id', $includeStatus));
     }
 
     private function countPackages(Builder $query, string $alias): Builder
@@ -278,6 +279,97 @@ class ProjectDeliveryProgressService
         return $query->orderBy('p.project_id');
     }
 
+    /** @param array<string, mixed> $filters */
+    public function warehouseItemsQuery(array $filters): Builder
+    {
+        $projectFilters = array_intersect_key($filters, array_flip(['project_id', 'active_only', 'search']));
+        $requirements = DB::query()->fromSub($this->packageAllocations($projectFilters, false), 'allocation')
+            ->join('package_content as content', 'content.package_id', '=', 'allocation.package_id')
+            ->select(['allocation.project_id', 'content.item_id'])
+            ->selectRaw('SUM(CASE WHEN allocation.package_qty > 0 THEN allocation.package_qty * CASE WHEN content.qty > 0 THEN content.qty ELSE 1 END ELSE 0 END) as required_quantity')
+            ->selectRaw('SUM(CASE WHEN allocation.package_qty > 0 THEN 0 ELSE 1 END) as missing_quantity_count')
+            ->groupBy('allocation.project_id', 'content.item_id');
+        $history = DB::table('inventory_history as h')->select('h.item_id')
+            ->join('item as history_item', 'history_item.item_id', '=', 'h.item_id')
+            ->joinSub($this->projects($projectFilters)->select('p.project_id'), 'history_projects', 'history_projects.project_id', '=', 'history_item.project_id')
+            ->selectRaw("SUM(CASE WHEN h.change_type = 'stock_in' THEN 1.0 * h.new_qty - h.old_qty ELSE 0 END) as stock_in_quantity")
+            ->selectRaw("SUM(CASE WHEN h.change_type = 'stock_out' THEN 1.0 * h.old_qty - h.new_qty ELSE 0 END) as stock_out_quantity")
+            ->selectRaw("SUM(CASE WHEN h.change_type = 'insert' THEN 1.0 * h.new_qty - h.old_qty ELSE 0 END) as opening_quantity")
+            ->selectRaw('SUM(1.0 * h.new_qty - h.old_qty) as history_balance')
+            ->selectRaw('MAX(h.changed_at) as last_inventory_date')
+            ->groupBy('h.item_id');
+        $balances = DB::table('inventory as inv')->select('inv.item_id')
+            ->join('item as balance_item', 'balance_item.item_id', '=', 'inv.item_id')
+            ->joinSub($this->projects($projectFilters)->select('p.project_id'), 'balance_projects', 'balance_projects.project_id', '=', 'balance_item.project_id')
+            ->selectRaw('SUM(inv.qty) as current_stock')->groupBy('inv.item_id');
+
+        return DB::table('item as i')
+            ->joinSub($this->projects($projectFilters)->select('p.project_id'), 'inventory_projects', 'inventory_projects.project_id', '=', 'i.project_id')
+            ->leftJoinSub($requirements, 'requirements', function (JoinClause $join): void {
+                $join->on('requirements.project_id', '=', 'i.project_id')->on('requirements.item_id', '=', 'i.item_id');
+            })
+            ->leftJoinSub($history, 'history', 'history.item_id', '=', 'i.item_id')
+            ->leftJoinSub($balances, 'balance', 'balance.item_id', '=', 'i.item_id')
+            ->select(['i.project_id', 'i.item_id', 'i.item_name', 'i.unit', 'history.last_inventory_date'])
+            ->selectRaw('COALESCE(requirements.required_quantity, 0) as required, COALESCE(requirements.missing_quantity_count, 0) as missing_quantity_count')
+            ->selectRaw('COALESCE(history.stock_in_quantity, 0) as stock_in, COALESCE(history.stock_out_quantity, 0) as stock_out, COALESCE(history.opening_quantity, 0) as opening')
+            ->selectRaw('COALESCE(history.history_balance, 0) as history_balance, COALESCE(balance.current_stock, 0) as available')
+            ->orderBy('i.item_id');
+    }
+
+    /** @param Collection<int, object> $rows @return array<string, mixed> */
+    private function warehouseReadiness(Collection $rows): array
+    {
+        $items = $rows->map(function (object $row): array {
+            $item = (array) $row;
+            foreach (['project_id', 'item_id', 'missing_quantity_count'] as $key) {
+                $item[$key] = (int) $item[$key];
+            }
+            foreach (['required', 'stock_in', 'stock_out', 'opening', 'history_balance', 'available'] as $key) {
+                $item[$key] = (float) $item[$key];
+            }
+            $item['covered'] = min(max(0, $item['available']), $item['required']);
+            $item['balance_difference'] = $item['available'] - $item['history_balance'];
+            $item['percent'] = $item['missing_quantity_count'] === 0 && $item['required'] > 0 ? round($item['covered'] / $item['required'] * 100, 2) : null;
+
+            return $item;
+        });
+        $units = $items->groupBy(fn (array $item): string => $item['unit'] ?: 'Unit unspecified')->map(function (Collection $items, string $unit): array {
+            $totals = ['unit' => $unit];
+            foreach (['required', 'stock_in', 'stock_out', 'opening', 'history_balance', 'available', 'covered', 'balance_difference'] as $key) {
+                $totals[$key] = $items->sum($key);
+            }
+            $totals['requirements_complete'] = (int) $items->sum('missing_quantity_count') === 0;
+            $totals['percent'] = $totals['requirements_complete'] && $totals['required'] > 0 ? round($totals['covered'] / $totals['required'] * 100, 2) : null;
+            $totals['stock_out_percent'] = $totals['requirements_complete'] && $totals['required'] > 0 ? round($totals['stock_out'] / $totals['required'] * 100, 2) : null;
+
+            return $totals;
+        })->values();
+        $totals = $units->count() === 1 ? $units->first() : [
+            'unit' => $units->isEmpty() ? 'item units' : 'mixed item units',
+            'required' => $units->isEmpty() ? 0 : null, 'stock_in' => $units->isEmpty() ? 0 : null,
+            'stock_out' => $units->isEmpty() ? 0 : null, 'opening' => $units->isEmpty() ? 0 : null,
+            'available' => $units->isEmpty() ? 0 : null, 'covered' => $units->isEmpty() ? 0 : null,
+            'history_balance' => $units->isEmpty() ? 0 : null, 'balance_difference' => $units->isEmpty() ? 0 : null,
+            'percent' => null, 'stock_out_percent' => null, 'requirements_complete' => $units->isEmpty(),
+        ];
+        $flags = [];
+        if ($items->contains(fn (array $item): bool => abs($item['balance_difference']) > 0.00001)) {
+            $flags[] = 'Inventory balances differ from recorded history; inspect opening stock or unlogged adjustments.';
+        }
+        if ($items->contains(fn (array $item): bool => $item['missing_quantity_count'] > 0)) {
+            $flags[] = 'Some DR item requirements lack a positive package quantity.';
+        }
+        if ($items->contains(fn (array $item): bool => $item['available'] < 0 || $item['stock_in'] < 0 || $item['stock_out'] < 0)) {
+            $flags[] = 'Inventory contains negative balances or reversed stock transaction quantities.';
+        }
+        if ($totals['stock_out_percent'] !== null && $totals['stock_out_percent'] > 100) {
+            $flags[] = 'Recorded Stock Out exceeds planned DR item requirements; inspect repeated releases or requirement changes.';
+        }
+
+        return $totals + ['current_stock' => $totals['available'], 'scope' => 'Whole-project item inventory and lifetime history; requirements use all project DR allocations.', 'by_unit' => $units->all(), 'items' => $items->all(), 'integrity_flags' => $flags];
+    }
+
     /**
      * One project set and a fixed number of grouped queries; never query per project.
      * Billing receipts are deduplicated before joining, so multiple delivery rows
@@ -289,7 +381,8 @@ class ProjectDeliveryProgressService
     public function report(array $filters): array
     {
         $records = $this->recordsQuery($filters)->get();
-        $projects = $records->map(function (object $record): array {
+        $warehouseRows = $this->warehouseItemsQuery($filters)->get()->groupBy('project_id');
+        $projects = $records->map(function (object $record) use ($warehouseRows, $filters): array {
             $project = (array) $record;
             foreach ($project as $column => $value) {
                 if (str_ends_with($column, '_count') || $column === 'project_id') {
@@ -304,10 +397,16 @@ class ProjectDeliveryProgressService
             $project['progress_basis'] = $project['total_packages_count'] > 0 ? 'package_allocations' : 'no_package_allocations';
             $project['delivery_progress_percent'] = $this->deliveryProgress($project);
             $project['billing_progress_percent'] = $this->percentage($project['billed_groups_count'] + $project['paid_groups_count'], $project['billing_groups_count']);
-            $project['pipeline'] = $this->pipeline($project);
+            $project['warehouse_readiness'] = $this->warehouseReadiness($warehouseRows->get($project['project_id'], collect()));
+            $project['last_inventory_date'] = $warehouseRows->get($project['project_id'], collect())->max('last_inventory_date');
+            $project['operational_pipeline'] = $this->pipeline($project, $project['warehouse_readiness']);
+            $project['pipeline'] = $project['operational_pipeline'];
             $project['overall_progress'] = $this->operationalProgress($project['pipeline']);
+            if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status'])) {
+                $project['overall_progress'] = null;
+            }
             $project['last_activity'] = $this->lastActivity($project);
-            $project['data_integrity_flags'] = $this->integrityFlags($project['pipeline']);
+            $project['data_integrity_flags'] = array_merge($this->integrityFlags($project['pipeline']), $project['warehouse_readiness']['integrity_flags']);
 
             return $project;
         });
@@ -322,8 +421,14 @@ class ProjectDeliveryProgressService
         }
         $summary['progress_basis'] = $summary['total_packages_count'] > 0 ? 'package_allocations' : 'no_package_allocations';
         $summary['delivery_progress_percent'] = $this->deliveryProgress($summary);
-        $summary['pipeline'] = $this->pipeline($summary);
+        $selectedWarehouseRows = $warehouseRows->only($projects->pluck('project_id')->all())->flatten(1);
+        $summary['warehouse_readiness'] = $this->warehouseReadiness($selectedWarehouseRows);
+        $summary['pipeline'] = $this->pipeline($summary, $summary['warehouse_readiness']);
+        $summary['operational_pipeline'] = $summary['pipeline'];
         $summary['overall_progress'] = $this->operationalProgress($summary['pipeline']);
+        if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status'])) {
+            $summary['overall_progress'] = null;
+        }
 
         return ['projects' => $projects, 'summary' => $summary, 'definitions' => $this->definitions()];
     }
@@ -340,17 +445,17 @@ class ProjectDeliveryProgressService
     }
 
     /** @param array<string, mixed> $counts @return array<string, array<string, mixed>> */
-    private function pipeline(array $counts): array
+    private function pipeline(array $counts, array $warehouse): array
     {
         $billingEntered = $counts['for_billing_groups_count'] + $counts['billed_groups_count'] + $counts['paid_groups_count'];
 
         return [
             'dr' => $this->stage($counts['total_deliveries_count'], $counts['total_deliveries_count'], 'DR receipts') + ['label' => 'DR', 'context' => 'Recorded receipts; the workflow baseline', 'source' => 'deliveries grouped by exact project_id + dr_no'],
-            'stock_in' => [
-                'label' => 'Stock In', 'completed' => null, 'total' => $counts['total_packages_count'], 'percent' => null,
-                'unit' => 'DR package allocations', 'available' => false,
-                'context' => 'Stock-IN transactions have no recorded DR/package link.',
-                'source' => 'inventory_history.change_type = stock_in; DR attribution unavailable',
+            'stock_out' => [
+                'label' => 'Stock Out', 'completed' => $warehouse['stock_out'], 'total' => $warehouse['required'], 'percent' => $warehouse['stock_out_percent'],
+                'unit' => $warehouse['unit'], 'available' => $warehouse['stock_out'] !== null,
+                'context' => 'Recorded project item quantities released from warehouse; whole-project history',
+                'source' => 'inventory_history stock_out quantity (old_qty - new_qty), project via item.project_id',
             ],
             'delivered' => $this->stage($counts['completed_packages_count'], $counts['total_packages_count'], 'DR package allocations') + [
                 'label' => 'Delivered', 'context' => 'Delivered + accepted allocations; accepted is a later delivery stage',
@@ -377,7 +482,7 @@ class ProjectDeliveryProgressService
     /** @param array<string, array<string, mixed>> $pipeline */
     private function operationalProgress(array $pipeline): ?float
     {
-        $percentages = [$pipeline['stock_in']['percent'], $pipeline['delivered']['percent'], $pipeline['billing']['percent'], $pipeline['billed']['milestone_percent']];
+        $percentages = [$pipeline['stock_out']['percent'], $pipeline['delivered']['percent'], $pipeline['billing']['percent'], $pipeline['billed']['milestone_percent']];
         if (in_array(null, $percentages, true)) {
             return null;
         }
@@ -394,6 +499,7 @@ class ProjectDeliveryProgressService
             'last_delivery_date' => ['Delivered', 'deliveries.delivered_date'],
             'last_accepted_date' => ['Accepted', 'deliveries.accepted_date'],
             'last_billing_date' => ['Billing recorded', 'billing_grouped.created_at'],
+            'last_inventory_date' => ['Inventory activity', 'inventory_history.changed_at'],
         ] as $column => [$type, $source]) {
             if ($project[$column] !== null && ($latest === null || strtotime($project[$column]) > strtotime($latest['at']))) {
                 $latest = ['type' => $type, 'at' => $project[$column], 'source' => $source];
@@ -407,9 +513,6 @@ class ProjectDeliveryProgressService
     private function integrityFlags(array $pipeline): array
     {
         $flags = [];
-        if ($pipeline['stock_in']['completed'] !== null && $pipeline['delivered']['completed'] > $pipeline['stock_in']['completed']) {
-            $flags[] = 'Delivered allocations exceed verified Stock In allocations.';
-        }
         if ($pipeline['billed']['completed'] > $pipeline['billing']['completed']) {
             $flags[] = 'Billed records exceed records that entered billing.';
         }
@@ -424,11 +527,13 @@ class ProjectDeliveryProgressService
     public function definitions(): array
     {
         return [
-            'pipeline' => 'DR -> Stock In -> Delivered -> Billing -> Billed. DR uses distinct exact receipts; delivery uses DR package allocations; billing uses matched DR/group records. Stage units are not interchangeable.',
-            'stock_in' => 'Warehouse Stock-IN writes inventory_history rows by item and warehouse with old_qty/new_qty, but stores no delivery_id, package_id, DR or lot link. Per-DR Stock In counts and dates are unavailable; warehouse package status and current inventory are not substitutes.',
-            'operational_progress' => 'Normalized quantity ratios, each weighted 25%: Stock In allocations / total allocations; delivered + accepted allocations / total allocations; for billing + billed + paid records / recorded DR/group records; billed + paid records / recorded DR/group records. DR creation is the baseline, not a weighted milestone. Any unavailable stage or zero denominator makes overall progress unavailable. No missing stage is treated as zero or inferred from a later stage.',
+            'pipeline' => 'Warehouse readiness is separate from DR -> Stock Out -> Delivered -> Billing -> Billed. Stock Out uses project item transaction quantities, delivery uses DR package allocations, and billing uses matched DR/group records. Stage units are not interchangeable.',
+            'stock_in' => 'SUM(new_qty - old_qty) for inventory_history.change_type = stock_in, grouped by item then project through item.project_id. Manual inventory insert deltas are reported separately as opening stock. Stock In does not require a DR link.',
+            'stock_out' => 'SUM(old_qty - new_qty) for inventory_history.change_type = stock_out, project via item.project_id. The QR workflow releases package contents and records content.qty x delivery.package_qty as item quantities. History stores item, warehouse, batch_no and changed_at, but no DR/package reference; these are whole-project item releases, not inferred DR releases.',
+            'warehouse_readiness' => 'Current stock is SUM(inventory.qty), exactly the balance used by Inventory and the scanner. History net is SUM(new_qty - old_qty), including insert/update adjustments; disagreements are flagged. Required item quantity is SUM(package_content.qty x deliveries.package_qty) over expected project DR allocations; non-positive content.qty uses 1, matching the scanner. Availability covers at most the required quantity of each item. Readiness = sum covered item quantities / sum required quantities x 100 within a single item unit; mixed units remain separate. Missing delivery package quantities make readiness unavailable. Warehouse inventory/history always use the whole project, while DR filters restrict delivery/billing.',
+            'operational_progress' => 'Normalized quantity ratios, each weighted 25%: recorded Stock Out item quantity / planned DR item quantity; delivered + accepted DR allocations / total allocations; for billing + billed + paid records / recorded DR/group records; billed + paid records / recorded DR/group records. DR creation is the baseline. Warehouse readiness is not a completion stage. Mixed stock units, missing quantities or zero denominators make overall progress unavailable. A DR year/location/status filter also makes overall unavailable because project-wide inventory history cannot be assigned to that DR subset.',
             'pipeline_billed' => 'Billed stage shows exact current billed records; paid stays separate. The normalized final billing milestone includes paid because it is a later billing stage. Billing entry includes all three recorded billing statuses. Unrecorded billing is unknown.',
-            'last_activity' => 'Latest recorded deliveries.created_at, delivered_date, accepted_date or billing_grouped.created_at. Billing recorded is the DR/group link date, not an invented billed-status update timestamp. Stock-In attribution is unavailable.',
+            'last_activity' => 'Latest recorded deliveries.created_at, delivered_date, accepted_date, billing_grouped.created_at or project inventory_history.changed_at. Billing recorded is the DR/group link date, not an invented billed-status update timestamp. Inventory activity is attributed via the existing item project relationship.',
             'deliveries' => 'Distinct exact DR receipts per project, rather than delivery rows. Receipt status is uniform expected package status, otherwise mixed; delivery row status is the fallback when no packages are defined.',
             'package_allocations' => 'Each delivery_id + package_id is one DR package allocation. Use delivery keystage when present, otherwise lot. Repeated package definitions across delivery records count as separate allocations. The newest package_status_id supplies the status if duplicate status rows exist; missing/null status is pending.',
             'delivery_progress' => '(Delivered + accepted DR package allocations) / total DR package allocations x 100. Zero allocations means unavailable, displayed as No package allocations.',

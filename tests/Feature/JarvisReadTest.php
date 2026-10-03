@@ -145,6 +145,10 @@ function jarvisOperations(): void
         ['inventory_id' => 2, 'item_id' => 2, 'warehouse_id' => 1, 'qty' => 5, 'inventory_status' => 'For Approval'],
         ['inventory_id' => 3, 'item_id' => 1, 'warehouse_id' => 1, 'qty' => 0, 'inventory_status' => 'Approved'],
     ]);
+    DB::table('inventory_history')->insert([
+        ['inventory_id' => 1, 'item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 0, 'new_qty' => 10, 'change_type' => 'insert'],
+        ['inventory_id' => 2, 'item_id' => 2, 'warehouse_id' => 1, 'old_qty' => 0, 'new_qty' => 5, 'change_type' => 'insert'],
+    ]);
     DB::table('grouping')->insert(['group_id' => 1, 'status' => 'billed']);
     DB::table('billing_grouped')->insert(['id' => 1, 'group_id' => 1, 'dr_no' => 3502]);
     DB::table('items')->insert(['id' => 1, 'item_id' => 'KIT-0001', 'code_prefix' => 'KIT', 'item_name' => 'Catalog kit', 'project_id' => 'BID-2026', 'lot_id' => 90, 'active' => 1, 'price' => 10]);
@@ -401,7 +405,7 @@ it('uses a fixed number of database queries for project progress regardless of p
     DB::flushQueryLog();
     DB::enableQueryLog();
     $service->report([]);
-    expect(count(DB::getQueryLog()))->toBe($firstQueryCount)->toBe(1);
+    expect(count(DB::getQueryLog()))->toBe($firstQueryCount)->toBe(2);
     DB::disableQueryLog();
 });
 
@@ -488,7 +492,7 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
     $companyId = $user->companies->first()->company_id;
     $token = $user->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
     $mysql = DB::connection('mysql');
-    $tables = ['projects', 'deliveries', 'school', 'lot', 'package', 'package_status', 'billing_grouped', 'grouping'];
+    $tables = ['projects', 'deliveries', 'school', 'lot', 'package', 'package_status', 'package_content', 'item', 'inventory', 'inventory_history', 'billing_grouped', 'grouping'];
     $createdTables = [];
 
     try {
@@ -513,7 +517,7 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
         DB::setDefaultConnection('mysql');
         $query = $service->recordsQuery(['active_only' => 0]);
         if ($sqlPath = getenv('JARVIS_PROGRESS_SQL_PATH')) {
-            file_put_contents($sqlPath, $query->toRawSql().';'.PHP_EOL);
+            file_put_contents($sqlPath, $query->toRawSql().';'.PHP_EOL.$service->warehouseItemsQuery(['active_only' => 0])->toRawSql().';'.PHP_EOL);
         }
         $startedAt = microtime(true);
         $queryRows = $query->get();
@@ -591,24 +595,94 @@ it('exposes the operational pipeline with compatible denominators and exact bill
         ->assertJsonPath('data.projects.0.pipeline.billed.completed', 1)
         ->assertJsonPath('data.projects.0.pipeline.billed.percent', 25)
         ->assertJsonPath('data.projects.0.paid_groups_count', 1)
-        ->assertJsonPath('data.projects.0.overall_progress', null)
+        ->assertJsonPath('data.projects.0.overall_progress', 43.75)
         ->assertJsonPath('data.projects.0.last_activity.type', 'Billing recorded')
         ->assertJsonPath('data.projects.0.last_activity.at', '2026-10-05 12:30:00')
         ->assertJsonCount(1, 'data.projects.0.data_integrity_flags')
         ->assertJsonPath('data.summary.pipeline.billing.percent', 75);
 });
 
-it('does not infer stock receipt from warehouse package status or later delivery status', function () {
+it('keeps warehouse inventory and stock transactions separate from package status', function () {
     jarvisOperations();
     DB::table('package_status')->where('delivery_id', 1)->update(['status' => 'warehouse']);
     $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
 
     jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
         ->assertOk()->assertJsonPath('data.projects.0.warehouse_packages_count', 1)
-        ->assertJsonPath('data.projects.0.pipeline.stock_in.completed', null)
-        ->assertJsonPath('data.projects.0.pipeline.stock_in.percent', null)
-        ->assertJsonPath('data.projects.0.pipeline.stock_in.available', false)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.available', 10)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.stock_in', 0)
+        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.completed', 0)
+        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.percent', 0)
+        ->assertJsonPath('data.projects.0.overall_progress', 62.5);
+});
+
+it('reconciles manually encoded stock quantities and current inventory through the item project', function () {
+    jarvisOperations();
+    DB::table('deliveries')->where('delivery_id', 1)->update(['package_qty' => 10]);
+    DB::table('inventory_history')->insert([
+        ['inventory_id' => 1, 'item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 10, 'new_qty' => 110, 'change_type' => 'stock_in', 'batch_no' => 'MANUAL', 'changed_at' => '2026-10-04 10:00:00'],
+        ['inventory_id' => 1, 'item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 110, 'new_qty' => 85, 'change_type' => 'stock_out', 'batch_no' => 'RELEASE', 'changed_at' => '2026-10-05 10:00:00'],
+    ]);
+    DB::table('inventory')->where('inventory_id', 1)->update(['qty' => 85]);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
+        ->assertOk()->assertJsonPath('data.projects.0.warehouse_readiness.required', 55)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.stock_in', 100)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.stock_out', 25)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.available', 85)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.history_balance', 85)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.covered', 55)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.percent', 100)
+        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.completed', 25)
+        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.total', 55)
+        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.percent', 45.45)
+        ->assertJsonPath('data.projects.0.overall_progress', 73.86)
+        ->assertJsonPath('data.projects.0.last_activity.type', 'Inventory activity')
+        ->assertJsonCount(0, 'data.projects.0.data_integrity_flags');
+    jarvisRead('inventory', $token, ['project_id' => 1, 'item_id' => 1])->assertJsonPath('data.0.qty', 85);
+});
+
+it('does not let surplus inventory cover a different required item shortage', function () {
+    jarvisOperations();
+    DB::table('package_content')->insert(['package_id' => 1, 'item_id' => 3, 'qty' => 2]);
+    DB::table('item')->insert(['item_id' => 3, 'project_id' => 1, 'item_name' => 'Missing item', 'unit' => 'pcs']);
+    DB::table('inventory')->where('inventory_id', 1)->update(['qty' => 100]);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
+        ->assertOk()->assertJsonPath('data.projects.0.warehouse_readiness.required', 21)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.available', 100)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.covered', 15)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.percent', 71.43)
+        ->assertJsonCount(1, 'data.projects.0.data_integrity_flags');
+});
+
+it('keeps different inventory units separate instead of summing incompatible quantities', function () {
+    jarvisOperations();
+    DB::table('item')->insert(['item_id' => 3, 'project_id' => 1, 'item_name' => 'Consumable', 'unit' => 'kg']);
+    DB::table('package_content')->insert(['package_id' => 1, 'item_id' => 3, 'qty' => 2]);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
+        ->assertOk()->assertJsonPath('data.projects.0.warehouse_readiness.required', null)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.available', null)
+        ->assertJsonCount(2, 'data.projects.0.warehouse_readiness.by_unit')
+        ->assertJsonPath('data.projects.0.warehouse_readiness.by_unit.0.required', 15)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.by_unit.1.required', 6)
         ->assertJsonPath('data.projects.0.overall_progress', null);
+});
+
+it('keeps project-wide inventory unchanged by DR filters and suppresses a mixed-scope overall percentage', function () {
+    jarvisOperations();
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1, 'delivery_status' => 'mixed', 'year' => 2026])
+        ->assertOk()->assertJsonPath('data.projects.0.warehouse_readiness.available', 10)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.required', 15)
+        ->assertJsonPath('data.projects.0.warehouse_readiness.percent', 66.67)
+        ->assertJsonPath('data.projects.0.overall_progress', null)
+        ->assertJsonPath('data.summary.overall_progress', null);
 });
 
 it('uses recorded DR timestamps for last activity rather than scheduled dates', function () {
@@ -648,7 +722,8 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
     $this->get('/deliveries/monitoring')->assertOk()->assertSee('Project Delivery Monitoring')
         ->assertSee('Delivery Monitoring')->assertSee('Science Kits')->assertSee('DR Packages')
         ->assertSee('DR Summary')->assertSee('Timeline')->assertSee('Oct 03, 2026')
-        ->assertSee('Operational Progress')->assertSee('Stock In')->assertSee('Last Activity');
+        ->assertSee('Operational Progress')->assertSee('Warehouse Readiness')->assertSee('Stock Out')->assertSee('Last Activity')
+        ->assertDontSee('DR link missing');
     $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()
         ->assertJsonPath('projects.0.delivery_progress_percent', 50)
         ->assertJsonPath('summary.total_packages_count', 4)->assertJsonStructure(['summary_html', 'projects_html']);

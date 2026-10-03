@@ -1,5 +1,5 @@
 <x-project_app-layout>
-    <div class="space-y-6" id="delivery-monitoring" data-endpoint="{{ route('deliveries.monitoring') }}">
+    <div class="space-y-6" id="delivery-monitoring" data-endpoint="{{ route('deliveries.monitoring') }}" data-locations-endpoint="{{ route('deliveries.monitoring.locations') }}">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
                 <p class="text-xs font-bold uppercase tracking-widest text-blue-600">Operations / Delivery Monitoring</p>
@@ -48,7 +48,7 @@
                         <label for="monitoring-{{ $field }}" class="mb-1 block text-xs font-semibold text-slate-600">{{ $label }}</label>
                         <select id="monitoring-{{ $field }}" name="{{ $field }}" class="w-full rounded-xl border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
                             <option value="">All {{ strtolower($label) }}s</option>
-                            @foreach($locations->pluck($field)->filter()->unique()->sort() as $value)
+                            @foreach($field === 'region' ? $locations : array_filter([$filters[$field] ?? null]) as $value)
                                 <option value="{{ $value }}" @selected(($filters[$field] ?? '') === $value)>{{ $value }}</option>
                             @endforeach
                         </select>
@@ -109,9 +109,4 @@
             </dl>
         </details>
     </div>
-    @push('scripts')
-        <script>
-            window.deliveryMonitoringLocations = {{ Illuminate\Support\Js::from($locations) }};
-        </script>
-    @endpush
 </x-project_app-layout>

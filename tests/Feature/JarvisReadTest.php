@@ -729,8 +729,8 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
 
     $this->get('/deliveries/monitoring')->assertOk()->assertSee('Project Delivery Monitoring')
-        ->assertSee('Delivery Monitoring')->assertSee('Science Kits')->assertSee('DR Packages')
-        ->assertSee('DR Summary')->assertSee('Timeline')->assertSee('Oct 03, 2026')
+        ->assertSee('Delivery Monitoring')->assertSee('Science Kits')->assertSee('Oct 03, 2026')
+        ->assertDontSee('data-detail-section')->assertDontSee('deliveryMonitoringLocations')
         ->assertSee('Operational Progress')->assertSee('Warehouse Readiness')->assertSee('Stock Out')->assertSee('Last Activity')
         ->assertDontSee('DR link missing');
     $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()
@@ -791,16 +791,28 @@ it('keeps monitoring memory bounded for a project with many inventory items', fu
     $peak = memory_get_peak_usage(true);
     $queries = count(DB::getQueryLog());
     DB::disableQueryLog();
-    $page->assertOk()->assertSee('Science Kits')->assertDontSee('Detail-only item')->assertSee('data-lazy-details');
+    $page->assertOk()->assertSee('Science Kits')->assertDontSee('Detail-only item')->assertSee('data-lazy-details')
+        ->assertDontSee('data-detail-section')->assertDontSee('deliveryMonitoringLocations');
     expect(strlen($page->getContent()))->toBeLessThan(150000);
     expect($peak)->toBeLessThan(128 * 1048576);
-    fwrite(STDOUT, PHP_EOL.json_encode(['monitoring_3001_item_fixture' => ['seconds' => round($seconds, 4), 'usage_before_mb' => $before / 1048576, 'usage_after_mb' => memory_get_usage(true) / 1048576, 'peak_mb' => $peak / 1048576, 'queries' => $queries, 'html_bytes' => strlen($page->getContent())]]).PHP_EOL);
+    $viewReport = $page->viewData('report');
+    $viewLocations = $page->viewData('locations');
+    fwrite(STDOUT, PHP_EOL.json_encode(['monitoring_3001_item_fixture' => ['seconds' => round($seconds, 4), 'usage_before_mb' => $before / 1048576, 'usage_after_mb' => memory_get_usage(true) / 1048576, 'peak_mb' => $peak / 1048576, 'queries' => $queries, 'html_bytes' => strlen($page->getContent()), 'report_json_bytes' => strlen(json_encode($viewReport)), 'project_rows' => $viewReport['projects']->count(), 'locations_json_bytes' => strlen(json_encode($viewLocations)), 'location_rows' => $viewLocations->count()]]).PHP_EOL);
     $token = $user->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+    memory_reset_peak_usage();
+    $started = microtime(true);
     jarvisRead('projects/delivery-progress', $token, ['project_id' => 502698, 'year' => 2026])
         ->assertOk()->assertJsonCount(1, 'data.projects')->assertJsonCount(0, 'data.projects.0.warehouse_readiness.items')
         ->assertJsonPath('data.projects.0.warehouse_readiness.required', 15)
         ->assertJsonPath('data.projects.0.warehouse_readiness.covered', 10);
+    fwrite(STDOUT, PHP_EOL.json_encode(['project_502698_api_fixture' => ['seconds' => round(microtime(true) - $started, 4), 'peak_mb' => memory_get_peak_usage(true) / 1048576]]).PHP_EOL);
     expect(app(ProjectDeliveryProgressService::class)->warehouseSummaryQuery(['project_id' => 502698])->get())->toHaveCount(1);
+    memory_reset_peak_usage();
+    $started = microtime(true);
+    $this->getJson('/deliveries/monitoring/502698/details?section=warehouse')->assertOk()
+        ->assertJsonCount(25, 'records.data')->assertJsonPath('records.per_page', 25)
+        ->assertJsonPath('records.total', 3001);
+    fwrite(STDOUT, PHP_EOL.json_encode(['project_502698_details_fixture' => ['seconds' => round(microtime(true) - $started, 4), 'peak_mb' => memory_get_peak_usage(true) / 1048576]]).PHP_EOL);
     foreach ([25, 50, 100] as $perPage) {
         $this->getJson('/deliveries/monitoring/502698/details?section=warehouse&per_page='.$perPage.'&page=2')
             ->assertOk()->assertJsonCount($perPage, 'records.data')->assertJsonPath('records.total', 3001)
@@ -865,6 +877,54 @@ it('loads filtered monitoring detail sections with exact DR matching and lifetim
     $this->getJson('/deliveries/monitoring/2/details?section=warehouse')->assertNotFound();
 });
 
+it('loads dependent monitoring location choices without embedding the location hierarchy', function () {
+    jarvisOperations();
+    DB::table('school')->insert([
+        ['school_id' => '003', 'region' => 'Region I', 'division' => 'East', 'municipality' => 'Town C'],
+        ['school_id' => '004', 'region' => 'Region I', 'division' => 'North', 'municipality' => 'Town A'],
+    ]);
+    $user = jarvisReader();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->getJson('/deliveries/monitoring/locations?level=region')->assertOk()->assertExactJson(['options' => ['Region I', 'Region II']]);
+    $this->getJson('/deliveries/monitoring/locations?level=division&region=Region%20I')->assertOk()->assertExactJson(['options' => ['East', 'North']]);
+    $this->getJson('/deliveries/monitoring/locations?level=municipality&region=Region%20I&division=North')->assertOk()->assertExactJson(['options' => ['Town A']]);
+    $this->getJson('/deliveries/monitoring/locations?level=division')->assertOk()->assertExactJson(['options' => ['East', 'North', 'South']]);
+    $this->getJson('/deliveries/monitoring/locations?level=municipality&region=Missing')->assertOk()->assertExactJson(['options' => []]);
+    $this->getJson('/deliveries/monitoring/locations?level=invalid')->assertUnprocessable()->assertJsonValidationErrors('level');
+    $this->getJson('/deliveries/monitoring/locations?level=division&region='.str_repeat('x', 256))->assertUnprocessable()->assertJsonValidationErrors('region');
+});
+
+it('keeps the initial location payload small with forty three thousand school location tuples', function () {
+    jarvisOperations();
+    for ($batch = 0; $batch < 86; $batch++) {
+        $schools = [];
+        for ($offset = 0; $offset < 500; $offset++) {
+            $schools[] = ['school_id' => 'SCALE-'.($batch * 500 + $offset), 'region' => 'Region I', 'division' => 'North', 'municipality' => 'Town '.($batch * 500 + $offset)];
+        }
+        DB::table('school')->insert($schools);
+    }
+    $oldLocations = DB::table('school')->select(['region', 'division', 'municipality'])->distinct()->get();
+    $oldSize = strlen(json_encode($oldLocations));
+    $oldCount = $oldLocations->count();
+    unset($oldLocations);
+    $user = jarvisReader();
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    memory_reset_peak_usage();
+    $started = microtime(true);
+    $page = $this->get('/deliveries/monitoring?project_id=1');
+    $seconds = microtime(true) - $started;
+    $peak = memory_get_peak_usage(true);
+    $size = strlen(json_encode($page->viewData('locations')));
+
+    $page->assertOk()->assertDontSee('SCALE-')->assertDontSee('Town 42999')->assertDontSee('deliveryMonitoringLocations');
+    expect($page->viewData('locations')->all())->toBe(['Region I', 'Region II']);
+    expect($size)->toBeLessThan(100);
+    expect($peak)->toBeLessThan(128 * 1048576);
+    fwrite(STDOUT, PHP_EOL.json_encode(['location_scale_fixture' => ['previous_location_rows' => $oldCount, 'previous_json_bytes' => $oldSize, 'initial_location_rows' => 2, 'initial_json_bytes' => $size, 'page_seconds' => round($seconds, 4), 'peak_mb' => $peak / 1048576]]).PHP_EOL);
+});
+
 it('rejects invalid detail section and pagination inputs', function (array $parameters, string $field) {
     $user = jarvisReader();
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
@@ -880,6 +940,7 @@ it('rejects invalid detail section and pagination inputs', function (array $para
 it('protects lazy monitoring details with the same login company and role boundary', function (string $condition) {
     if ($condition === 'guest') {
         $this->get('/deliveries/monitoring/1/details?section=dr')->assertRedirect('/login');
+        $this->get('/deliveries/monitoring/locations?level=region')->assertRedirect('/login');
 
         return;
     }
@@ -890,6 +951,7 @@ it('protects lazy monitoring details with the same login company and role bounda
     $this->actingAs($user)->withSession(['company_id' => $condition === 'no selected company' ? null : $user->companies()->first()->company_id]);
 
     $this->getJson('/deliveries/monitoring/1/details?section=dr')->assertForbidden();
+    $this->getJson('/deliveries/monitoring/locations?level=region')->assertForbidden();
 })->with(['guest', 'wrong role', 'other company', 'no selected company']);
 
 it('returns zero counts for deliveries without matching packages or billing groups', function () {

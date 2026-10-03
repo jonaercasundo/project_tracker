@@ -2,14 +2,15 @@ const monitoring = document.getElementById('delivery-monitoring');
 
 if (monitoring) {
     const form = document.getElementById('monitoring-filters');
-    const locations = window.deliveryMonitoringLocations ?? [];
     const region = form.elements.region;
     const division = form.elements.division;
     const municipality = form.elements.municipality;
     const apply = document.getElementById('monitoring-apply');
     const error = document.getElementById('monitoring-error');
     let currentRequest;
+    let locationRequest;
     const detailRequests = new Map();
+    const projectDetails = new Map();
     let appliedFilters = new URL(window.location.href).searchParams;
 
     async function loadDetails(panel, page = 1) {
@@ -19,8 +20,12 @@ if (monitoring) {
         const content = panel.querySelector('[data-detail-content]');
         const url = new URL(panel.dataset.endpoint);
         url.search = appliedFilters.toString();
-        url.searchParams.set('section', panel.querySelector('[data-detail-section]').value);
-        url.searchParams.set('per_page', panel.querySelector('[data-detail-per-page]').value);
+        panel.dataset.section = panel.querySelector('[data-detail-section]')?.value ?? panel.dataset.section ?? 'warehouse';
+        panel.dataset.perPage = panel.querySelector('[data-detail-per-page]')?.value ?? panel.dataset.perPage ?? '25';
+        panel.dataset.page = String(page);
+        panel.dataset.loaded = '';
+        url.searchParams.set('section', panel.dataset.section);
+        url.searchParams.set('per_page', panel.dataset.perPage);
         url.searchParams.set('page', page);
         panel.setAttribute('aria-busy', 'true');
         content.textContent = 'Loading records…';
@@ -48,8 +53,7 @@ if (monitoring) {
         }
     }
 
-    function fillLocations(select, field, rows, selected = '') {
-        const values = [...new Set(rows.map(row => row[field]).filter(Boolean))].sort();
+    function fillLocations(select, field, values, selected = '') {
         const allLabel = field === 'municipality' ? 'All municipalities' : `All ${field}s`;
         select.replaceChildren(new Option(allLabel, ''));
         for (const value of values) {
@@ -61,12 +65,43 @@ if (monitoring) {
         select.value = selected;
     }
 
-    function updateLocations(resetDivision = false, resetMunicipality = false) {
+    async function updateLocations(resetDivision = false, resetMunicipality = false) {
+        locationRequest?.abort();
+        const request = new AbortController();
+        locationRequest = request;
         const selectedDivision = resetDivision ? '' : division.value;
         const selectedMunicipality = resetMunicipality ? '' : municipality.value;
-        const regionalRows = locations.filter(row => !region.value || row.region === region.value);
-        fillLocations(division, 'division', regionalRows, selectedDivision);
-        fillLocations(municipality, 'municipality', regionalRows.filter(row => !division.value || row.division === division.value), selectedMunicipality);
+        const selectedRegion = region.value;
+        if (resetDivision) fillLocations(division, 'division', []);
+        if (resetMunicipality) fillLocations(municipality, 'municipality', []);
+        apply.disabled = true;
+        try {
+            const options = await Promise.all(['division', 'municipality'].map(async level => {
+                const url = new URL(monitoring.dataset.locationsEndpoint);
+                url.searchParams.set('level', level);
+                if (selectedRegion) url.searchParams.set('region', selectedRegion);
+                if (level === 'municipality' && selectedDivision) url.searchParams.set('division', selectedDivision);
+                const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal: request.signal });
+                if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+                    throw new Error('Location choices could not be loaded. Refresh the page to retry.');
+                }
+                return (await response.json()).options;
+            }));
+            if (locationRequest === request) {
+                fillLocations(division, 'division', options[0], selectedDivision);
+                fillLocations(municipality, 'municipality', options[1], selectedMunicipality);
+            }
+        } catch (exception) {
+            if (exception.name !== 'AbortError') {
+                error.textContent = exception.message;
+                error.classList.remove('hidden');
+            }
+        } finally {
+            if (locationRequest === request) {
+                locationRequest = undefined;
+                apply.disabled = Boolean(currentRequest);
+            }
+        }
     }
 
     region.addEventListener('change', () => updateLocations(true, true));
@@ -96,6 +131,7 @@ if (monitoring) {
             }
             detailRequests.forEach(request => request.abort());
             detailRequests.clear();
+            projectDetails.clear();
             appliedFilters = new URL(url).searchParams;
             document.getElementById('monitoring-results').innerHTML = report.summary_html;
             document.getElementById('monitoring-table').innerHTML = report.projects_html;
@@ -110,7 +146,8 @@ if (monitoring) {
             }
         } finally {
             if (currentRequest === request) {
-                apply.disabled = false;
+                currentRequest = undefined;
+                apply.disabled = Boolean(locationRequest);
                 apply.textContent = 'Apply Filters';
                 monitoring.removeAttribute('aria-busy');
             }
@@ -136,8 +173,8 @@ if (monitoring) {
         }
         form.elements.direction.value = filters.get('direction') ?? 'asc';
         document.getElementById('monitoring-active').checked = filters.get('active_only') !== '0';
-        fillLocations(division, 'division', locations, filters.get('division') ?? '');
-        fillLocations(municipality, 'municipality', locations, filters.get('municipality') ?? '');
+        fillLocations(division, 'division', [], filters.get('division') ?? '');
+        fillLocations(municipality, 'municipality', [], filters.get('municipality') ?? '');
         updateLocations();
     }
 
@@ -164,8 +201,21 @@ if (monitoring) {
         const details = document.getElementById(button.getAttribute('aria-controls'));
         details.hidden = !details.hidden;
         const panel = details.querySelector('[data-lazy-details]');
-        if (!details.hidden && panel && !panel.dataset.loaded) {
-            loadDetails(panel);
+        if (!details.hidden && panel) {
+            const previous = projectDetails.get(panel.dataset.projectId);
+            if (previous && previous !== panel) {
+                detailRequests.get(previous)?.abort();
+                panel.querySelector('[data-detail-content]').replaceChildren(...previous.querySelector('[data-detail-content]').childNodes);
+                panel.dataset.loaded = previous.dataset.loaded;
+                panel.dataset.section = previous.dataset.section ?? 'warehouse';
+                panel.dataset.perPage = previous.dataset.perPage ?? '25';
+                panel.dataset.page = previous.dataset.page ?? '1';
+                previous.dataset.loaded = '';
+            }
+            projectDetails.set(panel.dataset.projectId, panel);
+            if (!panel.dataset.loaded) {
+                loadDetails(panel, Number(panel.dataset.page ?? 1));
+            }
         }
         for (const control of monitoring.querySelectorAll('[data-expand-project]')) {
             if (control.getAttribute('aria-controls') === details.id) {

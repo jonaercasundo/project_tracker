@@ -548,7 +548,7 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
         $pageSeconds = microtime(true) - $startedAt;
         $pageQueryCount = count($mysql->getQueryLog());
         $mysql->disableQueryLog();
-        $page->assertOk()->assertSee('Project Delivery Progress')->assertSee('No allocations');
+        $page->assertOk()->assertSee('Project Delivery Monitoring')->assertSee('No allocations');
         if ($htmlPath = getenv('JARVIS_MONITORING_HTML_PATH')) {
             file_put_contents($htmlPath, $page->getContent());
         }
@@ -566,15 +566,89 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
     }
 });
 
+it('exposes the operational pipeline with compatible denominators and exact billed status', function () {
+    jarvisOperations();
+    DB::table('grouping')->insert([
+        ['group_id' => 2, 'status' => 'for billing'],
+        ['group_id' => 3, 'status' => 'paid'],
+        ['group_id' => 4, 'status' => 'unknown'],
+    ]);
+    DB::table('billing_grouped')->insert([
+        ['group_id' => 2, 'dr_no' => '3502-X', 'created_at' => '2026-10-05 12:30:00'],
+        ['group_id' => 3, 'dr_no' => '3502', 'created_at' => null],
+        ['group_id' => 4, 'dr_no' => '3502', 'created_at' => null],
+    ]);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
+        ->assertOk()->assertJsonPath('data.projects.0.pipeline.dr.total', 2)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.completed', 2)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.total', 4)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.percent', 50)
+        ->assertJsonPath('data.projects.0.pipeline.billing.completed', 3)
+        ->assertJsonPath('data.projects.0.pipeline.billing.total', 4)
+        ->assertJsonPath('data.projects.0.pipeline.billing.percent', 75)
+        ->assertJsonPath('data.projects.0.pipeline.billed.completed', 1)
+        ->assertJsonPath('data.projects.0.pipeline.billed.percent', 25)
+        ->assertJsonPath('data.projects.0.paid_groups_count', 1)
+        ->assertJsonPath('data.projects.0.overall_progress', null)
+        ->assertJsonPath('data.projects.0.last_activity.type', 'Billing recorded')
+        ->assertJsonPath('data.projects.0.last_activity.at', '2026-10-05 12:30:00')
+        ->assertJsonCount(1, 'data.projects.0.data_integrity_flags')
+        ->assertJsonPath('data.summary.pipeline.billing.percent', 75);
+});
+
+it('does not infer stock receipt from warehouse package status or later delivery status', function () {
+    jarvisOperations();
+    DB::table('package_status')->where('delivery_id', 1)->update(['status' => 'warehouse']);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
+        ->assertOk()->assertJsonPath('data.projects.0.warehouse_packages_count', 1)
+        ->assertJsonPath('data.projects.0.pipeline.stock_in.completed', null)
+        ->assertJsonPath('data.projects.0.pipeline.stock_in.percent', null)
+        ->assertJsonPath('data.projects.0.pipeline.stock_in.available', false)
+        ->assertJsonPath('data.projects.0.overall_progress', null);
+});
+
+it('uses recorded DR timestamps for last activity rather than scheduled dates', function () {
+    jarvisOperations();
+    DB::table('deliveries')->where('delivery_id', 1)->update(['created_at' => '2026-10-06 09:00:00', 'delivery_date' => '2027-01-01']);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
+        ->assertOk()->assertJsonPath('data.projects.0.last_activity.type', 'DR recorded')
+        ->assertJsonPath('data.projects.0.last_activity.at', '2026-10-06 09:00:00')
+        ->assertJsonPath('data.projects.0.last_delivery_date', '2026-10-03');
+});
+
+it('keeps empty pipeline denominators unavailable and does not invent activity dates', function () {
+    jarvisOperations();
+    DB::table('projects')->insert(['project_id' => 3, 'status' => 'Pending']);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 3])
+        ->assertOk()->assertJsonPath('data.projects.0.pipeline.dr.total', 0)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.percent', null)
+        ->assertJsonPath('data.projects.0.pipeline.billing.percent', null)
+        ->assertJsonPath('data.projects.0.pipeline.billed.percent', null)
+        ->assertJsonPath('data.projects.0.last_activity', null);
+    jarvisRead('projects/delivery-progress', $token, ['search' => 'Missing Project'])
+        ->assertOk()->assertJsonCount(0, 'data.projects')
+        ->assertJsonPath('data.summary.pipeline.delivered.total', 0)
+        ->assertJsonPath('data.summary.overall_progress', null);
+});
+
 it('serves the Operations page and AJAX filters using the same report as JARVIS', function () {
     jarvisOperations();
     $user = jarvisReader(true, true, false);
     $this->withoutVite();
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
 
-    $this->get('/deliveries/monitoring')->assertOk()->assertSee('Project Delivery Progress')
+    $this->get('/deliveries/monitoring')->assertOk()->assertSee('Project Delivery Monitoring')
         ->assertSee('Delivery Monitoring')->assertSee('Science Kits')->assertSee('DR Packages')
-        ->assertSee('Delivery Receipts')->assertSee('Timeline')->assertSee('Oct 03, 2026');
+        ->assertSee('DR Summary')->assertSee('Timeline')->assertSee('Oct 03, 2026')
+        ->assertSee('Operational Progress')->assertSee('Stock In')->assertSee('Last Activity');
     $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()
         ->assertJsonPath('projects.0.delivery_progress_percent', 50)
         ->assertJsonPath('summary.total_packages_count', 4)->assertJsonStructure(['summary_html', 'projects_html']);

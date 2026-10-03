@@ -127,10 +127,10 @@ class ProjectDeliveryProgressService
     private function receiptRows(array $filters): Builder
     {
         $deliveries = $this->deliveries($filters)
-            ->select(['d.project_id', 'd.delivery_id', 'd.status', 'd.delivered_date'])
+            ->select(['d.project_id', 'd.delivery_id', 'd.status', 'd.delivered_date', 'd.accepted_date', 'd.created_at'])
             ->selectRaw($this->receiptExpression('d').' as dr_no');
         $rows = DB::query()->fromSub($deliveries, 'dr')->select('dr.project_id', 'dr.dr_no')
-            ->selectRaw('COUNT(*) as delivery_rows_count, MAX(dr.delivered_date) as last_delivery_date');
+            ->selectRaw('COUNT(*) as delivery_rows_count, MAX(dr.delivered_date) as last_delivery_date, MAX(dr.accepted_date) as last_accepted_date, MAX(dr.created_at) as last_dr_date');
         foreach (self::DELIVERY_STATUSES as $status) {
             $column = str_replace(' ', '_', $status);
             $rows->selectRaw("COUNT(CASE WHEN dr.status = ? THEN 1 END) as {$column}_rows_count", [$status]);
@@ -186,7 +186,7 @@ class ProjectDeliveryProgressService
     {
         $receipts = $this->receipts($filters);
         $deliveryCounts = DB::query()->fromSub($receipts, 'receipt')->select('receipt.project_id')
-            ->selectRaw('COUNT(*) as total_deliveries_count, SUM(receipt.delivery_rows_count) as delivery_rows_count, MAX(receipt.last_delivery_date) as last_delivery_date')
+            ->selectRaw('COUNT(*) as total_deliveries_count, SUM(receipt.delivery_rows_count) as delivery_rows_count, MAX(receipt.last_delivery_date) as last_delivery_date, MAX(receipt.last_accepted_date) as last_accepted_date, MAX(receipt.last_dr_date) as last_dr_date')
             ->selectRaw('COUNT(CASE WHEN receipt.total_packages_count > 0 AND receipt.delivered_packages_count + receipt.accepted_packages_count = receipt.total_packages_count THEN 1 WHEN receipt.total_packages_count = 0 AND receipt.delivered_rows_count + receipt.accepted_rows_count = receipt.delivery_rows_count THEN 1 END) as completed_deliveries_count')
             ->groupBy('receipt.project_id');
         foreach (self::DELIVERY_STATUSES as $status) {
@@ -226,6 +226,7 @@ class ProjectDeliveryProgressService
             })
             ->join('grouping as g', 'g.group_id', '=', 'bg.group_id')
             ->select('receipt.project_id')->selectRaw('COUNT(*) as billing_groups_count')
+            ->selectRaw('MAX(bg.created_at) as last_billing_date')
             ->selectRaw("COUNT(CASE WHEN g.status = 'for billing' THEN 1 END) as for_billing_groups_count")
             ->selectRaw("COUNT(CASE WHEN g.status = 'billed' THEN 1 END) as billed_groups_count")
             ->selectRaw("COUNT(CASE WHEN g.status = 'paid' THEN 1 END) as paid_groups_count")
@@ -245,7 +246,7 @@ class ProjectDeliveryProgressService
             ->leftJoinSub($this->packageStats($filters), 'package_stats', 'package_stats.project_id', '=', 'p.project_id')
             ->leftJoinSub($this->billingStats($filters), 'billing_stats', 'billing_stats.project_id', '=', 'p.project_id')
             ->leftJoinSub($lotNames, 'project_lots', 'project_lots.project_id', '=', 'p.project_id')
-            ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'delivery_stats.last_delivery_date', 'project_lots.lot_names']);
+            ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'delivery_stats.last_delivery_date', 'delivery_stats.last_accepted_date', 'delivery_stats.last_dr_date', 'billing_stats.last_billing_date', 'project_lots.lot_names']);
         if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status'])) {
             $query->whereNotNull('delivery_stats.project_id');
         }
@@ -303,6 +304,10 @@ class ProjectDeliveryProgressService
             $project['progress_basis'] = $project['total_packages_count'] > 0 ? 'package_allocations' : 'no_package_allocations';
             $project['delivery_progress_percent'] = $this->deliveryProgress($project);
             $project['billing_progress_percent'] = $this->percentage($project['billed_groups_count'] + $project['paid_groups_count'], $project['billing_groups_count']);
+            $project['pipeline'] = $this->pipeline($project);
+            $project['overall_progress'] = $this->operationalProgress($project['pipeline']);
+            $project['last_activity'] = $this->lastActivity($project);
+            $project['data_integrity_flags'] = $this->integrityFlags($project['pipeline']);
 
             return $project;
         });
@@ -312,11 +317,13 @@ class ProjectDeliveryProgressService
                 $summary[$column] = (int) $projects->sum($column);
             }
         }
-        foreach (['total_deliveries_count', 'delivery_rows_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count'] as $column) {
+        foreach (['total_deliveries_count', 'delivery_rows_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count', 'billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count'] as $column) {
             $summary[$column] ??= 0;
         }
         $summary['progress_basis'] = $summary['total_packages_count'] > 0 ? 'package_allocations' : 'no_package_allocations';
         $summary['delivery_progress_percent'] = $this->deliveryProgress($summary);
+        $summary['pipeline'] = $this->pipeline($summary);
+        $summary['overall_progress'] = $this->operationalProgress($summary['pipeline']);
 
         return ['projects' => $projects, 'summary' => $summary, 'definitions' => $this->definitions()];
     }
@@ -332,10 +339,96 @@ class ProjectDeliveryProgressService
         return $total > 0 ? round($completed / $total * 100, 2) : null;
     }
 
+    /** @param array<string, mixed> $counts @return array<string, array<string, mixed>> */
+    private function pipeline(array $counts): array
+    {
+        $billingEntered = $counts['for_billing_groups_count'] + $counts['billed_groups_count'] + $counts['paid_groups_count'];
+
+        return [
+            'dr' => $this->stage($counts['total_deliveries_count'], $counts['total_deliveries_count'], 'DR receipts') + ['label' => 'DR', 'context' => 'Recorded receipts; the workflow baseline', 'source' => 'deliveries grouped by exact project_id + dr_no'],
+            'stock_in' => [
+                'label' => 'Stock In', 'completed' => null, 'total' => $counts['total_packages_count'], 'percent' => null,
+                'unit' => 'DR package allocations', 'available' => false,
+                'context' => 'Stock-IN transactions have no recorded DR/package link.',
+                'source' => 'inventory_history.change_type = stock_in; DR attribution unavailable',
+            ],
+            'delivered' => $this->stage($counts['completed_packages_count'], $counts['total_packages_count'], 'DR package allocations') + [
+                'label' => 'Delivered', 'context' => 'Delivered + accepted allocations; accepted is a later delivery stage',
+                'source' => 'package_status.status by delivery_id + package_id',
+            ],
+            'billing' => $this->stage($billingEntered, $counts['billing_groups_count'], 'DR/group records') + [
+                'label' => 'Billing', 'context' => 'Entered billing: for billing + billed + paid',
+                'source' => 'billing_grouped joined to grouping and exact DR receipts',
+            ],
+            'billed' => $this->stage($counts['billed_groups_count'], $counts['billing_groups_count'], 'DR/group records') + [
+                'label' => 'Billed', 'context' => 'Current billed status; paid is shown separately in details',
+                'source' => 'grouping.status = billed for matched billing_grouped records',
+                'milestone_percent' => $this->percentage($counts['billed_groups_count'] + $counts['paid_groups_count'], $counts['billing_groups_count']),
+            ],
+        ];
+    }
+
+    /** @return array{completed: int, total: int, percent: ?float, unit: string, available: bool} */
+    private function stage(int $completed, int $total, string $unit): array
+    {
+        return ['completed' => $completed, 'total' => $total, 'percent' => $this->percentage($completed, $total), 'unit' => $unit, 'available' => true];
+    }
+
+    /** @param array<string, array<string, mixed>> $pipeline */
+    private function operationalProgress(array $pipeline): ?float
+    {
+        $percentages = [$pipeline['stock_in']['percent'], $pipeline['delivered']['percent'], $pipeline['billing']['percent'], $pipeline['billed']['milestone_percent']];
+        if (in_array(null, $percentages, true)) {
+            return null;
+        }
+
+        return round(array_sum($percentages) / count($percentages), 2);
+    }
+
+    /** @param array<string, mixed> $project @return ?array{type: string, at: string, source: string} */
+    private function lastActivity(array $project): ?array
+    {
+        $latest = null;
+        foreach ([
+            'last_dr_date' => ['DR recorded', 'deliveries.created_at'],
+            'last_delivery_date' => ['Delivered', 'deliveries.delivered_date'],
+            'last_accepted_date' => ['Accepted', 'deliveries.accepted_date'],
+            'last_billing_date' => ['Billing recorded', 'billing_grouped.created_at'],
+        ] as $column => [$type, $source]) {
+            if ($project[$column] !== null && ($latest === null || strtotime($project[$column]) > strtotime($latest['at']))) {
+                $latest = ['type' => $type, 'at' => $project[$column], 'source' => $source];
+            }
+        }
+
+        return $latest;
+    }
+
+    /** @param array<string, array<string, mixed>> $pipeline @return list<string> */
+    private function integrityFlags(array $pipeline): array
+    {
+        $flags = [];
+        if ($pipeline['stock_in']['completed'] !== null && $pipeline['delivered']['completed'] > $pipeline['stock_in']['completed']) {
+            $flags[] = 'Delivered allocations exceed verified Stock In allocations.';
+        }
+        if ($pipeline['billed']['completed'] > $pipeline['billing']['completed']) {
+            $flags[] = 'Billed records exceed records that entered billing.';
+        }
+        if ($pipeline['billing']['completed'] < $pipeline['billing']['total']) {
+            $flags[] = 'Some billing records have statuses outside for billing, billed and paid.';
+        }
+
+        return $flags;
+    }
+
     /** @return array<string, string> */
     public function definitions(): array
     {
         return [
+            'pipeline' => 'DR -> Stock In -> Delivered -> Billing -> Billed. DR uses distinct exact receipts; delivery uses DR package allocations; billing uses matched DR/group records. Stage units are not interchangeable.',
+            'stock_in' => 'Warehouse Stock-IN writes inventory_history rows by item and warehouse with old_qty/new_qty, but stores no delivery_id, package_id, DR or lot link. Per-DR Stock In counts and dates are unavailable; warehouse package status and current inventory are not substitutes.',
+            'operational_progress' => 'Normalized quantity ratios, each weighted 25%: Stock In allocations / total allocations; delivered + accepted allocations / total allocations; for billing + billed + paid records / recorded DR/group records; billed + paid records / recorded DR/group records. DR creation is the baseline, not a weighted milestone. Any unavailable stage or zero denominator makes overall progress unavailable. No missing stage is treated as zero or inferred from a later stage.',
+            'pipeline_billed' => 'Billed stage shows exact current billed records; paid stays separate. The normalized final billing milestone includes paid because it is a later billing stage. Billing entry includes all three recorded billing statuses. Unrecorded billing is unknown.',
+            'last_activity' => 'Latest recorded deliveries.created_at, delivered_date, accepted_date or billing_grouped.created_at. Billing recorded is the DR/group link date, not an invented billed-status update timestamp. Stock-In attribution is unavailable.',
             'deliveries' => 'Distinct exact DR receipts per project, rather than delivery rows. Receipt status is uniform expected package status, otherwise mixed; delivery row status is the fallback when no packages are defined.',
             'package_allocations' => 'Each delivery_id + package_id is one DR package allocation. Use delivery keystage when present, otherwise lot. Repeated package definitions across delivery records count as separate allocations. The newest package_status_id supplies the status if duplicate status rows exist; missing/null status is pending.',
             'delivery_progress' => '(Delivered + accepted DR package allocations) / total DR package allocations x 100. Zero allocations means unavailable, displayed as No package allocations.',

@@ -1,9 +1,9 @@
-@if($project['delivery_progress_percent'] === null)
-    <p class="text-xs font-medium text-slate-500">No package allocations</p>
-@else
-    <p class="text-lg font-extrabold tabular-nums text-blue-700">{{ number_format($project['delivery_progress_percent'], 1) }}%</p>
-    <div class="mt-1 h-3 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="{{ $project['project_name'] }} DR package progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $project['delivery_progress_percent'] }}">
-        <div class="h-full rounded-full bg-blue-600" style="width: {{ $project['delivery_progress_percent'] }}%"></div>
-    </div>
-    <p class="mt-2 text-xs tabular-nums text-slate-500">{{ number_format($project['completed_packages_count']) }} / {{ number_format($project['total_packages_count']) }} DR packages</p>
-@endif
+<div class="flex items-center justify-between gap-3 text-xs">
+    <p class="font-semibold text-slate-700">Overall Operational Progress</p>
+    <span class="font-bold tabular-nums text-blue-700">{{ $project['overall_progress'] === null ? 'Unavailable' : number_format($project['overall_progress'], 1).'%' }}</span>
+</div>
+<div class="mt-2 h-3 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="{{ $project['project_name'] }} overall operational progress" aria-valuemin="0" aria-valuemax="100" @if($project['overall_progress'] !== null) aria-valuenow="{{ $project['overall_progress'] }}" @else aria-valuetext="Unavailable: Stock In cannot be linked to these DRs" @endif>
+    @if($project['overall_progress'] !== null)<div class="h-full rounded-full bg-blue-600" style="width: {{ $project['overall_progress'] }}%"></div>@endif
+</div>
+<p class="mt-2 text-[11px] leading-4 text-slate-500">{{ number_format($project['completed_packages_count']) }} delivered / accepted allocations &middot; {{ number_format($project['for_billing_groups_count']) }} for billing &middot; {{ number_format($project['billed_groups_count']) }} billed records</p>
+@if($project['overall_progress'] === null)<p class="mt-1 text-[11px] leading-4 text-slate-500">A verified Stock In link is needed for full workflow progress. Stage counts retain their own units.</p>@endif

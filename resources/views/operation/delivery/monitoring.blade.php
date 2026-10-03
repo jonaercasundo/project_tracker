@@ -3,8 +3,8 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
                 <p class="text-xs font-bold uppercase tracking-widest text-blue-600">Operations / Delivery Monitoring</p>
-                <h1 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-900">Project Delivery Progress</h1>
-                <p class="mt-2 text-sm text-slate-500">Monitor delivery, package, and billing progress across active projects.</p>
+                <h1 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-900">Project Delivery Monitoring</h1>
+                <p class="mt-2 text-sm text-slate-500">Follow each project from DR through Stock In, Delivered, Billing and Billed.</p>
             </div>
             <span class="text-xs text-slate-500">Live Tracker records · <span id="monitoring-project-count">{{ $report['summary']['projects_count'] }}</span> projects</span>
         </div>
@@ -75,8 +75,8 @@
         <section id="monitoring-projects" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="projects-heading">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
                 <div>
-                    <h2 id="projects-heading" class="font-bold text-slate-900">Project delivery progress</h2>
-                    <p class="mt-1 text-xs text-slate-500">Expand a project for DR, package allocation, billing and timeline details.</p>
+                    <h2 id="projects-heading" class="font-bold text-slate-900">Operational pipeline</h2>
+                    <p class="mt-1 text-xs text-slate-500">View Details for DR, Stock In, delivery, billing and timeline breakdowns.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <label class="sr-only" for="monitoring-search">Search project or reference</label>
@@ -84,7 +84,7 @@
                     <label class="sr-only" for="monitoring-sort">Sort projects</label>
                     <select form="monitoring-filters" id="monitoring-sort" name="sort" class="rounded-lg border-slate-200 text-sm">
                         <option value="">Default order</option>
-                        @foreach(['project' => 'Project', 'progress' => 'Progress', 'total_drs' => 'Total DRs', 'total_dr_packages' => 'Total DR Packages', 'last_delivery' => 'Last Delivery', 'end_date' => 'End Date'] as $value => $label)
+                        @foreach(['project' => 'Project', 'progress' => 'Delivered allocation %', 'total_drs' => 'Total DRs', 'total_dr_packages' => 'Total DR Packages', 'last_delivery' => 'Last Delivery', 'end_date' => 'End Date'] as $value => $label)
                             <option value="{{ $value }}" @selected(($filters['sort'] ?? '') === $value)>{{ $label }}</option>
                         @endforeach
                     </select>

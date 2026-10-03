@@ -136,7 +136,7 @@ Schema::create('package_content', function (Blueprint $table): void {
 
 Schema::create('billing_grouped', function (Blueprint $table): void {
     $table->increments('id');
-    $table->integer('dr_no')->nullable();
+    $table->string('dr_no', 100);
     $table->dateTime('created_at')->nullable();
     $table->integer('group_id')->nullable();
 });

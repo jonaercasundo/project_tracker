@@ -2,6 +2,7 @@
 
 use App\Models\Company;
 use App\Models\User;
+use App\Services\ProjectDeliveryProgressService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,7 +65,7 @@ pest()->extend(JarvisReadTestCase::class);
 
 dataset('jarvis read endpoints', [
     'dashboard', 'projects', 'projects/1', 'operation-masterlist',
-    'deliveries', 'inventory', 'warehouses', 'lots', 'packages',
+    'deliveries', 'inventory', 'warehouses', 'lots', 'packages', 'projects/delivery-progress',
 ]);
 
 function jarvisReader(bool $mmc = true, bool $active = true, bool $administrator = true): User
@@ -235,6 +236,235 @@ it('does not coerce alphanumeric receipt numbers into billing matches', function
         ->assertJsonPath('data.0.billing_groups_count', 0);
 });
 
+it('preserves all delivery counts including null duplicate and unexpected package statuses', function () {
+    jarvisOperations();
+    DB::table('package')->insert([
+        ['package_id' => 4, 'lot_id' => 1],
+        ['package_id' => 5, 'lot_id' => 1],
+    ]);
+    DB::table('package_status')->insert([
+        ['delivery_id' => 1, 'package_id' => 1, 'status' => 'delivered'],
+        ['delivery_id' => 1, 'package_id' => 2, 'status' => null],
+        ['delivery_id' => 1, 'package_id' => 4, 'status' => 'accepted'],
+        ['delivery_id' => 1, 'package_id' => 5, 'status' => 'warehouse'],
+        ['delivery_id' => 1, 'package_id' => 3, 'status' => 'paid'],
+    ]);
+    DB::table('grouping')->insert([
+        ['group_id' => 2, 'status' => 'paid'],
+        ['group_id' => 3, 'status' => 'for billing'],
+    ]);
+    DB::table('billing_grouped')->insert([
+        ['group_id' => 2, 'dr_no' => '3502'],
+        ['group_id' => 3, 'dr_no' => '3502'],
+        ['group_id' => 2, 'dr_no' => '3502-X'],
+    ]);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('deliveries', $token, ['delivery_id' => 1, 'package_status' => 'released', 'billing_status' => 'paid'])
+        ->assertOk()->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.package_allocations_count', 5)
+        ->assertJsonPath('data.0.pending_packages_count', 1)
+        ->assertJsonPath('data.0.released_packages_count', 1)
+        ->assertJsonPath('data.0.delivered_packages_count', 1)
+        ->assertJsonPath('data.0.accepted_packages_count', 1)
+        ->assertJsonPath('data.0.warehouse_packages_count', 1)
+        ->assertJsonPath('data.0.billing_groups_count', 3)
+        ->assertJsonPath('data.0.billed_groups_count', 1)
+        ->assertJsonPath('data.0.paid_groups_count', 1)
+        ->assertJsonPath('data.0.for_billing_groups_count', 1);
+    jarvisRead('deliveries', $token, ['delivery_id' => 2, 'billing_status' => 'paid'])
+        ->assertJsonPath('data.0.billing_groups_count', 1);
+});
+
+it('matches string receipts exactly including case and trailing spaces', function (string $receiptNumber, int $expectedCount) {
+    jarvisOperations();
+    DB::table('billing_grouped')->insert(['group_id' => 1, 'dr_no' => '3502-X']);
+    DB::table('deliveries')->where('delivery_id', 2)->update(['dr_no' => $receiptNumber]);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('deliveries', $token, ['delivery_id' => 2])
+        ->assertOk()->assertJsonPath('data.0.billing_groups_count', $expectedCount);
+    jarvisRead('deliveries', $token, ['delivery_id' => 2, 'billing_status' => 'billed'])
+        ->assertOk()->assertJsonCount($expectedCount, 'data');
+})->with([
+    'exact identifier' => ['3502-X', 1],
+    'different case' => ['3502-x', 0],
+    'trailing space' => ['3502-X ', 0],
+]);
+
+it('reports real project progress with package completion and recorded billing stages', function () {
+    jarvisOperations();
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['active_only' => 0])
+        ->assertOk()->assertJsonPath('data.summary.projects_count', 2)
+        ->assertJsonPath('data.summary.active_projects_count', 1)
+        ->assertJsonPath('data.summary.total_deliveries_count', 3)
+        ->assertJsonPath('data.summary.total_packages_count', 5)
+        ->assertJsonPath('data.summary.delivery_progress_percent', 40)
+        ->assertJsonPath('data.projects.0.total_packages_count', 4)
+        ->assertJsonPath('data.projects.0.pending_packages_count', 1)
+        ->assertJsonPath('data.projects.0.released_packages_count', 1)
+        ->assertJsonPath('data.projects.0.delivered_packages_count', 1)
+        ->assertJsonPath('data.projects.0.accepted_packages_count', 1)
+        ->assertJsonPath('data.projects.0.mixed_deliveries_count', 2)
+        ->assertJsonPath('data.projects.0.completed_deliveries_count', 1)
+        ->assertJsonPath('data.projects.0.remaining_deliveries_count', 1)
+        ->assertJsonPath('data.projects.0.delivery_progress_percent', 50)
+        ->assertJsonPath('data.projects.0.billing_progress_percent', 100)
+        ->assertJsonPath('data.projects.0.last_delivery_date', '2026-10-03')
+        ->assertJsonPath('data.projects.1.billing_progress_percent', null);
+    $this->assertDatabaseCount('package_status', 3);
+    $this->assertDatabaseCount('billing_grouped', 1);
+});
+
+it('combines progress filters and derives released receipt status from packages', function () {
+    jarvisOperations();
+    DB::table('package_status')->insert(['delivery_id' => 1, 'package_id' => 2, 'status' => 'released']);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1, 'year' => 2026, 'region' => 'Region I', 'division' => 'North', 'municipality' => 'Town A', 'delivery_status' => 'released'])
+        ->assertOk()->assertJsonCount(1, 'data.projects')
+        ->assertJsonPath('data.summary.total_deliveries_count', 1)
+        ->assertJsonPath('data.projects.0.released_deliveries_count', 1)
+        ->assertJsonPath('data.projects.0.total_packages_count', 2)
+        ->assertJsonPath('data.projects.0.released_packages_count', 2)
+        ->assertJsonPath('data.projects.0.delivery_progress_percent', 0);
+    jarvisRead('projects/delivery-progress', $token, ['region' => 'Region II', 'division' => 'North', 'active_only' => 0])
+        ->assertJsonCount(0, 'data.projects')->assertJsonPath('data.summary.delivery_progress_percent', null);
+});
+
+it('counts shared DR receipts once and does not multiply billing across allocation paths', function () {
+    jarvisOperations();
+    DB::table('keystage')->insert(['keystage_id' => 10, 'lot_id' => 1]);
+    DB::table('package')->insert(['package_id' => 4, 'keystage_id' => 10, 'lot_id' => 1]);
+    DB::table('deliveries')->insert(['delivery_id' => 4, 'project_id' => 1, 'dr_no' => '3502', 'lot_id' => 1, 'keystage_id' => 10, 'status' => 'pending']);
+    DB::table('billing_grouped')->insert(['group_id' => 1, 'dr_no' => '3502-X']);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
+        ->assertOk()->assertJsonPath('data.projects.0.total_deliveries_count', 2)
+        ->assertJsonPath('data.projects.0.delivery_rows_count', 3)
+        ->assertJsonPath('data.projects.0.total_packages_count', 7)
+        ->assertJsonPath('data.projects.0.pending_packages_count', 4)
+        ->assertJsonPath('data.projects.0.billing_groups_count', 2);
+});
+
+it('uses receipt progress without package definitions and keeps awarded projects active', function () {
+    jarvisOperations();
+    DB::table('projects')->where('project_id', 1)->update(['status' => 'Completed']);
+    DB::table('deliveries')->where('project_id', 1)->update(['lot_id' => null, 'keystage_id' => null]);
+    DB::table('grouping')->insert(['group_id' => 2, 'status' => 'for billing']);
+    DB::table('billing_grouped')->insert(['group_id' => 2, 'dr_no' => '3502-X']);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token)
+        ->assertOk()->assertJsonCount(1, 'data.projects')
+        ->assertJsonPath('data.projects.0.progress_basis', 'delivery_receipts')
+        ->assertJsonPath('data.projects.0.total_packages_count', 0)
+        ->assertJsonPath('data.projects.0.completed_deliveries_count', 2)
+        ->assertJsonPath('data.projects.0.delivery_progress_percent', 100)
+        ->assertJsonPath('data.projects.0.billing_progress_percent', 50);
+});
+
+it('retains projects without deliveries and returns unavailable progress instead of fabricated percentages', function () {
+    jarvisOperations();
+    DB::table('projects')->insert(['project_id' => 3, 'project_name' => 'New Project', 'status' => 'Pending']);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 3])
+        ->assertOk()->assertJsonCount(1, 'data.projects')
+        ->assertJsonPath('data.projects.0.total_deliveries_count', 0)
+        ->assertJsonPath('data.projects.0.delivery_progress_percent', null);
+});
+
+it('uses a fixed number of database queries for project progress regardless of project count', function () {
+    jarvisOperations();
+    $service = app(ProjectDeliveryProgressService::class);
+    DB::enableQueryLog();
+    $service->report([]);
+    $firstQueryCount = count(DB::getQueryLog());
+    DB::disableQueryLog();
+    foreach (range(3, 10) as $projectId) {
+        DB::table('projects')->insert(['project_id' => $projectId, 'project_name' => 'Project '.$projectId, 'status' => 'Pending']);
+    }
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $service->report([]);
+    expect(count(DB::getQueryLog()))->toBe($firstQueryCount)->toBeLessThanOrEqual(3);
+    DB::disableQueryLog();
+});
+
+it('serves the Operations page and AJAX filters using the same report as JARVIS', function () {
+    jarvisOperations();
+    $user = jarvisReader(true, true, false);
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->get('/deliveries/monitoring')->assertOk()->assertSee('Project Delivery Progress')
+        ->assertSee('Delivery Monitoring')->assertSee('Science Kits');
+    $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()
+        ->assertJsonPath('projects.0.delivery_progress_percent', 50)
+        ->assertJsonPath('summary.total_packages_count', 4)->assertJsonStructure(['summary_html', 'projects_html']);
+    $token = $user->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+    $user->assignRole(Role::findOrCreate('Administrator', 'web'));
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
+        ->assertJsonPath('data.projects.0.delivery_progress_percent', 50);
+});
+
+it('returns 403 on Operations monitoring without the existing role or selected MMC company', function (string $condition) {
+    $user = jarvisReader($condition !== 'other company', true, false);
+    if ($condition === 'wrong role') {
+        $user->syncRoles(Role::findOrCreate('finance', 'web'));
+    }
+    $this->actingAs($user)->withSession(['company_id' => $condition === 'no selected company' ? null : $user->companies()->first()->company_id]);
+
+    $this->get('/deliveries/monitoring')->assertForbidden();
+})->with(['wrong role', 'other company', 'no selected company']);
+
+it('allows administrators with selected MMC access and requires login for Operations monitoring', function () {
+    $this->get('/deliveries/monitoring')->assertRedirect('/login');
+    jarvisOperations();
+    $user = jarvisReader();
+    $this->withoutVite();
+
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id])
+        ->get('/deliveries/monitoring')->assertOk();
+});
+
+it('returns zero counts for deliveries without matching packages or billing groups', function () {
+    jarvisOperations();
+    DB::table('deliveries')->where('delivery_id', 3)->update(['lot_id' => null]);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('deliveries', $token, ['delivery_id' => 3])
+        ->assertOk()->assertJsonPath('data.0.package_allocations_count', 0)
+        ->assertJsonPath('data.0.pending_packages_count', 0)
+        ->assertJsonPath('data.0.billing_groups_count', 0);
+});
+
+it('paginates deliveries before counting allocations while preserving totals and page counts', function () {
+    jarvisOperations();
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('deliveries', $token, ['per_page' => 1, 'page' => 2])
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.delivery_id', 2)
+        ->assertJsonPath('data.0.package_allocations_count', 2)
+        ->assertJsonPath('data.0.delivered_packages_count', 1)
+        ->assertJsonPath('data.0.accepted_packages_count', 1)
+        ->assertJsonPath('meta.pagination.total', 3)->assertJsonPath('meta.pagination.last_page', 3);
+    jarvisRead('deliveries', $token, ['per_page' => 1, 'page' => 4])
+        ->assertOk()->assertJsonCount(0, 'data')->assertJsonPath('meta.pagination.total', 3);
+});
+
+it('refuses to roll back receipt identifiers that cannot round trip through signed integers', function (string $receiptNumber) {
+    DB::table('billing_grouped')->insert(['dr_no' => $receiptNumber]);
+    $migration = require database_path('migrations/2026_10_03_025127_change_billing_grouped_dr_no_to_varchar.php');
+
+    expect(fn () => $migration->down())->toThrow(RuntimeException::class);
+    $this->assertDatabaseHas('billing_grouped', ['dr_no' => $receiptNumber]);
+})->with(['3502-X', '03502', '3502 ', '+3502', '2147483648', '-2147483649']);
+
 it('filters by the selected delivery event date', function () {
     jarvisOperations();
     $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
@@ -262,6 +492,8 @@ it('matches packages by keystage before lot and inherits item lot from keystage'
     $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
 
     jarvisRead('packages', $token, ['delivery_id' => 1])->assertJsonCount(1, 'data')->assertJsonPath('data.0.package_id', 4);
+    jarvisRead('deliveries', $token, ['delivery_id' => 1])
+        ->assertJsonPath('data.0.package_allocations_count', 1)->assertJsonPath('data.0.pending_packages_count', 1);
     jarvisRead('operation-masterlist', $token, ['source' => 'operations', 'package_id' => 4, 'lot_id' => 1])->assertJsonCount(1, 'data')->assertJsonPath('data.0.item_id', 1);
 });
 

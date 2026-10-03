@@ -113,34 +113,107 @@ class JarvisReadService
      */
     private function billingGroups(): Builder
     {
-        $comparison = DB::connection()->getDriverName() === 'mysql'
-            ? 'CAST(bg.dr_no AS BINARY) = CAST(d.dr_no AS BINARY)'
-            : 'CAST(bg.dr_no AS TEXT) = CAST(d.dr_no AS TEXT)';
+        $query = DB::table('billing_grouped as bg')
+            ->join('grouping as bg_status', 'bg_status.group_id', '=', 'bg.group_id');
+        $this->matchReceiptNumber($query, 'bg');
 
-        return DB::table('billing_grouped as bg')
-            ->join('grouping as bg_status', 'bg_status.group_id', '=', 'bg.group_id')
-            ->whereRaw($comparison);
+        return $query;
     }
 
-    /** @param array<string, mixed> $filters */
-    public function deliveryRecords(array $filters): Builder
+    /** The indexed billing column stays bare; length also distinguishes trailing spaces. */
+    private function matchReceiptNumber(Builder|JoinClause $query, string $billingAlias): void
     {
-        return $this->deliveries($filters)->select([
-            'd.delivery_id', 'd.project_id', 'p.project_name', 'p.ref_no', 'd.dr_no',
-            'd.lot_id', 'd.keystage_id', 'd.status as delivery_status', 'd.delivery_date',
-            'd.delivered_date', 'd.accepted_date', 'd.package_qty', 'd.received_qty',
-            'd.school_id', 's.school_name', 's.region', 's.division', 's.municipality',
-            'll.warehouse_id',
-        ])->selectSub($this->allocations()->selectRaw('COUNT(*)'), 'package_allocations_count')
-            ->selectSub($this->allocations()->whereRaw("COALESCE(ps.status, 'pending') = ?", ['pending'])->selectRaw('COUNT(*)'), 'pending_packages_count')
-            ->selectSub($this->allocations()->where('ps.status', 'released')->selectRaw('COUNT(*)'), 'released_packages_count')
-            ->selectSub($this->allocations()->where('ps.status', 'delivered')->selectRaw('COUNT(*)'), 'delivered_packages_count')
-            ->selectSub($this->allocations()->where('ps.status', 'accepted')->selectRaw('COUNT(*)'), 'accepted_packages_count')
-            ->selectSub($this->allocations()->where('ps.status', 'warehouse')->selectRaw('COUNT(*)'), 'warehouse_packages_count')
-            ->selectSub($this->billingGroups()->selectRaw('COUNT(*)'), 'billing_groups_count')
-            ->selectSub($this->billingGroups()->where('bg_status.status', 'billed')->selectRaw('COUNT(*)'), 'billed_groups_count')
-            ->selectSub($this->billingGroups()->where('bg_status.status', 'paid')->selectRaw('COUNT(*)'), 'paid_groups_count')
-            ->selectSub($this->billingGroups()->where('bg_status.status', 'for billing')->selectRaw('COUNT(*)'), 'for_billing_groups_count');
+        if (DB::connection()->getDriverName() === 'mysql') {
+            $query->whereRaw($billingAlias.'.dr_no = d.dr_no COLLATE utf8mb4_bin')
+                ->whereRaw('OCTET_LENGTH('.$billingAlias.'.dr_no) = OCTET_LENGTH(d.dr_no)');
+        } else {
+            $query->whereColumn($billingAlias.'.dr_no', 'd.dr_no');
+        }
+    }
+
+    /**
+     * Aggregate both allocation paths separately so package key indexes remain usable.
+     *
+     * @param  list<int>|null  $deliveryIds
+     */
+    private function packageCounts(?array $deliveryIds): Builder
+    {
+        $byKeystage = $this->packageCountsBy('keystage_id')->whereNotNull('ad.keystage_id');
+        $byLot = $this->packageCountsBy('lot_id')->whereNull('ad.keystage_id');
+
+        if ($deliveryIds !== null) {
+            $byKeystage->whereIn('ad.delivery_id', $deliveryIds);
+            $byLot->whereIn('ad.delivery_id', $deliveryIds);
+        }
+
+        return $byKeystage->unionAll($byLot);
+    }
+
+    private function packageCountsBy(string $column): Builder
+    {
+        return DB::table('deliveries as ad')
+            ->join('package as pk', 'pk.'.$column, '=', 'ad.'.$column)
+            ->leftJoin('package_status as ps', function (JoinClause $join): void {
+                $join->on('ps.delivery_id', '=', 'ad.delivery_id')->on('ps.package_id', '=', 'pk.package_id');
+            })
+            ->select('ad.delivery_id')
+            ->selectRaw('COUNT(*) as package_allocations_count')
+            ->selectRaw("COUNT(CASE WHEN COALESCE(ps.status, 'pending') = 'pending' THEN 1 END) as pending_packages_count")
+            ->selectRaw("COUNT(CASE WHEN ps.status = 'released' THEN 1 END) as released_packages_count")
+            ->selectRaw("COUNT(CASE WHEN ps.status = 'delivered' THEN 1 END) as delivered_packages_count")
+            ->selectRaw("COUNT(CASE WHEN ps.status = 'accepted' THEN 1 END) as accepted_packages_count")
+            ->selectRaw("COUNT(CASE WHEN ps.status = 'warehouse' THEN 1 END) as warehouse_packages_count")
+            ->groupBy('ad.delivery_id');
+    }
+
+    private function billingCounts(): Builder
+    {
+        $query = DB::table('billing_grouped as bg')
+            ->join('grouping as bg_status', 'bg_status.group_id', '=', 'bg.group_id')
+            ->select('bg.dr_no')
+            ->selectRaw('COUNT(*) as billing_groups_count')
+            ->selectRaw("COUNT(CASE WHEN bg_status.status = 'billed' THEN 1 END) as billed_groups_count")
+            ->selectRaw("COUNT(CASE WHEN bg_status.status = 'paid' THEN 1 END) as paid_groups_count")
+            ->selectRaw("COUNT(CASE WHEN bg_status.status = 'for billing' THEN 1 END) as for_billing_groups_count")
+            ->groupBy('bg.dr_no');
+
+        if (DB::connection()->getDriverName() === 'mysql') {
+            $query->groupByRaw('OCTET_LENGTH(bg.dr_no)');
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @param  list<int>|null  $deliveryIds
+     */
+    public function deliveryRecords(array $filters, ?array $deliveryIds = null): Builder
+    {
+        $query = $this->deliveries($filters)
+            ->leftJoinSub($this->packageCounts($deliveryIds), 'package_counts', 'package_counts.delivery_id', '=', 'd.delivery_id')
+            ->leftJoinSub($this->billingCounts(), 'billing_counts', function (JoinClause $join): void {
+                $this->matchReceiptNumber($join, 'billing_counts');
+            })->select([
+                'd.delivery_id', 'd.project_id', 'p.project_name', 'p.ref_no', 'd.dr_no',
+                'd.lot_id', 'd.keystage_id', 'd.status as delivery_status', 'd.delivery_date',
+                'd.delivered_date', 'd.accepted_date', 'd.package_qty', 'd.received_qty',
+                'd.school_id', 's.school_name', 's.region', 's.division', 's.municipality',
+                'll.warehouse_id',
+            ]);
+
+        if ($deliveryIds !== null) {
+            $query->whereIn('d.delivery_id', $deliveryIds);
+        }
+
+        foreach (['package_allocations_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'warehouse_packages_count'] as $column) {
+            $query->selectRaw('COALESCE(package_counts.'.$column.', 0) as '.$column);
+        }
+        foreach (['billing_groups_count', 'billed_groups_count', 'paid_groups_count', 'for_billing_groups_count'] as $column) {
+            $query->selectRaw('COALESCE(billing_counts.'.$column.', 0) as '.$column);
+        }
+
+        return $query;
     }
 
     /** @param array<string, mixed> $filters */

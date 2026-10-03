@@ -57,6 +57,10 @@ class JarvisReadRequest extends FormRequest
             'code_prefix' => ['sometimes', 'string', 'max:255'],
         ];
 
+        if ($this->route()->getActionMethod() === 'deliveryProgress') {
+            $rules = array_replace($rules, DeliveryMonitoringRequest::filterRules());
+        }
+
         return array_intersect_key($rules, array_flip($this->supportedFilters()));
     }
 
@@ -70,6 +74,7 @@ class JarvisReadRequest extends FormRequest
         $filters = match ($endpoint) {
             'dashboard' => ['project_id', 'year', 'status', 'agency', 'ref_no'],
             'projects' => $projects,
+            'deliveryProgress' => array_keys(DeliveryMonitoringRequest::filterRules()),
             'project' => [],
             'deliveries' => $deliveries,
             'inventory', 'warehouses' => $inventory,
@@ -81,7 +86,7 @@ class JarvisReadRequest extends FormRequest
             default => [],
         };
 
-        return array_values(array_unique(array_merge(['company_id'], in_array($endpoint, ['dashboard', 'project'], true) ? [] : ['page', 'per_page'], $filters)));
+        return array_values(array_unique(array_merge(['company_id'], in_array($endpoint, ['dashboard', 'project', 'deliveryProgress'], true) ? [] : ['page', 'per_page'], $filters)));
     }
 
     /** @return array<int, callable> */

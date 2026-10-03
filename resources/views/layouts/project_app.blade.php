@@ -34,13 +34,25 @@
         </div>
 
         {{-- MAIN LAYOUT ENGINE CONTAINER --}}
-        <div class="min-h-screen flex flex-col relative">
+        <div class="min-h-screen flex flex-col relative" @if(request()->routeIs('deliveries.monitoring')) x-data="{ monitoringNavOpen: false }" @keydown.escape.window="monitoringNavOpen = false" @endif>
             
-            <aside class="w-64 bg-white border-r border-slate-200/80 shadow-sm fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto">
+            @if(request()->routeIs('deliveries.monitoring'))
+                <button type="button" x-show="monitoringNavOpen" x-cloak @click="monitoringNavOpen = false" class="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" aria-label="Close navigation"></button>
+            @endif
+            <aside @if(request()->routeIs('deliveries.monitoring')) :class="monitoringNavOpen ? 'translate-x-0' : '-translate-x-full'" @endif
+                class="w-64 bg-white border-r border-slate-200/80 shadow-sm fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto {{ request()->routeIs('deliveries.monitoring') ? '-translate-x-full lg:translate-x-0 transition-transform' : '' }}">
                 @include('layouts.project-sidebar')
             </aside>
 
-            <div class="flex-1 pl-64 flex flex-col min-h-screen">
+            <div class="flex-1 {{ request()->routeIs('deliveries.monitoring') ? 'lg:pl-64 min-w-0' : 'pl-64' }} flex flex-col min-h-screen">
+                @if(request()->routeIs('deliveries.monitoring'))
+                    <div class="px-4 pt-4 lg:hidden">
+                        <button type="button" @click="monitoringNavOpen = !monitoringNavOpen" :aria-expanded="monitoringNavOpen" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                            Operations menu
+                        </button>
+                    </div>
+                @endif
                 
                 @isset($header)
                     <header class="glass-header bg-white/75 sticky top-0 z-40 border-b border-slate-200/60 transition-all duration-300 dynamic-header py-4">

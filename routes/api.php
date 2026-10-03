@@ -13,6 +13,7 @@ Route::prefix('jarvis')->name('jarvis.')
         Route::middleware(EnsureJarvisCompany::class)->group(function () {
             Route::get('/dashboard', [JarvisReadController::class, 'dashboard'])->name('dashboard');
             Route::get('/projects', [JarvisReadController::class, 'projects'])->name('projects');
+            Route::get('/projects/delivery-progress', [JarvisReadController::class, 'deliveryProgress'])->name('projects.delivery-progress');
             Route::get('/projects/{id}', [JarvisReadController::class, 'project'])->whereNumber('id')->name('projects.show');
             Route::get('/operation-masterlist', [JarvisReadController::class, 'masterlist'])->name('masterlist');
             Route::get('/deliveries', [JarvisReadController::class, 'deliveries'])->name('deliveries');

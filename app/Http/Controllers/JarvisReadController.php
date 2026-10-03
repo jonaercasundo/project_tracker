@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\JarvisReadRequest;
 use App\Http\Resources\JarvisRecordResource;
 use App\Services\JarvisReadService;
+use App\Services\ProjectDeliveryProgressService;
+use Closure;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Collection;
 
 class JarvisReadController extends Controller
 {
@@ -22,6 +25,13 @@ class JarvisReadController extends Controller
         return $this->paginate($request, $this->operations->projectRecords($request->validated())->orderBy('p.project_id'));
     }
 
+    public function deliveryProgress(JarvisReadRequest $request, ProjectDeliveryProgressService $progress): JsonResponse
+    {
+        $filters = array_filter($request->validated(), fn (mixed $value): bool => $value !== null && $value !== '');
+
+        return $this->success($request, $progress->report($filters), ['definitions' => $progress->definitions()]);
+    }
+
     public function project(JarvisReadRequest $request, int $id): JsonResponse
     {
         $project = $this->operations->projectRecords(['project_id' => $id])->first();
@@ -35,7 +45,15 @@ class JarvisReadController extends Controller
 
     public function deliveries(JarvisReadRequest $request): JsonResponse
     {
-        return $this->paginate($request, $this->operations->deliveryRecords($request->validated())->orderBy('d.delivery_id'));
+        $filters = $request->validated();
+
+        return $this->paginate(
+            $request,
+            $this->operations->deliveries($filters)->select('d.delivery_id')->orderBy('d.delivery_id'),
+            fn (Collection $deliveries): Collection => $deliveries->isEmpty()
+                ? $deliveries
+                : $this->operations->deliveryRecords($filters, $deliveries->pluck('delivery_id')->all())->orderBy('d.delivery_id')->get(),
+        );
     }
 
     public function inventory(JarvisReadRequest $request): JsonResponse
@@ -67,12 +85,15 @@ class JarvisReadController extends Controller
         return $this->paginate($request, $query);
     }
 
-    private function paginate(JarvisReadRequest $request, Builder $query): JsonResponse
+    /** @param Closure(Collection): Collection|null $records */
+    private function paginate(JarvisReadRequest $request, Builder $query, ?Closure $records = null): JsonResponse
     {
         $filters = $request->validated();
         $page = $query->paginate((int) ($filters['per_page'] ?? 25), ['*'], 'page', (int) ($filters['page'] ?? 1));
 
-        return $this->success($request, JarvisRecordResource::collection($page->getCollection())->resolve($request), [
+        $collection = $records ? $records($page->getCollection()) : $page->getCollection();
+
+        return $this->success($request, JarvisRecordResource::collection($collection)->resolve($request), [
             'pagination' => [
                 'current_page' => $page->currentPage(),
                 'per_page' => $page->perPage(),

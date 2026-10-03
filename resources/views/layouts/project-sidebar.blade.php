@@ -110,6 +110,7 @@
         </a>
 
         <!-- Project List -->
+        <div class="px-4 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Operations</div>
         <a href="{{ route('projects.index') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-₁₅₀ relative overflow-hidden
            {{ request()->routeIs('projects.index') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-₁₀₀/8₀' }}">
@@ -135,7 +136,21 @@
             <span>Tracking Deliveries</span>
         </a>
 
-        <!-- Item List 
+        @if($currentUser?->hasAnyRole(['user', 'Administrator']) && $currentCompany?->code === 'MMC' && $currentCompany?->is_active)
+            <a href="{{ route('deliveries.monitoring') }}"
+               @if(request()->routeIs('deliveries.monitoring')) aria-current="page" @endif
+               class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('deliveries.monitoring') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
+                @if(request()->routeIs('deliveries.monitoring'))
+                    <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
+                @endif
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M7 14l4-4 4 3 5-7" />
+                </svg>
+                <span>Delivery Monitoring</span>
+            </a>
+        @endif
+
+        <!-- Item List
         <a href="{{ route('items.index') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
            {{ request()->routeIs('items.index') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">

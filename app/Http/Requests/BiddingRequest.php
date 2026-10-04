@@ -7,6 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Validator;
 
 abstract class BiddingRequest extends FormRequest
@@ -31,7 +32,47 @@ abstract class BiddingRequest extends FormRequest
             return;
         }
 
+        $this->guardHierarchySize($lots);
         $this->merge(['lots' => $this->restoreEmptyCollections($lots)]);
+    }
+
+    /** @param array<array-key, mixed> $lots */
+    private function guardHierarchySize(array $lots): void
+    {
+        $itemCount = 0;
+        foreach ($this->boundedRows($lots, 20, 'lots') as $index => $lot) {
+            if (! is_array($lot)) {
+                continue;
+            }
+            $itemCount += count($this->boundedRows($lot['legacy_items'] ?? [], 100, 'lots.'.$index.'.legacy_items'));
+            foreach ($this->boundedRows($lot['addresses'] ?? [], 20, 'lots.'.$index.'.addresses') as $addressIndex => $address) {
+                if (! is_array($address)) {
+                    continue;
+                }
+                $stagePath = 'lots.'.$index.'.addresses.'.$addressIndex.'.keystages';
+                foreach ($this->boundedRows($address['keystages'] ?? [], 20, $stagePath) as $stageIndex => $stage) {
+                    if (is_array($stage)) {
+                        $itemCount += count($this->boundedRows($stage['items'] ?? [], 100, $stagePath.'.'.$stageIndex.'.items'));
+                    }
+                }
+            }
+            if ($itemCount > 1000) {
+                throw ValidationException::withMessages(['lots' => 'A bidding document may contain at most 1,000 items.']);
+            }
+        }
+    }
+
+    /** @return array<array-key, mixed> */
+    private function boundedRows(mixed $rows, int $maximum, string $path): array
+    {
+        if (! is_array($rows)) {
+            return [];
+        }
+        if (count($rows) > $maximum) {
+            throw ValidationException::withMessages([$path => 'This section may contain at most '.$maximum.' rows.']);
+        }
+
+        return $rows;
     }
 
     /** @param array<array-key, mixed> $rows @return array<array-key, mixed> */
@@ -83,7 +124,7 @@ abstract class BiddingRequest extends FormRequest
             'lots' => [$required, 'array', 'min:1', 'max:20'],
             'lots.*' => ['array:id,lot_no,country_code,region_code,province_code,city_code,barangay_code,addresses,addresses_present,legacy_items,legacy_items_present'],
             'lots.*.id' => ['sometimes', 'integer', 'min:1', 'distinct'],
-            'lots.*.lot_no' => ['required', 'string', 'max:50', 'distinct'],
+            'lots.*.lot_no' => ['required', 'string', 'max:50', 'distinct:ignore_case'],
             'lots.*.country_code' => ['sometimes', Rule::in(['PH'])],
             'lots.*.addresses_present' => ['sometimes', 'boolean'],
             'lots.*.legacy_items_present' => ['sometimes', 'boolean'],
@@ -114,10 +155,10 @@ abstract class BiddingRequest extends FormRequest
         foreach (['lots.*.addresses.*.keystages.*.items' => false, 'lots.*.legacy_items' => true] as $path => $legacy) {
             $rules[$path.'.*'] = ['array:id,catalog_item_id,item_description,unit,quantity,unit_cost,total_amount,remarks,brand'];
             $rules[$path.'.*.id'] = [$legacy ? 'required' : 'sometimes', 'integer', 'min:1', 'distinct'];
-            $rules[$path.'.*.catalog_item_id'] = [$legacy ? 'nullable' : 'required', 'integer', Rule::exists('items', 'id')];
+            $rules[$path.'.*.catalog_item_id'] = ['nullable', ...($legacy ? [] : ['required_without:'.$path.'.*.id']), 'integer', Rule::exists('items', 'id')];
             $rules[$path.'.*.item_description'] = ['sometimes', 'nullable', 'string', 'max:10000'];
             $rules[$path.'.*.unit'] = ['sometimes', 'nullable', 'string', 'max:50'];
-            $rules[$path.'.*.quantity'] = ['required', ...$this->decimalRules()];
+            $rules[$path.'.*.quantity'] = [$legacy ? 'nullable' : 'required', ...$this->decimalRules()];
             $rules[$path.'.*.unit_cost'] = [$legacy ? 'nullable' : 'required', ...$this->decimalRules()];
             $rules[$path.'.*.total_amount'] = ['sometimes', 'nullable', ...$this->decimalRules()];
             $rules[$path.'.*.remarks'] = ['sometimes', 'nullable', 'string', 'max:10000'];

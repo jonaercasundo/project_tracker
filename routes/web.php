@@ -4,6 +4,8 @@ use App\Http\Controllers\Accounting_DashboardController;
 use App\Http\Controllers\Accounting_LiquidationController;
 use App\Http\Controllers\ActionCrawlerController;
 use App\Http\Controllers\BiddingController;
+use App\Http\Controllers\BiddingDocumentController;
+use App\Http\Controllers\BiddingFolderController;
 use App\Http\Controllers\BudgetRequestController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DeliveryController;
@@ -276,6 +278,22 @@ Route::middleware(['auth'])->group(function () {
 
         Route::delete('project/bidding/{bidding}', [BiddingController::class, 'project_destroy'])
             ->name('project.bidding.destroy');
+
+        Route::prefix('project/bidding/{bidding}')->name('project.bidding.')->group(function (): void {
+            Route::post('folders', [BiddingFolderController::class, 'store'])->name('folders.store');
+            Route::put('folders/{folder}', [BiddingFolderController::class, 'update'])->name('folders.update');
+            Route::delete('folders/{folder}', [BiddingFolderController::class, 'destroy'])->name('folders.destroy');
+            Route::get('documents', [BiddingDocumentController::class, 'index'])->name('documents.index');
+            Route::post('documents', [BiddingDocumentController::class, 'store'])->name('documents.store');
+            Route::post('documents/zip', [BiddingDocumentController::class, 'zip'])->name('documents.zip');
+            Route::put('documents/{document}', [BiddingDocumentController::class, 'update'])->name('documents.update');
+            Route::delete('documents/{document}', [BiddingDocumentController::class, 'destroy'])->name('documents.destroy');
+            Route::post('documents/{document}/replace', [BiddingDocumentController::class, 'replace'])->name('documents.replace');
+            Route::get('documents/{document}/download', [BiddingDocumentController::class, 'download'])->name('documents.download');
+            Route::get('documents/{document}/preview', [BiddingDocumentController::class, 'preview'])->name('documents.preview');
+            Route::get('documents/{document}/history', [BiddingDocumentController::class, 'history'])->name('documents.history');
+            Route::get('documents/{document}/versions/{version}/download', [BiddingDocumentController::class, 'downloadVersion'])->name('documents.versions.download');
+        });
     });
     /*
         |--------------------------------------------------------------------------
@@ -331,6 +349,22 @@ Route::middleware(['auth'])->group(function () {
 
         Route::delete('/bidding/{bidding}', [BiddingController::class, 'destroy'])
             ->name('bidding.destroy');
+
+        Route::prefix('bidding/{bidding}')->name('bidding.')->group(function (): void {
+            Route::post('folders', [BiddingFolderController::class, 'store'])->name('folders.store');
+            Route::put('folders/{folder}', [BiddingFolderController::class, 'update'])->name('folders.update');
+            Route::delete('folders/{folder}', [BiddingFolderController::class, 'destroy'])->name('folders.destroy');
+            Route::get('documents', [BiddingDocumentController::class, 'index'])->name('documents.index');
+            Route::post('documents', [BiddingDocumentController::class, 'store'])->name('documents.store');
+            Route::post('documents/zip', [BiddingDocumentController::class, 'zip'])->name('documents.zip');
+            Route::put('documents/{document}', [BiddingDocumentController::class, 'update'])->name('documents.update');
+            Route::delete('documents/{document}', [BiddingDocumentController::class, 'destroy'])->name('documents.destroy');
+            Route::post('documents/{document}/replace', [BiddingDocumentController::class, 'replace'])->name('documents.replace');
+            Route::get('documents/{document}/download', [BiddingDocumentController::class, 'download'])->name('documents.download');
+            Route::get('documents/{document}/preview', [BiddingDocumentController::class, 'preview'])->name('documents.preview');
+            Route::get('documents/{document}/history', [BiddingDocumentController::class, 'history'])->name('documents.history');
+            Route::get('documents/{document}/versions/{version}/download', [BiddingDocumentController::class, 'downloadVersion'])->name('documents.versions.download');
+        });
     });
     /*
         |--------------------------------------------------------------------------

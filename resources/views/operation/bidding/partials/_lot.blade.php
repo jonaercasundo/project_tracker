@@ -19,6 +19,13 @@
                 <div class="flex flex-col gap-1.5"><label for="{{ $uid }}-{{ $level }}" class="text-xs font-semibold text-slate-600">{{ $label }}</label><select id="{{ $uid }}-{{ $level }}" name="{{ $namePrefix }}[{{ $level }}_code]" data-location="{{ $level }}" data-selected="{{ $selectedCode }}" @disabled($level !== 'region' && $selectedCode === '') class="rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-400"><option value="">Select {{ strtolower($label) }}</option>@if($selectedCode !== '')<option value="{{ $selectedCode }}" selected>{{ $lotData[$level] ?? $selectedCode }}</option>@endif</select><x-input-error :messages="$errors->get($dotPrefix.'.'.$level.'_code')" class="text-xs" /></div>
             @endforeach
         </div>
+        @if(!empty($lotData['legacy_location']) || !empty($lotData['legacy_delivery_address']))
+            <div class="space-y-1 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+                @if(is_scalar($lotData['legacy_location'] ?? null) && $lotData['legacy_location'] !== '')<p>Saved location: {{ $lotData['legacy_location'] }}</p>@endif
+                @if(is_scalar($lotData['legacy_delivery_address'] ?? null) && $lotData['legacy_delivery_address'] !== '')<p>Saved delivery address: {{ $lotData['legacy_delivery_address'] }}</p>@endif
+                <p>Existing location labels stay available when no replacement location is selected.</p>
+            </div>
+        @endif
         <div data-location-message role="status" aria-live="polite" class="flex items-center gap-2 text-xs text-red-700"><span></span><button type="button" data-bidding-action="retry-locations" hidden class="font-semibold underline">Retry locations</button></div>
         <div data-bidding-addresses data-collection="addresses" data-name-prefix="{{ $namePrefix }}[addresses]" class="space-y-4">
             @foreach($addresses as $addressIndex => $address)

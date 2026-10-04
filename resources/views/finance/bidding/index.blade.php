@@ -28,6 +28,9 @@
     </x-slot>
 
     <div class="space-y-5">
+        @if(session('success'))
+            <div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{{ session('success') }}</div>
+        @endif
 
         {{-- Search --}}
         @include('finance.bidding.partials._search')

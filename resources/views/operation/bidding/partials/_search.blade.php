@@ -1,12 +1,12 @@
 {{-- SEARCH & FILTER --}}
 <div class="bg-white p-4 rounded-xl border border-slate-200">
 
-    <form action="{{ route('project.bidding.index') }}"
+    <form action="{{ route($biddingRoutePrefix.'.index') }}"
           method="GET"
           class="flex flex-col lg:flex-row flex-wrap gap-3 items-stretch lg:items-center">
 
         {{-- Search --}}
-        <div class="flex-1 min-w-[280px] relative">
+        <div class="flex-1 min-w-0 lg:min-w-[280px] relative">
 
             <label class="sr-only">
                 Search
@@ -71,7 +71,7 @@
 
             @if(request()->hasAny(['search','status']))
 
-                <a href="{{ route('project.bidding.index') }}"
+                <a href="{{ route($biddingRoutePrefix.'.index') }}"
                    class="w-full lg:w-auto text-center px-3.5 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
 
                     Clear

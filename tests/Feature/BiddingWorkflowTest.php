@@ -2,10 +2,16 @@
 
 use App\Models\BiddingDeliveryAddress;
 use App\Models\BiddingKeyStage;
+use App\Models\New\Item;
 use App\Models\ProjectInformation;
 use App\Models\ProjectItem;
 use App\Models\ProjectLot;
+use App\Policies\ProjectInformationPolicy;
+use App\Services\BiddingService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Validation\ValidationException;
+use Tests\BiddingCatalogFixtureFactory;
 use Tests\BiddingItemFixtureFactory;
 use Tests\BiddingLotFixtureFactory;
 use Tests\BiddingProjectFixtureFactory;
@@ -80,7 +86,7 @@ it('stores multiple lots addresses stages and items without collapsing their ide
 
 it('preserves omitted status metadata and all unchanged child IDs during a partial edit', function () {
     $this->signInBiddingUser();
-    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect();
+    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
     $project = ProjectInformation::query()->sole();
     $item = ProjectItem::query()->sole();
     $stage = BiddingKeyStage::query()->sole();
@@ -99,11 +105,11 @@ it('preserves omitted status metadata and all unchanged child IDs during a parti
 
 it('preserves unchanged items when an existing hierarchy is resubmitted', function () {
     $this->signInBiddingUser();
-    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect();
+    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
     $project = ProjectInformation::query()->sole();
     $item = ProjectItem::query()->sole();
 
-    $this->put(route('project.bidding.update', $project), $this->biddingHierarchyPayload($project))->assertRedirect();
+    $this->put(route('project.bidding.update', $project), $this->biddingHierarchyPayload($project))->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
 
     $this->assertModelExists($item);
     $this->assertDatabaseCount('project_items', 1);
@@ -112,7 +118,7 @@ it('preserves unchanged items when an existing hierarchy is resubmitted', functi
 
 it('adds a child without recreating unchanged existing item rows', function () {
     $this->signInBiddingUser();
-    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect();
+    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
     $project = ProjectInformation::query()->sole();
     $originalItem = ProjectItem::query()->sole();
     $payload = $this->biddingHierarchyPayload($project);
@@ -121,7 +127,7 @@ it('adds a child without recreating unchanged existing item rows', function () {
     $newItem['quantity'] = '3.00';
     $payload['lots'][0]['addresses'][0]['keystages'][0]['items'][] = $newItem;
 
-    $this->put(route('project.bidding.update', $project), $payload)->assertRedirect();
+    $this->put(route('project.bidding.update', $project), $payload)->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
 
     $this->assertModelExists($originalItem);
     $this->assertDatabaseCount('project_items', 2);
@@ -132,13 +138,13 @@ it('removes only explicitly omitted items from an authoritative submitted stage'
     $this->signInBiddingUser();
     $payload = $this->validBiddingPayload();
     $payload['lots'][0]['addresses'][0]['keystages'][0]['items'][] = $payload['lots'][0]['addresses'][0]['keystages'][0]['items'][0];
-    $this->post(route('project.bidding.store'), $payload)->assertRedirect();
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
     $project = ProjectInformation::query()->sole();
     $items = ProjectItem::query()->orderBy('id')->get();
     $update = $this->biddingHierarchyPayload($project);
     array_shift($update['lots'][0]['addresses'][0]['keystages'][0]['items']);
 
-    $this->put(route('project.bidding.update', $project), $update)->assertRedirect()->assertSessionHasNoErrors();
+    $this->put(route('project.bidding.update', $project), $update)->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
 
     $this->assertModelMissing($items[0]);
     $this->assertModelExists($items[1]);
@@ -148,16 +154,16 @@ it('removes only explicitly omitted items from an authoritative submitted stage'
 
 it('preserves an omitted nested item collection but clears an explicitly empty collection', function () {
     $this->signInBiddingUser();
-    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect();
+    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
     $project = ProjectInformation::query()->sole();
     $item = ProjectItem::query()->sole();
     $payload = $this->biddingHierarchyPayload($project);
     unset($payload['lots'][0]['addresses'][0]['keystages'][0]['items']);
-    $this->put(route('project.bidding.update', $project), $payload)->assertRedirect();
+    $this->put(route('project.bidding.update', $project), $payload)->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
     $this->assertModelExists($item);
     $payload['lots'][0]['addresses'][0]['keystages'][0]['items'] = [];
 
-    $this->put(route('project.bidding.update', $project), $payload)->assertRedirect();
+    $this->put(route('project.bidding.update', $project), $payload)->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
 
     $this->assertModelMissing($item);
     $this->assertDatabaseCount('keystages', 1);
@@ -185,7 +191,7 @@ it('preserves legacy lot items without inventing their missing unit costs', func
     $item = BiddingItemFixtureFactory::new()->create(['lot_id' => $lot->id, 'unit_cost' => null, 'total_amount' => '45.50']);
     $payload = ['lots' => [['id' => $lot->id, 'lot_no' => 'Lot 1', 'legacy_items' => [['id' => $item->id, 'item_description' => $item->item_description, 'unit' => 'pcs', 'quantity' => '2.50', 'unit_cost' => null, 'total_amount' => '999.99']]]]];
 
-    $this->put(route('project.bidding.update', $project), $payload)->assertRedirect();
+    $this->put(route('project.bidding.update', $project), $payload)->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
 
     $this->assertDatabaseHas('project_items', ['id' => $item->id, 'unit_cost' => null, 'total_amount' => '45.50', 'keystage_id' => null]);
     expect($project->fresh()->calculated_total)->toBe('45.50');
@@ -201,6 +207,38 @@ it('rejects changing a legacy quantity without supplying its missing cost', func
 
     expect($item->fresh()->quantity)->toBe('2.50');
     expect($item->fresh()->unit_cost)->toBeNull();
+});
+
+it('preserves missing legacy quantity and pricing while editing metadata', function (?string $unitCost, ?string $total) {
+    $this->signInBiddingUser();
+    $project = BiddingProjectFixtureFactory::new()->create();
+    $lot = BiddingLotFixtureFactory::new()->create(['project_id' => $project->id]);
+    $item = BiddingItemFixtureFactory::new()->create(['lot_id' => $lot->id, 'quantity' => null, 'unit_cost' => $unitCost, 'total_amount' => $total]);
+    $payload = ['project_name' => 'Updated legacy metadata', 'lots' => [['id' => $lot->id, 'lot_no' => 'Lot 1', 'legacy_items' => [['id' => $item->id, 'quantity' => null, 'unit_cost' => $unitCost, 'total_amount' => '999.99', 'remarks' => 'Updated legacy remarks']]]]];
+
+    $this->put(route('project.bidding.update', $project), $payload)->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('project_items', ['id' => $item->id, 'quantity' => null, 'unit_cost' => $unitCost, 'total_amount' => $total, 'remarks' => 'Updated legacy remarks']);
+    expect($project->fresh()->project_name)->toBe('Updated legacy metadata');
+    expect($project->fresh()->calculated_total)->toBe($total ?? '0.00');
+    $edit = $this->get(route('project.bidding.edit', $project));
+    $document = new DOMDocument;
+    $document->loadHTML($edit->getContent(), LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+    $quantity = (new DOMXPath($document))->query('//input[@name="lots[0][legacy_items][0][quantity]"]')->item(0);
+    expect($quantity)->not->toBeNull();
+    expect($quantity->getAttribute('value'))->toBe('');
+})->with(['known cost and historic total' => ['10.20', '45.50'], 'missing quantity cost and total' => [null, null]]);
+
+it('rejects changing legacy unit cost while its quantity is missing', function () {
+    $this->signInBiddingUser();
+    $project = BiddingProjectFixtureFactory::new()->create(['project_name' => 'Original legacy name']);
+    $lot = BiddingLotFixtureFactory::new()->create(['project_id' => $project->id]);
+    $item = BiddingItemFixtureFactory::new()->create(['lot_id' => $lot->id, 'quantity' => null, 'unit_cost' => '10.20', 'total_amount' => '45.50']);
+
+    $this->putJson(route('project.bidding.update', $project), ['project_name' => 'Rejected legacy name', 'lots' => [['id' => $lot->id, 'lot_no' => 'Lot 1', 'legacy_items' => [['id' => $item->id, 'quantity' => null, 'unit_cost' => '11.20']]]]])->assertUnprocessable()->assertJsonValidationErrors('lots.0.legacy_items.0.quantity');
+
+    $this->assertDatabaseHas('project_items', ['id' => $item->id, 'quantity' => null, 'unit_cost' => '10.20', 'total_amount' => '45.50']);
+    expect($project->fresh()->project_name)->toBe('Original legacy name');
 });
 
 it('rejects invalid status dates and financial values before saving any bidding data', function (string $field, mixed $value) {
@@ -220,10 +258,12 @@ it('rejects invalid status dates and financial values before saving any bidding 
     'negative ABC' => ['approved_budget_contract_abc', '-1.00'],
     'overflow ABC' => ['approved_budget_contract_abc', '10000000000000.00'],
     'negative quantity' => ['lots.0.addresses.0.keystages.0.items.0.quantity', '-1.00'],
+    'missing canonical quantity' => ['lots.0.addresses.0.keystages.0.items.0.quantity', null],
     'overprecision quantity' => ['lots.0.addresses.0.keystages.0.items.0.quantity', '1.234'],
     'negative unit cost' => ['lots.0.addresses.0.keystages.0.items.0.unit_cost', '-1.00'],
     'negative total' => ['lots.0.addresses.0.keystages.0.items.0.total_amount', '-1.00'],
     'invalid catalog ID' => ['lots.0.addresses.0.keystages.0.items.0.catalog_item_id', 99999],
+    'missing new catalog selection' => ['lots.0.addresses.0.keystages.0.items.0.catalog_item_id', null],
 ]);
 
 it('returns a friendly validation error for duplicate business project IDs without partial records', function () {
@@ -289,7 +329,7 @@ it('swaps existing lot labels atomically while preserving their IDs and items', 
     $this->put(route('project.bidding.update', $project), ['lots' => [
         ['id' => $firstLot->id, 'lot_no' => 'Lot 2'],
         ['id' => $secondLot->id, 'lot_no' => 'Lot 1'],
-    ]])->assertRedirect();
+    ]])->assertRedirect()->assertSessionHasNoErrors();
 
     expect($firstLot->fresh()->lot_no)->toBe('Lot 2');
     expect($secondLot->fresh()->lot_no)->toBe('Lot 1');
@@ -301,7 +341,7 @@ it('deletes an explicitly removed stage and its own items while preserving sibli
     $this->signInBiddingUser();
     $payload = $this->validBiddingPayload();
     $payload['lots'][0]['addresses'][0]['keystages'][] = array_replace($payload['lots'][0]['addresses'][0]['keystages'][0], ['name' => 'Keep stage']);
-    $this->post(route('project.bidding.store'), $payload)->assertRedirect();
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
     $project = ProjectInformation::query()->sole();
     $stages = BiddingKeyStage::query()->orderBy('id')->get();
     $removedItem = $stages[0]->items()->sole();
@@ -309,7 +349,7 @@ it('deletes an explicitly removed stage and its own items while preserving sibli
     $update = $this->biddingHierarchyPayload($project);
     array_shift($update['lots'][0]['addresses'][0]['keystages']);
 
-    $this->put(route('project.bidding.update', $project), $update)->assertRedirect();
+    $this->put(route('project.bidding.update', $project), $update)->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
 
     $this->assertModelMissing($stages[0]);
     $this->assertModelMissing($removedItem);
@@ -322,7 +362,7 @@ it('deletes an explicitly removed address and its stages and items while retaini
     $this->signInBiddingUser();
     $payload = $this->validBiddingPayload();
     $payload['lots'][0]['addresses'][] = array_replace($payload['lots'][0]['addresses'][0], ['delivery_address' => 'Keep address']);
-    $this->post(route('project.bidding.store'), $payload)->assertRedirect();
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
     $project = ProjectInformation::query()->sole();
     $addresses = BiddingDeliveryAddress::query()->orderBy('id')->get();
     $removedStage = $addresses[0]->keystages()->sole();
@@ -332,7 +372,7 @@ it('deletes an explicitly removed address and its stages and items while retaini
     $update = $this->biddingHierarchyPayload($project);
     array_shift($update['lots'][0]['addresses']);
 
-    $this->put(route('project.bidding.update', $project), $update)->assertRedirect();
+    $this->put(route('project.bidding.update', $project), $update)->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
 
     $this->assertModelMissing($addresses[0]);
     $this->assertModelMissing($removedStage);
@@ -346,7 +386,7 @@ it('deletes only an explicitly removed lot hierarchy while retaining another doc
     $this->signInBiddingUser();
     $payload = $this->validBiddingPayload();
     $payload['lots'][] = array_replace($payload['lots'][0], ['lot_no' => 'Keep lot']);
-    $this->post(route('project.bidding.store'), $payload)->assertRedirect();
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
     $project = ProjectInformation::query()->sole();
     $lots = $project->lots()->orderBy('id')->get();
     $removedAddress = $lots[0]->addresses()->sole();
@@ -356,9 +396,10 @@ it('deletes only an explicitly removed lot hierarchy while retaining another doc
     $otherLot = BiddingLotFixtureFactory::new()->create(['project_id' => $otherProject->id]);
     $otherItem = BiddingItemFixtureFactory::new()->create(['lot_id' => $otherLot->id]);
     $update = $this->biddingHierarchyPayload($project);
-    array_shift($update['lots']);
+    $update['lots'] = array_values(array_filter($update['lots'], fn (array $lot): bool => $lot['id'] !== $lots[0]->id));
 
-    $this->put(route('project.bidding.update', $project), $update)->assertRedirect()->assertSessionHasNoErrors();
+    $response = $this->put(route('project.bidding.update', $project), $update);
+    $response->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
 
     $this->assertModelMissing($lots[0]);
     $this->assertModelMissing($removedAddress);
@@ -371,10 +412,10 @@ it('deletes only an explicitly removed lot hierarchy while retaining another doc
 
 it('clears explicitly submitted optional metadata while preserving omitted dates and status', function () {
     $this->signInBiddingUser();
-    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect();
+    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
     $project = ProjectInformation::query()->sole();
 
-    $this->put(route('project.bidding.update', $project), ['prepared_by' => null, 'notes_special_condition' => null])->assertRedirect();
+    $this->put(route('project.bidding.update', $project), ['prepared_by' => null, 'notes_special_condition' => null])->assertRedirect()->assertSessionHasNoErrors();
 
     expect($project->fresh()->prepared_by)->toBeNull();
     expect($project->fresh()->notes_special_condition)->toBeNull();
@@ -389,7 +430,7 @@ it('rounds authoritative fractional currency with exact decimal arithmetic', fun
     $payload['lots'][0]['addresses'][0]['keystages'][0]['items'][0]['quantity'] = '8.50';
     $payload['lots'][0]['addresses'][0]['keystages'][0]['items'][0]['unit_cost'] = '19.99';
 
-    $this->post(route('project.bidding.store'), $payload)->assertRedirect();
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
 
     expect(ProjectItem::query()->sole()->total_amount)->toBe('169.92');
     expect(ProjectInformation::query()->sole()->calculated_total)->toBe('169.92');
@@ -426,4 +467,268 @@ it('preserves existing finance access to shared bidding records independently of
     $project = ProjectInformation::query()->sole();
     $response->assertRedirect(route('bidding.show', $project));
     $this->assertDatabaseCount('project_items', 1);
+});
+
+it('rejects duplicate lot labels differing only in case without partial inserts', function () {
+    $this->signInBiddingUser();
+    $payload = $this->validBiddingPayload();
+    $payload['lots'][] = array_replace($payload['lots'][0], ['lot_no' => 'LOT 1']);
+
+    $this->postJson(route('project.bidding.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors('lots.1.lot_no');
+
+    $this->assertDatabaseCount('project_information', 0);
+    $this->assertDatabaseCount('lots', 0);
+});
+
+it('rejects a truncated HTML hierarchy without changing existing children', function () {
+    $this->signInBiddingUser();
+    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
+    $project = ProjectInformation::query()->sole();
+    $item = ProjectItem::query()->sole();
+    $payload = $this->biddingHierarchyPayload($project);
+    $payload['hierarchy_present'] = '1';
+    $payload['lots'][0]['addresses'][0]['keystages'][0]['items'] = [];
+
+    $this->putJson(route('project.bidding.update', $project), $payload)->assertUnprocessable()->assertJsonValidationErrors('hierarchy_complete');
+
+    $this->assertModelExists($item);
+    expect($project->fresh()->calculated_total)->toBe('25.50');
+});
+
+it('converts a duplicate caught by the final database constraint to a friendly error', function () {
+    $project = BiddingProjectFixtureFactory::new()->create();
+    $payload = $this->validBiddingPayload();
+    $payload['project_id'] = $project->project_id;
+
+    try {
+        app(BiddingService::class)->store($payload);
+        test()->fail('The final unique constraint must refuse the second document.');
+    } catch (ValidationException $exception) {
+        expect($exception->errors())->toBe(['project_id' => ['A bidding document with this Project ID already exists.']]);
+    }
+
+    $this->assertDatabaseCount('project_information', 1);
+    $this->assertDatabaseCount('lots', 0);
+    $this->assertDatabaseCount('project_items', 0);
+});
+
+it('renders the canonical create edit and show views for operation and finance', function (string $prefix, string $role) {
+    $this->signInBiddingUser($role);
+    $create = $this->get(route($prefix.'.create'))->assertSee('name="status"', false)->assertSee('data-bidding-form', false);
+    $this->post(route($prefix.'.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
+    $project = ProjectInformation::query()->sole();
+
+    $edit = $this->get(route($prefix.'.edit', $project))->assertSee('name="status"', false)->assertSee('Fixture delivery address')->assertSee('Fixture key stage')->assertSee('Fixture catalog description')->assertSee('value="2.50"', false)->assertSee('value="10.20"', false);
+    $show = $this->get(route($prefix.'.show', $project))->assertSee('Fixture delivery address')->assertSee('Fixture key stage')->assertSee('Fixture catalog description')->assertSee('2.50')->assertSee('10.20')->assertSee('25.50')->assertSee('1,000.00');
+    if (getenv('BIDDING_RENDER_HTML') === '1') {
+        $directory = storage_path('framework/testing/bidding-ui');
+        File::ensureDirectoryExists($directory);
+        foreach (['create' => $create, 'edit' => $edit, 'show' => $show] as $page => $response) {
+            File::put($directory.'/'.str_replace('.', '-', $prefix).'-'.$page.'.html', $response->getContent());
+        }
+    }
+})->with(['operation' => ['project.bidding', 'user'], 'finance' => ['bidding', 'finance']]);
+
+it('renders create after invalid nested data without throwing on flashed malformed rows', function () {
+    $this->signInBiddingUser();
+    $payload = $this->validBiddingPayload();
+    $payload['lots'] = ['malformed lot'];
+    $this->from(route('project.bidding.create'))->post(route('project.bidding.store'), $payload)->assertRedirect(route('project.bidding.create'))->assertSessionHasErrors('lots.0');
+
+    $this->get(route('project.bidding.create'))->assertSee('Create bidding document')->assertSee('data-bidding-form', false);
+
+    $this->assertDatabaseCount('project_information', 0);
+});
+
+it('enforces the existing shared bidding policy for each supported role and company context', function (string $role, string $company, bool $allowed) {
+    $user = $this->signInBiddingUser($role, $company);
+    $project = BiddingProjectFixtureFactory::new()->create();
+    $policy = app(ProjectInformationPolicy::class);
+
+    expect([
+        $policy->viewAny($user), $policy->create($user), $policy->view($user, $project),
+        $policy->update($user, $project), $policy->delete($user, $project),
+        $policy->uploadDocument($user, $project), $policy->downloadDocument($user, $project),
+        $policy->deleteDocument($user, $project),
+    ])->toBe(array_fill(0, 8, $allowed));
+})->with([
+    'operation MMC' => ['user', 'MMC', true],
+    'operation MI' => ['user', 'MI', false],
+    'finance MMC' => ['finance', 'MMC', true],
+    'finance MI' => ['finance', 'MI', true],
+    'viewer MMC' => ['Viewer', 'MMC', false],
+    'viewer MI' => ['Viewer', 'MI', false],
+    'admin alone MMC' => ['admin', 'MMC', false],
+    'admin alone MI' => ['admin', 'MI', false],
+]);
+
+it('rejects cross-document address stage and item IDs without changing either document', function (string $field) {
+    $this->signInBiddingUser();
+    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
+    $projectA = ProjectInformation::query()->sole();
+    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
+    $projectB = ProjectInformation::query()->whereKeyNot($projectA->id)->sole();
+    $payload = $this->biddingHierarchyPayload($projectA);
+    $foreignPayload = $this->biddingHierarchyPayload($projectB);
+    $payload['project_name'] = 'Must roll back';
+    data_set($payload, $field, data_get($foreignPayload, $field));
+
+    $this->putJson(route('project.bidding.update', $projectA), $payload)->assertUnprocessable()->assertJsonValidationErrors($field);
+
+    expect($projectA->fresh()->project_name)->toBe('Bidding workflow fixture');
+    $this->assertDatabaseCount('project_items', 2);
+    $this->assertDatabaseCount('keystages', 2);
+    $this->assertDatabaseCount('delivery_address', 2);
+    expect($projectB->fresh()->calculated_total)->toBe('25.50');
+})->with([
+    'address' => 'lots.0.addresses.0.id',
+    'stage' => 'lots.0.addresses.0.keystages.0.id',
+    'item' => 'lots.0.addresses.0.keystages.0.items.0.id',
+]);
+
+it('uses native empty-collection presence markers to remove the last item intentionally', function () {
+    $this->signInBiddingUser();
+    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
+    $project = ProjectInformation::query()->sole();
+    $item = ProjectItem::query()->sole();
+    $payload = $this->biddingHierarchyPayload($project);
+    $payload['hierarchy_present'] = '1';
+    $payload['hierarchy_complete'] = '1';
+    $payload['lots'][0]['addresses'][0]['keystages'][0]['items_present'] = '1';
+    unset($payload['lots'][0]['addresses'][0]['keystages'][0]['items']);
+
+    $this->put(route('project.bidding.update', $project), $payload)->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
+
+    $this->assertModelMissing($item);
+    $this->assertDatabaseCount('keystages', 1);
+    expect($project->fresh()->calculated_total)->toBe('0.00');
+});
+
+it('bounds catalog search and returns stable identities with description unit and price', function () {
+    $this->signInBiddingUser();
+    BiddingCatalogFixtureFactory::new()->count(55)->create();
+    $rareItem = BiddingCatalogFixtureFactory::new()->create(['item_name' => 'Rare catalog fixture']);
+    $this->getJson(route('project.bidding.catalog'))->assertJsonCount(50, 'items')->assertJsonPath('has_more', true);
+
+    $response = $this->getJson(route('project.bidding.catalog', ['q' => 'Rare catalog fixture']))->assertJsonCount(1, 'items')->assertJsonPath('has_more', false)->assertJsonPath('items.0.id', $rareItem->id)->assertJsonPath('items.0.description', 'Fixture catalog description')->assertJsonPath('items.0.unit', 'pcs');
+
+    expect(array_keys($response->json('items.0')))->toBe(['id', 'item_name', 'description', 'unit', 'price']);
+});
+
+it('lists and searches actual child lots and reports successful deletion in operation and finance', function (string $prefix, string $role) {
+    $this->signInBiddingUser($role);
+    $project = BiddingProjectFixtureFactory::new()->create(['project_name' => 'Distinct listing fixture']);
+    BiddingLotFixtureFactory::new()->create(['project_id' => $project->id, 'lot_no' => 'Lot 9', 'region' => 'Legacy region']);
+    BiddingProjectFixtureFactory::new()->create(['project_name' => 'Unrelated listing fixture']);
+    $this->get(route($prefix.'.index'))->assertSee('Lot 9')->assertSee('Legacy region');
+    $this->get(route($prefix.'.index', ['search' => 'Lot 9']))->assertSee('Distinct listing fixture')->assertDontSee('Unrelated listing fixture')->assertViewHas('projects', fn ($projects): bool => $projects->total() === 1);
+
+    $this->delete(route($prefix.'.destroy', $project))->assertRedirect(route($prefix.'.index'));
+
+    $this->get(route($prefix.'.index'))->assertSee('Bidding document deleted successfully.')->assertDontSee('Distinct listing fixture');
+    $this->assertModelMissing($project);
+})->with(['operation' => ['project.bidding', 'user'], 'finance' => ['bidding', 'finance']]);
+
+it('bounds the initial catalog while preserving selected inactive entries and legacy snapshots beyond its limit', function () {
+    $this->signInBiddingUser();
+    $catalogItems = BiddingCatalogFixtureFactory::new()->count(105)->create();
+    $selectedItem = $catalogItems->last();
+    $selectedItem->update(['item_name' => 'ZZZ selected inactive catalog', 'active' => false]);
+    $otherSelectedItem = $catalogItems[$catalogItems->count() - 2];
+    $project = BiddingProjectFixtureFactory::new()->create();
+    $lot = BiddingLotFixtureFactory::new()->create(['project_id' => $project->id]);
+    $item = BiddingItemFixtureFactory::new()->create(['lot_id' => $lot->id, 'catalog_item_id' => $selectedItem->id, 'item_description' => 'Original quoted snapshot', 'unit' => 'boxes']);
+    BiddingItemFixtureFactory::new()->create(['lot_id' => $lot->id, 'item_no' => 2, 'catalog_item_id' => $otherSelectedItem->id]);
+
+    $this->get(route('project.bidding.create'))->assertViewHas('catalogItems', fn ($items): bool => $items->count() === 100 && ! $items->contains('id', $selectedItem->id));
+    $edit = $this->get(route('project.bidding.edit', $project))->assertViewHas('catalogItems', fn ($items): bool => $items->count() === 102 && $items->contains('id', $selectedItem->id))->assertSee('ZZZ selected inactive catalog')->assertSee('Original quoted snapshot')->assertSee('value="boxes"', false);
+    if (getenv('BIDDING_RENDER_HTML') === '1') {
+        $directory = storage_path('framework/testing/bidding-ui');
+        File::ensureDirectoryExists($directory);
+        File::put($directory.'/project-bidding-selected-edit.html', $edit->getContent());
+    }
+    $document = new DOMDocument;
+    $document->loadHTML($edit->getContent(), LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+    foreach ([$selectedItem->id => $otherSelectedItem->id, $otherSelectedItem->id => $selectedItem->id] as $selectedId => $otherId) {
+        $select = $xpath->query('//select[@data-catalog-item and option[@value="'.$selectedId.'" and @selected]]')->item(0);
+        expect($select)->not->toBeNull();
+        $values = [];
+        foreach ($select->getElementsByTagName('option') as $option) {
+            if ($option->getAttribute('value') !== '') {
+                $values[] = $option->getAttribute('value');
+            }
+        }
+        expect(count($values))->toBeLessThanOrEqual(51);
+        expect($values)->toContain((string) $selectedId)->not->toContain((string) $otherId);
+    }
+    $this->put(route('project.bidding.update', $project), ['project_name' => 'Edited metadata'])->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('project_items', ['id' => $item->id, 'catalog_item_id' => $selectedItem->id, 'item_description' => 'Original quoted snapshot', 'unit' => 'boxes']);
+});
+
+it('preserves a canonical item snapshot after its catalog record is deleted', function () {
+    $this->signInBiddingUser();
+    $payload = $this->validBiddingPayload();
+    $catalogId = $payload['lots'][0]['addresses'][0]['keystages'][0]['items'][0]['catalog_item_id'];
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    $project = ProjectInformation::query()->sole();
+    $item = $project->items()->sole();
+    Item::query()->findOrFail($catalogId)->delete();
+    expect($item->fresh()->catalog_item_id)->toBeNull();
+    $update = $this->biddingHierarchyPayload($project);
+    $update['project_name'] = 'Edited retained catalog snapshot';
+
+    $this->put(route('project.bidding.update', $project), $update)->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('project_items', ['id' => $item->id, 'catalog_item_id' => null, 'item_description' => 'Fixture catalog description', 'unit' => 'pcs', 'quantity' => '2.50', 'unit_cost' => '10.20', 'total_amount' => '25.50']);
+    expect($project->fresh()->calculated_total)->toBe('25.50');
+    $this->assertDatabaseCount('project_items', 1);
+    $this->get(route('project.bidding.edit', $project))->assertSee('Fixture catalog description')->assertSee('value="2.50"', false)->assertSee('value="10.20"', false);
+});
+
+it('rejects clearing a canonical item catalog selection while that catalog record still exists', function () {
+    $this->signInBiddingUser();
+    $this->post(route('project.bidding.store'), $this->validBiddingPayload())->assertRedirect()->assertSessionHasNoErrors();
+    $project = ProjectInformation::query()->sole();
+    $item = $project->items()->sole();
+    $catalogId = $item->catalog_item_id;
+    $update = $this->biddingHierarchyPayload($project);
+    $update['project_name'] = 'Rejected cleared selection';
+    $update['lots'][0]['addresses'][0]['keystages'][0]['items'][0]['catalog_item_id'] = null;
+
+    $this->putJson(route('project.bidding.update', $project), $update)->assertUnprocessable()->assertJsonValidationErrors('lots.0.addresses.0.keystages.0.items.0.catalog_item_id');
+
+    expect($item->fresh()->catalog_item_id)->toBe($catalogId);
+    expect($project->fresh()->project_name)->toBe('Bidding workflow fixture');
+    $this->assertDatabaseCount('project_items', 1);
+});
+
+it('rejects more than twenty lots before writing any hierarchy records', function () {
+    $this->signInBiddingUser();
+    $payload = $this->validBiddingPayload();
+    $lotTemplate = $payload['lots'][0];
+    $payload['lots'] = array_map(fn (int $index): array => array_replace($lotTemplate, ['lot_no' => 'Lot '.($index + 1)]), range(0, 20));
+
+    $this->postJson(route('project.bidding.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors('lots');
+
+    $this->assertDatabaseCount('project_information', 0);
+    $this->assertDatabaseCount('lots', 0);
+    $this->assertDatabaseCount('project_items', 0);
+});
+
+it('rejects more than one thousand aggregate items even when each collection is within its limit', function () {
+    $this->signInBiddingUser();
+    $payload = $this->validBiddingPayload();
+    $itemTemplate = $payload['lots'][0]['addresses'][0]['keystages'][0]['items'][0];
+    $payload['lots'][0]['addresses'][0]['keystages'] = array_map(fn (int $index): array => [
+        'name' => 'Stage '.$index,
+        'items' => array_fill(0, $index < 10 ? 100 : 1, $itemTemplate),
+    ], range(0, 10));
+
+    $this->postJson(route('project.bidding.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors('lots');
+
+    $this->assertDatabaseCount('project_information', 0);
+    $this->assertDatabaseCount('lots', 0);
+    $this->assertDatabaseCount('project_items', 0);
 });

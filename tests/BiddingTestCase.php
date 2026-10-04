@@ -25,8 +25,14 @@ class BiddingTestCase extends TestCase
         $application->singleton(Kernel::class, BiddingConsoleKernel::class);
         $application->make(Kernel::class)->bootstrap();
         $application['config']->set('database.default', 'sqlite');
-        $application['config']->set('database.connections.sqlite.database', ':memory:');
-        $application['config']->set('database.connections.sqlite.foreign_key_constraints', true);
+        $application['config']->set('database.connections.sqlite', [
+            'driver' => 'sqlite',
+            'url' => null,
+            'database' => ':memory:',
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+        ]);
+        $application->make('db')->purge('sqlite');
         RefreshDatabaseState::$migrated = false;
         RefreshDatabaseState::$inMemoryConnections = [];
 
@@ -54,6 +60,7 @@ class BiddingTestCase extends TestCase
             'database/migrations/2026_09_02_024221_create_companies_table.php',
             'database/migrations/2026_09_02_024448_create_company_user_table.php',
             'database/migrations/2026_10_04_053818_align_bidding_hierarchy.php',
+            'database/migrations/2026_10_04_101906_create_bidding_document_management_tables.php',
         ]];
     }
 
@@ -74,7 +81,7 @@ class BiddingTestCase extends TestCase
     {
         $user = User::factory()->create(['username' => fake()->unique()->userName(), 'role' => $role]);
         $user->assignRole(Role::findOrCreate($role, 'web'));
-        $company = Company::query()->create(['name' => $companyCode, 'code' => $companyCode, 'is_active' => true]);
+        $company = Company::query()->firstOrCreate(['code' => $companyCode], ['name' => $companyCode, 'is_active' => true]);
         $user->companies()->attach($company);
         $this->actingAs($user)->withSession(['company_id' => $company->company_id]);
 

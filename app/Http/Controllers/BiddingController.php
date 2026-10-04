@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 
 class BiddingController extends Controller
@@ -44,8 +45,9 @@ class BiddingController extends Controller
             $query->where('status', $filters['status']);
         }
         $projects = $query->with('lots')->latest()->orderByDesc('id')->paginate(20)->withQueryString();
+        $biddingRoutePrefix = $area === 'operation' ? 'project.bidding' : 'bidding';
 
-        return view($area.'.bidding.index', compact('projects'));
+        return view($area.'.bidding.index', compact('projects', 'biddingRoutePrefix'));
     }
 
     public function create(): View
@@ -164,9 +166,9 @@ class BiddingController extends Controller
         return response()->json(['items' => $items->take(50)->values(), 'has_more' => $items->count() > 50]);
     }
 
-    private function catalogItems(?ProjectInformation $bidding = null): \Illuminate\Support\Collection
+    private function catalogItems(?ProjectInformation $bidding = null): Collection
     {
-        $columns = ['id', 'item_name', 'description', 'unit', 'price'];
+        $columns = ['id', 'item_name', 'description', 'unit', 'price', 'active'];
         $items = Item::query()->where('active', 1)->select($columns)->orderBy('item_name')->orderBy('id')->limit(100)->get();
         $selected = $bidding?->items()->whereNotNull('catalog_item_id')->pluck('catalog_item_id') ?? collect();
         $oldLots = session()->getOldInput('lots', []);

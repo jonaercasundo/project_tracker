@@ -22,6 +22,8 @@ class BiddingService
 {
     public const MAX_AMOUNT = '9999999999999.99';
 
+    public function __construct(private BiddingDocumentService $documentService) {}
+
     /** @param array<string, mixed> $data */
     public function store(array $data): ProjectInformation
     {
@@ -69,9 +71,7 @@ class BiddingService
     {
         DB::transaction(function () use ($bidding): void {
             $project = ProjectInformation::query()->whereKey($bidding->getKey())->lockForUpdate()->firstOrFail();
-            if (class_exists(BiddingDocumentService::class)) {
-                app(BiddingDocumentService::class)->deleteBiddingFiles($project);
-            }
+            $this->documentService->deleteBiddingFiles($project);
             $project->keyStages()->delete();
             $project->delete();
         });
@@ -149,8 +149,8 @@ class BiddingService
     }
 
     /**
-     * @param array<array-key, array<string, mixed>> $rows
-     * @param callable(Model, array<string, mixed>, string): void $persist
+     * @param  array<array-key, array<string, mixed>>  $rows
+     * @param  callable(Model, array<string, mixed>, string): void  $persist
      */
     private function reconcile(HasMany $relation, array $rows, callable $persist, string $path): void
     {
@@ -192,16 +192,23 @@ class BiddingService
     /** @param array<string, mixed> $data */
     private function saveItem(ProjectItem $item, array $data, ProjectLot $lot, ?BiddingKeyStage $stage, string $path): void
     {
+        if ($stage !== null && array_key_exists('catalog_item_id', $data) && $data['catalog_item_id'] === null && $item->catalog_item_id !== null) {
+            throw ValidationException::withMessages([$path.'.catalog_item_id' => 'Keep the saved catalog item or select a replacement.']);
+        }
         $catalog = isset($data['catalog_item_id']) ? Item::findOrFail($data['catalog_item_id']) : null;
-        $quantity = self::amount((string) $data['quantity']);
+        $quantity = array_key_exists('quantity', $data) ? $data['quantity'] : $item->quantity;
+        $quantity = $quantity === null ? null : self::amount((string) $quantity);
         $cost = array_key_exists('unit_cost', $data) ? $data['unit_cost'] : $item->unit_cost;
-        if ($cost === null) {
-            if (! $item->exists || $stage !== null || $item->unit_cost !== null || ! BigDecimal::of($quantity)->isEqualTo($item->quantity ?? '0')) {
-                throw ValidationException::withMessages([$path.'.unit_cost' => 'Provide a unit cost before changing this legacy quantity.']);
+        $cost = $cost === null ? null : self::amount((string) $cost);
+        if ($quantity === null || $cost === null) {
+            $sameQuantity = $quantity === null ? $item->quantity === null : ($item->quantity !== null && BigDecimal::of($quantity)->isEqualTo($item->quantity));
+            $sameCost = $cost === null ? $item->unit_cost === null : ($item->unit_cost !== null && BigDecimal::of($cost)->isEqualTo($item->unit_cost));
+            if (! $item->exists || $stage !== null || ! $sameQuantity || ! $sameCost) {
+                $field = $quantity === null ? 'quantity' : 'unit_cost';
+                throw ValidationException::withMessages([$path.'.'.$field => 'Provide both quantity and unit cost before changing this legacy pricing.']);
             }
             $total = $item->total_amount;
         } else {
-            $cost = self::amount((string) $cost);
             $total = self::amount(BigDecimal::of($quantity)->multipliedBy($cost)->toScale(2, RoundingMode::HalfUp));
         }
         $attributes = Arr::only($data, ['catalog_item_id', 'item_description', 'unit', 'brand', 'remarks']);
@@ -245,6 +252,11 @@ class BiddingService
         $bidding->load('lots.addresses.keystages.items', 'lots.legacyItems', 'lots.items');
 
         return $bidding->lots->map(function (ProjectLot $lot): array {
+            $lotTotal = BigDecimal::of('0');
+            foreach ($lot->items as $item) {
+                $lotTotal = $lotTotal->plus($item->total_amount ?? '0');
+            }
+            $lot->setAttribute('calculated_item_total', self::amount($lotTotal));
             $row = Arr::only($lot->toArray(), ['id', 'lot_no', 'region_code', 'province_code', 'city_code', 'barangay_code']);
             $row['country_code'] = 'PH';
             $row['legacy_delivery_address'] = $lot->delivery_address;

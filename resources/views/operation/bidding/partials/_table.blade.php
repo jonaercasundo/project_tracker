@@ -20,7 +20,7 @@
                     <td colspan="2" class="px-5 py-5">
 
                         {{-- ================= HEADER ================= --}}
-                        <div class="flex justify-between items-start gap-6">
+                        <div class="flex flex-wrap justify-between items-start gap-4">
 
                             <div class="flex-1">
 
@@ -31,7 +31,8 @@
                                     </span>
 
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">
-                                        LOT {{ $project->lot_no ?? '-' }}
+                                        {{ $project->lots->pluck('lot_no')->take(3)->implode(', ') ?: ($project->lot_no ?: 'No lots') }}
+                                        @if($project->lots->count() > 3) +{{ $project->lots->count() - 3 }} @endif
                                     </span>
 
                                     {{-- STATUS --}}
@@ -69,7 +70,7 @@
                             {{-- ACTIONS --}}
                             <div class="flex items-center gap-1 shrink-0">
 
-                                <a href="{{ route('project.bidding.show',$project->id) }}"
+                                <a href="{{ route($biddingRoutePrefix.'.show',$project->id) }}"
                                    title="View"
                                    class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -78,7 +79,7 @@
                                     </svg>
                                 </a>
 
-                                <a href="{{ route('project.bidding.edit',$project->id) }}"
+                                <a href="{{ route($biddingRoutePrefix.'.edit',$project->id) }}"
                                    title="Edit"
                                    class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -87,7 +88,7 @@
                                 </a>
 
                                 <form method="POST"
-                                      action="{{ route('project.bidding.destroy',$project->id) }}"
+                                      action="{{ route($biddingRoutePrefix.'.destroy',$project->id) }}"
                                       onsubmit="return confirm('Delete this bidding project?')">
 
                                     @csrf
@@ -152,11 +153,12 @@
                                 </div>
 
                                 <div class="space-y-0.5">
-                                    <div class="font-medium text-slate-900">{{ $project->country }}</div>
-                                    <div class="text-slate-500 text-xs">{{ $project->region }}</div>
-                                    <div class="text-slate-500 text-xs">{{ $project->province }}</div>
-                                    <div class="text-slate-500 text-xs">{{ $project->city_municipality }}</div>
-                                    <div class="text-slate-500 text-xs">{{ $project->barangay }}</div>
+                                    @forelse($project->lots->take(3) as $lot)
+                                        <div class="font-medium text-slate-900">{{ $lot->lot_no }}</div>
+                                        <div class="text-xs text-slate-500">{{ collect([$lot->country, $lot->region, $lot->province, $lot->city_municipality, $lot->barangay])->filter()->implode(' / ') ?: 'Location not provided' }}</div>
+                                    @empty
+                                        <div class="text-xs text-slate-500">{{ collect([$project->country, $project->region, $project->province, $project->city_municipality, $project->barangay])->filter()->implode(' / ') ?: 'Location not provided' }}</div>
+                                    @endforelse
                                 </div>
 
                             </div>

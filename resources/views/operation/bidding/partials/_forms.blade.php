@@ -60,7 +60,7 @@
             @endforeach
         </div>
         <p data-bidding-empty-lots @if(count($formLots)) hidden @endif class="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">Add a lot to continue.</p>
-        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-5 py-4"><div><p class="text-xs font-semibold text-blue-900">Calculated item total</p><p class="mt-1 text-xs text-blue-700">Quantity ? unit cost across all lots. The approved budget stays separate.</p></div><p class="font-mono text-xl font-semibold tabular-nums text-blue-900">PHP <span data-bidding-calculated-total>{{ $calculatedTotal ?? '0.00' }}</span></p></div>
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-5 py-4"><div><p class="text-xs font-semibold text-blue-900">Calculated item total</p><p class="mt-1 text-xs text-blue-700">Quantity x unit cost across all lots. The approved budget stays separate.</p></div><p class="font-mono text-xl font-semibold tabular-nums text-blue-900">PHP <span data-bidding-calculated-total>{{ $calculatedTotal ?? '0.00' }}</span></p></div>
         <p data-bidding-feedback role="status" aria-live="polite" class="text-sm text-red-700"></p>
     </section>
     <section class="rounded-xl border border-slate-200 bg-white shadow-sm">

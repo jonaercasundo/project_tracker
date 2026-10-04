@@ -10,13 +10,34 @@ return new class extends Migration
     {
         Schema::create('bidding_document_folders', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('project_information_id')->constrained('project_information')->cascadeOnDelete();
-            $table->foreignId('parent_id')->nullable()->constrained('bidding_document_folders')->cascadeOnDelete();
+
+            $table->foreignId('project_information_id')
+                ->constrained('project_information')
+                ->cascadeOnDelete();
+
+            $table->foreignId('parent_id')
+                ->nullable()
+                ->constrained('bidding_document_folders')
+                ->cascadeOnDelete();
+
             $table->string('name', 120);
+
             $table->uuid('storage_uuid')->unique();
-            $table->foreignId('created_by')->nullable()->constrained('users', 'user_id')->nullOnDelete();
+
+            // users.user_id is signed INT(11)
+            $table->integer('created_by')->nullable();
+
             $table->timestamps();
-            $table->index(['project_information_id', 'parent_id', 'name'], 'bidding_folders_parent_name_index');
+
+            $table->foreign('created_by')
+                ->references('user_id')
+                ->on('users')
+                ->nullOnDelete();
+
+            $table->index(
+                ['project_information_id', 'parent_id', 'name'],
+                'bidding_folders_parent_name_index'
+            );
         });
 
         Schema::create('bidding_documents', function (Blueprint $table): void {

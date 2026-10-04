@@ -1,0 +1,7 @@
+<div class="overflow-x-auto rounded-lg border border-slate-200"><table class="w-full min-w-[750px] text-left text-xs"><thead class="border-b border-slate-200 bg-slate-50 text-slate-500"><tr><th class="px-3 py-2">Item</th><th class="px-3 py-2">Unit</th><th class="px-3 py-2 text-right">Quantity</th><th class="px-3 py-2 text-right">Unit cost (PHP)</th><th class="px-3 py-2 text-right">Amount (PHP)</th><th class="px-3 py-2">Brand / remarks</th></tr></thead><tbody class="divide-y divide-slate-100">
+@forelse($displayItems as $displayItem)
+    <tr><td class="px-3 py-3 font-medium text-slate-800">{{ $displayItem->item_description }}</td><td class="px-3 py-3 text-slate-500">{{ $displayItem->unit ?: '?' }}</td><td class="px-3 py-3 text-right font-mono tabular-nums">{{ $displayItem->quantity ?? '?' }}</td><td class="px-3 py-3 text-right font-mono tabular-nums">{{ $displayItem->unit_cost === null ? 'Not provided' : number_format((float) $displayItem->unit_cost, 2) }}</td><td class="px-3 py-3 text-right font-mono font-semibold tabular-nums">{{ $displayItem->total_amount === null ? 'Not provided' : number_format((float) $displayItem->total_amount, 2) }}</td><td class="px-3 py-3 text-slate-500">{{ $displayItem->brand ?: '?' }} @if($displayItem->remarks)<p class="mt-1">{{ $displayItem->remarks }}</p>@endif</td></tr>
+@empty
+    <tr><td colspan="6" class="px-3 py-5 text-center text-slate-500">No items in this key stage.</td></tr>
+@endforelse
+</tbody></table></div>

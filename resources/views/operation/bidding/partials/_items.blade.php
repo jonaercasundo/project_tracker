@@ -1,123 +1,24 @@
-{{-- ============================================================
-     finance/bidding/partials/_items.blade.php
-     Variables: $lotIndex, $itemIndex, $item (array|Model)
-     ============================================================ --}}
-
 @php
     $itemData = is_array($item) ? $item : $item->toArray();
-    $desc = old(
-        "lots.{$lotIndex}.items.{$itemIndex}.description",
-        $itemData['description'] ?? ''
-    );
-    $unit     = old("lots.{$lotIndex}.items.{$itemIndex}.unit",             $itemData['unit'] ?? '');
-    $qty      = old("lots.{$lotIndex}.items.{$itemIndex}.quantity",         $itemData['quantity'] ?? '');
-    /* $unitCost = old("lots.{$lotIndex}.items.{$itemIndex}.unit_cost", $itemData['unit_cost'] ?? ''); */
-    $brand    = old("lots.{$lotIndex}.items.{$itemIndex}.brand",            $itemData['brand'] ?? '');
-    $remarks  = old("lots.{$lotIndex}.items.{$itemIndex}.remarks",          $itemData['remarks'] ?? '');
+    $selectedItem = $fieldValue($dotPrefix.'.catalog_item_id', $itemData['catalog_item_id'] ?? '');
+    $originalItem = $legacy && isset($legacyOriginals[$itemData['id'] ?? '']) ? $legacyOriginals[$itemData['id']] : $itemData;
+    $originalQuantity = is_scalar($originalItem['quantity'] ?? null) ? (string) $originalItem['quantity'] : '0.00';
+    $originalTotal = is_scalar($originalItem['total_amount'] ?? null) ? (string) $originalItem['total_amount'] : '';
 @endphp
-
-<div class="bf-item-row flex flex-wrap items-center gap-2 py-2">
-
-        {{-- Item Description --}}
-        <select
-            class="item-select text-sm rounded-lg border-slate-200 py-1.5
-                focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
-            name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][item_description]">
-
-            <option value="" {{ empty($desc) ? 'selected' : '' }}>
-                Select Item
-            </option>
-
-            @foreach ($catalogItems as $catalogItem)
-                <option
-                    value="{{ $catalogItem->description }}"
-                    data-unit="{{ $catalogItem->unit }}"
-                    data-description="{{ $catalogItem->description }}"
-                    {{ isset($desc) && $desc == $catalogItem->description ? 'selected' : '' }}>
-                    {{ $catalogItem->item_name }}
-                </option>
-            @endforeach
-        </select>
-
-    {{-- Unit --}}
-    <input
-        type="text"
-        class="unit-input w-20 text-sm rounded-lg border-slate-200 py-1.5 px-2.5
-               placeholder:text-slate-400
-               focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
-        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit]"
-        value="{{ $unit }}"
-        placeholder="Unit">
-
-    {{-- Quantity --}}
-    <input
-        type="number"
-        class="qty w-16 text-sm rounded-lg border-slate-200 py-1.5 px-2.5
-               placeholder:text-slate-400
-               focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
-        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][quantity]"
-        value="{{ $qty }}"
-        placeholder="0"
-        min="0">
-
-    {{-- Unit Cost --}}
-     <div class="flex items-center gap-2 w-28 hidden">
-        <span class="text-slate-400 text-xs">₱</span>
-
-        <input
-            type="number"
-            class="unit-cost w-full text-sm rounded-lg border-slate-200 py-1.5 px-2
-                placeholder:text-slate-400
-                focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
-            step="0.01"
-            name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][unit_cost]"
-            placeholder="0.00" 
-            min="0"
-            readonly
-        >
-    </div>
-
-    {{-- Amount (computed, readonly) --}}
-    <div class="flex items-center gap-2 w-28">
-        <span class="text-slate-400 text-xs">₱</span>
-        <input
-            type="text"
-            class="item-amount w-full text-sm rounded-lg border-slate-200 bg-slate-50 py-1.5 pl-10 pr-2
-                   text-slate-600"
-            name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][total_amount]"          
-            >
-    </div>
-
-    <input
-        type="text"
-        class="item-description w-28 text-sm rounded-lg border-slate-200 py-1.5 px-2.5
-            placeholder:text-slate-400
-            focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
-        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][description]"
-        value="{{ $desc }}"
-        placeholder="Description"
-        readonly>
-
-    {{-- Remarks --}}
-    <input
-        type="text"
-        class="flex-1 min-w-[140px] text-sm rounded-lg border-slate-200 py-1.5 px-2.5
-               placeholder:text-slate-400
-               focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
-        name="lots[{{ $lotIndex }}][items][{{ $itemIndex }}][remarks]"
-        value="{{ $remarks }}"
-        placeholder="Remarks">
-
-    {{-- Delete --}}
-    <button
-        type="button"
-        class="bf-lot-del p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
-        aria-label="Remove item"
-        onclick="this.closest('.bf-item-row').remove()">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-        </svg>
-    </button>
-
-</div>
+<tr data-bidding-item data-entry-index="{{ $index }}" data-name-prefix="{{ $namePrefix }}" data-legacy="{{ $legacy ? 'true' : 'false' }}" data-original-quantity="{{ $originalQuantity }}" data-original-total="{{ $originalTotal }}">
+    <td class="space-y-2 px-3 py-3 align-top">
+        @if(!empty($itemData['id']) && is_scalar($itemData['id']))<input type="hidden" name="{{ $namePrefix }}[id]" value="{{ $itemData['id'] }}">@endif
+        <label for="{{ $uid }}-search" class="sr-only">Search catalog</label><input id="{{ $uid }}-search" type="search" data-catalog-search autocomplete="off" placeholder="Search catalog?" class="w-full rounded-md border-slate-200 py-1.5 text-xs focus:border-blue-500 focus:ring-blue-500">
+        <label for="{{ $uid }}-catalog" class="sr-only">Catalog item</label><select id="{{ $uid }}-catalog" name="{{ $namePrefix }}[catalog_item_id]" data-catalog-item @required(!$legacy) class="w-full rounded-md border-slate-200 py-1.5 text-xs focus:border-blue-500 focus:ring-blue-500"><option value="">{{ $legacy ? 'Keep saved item' : 'Select catalog item' }}</option>@foreach($catalogItems as $catalogItem)<option value="{{ $catalogItem->id }}" data-description="{{ $catalogItem->description ?: $catalogItem->item_name }}" data-unit="{{ $catalogItem->unit }}" data-price="{{ $catalogItem->price }}" @selected($selectedItem === (string) $catalogItem->id)>{{ $catalogItem->item_name }}{{ $catalogItem->active ? '' : ' (inactive)' }}</option>@endforeach</select>
+        <span data-catalog-message role="status" class="block text-xs text-slate-500"></span>
+        <label for="{{ $uid }}-description" class="sr-only">Item description</label><textarea id="{{ $uid }}-description" name="{{ $namePrefix }}[item_description]" data-item-description rows="2" maxlength="10000" class="w-full rounded-md border-slate-200 text-xs focus:border-blue-500 focus:ring-blue-500" placeholder="Item description">{{ $fieldValue($dotPrefix.'.item_description', $itemData['item_description'] ?? '') }}</textarea>
+        <x-input-error :messages="$errors->get($dotPrefix.'.catalog_item_id')" class="text-xs" /><x-input-error :messages="$errors->get($dotPrefix.'.item_description')" class="text-xs" />
+    </td>
+    <td class="px-2 py-3 align-top"><label for="{{ $uid }}-unit" class="sr-only">Unit</label><input id="{{ $uid }}-unit" name="{{ $namePrefix }}[unit]" data-item-unit value="{{ $fieldValue($dotPrefix.'.unit', $itemData['unit'] ?? '') }}" maxlength="50" class="w-full rounded-md border-slate-200 py-1.5 text-xs focus:border-blue-500 focus:ring-blue-500"><x-input-error :messages="$errors->get($dotPrefix.'.unit')" class="text-xs" /></td>
+    <td class="px-2 py-3 align-top"><label for="{{ $uid }}-quantity" class="sr-only">Quantity</label><input id="{{ $uid }}-quantity" name="{{ $namePrefix }}[quantity]" data-item-quantity type="number" min="0" max="9999999999999.99" step="0.01" required value="{{ $fieldValue($dotPrefix.'.quantity', $itemData['quantity'] ?? '1') }}" class="w-full rounded-md border-slate-200 py-1.5 text-xs focus:border-blue-500 focus:ring-blue-500"><x-input-error :messages="$errors->get($dotPrefix.'.quantity')" class="text-xs" /></td>
+    <td class="px-2 py-3 align-top"><label for="{{ $uid }}-cost" class="sr-only">Unit cost in PHP</label><input id="{{ $uid }}-cost" name="{{ $namePrefix }}[unit_cost]" data-item-cost type="number" min="0" max="9999999999999.99" step="0.01" @required(!$legacy) value="{{ $fieldValue($dotPrefix.'.unit_cost', $itemData['unit_cost'] ?? '') }}" class="w-full rounded-md border-slate-200 py-1.5 text-xs focus:border-blue-500 focus:ring-blue-500"><span data-item-price-message class="mt-1 block text-xs text-amber-800"></span><x-input-error :messages="$errors->get($dotPrefix.'.unit_cost')" class="text-xs" /></td>
+    <td class="px-2 py-3 align-top"><label for="{{ $uid }}-amount" class="sr-only">Calculated amount in PHP</label><input id="{{ $uid }}-amount" name="{{ $namePrefix }}[total_amount]" data-item-total type="text" readonly value="{{ $fieldValue($dotPrefix.'.total_amount', $itemData['total_amount'] ?? '') }}" class="w-full rounded-md border-slate-200 bg-slate-50 py-1.5 font-mono text-xs tabular-nums text-slate-700"><x-input-error :messages="$errors->get($dotPrefix.'.total_amount')" class="text-xs" /></td>
+    <td class="px-2 py-3 align-top"><label for="{{ $uid }}-brand" class="sr-only">Brand or specifications</label><input id="{{ $uid }}-brand" name="{{ $namePrefix }}[brand]" value="{{ $fieldValue($dotPrefix.'.brand', $itemData['brand'] ?? '') }}" maxlength="255" class="w-full rounded-md border-slate-200 py-1.5 text-xs focus:border-blue-500 focus:ring-blue-500"></td>
+    <td class="px-2 py-3 align-top"><label for="{{ $uid }}-remarks" class="sr-only">Item remarks</label><textarea id="{{ $uid }}-remarks" name="{{ $namePrefix }}[remarks]" rows="2" maxlength="10000" class="w-full rounded-md border-slate-200 text-xs focus:border-blue-500 focus:ring-blue-500">{{ $fieldValue($dotPrefix.'.remarks', $itemData['remarks'] ?? '') }}</textarea><x-input-error :messages="$errors->get($dotPrefix.'.remarks')" class="text-xs" /></td>
+    <td class="px-2 py-3 align-top"><button type="button" data-bidding-action="remove-item" class="rounded-md px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50" aria-label="Remove item">Remove</button></td>
+</tr>

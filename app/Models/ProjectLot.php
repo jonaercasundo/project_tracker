@@ -20,18 +20,32 @@ class ProjectLot extends Model
         'barangay',
         'delivery_address',
         'notes_special_condition',
+        'region_code',
+        'province_code',
+        'city_code',
+        'barangay_code',
     ];
 
     /**
      * Parent Project
      */
-    public function project()
+    public function project(): BelongsTo
     {
         return $this->belongsTo(ProjectInformation::class, 'project_id');
     }
 
-    public function items()
+    public function items(): HasMany
     {
         return $this->hasMany(ProjectItem::class, 'lot_id');
+    }
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(BiddingDeliveryAddress::class, 'lot_id');
+    }
+
+    public function legacyItems(): HasMany
+    {
+        return $this->items()->whereNull('keystage_id');
     }
 }

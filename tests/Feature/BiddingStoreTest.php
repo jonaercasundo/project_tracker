@@ -1,49 +1,21 @@
 <?php
 
-use App\Models\User;
+use App\Models\ProjectInformation;
+use App\Models\ProjectItem;
+use Tests\BiddingTestCase;
+
+pest()->extend(BiddingTestCase::class)->in(__FILE__);
 
 it('stores a bidding document when the abc value is blank', function () {
-    $this->withoutMiddleware();
+    $this->signInBiddingUser('finance');
+    $payload = $this->validBiddingPayload();
+    $payload['approved_budget_contract_abc'] = '';
 
-    $user = User::factory()->create([
-        'username' => 'tester',
-        'role' => 'admin',
-    ]);
+    $response = $this->post(route('bidding.store'), $payload);
 
-    $response = $this->actingAs($user)->post(route('bidding.store'), [
-        'project_name' => 'Sample Bidding Project',
-        'project_id' => 'BID-TEST-001',
-        'procuring_entity' => '',
-        'approved_budget_contract_abc' => '',
-        'delivery_period' => '30',
-        'date_of_bid_opening' => '2026-08-01',
-        'prepared_by' => 'Test User',
-        'prepared_date' => '2026-07-01',
-        'verified_by' => 'Verifier',
-        'status' => 'Draft',
-        'lots' => [
-            [
-                'lot_no' => 'Lot 1',
-                'country_code' => 'PH',
-                'region_code' => null,
-                'province_code' => null,
-                'city_code' => null,
-                'barangay_code' => null,
-                'delivery_address' => 'Test Address',
-                'items' => [
-                    [
-                        'item_description' => 'Sample item',
-                        'unit' => 'pcs',
-                        'quantity' => '2',
-                        'unit_cost' => '100',
-                        'brand' => 'Test Brand',
-                        'remarks' => 'Test remarks',
-                    ],
-                ],
-            ],
-        ],
-    ]);
-
-    $response->assertRedirect(route('bidding.index'));
+    $response->assertRedirect(route('bidding.show', ProjectInformation::query()->sole()));
     $response->assertSessionHas('success', 'Bidding document created successfully.');
+    expect(ProjectInformation::query()->sole()->approved_budget_contract_abc)->toBe('0.00');
+    expect(ProjectInformation::query()->sole()->calculated_total)->toBe('25.50');
+    expect(ProjectItem::query()->sole()->total_amount)->toBe('25.50');
 });

@@ -2,494 +2,219 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ProjectInformation;
-use App\Models\ProjectItem;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Http\Requests\StoreBiddingRequest;
+use App\Http\Requests\UpdateBiddingRequest;
 use App\Models\New\Item;
+use App\Models\ProjectInformation;
+use App\Services\BiddingService;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class BiddingController extends Controller
 {
-    private function normalizeAmount($value): float
-    {
-        if ($value === null || $value === '') {
-            return 0.0;
-        }
+    public function __construct(private BiddingService $biddingService) {}
 
-        return (float) str_replace([',', ' '], '', trim((string) $value));
+    public function index(Request $request): View
+    {
+        return $this->listing($request, 'finance');
     }
 
-    private function normalizeText($value): string
+    public function project_index(Request $request): View
     {
-        if ($value === null || $value === '') {
-            return '';
-        }
-
-        return trim((string) $value);
+        return $this->listing($request, 'operation');
     }
 
-    private function normalizeDate($value): ?string
+    private function listing(Request $request, string $area): View
     {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        return (string) $value;
-    }
-
-    public function index(Request $request)
-    {
+        Gate::authorize('viewAny', ProjectInformation::class);
+        $filters = $request->validate(['search' => ['nullable', 'string', 'max:100'], 'status' => ['nullable', 'string', 'max:30']]);
         $query = ProjectInformation::query();
-
-        if ($request->filled('search')) {
-
-            $search = $request->search;
-
-            $query->where(function ($q) use ($search) {
-
-                $q->where('project_id', 'like', "%{$search}%")
-                    ->orWhere('project_name', 'like', "%{$search}%")
-                    ->orWhere('procuring_entity', 'like', "%{$search}%")
-                    ->orWhere('lot_no', 'like', "%{$search}%");
-
+        if (! empty($filters['search'])) {
+            $search = '%'.$filters['search'].'%';
+            $query->where(function ($query) use ($search): void {
+                $query->where('project_id', 'like', $search)->orWhere('project_name', 'like', $search)
+                    ->orWhere('procuring_entity', 'like', $search)
+                    ->orWhereHas('lots', fn ($lots) => $lots->where('lot_no', 'like', $search));
             });
         }
+        if (! empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+        $projects = $query->with('lots')->latest()->orderByDesc('id')->paginate(20)->withQueryString();
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+        return view($area.'.bidding.index', compact('projects'));
+    }
+
+    public function create(): View
+    {
+        return $this->createView('finance', 'bidding');
+    }
+
+    public function project_create(): View
+    {
+        return $this->createView('operation', 'project.bidding');
+    }
+
+    private function createView(string $area, string $biddingRoutePrefix): View
+    {
+        Gate::authorize('create', ProjectInformation::class);
+        $this->sanitizeOldInput();
+
+        return view($area.'.bidding.create', [
+            'catalogItems' => $this->catalogItems(),
+            'biddingRoutePrefix' => $biddingRoutePrefix,
+            'biddingLots' => [],
+            'calculatedTotal' => '0.00',
+        ]);
+    }
+
+    public function store(StoreBiddingRequest $request): RedirectResponse
+    {
+        $bidding = $this->biddingService->store($request->validated());
+
+        return redirect()->route('bidding.show', $bidding)->with('success', 'Bidding document created successfully.');
+    }
+
+    public function project_store(StoreBiddingRequest $request): RedirectResponse
+    {
+        $bidding = $this->biddingService->store($request->validated());
+
+        return redirect()->route('project.bidding.show', $bidding)->with('success', 'Bidding document created successfully.');
+    }
+
+    public function show(ProjectInformation $bidding): View
+    {
+        return $this->documentView($bidding, 'finance', 'bidding', 'show');
+    }
+
+    public function project_show(ProjectInformation $bidding): View
+    {
+        return $this->documentView($bidding, 'operation', 'project.bidding', 'show');
+    }
+
+    public function edit(ProjectInformation $bidding): View
+    {
+        return $this->documentView($bidding, 'finance', 'bidding', 'edit');
+    }
+
+    public function project_edit(ProjectInformation $bidding): View
+    {
+        return $this->documentView($bidding, 'operation', 'project.bidding', 'edit');
+    }
+
+    private function documentView(ProjectInformation $bidding, string $area, string $biddingRoutePrefix, string $page): View
+    {
+        Gate::authorize($page === 'edit' ? 'update' : 'view', $bidding);
+        $this->sanitizeOldInput();
+        $biddingLots = $this->biddingService->formLots($bidding);
+
+        return view($area.'.bidding.'.$page, [
+            'project' => $bidding,
+            'biddingLots' => $biddingLots,
+            'biddingRoutePrefix' => $biddingRoutePrefix,
+            'catalogItems' => $page === 'edit' ? $this->catalogItems($bidding) : collect(),
+            'calculatedTotal' => $this->biddingService->calculatedTotal($bidding),
+        ]);
+    }
+
+    public function update(UpdateBiddingRequest $request, ProjectInformation $bidding): RedirectResponse
+    {
+        $this->biddingService->update($bidding, $request->validated());
+
+        return redirect()->route('bidding.show', $bidding)->with('success', 'Bidding document updated successfully.');
+    }
+
+    public function project_update(UpdateBiddingRequest $request, ProjectInformation $bidding): RedirectResponse
+    {
+        $this->biddingService->update($bidding, $request->validated());
+
+        return redirect()->route('project.bidding.show', $bidding)->with('success', 'Bidding document updated successfully.');
+    }
+
+    public function destroy(ProjectInformation $bidding): RedirectResponse
+    {
+        Gate::authorize('delete', $bidding);
+        $this->biddingService->delete($bidding);
+
+        return redirect()->route('bidding.index')->with('success', 'Bidding document deleted successfully.');
+    }
+
+    public function project_destroy(ProjectInformation $bidding): RedirectResponse
+    {
+        Gate::authorize('delete', $bidding);
+        $this->biddingService->delete($bidding);
+
+        return redirect()->route('project.bidding.index')->with('success', 'Bidding document deleted successfully.');
+    }
+
+    public function catalog(Request $request): JsonResponse
+    {
+        Gate::authorize('create', ProjectInformation::class);
+        $data = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+        $query = Item::query()->where('active', 1);
+        if (! empty($data['q'])) {
+            $search = '%'.$data['q'].'%';
+            $query->where(fn ($query) => $query->where('item_name', 'like', $search)->orWhere('item_id', 'like', $search)->orWhere('description', 'like', $search));
+        }
+        $items = $query->select('id', 'item_name', 'description', 'unit', 'price')->orderBy('item_name')->orderBy('id')->limit(51)->get();
+
+        return response()->json(['items' => $items->take(50)->values(), 'has_more' => $items->count() > 50]);
+    }
+
+    private function catalogItems(?ProjectInformation $bidding = null): \Illuminate\Support\Collection
+    {
+        $columns = ['id', 'item_name', 'description', 'unit', 'price'];
+        $items = Item::query()->where('active', 1)->select($columns)->orderBy('item_name')->orderBy('id')->limit(100)->get();
+        $selected = $bidding?->items()->whereNotNull('catalog_item_id')->pluck('catalog_item_id') ?? collect();
+        $oldLots = session()->getOldInput('lots', []);
+        if (is_array($oldLots)) {
+            $selected = $selected->merge(collect($oldLots)->flatMap(function (mixed $lot): array {
+                if (! is_array($lot)) {
+                    return [];
+                }
+                $ids = array_column(is_array($lot['legacy_items'] ?? null) ? $lot['legacy_items'] : [], 'catalog_item_id');
+                foreach ($lot['addresses'] ?? [] as $address) {
+                    if (! is_array($address)) {
+                        continue;
+                    }
+                    foreach ($address['keystages'] ?? [] as $stage) {
+                        if (is_array($stage)) {
+                            $ids = array_merge($ids, array_column(is_array($stage['items'] ?? null) ? $stage['items'] : [], 'catalog_item_id'));
+                        }
+                    }
+                }
+
+                return $ids;
+            }));
         }
 
-        $projects = $query
-            ->latest()
-            ->paginate(10);
+        $selected = $selected->filter(fn (mixed $id): bool => is_scalar($id) && ctype_digit((string) $id))->unique()->take(1000);
 
-        return view('finance.bidding.index', compact('projects'));
+        return $items->merge(Item::query()->whereIn('id', $selected)->select($columns)->get())->unique('id')->values();
     }
-    public function project_index(Request $request)
+
+    private function sanitizeOldInput(): void
     {
-        $query = ProjectInformation::query();
+        $old = session()->getOldInput();
+        if (is_array($old) && $old !== []) {
+            session()->flashInput($this->sanitizeFormRow($old));
+        }
+    }
 
-        if ($request->filled('search')) {
-
-            $search = $request->search;
-
-            $query->where(function ($q) use ($search) {
-
-                $q->where('project_id', 'like', "%{$search}%")
-                    ->orWhere('project_name', 'like', "%{$search}%")
-                    ->orWhere('procuring_entity', 'like', "%{$search}%")
-                    ->orWhere('lot_no', 'like', "%{$search}%");
-
-            });
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private function sanitizeFormRow(array $row): array
+    {
+        foreach ($row as $key => $value) {
+            if (in_array($key, ['lots', 'addresses', 'keystages', 'items', 'legacy_items'], true)) {
+                $row[$key] = is_array($value) ? array_map($this->sanitizeFormRow(...), array_filter($value, 'is_array')) : [];
+            } elseif (is_array($value) || is_object($value)) {
+                $row[$key] = null;
+            }
         }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        $projects = $query
-            ->latest()
-            ->paginate(20);
-
-        return view('operation.bidding.index', compact('projects'));
-    }
-    public function create()
-    {
-        $catalogItems = Item::where('active', 1)
-            ->orderBy('item_name')
-            ->get();
-
-        return view('finance.bidding.create', compact('catalogItems'));
-    }
-    public function project_create()
-    {
-        $catalogItems = Item::where('active', 1)
-            ->orderBy('item_name')
-            ->get();
-
-        return view('operation.bidding.create', compact('catalogItems'));
-    }
-    private function psgcName($code)
-    {
-        return DB::table('psgc')
-            ->where('psgc_code', $code)
-            ->value('name') ?? $code;
-    }
-    public function store(Request $request)
-    {
-        $request->validate([
-            'project_name' => 'required|string|max:255',
-            'project_id' => 'required|string|max:255',
-            'project_code' => 'required|string|max:255',
-
-            'lots' => 'required|array|min:1',
-            'lots.*.lot_no' => 'required|string|max:50',
-
-            'lots.*.items' => 'nullable|array',
-            'lots.*.items.*.quantity' => 'nullable|numeric|min:0',
-            'lots.*.items.*.unit' => 'nullable|string|max:50',
-            'lots.*.items.*.remarks' => 'nullable|string',
-        ]);
-
-        DB::transaction(function () use ($request) {
-
-            $project = ProjectInformation::create([
-                'project_name' => $this->normalizeText($request->input('project_name')),
-                'project_code' => $this->normalizeText($request->input('project_code')),
-                'project_id' => $this->normalizeText($request->input('project_id')),
-                'procuring_entity' => $this->normalizeText($request->input('procuring_entity')),
-                'approved_budget_contract_abc' => $this->normalizeAmount($request->input('approved_budget_contract_abc')),
-                'delivery_period' => $this->normalizeText($request->input('delivery_period')),
-                'date_of_bid_opening' => $this->normalizeDate($request->input('date_of_bid_opening')),
-                'prepared_by' => $this->normalizeText($request->input('prepared_by')),
-                'prepared_date' => $this->normalizeDate($request->input('prepared_date')),
-                'verified_by' => $this->normalizeText($request->input('verified_by')),
-                'status' => $request->input('status') ?? 'Draft',
-            ]);
-
-            foreach ($request->lots as $lotData) {
-
-                $lot = $project->lots()->create([
-                    'lot_no'                  => $lotData['lot_no'],
-                    'country' => $lotData['country_code'] == 'PH'
-                        ? 'Philippines'
-                        : $lotData['country_code'],
-                    'region' => $this->psgcName($lotData['region_code'] ?? null),
-                    'province' => $this->psgcName($lotData['province_code'] ?? null),
-                    'city_municipality' => $this->psgcName($lotData['city_code'] ?? null),
-                    'barangay' => $this->psgcName($lotData['barangay_code'] ?? null),
-                    'delivery_address' => $lotData['delivery_address'] ?? null,
-                ]);
-                    // Save items for this lot
-                if (!empty($lotData['items'])) {
-                    foreach ($lotData['items'] as $index => $itemData) {
-
-                        $quantity = $itemData['quantity'] ?? null;
-                        $unitCost = $this->normalizeAmount($itemData['unit_cost'] ?? null);
-
-                        $lot->items()->create([
-                            'item_no'          => $index + 1,
-                            'item_description' => $itemData['item_description'] ?? 'N/A',
-                            'quantity'         => $quantity ?? 0,
-                            'unit'             => $itemData['unit_of_measure'] ?? 'N/A',
-                            'total_amount' => $itemData['total_amount'] ?? 0,
-                            'remarks'          => $itemData['remarks'] ?? 'N/A',
-                        ]);
-                    }
-                }
-            }
-
-        });
-        
-        return redirect()
-            ->route('bidding.index')
-            ->with('success', 'Bidding document created successfully.');
-    }
-    public function project_store(Request $request)
-    {
-        $request->validate([
-            'project_name' => 'required|string|max:255',
-            'project_id' => 'required|string|max:255',
-            'project_code' => 'required|string|max:255',
-
-            'lots' => 'required|array|min:1',
-            'lots.*.lot_no' => 'required|string|max:50',
-
-            'lots.*.items' => 'nullable|array',
-            'lots.*.items.*.quantity' => 'nullable|numeric|min:0',
-            'lots.*.items.*.unit' => 'nullable|string|max:50',
-            'lots.*.items.*.remarks' => 'nullable|string',
-        ]);
-
-        DB::transaction(function () use ($request) {
-
-            $project = ProjectInformation::create([
-                'project_name' => $this->normalizeText($request->input('project_name')),
-                'project_code' => $this->normalizeText($request->input('project_code')),
-                'project_id' => $this->normalizeText($request->input('project_id')),
-                'procuring_entity' => $this->normalizeText($request->input('procuring_entity')),
-                'approved_budget_contract_abc' => $this->normalizeAmount($request->input('approved_budget_contract_abc')),
-                'delivery_period' => $this->normalizeText($request->input('delivery_period')),
-                'date_of_bid_opening' => $this->normalizeDate($request->input('date_of_bid_opening')),
-                'prepared_by' => $this->normalizeText($request->input('prepared_by')),
-                'prepared_date' => $this->normalizeDate($request->input('prepared_date')),
-                'verified_by' => $this->normalizeText($request->input('verified_by')),
-                'status' => $request->input('status') ?? 'Draft',
-            ]);
-
-            foreach ($request->lots as $lotData) {
-
-                $lot = $project->lots()->create([
-                    'lot_no'                  => $lotData['lot_no'],
-                    'country' => $lotData['country_code'] == 'PH'
-                        ? 'Philippines'
-                        : $lotData['country_code'],
-                    'region' => $this->psgcName($lotData['region_code'] ?? null),
-                    'province' => $this->psgcName($lotData['province_code'] ?? null),
-                    'city_municipality' => $this->psgcName($lotData['city_code'] ?? null),
-                    'barangay' => $this->psgcName($lotData['barangay_code'] ?? null),
-                    'delivery_address' => $lotData['delivery_address'] ?? null,
-                ]);
-                    // Save items for this lot
-                if (!empty($lotData['items'])) {
-                    foreach ($lotData['items'] as $index => $itemData) {
-
-                        $quantity = $itemData['quantity'] ?? null;
-                        $unitCost = $this->normalizeAmount($itemData['unit_cost'] ?? null);
-
-                        $lot->items()->create([
-                            'item_no'          => $index + 1,
-                            'item_description' => $itemData['item_description'] ?? 'N/A',
-                            'quantity'         => $quantity ?? 0,
-                            'unit'             => $itemData['unit_of_measure'] ?? 'N/A',
-                            'total_amount' => $itemData['total_amount'] ?? 0,
-                            'remarks'          => $itemData['remarks'] ?? 'N/A',
-                        ]);
-                    }
-                }
-            }
-
-        });
-        
-        return redirect()
-            ->route('project.bidding.index')
-            ->with('success', 'Bidding document created successfully.');
-    }
-
-    public function show(ProjectInformation $bidding)
-    {
-        $bidding->load('lots.items');
-
-        return view('finance.bidding.show', [
-            'project' => $bidding
-        ]);
-    }
-
-    public function project_show(ProjectInformation $bidding)
-    {
-        $bidding->load('lots.items');
-
-        return view('operation.bidding.show', [
-            'project' => $bidding
-        ]);
-    }
-
-    public function edit(ProjectInformation $bidding)
-    {
-        $bidding->load('lots.items');
-
-        return view('finance.bidding.edit', [
-            'project' => $bidding
-        ]);
-    }
-
-    public function project_edit(ProjectInformation $bidding)
-    {
-        $bidding->load('lots.items');
-
-        return view('operation.bidding.edit', [
-            'project' => $bidding
-        ]);
-    }
-
-    public function update(Request $request, ProjectInformation $bidding)
-    {
-        $request->validate([
-
-            'project_name' => 'required|string|max:255',
-            'project_id' => 'required|string|max:255',
-
-        ]);
-
-        DB::transaction(function () use ($request, $bidding) {
-
-            $bidding->update([
-
-                'project_name' => $this->normalizeText($request->input('project_name')),
-                'project_id' => $this->normalizeText($request->input('project_id')),
-                'procuring_entity' => $this->normalizeText($request->input('procuring_entity')),
-                'approved_budget_contract_abc' => $this->normalizeAmount($request->input('approved_budget_contract_abc')),
-                'lot_no' => $this->normalizeText($request->input('lot_no')),
-                'delivery_period' => $this->normalizeText($request->input('delivery_period')),
-                'country' => $this->normalizeText($request->input('country')),
-                'region' => $this->normalizeText($request->input('region')),
-                'province' => $this->normalizeText($request->input('province')),
-                'city_municipality' => $this->normalizeText($request->input('city_municipality')),
-                'barangay' => $this->normalizeText($request->input('barangay')),
-                'delivery_address' => $this->normalizeText($request->input('address') ?? $request->input('delivery_address')),
-                'date_of_bid_opening' => $this->normalizeDate($request->input('date_of_bid_opening')),
-                'notes_special_condition' => $this->normalizeText($request->input('notes_special_condition')),
-                'prepared_by' => $this->normalizeText($request->input('prepared_by')),
-                'prepared_date' => $this->normalizeDate($request->input('prepared_date')),
-                'verified_by' => $this->normalizeText($request->input('verified_by')),
-                'status' => $request->input('status'),
-
-            ]);
-
-            foreach ($bidding->lots as $lot) {
-                $lot->items()->delete();
-            }
-
-            foreach ($request->items ?? [] as $item) {
-
-                if (empty($item['item_description'])) {
-                    continue;
-                }
-                $total = (float)($item['quantity'] ?? 0) * (float)($item['unit_cost'] ?? 0);
-                foreach ($request->lots as $lotIndex => $lotData) {
-
-                    $lot = $bidding->lots()->updateOrCreate(
-                        ['lot_no' => $lotData['lot_no']],
-                        [
-                            'country' => $lotData['country_code'] == 'PH' ? 'Philippines' : $lotData['country_code'],
-                            'region' => $this->psgcName($lotData['region_code'] ?? null),
-                            'province' => $this->psgcName($lotData['province_code'] ?? null),
-                            'city_municipality' => $this->psgcName($lotData['city_code'] ?? null),
-                            'barangay' => $this->psgcName($lotData['barangay_code'] ?? null),
-                            'delivery_address' => $lotData['delivery_address'] ?? null,
-                        ]
-                    );
-
-                    // reset items per lot
-                    $lot->items()->delete();
-
-                    foreach ($lotData['items'] ?? [] as $index => $item) {
-
-                        if (empty($item['item_description'])) continue;
-
-                        $lot->items()->create([
-                            'item_no' => $index + 1,
-                            'item_description' => $item['item_description'],
-                            'unit' => $item['unit'],
-                            'quantity' => (float) $item['quantity'],
-                            'unit_cost' => (float) str_replace(',', '', $item['unit_cost']),
-                            'total_amount' => (float) str_replace(',', '', $item['total_amount']),
-                            'brand' => $item['brand'] ?? null,
-                            'remarks' => $item['remarks'] ?? null,
-                        ]);
-                    }
-                }
-            }
-
-        });
-
-        return redirect()
-            ->route('bidding.show', $bidding)
-            ->with('success', 'Bidding document updated successfully.');
-    }
-
-    public function project_update(Request $request, ProjectInformation $bidding)
-    {
-        $request->validate([
-
-            'project_name' => 'required|string|max:255',
-            'project_id' => 'required|string|max:255',
-
-        ]);
-
-        DB::transaction(function () use ($request, $bidding) {
-
-            $bidding->update([
-
-                'project_name' => $this->normalizeText($request->input('project_name')),
-                'project_id' => $this->normalizeText($request->input('project_id')),
-                'procuring_entity' => $this->normalizeText($request->input('procuring_entity')),
-                'approved_budget_contract_abc' => $this->normalizeAmount($request->input('approved_budget_contract_abc')),
-                'lot_no' => $this->normalizeText($request->input('lot_no')),
-                'delivery_period' => $this->normalizeText($request->input('delivery_period')),
-                'country' => $this->normalizeText($request->input('country')),
-                'region' => $this->normalizeText($request->input('region')),
-                'province' => $this->normalizeText($request->input('province')),
-                'city_municipality' => $this->normalizeText($request->input('city_municipality')),
-                'barangay' => $this->normalizeText($request->input('barangay')),
-                'delivery_address' => $this->normalizeText($request->input('address') ?? $request->input('delivery_address')),
-                'date_of_bid_opening' => $this->normalizeDate($request->input('date_of_bid_opening')),
-                'notes_special_condition' => $this->normalizeText($request->input('notes_special_condition')),
-                'prepared_by' => $this->normalizeText($request->input('prepared_by')),
-                'prepared_date' => $this->normalizeDate($request->input('prepared_date')),
-                'verified_by' => $this->normalizeText($request->input('verified_by')),
-                'status' => $request->input('status'),
-
-            ]);
-
-            foreach ($bidding->lots as $lot) {
-                $lot->items()->delete();
-            }
-
-            foreach ($request->items ?? [] as $item) {
-
-                if (empty($item['item_description'])) {
-                    continue;
-                }
-                $total = (float)($item['quantity'] ?? 0) * (float)($item['unit_cost'] ?? 0);
-                foreach ($request->lots as $lotIndex => $lotData) {
-
-                    $lot = $bidding->lots()->updateOrCreate(
-                        ['lot_no' => $lotData['lot_no']],
-                        [
-                            'country' => $lotData['country_code'] == 'PH' ? 'Philippines' : $lotData['country_code'],
-                            'region' => $this->psgcName($lotData['region_code'] ?? null),
-                            'province' => $this->psgcName($lotData['province_code'] ?? null),
-                            'city_municipality' => $this->psgcName($lotData['city_code'] ?? null),
-                            'barangay' => $this->psgcName($lotData['barangay_code'] ?? null),
-                            'delivery_address' => $lotData['delivery_address'] ?? null,
-                        ]
-                    );
-
-                    // reset items per lot
-                    $lot->items()->delete();
-
-                    foreach ($lotData['items'] ?? [] as $index => $item) {
-
-                        if (empty($item['item_description'])) continue;
-
-                        $lot->items()->create([
-                            'item_no' => $index + 1,
-                            'item_description' => $item['item_description'],
-                            'unit' => $item['unit'],
-                            'quantity' => (float) $item['quantity'],
-                            'unit_cost' => (float) str_replace(',', '', $item['unit_cost']),
-                            'total_amount' => (float) str_replace(',', '', $item['total_amount']),
-                            'brand' => $item['brand'] ?? null,
-                            'remarks' => $item['remarks'] ?? null,
-                        ]);
-                    }
-                }
-            }
-
-        });
-
-        return redirect()
-            ->route('project.bidding.show', $bidding)
-            ->with('success', 'Bidding document updated successfully.');
-    }
-
-    public function destroy(ProjectInformation $bidding)
-    {
-        DB::transaction(function () use ($bidding) {
-
-            $bidding->items()->delete();
-
-            $bidding->delete();
-
-        });
-
-        return redirect()
-            ->route('bidding.index')
-            ->with('success', 'Bidding document deleted successfully.');
-    }
-    public function project_destroy(ProjectInformation $bidding)
-    {
-        DB::transaction(function () use ($bidding) {
-
-            $bidding->items()->delete();
-
-            $bidding->delete();
-
-        });
-
-        return redirect()
-            ->route('project.bidding.index')
-            ->with('success', 'Bidding document deleted successfully.');
+        return $row;
     }
 }

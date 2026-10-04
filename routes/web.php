@@ -257,6 +257,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('project/bidding', [BiddingController::class, 'project_index'])
             ->name('project.bidding.index');
 
+        Route::get('project/bidding/catalog', [BiddingController::class, 'catalog'])->name('project.bidding.catalog');
+
         Route::get('project/bidding/create', [BiddingController::class, 'project_create'])
             ->name('project.bidding.create');
 
@@ -309,6 +311,8 @@ Route::middleware(['auth'])->group(function () {
         */
         Route::get('/bidding', [BiddingController::class, 'index'])
             ->name('bidding.index');
+
+        Route::get('/bidding/catalog', [BiddingController::class, 'catalog'])->name('bidding.catalog');
 
         Route::get('/bidding/create', [BiddingController::class, 'create'])
             ->name('bidding.create');

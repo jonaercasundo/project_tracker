@@ -242,13 +242,24 @@ Browser fixtures are rendered by real Laravel HTTP tests in the isolated databas
 
 ## 12. Test results
 
-Final combined verification results will be recorded here after the last validation-retry regression and formatting complete.
+Final combined command: `php vendor/bin/pest tests/Feature/BiddingWorkflowTest.php tests/Feature/BiddingStoreTest.php tests/Feature/BiddingDocumentsTest.php --compact` with `BIDDING_RENDER_HTML=1` for fixture exports. **113 tests passed, 878 assertions, 40.82 seconds.**
+
+| Verification | Result |
+| --- | --- |
+| Core workflow + repaired finance store test | 75 passing cases / 557 assertions within the combined run |
+| Folder/document feature tests | 38 passing cases / 321 assertions within the combined run |
+| Actual Blade rendering/export after final layout containment change | 6 passed / 88 assertions, 2.67 seconds |
+| Bidding browser behavior and responsive rendering | Final browser verification pending |
+| Existing Project Details browser regression, shared-bundle compatibility | 3 passed, no failures/skips |
+| PHP formatting | All implementation PHP paths formatted; final `php vendor/bin/pint --dirty --format agent` passed |
+
+Case totals include parameterized datasets. Additional rendering runs are verification repeats, not additional distinct PHP cases. Node/Chromium checks require subprocess access in this sandbox; a blocked initial launch was retried successfully for the compatibility checks.
 
 The complete repository test suite was not run: unrelated existing tests retain database configuration that has not been proven isolated. Before running `php artisan test --compact` for the whole repository, configure and verify a dedicated full-suite database/storage environment. The narrow bidding harness does not make other tests safe automatically. No production MySQL save/delete behavior or representative large production dataset was exercised.
 
 ## 13. Build result
 
-`npm run build` passed with Vite 5.4.21. The first attempt encountered a sandbox `spawn EPERM`; allowing the compiler subprocess completed the local asset build. A final build after the last template adjustment will be recorded with final verification. Dependencies/lockfiles were not changed.
+Final `npm run build` **passed** with Vite 5.4.21 after the last template/layout adjustments: 61 modules transformed, 2.95 seconds. Assets: `app-DkYiN6ib.css` (96.02 kB), `app-WuKkAfAG.js` (139.69 kB), and `manifest.json`. The first attempt encountered a sandbox `spawn EPERM`; allowing the compiler subprocess completed the local asset build. Dependencies/lockfiles were not changed.
 
 PHP formatting includes all implementation PHP paths, including files committed during the session, followed by the required `php vendor/bin/pint --dirty --format agent`. Git whitespace verification is part of the final checks.
 
@@ -263,7 +274,7 @@ PHP formatting includes all implementation PHP paths, including files committed 
 
 ## 15. Remaining risks
 
-- Deployment schema/cascades/SQL mode/users key parity and deployed bundle parity are unverified. Isolated SQLite tests do not replace a staging MySQL migration/FK/decimal smoke test. Existing corrupt or cross-linked hierarchy data was not repaired.
+- Deployment schema/cascades/SQL mode/users key parity and deployed bundle parity are unverified. In particular, confirm production `users.user_id` is compatible in width/signedness with the new uploader/creator foreign keys. Isolated SQLite tests do not replace a staging MySQL migration/FK/decimal smoke test. Existing corrupt or cross-linked hierarchy data was not repaired.
 - Updates lock the parent and are atomic; no optimistic stale-editor version token exists. A later valid full form can replace an earlier editor's intent. Confirm a conflict policy before introducing it.
 - Relational transactions cannot atomically commit filesystem writes. Ordinary DB/storage failures have tested compensation/outbox recovery, but a process kill between file write and DB commit may leave an unreferenced UUID file. Simultaneous DB and storage unavailability may prevent recording compensation. Persistent backups and operational reconciliation remain necessary.
 - Previous versions consume storage until explicit document/bidding deletion; no retention policy, antivirus service, or quota service was introduced. Allowed MIME checks validate format boundaries, not document trustworthiness.
@@ -318,6 +329,7 @@ After staging smoke tests and backups, activate the two targeted migrations with
 ```bash
 php artisan down --retry=60
 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+php artisan config:clear
 php artisan migrate --path=database/migrations/2026_10_04_053818_align_bidding_hierarchy.php --force --no-interaction
 php artisan migrate --path=database/migrations/2026_10_04_101906_create_bidding_document_management_tables.php --force --no-interaction
 php artisan config:cache

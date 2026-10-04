@@ -8,6 +8,8 @@ use App\Models\ProjectItem;
 use App\Models\ProjectLot;
 use App\Policies\ProjectInformationPolicy;
 use App\Services\BiddingService;
+use Database\Factories\BiddingDeliveryAddressFactory;
+use Database\Factories\BiddingKeyStageFactory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Validation\ValidationException;
@@ -634,6 +636,19 @@ it('renders the canonical create edit and show views for operation and finance',
             File::put($directory.'/'.str_replace('.', '-', $prefix).'-'.$page.'.html', $response->getContent());
         }
     }
+})->with(['operation' => ['project.bidding', 'user'], 'finance' => ['bidding', 'finance']]);
+
+it('shows legacy structured address and stage headings without backfilling stored values', function (string $prefix, string $role) {
+    $this->signInBiddingUser($role);
+    $project = BiddingProjectFixtureFactory::new()->create();
+    $lot = BiddingLotFixtureFactory::new()->create(['project_id' => $project->id]);
+    $address = BiddingDeliveryAddressFactory::new()->create(['project_id' => $project->id, 'lot_id' => $lot->id, 'delivery_address' => null, 'delivery_address_otherInformation' => 'Legacy structured delivery address']);
+    $stage = BiddingKeyStageFactory::new()->create(['project_id' => $project->id, 'lot_id' => $lot->id, 'delivery_address_id' => $address->id, 'name' => null]);
+
+    $this->get(route($prefix.'.show', $project))->assertSee('Legacy structured delivery address')->assertSee('Legacy stage');
+
+    $this->assertDatabaseHas('delivery_address', ['id' => $address->id, 'delivery_address' => null, 'delivery_address_otherInformation' => 'Legacy structured delivery address']);
+    $this->assertDatabaseHas('keystages', ['id' => $stage->id, 'name' => null]);
 })->with(['operation' => ['project.bidding', 'user'], 'finance' => ['bidding', 'finance']]);
 
 it('renders create after invalid nested data without throwing on flashed malformed rows', function () {

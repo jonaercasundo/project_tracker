@@ -396,22 +396,25 @@ test('actual isolated Blade pages render responsive forms with no page overflow'
             assert((await page.locator('[data-bidding-lot]').first().textContent()).includes('Japan'));
             for (const level of ['country', 'region', 'province', 'city', 'barangay']) assert.equal(await page.locator('[data-bidding-lot]').first().locator(`[name$="[${level}_code]"]`).count(), 0);
         }
-        await page.setViewportSize({ width: 390, height: 844 });
-        const menu = page.getByRole('button', { name: /Operations menu|Finance menu/ });
-        if (css) {
-            await menu.click();
-            await page.getByRole('button', { name: 'Close navigation' }).waitFor({ state: 'visible' });
-            await page.getByRole('button', { name: 'Close navigation' }).click();
+        for (const width of [320, 390, 1440]) {
+            await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
+            await page.waitForTimeout(400);
+            if (css && width !== 1440) {
+                await page.keyboard.press('Escape');
+                await page.waitForTimeout(400);
+                await page.getByRole('button', { name: /Operations menu|Finance menu/ }).click();
+                await page.getByRole('button', { name: 'Close navigation' }).waitFor({ state: 'visible' });
+                await page.keyboard.press('Escape');
+                await page.getByRole('button', { name: 'Close navigation' }).waitFor({ state: 'hidden' });
+                await page.waitForTimeout(400);
+            }
+            if (css) {
+                const overflow = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth, elements: [...document.querySelectorAll('body *')].filter(element => { const box = element.getBoundingClientRect(); return box.width && box.right > window.innerWidth + 1 && !element.closest('table'); }).slice(0, 5).map(element => ({ tag: element.tagName, classes: element.className, right: element.getBoundingClientRect().right })) }));
+                assert(overflow.width <= overflow.viewport + 1, `${file} overflows at ${width}px: ${JSON.stringify(overflow)}`);
+            }
+            await page.screenshot({ path: path.join(artifacts, file.replace('.html', `-${width}.png`)), fullPage: true });
+            if (file === 'project-bidding-edit.html') await page.locator('[data-bidding-documents]').screenshot({ path: path.join(artifacts, `documents-${width}.png`) });
         }
-        await page.screenshot({ path: path.join(artifacts, file.replace('.html', '-mobile.png')), fullPage: true });
-        if (file === 'project-bidding-edit.html') await page.locator('[data-bidding-documents]').screenshot({ path: path.join(artifacts, 'documents-mobile.png') });
-        if (css) {
-            const overflow = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth, tableAncestors: (() => { const chain = []; let node = document.querySelector('table'); while (node) { const style = getComputedStyle(node); chain.push({ tag: node.tagName, classes: node.className, right: node.getBoundingClientRect().right, width: node.getBoundingClientRect().width, scroll: node.scrollWidth, overflow: style.overflow, position: style.position }); node = node.parentElement; } return chain; })(), elements: [...document.querySelectorAll('body *')].filter(element => { const box = element.getBoundingClientRect(); return box.width && box.right > window.innerWidth + 1 && !element.closest('table'); }).slice(0, 10).map(element => ({ tag: element.tagName, classes: element.className, right: element.getBoundingClientRect().right })) }));
-            assert(overflow.width <= overflow.viewport + 1, `${file} overflows the page: ${JSON.stringify(overflow)}`);
-        }
-        await page.setViewportSize({ width: 1440, height: 1000 });
-        await page.screenshot({ path: path.join(artifacts, file.replace('.html', '-desktop.png')), fullPage: true });
-        if (file === 'project-bidding-edit.html') await page.locator('[data-bidding-documents]').screenshot({ path: path.join(artifacts, 'documents-desktop.png') });
         assert.deepEqual(errors, []);
         await page.close();
     }

@@ -35,7 +35,7 @@
 
         {{-- MAIN LAYOUT ENGINE CONTAINER --}}
         @php($hasMobileNavigation = request()->routeIs('deliveries.monitoring', 'project.bidding.*'))
-        <div class="min-h-screen flex flex-col relative" @if($hasMobileNavigation) x-data="{ monitoringNavOpen: false }" @keydown.escape.window="monitoringNavOpen = false" @endif>
+        <div class="min-h-screen flex flex-col relative {{ request()->routeIs('project.bidding.*') ? 'overflow-x-clip' : '' }}" @if($hasMobileNavigation) x-data="{ monitoringNavOpen: false }" @keydown.escape.window="monitoringNavOpen = false" @endif>
             
             @if($hasMobileNavigation)
                 <button type="button" x-show="monitoringNavOpen" x-cloak @click="monitoringNavOpen = false" class="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" aria-label="Close navigation"></button>

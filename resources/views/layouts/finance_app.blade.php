@@ -37,7 +37,7 @@
 
         {{-- MAIN LAYOUT ENGINE CONTAINER --}}
         @php($hasMobileNavigation = request()->routeIs('bidding.*'))
-        <div class="min-h-screen flex flex-col relative" @if($hasMobileNavigation) x-data="{ biddingNavOpen: false }" @keydown.escape.window="biddingNavOpen = false" @endif>
+        <div class="min-h-screen flex flex-col relative {{ $hasMobileNavigation ? 'overflow-x-clip' : '' }}" @if($hasMobileNavigation) x-data="{ biddingNavOpen: false }" @keydown.escape.window="biddingNavOpen = false" @endif>
             
             @if($hasMobileNavigation)
                 <button type="button" x-show="biddingNavOpen" x-cloak @click="biddingNavOpen = false" class="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" aria-label="Close navigation"></button>

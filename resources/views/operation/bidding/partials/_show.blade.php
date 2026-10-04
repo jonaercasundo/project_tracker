@@ -18,8 +18,8 @@
             <div class="space-y-4 p-5"><p class="text-xs text-slate-500">{{ collect([$lot->country, $lot->region, $lot->province, $lot->city_municipality, $lot->barangay])->filter()->implode(' / ') ?: 'Location not provided' }}</p>
                 @if($lot->delivery_address)<p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Existing lot delivery address: {{ $lot->delivery_address }}</p>@endif
                 @foreach($lot->addresses as $address)
-                    <div class="space-y-3 rounded-lg border border-slate-200 border-l-4 border-l-blue-200 p-4"><h3 class="text-sm font-semibold text-slate-800">{{ $address->delivery_address }}</h3>
-                        @forelse($address->keystages as $stage)<section class="space-y-2"><h4 class="text-xs font-semibold text-slate-600">{{ $stage->name }}</h4>@include('operation.bidding.partials._show_items', ['displayItems' => $stage->items])</section>@empty<p class="text-xs text-slate-500">No key stages added.</p>@endforelse
+                    <div class="space-y-3 rounded-lg border border-slate-200 border-l-4 border-l-blue-200 p-4"><h3 class="text-sm font-semibold text-slate-800">{{ $address->delivery_address ?? $address->delivery_address_otherInformation ?? 'Delivery address not provided' }}</h3>
+                        @forelse($address->keystages as $stage)<section class="space-y-2"><h4 class="text-xs font-semibold text-slate-600">{{ $stage->name ?? 'Legacy stage' }}</h4>@include('operation.bidding.partials._show_items', ['displayItems' => $stage->items])</section>@empty<p class="text-xs text-slate-500">No key stages added.</p>@endforelse
                     </div>
                 @endforeach
                 @if($lot->legacyItems->isNotEmpty())<section class="space-y-2"><h3 class="text-xs font-semibold text-amber-800">Existing items without an address or key stage</h3>@include('operation.bidding.partials._show_items', ['displayItems' => $lot->legacyItems])</section>@endif

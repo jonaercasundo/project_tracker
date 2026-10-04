@@ -12,7 +12,7 @@
 @endphp
 <div data-bidding-lot @if($readOnlyGeography) data-bidding-geography-readonly @endif data-entry-index="{{ $index }}" data-name-prefix="{{ $namePrefix }}" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3">
-        <div class="flex min-w-0 items-center gap-3"><label for="{{ $uid }}-number" class="shrink-0 text-xs font-semibold text-slate-600">Lot number</label><input id="{{ $uid }}-number" name="{{ $namePrefix }}[lot_no]" value="{{ $fieldValue($dotPrefix.'.lot_no', $lotData['lot_no'] ?? '') }}" required maxlength="50" data-lot-number class="w-40 rounded-lg border-slate-200 bg-white py-1.5 text-sm focus:border-blue-500 focus:ring-blue-500"></div>
+        <div class="flex min-w-0 flex-wrap items-center gap-3"><label for="{{ $uid }}-number" class="shrink-0 text-xs font-semibold text-slate-600">Lot number</label><input id="{{ $uid }}-number" name="{{ $namePrefix }}[lot_no]" value="{{ $fieldValue($dotPrefix.'.lot_no', $lotData['lot_no'] ?? '') }}" required maxlength="50" data-lot-number class="w-40 rounded-lg border-slate-200 bg-white py-1.5 text-sm focus:border-blue-500 focus:ring-blue-500"></div>
         <button type="button" data-bidding-action="remove-lot" class="rounded-lg px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">Remove lot</button>
     </div>
     <div class="space-y-5 p-5">
@@ -55,6 +55,6 @@
                 @include('operation.bidding.partials._item_table', ['items' => $legacyItems, 'legacy' => true, 'itemsPrefix' => $namePrefix.'[legacy_items]', 'itemsDot' => $dotPrefix.'.legacy_items', 'itemsUid' => $uid.'-legacy'])
             </section>
         @endif
-        <div class="flex justify-end gap-3 border-t border-slate-100 pt-4 text-sm"><span class="text-slate-500">Calculated lot total</span><strong class="font-mono tabular-nums text-slate-900">PHP <span data-bidding-lot-total>0.00</span></strong></div>
+        <div class="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4 text-sm"><span class="text-slate-500">Calculated lot total</span><strong class="font-mono tabular-nums text-slate-900">PHP <span data-bidding-lot-total>0.00</span></strong></div>
     </div>
 </div>

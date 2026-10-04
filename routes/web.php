@@ -161,6 +161,12 @@ Route::middleware(['auth'])->group(function () {
 
         Route::post('/projects/filter', [ProjectController::class, 'filter'])
             ->name('projects.filter');
+        Route::get('/projects/{project:project_id}/schools-data', [ProjectController::class, 'schoolsData'])->name('projects.schools-data');
+        Route::get('/projects/{project:project_id}/items-data', [ProjectController::class, 'itemsData'])->name('projects.items-data');
+        Route::get('/projects/{project:project_id}/packages-data', [ProjectController::class, 'packagesData'])->name('projects.packages-data');
+        Route::get('/projects/{project:project_id}/lots-data', [ProjectController::class, 'lotsData'])->name('projects.lots-data');
+        Route::get('/projects/{project:project_id}/keystages-data', [ProjectController::class, 'keystagesData'])->name('projects.keystages-data');
+        Route::get('/projects/{project:project_id}/detail-options', [ProjectController::class, 'detailOptions'])->name('projects.detail-options');
         Route::get('/projects/{project:project_id}', [ProjectController::class, 'show'])
             ->name('projects.show');
         /*

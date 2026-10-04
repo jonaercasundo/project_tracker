@@ -16,7 +16,7 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
-    ->in(...array_filter(glob(__DIR__.'/Feature/*'), fn (string $path): bool => ! in_array(basename($path), ['JarvisIntegrationTest.php', 'JarvisReadTest.php'], true)));
+    ->in(...array_filter(glob(__DIR__.'/Feature/*'), fn (string $path): bool => ! in_array(basename($path), ['JarvisIntegrationTest.php', 'JarvisReadTest.php', 'ProjectDetailsTest.php'], true)));
 
 /*
 |--------------------------------------------------------------------------

@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Services\ProjectDetailsService;
+use Illuminate\Contracts\View\View;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -48,7 +52,7 @@ class ProjectController extends Controller
 
         try {
             Project::create($validated);
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             // Fallback in case two submissions race each other and both
             // pass the validation check above before either one inserts.
             if ($e->errorInfo[1] == 1062) {
@@ -117,7 +121,7 @@ class ProjectController extends Controller
         );
     }
 
-    public function show(Project $project)
+    public function show(Project $project, ProjectDetailsService $details): View
     {
         /*
         |--------------------------------------------------------------------------
@@ -261,68 +265,11 @@ class ProjectController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $schools = DB::table('school as s')
-            ->where('s.project_id', $project->project_id)
-            ->orWhereIn(
-                's.school_id',
-                DB::table('deliveries')
-                    ->where('project_id', $project->project_id)
-                    ->select('school_id')
-            )
-            ->orderBy('s.school_name')
-            ->get();
-
-        $lots = DB::table('lot as l')
-            ->where('l.project_id', $project->project_id)
-            ->select('l.*')
-            ->selectSub(function ($query) {
-                $query->from('package as p')
-                    ->leftJoin('keystage as k', 'k.keystage_id', '=', 'p.keystage_id')
-                    ->where(function ($query) {
-                        $query->whereColumn('p.lot_id', 'l.lot_id')
-                            ->orWhereColumn('k.lot_id', 'l.lot_id');
-                    })
-                    ->selectRaw('count(*)');
-            }, 'packages_count')
-            ->orderBy('l.lot_name')
-            ->get();
-
-        $keystages = DB::table('keystage as k')
-            ->join('lot as l', 'l.lot_id', '=', 'k.lot_id')
-            ->where('l.project_id', $project->project_id)
-            ->select('k.*', 'l.lot_name')
-            ->orderBy('l.lot_name')
-            ->orderBy('k.keystage_num')
-            ->get();
-
-        $lots->each(function ($lot) use ($keystages) {
-            $lot->keystages = $keystages
-                ->where('lot_id', $lot->lot_id)
-                ->values();
-        });
-
-        $items = DB::table('item')
-            ->where('project_id', $project->project_id)
-            ->orderBy('item_name')
-            ->get();
-
-        $packages = DB::table('package as p')
-            ->leftJoin('lot as l', 'l.lot_id', '=', 'p.lot_id')
-            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'p.keystage_id')
-            ->leftJoin('lot as keystage_lot', 'keystage_lot.lot_id', '=', 'k.lot_id')
-            ->where(function ($query) use ($project) {
-                $query->where('l.project_id', $project->project_id)
-                    ->orWhere('keystage_lot.project_id', $project->project_id);
-            })
-            ->select([
-                'p.*',
-                'l.lot_name',
-                'k.keystage_num',
-                'k.description as keystage_description',
-                DB::raw("CONCAT('Package ', p.package_num) as package_name"),
-            ])
-            ->orderBy('p.package_num')
-            ->get();
+        $summary = $details->summary($project);
+        $structureIsSmall = $summary['lotCount'] <= 100 && $summary['keystageCount'] <= 100;
+        $lots = $structureIsSmall ? $details->lotRecords($project)->limit(100)->get() : collect();
+        $keystages = $structureIsSmall ? $details->keystageRecords($project)->limit(100)->get() : collect();
+        $details->attachKeystages($lots, $keystages);
 
         /*
         |--------------------------------------------------------------------------
@@ -332,13 +279,89 @@ class ProjectController extends Controller
 
         return view('projects.show', [
             'project' => $project,
-            'schools' => $schools,
+            'structureIsSmall' => $structureIsSmall,
             'lots' => $lots,
             'keystages' => $keystages,
-            'items' => $items,
-            'packages' => $packages,
             'arSettings' => $arSettings,
             'logoFiles' => $logoFiles,
+        ] + $summary);
+    }
+
+    public function schoolsData(Request $request, Project $project, ProjectDetailsService $details): JsonResponse
+    {
+        return $this->detailData($request, $project, $details, 'schools');
+    }
+
+    public function itemsData(Request $request, Project $project, ProjectDetailsService $details): JsonResponse
+    {
+        return $this->detailData($request, $project, $details, 'items');
+    }
+
+    public function packagesData(Request $request, Project $project, ProjectDetailsService $details): JsonResponse
+    {
+        return $this->detailData($request, $project, $details, 'packages');
+    }
+
+    public function lotsData(Request $request, Project $project, ProjectDetailsService $details): JsonResponse
+    {
+        return $this->detailData($request, $project, $details, 'lots');
+    }
+
+    public function keystagesData(Request $request, Project $project, ProjectDetailsService $details): JsonResponse
+    {
+        return $this->detailData($request, $project, $details, 'keystage');
+    }
+
+    public function detailOptions(Request $request, Project $project, ProjectDetailsService $details): JsonResponse
+    {
+        $filters = $this->detailFilters($request);
+        $request->validate(['section' => ['required', 'in:schools,items,packages,keystage']]);
+        if ($request->input('section') === 'schools') {
+            $request->validate(['level' => ['required', 'in:region,division,municipality']]);
+        }
+
+        return response()->json($details->options($project, $request->input('section'), $filters))
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    private function detailData(Request $request, Project $project, ProjectDetailsService $details, string $section): JsonResponse
+    {
+        $records = $details->records($project, $section, $this->detailFilters($request));
+        $totalCount = match ($section) {
+            'schools' => $details->schools($project)->count(),
+            'items' => $details->items($project)->count(),
+            'packages' => $details->packages($project)->count(),
+            'lots' => $details->lots($project)->count(),
+            'keystage' => $details->keystages($project)->count(),
+        };
+
+        return response()->json([
+            'html' => view('projects.partials.'.$section.'-rows', [($section === 'keystage' ? 'keystages' : $section) => $records, 'project' => $project, 'rowOffset' => ($records->currentPage() - 1) * $records->perPage()])->render(),
+            'current_page' => $records->currentPage(),
+            'last_page' => $records->lastPage(),
+            'per_page' => $records->perPage(),
+            'total' => $records->total(),
+            'total_count' => $totalCount,
+            'from' => $records->firstItem(),
+            'to' => $records->lastItem(),
+        ])->header('Cache-Control', 'private, no-store');
+    }
+
+    /** @return array<string, mixed> */
+    private function detailFilters(Request $request): array
+    {
+        return $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'region' => ['nullable', 'string', 'max:255'],
+            'division' => ['nullable', 'string', 'max:255'],
+            'municipality' => ['nullable', 'string', 'max:255'],
+            'item_type' => ['nullable', 'string', 'max:255'],
+            'package_type' => ['nullable', 'string', 'max:255'],
+            'lot' => ['nullable', 'integer', 'min:1'],
+            'keystage' => ['nullable', 'integer', 'min:1'],
+            'level' => ['nullable', 'in:region,division,municipality,lot,keystage,type'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
     }
 }

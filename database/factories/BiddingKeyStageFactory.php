@@ -3,10 +3,11 @@
 namespace Database\Factories;
 
 use App\Models\BiddingDeliveryAddress;
+use App\Models\BiddingKeyStage;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\BiddingKeyStage>
+ * @extends Factory<BiddingKeyStage>
  */
 class BiddingKeyStageFactory extends Factory
 {

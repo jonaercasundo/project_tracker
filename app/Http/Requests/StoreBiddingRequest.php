@@ -2,6 +2,4 @@
 
 namespace App\Http\Requests;
 
-class StoreBiddingRequest extends BiddingRequest
-{
-}
+class StoreBiddingRequest extends BiddingRequest {}

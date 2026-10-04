@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\BiddingDeliveryAddressFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BiddingDeliveryAddress extends Model
 {
-    /** @use HasFactory<\Database\Factories\BiddingDeliveryAddressFactory> */
+    /** @use HasFactory<BiddingDeliveryAddressFactory> */
     use HasFactory;
 
     protected $table = 'delivery_address';

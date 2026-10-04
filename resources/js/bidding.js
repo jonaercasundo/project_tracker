@@ -142,10 +142,17 @@ function initializeBidding(form) {
 
     const locationSelect = (lot, level) => lot.querySelector(`[data-location="${level}"]`);
     const locationLabel = level => level === 'city' ? 'city / municipality' : level;
+    function syncLocationValue(select) {
+        const mirror = select.closest('[data-bidding-lot]').querySelector(`[data-location-value="${select.dataset.location}"]`);
+        if (!mirror) return;
+        mirror.value = select.value;
+        mirror.disabled = !select.disabled;
+    }
     function resetSelect(select, level, disabled = true) {
         select.replaceChildren(new Option(`Select ${locationLabel(level)}`, ''));
         select.disabled = disabled;
         select.dataset.selected = '';
+        syncLocationValue(select);
     }
     function populate(select, data, level, selected = '') {
         select.replaceChildren(new Option(`Select ${locationLabel(level)}`, ''));
@@ -154,6 +161,7 @@ function initializeBidding(form) {
         select.value = selected;
         select.disabled = false;
         select.dataset.selected = selected;
+        syncLocationValue(select);
     }
     function locationMessage(lot, text = '') {
         const box = lot.querySelector('[data-location-message]');
@@ -176,6 +184,7 @@ function initializeBidding(form) {
         select.replaceChildren(new Option('Loading...', ''));
         if (selected) select.add(new Option(`${selected} (saved selection)`, selected, true, true));
         select.disabled = !selected;
+        syncLocationValue(select);
         const endpoint = { province: form.dataset.provincesUrl, city: form.dataset.citiesUrl, barangay: form.dataset.barangaysUrl }[level];
         const url = new URL(endpoint, window.location.href);
         url.searchParams.set(parameter, value);
@@ -188,6 +197,7 @@ function initializeBidding(form) {
         if (error.name !== 'AbortError' && requestStates.get(lot) === controller) locationMessage(lot, error.message);
     }
     async function restoreLocations(lot) {
+        if (!locationSelect(lot, 'region')) return;
         const saved = Object.fromEntries(['region', 'province', 'city', 'barangay'].map(level => [level, locationSelect(lot, level).dataset.selected || locationSelect(lot, level).value]));
         const controller = cancelLocations(lot);
         try {
@@ -212,6 +222,7 @@ function initializeBidding(form) {
         const levels = ['region', 'province', 'city', 'barangay'];
         const controller = cancelLocations(lot);
         select.dataset.selected = select.value;
+        syncLocationValue(select);
         for (const child of levels.slice(levels.indexOf(level) + 1)) resetSelect(locationSelect(lot, child), child);
         if (!select.value || level === 'barangay') return;
         try {
@@ -319,6 +330,7 @@ function initializeBidding(form) {
         const status = form.querySelector('[data-bidding-save-status]');
         if (status) status.textContent = '';
     });
+    form.querySelectorAll('[data-location]').forEach(syncLocationValue);
     form.querySelectorAll('[data-collection]').forEach(initializeCounter);
     recalculate();
     for (const lot of allLots()) restoreLocations(lot);

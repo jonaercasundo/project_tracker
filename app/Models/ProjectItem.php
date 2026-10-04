@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\New\Item;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -33,7 +34,7 @@ class ProjectItem extends Model
 
     public function catalogItem(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\New\Item::class, 'catalog_item_id');
+        return $this->belongsTo(Item::class, 'catalog_item_id');
     }
 
     protected function casts(): array

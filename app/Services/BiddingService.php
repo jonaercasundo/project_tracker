@@ -259,6 +259,7 @@ class BiddingService
             $lot->setAttribute('calculated_item_total', self::amount($lotTotal));
             $row = Arr::only($lot->toArray(), ['id', 'lot_no', 'region_code', 'province_code', 'city_code', 'barangay_code']);
             $row['country_code'] = 'PH';
+            $row['legacy_country'] = $lot->country !== 'Philippines' ? $lot->country : null;
             $row['legacy_delivery_address'] = $lot->delivery_address;
             $row['legacy_location'] = implode(', ', array_filter([$lot->region, $lot->province, $lot->city_municipality, $lot->barangay]));
             $row['addresses'] = $lot->addresses->map(fn (BiddingDeliveryAddress $address): array => [

@@ -242,6 +242,9 @@ function initializeBiddingDocuments(panel) {
             const finish = () => { entry.xhr = null; renderQueue(); resolve(); };
             xhr.onload = () => {
                 try {
+                    if (xhr.status === 413) throw new Error('The server upload limit is smaller than this file. Choose a smaller file or ask your administrator to adjust the upload limit.');
+                    if (xhr.status === 401 || xhr.status === 419) throw new Error('Your session has expired. Sign in and reload this page.');
+                    if (xhr.status >= 500 && !xhr.getResponseHeader('Content-Type')?.includes('application/json')) throw new Error('The server could not complete this upload. Retry when the server is available.');
                     if (!xhr.getResponseHeader('Content-Type')?.includes('application/json')) throw new Error('Your session has expired. Sign in and reload this page.');
                     const data = JSON.parse(xhr.responseText);
                     if (xhr.status < 200 || xhr.status >= 300) throw Object.assign(new Error(data.message || 'Upload failed.'), { errors: data.errors });

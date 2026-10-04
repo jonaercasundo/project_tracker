@@ -2,11 +2,12 @@
 
 namespace Database\Factories;
 
+use App\Models\BiddingDeliveryAddress;
 use App\Models\ProjectLot;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\BiddingDeliveryAddress>
+ * @extends Factory<BiddingDeliveryAddress>
  */
 class BiddingDeliveryAddressFactory extends Factory
 {

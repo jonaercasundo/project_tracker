@@ -9,7 +9,11 @@
     $formLots = session()->hasOldInput('hierarchy_present') ? old('lots', []) : ($biddingLots ?? [['lot_no' => 'Lot 1', 'country_code' => 'PH', 'addresses' => []]]);
     $formLots = is_array($formLots) ? $formLots : [];
     $legacyOriginals = [];
+    $savedLotSnapshots = [];
     foreach ($biddingLots ?? [] as $savedLot) {
+        if (is_scalar($savedLot['id'] ?? null)) {
+            $savedLotSnapshots[(string) $savedLot['id']] = $savedLot;
+        }
         foreach ($savedLot['legacy_items'] ?? [] as $savedItem) {
             $legacyOriginals[$savedItem['id']] = $savedItem;
         }

@@ -31,7 +31,7 @@ function address(index, prefix, nested = false) {
     return `<div data-bidding-address data-entry-index="${index}" data-name-prefix="${prefix}"><textarea name="${prefix}[delivery_address]">Address</textarea><input type="hidden" name="${prefix}[keystages_present]" value="1">${button('remove-address')}<div data-bidding-stages data-collection="stages" data-name-prefix="${prefix}[keystages]">${nested ? stage(0, `${prefix}[keystages][0]`, true) + stage(2, `${prefix}[keystages][2]`) : ''}</div>${button('add-stage')}</div>`;
 }
 function lot(index, prefix, nested = false, location = {}) {
-    return `<section data-bidding-lot data-entry-index="${index}" data-name-prefix="${prefix}"><input data-lot-number name="${prefix}[lot_no]" value="Lot ${Number(index) + 1}">${button('remove-lot')}<input type="hidden" name="${prefix}[addresses_present]" value="1"><input type="hidden" name="${prefix}[legacy_items_present]" value="1">${['region', 'province', 'city', 'barangay'].map(level => `<select data-location="${level}" data-selected="${location[level] || ''}" name="${prefix}[${level}_code]"><option value="">Choose</option>${location[level] ? `<option value="${location[level]}" selected>${location[level]}</option>` : ''}</select>`).join('')}<div data-location-message><span></span>${button('retry-locations')}</div><div data-bidding-addresses data-collection="addresses" data-name-prefix="${prefix}[addresses]">${nested ? address(0, `${prefix}[addresses][0]`, true) + address(2, `${prefix}[addresses][2]`) : ''}</div>${button('add-address')}<span data-bidding-lot-total></span></section>`;
+    return `<section data-bidding-lot data-entry-index="${index}" data-name-prefix="${prefix}"><input data-lot-number name="${prefix}[lot_no]" value="Lot ${Number(index) + 1}">${button('remove-lot')}<input type="hidden" name="${prefix}[addresses_present]" value="1"><input type="hidden" name="${prefix}[legacy_items_present]" value="1">${['region', 'province', 'city', 'barangay'].map(level => `<input type="hidden" data-location-value="${level}" name="${prefix}[${level}_code]" value="${location[level] || ''}" disabled><select data-location="${level}" data-selected="${location[level] || ''}" name="${prefix}[${level}_code]"><option value="">Choose</option>${location[level] ? `<option value="${location[level]}" selected>${location[level]}</option>` : ''}</select>`).join('')}<div data-location-message><span></span>${button('retry-locations')}</div><div data-bidding-addresses data-collection="addresses" data-name-prefix="${prefix}[addresses]">${nested ? address(0, `${prefix}[addresses][0]`, true) + address(2, `${prefix}[addresses][2]`) : ''}</div>${button('add-address')}<span data-bidding-lot-total></span></section>`;
 }
 function fixture(options = {}) {
     return `<html><body><form data-bidding-form data-catalog-url="/catalog" data-regions-url="/regions" data-provinces-url="/provinces" data-cities-url="/cities" data-barangays-url="/barangays"><input type="hidden" name="hierarchy_present" value="1"><input name="approved_budget_contract_abc" value="1000.00">${button('add-lot')}<div data-bidding-lots data-collection="lots" data-name-prefix="lots">${lot(0, 'lots[0]', options.nested, options.location)}${options.sparse ? lot(2, 'lots[2]') : ''}</div><p data-bidding-empty-lots hidden></p><span data-bidding-calculated-total></span><p data-bidding-feedback></p><input type="hidden" name="hierarchy_complete" value="1"><button data-bidding-save>Save</button><span data-bidding-save-status></span><template data-bidding-template="lot">${lot('__INDEX__', '__PREFIX__')}</template><template data-bidding-template="address">${address('__INDEX__', '__PREFIX__')}</template><template data-bidding-template="stage">${stage('__INDEX__', '__PREFIX__')}</template><template data-bidding-template="item">${item('__INDEX__', '__PREFIX__')}</template></form></body></html>`;
@@ -188,6 +188,8 @@ test('saved geography restores every level and delayed obsolete region responses
     assert.equal(await page.locator('[data-location="province"]').evaluate(select => select.options[1].value), 'R2-P');
     assert.equal(await page.locator('[data-location="city"]').inputValue(), '');
     assert.equal(await page.locator('[data-location="barangay"]').inputValue(), '');
+    const serialized = await page.locator('form').evaluate(form => Object.fromEntries(new FormData(form)));
+    for (const level of ['province', 'city', 'barangay']) assert.equal(serialized[`lots[0][${level}_code]`], '');
     assert.deepEqual(errors, []);
     await page.close();
 });
@@ -271,6 +273,7 @@ function documentApi() {
             const attempts = (uploadAttempts.get(filename) || 0) + 1;
             uploadAttempts.set(filename, attempts);
             await new Promise(resolve => setTimeout(resolve, 150));
+            if (filename === 'oversized.pdf') return { rawResponse: { status: 413, contentType: 'text/html', body: '<p>Payload too large</p>' } };
             if (filename === 'failed.pdf' && attempts === 1) return { rawResponse: { status: 422, contentType: 'application/json', body: JSON.stringify({ message: 'Validation failed', errors: { 'files.0': ['Synthetic file rejection.'] } }) } };
             return { message: 'Uploaded successfully.', documents: [] };
         }
@@ -320,18 +323,19 @@ test('document uploads report individual progress/errors, retry only failed file
     const api = documentApi();
     const { page, errors } = await open(documentFixture(), api.handler, [documentSource]);
     await page.waitForSelector('[data-document-card="4"]');
-    await page.locator('[data-document-files]').setInputFiles([{ name: 'accepted.pdf', mimeType: 'application/pdf', buffer: Buffer.from('synthetic accepted') }, { name: 'failed.pdf', mimeType: 'application/pdf', buffer: Buffer.from('synthetic rejected') }, { name: 'blocked.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('synthetic blocked') }]);
-    assert.equal(await page.locator('[data-upload-entry]').count(), 3);
-    assert((await page.locator('[data-upload-entry="2"]').textContent()).includes('not allowed'));
+    await page.locator('[data-document-files]').setInputFiles([{ name: 'accepted.pdf', mimeType: 'application/pdf', buffer: Buffer.from('synthetic accepted') }, { name: 'failed.pdf', mimeType: 'application/pdf', buffer: Buffer.from('synthetic rejected') }, { name: 'oversized.pdf', mimeType: 'application/pdf', buffer: Buffer.from('synthetic server-limit rejection') }, { name: 'blocked.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('synthetic blocked') }]);
+    assert.equal(await page.locator('[data-upload-entry]').count(), 4);
+    assert((await page.locator('[data-upload-entry="3"]').textContent()).includes('not allowed'));
     await page.locator('[data-document-action="start-upload"]').click();
     await page.waitForFunction(() => document.querySelector('[data-upload-entry="0"]').textContent.includes('Uploading'));
     await page.waitForFunction(() => document.querySelector('[data-upload-entry="0"]').textContent.includes('Uploaded successfully') && document.querySelector('[data-upload-entry="1"]').textContent.includes('Synthetic file rejection'));
     assert.equal(await page.locator('[data-upload-entry="0"] progress').getAttribute('value'), '100');
     await page.waitForFunction(() => document.querySelector('[data-document-status]').textContent.includes('Upload processing finished'));
-    assert.equal(api.calls.filter(call => call.path === '/store').length, 2);
+    assert.equal(api.calls.filter(call => call.path === '/store').length, 3);
+    assert((await page.locator('[data-upload-entry="2"]').textContent()).includes('server upload limit is smaller'));
     await page.locator('[data-upload-entry="1"] [data-document-action="retry-upload"]').click();
     await page.waitForFunction(() => document.querySelector('[data-upload-entry="1"]').textContent.includes('Uploaded successfully'));
-    assert.equal(api.calls.filter(call => call.path === '/store').length, 3);
+    assert.equal(api.calls.filter(call => call.path === '/store').length, 4);
     await page.waitForFunction(() => document.querySelector('[data-document-status]').textContent.includes('Upload processing finished'));
     assert(api.calls.filter(call => call.path === '/store').every(call => call.body.includes('name="files[]"') && call.headers['x-csrf-token'] === 'synthetic-token'));
     await page.locator('[data-document-card="4"] [data-document-action="replace"]').evaluate(button => button.click());
@@ -375,12 +379,23 @@ test('actual isolated Blade pages render responsive forms with no page overflow'
     await mkdir(artifacts, { recursive: true });
     let css = '';
     try { const assets = await readdir('public/build/assets'); const name = assets.find(name => name.endsWith('.css')); if (name) css = await readFile(path.join('public/build/assets', name), 'utf8'); } catch {}
-    for (const file of ['project-bidding-create.html', 'project-bidding-edit.html', 'project-bidding-show.html', 'bidding-create.html', 'bidding-edit.html', 'bidding-show.html']) {
-        const { page, errors } = await open(await readFile(path.join(fixtureDirectory, file), 'utf8'), url => {
-            if (url.pathname.includes('/documents')) return { folders: [], documents: [], permissions: { upload: true, update: true, delete: true }, limits: { extensions: ['pdf'], max_file_size_kb: 1024, max_files: 10 }, meta: { current_page: 1, last_page: 1, total: 0 } };
+    for (const file of ['project-bidding-create.html', 'project-bidding-edit.html', 'project-bidding-show.html', 'bidding-create.html', 'bidding-edit.html', 'bidding-show.html', 'project-bidding-selected-edit.html', 'project-bidding-legacy-country-edit.html', 'bidding-legacy-country-edit.html']) {
+        try { await access(path.join(fixtureDirectory, file)); } catch { continue; }
+        const cards = documentApi();
+        const { page, errors } = await open(await readFile(path.join(fixtureDirectory, file), 'utf8'), async (url, request) => {
+            if (url.pathname.includes('/documents')) {
+                const data = await cards.handler(new URL('/index', url), request);
+                data.documents[0].display_name = 'Technical specifications.pdf';
+                return data;
+            }
             return standardLookup(url);
         }, [source, documentSource, alpineSource]);
         if (css) await page.addStyleTag({ content: css });
+        if (file.includes('selected-edit')) assert(await page.locator('[data-catalog-item]').evaluateAll(selects => selects.every(select => [...select.options].filter(option => option.value).length <= 51)));
+        if (file.includes('legacy-country')) {
+            assert((await page.locator('[data-bidding-lot]').first().textContent()).includes('Japan'));
+            for (const level of ['country', 'region', 'province', 'city', 'barangay']) assert.equal(await page.locator('[data-bidding-lot]').first().locator(`[name$="[${level}_code]"]`).count(), 0);
+        }
         await page.setViewportSize({ width: 390, height: 844 });
         const menu = page.getByRole('button', { name: /Operations menu|Finance menu/ });
         if (css) {
@@ -389,12 +404,14 @@ test('actual isolated Blade pages render responsive forms with no page overflow'
             await page.getByRole('button', { name: 'Close navigation' }).click();
         }
         await page.screenshot({ path: path.join(artifacts, file.replace('.html', '-mobile.png')), fullPage: true });
+        if (file === 'project-bidding-edit.html') await page.locator('[data-bidding-documents]').screenshot({ path: path.join(artifacts, 'documents-mobile.png') });
         if (css) {
             const overflow = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth, elements: [...document.querySelectorAll('body *')].filter(element => { const box = element.getBoundingClientRect(); return box.width && box.right > window.innerWidth + 1 && !element.closest('table'); }).slice(0, 10).map(element => ({ tag: element.tagName, classes: element.className, right: element.getBoundingClientRect().right })) }));
             assert(overflow.width <= overflow.viewport + 1, `${file} overflows the page: ${JSON.stringify(overflow)}`);
         }
         await page.setViewportSize({ width: 1440, height: 1000 });
         await page.screenshot({ path: path.join(artifacts, file.replace('.html', '-desktop.png')), fullPage: true });
+        if (file === 'project-bidding-edit.html') await page.locator('[data-bidding-documents]').screenshot({ path: path.join(artifacts, 'documents-desktop.png') });
         assert.deepEqual(errors, []);
         await page.close();
     }

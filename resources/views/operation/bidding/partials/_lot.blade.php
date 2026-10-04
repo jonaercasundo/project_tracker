@@ -1,9 +1,16 @@
 @php
     $lotData = is_array($lot) ? $lot : $lot->toArray();
+    $savedLotId = is_scalar($lotData['id'] ?? null) ? (string) $lotData['id'] : '';
+    $savedLotSnapshot = $savedLotSnapshots[$savedLotId] ?? [];
+    foreach (['legacy_location', 'legacy_delivery_address', 'legacy_country'] as $snapshotKey) {
+        $lotData[$snapshotKey] = $savedLotSnapshot[$snapshotKey] ?? null;
+    }
+    $readOnlyGeography = is_scalar($lotData['legacy_country'] ?? null) && $lotData['legacy_country'] !== '';
+    $savedGeographyLot = $readOnlyGeography && isset($project) ? $project->lots->firstWhere('id', $savedLotId) : null;
     $addresses = is_array($lotData['addresses'] ?? null) ? $lotData['addresses'] : [];
     $legacyItems = is_array($lotData['legacy_items'] ?? null) ? $lotData['legacy_items'] : [];
 @endphp
-<div data-bidding-lot data-entry-index="{{ $index }}" data-name-prefix="{{ $namePrefix }}" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+<div data-bidding-lot @if($readOnlyGeography) data-bidding-geography-readonly @endif data-entry-index="{{ $index }}" data-name-prefix="{{ $namePrefix }}" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3">
         <div class="flex min-w-0 items-center gap-3"><label for="{{ $uid }}-number" class="shrink-0 text-xs font-semibold text-slate-600">Lot number</label><input id="{{ $uid }}-number" name="{{ $namePrefix }}[lot_no]" value="{{ $fieldValue($dotPrefix.'.lot_no', $lotData['lot_no'] ?? '') }}" required maxlength="50" data-lot-number class="w-40 rounded-lg border-slate-200 bg-white py-1.5 text-sm focus:border-blue-500 focus:ring-blue-500"></div>
         <button type="button" data-bidding-action="remove-lot" class="rounded-lg px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">Remove lot</button>
@@ -13,10 +20,19 @@
         <input type="hidden" name="{{ $namePrefix }}[addresses_present]" value="1"><input type="hidden" name="{{ $namePrefix }}[legacy_items_present]" value="1">
         <x-input-error :messages="$errors->get($dotPrefix.'.lot_no')" class="text-xs" />
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <div class="flex flex-col gap-1.5"><label for="{{ $uid }}-country" class="text-xs font-semibold text-slate-600">Country</label><select id="{{ $uid }}-country" name="{{ $namePrefix }}[country_code]" class="rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"><option value="PH">Philippines</option></select></div>
+            @if($readOnlyGeography)
+                <div class="flex flex-col gap-1.5"><p class="text-xs font-semibold text-slate-600">Country</p><p class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{{ $lotData['legacy_country'] }}</p><p class="text-[11px] text-slate-500">Saved country retained.</p></div>
+            @else
+                <div class="flex flex-col gap-1.5"><label for="{{ $uid }}-country" class="text-xs font-semibold text-slate-600">Country</label><select id="{{ $uid }}-country" name="{{ $namePrefix }}[country_code]" class="rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"><option value="PH">Philippines</option></select></div>
+            @endif
             @foreach(['region' => 'Region', 'province' => 'Province', 'city' => 'City / municipality', 'barangay' => 'Barangay'] as $level => $label)
+                @if($readOnlyGeography)
+                    @php($snapshotField = $level === 'city' ? 'city_municipality' : $level)
+                    <div class="flex flex-col gap-1.5"><p class="text-xs font-semibold text-slate-600">{{ $label }}</p><p class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{{ $savedGeographyLot?->{$snapshotField} ?: 'Not provided' }}</p></div>
+                @else
                 @php($selectedCode = $fieldValue($dotPrefix.'.'.$level.'_code', $lotData[$level.'_code'] ?? ''))
-                <div class="flex flex-col gap-1.5"><label for="{{ $uid }}-{{ $level }}" class="text-xs font-semibold text-slate-600">{{ $label }}</label><select id="{{ $uid }}-{{ $level }}" name="{{ $namePrefix }}[{{ $level }}_code]" data-location="{{ $level }}" data-selected="{{ $selectedCode }}" @disabled($level !== 'region' && $selectedCode === '') class="rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-400"><option value="">Select {{ strtolower($label) }}</option>@if($selectedCode !== '')<option value="{{ $selectedCode }}" selected>{{ $lotData[$level] ?? $selectedCode }}</option>@endif</select><x-input-error :messages="$errors->get($dotPrefix.'.'.$level.'_code')" class="text-xs" /></div>
+                <div class="flex flex-col gap-1.5"><label for="{{ $uid }}-{{ $level }}" class="text-xs font-semibold text-slate-600">{{ $label }}</label><input type="hidden" name="{{ $namePrefix }}[{{ $level }}_code]" data-location-value="{{ $level }}" value="{{ $selectedCode }}" @disabled($level === 'region' || $selectedCode !== '')><select id="{{ $uid }}-{{ $level }}" name="{{ $namePrefix }}[{{ $level }}_code]" data-location="{{ $level }}" data-selected="{{ $selectedCode }}" @disabled($level !== 'region' && $selectedCode === '') class="rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-400"><option value="">Select {{ strtolower($label) }}</option>@if($selectedCode !== '')<option value="{{ $selectedCode }}" selected>{{ $lotData[$level] ?? $selectedCode }}</option>@endif</select><x-input-error :messages="$errors->get($dotPrefix.'.'.$level.'_code')" class="text-xs" /></div>
+                @endif
             @endforeach
         </div>
         @if(!empty($lotData['legacy_location']) || !empty($lotData['legacy_delivery_address']))

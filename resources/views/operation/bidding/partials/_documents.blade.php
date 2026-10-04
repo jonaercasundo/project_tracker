@@ -22,7 +22,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" data-document-action="rename-folder" data-document-folder-mutable hidden class="rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Edit folder</button>
                     <button type="button" data-document-action="delete-folder" data-document-folder-mutable hidden class="rounded-lg px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Delete folder</button>
-                    <label for="bidding-document-search" class="sr-only">Search documents</label><input id="bidding-document-search" data-document-search type="search" placeholder="Search files..." class="w-48 max-w-full rounded-lg border-slate-200 py-2 text-xs focus:border-blue-500 focus:ring-blue-500">
+                    <label for="bidding-document-search" class="sr-only">Search documents</label><input id="bidding-document-search" data-document-search type="search" maxlength="255" placeholder="Search files..." class="w-48 max-w-full rounded-lg border-slate-200 py-2 text-xs focus:border-blue-500 focus:ring-blue-500">
                 </div>
             </div>
             <div data-document-error role="alert" tabindex="-1" hidden class="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"></div>

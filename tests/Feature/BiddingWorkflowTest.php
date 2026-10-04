@@ -308,6 +308,113 @@ it('rejects a geographic child belonging to another selected region', function (
     $this->assertDatabaseCount('project_information', 0);
 });
 
+it('requires clearing or replacing saved geographic children when changing an existing lot region', function (bool $clearChildren) {
+    $this->signInBiddingUser();
+    DB::table('psgc')->insert([
+        ['psgc_code' => '0100000000', 'name' => 'Region A', 'geographic_level' => 'Reg', 'region_code' => '0100000000', 'province_code' => null, 'city_code' => null],
+        ['psgc_code' => '0200000000', 'name' => 'Region B', 'geographic_level' => 'Reg', 'region_code' => '0200000000', 'province_code' => null, 'city_code' => null],
+        ['psgc_code' => '0101000000', 'name' => 'Province A', 'geographic_level' => 'Prov', 'region_code' => '0100000000', 'province_code' => '0101000000', 'city_code' => null],
+        ['psgc_code' => '0101010000', 'name' => 'City A', 'geographic_level' => 'City', 'region_code' => '0100000000', 'province_code' => '0101000000', 'city_code' => '0101010000'],
+        ['psgc_code' => '0101010001', 'name' => 'Barangay A', 'geographic_level' => 'Bgy', 'region_code' => '0100000000', 'province_code' => '0101000000', 'city_code' => '0101010000'],
+    ]);
+    $project = BiddingProjectFixtureFactory::new()->create(['project_name' => 'Original geographic metadata']);
+    $lot = BiddingLotFixtureFactory::new()->create(['project_id' => $project->id, 'region_code' => '0100000000', 'province_code' => '0101000000', 'city_code' => '0101010000', 'barangay_code' => '0101010001', 'region' => 'Region A', 'province' => 'Province A', 'city_municipality' => 'City A', 'barangay' => 'Barangay A']);
+    $item = BiddingItemFixtureFactory::new()->create(['lot_id' => $lot->id]);
+    $lotPayload = ['id' => $lot->id, 'lot_no' => 'Lot 1', 'region_code' => '0200000000'];
+    if ($clearChildren) {
+        $lotPayload += ['province_code' => null, 'city_code' => null, 'barangay_code' => null];
+    }
+
+    $response = $this->putJson(route('project.bidding.update', $project), ['project_name' => 'Updated geographic metadata', 'lots' => [$lotPayload]]);
+
+    if ($clearChildren) {
+        $response->assertRedirect(route('project.bidding.show', $project))->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('lots', ['id' => $lot->id, 'region_code' => '0200000000', 'province_code' => null, 'city_code' => null, 'barangay_code' => null, 'region' => 'Region B', 'province' => null, 'city_municipality' => null, 'barangay' => null]);
+        expect($project->fresh()->project_name)->toBe('Updated geographic metadata');
+    } else {
+        $response->assertUnprocessable()->assertJsonValidationErrors('lots.0.province_code');
+        $this->assertDatabaseHas('lots', ['id' => $lot->id, 'region_code' => '0100000000', 'province_code' => '0101000000', 'city_code' => '0101010000', 'barangay_code' => '0101010001', 'region' => 'Region A', 'province' => 'Province A', 'city_municipality' => 'City A', 'barangay' => 'Barangay A']);
+        expect($project->fresh()->project_name)->toBe('Original geographic metadata');
+    }
+    $this->assertModelExists($item);
+})->with(['omitted saved children reject' => false, 'explicitly cleared children succeed' => true]);
+
+it('preserves legacy foreign country and uncoded address snapshots through a normal edit', function (string $prefix, string $role) {
+    $this->signInBiddingUser($role);
+    $project = BiddingProjectFixtureFactory::new()->create();
+    $lot = BiddingLotFixtureFactory::new()->create(['project_id' => $project->id, 'country' => 'Japan', 'region' => 'Kanto', 'province' => 'Tokyo', 'city_municipality' => 'Shinjuku', 'barangay' => 'Legacy district', 'delivery_address' => 'Legacy Tokyo delivery address']);
+    $edit = $this->get(route($prefix.'.edit', $project))->assertSee('Japan')->assertSee('Kanto, Tokyo, Shinjuku, Legacy district')->assertSee('Legacy Tokyo delivery address');
+    $document = new DOMDocument;
+    $document->loadHTML($edit->getContent(), LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+    $lotElement = $xpath->query('//div[@data-bidding-lot and @data-name-prefix="lots[0]"]')->item(0);
+    expect($lotElement)->not->toBeNull();
+    expect($lotElement->textContent)->toContain('Japan');
+    expect($xpath->query('.//*[@name="lots[0][country_code]"]', $lotElement)->length)->toBe(0);
+    if (getenv('BIDDING_RENDER_HTML') === '1') {
+        $directory = storage_path('framework/testing/bidding-ui');
+        File::ensureDirectoryExists($directory);
+        File::put($directory.'/'.str_replace('.', '-', $prefix).'-legacy-country-edit.html', $edit->getContent());
+    }
+    $payload = ['hierarchy_present' => '1', 'hierarchy_complete' => '1', 'project_name' => 'Updated foreign country metadata', 'lots' => [['id' => $lot->id, 'lot_no' => 'Renamed legacy lot', 'region_code' => '', 'province_code' => '', 'city_code' => '', 'barangay_code' => '', 'addresses_present' => '1', 'legacy_items_present' => '1', 'addresses' => [], 'legacy_items' => []]]];
+
+    $this->put(route($prefix.'.update', $project), $payload)->assertRedirect(route($prefix.'.show', $project))->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('lots', ['id' => $lot->id, 'lot_no' => 'Renamed legacy lot', 'country' => 'Japan', 'region' => 'Kanto', 'province' => 'Tokyo', 'city_municipality' => 'Shinjuku', 'barangay' => 'Legacy district', 'delivery_address' => 'Legacy Tokyo delivery address', 'region_code' => null, 'province_code' => null, 'city_code' => null, 'barangay_code' => null]);
+    expect($project->fresh()->project_name)->toBe('Updated foreign country metadata');
+    $this->assertDatabaseCount('lots', 1);
+    $this->get(route($prefix.'.show', $project))->assertSee('Japan')->assertSee('Legacy Tokyo delivery address');
+})->with(['operation' => ['project.bidding', 'user'], 'finance' => ['bidding', 'finance']]);
+
+it('preserves trusted foreign geography through validation failure and native form resubmission', function (string $prefix, string $role) {
+    $this->signInBiddingUser($role);
+    $project = BiddingProjectFixtureFactory::new()->create();
+    $otherProject = BiddingProjectFixtureFactory::new()->create();
+    $lot = BiddingLotFixtureFactory::new()->create(['project_id' => $project->id, 'country' => 'Japan', 'region' => 'Kanto', 'province' => 'Tokyo', 'city_municipality' => 'Shinjuku', 'barangay' => 'Legacy district', 'delivery_address' => 'Legacy Tokyo delivery address']);
+    $serializeForm = static function (string $html): array {
+        $document = new DOMDocument;
+        $document->loadHTML($html, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new DOMXPath($document);
+        $form = $xpath->query('//form[@data-bidding-form]')->item(0);
+        $parameters = [];
+        foreach ($xpath->query('.//*[@name and not(@disabled) and not(ancestor::template) and (self::input or self::select or self::textarea)]', $form) as $control) {
+            if ($control->nodeName === 'select') {
+                $option = $xpath->query('./option[@selected]', $control)->item(0) ?? $xpath->query('./option', $control)->item(0);
+                $value = $option?->getAttribute('value') ?? '';
+            } else {
+                $value = $control->nodeName === 'textarea' ? $control->textContent : $control->getAttribute('value');
+            }
+            $parameters[] = rawurlencode($control->getAttribute('name')).'='.rawurlencode($value);
+        }
+        parse_str(implode('&', $parameters), $payload);
+
+        return $payload;
+    };
+    $editUrl = route($prefix.'.edit', $project);
+    $payload = $serializeForm($this->get($editUrl)->getContent());
+    $payload['project_id'] = $otherProject->project_id;
+    $payload['project_name'] = 'Corrected foreign-country metadata';
+    $this->from($editUrl)->put(route($prefix.'.update', $project), $payload)->assertRedirect($editUrl)->assertSessionHasErrors('project_id');
+    $retry = $this->get($editUrl)->assertSee('Japan')->assertSee('Kanto, Tokyo, Shinjuku, Legacy district')->assertSee('Legacy Tokyo delivery address');
+    $document = new DOMDocument;
+    $document->loadHTML($retry->getContent(), LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+    $lotElement = $xpath->query('//div[@data-bidding-lot and @data-name-prefix="lots[0]"]')->item(0);
+    expect($lotElement)->not->toBeNull();
+    foreach (['country_code', 'region_code', 'province_code', 'city_code', 'barangay_code'] as $field) {
+        expect($xpath->query('.//*[@name="lots[0]['.$field.']"]', $lotElement)->length)->toBe(0);
+    }
+    $corrected = $serializeForm($retry->getContent());
+    $corrected['project_id'] = $project->project_id;
+
+    $this->put(route($prefix.'.update', $project), $corrected)->assertRedirect(route($prefix.'.show', $project))->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('lots', ['id' => $lot->id, 'country' => 'Japan', 'region' => 'Kanto', 'province' => 'Tokyo', 'city_municipality' => 'Shinjuku', 'barangay' => 'Legacy district', 'delivery_address' => 'Legacy Tokyo delivery address', 'region_code' => null, 'province_code' => null, 'city_code' => null, 'barangay_code' => null]);
+    expect($project->fresh()->project_name)->toBe('Corrected foreign-country metadata');
+    $this->assertDatabaseCount('lots', 1);
+    $this->assertDatabaseCount('project_information', 2);
+})->with(['operation' => ['project.bidding', 'user'], 'finance' => ['bidding', 'finance']]);
+
 it('requires authentication and appropriate operation access before changing a bidding document', function () {
     $project = BiddingProjectFixtureFactory::new()->create();
     $this->deleteJson(route('project.bidding.destroy', $project))->assertUnauthorized();

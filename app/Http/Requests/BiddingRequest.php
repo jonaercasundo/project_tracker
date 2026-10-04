@@ -183,11 +183,20 @@ abstract class BiddingRequest extends FormRequest
             }
             $itemCount = 0;
             foreach ($this->input('lots', []) as $index => $lot) {
-                foreach (['province_code' => 'region_code', 'city_code' => empty($lot['province_code']) ? 'region_code' : 'province_code', 'barangay_code' => 'city_code'] as $child => $parent) {
-                    if (empty($lot[$child])) {
+                $location = $lot;
+                $locationFields = ['region_code', 'province_code', 'city_code', 'barangay_code'];
+                $bidding = $this->route('bidding');
+                if ($bidding instanceof ProjectInformation && isset($lot['id']) && array_intersect($locationFields, array_keys($lot)) !== []) {
+                    $savedLot = $bidding->lots()->whereKey($lot['id'])->first($locationFields);
+                    if ($savedLot !== null) {
+                        $location = array_replace($savedLot->getAttributes(), $lot);
+                    }
+                }
+                foreach (['province_code' => 'region_code', 'city_code' => empty($location['province_code']) ? 'region_code' : 'province_code', 'barangay_code' => 'city_code'] as $child => $parent) {
+                    if (empty($location[$child])) {
                         continue;
                     }
-                    if (empty($lot[$parent]) || ! DB::table('psgc')->where('psgc_code', $lot[$child])->where($parent, $lot[$parent])->exists()) {
+                    if (empty($location[$parent]) || ! DB::table('psgc')->where('psgc_code', $location[$child])->where($parent, $location[$parent])->exists()) {
                         $validator->errors()->add('lots.'.$index.'.'.$child, 'Select a location belonging to its selected parent.');
                     }
                 }

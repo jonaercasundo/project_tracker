@@ -85,7 +85,7 @@ class BiddingDocumentService
     }
 
     /** @param array<string, mixed> $data
-     *  @return Collection<int, BiddingDocument>
+     * @return Collection<int, BiddingDocument>
      */
     public function upload(ProjectInformation $bidding, array $data, User $user): Collection
     {
@@ -325,7 +325,7 @@ class BiddingDocumentService
     }
 
     /** @param array<int, array{project_information_id: int, storage_disk: string, storage_path: string}> $newFiles
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function storeFile(ProjectInformation $bidding, ?BiddingDocumentFolder $folder, UploadedFile $file, User $user, array &$newFiles): array
     {

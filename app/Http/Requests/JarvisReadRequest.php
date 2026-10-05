@@ -59,6 +59,8 @@ class JarvisReadRequest extends FormRequest
 
         if ($this->route()->getActionMethod() === 'deliveryProgress') {
             $rules = array_replace($rules, DeliveryMonitoringRequest::filterRules());
+            $rules['per_page'] = ['sometimes', 'integer', 'between:1,50'];
+            $rules['compact'] = ['sometimes', 'boolean'];
         }
 
         return array_intersect_key($rules, array_flip($this->supportedFilters()));
@@ -74,7 +76,7 @@ class JarvisReadRequest extends FormRequest
         $filters = match ($endpoint) {
             'dashboard' => ['project_id', 'year', 'status', 'agency', 'ref_no'],
             'projects' => $projects,
-            'deliveryProgress' => array_keys(DeliveryMonitoringRequest::filterRules()),
+            'deliveryProgress' => array_merge(array_keys(DeliveryMonitoringRequest::filterRules()), ['page', 'per_page', 'status', 'lot_id', 'compact']),
             'project' => [],
             'deliveries' => $deliveries,
             'inventory', 'warehouses' => $inventory,

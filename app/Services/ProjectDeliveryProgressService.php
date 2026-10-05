@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -26,6 +27,12 @@ class ProjectDeliveryProgressService
         }
         if (isset($filters['project_id'])) {
             $query->where('p.project_id', $filters['project_id']);
+        }
+        if (isset($filters['project_ids'])) {
+            $query->whereIn('p.project_id', $filters['project_ids']);
+        }
+        if (isset($filters['status'])) {
+            $query->where('p.status', $filters['status']);
         }
         if (isset($filters['search'])) {
             $query->where(function (Builder $query) use ($filters): void {
@@ -51,6 +58,9 @@ class ProjectDeliveryProgressService
             if (isset($filters[$column])) {
                 $query->where('s.'.$column, $filters[$column]);
             }
+        }
+        if (isset($filters['lot_id'])) {
+            $query->where('d.lot_id', $filters['lot_id']);
         }
 
         return $query;
@@ -195,21 +205,12 @@ class ProjectDeliveryProgressService
             $column = str_replace(' ', '_', $status);
             $deliveryCounts->selectRaw("COUNT(CASE WHEN receipt.delivery_status = ? THEN 1 END) as {$column}_deliveries_count", [$status]);
         }
-
-        return $deliveryCounts;
-    }
-
-    /** @param array<string, mixed> $filters */
-    private function packageStats(array $filters): Builder
-    {
-        $query = DB::query()->fromSub($this->packageAllocations($filters), 'a');
-        if (isset($filters['delivery_status'])) {
-            $query->joinSub($this->receipts($filters)->select('receipt.project_id', 'receipt.dr_no'), 'selected_receipts', function (JoinClause $join): void {
-                $this->matchReceipt($join, 'a', 'selected_receipts');
-            });
+        $deliveryCounts->selectRaw('SUM(receipt.total_packages_count) as total_packages_count');
+        foreach (self::PACKAGE_STATUSES as $status) {
+            $deliveryCounts->selectRaw("SUM(receipt.{$status}_packages_count) as {$status}_packages_count");
         }
 
-        return $this->countPackages($query->select('a.project_id'), 'a')->groupBy('a.project_id');
+        return $deliveryCounts;
     }
 
     /** @param array<string, mixed> $filters */
@@ -238,25 +239,25 @@ class ProjectDeliveryProgressService
     /** Each join is already reduced to at most one row per project. @param array<string, mixed> $filters */
     public function recordsQuery(array $filters): Builder
     {
-        $lotNames = $this->deliveries($filters)
-            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
-            ->select('d.project_id')
-            ->selectRaw('GROUP_CONCAT(DISTINCT l.lot_name) as lot_names')
-            ->groupBy('d.project_id');
         $query = $this->projects($filters)
             ->leftJoinSub($this->deliveryStats($filters), 'delivery_stats', 'delivery_stats.project_id', '=', 'p.project_id')
-            ->leftJoinSub($this->packageStats($filters), 'package_stats', 'package_stats.project_id', '=', 'p.project_id')
             ->leftJoinSub($this->billingStats($filters), 'billing_stats', 'billing_stats.project_id', '=', 'p.project_id')
-            ->leftJoinSub($lotNames, 'project_lots', 'project_lots.project_id', '=', 'p.project_id')
-            ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'delivery_stats.last_delivery_date', 'delivery_stats.last_accepted_date', 'delivery_stats.last_dr_date', 'billing_stats.last_billing_date', 'project_lots.lot_names']);
-        if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status'])) {
+            ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'delivery_stats.last_delivery_date', 'delivery_stats.last_accepted_date', 'delivery_stats.last_dr_date', 'billing_stats.last_billing_date']);
+        if (! (bool) ($filters['compact'] ?? false)) {
+            $lotNames = $this->deliveries($filters)
+                ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
+                ->select('d.project_id')->selectRaw('GROUP_CONCAT(DISTINCT l.lot_name) as lot_names')
+                ->groupBy('d.project_id');
+            $query->leftJoinSub($lotNames, 'project_lots', 'project_lots.project_id', '=', 'p.project_id')->addSelect('project_lots.lot_names');
+        }
+        if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status', 'lot_id'])) {
             $query->whereNotNull('delivery_stats.project_id');
         }
         foreach (array_merge(['total_deliveries_count', 'completed_deliveries_count', 'delivery_rows_count'], array_map(fn (string $status): string => str_replace(' ', '_', $status).'_deliveries_count', self::DELIVERY_STATUSES)) as $column) {
             $query->selectRaw("COALESCE(delivery_stats.{$column}, 0) as {$column}");
         }
         foreach (array_merge(['total_packages_count'], array_map(fn (string $status): string => $status.'_packages_count', self::PACKAGE_STATUSES)) as $column) {
-            $query->selectRaw("COALESCE(package_stats.{$column}, 0) as {$column}");
+            $query->selectRaw("COALESCE(delivery_stats.{$column}, 0) as {$column}");
         }
         foreach (['billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count'] as $column) {
             $query->selectRaw("COALESCE(billing_stats.{$column}, 0) as {$column}");
@@ -272,7 +273,7 @@ class ProjectDeliveryProgressService
         $sort = $filters['sort'] ?? null;
         $direction = ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
         if ($sort === 'progress') {
-            $query->orderByRaw('(COALESCE(package_stats.delivered_packages_count, 0) + COALESCE(package_stats.accepted_packages_count, 0)) * 1.0 / NULLIF(package_stats.total_packages_count, 0) '.$direction);
+            $query->orderByRaw('(COALESCE(delivery_stats.delivered_packages_count, 0) + COALESCE(delivery_stats.accepted_packages_count, 0)) * 1.0 / NULLIF(delivery_stats.total_packages_count, 0) '.$direction);
         } elseif (isset($sortColumns[$sort])) {
             $query->orderBy($sortColumns[$sort], $direction);
         }
@@ -283,7 +284,7 @@ class ProjectDeliveryProgressService
     /** @param array<string, mixed> $filters */
     public function warehouseItemsQuery(array $filters): Builder
     {
-        $projectFilters = array_intersect_key($filters, array_flip(['project_id', 'active_only', 'search']));
+        $projectFilters = array_intersect_key($filters, array_flip(['project_id', 'project_ids', 'active_only', 'search', 'status']));
         $requirements = DB::query()->fromSub($this->packageAllocations($projectFilters, false), 'allocation')
             ->join('package_content as content', 'content.package_id', '=', 'allocation.package_id')
             ->select(['allocation.project_id', 'content.item_id'])
@@ -442,18 +443,67 @@ class ProjectDeliveryProgressService
     }
 
     /**
+     * Page project identifiers before calculating their allocations or stock totals.
+     * The monitoring UI retains report(); the API uses this bounded variant.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array{data: array<string, mixed>, pagination: array<string, int|bool>}
+     */
+    public function apiReport(array $filters): array
+    {
+        if (isset($filters['project_id'])) {
+            abort_unless(DB::table('projects')->where('project_id', $filters['project_id'])->exists(), 404, 'Project not found.');
+            $report = $this->report($filters);
+            $count = $report['projects']->count();
+            $pagination = ['current_page' => 1, 'per_page' => 1, 'total' => $count, 'last_page' => 1, 'has_more' => false];
+        } else {
+            $query = $this->projects($filters)->select('p.project_id');
+            if (isset($filters['delivery_status'])) {
+                $query->whereIn('p.project_id', $this->receipts($filters)->select('receipt.project_id'));
+            } elseif (array_intersect(array_keys($filters), ['year', 'lot_id', 'region', 'division', 'municipality'])) {
+                $query->whereIn('p.project_id', $this->deliveries($filters)->select('d.project_id'));
+            }
+            $sort = $filters['sort'] ?? null;
+            $direction = ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+            if (in_array($sort, ['progress', 'total_drs', 'total_dr_packages', 'last_delivery'], true)) {
+                $query = $this->recordsQuery($filters);
+            } elseif (in_array($sort, ['project', 'end_date'], true)) {
+                $query->orderBy($sort === 'project' ? 'p.project_name' : 'p.end_date', $direction);
+            }
+            $page = $query->orderBy('p.project_id')->paginate((int) ($filters['per_page'] ?? 20), ['*'], 'page', (int) ($filters['page'] ?? 1));
+            $report = $this->report([...$filters, 'project_ids' => $page->pluck('project_id')->all()]);
+            $pagination = ['current_page' => $page->currentPage(), 'per_page' => $page->perPage(),
+                'total' => $page->total(), 'last_page' => $page->lastPage(), 'has_more' => $page->hasMorePages()];
+        }
+
+        return ['data' => $report, 'pagination' => $pagination];
+    }
+
+    /** @param array<string, mixed> $project @return array<string, mixed> */
+    private function compactApiProject(array $project): array
+    {
+        return Arr::only($project, [
+            'project_id', 'project_name', 'ref_no', 'project_status', 'start_date', 'end_date',
+            'total_deliveries_count', 'completed_deliveries_count', 'pending_deliveries_count',
+            'total_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'remaining_packages_count',
+            'delivery_progress_percent', 'billing_progress_percent', 'last_activity',
+        ]);
+    }
+
+    /**
      * One project set and a fixed number of grouped queries; never query per project.
      * Billing receipts are deduplicated before joining, so multiple delivery rows
      * sharing a DR do not multiply billing counts.
      *
      * @param  array<string, mixed>  $filters
-     * @return array{projects: Collection<int, array<string, mixed>>, summary: array<string, mixed>, definitions: array<string, string>}
+     * @return array{projects: Collection<int, array<string, mixed>>, summary: array<string, mixed>, definitions?: array<string, string>}
      */
     public function report(array $filters): array
     {
+        $compact = (bool) ($filters['compact'] ?? false);
         $records = $this->recordsQuery($filters)->get();
-        $warehouseRows = $this->warehouseSummaryQuery($filters)->get()->groupBy('project_id');
-        $projects = $records->map(function (object $record) use ($warehouseRows, $filters): array {
+        $warehouseRows = $compact ? collect() : $this->warehouseSummaryQuery($filters)->get()->groupBy('project_id');
+        $projects = $records->map(function (object $record) use ($warehouseRows, $filters, $compact): array {
             $project = (array) $record;
             foreach ($project as $column => $value) {
                 if (str_ends_with($column, '_count') || $column === 'project_id') {
@@ -468,12 +518,17 @@ class ProjectDeliveryProgressService
             $project['progress_basis'] = $project['total_packages_count'] > 0 ? 'package_allocations' : 'no_package_allocations';
             $project['delivery_progress_percent'] = $this->deliveryProgress($project);
             $project['billing_progress_percent'] = $this->percentage($project['billed_groups_count'] + $project['paid_groups_count'], $project['billing_groups_count']);
+            if ($compact) {
+                $project['last_activity'] = $this->lastActivity($project);
+
+                return $project;
+            }
             $project['warehouse_readiness'] = $this->warehouseReadiness($warehouseRows->get($project['project_id'], collect()));
             $project['last_inventory_date'] = $warehouseRows->get($project['project_id'], collect())->max('last_inventory_date');
             $project['operational_pipeline'] = $this->pipeline($project, $project['warehouse_readiness']);
             $project['pipeline'] = $project['operational_pipeline'];
             $project['overall_progress'] = $this->operationalProgress($project['pipeline']);
-            if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status'])) {
+            if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status', 'lot_id'])) {
                 $project['overall_progress'] = null;
             }
             $project['last_activity'] = $this->lastActivity($project);
@@ -492,12 +547,17 @@ class ProjectDeliveryProgressService
         }
         $summary['progress_basis'] = $summary['total_packages_count'] > 0 ? 'package_allocations' : 'no_package_allocations';
         $summary['delivery_progress_percent'] = $this->deliveryProgress($summary);
+        if ($compact) {
+            $summary['billing_progress_percent'] = $this->percentage($summary['billed_groups_count'] + $summary['paid_groups_count'], $summary['billing_groups_count']);
+
+            return ['projects' => $projects->map(fn (array $project): array => $this->compactApiProject($project)), 'summary' => $summary];
+        }
         $selectedWarehouseRows = $warehouseRows->only($projects->pluck('project_id')->all())->flatten(1);
         $summary['warehouse_readiness'] = $this->warehouseReadiness($selectedWarehouseRows);
         $summary['pipeline'] = $this->pipeline($summary, $summary['warehouse_readiness']);
         $summary['operational_pipeline'] = $summary['pipeline'];
         $summary['overall_progress'] = $this->operationalProgress($summary['pipeline']);
-        if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status'])) {
+        if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status', 'lot_id'])) {
             $summary['overall_progress'] = null;
         }
 
@@ -572,7 +632,7 @@ class ProjectDeliveryProgressService
             'last_billing_date' => ['Billing recorded', 'billing_grouped.created_at'],
             'last_inventory_date' => ['Inventory activity', 'inventory_history.changed_at'],
         ] as $column => [$type, $source]) {
-            if ($project[$column] !== null && ($latest === null || strtotime($project[$column]) > strtotime($latest['at']))) {
+            if (($project[$column] ?? null) !== null && ($latest === null || strtotime($project[$column]) > strtotime($latest['at']))) {
                 $latest = ['type' => $type, 'at' => $project[$column], 'source' => $source];
             }
         }

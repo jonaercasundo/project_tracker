@@ -29,7 +29,17 @@ class JarvisReadController extends Controller
     {
         $filters = array_filter($request->validated(), fn (mixed $value): bool => $value !== null && $value !== '');
 
-        return $this->success($request, $progress->report($filters), ['definitions' => $progress->definitions()]);
+        if (! $request->boolean('compact') && ! $request->hasAny(['page', 'per_page'])) {
+            return $this->success($request, $progress->report($filters), ['definitions' => $progress->definitions()]);
+        }
+
+        $report = $progress->apiReport($filters);
+
+        return $this->success($request, $report['data'], [
+            ...($request->boolean('compact') ? [] : ['definitions' => $progress->definitions()]),
+            'pagination' => $report['pagination'],
+            'summary_scope' => 'Returned project page only; pagination.total counts all matching projects.',
+        ]);
     }
 
     public function project(JarvisReadRequest $request, int $id): JsonResponse
@@ -146,6 +156,10 @@ class JarvisReadController extends Controller
             'lots' => ['source' => 'Operational lot table; use masterlist source=operations with lot_id for its items.'],
             default => ['pending_deliveries' => 'Non-cancelled delivery rows with pending delivery status or an expected pending package allocation.'],
         };
+
+        if ($endpoint === 'deliveryProgress' && $request->boolean('compact')) {
+            unset($meta['definitions']);
+        }
 
         return response()->json(['success' => true, 'data' => $data, 'meta' => array_merge($meta, $extraMeta)])
             ->header('Cache-Control', 'private, no-store');

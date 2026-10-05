@@ -332,6 +332,150 @@ it('reports real project progress with package completion and recorded billing s
     $this->assertDatabaseCount('billing_grouped', 1);
 });
 
+it('paginates project progress before aggregation and bounds summary response size', function () {
+    jarvisOperations();
+    $projects = [];
+    $deliveries = [];
+    for ($projectId = 3; $projectId <= 62; $projectId++) {
+        $projects[] = ['project_id' => $projectId, 'project_name' => 'Progress fixture '.$projectId, 'status' => 'Ongoing'];
+        for ($receipt = 0; $receipt < 100; $receipt++) {
+            $deliveries[] = ['project_id' => $projectId, 'lot_id' => 1, 'dr_no' => 'P'.$projectId.'-DR'.$receipt, 'status' => 'pending', 'delivery_date' => '2026-10-03'];
+        }
+    }
+    DB::table('projects')->insert($projects);
+    foreach (array_chunk($deliveries, 100) as $chunk) {
+        DB::table('deliveries')->insert($chunk);
+    }
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+    foreach ([['compact' => 0, 'per_page' => 20], ['compact' => 1, 'per_page' => 20], ['compact' => 1, 'project_id' => 62]] as $profileFilters) {
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $profileStart = microtime(true);
+        $profileResponse = jarvisRead('projects/delivery-progress', $token, $profileFilters)->assertOk();
+        $profileSeconds = microtime(true) - $profileStart;
+        $profileQueries = DB::getQueryLog();
+        DB::disableQueryLog();
+        $operationsQueries = array_values(array_filter($profileQueries, fn (array $query): bool => str_contains($query['query'], 'projects')));
+        $calculationQueries = array_map(fn (array $query): array => [
+            'calculation' => str_contains($query['query'], 'inventory_history') ? 'warehouse/history' : (str_contains($query['query'], 'package_status') ? 'delivery/package/billing aggregates' : 'project selection'),
+            'ms' => $query['time'],
+        ], $operationsQueries);
+        $queryIdentities = array_map(fn (array $query): string => hash('sha256', $query['query'].json_encode($query['bindings'])), $profileQueries);
+        fwrite(STDOUT, PHP_EOL.json_encode(['progress_profile_fixture' => [
+            'filters' => $profileFilters, 'seconds' => round($profileSeconds, 4), 'bytes' => strlen($profileResponse->getContent()),
+            'total_sql_queries' => count($profileQueries), 'operations_queries' => count($operationsQueries),
+            'duplicate_sql_queries' => count($queryIdentities) - count(array_unique($queryIdentities)), 'calculations' => $calculationQueries,
+        ]]).PHP_EOL);
+    }
+    $startedAt = microtime(true);
+    $page = jarvisRead('projects/delivery-progress', $token, ['compact' => 1])->assertOk()
+        ->assertJsonCount(20, 'data.projects')->assertJsonPath('meta.pagination.per_page', 20)
+        ->assertJsonPath('meta.pagination.total', 61)->assertJsonPath('meta.pagination.has_more', true)
+        ->assertJsonPath('data.summary.projects_count', 20);
+    $pageSeconds = microtime(true) - $startedAt;
+    $startedAt = microtime(true);
+    $single = jarvisRead('projects/delivery-progress', $token, ['project_id' => 62, 'compact' => 1])->assertOk()
+        ->assertJsonCount(1, 'data.projects')->assertJsonPath('data.projects.0.project_id', 62)
+        ->assertJsonPath('data.projects.0.total_deliveries_count', 100)
+        ->assertJsonPath('data.projects.0.total_packages_count', 200);
+    $singleSeconds = microtime(true) - $startedAt;
+    $maximum = jarvisRead('projects/delivery-progress', $token, ['per_page' => 50, 'compact' => 1])->assertOk()->assertJsonCount(50, 'data.projects');
+    expect(strlen($page->getContent()))->toBeLessThan(50000);
+    expect(strlen($single->getContent()))->toBeLessThan(50000);
+    expect(strlen($maximum->getContent()))->toBeLessThan(50000);
+    jarvisRead('projects/delivery-progress', $token, ['page' => 4, 'compact' => 1])->assertOk()->assertJsonCount(1, 'data.projects')
+        ->assertJsonPath('data.projects.0.project_id', 62)->assertJsonPath('meta.pagination.has_more', false);
+    jarvisRead('projects/delivery-progress', $token, ['page' => 5, 'compact' => 1])->assertOk()->assertJsonCount(0, 'data.projects');
+
+    $service = app(ProjectDeliveryProgressService::class);
+    DB::enableQueryLog();
+    $metrics = [];
+    foreach ([1, 20, 50] as $perPage) {
+        DB::flushQueryLog();
+        $service->apiReport(['per_page' => $perPage, 'compact' => 1]);
+        $queries = DB::getQueryLog();
+        expect($queries)->toHaveCount(3);
+        $metrics[$perPage] = ['operations_queries' => count($queries), 'slowest_query_ms' => max(array_column($queries, 'time'))];
+    }
+    DB::disableQueryLog();
+    fwrite(STDOUT, PHP_EOL.json_encode(['paginated_progress_sqlite_fixture' => [
+        'projects' => 62, 'deliveries' => 6003, 'page_seconds' => round($pageSeconds, 4), 'single_seconds' => round($singleSeconds, 4),
+        'page_bytes' => strlen($page->getContent()), 'single_bytes' => strlen($single->getContent()), 'maximum_page_bytes' => strlen($maximum->getContent()),
+        'queries' => $metrics,
+    ]]).PHP_EOL);
+});
+
+it('returns structured progress errors and validates bounded pagination', function () {
+    jarvisOperations();
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 999999, 'compact' => 1])->assertNotFound()
+        ->assertJsonPath('success', false)->assertJsonPath('message', 'Project not found.');
+    foreach (['per_page' => 51, 'page' => 0, 'compact' => 'invalid', 'lot_id' => 0] as $field => $value) {
+        jarvisRead('projects/delivery-progress', $token, [$field => $value])->assertUnprocessable()->assertJsonValidationErrors($field);
+    }
+    jarvisRead('projects/delivery-progress', $token, ['status' => 'Delivered', 'active_only' => 0, 'lot_id' => 2])
+        ->assertOk()->assertJsonCount(1, 'data.projects')->assertJsonPath('data.projects.0.project_id', 2);
+    jarvisRead('projects/delivery-progress', $token, ['status' => 'Delivered', 'active_only' => 0, 'lot_id' => 1])
+        ->assertOk()->assertJsonCount(0, 'data.projects');
+});
+
+it('returns only AI summary fields and skips warehouse and definition calculations in compact mode', function (array $filters, int $projectCount) {
+    jarvisOperations();
+    DB::table('projects')->where('project_id', 1)->update(['project_id' => 502698]);
+    DB::table('deliveries')->where('project_id', 1)->update(['project_id' => 502698]);
+    DB::table('item')->where('project_id', 1)->update(['project_id' => 502698]);
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+    $full = jarvisRead('projects/delivery-progress', $token, ['project_id' => 502698])->assertOk();
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+    $response = jarvisRead('projects/delivery-progress', $token, ['compact' => 1, ...$filters])->assertOk()
+        ->assertJsonCount($projectCount, 'data.projects')->assertJsonMissingPath('data.definitions')
+        ->assertJsonMissingPath('meta.definitions')->assertJsonMissingPath('data.summary.warehouse_readiness')
+        ->assertJsonMissingPath('data.summary.pipeline')->assertJsonMissingPath('data.summary.operational_pipeline');
+    $queries = DB::getQueryLog();
+    DB::disableQueryLog();
+    foreach ($queries as $query) {
+        expect($query['query'])->not->toContain('inventory_history')->not->toContain('package_content')->not->toContain('project_lots');
+    }
+    $fields = ['project_id', 'project_name', 'ref_no', 'project_status', 'start_date', 'end_date',
+        'total_deliveries_count', 'completed_deliveries_count', 'pending_deliveries_count', 'total_packages_count',
+        'delivered_packages_count', 'accepted_packages_count', 'remaining_packages_count',
+        'delivery_progress_percent', 'billing_progress_percent', 'last_activity'];
+    sort($fields);
+    foreach ($response->json('data.projects') as $project) {
+        $keys = array_keys($project);
+        sort($keys);
+        expect($keys)->toBe($fields);
+        if ($project['project_id'] === 502698) {
+            foreach ($project as $key => $value) {
+                expect($value)->toBe($full->json('data.projects.0.'.$key));
+            }
+        }
+    }
+    expect(strlen($response->getContent()))->toBeLessThan(50000);
+})->with([
+    'compact only' => [[], 1],
+    'project identifier' => [['project_id' => 502698], 1],
+    'delivery year' => [['year' => 2026], 1],
+    'active projects' => [['active_only' => 1], 1],
+    'include inactive' => [['active_only' => 0], 2],
+    'year with no deliveries' => [['year' => 2025], 0],
+]);
+
+it('preserves full delivery progress when compact is omitted or disabled', function () {
+    jarvisOperations();
+    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+    $expected = json_decode(json_encode(app(ProjectDeliveryProgressService::class)->report(['active_only' => 0])), true);
+    foreach ([['active_only' => 0], ['active_only' => 0, 'compact' => 0]] as $filters) {
+        $response = jarvisRead('projects/delivery-progress', $token, $filters)->assertOk()
+            ->assertJsonCount(2, 'data.projects')->assertJsonMissingPath('meta.pagination');
+        expect($response->json('data.projects'))->toBe($expected['projects']);
+        expect($response->json('data.summary'))->toBe($expected['summary']);
+        expect($response->json('data.definitions'))->toBe($expected['definitions']);
+        expect($response->json('meta.definitions'))->toBe($expected['definitions']);
+    }
+});
+
 it('combines progress filters and derives released receipt status from packages', function () {
     jarvisOperations();
     DB::table('package_status')->insert(['delivery_id' => 1, 'package_id' => 2, 'status' => 'released']);
@@ -543,11 +687,20 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
         $mysql->flushQueryLog();
         $mysql->enableQueryLog();
         $startedAt = microtime(true);
-        $api = jarvisRead('projects/delivery-progress', $token, ['active_only' => 0]);
+        $api = jarvisRead('projects/delivery-progress', $token, ['active_only' => 0, 'compact' => 0]);
         $apiSeconds = microtime(true) - $startedAt;
         $apiQueryCount = count($mysql->getQueryLog());
         $mysql->disableQueryLog();
         $api->assertOk()->assertJsonCount(3, 'data.projects');
+        foreach ([['compact' => 1, 'active_only' => 0, 'sort' => 'total_drs'], ['compact' => 1, 'project_id' => 1, 'year' => 2026]] as $compactFilters) {
+            $compactResponse = jarvisRead('projects/delivery-progress', $token, $compactFilters)->assertOk()
+                ->assertJsonMissingPath('meta.definitions')->assertJsonMissingPath('data.summary.warehouse_readiness');
+            foreach ($compactResponse->json('data.projects') as $project) {
+                $fullProject = collect($api->json('data.projects'))->firstWhere('project_id', $project['project_id']);
+                expect($project['total_packages_count'])->toBe($fullProject['total_packages_count']);
+                expect($project['delivery_progress_percent'])->toBe($fullProject['delivery_progress_percent']);
+            }
+        }
         jarvisRead('projects/delivery-progress', $token)->assertOk()->assertJsonCount(2, 'data.projects');
         $this->withoutVite();
         $this->actingAs($user)->withSession(['company_id' => $companyId]);
@@ -741,7 +894,7 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
     jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
         ->assertJsonPath('data.projects.0.delivery_progress_percent', 50);
     $dashboard = $this->getJson('/deliveries/monitoring?search=REF-001&sort=progress&direction=desc');
-    $api = jarvisRead('projects/delivery-progress', $token, ['search' => 'REF-001', 'sort' => 'progress', 'direction' => 'desc']);
+    $api = jarvisRead('projects/delivery-progress', $token, ['search' => 'REF-001', 'sort' => 'progress', 'direction' => 'desc', 'compact' => 0]);
     expect($dashboard->json('summary'))->toBe($api->json('data.summary'));
     expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
 });

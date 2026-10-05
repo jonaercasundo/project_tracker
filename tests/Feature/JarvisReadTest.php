@@ -462,6 +462,53 @@ it('returns only AI summary fields and skips warehouse and definition calculatio
     'year with no deliveries' => [['year' => 2025], 0],
 ]);
 
+it('matches full status rules in compact mode for sparse histories and exact shared receipts', function (array $filters) {
+    jarvisOperations();
+    DB::table('keystage')->insert(['keystage_id' => 10, 'lot_id' => 1]);
+    DB::table('package')->insert(['package_id' => 4, 'keystage_id' => 10, 'lot_id' => 1]);
+    DB::table('deliveries')->insert([
+        ['delivery_id' => 4, 'project_id' => 1, 'dr_no' => '3502', 'lot_id' => 1, 'keystage_id' => 10, 'status' => 'pending', 'delivery_date' => '2026-10-02'],
+        ['delivery_id' => 5, 'project_id' => 1, 'dr_no' => null, 'lot_id' => 1, 'keystage_id' => null, 'status' => 'accepted', 'delivery_date' => '2026-10-02'],
+        ['delivery_id' => 6, 'project_id' => 1, 'dr_no' => '3502-x', 'lot_id' => 1, 'keystage_id' => null, 'status' => 'pending', 'delivery_date' => '2026-10-02'],
+        ['delivery_id' => 7, 'project_id' => 1, 'dr_no' => '3502-X ', 'lot_id' => 1, 'keystage_id' => null, 'status' => 'pending', 'delivery_date' => '2026-10-02'],
+        ['delivery_id' => 8, 'project_id' => 1, 'dr_no' => 'NO-ALLOCATIONS', 'lot_id' => null, 'keystage_id' => null, 'status' => 'accepted', 'delivery_date' => '2026-10-02'],
+    ]);
+    DB::table('package_status')->insert([
+        ['delivery_id' => 1, 'package_id' => 1, 'status' => 'pending'],
+        ['delivery_id' => 2, 'package_id' => 2, 'status' => null],
+        ['delivery_id' => 4, 'package_id' => 4, 'status' => 'delivered'],
+        ['delivery_id' => 4, 'package_id' => 1, 'status' => 'accepted'],
+        ['delivery_id' => 6, 'package_id' => 1, 'status' => 'accepted'],
+        ['delivery_id' => 6, 'package_id' => 1, 'status' => 'unexpected'],
+    ]);
+    DB::table('billing_grouped')->insert(['group_id' => 1, 'dr_no' => '3502-X ']);
+    $service = app(ProjectDeliveryProgressService::class);
+    $full = $service->report($filters);
+
+    $compact = $service->report([...$filters, 'compact' => 1]);
+
+    foreach ($compact['projects'] as $project) {
+        $original = $full['projects']->firstWhere('project_id', $project['project_id']);
+        foreach ($project as $key => $value) {
+            expect($value)->toBe($original[$key]);
+        }
+    }
+    foreach ($compact['summary'] as $key => $value) {
+        if ($key !== 'billing_progress_percent') {
+            expect($value)->toBe($full['summary'][$key]);
+        }
+    }
+})->with([
+    'all projects' => [['active_only' => 0]],
+    'one project' => [['project_id' => 1]],
+    'year' => [['year' => 2026]],
+    'pending receipts' => [['delivery_status' => 'pending']],
+    'mixed receipts' => [['delivery_status' => 'mixed']],
+    'accepted receipts' => [['delivery_status' => 'accepted']],
+    'location' => [['region' => 'Region I']],
+    'lot' => [['lot_id' => 1]],
+]);
+
 it('preserves full delivery progress when compact is omitted or disabled', function () {
     jarvisOperations();
     $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;

@@ -16,7 +16,7 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
-    ->in(...array_filter(glob(__DIR__.'/Feature/*'), fn (string $path): bool => ! in_array(basename($path), ['OperationInventoryWarehouseFilterTest.php', 'MIApproverTest.php', 'AccountingWorkspaceTest.php', 'UserRoleProvisioningTest.php', 'MISchemaInstallationTest.php', 'CreateAdministratorTest.php', 'MIWorkflowTest.php', 'MIFinancialEnhancementTest.php', 'JarvisIntegrationTest.php', 'JarvisReadTest.php', 'ProjectDetailsTest.php', 'BiddingWorkflowTest.php', 'BiddingDocumentsTest.php', 'BiddingStoreTest.php'], true)));
+    ->in(...array_filter(glob(__DIR__.'/Feature/*'), fn (string $path): bool => ! in_array(basename($path), ['DashboardLaunchTest.php', 'OperationInventoryWarehouseFilterTest.php', 'MIApproverTest.php', 'AccountingWorkspaceTest.php', 'UserRoleProvisioningTest.php', 'MISchemaInstallationTest.php', 'CreateAdministratorTest.php', 'MIWorkflowTest.php', 'MIFinancialEnhancementTest.php', 'JarvisIntegrationTest.php', 'JarvisReadTest.php', 'ProjectDetailsTest.php', 'BiddingWorkflowTest.php', 'BiddingDocumentsTest.php', 'BiddingStoreTest.php'], true)));
 
 /*
 |--------------------------------------------------------------------------

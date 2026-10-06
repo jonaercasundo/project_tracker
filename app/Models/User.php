@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\DashboardService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -83,17 +84,9 @@ class User extends Authenticatable
     /**
      * Get the currently selected company.
      */
-    public function currentCompany()
+    public function currentCompany(): ?Company
     {
-        $companyId = session('company_id');
-
-        if (! $companyId) {
-            return null;
-        }
-
-        return $this->companies()
-            ->where('companies.company_id', $companyId)
-            ->first();
+        return app(DashboardService::class)->currentCompany($this, session()->driver());
     }
 
     /**

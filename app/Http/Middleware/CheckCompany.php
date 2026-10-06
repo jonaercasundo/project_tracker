@@ -2,40 +2,34 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\DashboardService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class CheckCompany
 {
+    public function __construct(private DashboardService $dashboards) {}
+
     public function handle(
         Request $request,
         Closure $next,
-        $company
+        string $company
     ): Response {
 
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             abort(403, 'CHECK COMPANY: User not authenticated.');
         }
 
-        $requiredCompany = $user->companies()
-            ->where('companies.code', $company)
-            ->where('companies.is_active', true)
-            ->first();
+        $selectedCompany = $this->dashboards->currentCompany($user, $request->session());
 
-        if (!$requiredCompany) {
-            abort(403, 'CHECK COMPANY: User does not have access to ' . $company);
+        if (! $selectedCompany) {
+            abort(403, 'CHECK COMPANY: No authorized active company selected.');
         }
 
-        $selectedCompanyId = session('company_id');
-
-        if (!$selectedCompanyId) {
-            abort(403, 'CHECK COMPANY: No company selected.');
-        }
-
-        if ((int) $selectedCompanyId !== (int) $requiredCompany->company_id) {
+        if ($selectedCompany->code !== $company) {
             abort(403, 'CHECK COMPANY: Wrong company selected.');
         }
 

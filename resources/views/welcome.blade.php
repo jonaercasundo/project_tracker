@@ -36,11 +36,11 @@
 
             <div class="flex items-center gap-3">
                 @auth
-                    <a href="{{ \App\Services\DashboardService::route(auth()->user()) }}" class="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-lg shadow-brand-600/30">
+                    <a href="{{ route('dashboard.launch') }}" class="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-lg shadow-brand-600/30">
                         Launch App
                     </a>
                 @else
-                    <a href="/login" class="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-lg shadow-brand-600/30">
+                    <a href="{{ route('login') }}" class="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-lg shadow-brand-600/30">
                         Sign In
                     </a>
                 @endauth
@@ -70,11 +70,11 @@
             <!-- Hero Action CTA -->
             <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                 @auth
-                    <a href="{{ \App\Services\DashboardService::route(auth()->user()) }}" class="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-xl shadow-brand-600/30">
+                    <a href="{{ route('dashboard.launch') }}" class="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-xl shadow-brand-600/30">
                         Launch Dashboard
                     </a>
                 @else
-                    <a href="/login" class="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-xl shadow-brand-600/30 flex items-center justify-center gap-2">
+                    <a href="{{ route('login') }}" class="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-xl shadow-brand-600/30 flex items-center justify-center gap-2">
                         <span>Sign In to METRO</span>
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />

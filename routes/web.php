@@ -9,6 +9,7 @@ use App\Http\Controllers\BiddingDocumentController;
 use App\Http\Controllers\BiddingFolderController;
 use App\Http\Controllers\BudgetRequestController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\DashboardLaunchController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryMonitoringController;
 use App\Http\Controllers\DeliveryReceiveController;
@@ -55,6 +56,8 @@ Route::get('/', function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard/launch', DashboardLaunchController::class)->name('dashboard.launch');
+
     Route::get('/deliveries/monitoring', [DeliveryMonitoringController::class, 'index'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring');

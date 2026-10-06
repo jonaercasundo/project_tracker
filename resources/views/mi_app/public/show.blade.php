@@ -495,6 +495,7 @@
     */
 
     $pdImages = $product->images
+        ->sortByDesc('is_primary')
         ->map(function ($image) use ($convertImageUrl) {
 
             return [

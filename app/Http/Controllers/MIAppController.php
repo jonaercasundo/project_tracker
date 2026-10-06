@@ -2,134 +2,142 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\MI_Product; // Ensure the model is imported
-use Illuminate\Support\Facades\Storage;
 use App\Models\MI_Category;
-use App\Models\MI_SubCategory;
-use App\Models\MI_ProductType;
 use App\Models\MI_Collection;
 use App\Models\MI_Material;
+use App\Models\MI_Product;
 use App\Models\MI_Product_Image;
+use App\Models\MI_ProductType;
+use App\Models\MI_SubCategory;
+use Illuminate\Contracts\View\View;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class MIAppController extends Controller
 {
-public function index(Request $request)
-{
-    $query = MI_Product::with([
-        'category',
-        'subCategory',
-        'productType',
-        'collection',
-    ]);
+    public function index(Request $request)
+    {
+        $query = MI_Product::with([
+            'category',
+            'subCategory',
+            'productType',
+            'collection',
+        ]);
 
-    // Search
-    if ($request->filled('search')) {
-        $search = trim($request->search);
+        // Search
+        if ($request->filled('search')) {
+            $search = trim($request->search);
 
-        $query->where(function ($q) use ($search) {
+            $query->where(function ($q) use ($search) {
 
-            // Product fields
-            $q->where('item_name', 'like', "%{$search}%")
-              ->orWhere('type_of_sample', 'like', "%{$search}%")
-              ->orWhere('designed_by', 'like', "%{$search}%")
-              ->orWhere('classification', 'like', "%{$search}%");
+                // Product fields
+                $q->where('item_name', 'like', "%{$search}%")
+                    ->orWhere('type_of_sample', 'like', "%{$search}%")
+                    ->orWhere('designed_by', 'like', "%{$search}%")
+                    ->orWhere('classification', 'like', "%{$search}%");
 
-            // Category
-            $q->orWhereHas('category', function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%");
+                // Category
+                $q->orWhereHas('category', function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%");
+                });
+
+                // Sub Category
+                $q->orWhereHas('subCategory', function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%");
+                });
+
+                // Product Type
+                $q->orWhereHas('productType', function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%");
+                });
+
+                // Collection
+                $q->orWhereHas('collection', function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%");
+                });
             });
+        }
 
-            // Sub Category
-            $q->orWhereHas('subCategory', function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%");
-            });
+        // Filter by Classification
+        if ($request->filled('classification')) {
+            $query->where('classification', $request->classification);
+        }
 
-            // Product Type
-            $q->orWhereHas('productType', function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%");
-            });
+        // Filter by Status (optional)
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
 
-            // Collection
-            $q->orWhereHas('collection', function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%");
-            });
-        });
+        $products = $query->latest()->paginate(15);
+
+        return view('mi_app.designer_module.index', compact('products'));
     }
 
-    // Filter by Classification
-    if ($request->filled('classification')) {
-        $query->where('classification', $request->classification);
+    public function dashboard()
+    {
+        $stats = [
+            'total_products' => MI_Product::count(),
+            'active_products' => MI_Product::where('classification', 'Available')->count(),
+            'total_categories' => MI_Category::count(),
+            'total_collections' => MI_Collection::count(),
+        ];
+
+        $taxonomyCounts = [
+            'categories' => MI_Category::count(),
+            'sub_categories' => MI_SubCategory::count(),
+            'product_types' => MI_ProductType::count(),
+            'collections' => MI_Collection::count(),
+        ];
+
+        $classificationBreakdown = MI_Product::selectRaw('classification, count(*) as count')
+            ->whereNotNull('classification')
+            ->groupBy('classification')
+            ->pluck('count', 'classification');
+
+        $categoryBreakdown = MI_Product::with('category')
+            ->get()
+            ->groupBy(fn ($product) => $product->category->name ?? 'Uncategorized')
+            ->map(fn ($group, $name) => [
+                'name' => $name,
+                'count' => $group->count(),
+            ])
+            ->values()
+            ->sortByDesc('count')
+            ->take(8)
+            ->values();
+
+        $recentProducts = MI_Product::with('category')
+            ->latest()
+            ->take(8)
+            ->get();
+
+        return view('mi_app.designer_module.dashboard', compact(
+            'stats',
+            'taxonomyCounts',
+            'classificationBreakdown',
+            'categoryBreakdown',
+            'recentProducts'
+        ));
     }
 
-    // Filter by Status (optional)
-    if ($request->filled('status')) {
-        $query->where('status', $request->status);
-    }
-
-    $products = $query->latest()->paginate(15);
-
-    return view('mi_app.designer_module.index', compact('products'));
-}
-public function dashboard()
-{
-    $stats = [
-        'total_products'    => MI_Product::count(),
-        'active_products'   => MI_Product::where('classification', 'Available')->count(),
-        'total_categories'  => MI_Category::count(),
-        'total_collections' => MI_Collection::count(),
-    ];
-
-    $taxonomyCounts = [
-        'categories'     => MI_Category::count(),
-        'sub_categories' => MI_SubCategory::count(),
-        'product_types'  => MI_ProductType::count(),
-        'collections'    => MI_Collection::count(),
-    ];
-
-    $classificationBreakdown = MI_Product::selectRaw('classification, count(*) as count')
-        ->whereNotNull('classification')
-        ->groupBy('classification')
-        ->pluck('count', 'classification');
-
-    $categoryBreakdown = MI_Product::with('category')
-        ->get()
-        ->groupBy(fn ($product) => $product->category->name ?? 'Uncategorized')
-        ->map(fn ($group, $name) => [
-            'name'  => $name,
-            'count' => $group->count(),
-        ])
-        ->values()
-        ->sortByDesc('count')
-        ->take(8)
-        ->values();
-
-    $recentProducts = MI_Product::with('category')
-        ->latest()
-        ->take(8)
-        ->get();
-
-    return view('mi_app.designer_module.dashboard', compact(
-        'stats',
-        'taxonomyCounts',
-        'classificationBreakdown',
-        'categoryBreakdown',
-        'recentProducts'
-    ));
-}
     public function create()
     {
-        $categories    = MI_Category::orderBy('name')->get();
+        $categories = MI_Category::orderBy('name')->get();
         $subCategories = MI_SubCategory::orderBy('name')->get();
-        $productTypes  = MI_ProductType::orderBy('name')->get();
-        $collections   = MI_Collection::orderBy('name')->get();
+        $productTypes = MI_ProductType::orderBy('name')->get();
+        $collections = MI_Collection::orderBy('name')->get();
 
         return view('mi_app.designer_module.create', compact(
             'categories',
@@ -138,6 +146,7 @@ public function dashboard()
             'collections'
         ));
     }
+
     public function settings()
     {
         $categories = MI_Category::orderBy('name')->get();
@@ -158,6 +167,7 @@ public function dashboard()
             'materials'
         ));
     }
+
     public function setting_store(Request $request)
     {
         DB::beginTransaction();
@@ -178,41 +188,41 @@ public function dashboard()
                     ]);
 
                     MI_Category::create([
-                        'code'        => $this->generateUniqueCode(MI_Category::class, $request->category_name),
-                        'name'        => $request->category_name,
+                        'code' => $this->generateUniqueCode(MI_Category::class, $request->category_name),
+                        'name' => $request->category_name,
                         'description' => $request->description,
-                        'is_active'   => true,
+                        'is_active' => true,
                     ]);
 
                     break;
 
-                /*
-                |--------------------------------------------------------------------------
-                | Sub Category
-                |--------------------------------------------------------------------------
-                */
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Sub Category
+                    |--------------------------------------------------------------------------
+                    */
                 case 'sub_category':
 
                     $request->validate([
-                        'category_id'      => 'required|exists:mi_categories,id',
-                        'sub_category_name'=> 'required|string|max:255',
+                        'category_id' => 'required|exists:mi_categories,id',
+                        'sub_category_name' => 'required|string|max:255',
                     ]);
 
                     MI_SubCategory::create([
                         'category_id' => $request->category_id,
-                        'code'        => $this->generateUniqueCode(MI_SubCategory::class, $request->sub_category_name),
-                        'name'        => $request->sub_category_name,
+                        'code' => $this->generateUniqueCode(MI_SubCategory::class, $request->sub_category_name),
+                        'name' => $request->sub_category_name,
                         'description' => $request->description,
-                        'is_active'   => true,
+                        'is_active' => true,
                     ]);
 
                     break;
 
-                /*
-                |--------------------------------------------------------------------------
-                | Product Type
-                |--------------------------------------------------------------------------
-                */
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Product Type
+                    |--------------------------------------------------------------------------
+                    */
                 case 'product_type':
 
                     $request->validate([
@@ -226,18 +236,18 @@ public function dashboard()
                             MI_ProductType::class,
                             $request->product_type_name
                         ),
-                        'name'            => $request->product_type_name,
-                        'description'     => $request->description,
-                        'is_active'       => true,
+                        'name' => $request->product_type_name,
+                        'description' => $request->description,
+                        'is_active' => true,
                     ]);
 
                     break;
 
-                /*
-                |--------------------------------------------------------------------------
-                | Collection
-                |--------------------------------------------------------------------------
-                */
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Collection
+                    |--------------------------------------------------------------------------
+                    */
                 case 'collection':
 
                     $request->validate([
@@ -247,19 +257,19 @@ public function dashboard()
 
                     MI_Collection::create([
                         'product_type_id' => $request->product_type_id,
-                        'code'        => $this->generateUniqueCode(MI_Collection::class, $request->collection_name),
-                        'name'            => $request->collection_name,
-                        'description'     => $request->description,
-                        'is_active'       => true,
+                        'code' => $this->generateUniqueCode(MI_Collection::class, $request->collection_name),
+                        'name' => $request->collection_name,
+                        'description' => $request->description,
+                        'is_active' => true,
                     ]);
 
                     break;
 
-                /*
-                |--------------------------------------------------------------------------
-                | Material
-                |--------------------------------------------------------------------------
-                */
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Material
+                    |--------------------------------------------------------------------------
+                    */
                 case 'material':
 
                     $request->validate([
@@ -268,14 +278,14 @@ public function dashboard()
 
                     MI_Material::create([
                         'material_name' => $request->material_name,
-                        'is_active'     => true,
+                        'is_active' => true,
                     ]);
 
                     break;
 
                 default:
                     return back()->withErrors([
-                        'entity_type' => 'Invalid request.'
+                        'entity_type' => 'Invalid request.',
                     ]);
             }
 
@@ -290,13 +300,14 @@ public function dashboard()
             return back()
                 ->withInput()
                 ->withErrors([
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
         }
     }
+
     private function normalizeArrayInput($value): array
     {
-        if (!is_array($value)) {
+        if (! is_array($value)) {
             $value = $value ? [$value] : [];
         }
 
@@ -325,7 +336,7 @@ public function dashboard()
         $prefix = substr($base, 0, 2);
         $n = 1;
         do {
-            $candidate = $prefix . $n;
+            $candidate = $prefix.$n;
             $n++;
         } while ($model::where('code', $candidate)->exists());
 
@@ -341,12 +352,12 @@ public function dashboard()
      *
      * @throws \RuntimeException
      */
-    private function storeUploadedFile(\Illuminate\Http\UploadedFile $file, string $directory, string $disk = 'public'): string
+    private function storeUploadedFile(UploadedFile $file, string $directory, string $disk = 'public'): string
     {
-        if (!$file->isValid()) {
+        if (! $file->isValid()) {
             throw new \RuntimeException(
-                'Upload failed for "' . $file->getClientOriginalName()
-                . '" (error code: ' . $file->getError() . '). Please try uploading the file again.'
+                'Upload failed for "'.$file->getClientOriginalName()
+                .'" (error code: '.$file->getError().'). Please try uploading the file again.'
             );
         }
 
@@ -354,7 +365,7 @@ public function dashboard()
 
         if ($path === false || $path === null || $path === '') {
             throw new \RuntimeException(
-                'Failed to save uploaded file "' . $file->getClientOriginalName() . '" to storage. Please try again.'
+                'Failed to save uploaded file "'.$file->getClientOriginalName().'" to storage. Please try again.'
             );
         }
 
@@ -380,7 +391,7 @@ public function dashboard()
 
             // Taxonomy
             'category_id' => 'required|integer|exists:mi_categories,id',
-            'sub_category_id' => 'nullable|integer|exists:mi_sub_categories,id',
+            'sub_category_id' => 'required|integer|exists:mi_sub_categories,id',
             'product_type_id' => 'nullable|integer|exists:mi_product_types,id',
             'collection_id' => 'nullable|integer|exists:mi_collections,id',
 
@@ -419,6 +430,7 @@ public function dashboard()
             'image_links.*' => 'nullable|url|max:1000',
         ]);
 
+        $this->validateProductTaxonomy($validated);
         $uploadedPaths = [];
 
         // Save arrays as JSON
@@ -431,749 +443,361 @@ public function dashboard()
 
         try {
 
-        $product = MI_Product::create($validated);
+            $product = MI_Product::create($validated);
 
-        if ($request->image_links) {
-            foreach ($request->image_links as $index => $url) {
-                if (!empty($url)) {
-                    MI_Product_Image::create([
-                        'product_id' => $product->product_id,
-                        'image_type' => 'url',
-                        'image_url' => $url,
-                        'is_primary' => $index == 0,
-                        'sort_order' => $index,
-                    ]);
-                }
-            }
-        }
-
-        if ($request->hasFile('product_images')) {
-            foreach ($request->file('product_images') as $index => $file) {
-
-                // Throws \RuntimeException if the upload is invalid or the
-                // storage write fails — caught below, which rolls back the
-                // DB transaction and cleans up any files already stored.
-                $path = $this->storeUploadedFile($file, 'product_images');
-
-                $uploadedPaths[] = $path;
-
-                MI_Product_Image::create([
-                    'product_id' => $product->product_id,
-                    'image_type' => 'upload',
-                    'image_path' => $path,
-                    'is_primary' => empty($request->image_links) && $index == 0,
-                    'sort_order' => $index,
-                ]);
-            }
-        }
-        /*
-        |--------------------------------------------------------------------------
-        | Convert Google Drive Image Link
-        |--------------------------------------------------------------------------
-        */
-
-        /*
-        |--------------------------------------------------------------------------
-        | Auto Generate Draft Number
-        |--------------------------------------------------------------------------
-        */
-
-        $product->draft_number = 'DR-' 
-            . date('Y') 
-            . '-' 
-            . str_pad($product->product_id, 4, '0', STR_PAD_LEFT);
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Auto Generate SKU
-        |--------------------------------------------------------------------------
-        | Example:
-        | HD-IN-AAL-0001
-        |
-        | Category Code
-        | Sub Category Code
-        | Collection Code
-        | Sequence
-        |--------------------------------------------------------------------------
-        */
-
-        $category = MI_Category::find($product->category_id);
-
-        $subCategory = MI_SubCategory::find($product->sub_category_id);
-
-        $subsubCategory = MI_ProductType::find($product->product_type_id);
-
-        $collection = MI_Collection::find($product->collection_id);
-
-
-        $categoryCode = strtoupper(
-            substr($category->code ?? 'GEN', 0, 2)
-        );
-
-
-        $subCategoryCode = strtoupper(
-            substr($subCategory->code ?? 'XX', 0, 2)
-        );
-
-        $subsubCategory = strtoupper(
-            substr($subsubCategory->code ?? 'XX', 0, 2)
-        );
-
-        $collectionCode = strtoupper(
-            substr($collection->code ?? 'XXX', 0, 3)
-        );
-
-
-        $product->sku =
-            $categoryCode
-            . '-'
-            . $subCategoryCode
-            . '-'
-            . $collectionCode
-            . '-'
-            . $subsubCategory
-            . '-'
-            . str_pad($product->product_id, 4, '0', STR_PAD_LEFT);
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Save Generated Values
-        |--------------------------------------------------------------------------
-        */
-
-        $product->save();
-
-
-        DB::commit();
-
-                    return redirect()
-                        ->route('mi_app.index')
-                        ->with('success', 'Product saved successfully!');
-
-                } catch (\Throwable $e) {
-
-                    DB::rollBack();
-
-                    foreach ($uploadedPaths as $path) {
-                        if (!empty($path)) {
-                            Storage::disk('public')->delete($path);
-                        }
-                    }
-
-                    Log::error('Product save failed: ' . $e->getMessage(), [
-                        'exception' => $e,
-                        'input' => $request->except('product_images'),
-                    ]);
-
-                    $errorMessage = $e->getMessage() ?: 'Something went wrong while saving the product. Please try again or contact support.';
-
-                    return back()
-                        ->withInput()
-                        ->withErrors([
-                            'error' => $errorMessage,
-                        ])
-                        ->with('error', $errorMessage);
-                }
-    }
-
-    public function edit($id)
-    {
-        $product = MI_Product::with([
-            'category',
-            'subCategory',
-            'productType',
-            'collection',
-            'images',
-        ])->findOrFail($id);
-    
-        $categories = MI_Category::orderBy('name')->get();
-    
-        $subCategories = MI_SubCategory::orderBy('name')->get();
-    
-        $productTypes = MI_ProductType::orderBy('name')->get();
-    
-        $collections = MI_Collection::orderBy('name')->get();
-    
-        return view('mi_app.designer_module.edit', compact(
-            'product',
-            'categories',
-            'subCategories',
-            'productTypes',
-            'collections'
-        ));
-    }
-
-    public function update(Request $request, $id)
-    {
-        $product = MI_Product::with('images')->findOrFail($id);
-
-        // Uploaded files stored on disk during this request, tracked here
-        // so they can be cleaned up if anything fails after they're written.
-        $uploadedPaths = [];
-
-        try {
-    
-            /*
-            |--------------------------------------------------------------------------
-            | 1. CLEAN IMAGE LINKS BEFORE VALIDATION
-            |--------------------------------------------------------------------------
-            */
-    
-            $imageLinks = collect($request->input('image_links', []))
-                ->map(fn ($value) => trim((string) $value))
-                ->filter(fn ($value) => $value !== '')
-                ->values()
-                ->all();
-    
-            $request->merge([
-                'image_links' => $imageLinks,
-            ]);
-    
-    
-            /*
-            |--------------------------------------------------------------------------
-            | 2. VALIDATE
-            |--------------------------------------------------------------------------
-            */
-    
-            $validated = $request->validate([
-    
-                // General
-                'item_name' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-    
-                'type_of_sample' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-    
-                'designed_by' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Taxonomy
-                |--------------------------------------------------------------------------
-                */
-    
-                'category_id' => [
-                    'required',
-                    'integer',
-                    'exists:mi_categories,id',
-                ],
-    
-                'sub_category_id' => [
-                    'nullable',
-                    'integer',
-                    'exists:mi_sub_categories,id',
-                ],
-    
-                'product_type_id' => [
-                    'nullable',
-                    'integer',
-                    'exists:mi_product_types,id',
-                ],
-    
-                'collection_id' => [
-                    'nullable',
-                    'integer',
-                    'exists:mi_collections,id',
-                ],
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Materials / Colors
-                |--------------------------------------------------------------------------
-                */
-    
-                'materials' => [
-                    'required',
-                    'array',
-                    'min:1',
-                ],
-    
-                'materials.*' => [
-                    'string',
-                    'max:255',
-                ],
-    
-                'color' => [
-                    'nullable',
-                    'array',
-                ],
-    
-                'color.*' => [
-                    'string',
-                    'max:255',
-                ],
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Product Dimensions
-                |--------------------------------------------------------------------------
-                */
-    
-                'product_height' => [
-                    'required',
-                    'numeric',
-                    'min:0',
-                ],
-    
-                'product_width' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-    
-                'product_length' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-    
-                'product_depth' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Carton Dimensions
-                |--------------------------------------------------------------------------
-                */
-    
-                'carton_height' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-    
-                'carton_width' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-    
-                'carton_length' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-    
-                'carton_depth' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Price
-                |--------------------------------------------------------------------------
-                */
-    
-                'price' => [
-                    'required',
-                    'numeric',
-                    'min:0',
-                ],
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Image Links
-                |--------------------------------------------------------------------------
-                */
-    
-                'image_links' => [
-                    'nullable',
-                    'array',
-                ],
-    
-                'image_links.*' => [
-                    'nullable',
-                    'url',
-                    'max:1000',
-                ],
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Uploaded Files
-                |--------------------------------------------------------------------------
-                */
-    
-                'product_images' => [
-                    'nullable',
-                    'array',
-                ],
-    
-                'product_images.*' => [
-                    'file',
-                    'mimes:jpeg,png,jpg,webp,pdf,obj,stl',
-                    'max:20480',
-                ],
-
-                /*
-                |--------------------------------------------------------------------------
-                | Existing Images Marked For Removal
-                |--------------------------------------------------------------------------
-                */
-
-                'remove_image_ids' => [
-                    'nullable',
-                    'array',
-                ],
-
-                'remove_image_ids.*' => [
-                    'integer',
-                    'exists:mi_product_images,id',
-                ],
-            ]);
-    
-    
-            /*
-            |--------------------------------------------------------------------------
-            | 3. NORMALIZE JSON FIELDS
-            |--------------------------------------------------------------------------
-            */
-    
-            $validated['materials'] = $this->normalizeArrayInput(
-                $request->input('materials', [])
-            );
-    
-            $validated['color'] = $this->normalizeArrayInput(
-                $request->input('color', [])
-            );
-    
-            $validated['image_links'] = $imageLinks;
-    
-    
-            /*
-            |--------------------------------------------------------------------------
-            | 4. VERIFY TAXONOMY HIERARCHY
-            |--------------------------------------------------------------------------
-            */
-    
-            if (!empty($validated['sub_category_id'])) {
-    
-                $subCategory = MI_SubCategory::findOrFail(
-                    $validated['sub_category_id']
-                );
-    
-                if ((int) $subCategory->category_id !== (int) $validated['category_id']) {
-                    throw ValidationException::withMessages([
-                        'sub_category_id' =>
-                            'The selected sub category does not belong to the selected category.',
-                    ]);
-                }
-            }
-    
-    
-            if (!empty($validated['product_type_id'])) {
-    
-                if (empty($validated['sub_category_id'])) {
-                    throw ValidationException::withMessages([
-                        'product_type_id' =>
-                            'Please select a sub category first.',
-                    ]);
-                }
-    
-                $productType = MI_ProductType::findOrFail(
-                    $validated['product_type_id']
-                );
-    
-                if (
-                    (int) $productType->sub_category_id !==
-                    (int) $validated['sub_category_id']
-                ) {
-                    throw ValidationException::withMessages([
-                        'product_type_id' =>
-                            'The selected sub sub category does not belong to the selected sub category.',
-                    ]);
-                }
-            }
-    
-    
-            if (!empty($validated['collection_id'])) {
-    
-                if (empty($validated['product_type_id'])) {
-                    throw ValidationException::withMessages([
-                        'collection_id' =>
-                            'Please select a sub sub category first.',
-                    ]);
-                }
-    
-                $collection = MI_Collection::findOrFail(
-                    $validated['collection_id']
-                );
-    
-                if (
-                    (int) $collection->product_type_id !==
-                    (int) $validated['product_type_id']
-                ) {
-                    throw ValidationException::withMessages([
-                        'collection_id' =>
-                            'The selected collection does not belong to the selected sub sub category.',
-                    ]);
-                }
-            }
-    
-    
-            /*
-            |--------------------------------------------------------------------------
-            | 5. HANDLE DATABASE + FILE RECORDS IN TRANSACTION
-            |--------------------------------------------------------------------------
-            */
-    
-            DB::transaction(function () use (
-                $product,
-                $validated,
-                $request,
-                &$uploadedPaths
-            ) {
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Update Product
-                |--------------------------------------------------------------------------
-                */
-    
-                $product->update([
-                    'item_name'       => $validated['item_name'],
-                    'category_id'     => $validated['category_id'],
-                    'sub_category_id' => $validated['sub_category_id'] ?? null,
-                    'product_type_id' => $validated['product_type_id'] ?? null,
-                    'collection_id'   => $validated['collection_id'] ?? null,
-    
-                    'type_of_sample'  => $validated['type_of_sample'],
-                    'designed_by'     => $validated['designed_by'] ?? null,
-    
-                    'materials'       => $validated['materials'],
-                    'color'           => $validated['color'],
-    
-                    'product_height'  => $validated['product_height'],
-                    'product_width'   => $validated['product_width'] ?? null,
-                    'product_length'  => $validated['product_length'] ?? null,
-                    'product_depth'   => $validated['product_depth'] ?? null,
-    
-                    'carton_height'   => $validated['carton_height'] ?? null,
-                    'carton_width'    => $validated['carton_width'] ?? null,
-                    'carton_length'   => $validated['carton_length'] ?? null,
-                    'carton_depth'    => $validated['carton_depth'] ?? null,
-    
-                    'price'           => $validated['price'],
-                ]);
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Validate New Uploads BEFORE Deleting Old Images
-                |--------------------------------------------------------------------------
-                | Fail fast if any new file is invalid, so we never delete the
-                | existing images unless we know the replacements are good.
-                |--------------------------------------------------------------------------
-                */
-
-                if ($request->hasFile('product_images')) {
-                    foreach ($request->file('product_images') as $file) {
-                        if (!$file->isValid()) {
-                            throw new \RuntimeException(
-                                'Upload failed for "' . $file->getClientOriginalName()
-                                . '" (error code: ' . $file->getError() . '). Please try uploading the file again.'
-                            );
-                        }
-                    }
-                }
-    
-    
-                /*
-                |--------------------------------------------------------------------------
-                | Delete Only Explicitly-Removed Uploaded Images
-                |--------------------------------------------------------------------------
-                | Existing uploaded-file images are shown as read-only
-                | previews in the form (no re-submittable input for their
-                | path), so they must be preserved unless the user clicked
-                | "Remove" on them — which populates remove_image_ids[].
-                |
-                | URL-type images ARE fully re-submitted via image_links[]
-                | text inputs on every save, so those are always replaced
-                | wholesale below, same as before.
-                |--------------------------------------------------------------------------
-                */
-
-                $removeIds = collect($request->input('remove_image_ids', []))
-                    ->map(fn ($id) => (int) $id)
-                    ->filter()
-                    ->all();
-
-                foreach ($product->images as $oldImage) {
-
-                    if ($oldImage->image_type === 'url') {
-                        $oldImage->delete();
-                        continue;
-                    }
-
-                    // image_type === 'upload'
-                    if (in_array((int) $oldImage->id, $removeIds, true)) {
-
-                        if ($oldImage->image_path) {
-                            Storage::disk('public')->delete(
-                                $oldImage->image_path
-                            );
-                        }
-
-                        $oldImage->delete();
-                    }
-
-                    // Otherwise: leave this uploaded image untouched.
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Save Image URLs
-                |--------------------------------------------------------------------------
-                */
-    
-                foreach (
-                    $validated['image_links']
-                    as $index => $url
-                ) {
-    
-                    MI_Product_Image::create([
-                        'product_id' => $product->product_id,
-                        'image_type' => 'url',
-                        'image_url' => $url,
-                        'is_primary' => $index === 0,
-                        'sort_order' => $index,
-                    ]);
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Save Uploaded Files
-                |--------------------------------------------------------------------------
-                | Sort order continues after both the URL images above and
-                | whatever uploaded images survived the removal step, so
-                | new images are appended rather than overlapping.
-                |--------------------------------------------------------------------------
-                */
-
-                if ($request->hasFile('product_images')) {
-
-                    $remainingUploadCount = $product->images()
-                        ->where('image_type', 'upload')
-                        ->whereNotIn('id', $removeIds)
-                        ->count();
-
-                    $startingSortOrder =
-                        count($validated['image_links']) + $remainingUploadCount;
-
-                    $hasAnyExistingImage =
-                        !empty($validated['image_links']) || $remainingUploadCount > 0;
-
-                    foreach (
-                        $request->file('product_images')
-                        as $index => $file
-                    ) {
-
-                        // Throws \RuntimeException if the storage write
-                        // fails — caught by the outer try/catch below,
-                        // which rolls back this whole transaction.
-                        $path = $this->storeUploadedFile($file, 'product_images');
-
-                        $uploadedPaths[] = $path;
-    
+            if ($request->image_links) {
+                foreach ($request->image_links as $index => $url) {
+                    if (! empty($url)) {
                         MI_Product_Image::create([
                             'product_id' => $product->product_id,
-                            'image_type' => 'upload',
-                            'image_path' => $path,
-    
-                            'is_primary' =>
-                                !$hasAnyExistingImage &&
-                                $index === 0,
-    
-                            'sort_order' =>
-                                $startingSortOrder + $index,
+                            'image_type' => 'url',
+                            'image_url' => $url,
+                            'is_primary' => $index == 0,
+                            'sort_order' => $index,
                         ]);
                     }
                 }
-            });
-    
-    
+            }
+
+            if ($request->hasFile('product_images')) {
+                foreach ($request->file('product_images') as $index => $file) {
+
+                    // Throws \RuntimeException if the upload is invalid or the
+                    // storage write fails — caught below, which rolls back the
+                    // DB transaction and cleans up any files already stored.
+                    $path = $this->storeUploadedFile($file, 'product_images');
+
+                    $uploadedPaths[] = $path;
+
+                    MI_Product_Image::create([
+                        'product_id' => $product->product_id,
+                        'image_type' => 'upload',
+                        'image_path' => $path,
+                        'is_primary' => empty($request->image_links) && $index == 0,
+                        'sort_order' => $index,
+                    ]);
+                }
+            }
             /*
             |--------------------------------------------------------------------------
-            | 6. SUCCESS
+            | Convert Google Drive Image Link
             |--------------------------------------------------------------------------
             */
-    
+
+            /*
+            |--------------------------------------------------------------------------
+            | Auto Generate SKU
+            |--------------------------------------------------------------------------
+            | Example:
+            | HD-IN-AAL-0001
+            |
+            | Category Code
+            | Sub Category Code
+            | Collection Code
+            | Sequence
+            |--------------------------------------------------------------------------
+            */
+
+            $category = MI_Category::find($product->category_id);
+
+            $subCategory = MI_SubCategory::find($product->sub_category_id);
+
+            $subsubCategory = MI_ProductType::find($product->product_type_id);
+
+            $collection = MI_Collection::find($product->collection_id);
+
+            $categoryCode = strtoupper(
+                substr($category->code ?? 'GEN', 0, 2)
+            );
+
+            $subCategoryCode = strtoupper(
+                substr($subCategory->code ?? 'XX', 0, 2)
+            );
+
+            $subsubCategory = strtoupper(
+                substr($subsubCategory->code ?? 'XX', 0, 2)
+            );
+
+            $collectionCode = strtoupper(
+                substr($collection->code ?? 'XXX', 0, 3)
+            );
+
+            $product->sku =
+                $categoryCode
+                .'-'
+                .$subCategoryCode
+                .'-'
+                .$collectionCode
+                .'-'
+                .$subsubCategory
+                .'-'
+                .str_pad($product->product_id, 4, '0', STR_PAD_LEFT);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Save Generated Values
+            |--------------------------------------------------------------------------
+            */
+
+            $product->save();
+
+            DB::commit();
+
             return redirect()
                 ->route('mi_app.index')
-                ->with(
-                    'success',
-                    'Product updated successfully!'
-                );
-    
-    
-        } catch (ValidationException $e) {
+                ->with('success', 'Product saved successfully!');
 
-            foreach ($uploadedPaths as $path) {
-                if (!empty($path)) {
-                    Storage::disk('public')->delete($path);
-                }
-            }
-
-            throw $e;
-    
-    
         } catch (\Throwable $e) {
 
+            DB::rollBack();
+
             foreach ($uploadedPaths as $path) {
-                if (!empty($path)) {
+                if (! empty($path)) {
                     Storage::disk('public')->delete($path);
                 }
             }
-    
-            Log::error(
-                'Product update failed',
-                [
-                    'message' => $e->getMessage(),
-                    'exception' => $e,
-                    'product_id' => $id,
-                ]
-            );
-    
+
+            Log::error('Product save failed: '.$e->getMessage(), [
+                'exception' => $e,
+                'input' => $request->except('product_images'),
+            ]);
+
+            $errorMessage = $e->getMessage() ?: 'Something went wrong while saving the product. Please try again or contact support.';
+
             return back()
                 ->withInput()
                 ->withErrors([
-                    'error' => $e->getMessage()
-                        ?: 'Something went wrong while updating the product.',
+                    'error' => $errorMessage,
                 ])
-                ->with('error', $e->getMessage());
+                ->with('error', $errorMessage);
         }
     }
 
-    public function destroy($id) 
+    public function edit(MI_Product $product): View
+    {
+        $product->load(['category', 'subCategory', 'productType', 'collection', 'images']);
+        $categories = MI_Category::orderBy('name')->get();
+        $subCategories = MI_SubCategory::orderBy('name')->get();
+        $productTypes = MI_ProductType::orderBy('name')->get();
+        $collections = MI_Collection::orderBy('name')->get();
+
+        return view('mi_app.designer_module.edit', compact('product', 'categories', 'subCategories', 'productTypes', 'collections'));
+    }
+
+    public function update(Request $request, MI_Product $product): RedirectResponse
+    {
+        $ownedImage = Rule::exists('mi_product_images', 'id')->where('product_id', $product->getKey());
+        $rules = [
+            'item_name' => 'required|string|max:255',
+            'item_code' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('mi_products', 'item_code')->ignore($product)],
+            'description' => 'sometimes|nullable|string|max:20000',
+            'type_of_sample' => 'required|string|max:255',
+            'designed_by' => 'sometimes|nullable|string|max:255',
+            'category_id' => 'required|integer|exists:mi_categories,id',
+            'sub_category_id' => 'sometimes|required|integer|exists:mi_sub_categories,id',
+            'product_type_id' => 'sometimes|nullable|integer|exists:mi_product_types,id',
+            'collection_id' => 'sometimes|nullable|integer|exists:mi_collections,id',
+            'materials' => 'required|array|min:1|max:100',
+            'materials.*' => 'required|string|max:255',
+            'color' => 'sometimes|nullable|array|max:100',
+            'color.*' => 'required|string|max:255',
+            'type' => 'sometimes|nullable|string|max:255',
+            'price' => 'sometimes|nullable|numeric|min:0|max:9999999999.99',
+            'purchase_cost' => 'sometimes|nullable|numeric|min:0|max:9999999999.99',
+            'image_links' => 'nullable|array|max:30',
+            'image_links.*' => 'nullable|url:http,https|max:1000',
+            'product_images' => 'nullable|array|max:30',
+            'product_images.*' => 'file|image|mimes:jpeg,png,jpg,webp|max:20480',
+            'remove_image_ids' => 'nullable|array|max:100',
+            'remove_image_ids.*' => ['integer', 'distinct', $ownedImage],
+            'primary_image_id' => ['nullable', 'integer', $ownedImage],
+            'image_order' => 'nullable|array|max:100',
+            'image_order.*' => ['integer', 'distinct', $ownedImage],
+        ];
+        foreach (['product', 'carton'] as $prefix) {
+            foreach (['height', 'width', 'length', 'depth'] as $dimension) {
+                $rules[$prefix.'_'.$dimension] = 'sometimes|nullable|numeric|min:0|max:99999999.99';
+            }
+        }
+        $validated = $request->validate($rules);
+        $removeIds = array_map('intval', $validated['remove_image_ids'] ?? []);
+        if (in_array((int) ($validated['primary_image_id'] ?? 0), $removeIds, true)) {
+            throw ValidationException::withMessages(['primary_image_id' => 'Select an image that is not marked for removal.']);
+        }
+        $controls = ['image_links', 'product_images', 'remove_image_ids', 'primary_image_id', 'image_order'];
+        $attributes = Arr::except($validated, $controls);
+        $attributes['materials'] = $this->normalizeArrayInput($attributes['materials']);
+        if (array_key_exists('color', $attributes)) {
+            $attributes['color'] = $this->normalizeArrayInput($attributes['color']);
+        }
+        $uploadedPaths = [];
+        $removedPaths = [];
+
+        try {
+            DB::transaction(function () use ($product, $attributes, $validated, $request, $removeIds, &$uploadedPaths, &$removedPaths): void {
+                $lockedProduct = MI_Product::whereKey($product->getKey())->lockForUpdate()->firstOrFail();
+                $validatedTaxonomy = array_replace($lockedProduct->only(['category_id', 'sub_category_id', 'product_type_id', 'collection_id']), $attributes);
+                $this->validateProductTaxonomy($validatedTaxonomy);
+                $lockedProduct->fill($attributes)->save();
+                $images = $lockedProduct->images()->lockForUpdate()->get();
+                $imageIds = $images->modelKeys();
+                $submittedIds = array_merge($removeIds, $validated['image_order'] ?? [], isset($validated['primary_image_id']) ? [$validated['primary_image_id']] : []);
+                foreach ($submittedIds as $imageId) {
+                    if (! in_array((int) $imageId, $imageIds, true)) {
+                        throw ValidationException::withMessages(['images' => 'An image has changed since this form was opened. Reload and try again.']);
+                    }
+                }
+                foreach ($images as $image) {
+                    if (in_array($image->getKey(), $removeIds, true)) {
+                        if ($image->image_type === 'upload' && $image->image_path) {
+                            $removedPaths[] = $image->image_path;
+                        }
+                        $image->delete();
+                    }
+                }
+                $images = $images->reject(fn (MI_Product_Image $image): bool => in_array($image->getKey(), $removeIds, true))->values();
+                $nextOrder = (int) ($images->max('sort_order') ?? -1) + 1;
+                foreach ($validated['image_links'] ?? [] as $url) {
+                    if (! $url || $images->contains('image_url', $url)) {
+                        continue;
+                    }
+                    $images->push($lockedProduct->images()->create([
+                        'image_type' => 'url', 'image_url' => $url, 'is_primary' => false, 'sort_order' => $nextOrder++,
+                    ]));
+                }
+                foreach ($request->file('product_images', []) as $file) {
+                    $path = $this->storeUploadedFile($file, 'product_images');
+                    $uploadedPaths[] = $path;
+                    $images->push($lockedProduct->images()->create([
+                        'image_type' => 'upload', 'image_path' => $path, 'is_primary' => false, 'sort_order' => $nextOrder++,
+                    ]));
+                }
+                if (! empty($validated['image_order'])) {
+                    $order = array_map('intval', $validated['image_order']);
+                    $images = $images->sortBy(fn (MI_Product_Image $image): int => ($position = array_search($image->getKey(), $order, true)) === false ? count($order) + $image->sort_order : $position)->values();
+                    foreach ($images as $position => $image) {
+                        $image->sort_order = $position;
+                        $image->save();
+                    }
+                }
+                $primaryId = $validated['primary_image_id'] ?? $images->firstWhere('is_primary', true)?->getKey() ?? $images->first()?->getKey();
+                $lockedProduct->images()->update(['is_primary' => false]);
+                if ($primaryId !== null) {
+                    $lockedProduct->images()->whereKey($primaryId)->update(['is_primary' => true]);
+                }
+                DB::afterCommit(function () use ($removedPaths): void {
+                    $this->deleteProductImageFiles($removedPaths);
+                });
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            $this->deleteProductImageFiles($uploadedPaths);
+            throw ValidationException::withMessages(['item_code' => 'The item code has already been taken.']);
+        } catch (ValidationException $exception) {
+            $this->deleteProductImageFiles($uploadedPaths);
+            throw $exception;
+        } catch (\Throwable $exception) {
+            $this->deleteProductImageFiles($uploadedPaths);
+            report($exception);
+
+            return back()->withInput()->withErrors(['error' => 'Unable to save the product. Your existing data has been preserved. Please try again.']);
+        }
+
+        return redirect()->route('mi_app.edit', $product)->with('success', 'Product updated successfully!');
+    }
+
+    /** @param array<string, mixed> $validated */
+    private function validateProductTaxonomy(array $validated): void
+    {
+        if (! empty($validated['sub_category_id'])) {
+
+            $subCategory = MI_SubCategory::findOrFail(
+                $validated['sub_category_id']
+            );
+
+            if ((int) $subCategory->category_id !== (int) $validated['category_id']) {
+                throw ValidationException::withMessages([
+                    'sub_category_id' => 'The selected sub category does not belong to the selected category.',
+                ]);
+            }
+        }
+
+        if (! empty($validated['product_type_id'])) {
+
+            if (empty($validated['sub_category_id'])) {
+                throw ValidationException::withMessages([
+                    'product_type_id' => 'Please select a sub category first.',
+                ]);
+            }
+
+            $productType = MI_ProductType::findOrFail(
+                $validated['product_type_id']
+            );
+
+            if (
+                (int) $productType->sub_category_id !==
+                (int) $validated['sub_category_id']
+            ) {
+                throw ValidationException::withMessages([
+                    'product_type_id' => 'The selected sub sub category does not belong to the selected sub category.',
+                ]);
+            }
+        }
+
+        if (! empty($validated['collection_id'])) {
+
+            if (empty($validated['product_type_id'])) {
+                throw ValidationException::withMessages([
+                    'collection_id' => 'Please select a sub sub category first.',
+                ]);
+            }
+
+            $collection = MI_Collection::findOrFail(
+                $validated['collection_id']
+            );
+
+            if (
+                (int) $collection->product_type_id !==
+                (int) $validated['product_type_id']
+            ) {
+                throw ValidationException::withMessages([
+                    'collection_id' => 'The selected collection does not belong to the selected sub sub category.',
+                ]);
+            }
+        }
+
+    }
+
+    /** @param list<string> $paths */
+    private function deleteProductImageFiles(array $paths): void
+    {
+        foreach (array_unique($paths) as $path) {
+            try {
+                if (! str_starts_with($path, 'product_images/') || str_contains($path, '..') || str_contains($path, '\\')) {
+                    continue;
+                }
+                if (MI_Product_Image::where('image_path', $path)->exists() || MI_Product::where('product_file', $path)->exists()) {
+                    continue;
+                }
+                if (! Storage::disk('public')->delete($path)) {
+                    Log::warning('Unable to delete unused MI product image', ['path' => $path]);
+                }
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+    }
+
+    public function destroy($id)
     {
         $product = MI_Product::findOrFail($id);
-        
+
         // Delete the associated file from storage to free up space
         if ($product->product_file) {
             Storage::disk('public')->delete($product->product_file);
         }
 
         $product->delete();
-        
+
         return redirect()->route('mi_app.index')->with('success', 'Product deleted successfully.');
     }
 
@@ -1184,107 +808,109 @@ public function dashboard()
             'subCategory',
             'productType',
             'collection',
+            'images',
         ]);
 
         return view('mi_app.designer_module.show', compact('product'));
     }
 
-public function taxonomy_edit($type, $id)
-{
-    switch ($type) {
-        case 'category':
-            $item = MI_Category::findOrFail($id);
-            break;
+    public function taxonomy_edit($type, $id)
+    {
+        switch ($type) {
+            case 'category':
+                $item = MI_Category::findOrFail($id);
+                break;
 
-        case 'sub_category':
-            $item = MI_SubCategory::findOrFail($id);
-            break;
+            case 'sub_category':
+                $item = MI_SubCategory::findOrFail($id);
+                break;
 
-        case 'product_type':
-            $item = MI_ProductType::findOrFail($id);
-            break;
+            case 'product_type':
+                $item = MI_ProductType::findOrFail($id);
+                break;
 
-        case 'collection':
-            $item = MI_Collection::findOrFail($id);
-            break;
+            case 'collection':
+                $item = MI_Collection::findOrFail($id);
+                break;
 
-        default:
-            abort(404, 'Invalid taxonomy type.');
+            default:
+                abort(404, 'Invalid taxonomy type.');
+        }
+
+        return view('mi_app.designer_module.taxonomy_edit', [
+            'item' => $item,
+            'entityType' => $type,
+            'categories' => MI_Category::all(),
+            'subCategories' => MI_SubCategory::all(),
+            'productTypes' => MI_ProductType::all(),
+        ]);
     }
 
-    return view('mi_app.designer_module.taxonomy_edit', [
-        'item' => $item,
-        'entityType' => $type,
-        'categories' => MI_Category::all(),
-        'subCategories' => MI_SubCategory::all(),
-        'productTypes' => MI_ProductType::all(),
-    ]);
-}
+    public function taxonomy_update(Request $request, $type, $id)
+    {
+        switch ($type) {
+            case 'category':
+                $item = MI_Category::findOrFail($id);
+                $request->validate([
+                    'name' => 'required|string|max:255|unique:mi_categories,name,'.$item->id,
+                ]);
+                break;
+            case 'sub_category':
+                $item = MI_SubCategory::findOrFail($id);
+                $request->validate([
+                    'name' => 'required|string|max:255|unique:mi_sub_categories,name,'.$item->id,
+                ]);
+                break;
+            case 'product_type':
+                $item = MI_ProductType::findOrFail($id);
+                $request->validate([
+                    'name' => 'required|string|max:255|unique:mi_product_types,name,'.$item->id,
+                ]);
+                break;
+            case 'collection':
+                $item = MI_Collection::findOrFail($id);
+                $request->validate([
+                    'name' => 'required|string|max:255|unique:mi_collections,name,'.$item->id,
+                ]);
+                break;
+            default:
+                abort(404, 'Invalid taxonomy type.');
+        }
 
-public function taxonomy_update(Request $request, $type, $id)
-{
-    switch ($type) {
-        case 'category':
-            $item = MI_Category::findOrFail($id);
-            $request->validate([
-                'name' => 'required|string|max:255|unique:mi_categories,name,' . $item->id,
-            ]);
-            break;
-        case 'sub_category':
-            $item = MI_SubCategory::findOrFail($id);
-            $request->validate([
-                'name' => 'required|string|max:255|unique:mi_sub_categories,name,' . $item->id,
-            ]);
-            break;
-        case 'product_type':
-            $item = MI_ProductType::findOrFail($id);
-            $request->validate([
-                'name' => 'required|string|max:255|unique:mi_product_types,name,' . $item->id,
-            ]);
-            break;
-        case 'collection':
-            $item = MI_Collection::findOrFail($id);
-            $request->validate([
-                'name' => 'required|string|max:255|unique:mi_collections,name,' . $item->id,
-            ]);
-            break;
-        default:
-            abort(404, 'Invalid taxonomy type.');
+        $item->update($request->only('name', 'description'));
+
+        return redirect()
+            ->route('mi_app.settings')
+            ->with('success', ucfirst(str_replace('_', ' ', $type)).' updated successfully.');
     }
 
-    $item->update($request->only('name', 'description'));
+    public function taxonomy_destroy($type, $product)
+    {
+        switch ($type) {
 
-    return redirect()
-        ->route('mi_app.settings')
-        ->with('success', ucfirst(str_replace('_', ' ', $type)) . ' updated successfully.');
-}
-public function taxonomy_destroy($type, $product)
-{
-    switch ($type) {
+            case 'category':
+                $item = MI_Category::findOrFail($product);
+                break;
 
-        case 'category':
-            $item = MI_Category::findOrFail($product);
-            break;
+            case 'sub_category':
+                $item = MI_SubCategory::findOrFail($product);
+                break;
 
-        case 'sub_category':
-            $item = MI_SubCategory::findOrFail($product);
-            break;
+            case 'product_type':
+                $item = MI_ProductType::findOrFail($product);
+                break;
 
-        case 'product_type':
-            $item = MI_ProductType::findOrFail($product);
-            break;
+            case 'collection':
+                $item = MI_Collection::findOrFail($product);
+                break;
 
-        case 'collection':
-            $item = MI_Collection::findOrFail($product);
-            break;
+            default:
+                abort(404);
+        }
 
-        default:
-            abort(404);
+        $item->delete();
+
+        return redirect()->route('mi_app.settings')
+            ->with('success', 'Deleted successfully.');
     }
-
-    $item->delete();
-
-    return redirect()->route('mi_app.settings')
-        ->with('success', 'Deleted successfully.');
-}
 }

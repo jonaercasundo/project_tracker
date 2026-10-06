@@ -42,6 +42,7 @@
         |--------------------------------------------------------------------------
         */
         $images = ($product->images ?? collect())
+            ->sortByDesc('is_primary')
             ->map(function ($image) use ($convertImageUrl) {
                 return [
                     'title' => $image->image_type === 'upload'

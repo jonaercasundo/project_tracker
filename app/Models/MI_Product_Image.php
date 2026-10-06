@@ -3,12 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MI_Product_Image extends Model
 {
-
     protected $table = 'mi_product_images';
-
 
     protected $fillable = [
         'product_id',
@@ -16,11 +15,12 @@ class MI_Product_Image extends Model
         'image_path',
         'image_url',
         'is_primary',
-        'sort_order'
+        'sort_order',
     ];
 
+    protected $casts = ['is_primary' => 'boolean', 'sort_order' => 'integer'];
 
-    public function product()
+    public function product(): BelongsTo
     {
         return $this->belongsTo(
             MI_Product::class,
@@ -28,5 +28,4 @@ class MI_Product_Image extends Model
             'product_id'
         );
     }
-
 }

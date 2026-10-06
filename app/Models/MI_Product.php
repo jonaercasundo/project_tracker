@@ -2,12 +2,19 @@
 
 namespace App\Models;
 
+use Database\Factories\MIProductFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MI_Product extends Model
 {
     use HasFactory;
+
+    protected static function newFactory(): MIProductFactory
+    {
+        return MIProductFactory::new();
+    }
 
     protected $table = 'mi_products';
 
@@ -16,6 +23,7 @@ class MI_Product extends Model
     protected $fillable = [
 
         'item_name',
+        'item_code',
         'description',
 
         'category_id',
@@ -66,6 +74,17 @@ class MI_Product extends Model
         'purchase_cost' => 'decimal:2',
 
     ];
+
+    public function getDraftNumberAttribute(mixed $value): ?string
+    {
+        if ($value !== null) {
+            return (string) $value;
+        }
+
+        return $this->exists
+            ? 'DR-'.($this->created_at?->format('Y') ?? now()->format('Y')).'-'.str_pad((string) $this->getKey(), 4, '0', STR_PAD_LEFT)
+            : null;
+    }
 
     public function getMaterialsAttribute($value)
     {
@@ -119,7 +138,7 @@ class MI_Product extends Model
 
     private function encodeArrayAttribute($value): string
     {
-        if (!is_array($value)) {
+        if (! is_array($value)) {
             $value = $value ? [$value] : [];
         }
 
@@ -163,13 +182,14 @@ class MI_Product extends Model
     {
         return $this->belongsTo(MI_Collection::class);
     }
-    public function images()
+
+    public function images(): HasMany
     {
         return $this->hasMany(
             MI_Product_Image::class,
             'product_id',
             'product_id'
         )
-        ->orderBy('sort_order');
+            ->orderBy('sort_order')->orderBy('id');
     }
 }

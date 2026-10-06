@@ -492,7 +492,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/mi/store', [MIAppController::class, 'store'])->name('mi_app.store_1');
         Route::get('/mi/{product}', [MIAppController::class, 'show'])->name('mi_app.show');
         Route::get('/mi/{product}/edit', [MIAppController::class, 'edit'])->name('mi_app.edit');
-        Route::put('/mi/{product}', [MIAppController::class, 'update'])->name('mi_app.update');
+        Route::match(['put', 'patch'], '/mi/{product}', [MIAppController::class, 'update'])->name('mi_app.update');
         Route::delete('/mi/{product}', [MIAppController::class, 'destroy'])->name('mi_app.destroy');
         Route::get('/taxonomy/{type}/{product}/edit', [MIAppController::class, 'taxonomy_edit'])->name('taxonomy.edit');
         Route::put('/taxonomy/{type}/{product}', [MIAppController::class, 'taxonomy_update'])->name('taxonomy.update');

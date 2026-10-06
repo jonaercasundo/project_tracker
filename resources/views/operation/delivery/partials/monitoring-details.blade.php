@@ -1,7 +1,7 @@
 <div class="flex flex-wrap items-center gap-3">
     <label class="text-xs font-semibold text-slate-600">Records
         <select data-detail-section class="ml-2 rounded border-slate-300 text-xs">
-            @foreach(['warehouse' => 'Warehouse items', 'dr' => 'DR receipts', 'stock-out' => 'Stock Out transactions', 'delivered' => 'Delivered packages', 'billing' => 'Billing records'] as $value => $label)
+            @foreach(['warehouse' => 'Warehouse items', 'dr' => 'DR receipts', 'stock-out' => 'Stock Out transactions', 'delivered' => 'Delivered DRs', 'billing' => 'Billing records'] as $value => $label)
                 <option value="{{ $value }}" @selected($section === $value)>{{ $label }}</option>
             @endforeach
         </select>

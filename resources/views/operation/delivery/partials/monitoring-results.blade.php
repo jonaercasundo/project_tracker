@@ -3,7 +3,7 @@
         ['Active Projects', $report['summary']['active_projects_count'], null],
         ['Total DRs', $report['summary']['total_deliveries_count'], 'receipts'],
         ['Warehouse Stock', $report['summary']['warehouse_readiness']['available'], $report['summary']['warehouse_readiness']['unit']],
-        ['Delivered / Accepted', $report['summary']['completed_packages_count'], 'DR allocations'],
+        ['Delivered / Accepted', $report['summary']['completed_deliveries_count'], 'DRs'],
         ['Entered Billing', $report['summary']['pipeline']['billing']['completed'], 'DR/group records'],
         ['Billed', $report['summary']['billed_groups_count'], 'DR/group records'],
         ['Overall Operational Progress', $report['summary']['overall_progress'], '%'],

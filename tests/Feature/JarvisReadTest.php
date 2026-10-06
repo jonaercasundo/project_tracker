@@ -154,6 +154,128 @@ function jarvisOperations(): void
     DB::table('items')->insert(['id' => 1, 'item_id' => 'KIT-0001', 'code_prefix' => 'KIT', 'item_name' => 'Catalog kit', 'project_id' => 'BID-2026', 'lot_id' => 90, 'active' => 1, 'price' => 10]);
 }
 
+it('counts completed DRs once regardless of delivery rows packages items and quantities', function () {
+    jarvisOperations();
+    DB::table('logistics_location')->where('logistics_location_id', 1)->update(['logistics_id' => 7]);
+    DB::table('deliveries')->where('project_id', 1)->update(['package_qty' => 251557]);
+    DB::table('deliveries')->insert(['delivery_id' => 4, 'project_id' => 1, 'dr_no' => '3502-X', 'lot_id' => 1, 'logistics_location_id' => 1, 'status' => 'accepted']);
+    DB::table('item')->insert(['item_id' => 3, 'project_id' => 1, 'unit' => 'pcs']);
+    DB::table('package_content')->insert(['package_id' => 1, 'item_id' => 3, 'qty' => 99999]);
+    DB::table('package_status')->insert([
+        ['delivery_id' => 4, 'package_id' => 1, 'status' => 'delivered'],
+        ['delivery_id' => 4, 'package_id' => 2, 'status' => 'released'],
+        ['delivery_id' => 4, 'package_id' => 2, 'status' => 'accepted'],
+    ]);
+
+    $project = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1])['projects']->first();
+
+    expect($project['operational_pipeline']['delivered'])->toMatchArray(['completed' => 1, 'total' => 2, 'percent' => 50.0, 'unit' => 'Delivery Receipts']);
+    expect($project['logistics_delivery_performance']['partners'][0])->toMatchArray(['total_assigned_drs' => 2, 'delivered_drs' => 1, 'delivery_percentage' => 50.0]);
+    expect($project['unassigned_logistics_drs'])->toBe(0);
+});
+
+it('keeps unassigned DRs in project totals and renders receipt based delivery progress', function () {
+    jarvisOperations();
+    DB::table('logistics_location')->where('logistics_location_id', 1)->update(['logistics_id' => 7]);
+    DB::table('deliveries')->insert(['delivery_id' => 4, 'project_id' => 1, 'dr_no' => 'UNASSIGNED', 'status' => 'delivered']);
+    $user = jarvisReader();
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $page = $this->get('/deliveries/monitoring?project_id=1');
+
+    $page->assertSee('Delivery Receipts')->assertSee('/ 3 DRs')->assertSee('66.7%')
+        ->assertSee('Logistics Delivery Performance')->assertSee('1 DRs without logistics partner')->assertDontSee('DR package allocations');
+    $project = $page->viewData('report')['projects']->first();
+    expect($project['operational_pipeline']['delivered'])->toMatchArray(['completed' => 2, 'total' => 3, 'percent' => 66.67]);
+    expect($project['logistics_delivery_performance'])->toMatchArray(['assigned_drs' => 2, 'delivered_assigned_drs' => 1, 'unassigned_drs' => 1, 'delivered_unassigned_drs' => 1]);
+    $this->getJson('/deliveries/monitoring/1/details?section=delivered')->assertJsonPath('records.total', 2);
+});
+
+it('excludes invalid DRs even when their package statuses indicate delivery completion', function (string $status) {
+    jarvisOperations();
+    DB::table('deliveries')->where('delivery_id', 2)->update(['status' => $status]);
+
+    $project = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1])['projects']->first();
+
+    expect($project['operational_pipeline']['delivered'])->toMatchArray(['completed' => 0, 'total' => 1, 'percent' => 0.0]);
+    expect($project['logistics_delivery_performance']['unassigned_drs'])->toBe(1);
+})->with(['cancelled', 'void', 'voided', 'deleted', 'rejected', 'Cancelled']);
+
+it('uses delivery completion independently of billing status', function (string $billingStatus) {
+    jarvisOperations();
+    DB::table('grouping')->where('group_id', 1)->update(['status' => $billingStatus]);
+    DB::table('billing_grouped')->insert(['group_id' => 1, 'dr_no' => '3502-X']);
+
+    $project = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1])['projects']->first();
+
+    expect($project['operational_pipeline']['delivered'])->toMatchArray(['completed' => 1, 'total' => 2, 'percent' => 50.0]);
+})->with(['for billing', 'billed', 'paid']);
+
+it('reconciles partner totals with project totals across logistics locations', function () {
+    jarvisOperations();
+    DB::table('logistics_location')->where('logistics_location_id', 1)->update(['logistics_id' => 7]);
+    DB::table('logistics_location')->insert([
+        ['logistics_location_id' => 2, 'logistics_id' => 7],
+        ['logistics_location_id' => 3, 'logistics_id' => 8],
+    ]);
+    DB::table('deliveries')->insert([
+        ['delivery_id' => 4, 'project_id' => 1, 'dr_no' => 'OTHER-LOCATION', 'status' => 'accepted', 'logistics_location_id' => 2],
+        ['delivery_id' => 5, 'project_id' => 1, 'dr_no' => 'OTHER-PARTNER', 'status' => 'delivered', 'logistics_location_id' => 3],
+    ]);
+
+    $project = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1])['projects']->first();
+
+    expect($project['operational_pipeline']['delivered'])->toMatchArray(['completed' => 3, 'total' => 4, 'percent' => 75.0]);
+    expect($project['logistics_delivery_performance'])->toMatchArray(['assigned_drs' => 4, 'delivered_assigned_drs' => 3, 'unassigned_drs' => 0]);
+    expect($project['logistics_delivery_performance']['partners'][0])->toMatchArray(['logistics_id' => 8, 'total_assigned_drs' => 1, 'delivered_drs' => 1, 'delivery_percentage' => 100.0]);
+    expect($project['logistics_delivery_performance']['partners'][1])->toMatchArray(['logistics_id' => 7, 'total_assigned_drs' => 3, 'delivered_drs' => 2, 'delivery_percentage' => 66.67]);
+});
+
+it('keeps conflicting partner assignments in the project without counting the DR twice', function () {
+    jarvisOperations();
+    DB::table('logistics_location')->where('logistics_location_id', 1)->update(['logistics_id' => 7]);
+    DB::table('logistics_location')->insert(['logistics_location_id' => 2, 'logistics_id' => 8]);
+    DB::table('deliveries')->insert(['delivery_id' => 4, 'project_id' => 1, 'dr_no' => '3502-X', 'status' => 'accepted', 'logistics_location_id' => 2]);
+
+    $project = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1])['projects']->first();
+
+    expect($project['operational_pipeline']['delivered'])->toMatchArray(['completed' => 1, 'total' => 2]);
+    expect($project['logistics_delivery_performance'])->toMatchArray(['assigned_drs' => 1, 'delivered_assigned_drs' => 0, 'unassigned_drs' => 1, 'conflicting_drs' => 1]);
+});
+
+it('does not count unfinished delivery row statuses as completed when no packages exist', function (string $status) {
+    jarvisOperations();
+    DB::table('deliveries')->where('project_id', 1)->update(['lot_id' => null, 'status' => $status]);
+
+    $project = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1])['projects']->first();
+
+    expect($project['operational_pipeline']['delivered'])->toMatchArray(['completed' => 0, 'total' => 2, 'percent' => 0.0]);
+})->with(['pending', 'released', 'unreleased', 'for approval']);
+
+it('excludes empty DR identifiers from both project and logistics totals', function (?string $identifier) {
+    jarvisOperations();
+    DB::table('deliveries')->where('delivery_id', 2)->update(['dr_no' => $identifier]);
+
+    $project = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1])['projects']->first();
+
+    expect($project['operational_pipeline']['delivered'])->toMatchArray(['completed' => 0, 'total' => 1]);
+    expect($project['logistics_delivery_performance']['unassigned_drs'])->toBe(1);
+})->with([null, '', '   ']);
+
+it('renders N/A delivery completion and empty logistics safely when a project has no DRs', function () {
+    jarvisOperations();
+    DB::table('projects')->insert(['project_id' => 3, 'project_name' => 'No receipts', 'status' => 'Pending']);
+    $user = jarvisReader();
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $page = $this->get('/deliveries/monitoring?project_id=3');
+
+    $page->assertSee('/ 0 DRs')->assertSee('N/A')->assertSee('No assigned logistics partners.');
+    expect($page->viewData('report')['projects']->first()['operational_pipeline']['delivered'])->toMatchArray(['completed' => 0, 'total' => 0, 'percent' => null]);
+});
+
 it('returns 401 without a bearer token on every read endpoint', function (string $endpoint) {
     $this->get('/api/jarvis/'.$endpoint)->assertUnauthorized()->assertJsonPath('success', false);
 })->with('jarvis read endpoints');
@@ -315,7 +437,7 @@ it('reports real project progress with package completion and recorded billing s
         ->assertJsonPath('data.summary.active_projects_count', 1)
         ->assertJsonPath('data.summary.total_deliveries_count', 3)
         ->assertJsonPath('data.summary.total_packages_count', 5)
-        ->assertJsonPath('data.summary.delivery_progress_percent', 40)
+        ->assertJsonPath('data.summary.delivery_progress_percent', 33.33)
         ->assertJsonPath('data.projects.0.total_packages_count', 4)
         ->assertJsonPath('data.projects.0.pending_packages_count', 1)
         ->assertJsonPath('data.projects.0.released_packages_count', 1)
@@ -555,7 +677,7 @@ it('counts shared DR receipts once and does not multiply billing across allocati
         ->assertJsonPath('data.projects.0.billing_groups_count', 2);
 });
 
-it('shows neutral package progress without allocations and keeps awarded projects active', function () {
+it('reports delivery completion without allocations and keeps awarded projects active', function () {
     jarvisOperations();
     DB::table('projects')->where('project_id', 1)->update(['status' => 'Completed']);
     DB::table('deliveries')->where('project_id', 1)->update(['lot_id' => null, 'keystage_id' => null]);
@@ -565,10 +687,10 @@ it('shows neutral package progress without allocations and keeps awarded project
 
     jarvisRead('projects/delivery-progress', $token)
         ->assertOk()->assertJsonCount(1, 'data.projects')
-        ->assertJsonPath('data.projects.0.progress_basis', 'no_package_allocations')
+        ->assertJsonPath('data.projects.0.progress_basis', 'delivery_receipts')
         ->assertJsonPath('data.projects.0.total_packages_count', 0)
         ->assertJsonPath('data.projects.0.completed_deliveries_count', 2)
-        ->assertJsonPath('data.projects.0.delivery_progress_percent', null)
+        ->assertJsonPath('data.projects.0.delivery_progress_percent', 100)
         ->assertJsonPath('data.projects.0.billing_progress_percent', 50);
 });
 
@@ -596,7 +718,7 @@ it('uses a fixed number of database queries for project progress regardless of p
     DB::flushQueryLog();
     DB::enableQueryLog();
     $service->report([]);
-    expect(count(DB::getQueryLog()))->toBe($firstQueryCount)->toBe(2);
+    expect(count(DB::getQueryLog()))->toBe($firstQueryCount)->toBe(3);
     DB::disableQueryLog();
 });
 
@@ -619,7 +741,7 @@ it('counts DR allocations rather than definitions and uses one current status pe
         ->assertJsonPath('data.projects.0.accepted_packages_count', 2)
         ->assertJsonPath('data.projects.0.completed_packages_count', 3)
         ->assertJsonPath('data.projects.0.remaining_packages_count', 1)
-        ->assertJsonPath('data.projects.0.delivery_progress_percent', 75);
+        ->assertJsonPath('data.projects.0.delivery_progress_percent', 50);
     expect(DB::table('package')->where('lot_id', 1)->count())->toBe(2);
 });
 
@@ -683,7 +805,7 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
     $companyId = $user->companies->first()->company_id;
     $token = $user->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
     $mysql = DB::connection('mysql');
-    $tables = ['projects', 'deliveries', 'school', 'lot', 'package', 'package_status', 'package_content', 'item', 'inventory', 'inventory_history', 'billing_grouped', 'grouping'];
+    $tables = ['projects', 'deliveries', 'school', 'lot', 'package', 'package_status', 'package_content', 'item', 'inventory', 'inventory_history', 'billing_grouped', 'grouping', 'logistics_location'];
     $createdTables = [];
 
     try {
@@ -763,7 +885,7 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
             file_put_contents($htmlPath, $page->getContent());
         }
         $this->get('/deliveries/monitoring')->assertOk();
-        foreach (['warehouse' => 1, 'dr' => 4, 'delivered' => 2, 'billing' => 2, 'stock-out' => 0] as $section => $count) {
+        foreach (['warehouse' => 1, 'dr' => 4, 'delivered' => 1, 'billing' => 2, 'stock-out' => 0] as $section => $count) {
             $this->getJson('/deliveries/monitoring/1/details?section='.$section)->assertOk()->assertJsonPath('records.total', $count);
         }
         $dashboard = $this->getJson('/deliveries/monitoring?active_only=0')->assertOk();
@@ -795,8 +917,8 @@ it('exposes the operational pipeline with compatible denominators and exact bill
 
     jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
         ->assertOk()->assertJsonPath('data.projects.0.pipeline.dr.total', 2)
-        ->assertJsonPath('data.projects.0.pipeline.delivered.completed', 2)
-        ->assertJsonPath('data.projects.0.pipeline.delivered.total', 4)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.completed', 1)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.total', 2)
         ->assertJsonPath('data.projects.0.pipeline.delivered.percent', 50)
         ->assertJsonPath('data.projects.0.pipeline.billing.completed', 3)
         ->assertJsonPath('data.projects.0.pipeline.billing.total', 4)
@@ -1068,7 +1190,7 @@ it('loads filtered monitoring detail sections with exact DR matching and lifetim
     $this->getJson('/deliveries/monitoring/1/details?section=dr&year=2026')->assertOk()->assertJsonPath('records.total', 2);
     $this->getJson('/deliveries/monitoring/1/details?section=dr&delivery_status=mixed')->assertOk()->assertJsonPath('records.total', 2);
     $this->getJson('/deliveries/monitoring/1/details?section=dr&region=Region%20II')->assertOk()->assertJsonPath('records.total', 0);
-    $this->getJson('/deliveries/monitoring/1/details?section=delivered&year=2026')->assertOk()->assertJsonPath('records.total', 2);
+    $this->getJson('/deliveries/monitoring/1/details?section=delivered&year=2026')->assertOk()->assertJsonPath('records.total', 1);
     $this->getJson('/deliveries/monitoring/1/details?section=delivered&delivery_status=pending')->assertOk()->assertJsonPath('records.total', 0);
     $this->getJson('/deliveries/monitoring/1/details?section=billing')->assertOk()->assertJsonPath('records.total', 1)->assertJsonPath('records.data.0.dr_no', '3502');
     $this->getJson('/deliveries/monitoring/1/details?section=stock-out&year=2026')->assertOk()->assertJsonPath('records.total', 1)->assertJsonPath('records.data.0.stock_out', 3);

@@ -2,7 +2,7 @@
     $columns = match ($section) {
         'warehouse' => ['item_name' => 'Item', 'unit' => 'Unit', 'required' => 'Required', 'stock_in' => 'Stock In', 'stock_out' => 'Stock Out', 'available' => 'Current Stock', 'covered' => 'Covered', 'percent' => 'Readiness %'],
         'stock-out' => ['history_id' => 'Transaction', 'item_name' => 'Item', 'unit' => 'Unit', 'warehouse_id' => 'Warehouse ID', 'stock_out' => 'Released quantity', 'changed_at' => 'Recorded at'],
-        'delivered' => ['dr_no' => 'DR', 'delivery_id' => 'Delivery ID', 'package_id' => 'Package ID', 'package_status' => 'Status', 'package_qty' => 'Package quantity'],
+        'delivered' => ['dr_no' => 'DR', 'delivery_status' => 'Status', 'delivery_rows_count' => 'Delivery rows', 'last_delivery_date' => 'Last delivery'],
         'billing' => ['dr_no' => 'DR', 'group_id' => 'Group ID', 'status' => 'Status', 'created_at' => 'Recorded at'],
         default => ['dr_no' => 'DR', 'delivery_status' => 'Status', 'delivery_rows_count' => 'Delivery rows', 'total_packages_count' => 'Package allocations', 'last_delivery_date' => 'Last delivery'],
     };

@@ -89,6 +89,22 @@ class User extends Authenticatable
         return app(DashboardService::class)->currentCompany($this, session()->driver());
     }
 
+    public function hasMIUserAccess(): bool
+    {
+        return $this->currentCompany()?->code === 'MI' && $this->hasAnyRole(['user', 'Executive', 'executive']);
+    }
+
+    public function canApproveMI(string $permission): bool
+    {
+        return $this->currentCompany()?->code === 'MI'
+            && ($this->hasAnyRole(['Executive', 'executive', 'Administrator']) || $this->can($permission));
+    }
+
+    public function canAccessMIApprovals(): bool
+    {
+        return $this->canApproveMI('mi.budget.approve') || $this->canApproveMI('mi.travel.approve');
+    }
+
     /**
      * Get all users for role access management.
      */

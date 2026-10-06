@@ -11,7 +11,7 @@ class MILiquidationPolicy
     {
         $company = $user->currentCompany();
 
-        return $company?->code === 'MI' && $company->is_active && $user->hasRole('user');
+        return $company?->code === 'MI' && $company->is_active && $user->hasMIUserAccess();
     }
 
     public function view(User $user, MI_Liquidation $liquidation): bool
@@ -20,13 +20,13 @@ class MILiquidationPolicy
 
         return $company?->code === 'MI' && $company->is_active
             && (int) $liquidation->company_id === (int) $company->getKey()
-            && (($user->hasRole('accounting') && $user->can('mi.liquidation.view')) || ($user->hasRole('user')
+            && (($user->hasRole('accounting') && $user->can('mi.liquidation.view')) || ($user->hasMIUserAccess()
                 && (int) $liquidation->prepared_by === (int) $user->getKey()));
     }
 
     public function update(User $user, MI_Liquidation $liquidation): bool
     {
-        return $this->view($user, $liquidation) && $user->hasRole('user')
+        return $this->view($user, $liquidation) && $user->hasMIUserAccess()
             && (int) $liquidation->prepared_by === (int) $user->getKey() && $liquidation->status === 'Pending';
     }
 

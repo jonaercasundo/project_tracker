@@ -481,7 +481,8 @@ Route::middleware(['auth'])->group(function () {
         |--------------------------------------------------------------------------
     */
     Route::get('/mi/approvals', [MIApprovalController::class, 'index'])->middleware(['auth', 'company.context:MI'])->name('mi.approvals');
-    Route::middleware(['auth', 'company.context:MI', 'role:user'])->group(function () {
+    Route::post('/mi/approvals/{type}/{recordId}', [MIApprovalController::class, 'decide'])->middleware(['auth', 'company.context:MI'])->whereIn('type', ['budget', 'travel'])->whereNumber('recordId')->name('mi.approvals.decide');
+    Route::middleware(['auth', 'company.context:MI', 'role:user,Executive,executive'])->group(function () {
 
         Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
         Route::get('/mi/settings', [MIAppController::class, 'settings'])->name('mi_app.settings');
@@ -520,6 +521,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Workflow transitions - one per box in the diagram
         Route::post('/budget-requests/{budgetRequest}/received', [BudgetRequestController::class, 'markReceived'])->name('budget_requests.received');
+        Route::post('/budget-requests/{budgetRequest}/resubmit', [BudgetRequestController::class, 'resubmit'])->name('budget_requests.resubmit');
 
         // --- Travel Liquidation (tied to a budget_requests row, review/approve workflow) ---
         // NOTE: renamed from 'liquidation.*' to 'travel_liquidation.*' to stop colliding
@@ -545,7 +547,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/travel_liquidation/{liquidation}/settlement', [TravelLiquidationController::class, 'recordSettlement'])->name('travel_liquidation.settlement');
         Route::post('/travel_liquidation/{liquidation}/close', [TravelLiquidationController::class, 'close'])->name('travel_liquidation.close');
     });
-    Route::middleware(['auth', 'company.context:MI', 'role:user,accounting'])->group(function () {
+    Route::middleware(['auth', 'company.context:MI', 'role:user,Executive,executive,accounting'])->group(function () {
         Route::get('/mi-liquidation-receipts/{item}', [LiquidationController::class, 'receipt'])->name('liquidation.receipt');
     });
     Route::middleware(['auth', 'company.context:MI', 'role:accounting'])->group(function () {

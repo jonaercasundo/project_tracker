@@ -42,9 +42,9 @@ class MiFinancialWorkflowService
         });
     }
 
-    public function approveBudget(BudgetRequest $budget, User $actor): void
+    public function approveBudget(BudgetRequest $budget, User $actor, ?string $remarks = null, ?string $reviewedVersion = null): void
     {
-        $this->budgetTransition($budget, $actor, 'approve', 'budget_requested', 'budget_approved');
+        $this->decide($budget, $actor, 'approve', $remarks, $reviewedVersion);
     }
 
     public function noteBudget(BudgetRequest $budget, User $actor): void
@@ -82,7 +82,7 @@ class MiFinancialWorkflowService
 
     public function submitLiquidation(Liquidation $liquidation, User $actor): void
     {
-        $this->travelTransition($liquidation, $actor, 'submit', 'draft', 'liquidation_submitted', function (Liquidation $locked) use ($actor): void {
+        $this->travelTransition($liquidation, $actor, 'submit', $liquidation->status === 'returned_for_revision' ? 'returned_for_revision' : 'draft', 'liquidation_submitted', function (Liquidation $locked) use ($actor): void {
             abort_if($locked->submitted_at !== null, 422);
             $locked->recalcTotals();
             $this->activity($locked, $actor, 'liquidation_created');
@@ -98,13 +98,9 @@ class MiFinancialWorkflowService
         });
     }
 
-    public function approveLiquidation(Liquidation $liquidation, User $actor): void
+    public function approveLiquidation(Liquidation $liquidation, User $actor, ?string $remarks = null, ?string $reviewedVersion = null): void
     {
-        $this->travelTransition($liquidation, $actor, 'approve', 'noted', 'liquidation_approved', function (Liquidation $locked) use ($actor): void {
-            abort_if($locked->approved_at !== null, 422);
-            abort_unless($locked->budgetRequest->status === 'in_progress', 422);
-            $locked->update(['status' => 'approved', 'approved_by' => $actor->getKey(), 'approved_at' => now()]);
-        });
+        $this->decide($liquidation, $actor, 'approve', $remarks, $reviewedVersion);
     }
 
     /** @param array<string, mixed> $payment */
@@ -148,16 +144,67 @@ class MiFinancialWorkflowService
         });
     }
 
-    public function rejectBudget(BudgetRequest $budget, User $actor): never
+    public function decide(BudgetRequest|Liquidation $record, User $actor, string $action, ?string $remarks = null, ?string $reviewedVersion = null): void
     {
-        Gate::forUser($actor)->authorize('reject', $budget);
-        abort(403, 'Rejection rules need business confirmation.');
+        $details = Validator::make(['action' => $action, 'remarks' => $remarks], [
+            'action' => ['required', Rule::in(['approve', 'reject', 'return'])],
+            'remarks' => [$action === 'approve' ? 'nullable' : 'required', 'string', 'max:2000'],
+        ])->validate();
+        DB::transaction(function () use ($record, $actor, $action, $details, $reviewedVersion): void {
+            $isBudget = $record instanceof BudgetRequest;
+            $budget = BudgetRequest::whereKey($isBudget ? $record->getKey() : $record->budget_request_id)->lockForUpdate()->firstOrFail();
+            $locked = $isBudget ? $budget : Liquidation::whereKey($record->getKey())->lockForUpdate()->firstOrFail();
+            if (! $isBudget) {
+                $locked->setRelation('budgetRequest', $budget);
+            }
+            Gate::forUser($actor)->authorize(match ($action) { 'return' => 'returnForCorrection', default => $action }, $locked);
+            $previous = $isBudget ? 'budget_requested' : 'noted';
+            abort_unless($locked->status === $previous && $locked->approved_at === null, 422, 'Invalid or stale workflow action.');
+            if (! $isBudget) {
+                abort_unless($budget->status === 'in_progress', 422, 'The parent budget must be in progress.');
+            }
+            if ($reviewedVersion !== null) {
+                abort_unless(hash_equals($reviewedVersion, MIApprovalReview::fingerprint($locked)), 422, 'The transaction changed. Review its details again.');
+            }
+            $newStatus = match ($action) { 'approve' => 'approved', 'reject' => 'rejected', 'return' => 'returned_for_revision' };
+            $metadata = ['reviewed_version' => $reviewedVersion];
+            if ($action === 'approve') {
+                $locked->update(['status' => $newStatus, 'approved_by' => $actor->getKey(), 'approved_at' => now()]);
+            } else {
+                $changes = ['status' => $newStatus];
+                if (! $isBudget && $action === 'return') {
+                    $metadata += $locked->only(['submitted_at', 'noted_at', 'noted_by']);
+                    $changes += ['submitted_at' => null, 'noted_at' => null, 'noted_by' => null];
+                }
+                $locked->update($changes);
+            }
+            $event = ($isBudget ? 'budget_' : 'liquidation_').match ($action) { 'approve' => 'approved', 'reject' => 'rejected', 'return' => 'returned_for_revision' };
+            $this->activity($locked, $actor, $event, $previous, [
+                'note' => $details['remarks'] ?? null, 'amount' => $isBudget ? $locked->budget_total : $locked->actual_total,
+                'metadata' => $metadata,
+            ]);
+        });
     }
 
-    public function returnLiquidation(Liquidation $liquidation, User $actor): never
+    public function rejectBudget(BudgetRequest $budget, User $actor, string $remarks): void
     {
-        Gate::forUser($actor)->authorize('returnForCorrection', $liquidation);
-        abort(403, 'Correction rules need business confirmation.');
+        $this->decide($budget, $actor, 'reject', $remarks);
+    }
+
+    public function returnLiquidation(Liquidation $liquidation, User $actor, string $remarks): void
+    {
+        $this->decide($liquidation, $actor, 'return', $remarks);
+    }
+
+    public function resubmitBudget(BudgetRequest $budget, User $actor): void
+    {
+        DB::transaction(function () use ($budget, $actor): void {
+            $locked = BudgetRequest::whereKey($budget->getKey())->lockForUpdate()->firstOrFail();
+            Gate::forUser($actor)->authorize('submit', $locked);
+            abort_unless($locked->status === 'returned_for_revision' && $locked->approved_at === null, 422);
+            $locked->update(['status' => 'budget_requested']);
+            $this->activity($locked, $actor, 'budget_resubmitted', 'returned_for_revision');
+        });
     }
 
     private function budgetTransition(BudgetRequest $budget, User $actor, string $action, string $status, string $event): void

@@ -9,12 +9,12 @@ class BudgetRequestPolicy
 {
     public function view(User $user, BudgetRequest $budgetRequest): bool
     {
-        return $this->companyMatches($user, $budgetRequest) && $user->hasRole('user') && (int) $budgetRequest->employee_id === (int) $user->getKey();
+        return $this->companyMatches($user, $budgetRequest) && $user->hasMIUserAccess() && (int) $budgetRequest->employee_id === (int) $user->getKey();
     }
 
     public function update(User $user, BudgetRequest $budgetRequest): bool
     {
-        return $this->view($user, $budgetRequest) && $budgetRequest->status === 'budget_requested'
+        return $this->view($user, $budgetRequest) && in_array($budgetRequest->status, ['budget_requested', 'returned_for_revision'], true)
             && $budgetRequest->approved_at === null && $budgetRequest->noted_at === null
             && $budgetRequest->released_at === null && $budgetRequest->received_at === null
             && ! $budgetRequest->releases()->exists() && ! $budgetRequest->liquidation()->exists();
@@ -27,11 +27,10 @@ class BudgetRequestPolicy
             && $budgetRequest->released_at === null && $budgetRequest->received_at === null;
     }
 
-    /** Approval authority needs business confirmation before granting this action. */
     public function approve(User $user, BudgetRequest $budgetRequest): bool
     {
         return $this->companyMatches($user, $budgetRequest)
-            && $user->can('mi.budget.approve')
+            && $user->canApproveMI('mi.budget.approve')
             && (int) $budgetRequest->employee_id !== (int) $user->getKey();
     }
 
@@ -52,13 +51,13 @@ class BudgetRequestPolicy
 
     public function create(User $user): bool
     {
-        return $this->hasMIContext($user) && $user->hasRole('user');
+        return $this->hasMIContext($user) && $user->hasMIUserAccess();
     }
 
     public function viewProcessing(User $user, BudgetRequest $budgetRequest): bool
     {
         return $this->companyMatches($user, $budgetRequest)
-            && (($user->hasRole('accounting') && $user->can('mi.budget.view')) || $user->can('mi.budget.approve'));
+            && (($user->hasRole('accounting') && $user->can('mi.budget.view')) || $user->canApproveMI('mi.budget.approve'));
     }
 
     public function submit(User $user, BudgetRequest $budgetRequest): bool
@@ -73,7 +72,12 @@ class BudgetRequestPolicy
 
     public function reject(User $user, BudgetRequest $budgetRequest): bool
     {
-        return false;
+        return $this->approve($user, $budgetRequest);
+    }
+
+    public function returnForCorrection(User $user, BudgetRequest $budgetRequest): bool
+    {
+        return $this->approve($user, $budgetRequest);
     }
 
     public function companyMatches(User $user, BudgetRequest $budgetRequest): bool

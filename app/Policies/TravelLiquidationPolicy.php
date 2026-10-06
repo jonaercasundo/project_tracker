@@ -16,7 +16,7 @@ class TravelLiquidationPolicy
 
     public function update(User $user, Liquidation $liquidation): bool
     {
-        return $this->view($user, $liquidation) && in_array($liquidation->status, ['draft', 'submitted'], true)
+        return $this->view($user, $liquidation) && in_array($liquidation->status, ['draft', 'submitted', 'returned_for_revision'], true)
             && $liquidation->noted_at === null && $liquidation->approved_at === null && ! $liquidation->settlement()->exists();
     }
 
@@ -32,10 +32,9 @@ class TravelLiquidationPolicy
         return $this->companyMatches($user, $liquidation) && $user->hasRole('accounting') && $user->can('mi.liquidation.review');
     }
 
-    /** Final approval authority needs business confirmation before granting this action. */
     public function approve(User $user, Liquidation $liquidation): bool
     {
-        return $this->companyMatches($user, $liquidation) && $user->can('mi.travel.approve')
+        return $this->companyMatches($user, $liquidation) && $user->canApproveMI('mi.travel.approve')
             && (int) $liquidation->liquidated_by !== (int) $user->getKey();
     }
 
@@ -47,7 +46,7 @@ class TravelLiquidationPolicy
     public function viewProcessing(User $user, Liquidation $liquidation): bool
     {
         return $this->companyMatches($user, $liquidation)
-            && (($user->hasRole('accounting') && $user->can('mi.liquidation.view')) || $user->can('mi.travel.approve'));
+            && (($user->hasRole('accounting') && $user->can('mi.liquidation.view')) || $user->canApproveMI('mi.travel.approve'));
     }
 
     public function recordSettlement(User $user, Liquidation $liquidation): bool
@@ -74,7 +73,12 @@ class TravelLiquidationPolicy
 
     public function returnForCorrection(User $user, Liquidation $liquidation): bool
     {
-        return false;
+        return $this->approve($user, $liquidation);
+    }
+
+    public function reject(User $user, Liquidation $liquidation): bool
+    {
+        return $this->approve($user, $liquidation);
     }
 
     private function companyMatches(User $user, Liquidation $liquidation): bool

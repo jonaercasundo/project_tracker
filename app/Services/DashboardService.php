@@ -111,7 +111,7 @@ class DashboardService
             }
         }
 
-        if ($company->code === 'MI' && ($user->can('mi.budget.approve') || $user->can('mi.travel.approve'))) {
+        if ($company->code === 'MI' && $user->canAccessMIApprovals()) {
             return redirect()->route('mi.approvals');
         }
 

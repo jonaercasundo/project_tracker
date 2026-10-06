@@ -2,6 +2,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css" rel="stylesheet">
 
     @include('mi_app.designer_module.partials._product-form-styles')
 
@@ -19,6 +20,8 @@
         .tx-product-edit .tx-edit-inline { display: flex; align-items: center; gap: 8px; }
         .tx-product-edit .tx-edit-inline .tx-field { min-width: 0; flex: 1; }
         .tx-product-edit .tx-edit-inline .tx-btn-small { margin: 0; min-height: 41px; flex-shrink: 0; }
+        .tx-product-edit .ts-wrapper { min-height: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
+        .tx-product-edit .ts-wrapper.field-invalid .ts-control { border-color: var(--tx-danger); }
         .tx-product-edit .tx-edit-heading-actions { margin-left: auto; }
         .tx-product-edit .tx-edit-heading-actions .tx-btn-small { margin-top: 0; }
         .tx-product-edit .tx-edit-image-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
@@ -169,19 +172,24 @@
                     </div>
                     <div class="tx-card-body">
                         <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-                            @foreach(['materials' => ['Materials', $product->materials], 'color' => ['Color', $product->color]] as $field => [$label, $values])
+                            @foreach(['materials' => ['Materials', $product->materials], 'color' => ['Colors', $product->color]] as $field => [$label, $values])
                                 @php
                                     $selectedValues = old($field, $values) ?: [];
                                 @endphp
                                 <div>
                                     <label for="{{ $field }}" class="tx-label">{{ $label }} @if($field === 'materials')<span class="tx-required">*</span>@endif</label>
                                     <div class="tx-multi-select-wrap">
-                                        <p class="tx-multi-hint">Select one or more {{ strtolower($label) }} values</p>
-                                        @if($field === 'color')<input type="hidden" name="color" value="">@endif
-                                        <select id="{{ $field }}" name="{{ $field }}[]" multiple size="8" @if($field === 'materials') required @endif class="tx-field tx-multi-select {{ $errors->has($field) || $errors->has($field.'.*') ? 'field-invalid' : '' }}" @if($errors->has($field) || $errors->has($field.'.*')) aria-invalid="true" aria-describedby="{{ $field }}_error" @endif>
+                                        <div class="tx-multi-toolbar">
+                                            <span class="tx-multi-hint">Select one or more {{ strtolower($label) }}</span>
+                                            <button type="button" class="tx-multi-clear" data-target="{{ $field }}" aria-label="Clear {{ strtolower($label) }}" hidden>Clear</button>
+                                        </div>
+                                        <input type="hidden" name="{{ $field }}" value="">
+                                        <select id="{{ $field }}" name="{{ $field }}[]" multiple size="{{ $field === 'materials' ? 12 : 8 }}" @if($field === 'materials') required @endif class="tx-field tx-multi-select {{ $errors->has($field) || $errors->has($field.'.*') ? 'field-invalid' : '' }}" @if($errors->has($field) || $errors->has($field.'.*')) aria-invalid="true" aria-describedby="{{ $field }}_error" @endif>
                                             @include('mi_app.designer_module.partials._attribute-options', ['attribute' => $field, 'selectedValues' => $selectedValues])
                                         </select>
-                                        <p class="tx-hint">Hold Ctrl or Command to select multiple values.</p>
+                                        <div id="{{ $field }}_chips" class="tx-multi-chips" aria-live="polite"></div>
+                                        <p id="{{ $field }}_selection_error" class="tx-error" data-multi-error hidden>Select at least one material.</p>
+                                        <p class="tx-hint" data-native-multi-hint>Hold Ctrl or Command to select multiple values.</p>
                                         <div class="tx-edit-inline">
                                             <input type="text" maxlength="255" data-custom-value="{{ $field }}" aria-label="Custom {{ strtolower($label) }}" placeholder="Add a custom value" class="tx-field">
                                             <button type="button" data-add-value="{{ $field }}" class="tx-btn-small">Add</button>
@@ -282,4 +290,5 @@
             <template id="new_image_template">@include('mi_app.designer_module.partials._new-image', ['index' => '__INDEX__', 'url' => ''])</template>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
 </x-mi_app>

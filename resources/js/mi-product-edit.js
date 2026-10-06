@@ -53,15 +53,113 @@ if (form) {
     taxonomy.forEach((select) => select.addEventListener('change', () => filterTaxonomy(true)));
     filterTaxonomy(false);
 
+    form.querySelectorAll('select.tx-multi-select').forEach((select) => {
+        const wrapper = select.closest('.tx-multi-select-wrap');
+        const chips = wrapper.querySelector('.tx-multi-chips');
+        const clearButton = wrapper.querySelector('.tx-multi-clear');
+        const selectionError = wrapper.querySelector('[data-multi-error]');
+
+        if (typeof window.TomSelect === 'function') {
+            new window.TomSelect(select, {
+                plugins: ['remove_button'],
+                create: false,
+                maxItems: 100,
+                hideSelected: true,
+                closeAfterSelect: false,
+                copyClassesToDropdown: false,
+                placeholder: `Select one or more ${select.id === 'materials' ? 'materials' : 'colors'}...`,
+                searchField: ['text'],
+                render: {
+                    no_results: () => `<div class="no-results">No ${select.id === 'materials' ? 'material' : 'color'} found</div>`,
+                },
+            });
+            wrapper.querySelector('[data-native-multi-hint]').hidden = true;
+            if (select.hasAttribute('aria-describedby')) {
+                select.tomselect.control_input.setAttribute('aria-describedby', select.getAttribute('aria-describedby'));
+            }
+            if (select.hasAttribute('aria-invalid')) {
+                select.tomselect.control_input.setAttribute('aria-invalid', select.getAttribute('aria-invalid'));
+            }
+        }
+
+        const updateChips = () => {
+            chips.replaceChildren();
+            [...select.selectedOptions].filter((option) => option.value).forEach((option) => {
+                const chip = document.createElement('span');
+                chip.className = 'tx-multi-chip';
+                const label = document.createElement('span');
+                label.textContent = option.text;
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.textContent = '\u00d7';
+                remove.setAttribute('aria-label', `Remove ${option.text}`);
+                remove.addEventListener('click', () => {
+                    if (select.tomselect) {
+                        select.tomselect.removeItem(option.value);
+                    } else {
+                        option.selected = false;
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
+                chip.append(label, remove);
+                chips.append(chip);
+            });
+            clearButton.hidden = chips.childElementCount === 0;
+        };
+
+        select.addEventListener('change', () => {
+            updateChips();
+            if (select.validity.valid) {
+                selectionError.hidden = true;
+                select.classList.remove('field-invalid');
+                select.removeAttribute('aria-invalid');
+                if (select.tomselect) {
+                    select.tomselect.wrapper.classList.remove('field-invalid');
+                    select.tomselect.control_input.removeAttribute('aria-invalid');
+                    if (select.hasAttribute('aria-describedby')) {
+                        select.tomselect.control_input.setAttribute('aria-describedby', select.getAttribute('aria-describedby'));
+                    } else {
+                        select.tomselect.control_input.removeAttribute('aria-describedby');
+                    }
+                }
+            }
+        });
+        select.addEventListener('invalid', (event) => {
+            if (!select.tomselect) return;
+            event.preventDefault();
+            selectionError.hidden = false;
+            select.tomselect.wrapper.classList.add('field-invalid');
+            select.tomselect.control_input.setAttribute('aria-invalid', 'true');
+            const descriptions = [select.getAttribute('aria-describedby'), selectionError.id].filter(Boolean);
+            select.tomselect.control_input.setAttribute('aria-describedby', descriptions.join(' '));
+            select.tomselect.focus();
+        });
+        clearButton.addEventListener('click', () => {
+            if (select.tomselect) {
+                select.tomselect.clear();
+            } else {
+                [...select.options].forEach((option) => { option.selected = false; });
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+        updateChips();
+    });
+
     form.querySelectorAll('[data-add-value]').forEach((button) => {
         const input = form.querySelector(`[data-custom-value="${button.dataset.addValue}"]`);
         const addValue = () => {
             const value = input.value.trim();
             if (!value) return;
             const select = document.getElementById(button.dataset.addValue);
-            const existing = [...select.options].find((option) => option.value === value);
-            if (existing) existing.selected = true;
-            else select.add(new Option(value, value, true, true));
+            if (select.tomselect) {
+                select.tomselect.addOption({ value, text: value });
+                select.tomselect.addItem(value);
+            } else {
+                const existing = [...select.options].find((option) => option.value === value);
+                if (existing) existing.selected = true;
+                else select.add(new Option(value, value, true, true));
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
             input.value = '';
             markDirty();
         };

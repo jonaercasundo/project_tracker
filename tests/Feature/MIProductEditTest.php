@@ -79,6 +79,45 @@ it('saves create fields through PATCH and keeps the current product code valid',
     expect($product->fresh()->color)->toBe(['Blue']);
 });
 
+it('clears all colors when the edit form submits the empty hidden fallback', function () {
+    $product = MI_Product::factory()->create(['color' => ['Custom color']]);
+    $this->signInMI($this->miUser());
+
+    $this->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), ['color' => '']))
+        ->assertRedirect(route('mi_app.edit', $product))->assertSessionHasNoErrors();
+
+    expect($product->fresh()->color)->toBe([]);
+    $response = $this->get(route('mi_app.edit', $product));
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+    expect($xpath->query('//select[@id="color"]')->length)->toBe(1);
+    expect($xpath->query('//select[@id="color"]//option[@selected]')->length)->toBe(0);
+});
+
+it('rejects clearing all materials and redisplays the empty selection without changing saved attributes or images', function () {
+    $product = MI_Product::factory()->create(['materials' => ['Custom timber'], 'color' => ['Custom color']]);
+    $image = $product->images()->create(['image_type' => 'url', 'image_url' => 'https://example.com/original.jpg', 'is_primary' => true]);
+    $this->signInMI($this->miUser());
+
+    $this->from(route('mi_app.edit', $product))->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'item_name' => 'Rejected product name', 'materials' => '', 'color' => '', 'remove_image_ids' => [$image->id],
+    ]))->assertRedirect(route('mi_app.edit', $product))
+        ->assertSessionHasErrors(['materials' => 'The materials field is required.'])
+        ->assertSessionHas('_old_input', fn (array $input): bool => array_key_exists('materials', $input) && $input['materials'] === null);
+
+    $response = $this->get(route('mi_app.edit', $product))->assertSee('The materials field is required.');
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+    expect($xpath->query('//select[@id="materials"]')->length)->toBe(1);
+    expect($xpath->query('//select[@id="materials"]//option[@selected]')->length)->toBe(0);
+    $this->assertDatabaseHas('mi_products', ['product_id' => $product->getKey(), 'item_name' => $product->item_name]);
+    expect($product->fresh()->materials)->toBe(['Custom timber']);
+    expect($product->fresh()->color)->toBe(['Custom color']);
+    $this->assertDatabaseHas('mi_product_images', ['id' => $image->id, 'image_url' => 'https://example.com/original.jpg', 'is_primary' => true]);
+});
+
 it('adds a URL without duplicating existing or repeated links', function () {
     $product = MI_Product::factory()->create();
     $existing = $product->images()->create(['image_type' => 'url', 'image_url' => 'https://example.com/original.jpg', 'is_primary' => true]);

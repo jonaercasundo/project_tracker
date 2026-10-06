@@ -124,7 +124,7 @@ class AccountingWorkspaceController extends Controller
     {
         return $request->validate([
             'employee' => ['nullable', 'integer'], 'department' => ['nullable', 'string', 'max:100'],
-            'reference' => ['nullable', 'string', 'max:255'], 'workflow_status' => ['nullable', Rule::in(['budget_requested', 'approved', 'released', 'in_progress', 'liquidated', 'closed', 'cancelled', 'draft', 'submitted', 'noted', 'Pending', 'Approved', 'Rejected'])],
+            'reference' => ['nullable', 'string', 'max:255'], 'workflow_status' => ['nullable', Rule::in(['budget_requested', 'approved', 'released', 'in_progress', 'liquidated', 'closed', 'cancelled', 'draft', 'submitted', 'noted', 'rejected', 'returned_for_revision', 'Pending', 'Approved', 'Rejected'])],
             'type' => ['nullable', Rule::in(['budget', 'travel', 'ordinary'])],
             'date_from' => ['nullable', 'date'], 'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'amount_min' => ['nullable', 'regex:/^\d{1,12}(\.\d{1,2})?$/D'],

@@ -4,7 +4,7 @@
         <div><p class="text-xs font-bold uppercase tracking-widest text-blue-600">{{ $workflowCompany->name }} · Accounting</p><h1 class="mt-2 text-2xl font-bold">{{ \App\Services\AccountingWorkspace::SECTIONS[$section][0] }}</h1><p class="mt-2 text-sm text-slate-500">Company-scoped financial records and recorded workflow evidence.</p></div>
         @if(in_array($section, ['returned', 'missing', 'settlement', 'cash', 'expenses', 'documents', 'releases', 'audit', 'reports']))
             <div class="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">{{ match($section) {
-                'returned' => 'Ordinary Rejected records are visible here. Budget and travel return/rejection transitions need confirmed rules and remain disabled.',
+                'returned' => 'Rejected and returned requests are visible here. Owners can correct and resubmit returned requests; travel liquidations require Accounting review again before Executive approval.',
                 'missing' => 'Receipt flags and missing ordinary receipt references indicate documentation gaps. A travel receipt flag does not prove a file was uploaded or verified.',
                 'settlement' => 'Approved travel records awaiting settlement or carrying a nonzero recorded balance. Payments and closure remain permission- and configuration-controlled.',
                 'cash' => 'Ordinary petty cash reports use VND. Their PCF balance is a report calculation, not an authoritative cash ledger.',

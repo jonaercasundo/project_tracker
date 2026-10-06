@@ -67,12 +67,12 @@ it('lets the approver review and approve eligible budgets and reviewed travel wi
     $travel = MITravelFixtureFactory::new()->create(['budget_request_id' => $parent->getKey(), 'liquidated_by' => $owner->getKey(), 'status' => 'noted', 'noted_at' => now()]);
     $this->signInMI($approver);
     $this->get(route('mi.approvals'))->assertOk()->assertSee($budget->control_id)->assertSee($parent->control_id);
-    $this->get(route('budget_requests.processing', $budget))->assertOk()->assertSee(route('budget_requests.approve', $budget));
+    $this->get(route('budget_requests.processing', $budget))->assertOk()->assertSee('Executive decision');
     $this->post(route('budget_requests.approve', $budget))->assertRedirect();
     expect($budget->fresh()->status)->toBe('approved');
     expect($budget->fresh()->approved_by)->toBe($approver->getKey());
     $this->post(route('budget_requests.approve', $budget))->assertUnprocessable();
-    $this->get(route('travel_liquidation.processing', $travel))->assertOk()->assertSee(route('travel_liquidation.approve', $travel));
+    $this->get(route('travel_liquidation.processing', $travel))->assertOk()->assertSee('Executive decision');
     $this->post(route('travel_liquidation.approve', $travel))->assertRedirect();
     expect($travel->fresh()->status)->toBe('approved');
     $this->post(route('budget_requests.release', $budget))->assertForbidden();

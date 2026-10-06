@@ -69,6 +69,7 @@ class MigrateMI extends Command
             'database/migrations/2026_10_06_040342_create_mi_product_images_table.php',
             'database/migrations/2026_10_06_050731_change_users_role_to_string.php',
             'database/migrations/2026_10_06_061026_rename_mi_approver_role_to_executive.php',
+            'database/migrations/2026_10_06_080510_enable_mi_executive_approval_workflow.php',
         ]]);
     }
 }

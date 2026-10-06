@@ -11,7 +11,7 @@
         </form>
     </div>
     <nav aria-label="Accounting navigation" class="flex-1 space-y-6 p-3">
-        @if(auth()->user()->can('mi.budget.approve') || auth()->user()->can('mi.travel.approve'))
+        @if(auth()->user()->canAccessMIApprovals())
             <a href="{{ route('mi.approvals') }}" class="block rounded-xl bg-blue-50 px-3 py-3 text-sm font-semibold text-blue-700">Approval Queue</a>
         @endif
         @php

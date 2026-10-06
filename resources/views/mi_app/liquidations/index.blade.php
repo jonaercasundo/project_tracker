@@ -6,6 +6,8 @@
             'noted' => ['Reviewed', 'Awaiting approval', 'bg-amber-50 text-amber-700'],
             'approved' => ['Approved', 'Approval recorded', 'bg-violet-50 text-violet-700'],
             'closed' => ['Closed', 'Report closed', 'bg-emerald-50 text-emerald-700'],
+            'rejected' => ['Rejected', 'See approval history', 'bg-red-50 text-red-700'],
+            'returned_for_revision' => ['Returned', 'Correct and resubmit for accounting review', 'bg-blue-50 text-blue-700'],
         ];
         $summaries = [
             ['', 'All reports', $statusCounts->sum(), 'border-t-blue-600', 'Your travel expense reports'],

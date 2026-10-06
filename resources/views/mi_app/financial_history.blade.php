@@ -1,5 +1,5 @@
 <section class="my-6 rounded border bg-white p-4 text-sm">
-    <h2 class="mb-3 font-semibold">Financial activity history</h2>
+    <h2 class="mb-3 font-semibold">Approval History / Financial activity history</h2>
     <ol class="space-y-3">
         @forelse($activities as $activity)
             <li>

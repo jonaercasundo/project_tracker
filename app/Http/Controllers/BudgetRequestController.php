@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BudgetRequest;
+use App\Services\MIApprovalReview;
 use App\Services\MiFinancialAmount;
 use App\Services\MiFinancialWorkflowService;
 use Illuminate\Http\RedirectResponse;
@@ -147,7 +148,10 @@ class BudgetRequestController extends Controller
 
     public function approve(Request $request, BudgetRequest $budgetRequest): RedirectResponse
     {
-        app(MiFinancialWorkflowService::class)->approveBudget($budgetRequest, $request->user());
+        Gate::authorize('approve', $budgetRequest);
+        $data = $request->validate(['remarks' => ['nullable', 'string', 'max:2000']]);
+        app(MiFinancialWorkflowService::class)->approveBudget($budgetRequest, $request->user(), $data['remarks'] ?? null,
+            app(MIApprovalReview::class)->reviewedVersion($request, $budgetRequest));
 
         return back()->with('status', "{$budgetRequest->control_id} approved.");
     }
@@ -173,9 +177,17 @@ class BudgetRequestController extends Controller
         return back()->with('status', 'Marked as received. You can now file a liquidation.');
     }
 
-    public function processing(BudgetRequest $budgetRequest): View
+    public function resubmit(Request $request, BudgetRequest $budgetRequest): RedirectResponse
+    {
+        app(MiFinancialWorkflowService::class)->resubmitBudget($budgetRequest, $request->user());
+
+        return back()->with('status', 'Budget resubmitted for approval.');
+    }
+
+    public function processing(Request $request, BudgetRequest $budgetRequest): View
     {
         Gate::authorize('viewProcessing', $budgetRequest);
+        app(MIApprovalReview::class)->mark($request, $budgetRequest);
         $budgetRequest->load('items', 'employee', 'company', 'activities', 'releases', 'liquidation.items');
 
         return view('mi_app.budget_requests.show', compact('budgetRequest'));

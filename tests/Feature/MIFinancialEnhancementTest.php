@@ -110,6 +110,7 @@ it('allows only explicitly permitted nonrequester budget approval and preserves 
     $this->signInMI($approver);
     $this->post(route('budget_requests.approve', $budget))->assertForbidden();
     miGrant($approver, 'mi.budget.approve');
+    $this->get(route('budget_requests.processing', $budget))->assertOk();
     $this->post(route('budget_requests.approve', $budget))->assertRedirect();
     $approvedAt = $budget->fresh()->approved_at;
     $this->post(route('budget_requests.approve', $budget))->assertUnprocessable();
@@ -133,6 +134,7 @@ it('allows explicit final travel permission without automatically closing or set
     $this->post(route('travel_liquidation.approve', $travel))->assertForbidden();
     miGrant($approver, 'mi.travel.approve');
     $this->signInMI($approver);
+    $this->get(route('travel_liquidation.processing', $travel))->assertOk();
     $this->post(route('travel_liquidation.approve', $travel))->assertRedirect();
     expect($travel->fresh()->status)->toBe('approved');
     expect($budget->fresh()->status)->toBe('in_progress');

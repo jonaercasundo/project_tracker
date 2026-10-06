@@ -79,6 +79,10 @@
     @endif
     <!-- Navigation Menu Items -->
     <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+        @if(auth()->user()?->canAccessMIApprovals())
+            <a href="{{ route('mi.approvals') }}" class="flex items-center justify-between gap-3 rounded-xl bg-blue-50 px-4 py-3 text-xs font-bold text-blue-700"><span>Approvals</span>@if($miApprovalPendingCount > 0)<span class="rounded-full bg-blue-600 px-2 py-0.5 text-white">{{ $miApprovalPendingCount }}</span>@endif</a>
+        @endif
+
 
         <!-- Dashboard Overview -->
         <a href="{{ route('mi_app.dashboard') }}"

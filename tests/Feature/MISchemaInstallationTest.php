@@ -176,6 +176,8 @@ it('runs the MI migration command without requiring the legacy delivery module a
     expect(Schema::hasTable('package_status'))->toBeFalse();
     $this->assertDatabaseMissing('migrations', ['migration' => '2026_07_22_030841_create_delivery_proofs_table']);
     $this->assertDatabaseMissing('migrations', ['migration' => '2026_10_04_053818_align_bidding_hierarchy']);
+    $this->assertDatabaseHas('migrations', ['migration' => '2026_10_06_080510_enable_mi_executive_approval_workflow']);
+    $this->assertDatabaseHas('roles', ['name' => 'executive', 'guard_name' => 'web']);
 });
 
 it('previews MI migrations without installing tables or recording them as applied', function () {

@@ -85,7 +85,9 @@ class MiFinancialWorkflowService
         $this->travelTransition($liquidation, $actor, 'submit', $liquidation->status === 'returned_for_revision' ? 'returned_for_revision' : 'draft', 'liquidation_submitted', function (Liquidation $locked) use ($actor): void {
             abort_if($locked->submitted_at !== null, 422);
             $locked->recalcTotals();
-            $this->activity($locked, $actor, 'liquidation_created');
+            if ($locked->status === 'draft') {
+                $this->activity($locked, $actor, 'liquidation_created');
+            }
             $locked->submit();
         });
     }
@@ -157,7 +159,9 @@ class MiFinancialWorkflowService
             if (! $isBudget) {
                 $locked->setRelation('budgetRequest', $budget);
             }
-            Gate::forUser($actor)->authorize(match ($action) { 'return' => 'returnForCorrection', default => $action }, $locked);
+            Gate::forUser($actor)->authorize(match ($action) {
+                'return' => 'returnForCorrection', default => $action
+            }, $locked);
             $previous = $isBudget ? 'budget_requested' : 'noted';
             abort_unless($locked->status === $previous && $locked->approved_at === null, 422, 'Invalid or stale workflow action.');
             if (! $isBudget) {
@@ -166,7 +170,9 @@ class MiFinancialWorkflowService
             if ($reviewedVersion !== null) {
                 abort_unless(hash_equals($reviewedVersion, MIApprovalReview::fingerprint($locked)), 422, 'The transaction changed. Review its details again.');
             }
-            $newStatus = match ($action) { 'approve' => 'approved', 'reject' => 'rejected', 'return' => 'returned_for_revision' };
+            $newStatus = match ($action) {
+                'approve' => 'approved', 'reject' => 'rejected', 'return' => 'returned_for_revision'
+            };
             $metadata = ['reviewed_version' => $reviewedVersion];
             if ($action === 'approve') {
                 $locked->update(['status' => $newStatus, 'approved_by' => $actor->getKey(), 'approved_at' => now()]);
@@ -178,7 +184,9 @@ class MiFinancialWorkflowService
                 }
                 $locked->update($changes);
             }
-            $event = ($isBudget ? 'budget_' : 'liquidation_').match ($action) { 'approve' => 'approved', 'reject' => 'rejected', 'return' => 'returned_for_revision' };
+            $event = ($isBudget ? 'budget_' : 'liquidation_').match ($action) {
+                'approve' => 'approved', 'reject' => 'rejected', 'return' => 'returned_for_revision'
+            };
             $this->activity($locked, $actor, $event, $previous, [
                 'note' => $details['remarks'] ?? null, 'amount' => $isBudget ? $locked->budget_total : $locked->actual_total,
                 'metadata' => $metadata,

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BudgetRequest;
 use App\Models\Liquidation;
+use App\Services\MIApprovalReview;
 use App\Services\MiFinancialWorkflowService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -21,7 +22,7 @@ class TravelLiquidationController extends Controller
     {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', Rule::in(['draft', 'submitted', 'noted', 'approved', 'closed'])],
+            'status' => ['nullable', Rule::in(['draft', 'submitted', 'noted', 'approved', 'closed', 'rejected', 'returned_for_revision'])],
         ]);
         $search = trim($filters['search'] ?? '');
         $status = $filters['status'] ?? '';
@@ -202,6 +203,13 @@ class TravelLiquidationController extends Controller
         return $pdf->download("{$liquidation->budgetRequest->control_id}-liquidation.pdf");
     }
 
+    public function submit(Request $request, Liquidation $liquidation): RedirectResponse
+    {
+        app(MiFinancialWorkflowService::class)->submitLiquidation($liquidation, $request->user());
+
+        return back()->with('status', 'Liquidation submitted for accounting review.');
+    }
+
     public function noteByAccounting(Request $request, Liquidation $liquidation): RedirectResponse
     {
         app(MiFinancialWorkflowService::class)->reviewLiquidation($liquidation, $request->user());
@@ -211,7 +219,10 @@ class TravelLiquidationController extends Controller
 
     public function approve(Request $request, Liquidation $liquidation): RedirectResponse
     {
-        app(MiFinancialWorkflowService::class)->approveLiquidation($liquidation, $request->user());
+        Gate::authorize('approve', $liquidation);
+        $data = $request->validate(['remarks' => ['nullable', 'string', 'max:2000']]);
+        app(MiFinancialWorkflowService::class)->approveLiquidation($liquidation, $request->user(), $data['remarks'] ?? null,
+            app(MIApprovalReview::class)->reviewedVersion($request, $liquidation));
 
         return back()->with('status', 'Liquidation approved. Settlement and closure are separate actions.');
     }
@@ -230,9 +241,10 @@ class TravelLiquidationController extends Controller
         return back()->with('status', 'Liquidation closed.');
     }
 
-    public function processing(Liquidation $liquidation): View
+    public function processing(Request $request, Liquidation $liquidation): View
     {
         Gate::authorize('viewProcessing', $liquidation);
+        app(MIApprovalReview::class)->mark($request, $liquidation);
         $liquidation->load('items.budgetRequestItem', 'budgetRequest.items', 'budgetRequest.releases', 'budgetRequest.activities', 'budgetRequest.approver', 'budgetRequest.accountant', 'budgetRequest.releaser', 'company', 'activities', 'settlement', 'liquidatedBy');
 
         return view('mi_app.liquidations.show', compact('liquidation'));

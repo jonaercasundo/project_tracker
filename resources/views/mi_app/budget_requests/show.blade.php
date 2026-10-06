@@ -1,4 +1,4 @@
-<x-dynamic-component :component="(auth()->user()->hasRole('accounting') || auth()->user()->hasRole('Executive')) ? 'accounting_app' : 'mi_app'">
+<x-dynamic-component :component="auth()->user()->hasRole('accounting') ? 'accounting_app' : 'mi_app'">
     <div class="max-w-4xl mx-auto py-6">
 
         @if (session('status'))
@@ -63,15 +63,15 @@
             </tfoot>
         </table>
 
+        @if($budgetRequest->status === 'returned_for_revision')
+            @can('update', $budgetRequest)
+                <div class="my-4 flex flex-wrap gap-3"><a href="{{ route('budget_requests.edit', $budgetRequest) }}" class="text-blue-700">Edit returned request</a><form method="POST" action="{{ route('budget_requests.resubmit', $budgetRequest) }}">@csrf<button class="font-semibold text-blue-700" onclick="return confirm('Resubmit this budget for approval?');">Resubmit for approval</button></form></div>
+            @endcan
+        @endif
         {{-- Workflow action buttons - visibility should also be gated by role/policy on the backend --}}
         <div class="flex gap-2 mb-6">
             @if($budgetRequest->status === 'budget_requested')
-                @can('approve', $budgetRequest)
-                <form method="POST" action="{{ route('budget_requests.approve', $budgetRequest) }}">
-                    @csrf
-                    <button class="bg-green-600 text-white px-4 py-2 rounded text-sm">Approve</button>
-                </form>
-                @endcan
+                @include('mi_app.approval_actions', ['record' => $budgetRequest, 'type' => 'budget'])
             @endif
 
             @if($budgetRequest->status === 'approved')

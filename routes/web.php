@@ -531,6 +531,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/travel_liquidation', [TravelLiquidationController::class, 'index'])->name('travel_liquidation.index');
         Route::get('/travel_liquidation/create', [TravelLiquidationController::class, 'create'])->name('travel_liquidation.create');
         Route::post('/travel_liquidation', [TravelLiquidationController::class, 'store'])->name('travel_liquidation.store');
+        Route::post('/travel_liquidation/{liquidation}/submit', [TravelLiquidationController::class, 'submit'])->name('travel_liquidation.submit');
         Route::get('/travel_liquidation/{liquidation}', [TravelLiquidationController::class, 'show'])->name('travel_liquidation.show');
         Route::get('/travel_liquidation/{liquidation}/edit', [TravelLiquidationController::class, 'edit'])->name('travel_liquidation.edit');
         Route::put('/travel_liquidation/{liquidation}', [TravelLiquidationController::class, 'update'])->name('travel_liquidation.update');

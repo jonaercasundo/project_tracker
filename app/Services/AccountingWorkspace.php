@@ -83,7 +83,7 @@ class AccountingWorkspace
             'tasks' => $query->where('actionable', 1),
             'budgets' => $query->where('type', 'budget'),
             'budget-review', 'releases', 'acknowledgment', 'liquidation-review' => $query->where('stage', $section),
-            'returned' => $query->where('status', 'Rejected')->where('type', 'ordinary'),
+            'returned' => $query->whereIn('status', ['Rejected', 'rejected', 'returned_for_revision']),
             'cash' => $query->where('type', 'ordinary'),
             'liquidations', 'liquidation-reports' => $query->whereIn('type', ['travel', 'ordinary']),
             'missing' => $query->where('missing', 1),

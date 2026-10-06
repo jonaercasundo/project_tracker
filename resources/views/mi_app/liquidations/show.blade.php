@@ -1,4 +1,4 @@
-<x-dynamic-component :component="(auth()->user()->hasRole('accounting') || auth()->user()->hasRole('Executive')) ? 'accounting_app' : 'mi_app'">
+<x-dynamic-component :component="auth()->user()->hasRole('accounting') ? 'accounting_app' : 'mi_app'">
     <div class="max-w-4xl mx-auto py-6">
 
         @if (session('status'))
@@ -58,6 +58,11 @@
         </table>
 
         <div class="flex gap-2">
+            @if($liquidation->status === 'returned_for_revision')
+                @can('update', $liquidation)
+                    <div class="flex flex-wrap gap-3"><a href="{{ route('travel_liquidation.edit', $liquidation) }}" class="text-blue-700">Edit returned report</a><form method="POST" action="{{ route('travel_liquidation.submit', $liquidation) }}" onsubmit="return confirm('Resubmit this report for accounting review?');">@csrf<button class="font-semibold text-blue-700">Resubmit for accounting review</button></form></div>
+                @endcan
+            @endif
             @if($liquidation->status === 'submitted')
                 @can('noteByAccounting', $liquidation)
                 <form method="POST" action="{{ route('travel_liquidation.note', $liquidation) }}">
@@ -67,12 +72,7 @@
                 @endcan
             @endif
             @if($liquidation->status === 'noted')
-                @can('approve', $liquidation)
-                <form method="POST" action="{{ route('travel_liquidation.approve', $liquidation) }}">
-                    @csrf
-                    <button class="bg-green-600 text-white px-4 py-2 rounded text-sm">Approve Liquidation</button>
-                </form>
-                @endcan
+                @include('mi_app.approval_actions', ['record' => $liquidation, 'type' => 'travel'])
             @endif
         </div>
         @include('mi_app.financial_history', ['activities' => $liquidation->activities])

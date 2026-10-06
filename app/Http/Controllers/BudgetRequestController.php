@@ -2,30 +2,39 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\BudgetRequest;
-use Illuminate\Support\Facades\Auth;
+use App\Services\MiFinancialAmount;
+use App\Services\MiFinancialWorkflowService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\View\View;
+
 class BudgetRequestController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): View
     {
         $budgetRequests = BudgetRequest::with('employee')
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
-            ->when(! $request->user()->hasRole('admin'), fn ($q) => $q->where('employee_id', $request->user()->id))
+            ->where('employee_id', $request->user()->getKey())
+            ->where('company_id', $request->user()->currentCompany()->getKey())
             ->latest()
             ->paginate(15);
 
         return view('mi_app.budget_requests.index', compact('budgetRequests'));
     }
 
-    public function create()
+    public function create(): View
     {
+        Gate::authorize('create', BudgetRequest::class);
+
         return view('mi_app.budget_requests.create');
     }
 
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
+        Gate::authorize('create', BudgetRequest::class);
         $data = $request->validate([
             'department' => 'required|string|max:100',
             'objectives' => 'nullable|string',
@@ -35,16 +44,18 @@ class BudgetRequestController extends Controller
             'country' => 'nullable|string|max:100',
             'remarks' => 'nullable|string',
             'items' => 'required|array|min:1',
+            'items.*' => 'required|array',
             'items.*.expense_category' => 'required|string|max:100',
             'items.*.particular' => 'required|string|max:255',
-            'items.*.budget_cash' => 'nullable|numeric|min:0',
-            'items.*.budget_credit_card' => 'nullable|numeric|min:0',
-            'items.*.budget_travel_agent' => 'nullable|numeric|min:0',
+            'items.*.budget_cash' => 'nullable|numeric|min:0|max:9999999999.99|regex:/^\d+(\.\d{1,2})?$/',
+            'items.*.budget_credit_card' => 'nullable|numeric|min:0|max:9999999999.99|regex:/^\d+(\.\d{1,2})?$/',
+            'items.*.budget_travel_agent' => 'nullable|numeric|min:0|max:9999999999.99|regex:/^\d+(\.\d{1,2})?$/',
         ]);
 
         $budgetRequest = DB::transaction(function () use ($data, $request) {
             $budgetRequest = BudgetRequest::create([
-                'employee_id' => $request->user()->id,
+                'employee_id' => $request->user()->getKey(),
+                'company_id' => $request->user()->currentCompany()->getKey(),
                 'department' => $data['department'],
                 'objectives' => $data['objectives'] ?? null,
                 'travel_date_from' => $data['travel_date_from'] ?? null,
@@ -66,37 +77,39 @@ class BudgetRequestController extends Controller
                     'budget_cash' => $cash,
                     'budget_credit_card' => $cc,
                     'budget_travel_agent' => $agent,
-                    'budget_total' => $cash + $cc + $agent,
+                    'budget_total' => MiFinancialAmount::sum([$cash, $cc, $agent]),
                 ]);
             }
 
             $budgetRequest->recalcTotals();
+            app(MiFinancialWorkflowService::class)->submitBudget($budgetRequest, $request->user());
 
             return $budgetRequest;
         });
 
-        return redirect()->route('mi_app.budget_requests.show', $budgetRequest)
+        return redirect()->route('budget_requests.show', $budgetRequest)
             ->with('status', "Budget request {$budgetRequest->control_id} submitted.");
     }
 
-    public function show(BudgetRequest $budgetRequest)
+    public function show(BudgetRequest $budgetRequest): View
     {
-        $budgetRequest->load('items', 'employee', 'liquidation.items');
+        Gate::authorize('view', $budgetRequest);
+        $budgetRequest->load('items', 'employee', 'company', 'activities', 'releases', 'liquidation.items');
 
         return view('mi_app.budget_requests.show', compact('budgetRequest'));
     }
 
-    public function edit(BudgetRequest $budgetRequest)
+    public function edit(BudgetRequest $budgetRequest): View
     {
-        abort_unless($budgetRequest->status === 'budget_requested', 403, 'Only a pending request can be edited.');
+        Gate::authorize('update', $budgetRequest);
         $budgetRequest->load('items');
 
         return view('mi_app.budget_requests.edit', compact('budgetRequest'));
     }
 
-    public function update(Request $request, BudgetRequest $budgetRequest)
+    public function update(Request $request, BudgetRequest $budgetRequest): RedirectResponse
     {
-        abort_unless($budgetRequest->status === 'budget_requested', 403, 'Only a pending request can be edited.');
+        Gate::authorize('update', $budgetRequest);
 
         $data = $request->validate([
             'department' => 'required|string|max:100',
@@ -108,52 +121,63 @@ class BudgetRequestController extends Controller
             'remarks' => 'nullable|string',
         ]);
 
-        $budgetRequest->update($data);
+        DB::transaction(function () use ($budgetRequest, $data): void {
+            $budgetRequest = BudgetRequest::query()->whereKey($budgetRequest->getKey())->lockForUpdate()->firstOrFail();
+            Gate::authorize('update', $budgetRequest);
+            $before = $budgetRequest->only(array_keys($data));
+            $budgetRequest->update($data);
+            app(MiFinancialWorkflowService::class)->activity($budgetRequest, auth()->user(), 'budget_metadata_updated', $budgetRequest->status,
+                ['metadata' => ['before' => $before, 'after' => $data]]);
+        });
 
-        return redirect()->route('mi_app.budget_requests.show', $budgetRequest)->with('status', 'Budget request updated.');
+        return redirect()->route('budget_requests.show', $budgetRequest)->with('status', 'Budget request updated.');
     }
 
-    public function destroy(BudgetRequest $budgetRequest)
+    public function destroy(BudgetRequest $budgetRequest): RedirectResponse
     {
-        abort_unless($budgetRequest->status === 'budget_requested', 403, 'Only a pending request can be deleted.');
-        $budgetRequest->delete();
+        DB::transaction(function () use ($budgetRequest): void {
+            $budgetRequest = BudgetRequest::query()->whereKey($budgetRequest->getKey())->lockForUpdate()->firstOrFail();
+            Gate::authorize('delete', $budgetRequest);
+            app(MiFinancialWorkflowService::class)->activity($budgetRequest, auth()->user(), 'archived', $budgetRequest->status);
+            $budgetRequest->delete();
+        });
 
-        return redirect()->route('mi_app.budget_requests.index')->with('status', 'Budget request deleted.');
+        return redirect()->route('budget_requests.index')->with('status', 'Budget request deleted.');
     }
 
-    // --- Workflow actions, one per box in the diagram ---
-
-    public function approve(Request $request, BudgetRequest $budgetRequest)
+    public function approve(Request $request, BudgetRequest $budgetRequest): RedirectResponse
     {
-        abort_unless($budgetRequest->status === 'budget_requested', 422, 'Request is not pending approval.');
-        $budgetRequest->approve(Auth::user());
+        app(MiFinancialWorkflowService::class)->approveBudget($budgetRequest, $request->user());
 
         return back()->with('status', "{$budgetRequest->control_id} approved.");
     }
 
-    public function noteByAccounting(Request $request, BudgetRequest $budgetRequest)
+    public function noteByAccounting(Request $request, BudgetRequest $budgetRequest): RedirectResponse
     {
-        abort_unless($budgetRequest->status === 'approved', 422, 'Request must be approved before accounting can process it.');
-        $budgetRequest->noteByAccounting(Auth::user());
+        app(MiFinancialWorkflowService::class)->noteBudget($budgetRequest, $request->user());
 
         return back()->with('status', "{$budgetRequest->control_id} noted by accounting.");
     }
 
-    public function release(Request $request, BudgetRequest $budgetRequest)
+    public function release(Request $request, BudgetRequest $budgetRequest): RedirectResponse
     {
-        abort_unless($budgetRequest->status === 'approved', 422, 'Request must be approved before releasing funds.');
-        $budgetRequest->release(Auth::user());
+        app(MiFinancialWorkflowService::class)->releaseBudget($budgetRequest, $request->user(), $request->only(['amount', 'currency', 'exchange_rate', 'payment_method', 'reference_no', 'note']));
 
         return back()->with('status', "Budget released for {$budgetRequest->control_id}.");
     }
 
-    public function markReceived(Request $request, BudgetRequest $budgetRequest)
+    public function markReceived(Request $request, BudgetRequest $budgetRequest): RedirectResponse
     {
-        abort_unless($budgetRequest->status === 'released', 422, 'Budget has not been released yet.');
-        abort_unless($budgetRequest->employee_id === Auth::id(), 403);
-
-        $budgetRequest->markReceived();
+        app(MiFinancialWorkflowService::class)->confirmReceipt($budgetRequest, $request->user());
 
         return back()->with('status', 'Marked as received. You can now file a liquidation.');
+    }
+
+    public function processing(BudgetRequest $budgetRequest): View
+    {
+        Gate::authorize('viewProcessing', $budgetRequest);
+        $budgetRequest->load('items', 'employee', 'company', 'activities', 'releases', 'liquidation.items');
+
+        return view('mi_app.budget_requests.show', compact('budgetRequest'));
     }
 }

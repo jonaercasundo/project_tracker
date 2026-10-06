@@ -9,23 +9,23 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-public function up()
-{
-    Schema::table('mi_products', function (Blueprint $table) {
+    public function up(): void
+    {
+        Schema::table('mi_products', function (Blueprint $table) {
 
-        $table->json('materials')->change();
-        $table->json('color')->nullable()->change();
+            $table->json('materials')->nullable()->change();
+            $table->json('color')->nullable()->change();
 
-    });
-}
+        });
+    }
 
-public function down()
-{
-    Schema::table('mi_products', function (Blueprint $table) {
+    public function down(): void
+    {
+        Schema::table('mi_products', function (Blueprint $table) {
 
-        $table->string('materials')->change();
-        $table->string('color')->nullable()->change();
+            $table->string('materials')->nullable()->change();
+            $table->string('color')->nullable()->change();
 
-    });
-}
+        });
+    }
 };

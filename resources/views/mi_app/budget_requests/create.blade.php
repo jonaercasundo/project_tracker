@@ -453,6 +453,10 @@
                                     Expense Category
                                 </th>
 
+                                <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                    Particulars <span class="text-red-500" aria-hidden="true">*</span>
+                                </th>
+
                                 <th class="p-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-28">
                                     Currency
                                 </th>
@@ -483,6 +487,8 @@
 
                         <tbody class="divide-y divide-slate-100">
 
+                            @foreach(is_array(old('items')) && old('items') ? old('items') : [[]] as $originalIndex => $row)
+                            @php($i = $loop->index)
                             <tr class="item-row">
 
                                 {{-- EXPENSE CATEGORY --}}
@@ -490,7 +496,7 @@
                                 <td class="p-1.5">
 
                                     <select
-                                        name="items[0][expense_category]"
+                                        name="items[{{ $i }}][expense_category]"
                                         class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                                         required
                                     >
@@ -499,39 +505,39 @@
                                             Select Expense Category
                                         </option>
 
-                                        <option value="Airfare">
+                                        <option value="Airfare" @selected(($row['expense_category'] ?? '') === 'Airfare')>
                                             Airfare
                                         </option>
 
-                                        <option value="Airport Tax">
+                                        <option value="Airport Tax" @selected(($row['expense_category'] ?? '') === 'Airport Tax')>
                                             Airport Tax
                                         </option>
 
-                                        <option value="Hotel And Accommodation">
+                                        <option value="Hotel And Accommodation" @selected(($row['expense_category'] ?? '') === 'Hotel And Accommodation')>
                                             Hotel And Accommodation
                                         </option>
 
-                                        <option value="Per Diem">
+                                        <option value="Per Diem" @selected(($row['expense_category'] ?? '') === 'Per Diem')>
                                             Per Diem
                                         </option>
 
-                                        <option value="Transportation">
+                                        <option value="Transportation" @selected(($row['expense_category'] ?? '') === 'Transportation')>
                                             Transportation
                                         </option>
 
-                                        <option value="Communication And Petty Cash">
+                                        <option value="Communication And Petty Cash" @selected(($row['expense_category'] ?? '') === 'Communication And Petty Cash')>
                                             Communication And Petty Cash
                                         </option>
 
-                                        <option value="Travel Insurance">
+                                        <option value="Travel Insurance" @selected(($row['expense_category'] ?? '') === 'Travel Insurance')>
                                             Travel Insurance
                                         </option>
 
-                                        <option value="Visa And Permit">
+                                        <option value="Visa And Permit" @selected(($row['expense_category'] ?? '') === 'Visa And Permit')>
                                             Visa And Permit
                                         </option>
 
-                                        <option value="Other">
+                                        <option value="Other" @selected(($row['expense_category'] ?? '') === 'Other')>
                                             Other
                                         </option>
 
@@ -540,24 +546,33 @@
                                 </td>
 
 
+                                <td class="p-1.5">
+                                    <input type="text" name="items[{{ $i }}][particular]" value="{{ $row['particular'] ?? '' }}" required maxlength="255"
+                                        aria-label="Particulars for expense {{ $i + 1 }}" placeholder="Describe this expense"
+                                        class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100">
+                                    @error("items.$originalIndex.particular")
+                                        <p class="mt-1 text-xs text-red-600" role="alert">{{ $message }}</p>
+                                    @enderror
+                                </td>
+
                                 {{-- CURRENCY --}}
 
                                 <td class="p-1.5">
 
                                     <select
-                                        name="items[0][currency]"
+                                        name="items[{{ $i }}][currency]"
                                         class="w-full p-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 currency-select"
                                     >
 
-                                        <option value="PHP">
+                                        <option value="PHP" @selected(($row['currency'] ?? 'PHP') === 'PHP')>
                                             PHP ₱
                                         </option>
 
-                                        <option value="USD">
+                                        <option value="USD" @selected(($row['currency'] ?? 'PHP') === 'USD')>
                                             USD $
                                         </option>
 
-                                        <option value="VND">
+                                        <option value="VND" @selected(($row['currency'] ?? 'PHP') === 'VND')>
                                             VND ₫
                                         </option>
 
@@ -581,7 +596,8 @@
                                         <input
                                             type="text"
                                             inputmode="decimal"
-                                            name="items[0][budget_cash]"
+                                            name="items[{{ $i }}][budget_cash]"
+                                            value="{{ $row['budget_cash'] ?? '' }}"
                                             class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                             placeholder="0.00"
                                             autocomplete="off"
@@ -607,7 +623,8 @@
                                         <input
                                             type="text"
                                             inputmode="decimal"
-                                            name="items[0][budget_credit_card]"
+                                            name="items[{{ $i }}][budget_credit_card]"
+                                            value="{{ $row['budget_credit_card'] ?? '' }}"
                                             class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                             placeholder="0.00"
                                             autocomplete="off"
@@ -633,7 +650,8 @@
                                         <input
                                             type="text"
                                             inputmode="decimal"
-                                            name="items[0][budget_travel_agent]"
+                                            name="items[{{ $i }}][budget_travel_agent]"
+                                            value="{{ $row['budget_travel_agent'] ?? '' }}"
                                             class="w-full p-1.5 pl-7 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 amount"
                                             placeholder="0.00"
                                             autocomplete="off"
@@ -650,7 +668,7 @@
 
                                     <input
                                         type="hidden"
-                                        name="items[0][php_equivalent]"
+                                        name="items[{{ $i }}][php_equivalent]"
                                         class="php-equivalent-input"
                                         value="0"
                                     >
@@ -679,6 +697,7 @@
                                 </td>
 
                             </tr>
+                            @endforeach
 
                         </tbody>
 
@@ -1478,7 +1497,7 @@
            ROW INDEX
         ========================================================== */
 
-        let rowIndex = 1;
+        let rowIndex = document.querySelectorAll('#items-table tbody .item-row').length;
 
 
         /* =========================================================
@@ -1507,6 +1526,12 @@
 
                     </td>
 
+
+                    <td class="p-1.5">
+                        <input type="text" name="items[${i}][particular]" required maxlength="255"
+                            aria-label="Particulars for expense ${i + 1}" placeholder="Describe this expense"
+                            class="w-full p-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100">
+                    </td>
 
                     {{-- CURRENCY --}}
 

@@ -1,4 +1,4 @@
-<x-mi_app>
+<x-dynamic-component :component="(auth()->user()->hasRole('accounting') || auth()->user()->hasRole('Executive')) ? 'accounting_app' : 'mi_app'">
     <div class="max-w-4xl mx-auto py-6">
 
         @if (session('status'))
@@ -10,17 +10,27 @@
             <span class="px-3 py-1 rounded text-sm bg-gray-200">{{ str_replace('_', ' ', ucfirst($budgetRequest->status)) }}</span>
         </div>
 
-        {{-- Status timeline, mirrors: budget request > approved > accounting/release > in progress > liquidated --}}
-        <div class="flex text-xs mb-6">
-            @foreach(['budget_requested' => 'Requested', 'approved' => 'Approved', 'released' => 'Released', 'in_progress' => 'Received', 'liquidated' => 'Liquidated'] as $key => $label)
-                @php $reached = array_search($budgetRequest->status, ['budget_requested','approved','released','in_progress','liquidated','closed']) >= array_search($key, ['budget_requested','approved','released','in_progress','liquidated']); @endphp
-                <div class="flex-1 text-center {{ $reached ? 'text-green-700 font-semibold' : 'text-gray-400' }}">
-                    {{ $label }}
-                </div>
-            @endforeach
-        </div>
+        @include('mi_app.financial_history', ['activities' => $budgetRequest->activities])
+        @php
+            $next = match($budgetRequest->status) {
+                'budget_requested' => 'Designated approver: budget approval',
+                'approved' => $budgetRequest->noted_at ? 'Accounting: release confirmation' : 'Accounting: note request',
+                'released' => 'Employee: confirm receipt',
+                'in_progress' => 'Employee: file travel liquidation',
+                default => 'Review recorded history',
+            };
+        @endphp
+        <p class="mb-4 text-sm">Next expected action / responsible party: {{ $next }}</p>
+        <p class="mb-4 text-sm">Company: {{ $budgetRequest->company?->name }}</p>
+        @if($errors->any())<div class="mb-4 text-red-700">{{ $errors->first() }}</div>@endif
+        <h2 class="font-semibold">Recorded releases</h2>
+        @forelse($budgetRequest->releases as $release)
+            <p>{{ $release->currency }} {{ $release->amount }} ? {{ $release->reference_no }} ? {{ $release->released_at }}</p>
+        @empty
+            <p class="mb-4 text-sm text-gray-600">No quantified release evidence recorded.</p>
+        @endforelse
 
-        <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-sm">
             <div><span class="text-gray-500">Employee:</span> {{ $budgetRequest->employee->name }}</div>
             <div><span class="text-gray-500">Department:</span> {{ $budgetRequest->department }}</div>
             <div><span class="text-gray-500">Place:</span> {{ $budgetRequest->place }}, {{ $budgetRequest->country }}</div>
@@ -56,39 +66,57 @@
         {{-- Workflow action buttons - visibility should also be gated by role/policy on the backend --}}
         <div class="flex gap-2 mb-6">
             @if($budgetRequest->status === 'budget_requested')
+                @can('approve', $budgetRequest)
                 <form method="POST" action="{{ route('budget_requests.approve', $budgetRequest) }}">
                     @csrf
                     <button class="bg-green-600 text-white px-4 py-2 rounded text-sm">Approve</button>
                 </form>
+                @endcan
             @endif
 
             @if($budgetRequest->status === 'approved')
+                @if($budgetRequest->noted_at === null)
+                @can('noteByAccounting', $budgetRequest)
                 <form method="POST" action="{{ route('budget_requests.note', $budgetRequest) }}">
                     @csrf
                     <button class="bg-yellow-600 text-white px-4 py-2 rounded text-sm">Note (Accounting)</button>
                 </form>
+                @endcan
+                @endif
+                @if($budgetRequest->noted_at !== null)
+                @can('release', $budgetRequest)
                 <form method="POST" action="{{ route('budget_requests.release', $budgetRequest) }}">
                     @csrf
+                    @if(config('mi_financial.release_recording_enabled'))
+                        <label>Released amount <input name="amount" required inputmode="decimal" class="border p-2"></label>
+                        <label>Currency <select name="currency" required>@foreach(config('mi_financial.currencies') as $currency)<option>{{ $currency }}</option>@endforeach</select></label>
+                        <label>Payment method <input name="payment_method" required class="border p-2"></label>
+                        <label>Payment reference <input name="reference_no" required class="border p-2"></label>
+                    @endif
                     <button class="bg-blue-600 text-white px-4 py-2 rounded text-sm">Release Budget</button>
                 </form>
+                @endcan
+                @endif
             @endif
 
-            @if($budgetRequest->status === 'released' && $budgetRequest->employee_id === auth()->id())
+            @if($budgetRequest->status === 'released')
+                @can('markReceived', $budgetRequest)
                 <form method="POST" action="{{ route('budget_requests.received', $budgetRequest) }}">
                     @csrf
                     <button class="bg-indigo-600 text-white px-4 py-2 rounded text-sm">Mark Budget Received</button>
                 </form>
+            @endcan
             @endif
 
-            @if($budgetRequest->status === 'in_progress' && ! $budgetRequest->liquidation)
-                <a href="{{ route('liquidation.create', ['budget_request' => $budgetRequest->id]) }}"
+            @if($budgetRequest->status === 'in_progress' && ! $budgetRequest->liquidation && auth()->user()->can('view', $budgetRequest))
+                <a href="{{ route('travel_liquidation.create', ['budget_request' => $budgetRequest->id]) }}"
                 class="bg-purple-600 text-white px-4 py-2 rounded text-sm">File Liquidation</a>
             @endif
 
-            @if($budgetRequest->liquidation)
-                <a href="{{ route('liquidation.show', $budgetRequest->liquidation) }}"
+            @if($budgetRequest->liquidation && auth()->user()->can('view', $budgetRequest->liquidation))
+                <a href="{{ route('travel_liquidation.show', $budgetRequest->liquidation) }}"
                 class="bg-gray-700 text-white px-4 py-2 rounded text-sm">View Liquidation Report</a>
             @endif
         </div>
     </div>
-</x-mi_app>
+</x-dynamic-component>

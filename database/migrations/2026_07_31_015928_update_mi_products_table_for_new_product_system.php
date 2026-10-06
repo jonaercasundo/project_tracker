@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,7 +12,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('mi_products', function (Blueprint $table) {
+        if (DB::table('mi_products')->exists()) {
+            throw new RuntimeException('Populated legacy MI products require an explicit data conversion before replacing classification columns.');
+        }
+        $legacyColumns = array_values(array_intersect([
+            'item_no', 'main_category', 'sub_category', 'sub_sub_category', 'collection',
+            'sample_type', 'photo_reference', 'file_id', 'gdrive_link', 'material',
+            'dimension', 'qty', 'sample_dev_status', 'present_in_showroom', 'borrowed', 'remarks',
+        ], Schema::getColumnListing('mi_products')));
+
+        $legacyIndexes = array_filter(Schema::getIndexes('mi_products'), fn (array $index): bool => ! $index['primary'] && array_intersect($index['columns'], $legacyColumns) !== []);
+
+        Schema::table('mi_products', function (Blueprint $table) use ($legacyColumns, $legacyIndexes) {
 
             /*
             |--------------------------------------------------------------------------
@@ -19,24 +31,12 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            $table->dropColumn([
-                'item_no',
-                'main_category',
-                'sub_category',
-                'sub_sub_category',
-                'collection',
-                'sample_type',
-                'photo_reference',
-                'file_id',
-                'gdrive_link',
-                'material',
-                'dimension',
-                'qty',
-                'sample_dev_status',
-                'present_in_showroom',
-                'borrowed',
-                'remarks',
-            ]);
+            if ($legacyColumns !== []) {
+                foreach ($legacyIndexes as $index) {
+                    $table->dropIndex($index['name']);
+                }
+                $table->dropColumn($legacyColumns);
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -84,10 +84,10 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            $table->decimal('product_height',10,2)->nullable();
-            $table->decimal('product_width',10,2)->nullable();
-            $table->decimal('product_length',10,2)->nullable();
-            $table->decimal('product_depth',10,2)->nullable();
+            $table->decimal('product_height', 10, 2)->nullable();
+            $table->decimal('product_width', 10, 2)->nullable();
+            $table->decimal('product_length', 10, 2)->nullable();
+            $table->decimal('product_depth', 10, 2)->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -95,10 +95,10 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            $table->decimal('carton_height',10,2)->nullable();
-            $table->decimal('carton_width',10,2)->nullable();
-            $table->decimal('carton_length',10,2)->nullable();
-            $table->decimal('carton_depth',10,2)->nullable();
+            $table->decimal('carton_height', 10, 2)->nullable();
+            $table->decimal('carton_width', 10, 2)->nullable();
+            $table->decimal('carton_length', 10, 2)->nullable();
+            $table->decimal('carton_depth', 10, 2)->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -106,7 +106,7 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            $table->decimal('purchase_cost',12,2)->nullable();
+            $table->decimal('purchase_cost', 12, 2)->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -225,7 +225,7 @@ return new class extends Migration
                 'On-going',
                 'Completed',
                 'Cancelled',
-                'returned'
+                'returned',
             ])->default('For Development');
 
             $table->boolean('present_in_showroom')->default(false);

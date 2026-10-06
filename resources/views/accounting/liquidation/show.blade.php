@@ -1411,7 +1411,7 @@
 
                 <div class="liq-breadcrumb">
 
-                    <a href="{{ route('liquidation.index') }}">
+                    <a href="{{ route('accounting.mi.liquidation.index') }}">
                         Liquidation
                     </a>
 
@@ -2180,7 +2180,7 @@
 
                                     @php
                                         $receiptPath = ltrim($item->receipt_image, '/');
-                                        $receiptUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($receiptPath);
+                                        $receiptUrl = route('liquidation.receipt', $item);
                                         $receiptModalId = 'receiptModal-' . $item->id;
                                     @endphp
 
@@ -2785,4 +2785,5 @@ window.downloadReceiptPdf = async function (imageUrl, refNo, button) {
 };
 </script>
 
+@include('mi_app.financial_history', ['activities' => $liquidation->activities])
 </x-accounting_app>

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Accounting_DashboardController;
 use App\Http\Controllers\Accounting_LiquidationController;
+use App\Http\Controllers\AccountingWorkspaceController;
 use App\Http\Controllers\ActionCrawlerController;
 use App\Http\Controllers\BiddingController;
 use App\Http\Controllers\BiddingDocumentController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\ITinventoryController;
 use App\Http\Controllers\LiquidationController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MIAppController;
+use App\Http\Controllers\MIApprovalController;
 use App\Http\Controllers\PplFormController;
 use App\Http\Controllers\ProductScanController;
 use App\Http\Controllers\ProfileController;
@@ -475,6 +477,7 @@ Route::middleware(['auth'])->group(function () {
         | MI ROUTES
         |--------------------------------------------------------------------------
     */
+    Route::get('/mi/approvals', [MIApprovalController::class, 'index'])->middleware(['auth', 'company.context:MI'])->name('mi.approvals');
     Route::middleware(['auth', 'company.context:MI', 'role:user'])->group(function () {
 
         Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
@@ -496,7 +499,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/liquidation', [LiquidationController::class, 'store'])->name('liquidation.store');
         Route::get('/liquidation/{liquidation}', [LiquidationController::class, 'show'])->name('liquidation.show');
         Route::get(
-            '/liquidation/{id}/edit',
+            '/liquidation/{liquidation}/edit',
             [LiquidationController::class, 'edit']
         )->name('liquidation.edit');
         Route::put('/liquidation/{liquidation}', [LiquidationController::class, 'update'])->name('liquidation.update');
@@ -513,9 +516,6 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/budget-requests/{budgetRequest}', [BudgetRequestController::class, 'destroy'])->name('budget_requests.destroy');
 
         // Workflow transitions - one per box in the diagram
-        Route::post('/budget-requests/{budgetRequest}/approve', [BudgetRequestController::class, 'approve'])->name('budget_requests.approve');
-        Route::post('/budget-requests/{budgetRequest}/note', [BudgetRequestController::class, 'noteByAccounting'])->name('budget_requests.note');
-        Route::post('/budget-requests/{budgetRequest}/release', [BudgetRequestController::class, 'release'])->name('budget_requests.release');
         Route::post('/budget-requests/{budgetRequest}/received', [BudgetRequestController::class, 'markReceived'])->name('budget_requests.received');
 
         // --- Travel Liquidation (tied to a budget_requests row, review/approve workflow) ---
@@ -533,11 +533,28 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/travel_liquidation/{liquidation}/pdf', [TravelLiquidationController::class, 'downloadPdf'])->name('travel_liquidation.pdf');
 
         // Balance-check sign-off (the dashed box in your diagram)
-        Route::post('/travel_liquidation/{liquidation}/note', [TravelLiquidationController::class, 'noteByAccounting'])->name('travel_liquidation.note');
+    });
+    Route::middleware(['auth', 'company.context:MI'])->group(function () {
+        Route::post('/budget-requests/{budgetRequest}/approve', [BudgetRequestController::class, 'approve'])->name('budget_requests.approve');
         Route::post('/travel_liquidation/{liquidation}/approve', [TravelLiquidationController::class, 'approve'])->name('travel_liquidation.approve');
+        Route::get('/mi/processing/budgets/{budgetRequest}', [BudgetRequestController::class, 'processing'])->name('budget_requests.processing');
+        Route::get('/mi/processing/travel/{liquidation}', [TravelLiquidationController::class, 'processing'])->name('travel_liquidation.processing');
+        Route::post('/travel_liquidation/{liquidation}/settlement', [TravelLiquidationController::class, 'recordSettlement'])->name('travel_liquidation.settlement');
+        Route::post('/travel_liquidation/{liquidation}/close', [TravelLiquidationController::class, 'close'])->name('travel_liquidation.close');
+    });
+    Route::middleware(['auth', 'company.context:MI', 'role:user,accounting'])->group(function () {
+        Route::get('/mi-liquidation-receipts/{item}', [LiquidationController::class, 'receipt'])->name('liquidation.receipt');
     });
     Route::middleware(['auth', 'company.context:MI', 'role:accounting'])->group(function () {
+        Route::post('/budget-requests/{budgetRequest}/note', [BudgetRequestController::class, 'noteByAccounting'])->name('budget_requests.note');
+        Route::post('/budget-requests/{budgetRequest}/release', [BudgetRequestController::class, 'release'])->name('budget_requests.release');
+        Route::post('/travel_liquidation/{liquidation}/note', [TravelLiquidationController::class, 'noteByAccounting'])->name('travel_liquidation.note');
+
+        Route::get('/accounting', [Accounting_DashboardController::class, 'dashboard'])->name('accounting.mi.home');
         Route::get('/accounting/dashboard', [Accounting_DashboardController::class, 'dashboard'])->name('accounting.mi.dashboard');
+        Route::get('/accounting/workspace/{section}', [AccountingWorkspaceController::class, 'index'])->name('accounting.mi.workspace');
+        Route::get('/accounting/budgets/{budgetRequest}', [AccountingWorkspaceController::class, 'budget'])->name('accounting.mi.budgets.show');
+        Route::get('/accounting/travel/{liquidation}', [AccountingWorkspaceController::class, 'travel'])->name('accounting.mi.travel.show');
         Route::get('/accounting/liquidation', [Accounting_LiquidationController::class, 'index'])->name('accounting.mi.liquidation.index');
         Route::get('/accounting/liquidation/{liquidation}', [Accounting_LiquidationController::class, 'show'])->name('accounting.mi.liquidation.show');
         Route::get('/accounting/liquidation/{liquidation}/pdf', [Accounting_LiquidationController::class, 'downloadPdf'])->name('accounting.mi.liquidation.pdf');

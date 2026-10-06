@@ -3,8 +3,19 @@
         <h1 class="text-xl font-semibold mb-1">Liquidation — {{ $budgetRequest->control_id }}</h1>
         <p class="text-sm text-gray-500 mb-4">Budget total: {{ number_format($budgetRequest->budget_total, 2) }}</p>
 
-        <form method="POST" action="{{ route('liquidation.store') }}">
+        @if ($errors->any())
+            <ul class="text-red-700 mb-4">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        @endif
+
+        <form method="POST" action="{{ isset($liquidation) ? route('travel_liquidation.update', $liquidation) : route('travel_liquidation.store') }}">
             @csrf
+            @isset($liquidation)
+                @method('PUT')
+            @endisset
             <input type="hidden" name="budget_request_id" value="{{ $budgetRequest->id }}">
 
             <table class="w-full text-sm border mb-2">
@@ -20,26 +31,31 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($budgetRequest->items as $i => $item)
+                    @foreach(isset($liquidation) ? $liquidation->items : $budgetRequest->items as $i => $item)
                         <tr>
                             <td class="border p-1">
                                 {{ $item->expense_category }}
-                                <input type="hidden" name="items[{{ $i }}][budget_request_item_id]" value="{{ $item->id }}">
+                                @isset($liquidation)
+                                    <input type="hidden" name="items[{{ $i }}][id]" value="{{ $item->id }}">
+                                @else
+                                    <input type="hidden" name="items[{{ $i }}][budget_request_item_id]" value="{{ $item->id }}">
+                                @endisset
                                 <input type="hidden" name="items[{{ $i }}][expense_category]" value="{{ $item->expense_category }}">
                             </td>
                             <td class="border p-1">
                                 {{ $item->particular }}
                                 <input type="hidden" name="items[{{ $i }}][particular]" value="{{ $item->particular }}">
                             </td>
-                            <td class="border p-1 text-right budgeted" data-amount="{{ $item->budget_total }}">{{ number_format($item->budget_total, 2) }}</td>
-                            <td class="border p-1"><input type="number" step="0.01" class="w-full p-1 text-right actual" name="items[{{ $i }}][actual_cash]" value="{{ $item->budget_cash }}"></td>
-                            <td class="border p-1"><input type="number" step="0.01" class="w-full p-1 text-right actual" name="items[{{ $i }}][actual_credit_card]" value="{{ $item->budget_credit_card }}"></td>
-                            <td class="border p-1"><input type="number" step="0.01" class="w-full p-1 text-right actual" name="items[{{ $i }}][actual_travel_agent]" value="{{ $item->budget_travel_agent }}"></td>
+                            @php $budgeted = isset($liquidation) ? ($item->budgetRequestItem?->budget_total ?? 0) : $item->budget_total; @endphp
+                            <td class="border p-1 text-right budgeted" data-amount="{{ $budgeted }}">{{ number_format($budgeted, 2) }}</td>
+                            <td class="border p-1"><input type="number" step="0.01" class="w-full p-1 text-right actual" name="items[{{ $i }}][actual_cash]" value="{{ old("items.$i.actual_cash", isset($liquidation) ? $item->actual_cash : $item->budget_cash) }}"></td>
+                            <td class="border p-1"><input type="number" step="0.01" class="w-full p-1 text-right actual" name="items[{{ $i }}][actual_credit_card]" value="{{ old("items.$i.actual_credit_card", isset($liquidation) ? $item->actual_credit_card : $item->budget_credit_card) }}"></td>
+                            <td class="border p-1"><input type="number" step="0.01" class="w-full p-1 text-right actual" name="items[{{ $i }}][actual_travel_agent]" value="{{ old("items.$i.actual_travel_agent", isset($liquidation) ? $item->actual_travel_agent : $item->budget_travel_agent) }}"></td>
                             <td class="border p-1 text-center">
                                 <select name="items[{{ $i }}][receipt_attached]" class="p-1">
-                                    <option value="Yes">Yes</option>
-                                    <option value="No">No</option>
-                                    <option value="N/A">N/A</option>
+                                    <option value="yes" @selected(old("items.$i.receipt_attached", $item->receipt_attached ?? 'yes') === 'yes')>Yes</option>
+                                    <option value="no" @selected(old("items.$i.receipt_attached", $item->receipt_attached ?? 'yes') === 'no')>No</option>
+                                    <option value="n_a" @selected(old("items.$i.receipt_attached", $item->receipt_attached ?? 'yes') === 'n_a')>N/A</option>
                                 </select>
                             </td>
                         </tr>
@@ -56,10 +72,10 @@
 
             <div class="mb-4">
                 <label class="block text-sm font-medium">Remarks</label>
-                <textarea name="remarks" class="w-full border rounded p-2" rows="2"></textarea>
+                <textarea name="remarks" class="w-full border rounded p-2" rows="2">{{ old('remarks', $liquidation->remarks ?? '') }}</textarea>
             </div>
 
-            <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded">Submit Liquidation</button>
+            <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded">{{ isset($liquidation) ? 'Save changes' : 'Submit Liquidation' }}</button>
         </form>
     </div>
 

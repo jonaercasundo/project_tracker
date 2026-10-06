@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class CompanyController extends Controller
 {
@@ -81,7 +82,7 @@ class CompanyController extends Controller
                 'required',
                 'string',
                 'max:50',
-                'unique:companies,code,' . $company->company_id . ',company_id',
+                'unique:companies,code,'.$company->company_id.',company_id',
             ],
             'is_active' => [
                 'nullable',
@@ -113,38 +114,38 @@ class CompanyController extends Controller
     /**
      * Switch company while already logged in.
      */
-public function switch(Request $request): RedirectResponse
-{
-    $validated = $request->validate([
-        'company_id' => [
-            'required',
-            'integer',
-            'exists:companies,company_id',
-        ],
-    ]);
+    public function switch(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                'exists:companies,company_id',
+            ],
+        ]);
 
-    $user = auth()->user();
+        $user = auth()->user();
 
-    $company = $user->companies()
-        ->where('companies.company_id', $validated['company_id'])
-        ->where('companies.is_active', true)
-        ->first();
+        $company = $user->companies()
+            ->where('companies.company_id', $validated['company_id'])
+            ->where('companies.is_active', true)
+            ->first();
 
-    if (!$company) {
-        abort(403, 'You do not have access to this company.');
+        if (! $company) {
+            abort(403, 'You do not have access to this company.');
+        }
+
+        session([
+            'company_id' => $company->company_id,
+        ]);
+
+        return $this->redirectForCompany($company, $user);
     }
-
-    session([
-        'company_id' => $company->company_id,
-    ]);
-
-    return $this->redirectForCompany($company, $user);
-}
 
     /**
      * Show company selection screen.
      */
-    public function select(): RedirectResponse|\Illuminate\View\View
+    public function select(): RedirectResponse|View
     {
         $user = auth()->user();
 
@@ -213,7 +214,7 @@ public function switch(Request $request): RedirectResponse
         | Security check
         |--------------------------------------------------------------------------
         */
-        if (!$user->belongsToCompany($validated['company_id'])) {
+        if (! $user->belongsToCompany($validated['company_id'])) {
             abort(403, 'You do not have access to this company.');
         }
 
@@ -226,7 +227,7 @@ public function switch(Request $request): RedirectResponse
             ->where('is_active', true)
             ->first();
 
-        if (!$company) {
+        if (! $company) {
             abort(403, 'This company is inactive.');
         }
 
@@ -296,6 +297,13 @@ public function switch(Request $request): RedirectResponse
 
             if ($user->hasRole('Administrator')) {
                 return redirect()->route('admin.dashboard');
+            }
+
+            if ($user->hasRole('accounting')) {
+                return redirect()->route('accounting.mi.dashboard');
+            }
+            if ($user->can('mi.budget.approve') || $user->can('mi.travel.approve')) {
+                return redirect()->route('mi.approvals');
             }
         }
 

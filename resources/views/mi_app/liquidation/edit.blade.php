@@ -2263,6 +2263,7 @@
                                         ================================================== --}}
 
                                         <div class="expense-row">
+                                            <input type="hidden" data-field="id" name="items[{{ $index }}][id]" value="{{ $item['id'] ?? '' }}">
 
 
                                             {{-- REF --}}

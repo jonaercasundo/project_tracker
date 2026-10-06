@@ -2,12 +2,20 @@
 
 namespace App\Models;
 
-use App\Models\User;
+use App\Services\MiFinancialAmount;
+use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Liquidation extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
+        'company_id',
         'budget_request_id', 'liquidated_by', 'status',
         'actual_total', 'variance', 'submitted_at',
         'noted_by', 'noted_at', 'approved_by', 'approved_at', 'remarks',
@@ -24,17 +32,17 @@ class Liquidation extends Model
     // Amounts within this tolerance count as "balanced" (avoids float rounding false positives)
     const BALANCE_TOLERANCE = 0.01;
 
-    public function budgetRequest()
+    public function budgetRequest(): BelongsTo
     {
         return $this->belongsTo(BudgetRequest::class);
     }
 
-    public function liquidatedBy()
+    public function liquidatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'liquidated_by');
     }
 
-    public function items()
+    public function items(): HasMany
     {
         return $this->hasMany(LiquidationItem::class);
     }
@@ -46,28 +54,28 @@ class Liquidation extends Model
      */
     public function recalcTotals(): void
     {
-        $actualTotal = $this->items()->sum('actual_total');
-        $budgetTotal = (float) $this->budgetRequest->budget_total;
+        $actualTotal = MiFinancialAmount::sum($this->items()->pluck('actual_total'));
+        $budgetTotal = $this->budgetRequest->budget_total;
 
         $this->update([
             'actual_total' => $actualTotal,
-            'variance' => $budgetTotal - $actualTotal,
+            'variance' => (string) BigDecimal::of($budgetTotal)->minus($actualTotal)->toScale(2),
         ]);
     }
 
     public function isBalanced(): bool
     {
-        return abs((float) $this->variance) <= self::BALANCE_TOLERANCE;
+        return BigDecimal::of($this->variance)->abs()->isLessThanOrEqualTo('0.01');
     }
 
     public function isOverBudget(): bool
     {
-        return (float) $this->variance < -self::BALANCE_TOLERANCE;
+        return BigDecimal::of($this->variance)->isLessThan('-0.01');
     }
 
     public function isUnderBudget(): bool
     {
-        return (float) $this->variance > self::BALANCE_TOLERANCE;
+        return BigDecimal::of($this->variance)->isGreaterThan('0.01');
     }
 
     public function percentVariance(): float
@@ -87,16 +95,21 @@ class Liquidation extends Model
 
     public function noteByAccounting(User $accountant): void
     {
-        $this->update(['status' => 'noted', 'noted_by' => $accountant->id, 'noted_at' => now()]);
+        $this->update(['status' => 'noted', 'noted_by' => $accountant->getKey(), 'noted_at' => now()]);
     }
 
-    /**
-     * Approving/closing a liquidation also flips the parent budget request to
-     * "liquidated", closing the loop shown in the diagram.
-     */
-    public function approve(User $approver): void
+    public function company(): BelongsTo
     {
-        $this->update(['status' => 'closed', 'approved_by' => $approver->id, 'approved_at' => now()]);
-        $this->budgetRequest->update(['status' => 'liquidated']);
+        return $this->belongsTo(Company::class, 'company_id', 'company_id');
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(FinancialActivity::class, 'record_id')->where('record_type', $this->getTable())->orderBy('id');
+    }
+
+    public function settlement(): HasOne
+    {
+        return $this->hasOne(FinancialSettlement::class);
     }
 }

@@ -8,7 +8,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
-use App\Services\DashboardService;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -16,6 +15,7 @@ class AuthenticatedSessionController extends Controller
     {
         return view('auth.login');
     }
+
     private function redirectByRole($user): RedirectResponse
     {
         $companyId = session('company_id');
@@ -25,7 +25,7 @@ class AuthenticatedSessionController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$company) {
+        if (! $company) {
             return redirect()->route('site.maintenance');
         }
 
@@ -44,6 +44,9 @@ class AuthenticatedSessionController extends Controller
             }
             if ($user->hasRole('accounting')) {
                 return redirect()->route('accounting.mi.dashboard');
+            }
+            if ($user->can('mi.budget.approve') || $user->can('mi.travel.approve')) {
+                return redirect()->route('mi.approvals');
             }
         }
 
@@ -76,6 +79,7 @@ class AuthenticatedSessionController extends Controller
 
         return redirect()->route('site.maintenance');
     }
+
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();

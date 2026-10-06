@@ -17,8 +17,8 @@ return new class extends Migration
             $table->string('control_id')->unique(); // BR-YYYY-####
 
             // Employee who submitted the budget request.
-            // Existing users table uses user_id INT.
-            $table->integer('employee_id'); // signed to match users.user_id int(11)
+            // Existing users table uses user_id BIGINT UNSIGNED.
+            $table->unsignedBigInteger('employee_id'); // matches users.user_id BIGINT UNSIGNED
 
             $table->foreign('employee_id')
                 ->references('user_id')
@@ -55,7 +55,7 @@ return new class extends Migration
             $table->index('status'); // frequently filtered (e.g. "pending approvals")
 
             // Approver
-            $table->integer('approved_by')->nullable(); // signed to match users.user_id int(11)
+            $table->unsignedBigInteger('approved_by')->nullable(); // matches users.user_id BIGINT UNSIGNED
 
             $table->foreign('approved_by')
                 ->references('user_id')
@@ -65,7 +65,7 @@ return new class extends Migration
             $table->timestamp('approved_at')->nullable();
 
             // Accounting sign-off
-            $table->integer('noted_by')->nullable(); // signed to match users.user_id int(11)
+            $table->unsignedBigInteger('noted_by')->nullable(); // matches users.user_id BIGINT UNSIGNED
 
             $table->foreign('noted_by')
                 ->references('user_id')
@@ -75,7 +75,7 @@ return new class extends Migration
             $table->timestamp('noted_at')->nullable();
 
             // Accounting/person who released the budget
-            $table->integer('released_by')->nullable(); // signed to match users.user_id int(11)
+            $table->unsignedBigInteger('released_by')->nullable(); // matches users.user_id BIGINT UNSIGNED
 
             $table->foreign('released_by')
                 ->references('user_id')

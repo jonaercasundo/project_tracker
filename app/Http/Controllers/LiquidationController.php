@@ -4,14 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\MI_Liquidation;
 use App\Models\MI_LiquidationItem;
+use App\Services\MiFinancialAmount;
+use App\Services\MiFinancialWorkflowService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class LiquidationController extends Controller
@@ -19,21 +26,22 @@ class LiquidationController extends Controller
     /**
      * Display liquidation reports.
      */
-    public function downloadPdf(MI_Liquidation $liquidation)
+    public function downloadPdf(MI_Liquidation $liquidation): Response
     {
-        $liquidation->load('items', 'preparer', 'company');
+        Gate::authorize('view', $liquidation);
+        $liquidation->load('items', 'preparer', 'company', 'activities');
 
         $pdf = Pdf::loadView('mi_app.liquidation.liquidation_pdf', compact('liquidation'))
             ->setPaper('a4', 'portrait');
 
-        return $pdf->download('Liquidation-' . str_pad($liquidation->id, 6, '0', STR_PAD_LEFT) . '.pdf');
+        return $pdf->download('Liquidation-'.str_pad($liquidation->id, 6, '0', STR_PAD_LEFT).'.pdf');
     }
+
     public function index(Request $request): View
     {
-        $query = MI_Liquidation::query()
+        $query = MI_Liquidation::query()->where('company_id', session('company_id'))->where('prepared_by', $request->user()->getKey())
             ->with([
                 'items',
-                'items.requestedBy',
                 'preparer',
                 'company',
             ]);
@@ -133,16 +141,16 @@ class LiquidationController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $pendingCount = MI_Liquidation::query()
+        $pendingCount = MI_Liquidation::query()->where('company_id', session('company_id'))->where('prepared_by', $request->user()->getKey())
             ->where('status', 'Pending')
             ->count();
 
-        $approvedCount = MI_Liquidation::query()
+        $approvedCount = MI_Liquidation::query()->where('company_id', session('company_id'))->where('prepared_by', $request->user()->getKey())
             ->where('status', 'Approved')
             ->count();
 
         $totalVnd = MI_LiquidationItem::query()
-            ->whereHas('report')
+            ->whereHas('report', fn ($query) => $query->where('company_id', session('company_id'))->where('prepared_by', $request->user()->getKey()))
             ->sum('amount_vnd');
 
         /*
@@ -162,12 +170,12 @@ class LiquidationController extends Controller
         );
     }
 
-
     /**
      * Show create liquidation form.
      */
     public function create(): View
     {
+        Gate::authorize('create', MI_Liquidation::class);
         /*
         |--------------------------------------------------------------------------
         | Dropdown Options
@@ -187,12 +195,12 @@ class LiquidationController extends Controller
         );
     }
 
-
     /**
      * Store a new liquidation report.
      */
     public function store(Request $request): RedirectResponse
     {
+        Gate::authorize('create', MI_Liquidation::class);
         $user = auth()->user();
 
         /*
@@ -201,7 +209,7 @@ class LiquidationController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (!$user) {
+        if (! $user) {
             return back()
                 ->withInput()
                 ->with(
@@ -210,6 +218,7 @@ class LiquidationController extends Controller
                 );
         }
 
+        $uploadedPaths = [];
         try {
 
             /*
@@ -241,19 +250,26 @@ class LiquidationController extends Controller
                     'required',
                     'numeric',
                     'gt:0',
+                    'max:99999999.9999',
+                    'regex:/^\d+(\.\d{1,4})?$/',
                 ],
 
                 'pcf_amount' => [
                     'nullable',
                     'numeric',
                     'min:0',
+                    'max:999999999999.99',
+                    'regex:/^\d+(\.\d{1,2})?$/',
                 ],
 
                 'items' => [
                     'required',
                     'array',
+                    'list',
                     'min:1',
                 ],
+
+                'items.*' => ['required', 'array'],
 
                 'items.*.ref_no' => [
                     'nullable',
@@ -292,6 +308,8 @@ class LiquidationController extends Controller
                     'required',
                     'numeric',
                     'min:0.01',
+                    'max:999999999999.99',
+                    'regex:/^\d+(\.\d{1,2})?$/',
                 ],
 
                 'items.*.remarks' => [
@@ -307,6 +325,7 @@ class LiquidationController extends Controller
                     'max:10240',
                 ],
             ]);
+            MiFinancialAmount::sum(array_column($validated['items'], 'amount_vnd'), 'items', '999999999999.99');
 
             /*
             |--------------------------------------------------------------------------
@@ -314,7 +333,7 @@ class LiquidationController extends Controller
             |--------------------------------------------------------------------------
             */
 
-            $companyId = null;
+            $companyId = session('company_id');
 
             if (method_exists($user, 'currentCompany')) {
 
@@ -336,34 +355,28 @@ class LiquidationController extends Controller
                     $validated,
                     $request,
                     $user,
-                    $companyId
+                    $companyId,
+                    &$uploadedPaths
                 ) {
 
                     $liquidation = MI_Liquidation::create([
 
-                        'title' =>
-                            $validated['report_title'],
+                        'title' => $validated['report_title'],
 
-                        'date_prepared' =>
-                            $validated['date_prepared'],
+                        'date_prepared' => $validated['date_prepared'],
 
-                        'exchange_rate' =>
-                            $validated['exchange_rate'],
+                        'exchange_rate' => $validated['exchange_rate'],
 
-                        'pcf_amount' =>
-                            $validated['pcf_amount'] ?? null,
+                        'pcf_amount' => $validated['pcf_amount'] ?? null,
 
-                        'company_id' =>
-                            $companyId,
+                        'company_id' => $companyId,
 
                         /*
                         | Always use logged-in user.
                         */
-                        'prepared_by' =>
-                            $user->user_id,
+                        'prepared_by' => $user->user_id,
 
-                        'status' =>
-                            'Pending',
+                        'status' => 'Pending',
                     ]);
 
                     /*
@@ -383,8 +396,7 @@ class LiquidationController extends Controller
                     */
 
                     foreach (
-                        $validated['items']
-                        as $index => $item
+                        $validated['items'] as $index => $item
                     ) {
 
                         $receiptPath = null;
@@ -410,10 +422,11 @@ class LiquidationController extends Controller
                                 $file->isValid()
                             ) {
 
-                                $receiptPath = $file->store(
-                                    'liquidations/receipts',
-                                    'public'
-                                );
+                                $receiptPath = $file->store('private/liquidations/receipts', 'local');
+                                if (! $receiptPath) {
+                                    throw new \RuntimeException('Unable to store receipt.');
+                                }
+                                $uploadedPaths[] = $receiptPath;
                             }
                         }
 
@@ -437,40 +450,31 @@ class LiquidationController extends Controller
 
                         MI_LiquidationItem::create([
 
-                            'liquidation_id' =>
-                                $liquidation->id,
+                            'liquidation_id' => $liquidation->id,
 
-                            'ref_no' =>
-                                $refNo,
+                            'ref_no' => $refNo,
 
-                            'line_no' =>
-                                $index + 1,
+                            'line_no' => $index + 1,
 
-                            'item_date' =>
-                                $item['item_date'],
+                            'item_date' => $item['item_date'],
 
-                            'requested_by' =>
-                                $item['requested_by'],
+                            'requested_by' => $item['requested_by'],
 
-                            'payee' =>
-                                $item['payee'],
+                            'payee' => $item['payee'],
 
-                            'expense_type' =>
-                                $item['expense_type'],
+                            'expense_type' => $item['expense_type'],
 
-                            'account_buyer' =>
-                                $item['account_buyer'],
+                            'account_buyer' => $item['account_buyer'],
 
-                            'amount_vnd' =>
-                                $item['amount_vnd'],
+                            'amount_vnd' => $item['amount_vnd'],
 
-                            'remarks' =>
-                                $item['remarks'] ?? null,
+                            'remarks' => $item['remarks'] ?? null,
 
-                            'receipt_image' =>
-                                $receiptPath,
+                            'receipt_image' => $receiptPath,
                         ]);
                     }
+
+                    app(MiFinancialWorkflowService::class)->activity($liquidation, $user, 'ordinary_liquidation_created');
 
                     return $liquidation;
                 }
@@ -492,49 +496,36 @@ class LiquidationController extends Controller
                     'Liquidation report created successfully.'
                 );
 
+        } catch (ValidationException $e) {
+            Storage::disk('local')->delete($uploadedPaths);
+            throw $e;
         } catch (Throwable $e) {
+            Storage::disk('local')->delete($uploadedPaths);
 
             Log::error(
                 'Liquidation save failed',
                 [
-                    'user_id' =>
-                        $user->user_id ?? null,
+                    'user_id' => $user->user_id ?? null,
 
-                    'message' =>
-                        $e->getMessage(),
+                    'message' => $e->getMessage(),
 
-                    'file' =>
-                        $e->getFile(),
+                    'file' => $e->getFile(),
 
-                    'line' =>
-                        $e->getLine(),
+                    'line' => $e->getLine(),
 
-                    'trace' =>
-                        $e->getTraceAsString(),
+                    'trace' => $e->getTraceAsString(),
                 ]
             );
-
-            if (config('app.debug')) {
-
-                return back()
-                    ->withInput()
-                    ->with(
-                        'error',
-                        'Liquidation save failed: ' .
-                        $e->getMessage()
-                    );
-            }
 
             return back()
                 ->withInput()
                 ->with(
                     'error',
-                    'Unable to save the liquidation report. ' .
+                    'Unable to save the liquidation report. '.
                     'Please check the required fields and try again.'
                 );
         }
     }
-
 
     /**
      * Display a single liquidation report.
@@ -549,8 +540,10 @@ class LiquidationController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        Gate::authorize('view', $liquidation);
         $liquidation->load([
-            'items.requestedBy',
+            'activities',
+            'items',
             'preparer',
             'company',
         ]);
@@ -576,506 +569,192 @@ class LiquidationController extends Controller
     /**
      * Show edit liquidation form.
      */
-public function edit($id): View
-{
-    $liquidation = MI_Liquidation::with([
-        'items.requestedBy',
-        'preparer',
-        'company',
-    ])->findOrFail($id);
+    public function edit(MI_Liquidation $liquidation): View
+    {
+        Gate::authorize('update', $liquidation);
+        $liquidation->load('items', 'preparer', 'company', 'activities');
 
-    return view('mi_app.liquidation.edit', [
-        'report' => $liquidation,
-    ]);
-}
+        return view('mi_app.liquidation.edit', ['report' => $liquidation]);
+    }
 
     /**
      * Update liquidation report.
      */
-    public function update(
-        Request $request,
-        MI_Liquidation $liquidation
-    ): RedirectResponse {
+    public function update(Request $request, MI_Liquidation $liquidation): RedirectResponse
+    {
+        Gate::authorize('update', $liquidation);
+        $validated = $request->validate([
 
-        $user = auth()->user();
+            'report_title' => [
+                'required',
+                'string',
+                'max:255',
+            ],
 
-        /*
-        |--------------------------------------------------------------------------
-        | Authentication
-        |--------------------------------------------------------------------------
-        */
+            'date_prepared' => [
+                'required',
+                'date',
+            ],
 
-        if (!$user) {
-            abort(
-                401,
-                'You must be logged in.'
-            );
-        }
+            'exchange_rate' => [
+                'required',
+                'numeric',
+                'gt:0',
+                'max:99999999.9999',
+                'regex:/^\d+(\.\d{1,4})?$/',
+            ],
 
+            'pcf_amount' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:999999999999.99',
+                'regex:/^\d+(\.\d{1,2})?$/',
+            ],
+
+            'items' => [
+                'required',
+                'array',
+                'list',
+                'min:1',
+            ],
+
+            'items.*.id' => ['nullable', 'integer', 'distinct', Rule::exists('mi_liquidation_items', 'id')->where('liquidation_id', $liquidation->getKey())],
+            'items.*' => ['required', 'array'],
+
+            'items.*.ref_no' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
+
+            'items.*.item_date' => [
+                'required',
+                'date',
+            ],
+
+            'items.*.requested_by' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'items.*.payee' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'items.*.expense_type' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'items.*.account_buyer' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'items.*.amount_vnd' => [
+                'required',
+                'numeric',
+                'min:0.01',
+                'max:999999999999.99',
+                'regex:/^\d+(\.\d{1,2})?$/',
+            ],
+
+            'items.*.remarks' => [
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+
+            'items.*.receipt_image' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:10240',
+            ],
+        ]);
+
+        MiFinancialAmount::sum(array_column($validated['items'], 'amount_vnd'), 'items', '999999999999.99');
+        $uploadedPaths = [];
         try {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Validation
-            |--------------------------------------------------------------------------
-            */
-
-            $validated = $request->validate([
-
-                'report_title' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
-                'date_prepared' => [
-                    'required',
-                    'date',
-                ],
-
-                'exchange_rate' => [
-                    'required',
-                    'numeric',
-                    'gt:0',
-                ],
-
-                'pcf_amount' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-
-                'items' => [
-                    'required',
-                    'array',
-                    'min:1',
-                ],
-
-                'items.*.ref_no' => [
-                    'nullable',
-                    'string',
-                    'max:50',
-                ],
-
-                'items.*.item_date' => [
-                    'required',
-                    'date',
-                ],
-
-                'items.*.requested_by' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-                
-                'items.*.payee' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
-                'items.*.expense_type' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
-                'items.*.account_buyer' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
-                'items.*.amount_vnd' => [
-                    'required',
-                    'numeric',
-                    'min:0.01',
-                ],
-
-                'items.*.remarks' => [
-                    'nullable',
-                    'string',
-                    'max:5000',
-                ],
-
-                'items.*.receipt_image' => [
-                    'nullable',
-                    'image',
-                    'mimes:jpg,jpeg,png,webp',
-                    'max:10240',
-                ],
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | Existing Items
-            |--------------------------------------------------------------------------
-            */
-
-            $existingItems = $liquidation
-                ->items()
-                ->get();
-
-            $oldItemsByLine = $existingItems
-                ->keyBy('line_no');
-
-            /*
-            |--------------------------------------------------------------------------
-            | Update
-            |--------------------------------------------------------------------------
-            */
-
-            DB::transaction(
-                function () use (
-                    $validated,
-                    $request,
-                    $liquidation,
-                    $user,
-                    $oldItemsByLine
-                ) {
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Update Header
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $liquidation->update([
-
-                        'title' =>
-                            $validated['report_title'],
-
-                        'date_prepared' =>
-                            $validated['date_prepared'],
-
-                        'exchange_rate' =>
-                            $validated['exchange_rate'],
-
-                        'pcf_amount' =>
-                            $validated['pcf_amount'] ?? null,
-                    ]);
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Date Prefix
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $datePrefix = Carbon::parse(
-                        $validated['date_prepared']
-                    )->format('Ymd');
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Delete Existing Items
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $liquidation
-                        ->items()
-                        ->delete();
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Recreate Items
-                    |--------------------------------------------------------------------------
-                    */
-
-                    foreach (
-                        $validated['items']
-                        as $index => $item
-                    ) {
-
-                        $lineNo = $index + 1;
-
-                        $receiptPath = null;
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Preserve Existing Receipt
-                        |--------------------------------------------------------------------------
-                        */
-
-                        if (
-                            isset($oldItemsByLine[$lineNo]) &&
-                            !empty(
-                                $oldItemsByLine[$lineNo]->receipt_image
-                            )
-                        ) {
-
-                            $receiptPath =
-                                $oldItemsByLine[$lineNo]
-                                    ->receipt_image;
+            DB::transaction(function () use ($validated, $request, $liquidation, &$uploadedPaths): void {
+                $liquidation = MI_Liquidation::query()->whereKey($liquidation->getKey())->lockForUpdate()->firstOrFail();
+                Gate::authorize('update', $liquidation);
+                $liquidation->update([
+                    'title' => $validated['report_title'],
+                    'date_prepared' => $validated['date_prepared'],
+                    'exchange_rate' => $validated['exchange_rate'],
+                    'pcf_amount' => $validated['pcf_amount'] ?? null,
+                ]);
+                $keptIds = [];
+                $datePrefix = Carbon::parse($validated['date_prepared'])->format('Ymd');
+                foreach (array_values($validated['items']) as $index => $row) {
+                    $item = isset($row['id'])
+                        ? $liquidation->items()->whereKey($row['id'])->firstOrFail()
+                        : $liquidation->items()->make();
+                    $receiptPath = $item->receipt_image;
+                    if ($request->hasFile("items.{$index}.receipt_image")) {
+                        $receiptPath = $request->file("items.{$index}.receipt_image")->store('private/liquidations/receipts', 'local');
+                        if (! $receiptPath) {
+                            throw new \RuntimeException('Unable to store receipt.');
                         }
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | New Receipt
-                        |--------------------------------------------------------------------------
-                        */
-
-                        if (
-                            $request->hasFile(
-                                "items.{$index}.receipt_image"
-                            )
-                        ) {
-
-                            $file = $request->file(
-                                "items.{$index}.receipt_image"
-                            );
-
-                            if (
-                                $file &&
-                                $file->isValid()
-                            ) {
-
-                                /*
-                                | Delete previous receipt.
-                                */
-
-                                if (
-                                    $receiptPath &&
-                                    Storage::disk('public')
-                                        ->exists($receiptPath)
-                                ) {
-
-                                    Storage::disk('public')
-                                        ->delete($receiptPath);
-                                }
-
-                                /*
-                                | Store replacement.
-                                */
-
-                                $receiptPath =
-                                    $file->store(
-                                        'liquidations/receipts',
-                                        'public'
-                                    );
-                            }
-                        }
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Reference Number
-                        |--------------------------------------------------------------------------
-                        */
-
-                        $refNo = sprintf(
-                            'LF-%s-%03d',
-                            $datePrefix,
-                            $lineNo
-                        );
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Create Updated Item
-                        |--------------------------------------------------------------------------
-                        */
-
-                        MI_LiquidationItem::create([
-
-                            'liquidation_id' =>
-                                $liquidation->id,
-
-                            'ref_no' =>
-                                $refNo,
-
-                            'line_no' =>
-                                $lineNo,
-
-                            'item_date' =>
-                                $item['item_date'],
-
-                            /*
-                            | Server-side user.
-                            */
-                            'requested_by' =>
-                                $item['requested_by'],
-
-                            'payee' =>
-                                $item['payee'],
-
-                            'expense_type' =>
-                                $item['expense_type'],
-
-                            'account_buyer' =>
-                                $item['account_buyer'],
-
-                            'amount_vnd' =>
-                                $item['amount_vnd'],
-
-                            'remarks' =>
-                                $item['remarks'] ?? null,
-
-                            'receipt_image' =>
-                                $receiptPath,
-                        ]);
+                        $uploadedPaths[] = $receiptPath;
                     }
+                    $item->fill([
+                        'line_no' => $index + 1,
+                        'ref_no' => $item->ref_no ?? sprintf('LF-%s-%03d', $datePrefix, $index + 1),
+                        'item_date' => $row['item_date'],
+                        'requested_by' => $row['requested_by'],
+                        'payee' => $row['payee'],
+                        'expense_type' => $row['expense_type'],
+                        'account_buyer' => $row['account_buyer'],
+                        'amount_vnd' => $row['amount_vnd'],
+                        'remarks' => $row['remarks'] ?? null,
+                        'receipt_image' => $receiptPath,
+                    ])->save();
+                    $keptIds[] = $item->getKey();
                 }
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Success
-            |--------------------------------------------------------------------------
-            */
-
-            return redirect()
-                ->route(
-                    'liquidation.show',
-                    $liquidation->id
-                )
-                ->with(
-                    'success',
-                    'Liquidation report updated successfully.'
-                );
-
-        } catch (Throwable $e) {
-
-            Log::error(
-                'Liquidation update failed',
-                [
-                    'liquidation_id' =>
-                        $liquidation->id,
-
-                    'user_id' =>
-                        $user->user_id ?? null,
-
-                    'message' =>
-                        $e->getMessage(),
-
-                    'file' =>
-                        $e->getFile(),
-
-                    'line' =>
-                        $e->getLine(),
-
-                    'trace' =>
-                        $e->getTraceAsString(),
-                ]
-            );
-
-            if (config('app.debug')) {
-
-                return back()
-                    ->withInput()
-                    ->with(
-                        'error',
-                        'Liquidation update failed: ' .
-                        $e->getMessage()
-                    );
-            }
-
-            return back()
-                ->withInput()
-                ->with(
-                    'error',
-                    'Unable to update the liquidation report. ' .
-                    'Please try again.'
-                );
+                $removed = $liquidation->items()->whereNotIn('id', $keptIds)->get()->toArray();
+                app(MiFinancialWorkflowService::class)->activity($liquidation, $request->user(), 'ordinary_liquidation_updated', $liquidation->status, ['metadata' => ['removed_items' => $removed]]);
+                $liquidation->items()->whereNotIn('id', $keptIds)->delete();
+            });
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete($uploadedPaths);
+            throw $exception;
         }
-    }
 
+        return redirect()->route('liquidation.show', $liquidation)->with('success', 'Liquidation report updated successfully.');
+    }
 
     /**
      * Delete liquidation report.
      */
-    public function destroy(
-        MI_Liquidation $liquidation
-    ): RedirectResponse {
+    public function destroy(MI_Liquidation $liquidation): RedirectResponse
+    {
+        DB::transaction(function () use ($liquidation): void {
+            $liquidation = MI_Liquidation::query()->whereKey($liquidation->getKey())->lockForUpdate()->firstOrFail();
+            Gate::authorize('delete', $liquidation);
+            app(MiFinancialWorkflowService::class)->activity($liquidation, auth()->user(), 'ordinary_liquidation_archived', $liquidation->status);
+            $liquidation->delete();
+        });
 
-        try {
+        return redirect()->route('liquidation.index')->with('success', 'Liquidation report deleted successfully.');
+    }
 
-            DB::transaction(
-                function () use ($liquidation) {
+    public function receipt(MI_LiquidationItem $item): StreamedResponse
+    {
+        abort_unless($item->report, 404);
+        Gate::authorize('view', $item->report);
+        $path = $item->receipt_image;
+        abort_unless(is_string($path) && preg_match('~^(?:private/)?liquidations/receipts/[A-Za-z0-9._-]+$~D', $path), 404);
+        $disk = str_starts_with($path, 'private/') ? 'local' : 'public';
+        abort_unless(Storage::disk($disk)->exists($path), 404);
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Receipt Files
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $receiptPaths = $liquidation
-                        ->items()
-                        ->whereNotNull('receipt_image')
-                        ->pluck('receipt_image')
-                        ->filter()
-                        ->values()
-                        ->toArray();
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Delete Items
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $liquidation
-                        ->items()
-                        ->delete();
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Delete Liquidation
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $liquidation->delete();
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Delete Receipt Files
-                    |--------------------------------------------------------------------------
-                    */
-
-                    foreach ($receiptPaths as $path) {
-
-                        if (
-                            Storage::disk('public')
-                                ->exists($path)
-                        ) {
-
-                            Storage::disk('public')
-                                ->delete($path);
-                        }
-                    }
-                }
-            );
-
-            return redirect()
-                ->route('liquidation.index')
-                ->with(
-                    'success',
-                    'Liquidation report deleted successfully.'
-                );
-
-        } catch (Throwable $e) {
-
-            Log::error(
-                'Liquidation delete failed',
-                [
-                    'liquidation_id' =>
-                        $liquidation->id,
-
-                    'message' =>
-                        $e->getMessage(),
-
-                    'file' =>
-                        $e->getFile(),
-
-                    'line' =>
-                        $e->getLine(),
-                ]
-            );
-
-            return back()
-                ->with(
-                    'error',
-                    config('app.debug')
-                        ? 'Unable to delete liquidation: ' .
-                          $e->getMessage()
-                        : 'Unable to delete the liquidation report.'
-                );
-        }
+        return Storage::disk($disk)->response($path, null, ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
     }
 }

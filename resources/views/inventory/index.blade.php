@@ -88,7 +88,26 @@
     {{-- FILTERS --}}
     <form method="GET" action="{{ route('operation_inventory.index') }}" class="mt-8">
         <div class="bg-slate-50 border border-slate-200/60 rounded-xl p-3">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                {{-- Warehouse --}}
+                <div>
+                    <label for="warehouse_id" class="sr-only">Warehouse</label>
+                    <select
+                        id="warehouse_id"
+                        name="warehouse_id"
+                        class="w-full h-9 text-xs rounded-lg border-slate-200 bg-white text-slate-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="">All Warehouses</option>
+                        @foreach($warehouses as $warehouse)
+                            <option value="{{ $warehouse->warehouse_id }}"
+                                @selected(request('warehouse_id') == $warehouse->warehouse_id)>
+                                {{ $warehouse->warehouse_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('warehouse_id')
+                        <p class="mt-1 text-xs text-red-600" role="alert">{{ $message }}</p>
+                    @enderror
+                </div>
                 {{-- Project --}}
                 <select
                     name="project_id"
@@ -262,7 +281,7 @@
                 @empty
  
                     <tr>
-                        <td colspan="7" class="py-16">
+                        <td colspan="8" class="py-16">
                             <div class="flex flex-col items-center justify-center text-center">
                                 <div class="h-12 w-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
                                     <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">

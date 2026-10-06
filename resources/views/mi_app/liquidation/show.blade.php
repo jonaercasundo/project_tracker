@@ -1244,7 +1244,8 @@
                 </a>
 
 
-                <a
+                @can('update', $liquidation)
+<a
                     href="{{ route('liquidation.edit', $liquidation->id) }}"
                     class="liq-btn liq-btn-primary"
                 >
@@ -1267,6 +1268,7 @@
                     Edit Report
 
                 </a>
+@endcan
 
             </div>
 
@@ -1940,7 +1942,7 @@
 
     @php
         $receiptPath = ltrim($item->receipt_image, '/');
-        $receiptUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($receiptPath);
+        $receiptUrl = route('liquidation.receipt', $item);
     @endphp
 
     <div class="liq-receipt">
@@ -2158,7 +2160,8 @@
                 </a>
 
 
-                <a
+                @can('update', $liquidation)
+<a
                     href="{{ route('liquidation.edit', $liquidation->id) }}"
                     class="liq-btn liq-btn-primary"
                 >
@@ -2166,9 +2169,11 @@
                     Edit Report
 
                 </a>
+@endcan
 
 
-                <form
+                @can('delete', $liquidation)
+<form
                     method="POST"
                     action="{{ route('liquidation.destroy', $liquidation->id) }}"
                     onsubmit="return confirm('Delete this liquidation report? This action cannot be undone.');"
@@ -2189,6 +2194,7 @@
                     </button>
 
                 </form>
+@endcan
 
 
             </div>
@@ -2200,4 +2206,5 @@
 
 </div>
 
+@include('mi_app.financial_history', ['activities' => $liquidation->activities])
 </x-mi_app>

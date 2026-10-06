@@ -8,13 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('package_status') || ! Schema::hasColumn('package_status', 'package_status_id')) {
+            throw new RuntimeException('Restore the legacy package_status table with its package_status_id primary key before migrating delivery history.');
+        }
+
         Schema::create('delivery_history', function (Blueprint $table) {
             $table->id();
 
             // Replaces both the integer() and foreign() methods for package_status
             $table->foreignId('package_status_id')
-                  ->constrained('package_status')
-                  ->cascadeOnDelete();
+                ->constrained('package_status', 'package_status_id')
+                ->cascadeOnDelete();
 
             $table->foreignId('user_id')
                 ->references('user_id')

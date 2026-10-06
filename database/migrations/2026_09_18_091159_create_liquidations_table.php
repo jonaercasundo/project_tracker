@@ -33,12 +33,12 @@ return new class extends Migration
             /*
              * Existing users table uses:
              *
-             * users.user_id = INT
+             * users.user_id = BIGINT UNSIGNED
              *
              * Therefore all user foreign keys below use
-             * integer() (SIGNED) and explicitly reference user_id, since
+             * unsignedBigInteger() and explicitly reference user_id, since
              */
-            $table->integer('liquidated_by'); // signed to match users.user_id int(11)
+            $table->unsignedBigInteger('liquidated_by'); // matches users.user_id BIGINT UNSIGNED
 
             $table->foreign('liquidated_by')
                 ->references('user_id')
@@ -77,7 +77,7 @@ return new class extends Migration
             /*
              * Accounting / checking sign-off
              */
-            $table->integer('noted_by')->nullable(); // signed to match users.user_id int(11)
+            $table->unsignedBigInteger('noted_by')->nullable(); // matches users.user_id BIGINT UNSIGNED
 
             $table->foreign('noted_by')
                 ->references('user_id')
@@ -89,7 +89,7 @@ return new class extends Migration
             /*
              * Approval
              */
-            $table->integer('approved_by')->nullable(); // signed to match users.user_id int(11)
+            $table->unsignedBigInteger('approved_by')->nullable(); // matches users.user_id BIGINT UNSIGNED
 
             $table->foreign('approved_by')
                 ->references('user_id')

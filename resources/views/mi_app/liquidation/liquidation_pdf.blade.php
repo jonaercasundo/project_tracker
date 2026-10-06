@@ -7,7 +7,7 @@
 
     /* ==============================================================
        DOMPDF-SAFE STYLES
-       No flexbox / grid / external fonts / JS — tables + block only.
+       No flexbox / grid / external fonts / JS - tables + block only.
     =============================================================== */
 
     @page {
@@ -396,16 +396,16 @@
         <td>
             <div class="info-label">Date Prepared</div>
             <div class="info-value">
-                {{ $liquidation->date_prepared ? $liquidation->date_prepared->format('F d, Y') : '—' }}
+                {{ $liquidation->date_prepared ? $liquidation->date_prepared->format('F d, Y') : '-' }}
             </div>
         </td>
         <td>
             <div class="info-label">Prepared By</div>
-            <div class="info-value">{{ $liquidation->preparer?->name ?? '—' }}</div>
+            <div class="info-value">{{ $liquidation->preparer?->name ?? '-' }}</div>
         </td>
         <td>
             <div class="info-label">Company</div>
-            <div class="info-value">{{ $liquidation->company?->name ?? '—' }}</div>
+            <div class="info-value">{{ $liquidation->company?->name ?? '-' }}</div>
         </td>
     </tr>
     <tr>
@@ -422,13 +422,13 @@
         <td>
             <div class="info-label">Created</div>
             <div class="info-value">
-                {{ $liquidation->created_at ? $liquidation->created_at->format('M d, Y h:i A') : '—' }}
+                {{ $liquidation->created_at ? $liquidation->created_at->format('M d, Y h:i A') : '-' }}
             </div>
         </td>
         <td>
             <div class="info-label">Last Updated</div>
             <div class="info-value">
-                {{ $liquidation->updated_at ? $liquidation->updated_at->format('M d, Y h:i A') : '—' }}
+                {{ $liquidation->updated_at ? $liquidation->updated_at->format('M d, Y h:i A') : '-' }}
             </div>
         </td>
     </tr>
@@ -466,15 +466,15 @@
             @foreach($liquidation->items as $index => $item)
                 <tr>
                     <td>{{ $index + 1 }}</td>
-                    <td class="mono">{{ $item->ref_no ?: '—' }}</td>
-                    <td class="mono">{{ $item->item_date ? $item->item_date->format('m/d/Y') : '—' }}</td>
-                    <td>{{ $item->requested_by ?: '—' }}</td>
-                    <td>{{ $item->payee ?: '—' }}</td>
-                    <td>{{ $item->expense_type ?: '—' }}</td>
-                    <td>{{ $item->account_buyer ?: '—' }}</td>
+                    <td class="mono">{{ $item->ref_no ?: '-' }}</td>
+                    <td class="mono">{{ $item->item_date ? $item->item_date->format('m/d/Y') : '-' }}</td>
+                    <td>{{ $item->requested_by ?: '-' }}</td>
+                    <td>{{ $item->payee ?: '-' }}</td>
+                    <td>{{ $item->expense_type ?: '-' }}</td>
+                    <td>{{ $item->account_buyer ?: '-' }}</td>
                     <td class="mono text-right">&#8363;{{ number_format((float) $item->amount_vnd, 0) }}</td>
                     <td class="mono text-right">${{ number_format((float) $item->amount_usd, 2) }}</td>
-                    <td>{{ $item->remarks ?: '—' }}</td>
+                    <td>{{ $item->remarks ?: '-' }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -533,13 +533,15 @@
 
         @php
             $receiptRelativePath = ltrim($item->receipt_image, '/');
-            $receiptFullPath = \Illuminate\Support\Facades\Storage::disk('public')->path($receiptRelativePath);
+            $receiptFullPath = preg_match('~^(?:private/)?liquidations/receipts/[A-Za-z0-9._-]+$~D', $receiptRelativePath)
+                ? \Illuminate\Support\Facades\Storage::disk(str_starts_with($receiptRelativePath, 'private/') ? 'local' : 'public')->path($receiptRelativePath)
+                : null;
         @endphp
 
         <div class="receipt-page-item">
 
             <div class="receipt-page-label">
-                Receipt — {{ $item->ref_no ?: 'Expense Item' }}
+                Receipt - {{ $item->ref_no ?: 'Expense Item' }}
             </div>
 
             <div class="receipt-page-sub">
@@ -552,7 +554,7 @@
                 @endif
             </div>
 
-            @if(file_exists($receiptFullPath))
+            @if($receiptFullPath && file_exists($receiptFullPath))
                 <img
                     src="{{ $receiptFullPath }}"
                     class="receipt-page-image"
@@ -576,5 +578,15 @@
     Generated {{ now()->format('M d, Y h:i A') }} &middot; {{ $reportId }}
 </div>
 
+@if($liquidation->activities->isNotEmpty())
+    <div style="page-break-before: always;">
+        <h3>Financial activity history</h3>
+        @foreach($liquidation->activities as $activity)
+            <p>{{ str_replace('_', ' ', $activity->event) }} -
+                {{ $activity->actor_name_snapshot }} -
+                {{ $activity->created_at->format('Y-m-d H:i:s') }}</p>
+        @endforeach
+    </div>
+@endif
 </body>
 </html>

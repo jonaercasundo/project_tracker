@@ -3,32 +3,38 @@
 namespace App\Http\Controllers;
 
 use App\Models\MI_Liquidation;
-use Illuminate\Http\Request;
-use Illuminate\View\View;
+use App\Models\MI_LiquidationItem;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\View\View;
 
 class Accounting_LiquidationController extends Controller
 {
     /**
      * Display liquidation reports for Accounting.
      */
-    public function downloadPdf(MI_Liquidation $liquidation)
+    public function downloadPdf(MI_Liquidation $liquidation): Response
     {
-        $liquidation->load('items', 'preparer', 'company');
+        Gate::authorize('view', $liquidation);
+        $liquidation->load('items', 'preparer', 'company', 'activities');
 
         $pdf = Pdf::loadView('mi_app.liquidation.liquidation_pdf', compact('liquidation'))
             ->setPaper('a4', 'portrait');
 
-        return $pdf->download('Liquidation-' . str_pad($liquidation->id, 6, '0', STR_PAD_LEFT) . '.pdf');
+        return $pdf->download('Liquidation-'.str_pad($liquidation->id, 6, '0', STR_PAD_LEFT).'.pdf');
     }
+
     public function index(Request $request): View
     {
-        $query = MI_Liquidation::query()
+        Gate::authorize('mi.liquidation.view');
+        $query = MI_Liquidation::query()->where('company_id', session('company_id'))
             ->with([
                 'items',
-                'items.requestedBy',
+                'items',
                 'preparer',
-                'company',
+                'company', 'activities',
             ]);
 
         /*
@@ -158,7 +164,7 @@ class Accounting_LiquidationController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $statisticsQuery = MI_Liquidation::query();
+        $statisticsQuery = MI_Liquidation::query()->where('company_id', session('company_id'));
 
         // Keep dashboard statistics within current company
         if (
@@ -185,7 +191,7 @@ class Accounting_LiquidationController extends Controller
             ->where('status', 'Approved')
             ->count();
 
-        $totalVnd = \App\Models\MI_LiquidationItem::query()
+        $totalVnd = MI_LiquidationItem::query()
             ->whereHas('report', function ($q) use ($user) {
 
                 if (
@@ -223,7 +229,6 @@ class Accounting_LiquidationController extends Controller
         );
     }
 
-
     /**
      * Display a single liquidation report.
      */
@@ -237,10 +242,11 @@ class Accounting_LiquidationController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        Gate::authorize('view', $liquidation);
         $liquidation->load([
-            'items.requestedBy',
+            'items',
             'preparer',
-            'company',
+            'company', 'activities',
         ]);
 
         /*
@@ -286,13 +292,12 @@ class Accounting_LiquidationController extends Controller
         );
     }
 
-
     /**
      * Generate liquidation PDF.
      */
     public function liquidation_pdf(
         MI_Liquidation $liquidation
-    ) {
+    ): Response {
 
         /*
         |--------------------------------------------------------------------------
@@ -300,10 +305,11 @@ class Accounting_LiquidationController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        Gate::authorize('view', $liquidation);
         $liquidation->load([
-            'items.requestedBy',
+            'items',
             'preparer',
-            'company',
+            'company', 'activities',
         ]);
 
         /*
@@ -352,13 +358,13 @@ class Accounting_LiquidationController extends Controller
         */
 
         return $pdf->download(
-            'Liquidation-' .
+            'Liquidation-'.
             str_pad(
                 $liquidation->id,
                 6,
                 '0',
                 STR_PAD_LEFT
-            ) .
+            ).
             '.pdf'
         );
     }

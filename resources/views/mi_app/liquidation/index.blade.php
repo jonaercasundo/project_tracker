@@ -1502,7 +1502,8 @@
 
                                                 {{-- EDIT --}}
 
-                                                <a
+                                                @can('update', $report)
+<a
                                                     href="{{ route('liquidation.edit', $report->id) }}"
                                                     class="tx-icon-btn"
                                                     title="Edit liquidation"
@@ -1528,11 +1529,13 @@
                                                     </svg>
 
                                                 </a>
+@endcan
 
 
                                                 {{-- DELETE --}}
 
-                                                <form
+                                                @can('delete', $report)
+<form
                                                     method="POST"
                                                     action="{{ route('liquidation.destroy', $report->id) }}"
                                                     onsubmit="return confirm('Delete this liquidation report? This action cannot be undone.');"
@@ -1570,6 +1573,7 @@
                                                     </button>
 
                                                 </form>
+@endcan
 
                                             </div>
 

@@ -2,15 +2,20 @@
 
 namespace App\Models;
 
-use App\Models\User;
+use App\Services\MiFinancialAmount;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BudgetRequest extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'company_id',
         'control_id', 'employee_id', 'department', 'objectives',
         'travel_date_from', 'travel_date_to', 'place', 'country',
         'budget_cash', 'budget_credit_card', 'budget_travel_agent', 'budget_total',
@@ -43,29 +48,29 @@ class BudgetRequest extends Model
     public static function generateControlId(): string
     {
         $year = now()->year;
-        $lastSeq = static::whereYear('created_at', $year)
+        $lastSeq = static::withTrashed()->whereYear('created_at', $year)
             ->orderByDesc('id')
             ->value('control_id');
 
         $next = 1;
-        if ($lastSeq && preg_match('/(\d{4})$/', $lastSeq, $m)) {
+        if ($lastSeq && preg_match('/(\d+)$/', $lastSeq, $m)) {
             $next = ((int) $m[1]) + 1;
         }
 
         return sprintf('BR-%d-%04d', $year, $next);
     }
 
-    public function employee()
+    public function employee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'employee_id');
     }
 
-    public function items()
+    public function items(): HasMany
     {
         return $this->hasMany(BudgetRequestItem::class);
     }
 
-    public function liquidation()
+    public function liquidation(): HasOne
     {
         return $this->hasOne(Liquidation::class);
     }
@@ -73,18 +78,12 @@ class BudgetRequest extends Model
     /** Recompute cached totals from line items. Call after any item change. */
     public function recalcTotals(): void
     {
-        $sums = $this->items()->selectRaw('
-            COALESCE(SUM(budget_cash),0) as cash,
-            COALESCE(SUM(budget_credit_card),0) as cc,
-            COALESCE(SUM(budget_travel_agent),0) as agent,
-            COALESCE(SUM(budget_total),0) as total
-        ')->first();
-
+        $items = $this->items()->get();
         $this->update([
-            'budget_cash' => $sums->cash,
-            'budget_credit_card' => $sums->cc,
-            'budget_travel_agent' => $sums->agent,
-            'budget_total' => $sums->total,
+            'budget_cash' => MiFinancialAmount::sum($items->pluck('budget_cash')),
+            'budget_credit_card' => MiFinancialAmount::sum($items->pluck('budget_credit_card')),
+            'budget_travel_agent' => MiFinancialAmount::sum($items->pluck('budget_travel_agent')),
+            'budget_total' => MiFinancialAmount::sum($items->pluck('budget_total')),
         ]);
     }
 
@@ -94,7 +93,7 @@ class BudgetRequest extends Model
     {
         $this->update([
             'status' => 'approved',
-            'approved_by' => $approver->id,
+            'approved_by' => $approver->getKey(),
             'approved_at' => now(),
         ]);
     }
@@ -102,7 +101,7 @@ class BudgetRequest extends Model
     public function noteByAccounting(User $accountant): void
     {
         $this->update([
-            'noted_by' => $accountant->id,
+            'noted_by' => $accountant->getKey(),
             'noted_at' => now(),
         ]);
     }
@@ -111,7 +110,7 @@ class BudgetRequest extends Model
     {
         $this->update([
             'status' => 'released',
-            'released_by' => $releaser->id,
+            'released_by' => $releaser->getKey(),
             'released_at' => now(),
         ]);
     }
@@ -122,5 +121,35 @@ class BudgetRequest extends Model
             'status' => 'in_progress',
             'received_at' => now(),
         ]);
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_id', 'company_id');
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(FinancialActivity::class, 'record_id')->where('record_type', $this->getTable())->orderBy('id');
+    }
+
+    public function releases(): HasMany
+    {
+        return $this->hasMany(BudgetRelease::class);
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function accountant(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'noted_by');
+    }
+
+    public function releaser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'released_by');
     }
 }

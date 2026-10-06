@@ -1,3 +1,4 @@
+@props(['mobileNavigation' => false])
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full scroll-smooth">
     <head>
@@ -28,7 +29,7 @@
             }
         </style>
     </head>
-    <body class="antialiased bg-slate-50 text-slate-800 min-h-full relative selection:bg-blue-600 selection:text-white">
+    <body x-data="{ miMenuOpen: false }" class="antialiased bg-slate-50 text-slate-800 min-h-full relative selection:bg-blue-600 selection:text-white">
         
         {{-- BACKDROP DECORATIVE ORBS --}}
         <div class="absolute inset-0 overflow-hidden pointer-events-none -z-50">
@@ -39,11 +40,21 @@
         {{-- MAIN LAYOUT ENGINE CONTAINER --}}
         <div class="min-h-screen flex flex-col relative">
             
-            <aside class="w-64 bg-white border-r border-slate-200/80 shadow-sm fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto">
+            @if($mobileNavigation)
+                <button x-cloak x-show="miMenuOpen" @click="miMenuOpen = false" class="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" aria-label="Close navigation"></button>
+            @endif
+            <aside @class(['w-64 bg-white border-r border-slate-200/80 shadow-sm fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto', '-translate-x-full lg:translate-x-0' => $mobileNavigation])
+                @if($mobileNavigation) :class="{ '!translate-x-0': miMenuOpen }" @keydown.escape.window="miMenuOpen = false" @endif>
                 @include('components.mi-sidebar')
             </aside>
 
-            <div class="flex-1 pl-64 flex flex-col min-h-screen">
+            <div @class(['flex-1 flex flex-col min-h-screen min-w-0', 'lg:pl-64' => $mobileNavigation, 'pl-64' => ! $mobileNavigation])>
+                @if($mobileNavigation)
+                    <div class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
+                        <span class="text-sm font-bold text-slate-900">MI workspace</span>
+                        <button type="button" @click="miMenuOpen = !miMenuOpen" :aria-expanded="miMenuOpen" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-blue-600">Menu</button>
+                    </div>
+                @endif
                 
                 @isset($header)
                     <header class="glass-header bg-white/75 sticky top-0 z-40 border-b border-slate-200/60 transition-all duration-300 dynamic-header py-4">

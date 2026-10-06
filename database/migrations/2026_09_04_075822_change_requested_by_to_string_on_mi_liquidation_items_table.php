@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -14,14 +15,14 @@ return new class extends Migration
 
         Schema::table('mi_liquidation_items', function (Blueprint $table) {
             // Change from integer to string
-            $table->string('requested_by', 255)->change();
+            $table->string('requested_by', 255)->nullable()->change();
         });
     }
 
     public function down(): void
     {
         Schema::table('mi_liquidation_items', function (Blueprint $table) {
-            $table->unsignedBigInteger('requested_by')->change();
+            $table->unsignedBigInteger('requested_by')->nullable()->change();
         });
 
         Schema::table('mi_liquidation_items', function (Blueprint $table) {

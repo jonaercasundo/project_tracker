@@ -1,4 +1,4 @@
-<x-mi_app>
+<x-dynamic-component :component="(auth()->user()->hasRole('accounting') || auth()->user()->hasRole('Executive')) ? 'accounting_app' : 'mi_app'">
     <div class="max-w-4xl mx-auto py-6">
 
         @if (session('status'))
@@ -7,7 +7,7 @@
 
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-xl font-semibold">Liquidation Report — {{ $liquidation->budgetRequest->control_id }}</h1>
-            <a href="{{ route('liquidation.pdf', $liquidation) }}" class="text-sm text-blue-600 underline">Download PDF</a>
+            @can('view', $liquidation)<a href="{{ route('travel_liquidation.pdf', $liquidation) }}" class="text-sm text-blue-600 underline">Download PDF</a>@endcan
         </div>
 
         {{-- Automated balance check: budget requisition vs. liquidation actuals --}}
@@ -59,17 +59,53 @@
 
         <div class="flex gap-2">
             @if($liquidation->status === 'submitted')
-                <form method="POST" action="{{ route('liquidation.note', $liquidation) }}">
+                @can('noteByAccounting', $liquidation)
+                <form method="POST" action="{{ route('travel_liquidation.note', $liquidation) }}">
                     @csrf
                     <button class="bg-yellow-600 text-white px-4 py-2 rounded text-sm">Note (Accounting)</button>
                 </form>
+                @endcan
             @endif
             @if($liquidation->status === 'noted')
-                <form method="POST" action="{{ route('liquidation.approve', $liquidation) }}">
+                @can('approve', $liquidation)
+                <form method="POST" action="{{ route('travel_liquidation.approve', $liquidation) }}">
                     @csrf
-                    <button class="bg-green-600 text-white px-4 py-2 rounded text-sm">Approve & Close</button>
+                    <button class="bg-green-600 text-white px-4 py-2 rounded text-sm">Approve Liquidation</button>
                 </form>
+                @endcan
             @endif
         </div>
+        @include('mi_app.financial_history', ['activities' => $liquidation->activities])
+        <p class="text-sm">Next expected action / responsible party:
+            {{ match($liquidation->status) {
+                'draft' => 'Employee: submission', 'submitted' => 'Accounting: review',
+                'noted' => 'Designated approver: final approval',
+                'approved' => 'Accounting: verified settlement; authorized closure',
+                'closed' => 'Complete', default => 'Administrative review',
+            } }}
+        </p>
+        @if($liquidation->settlement)
+            <p>Settlement reference: {{ $liquidation->settlement->reference_no }};
+                {{ $liquidation->settlement->currency }} outstanding: {{ $liquidation->settlement->outstanding_balance }}</p>
+        @endif
+        @if($liquidation->status === 'approved' && ! $liquidation->settlement)
+            @can('recordSettlement', $liquidation)
+                <form method="POST" action="{{ route('travel_liquidation.settlement', $liquidation) }}" class="my-4 space-y-2">
+                    @csrf
+                    <label>Employee return <input name="employee_return_amount" required inputmode="decimal" class="border p-2"></label>
+                    <label>Company reimbursement <input name="company_reimbursement_amount" required inputmode="decimal" class="border p-2"></label>
+                    <label>Currency <select name="currency">@foreach(config('mi_financial.currencies') as $currency)<option>{{ $currency }}</option>@endforeach</select></label>
+                    <label>Payment method <input name="settlement_method" required class="border p-2"></label>
+                    <label>Reference <input name="reference_no" required class="border p-2"></label>
+                    <button class="rounded bg-blue-600 p-2 text-white">Record verified settlement</button>
+                </form>
+            @endcan
+        @endif
+        @if($liquidation->status === 'approved' && $liquidation->settlement?->outstanding_balance === '0.00')
+            @can('close', $liquidation)
+                <form method="POST" action="{{ route('travel_liquidation.close', $liquidation) }}">@csrf<button>Close liquidation</button></form>
+            @endcan
+        @endif
+        @if($errors->any())<p class="text-red-700">{{ $errors->first() }}</p>@endif
     </div>
-</x-mi_app>
+</x-dynamic-component>

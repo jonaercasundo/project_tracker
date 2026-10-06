@@ -9,8 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('company_user', function (Blueprint $table) {
-            // Must match users.user_id exactly: int(11)
-            $table->integer('user_id');
+            $table->unsignedBigInteger('user_id');
 
             // Matches companies.company_id: bigint(20) unsigned
             $table->unsignedBigInteger('company_id');

@@ -76,10 +76,10 @@ return new class extends Migration
             | Prepared By
             |--------------------------------------------------------------------------
             |
-            | users.user_id is the PK and is signed integer.
+            | users.user_id is the PK and is BIGINT UNSIGNED.
             |
             */
-            $table->integer(
+            $table->unsignedBigInteger(
                 'prepared_by'
             )->nullable();
 
@@ -123,7 +123,6 @@ return new class extends Migration
             $table->index('prepared_by');
         });
 
-
         /*
         |--------------------------------------------------------------------------
         | Liquidation Items
@@ -148,7 +147,6 @@ return new class extends Migration
                 )
                 ->cascadeOnDelete();
 
-
             /*
             |--------------------------------------------------------------------------
             | Expense Identification
@@ -164,14 +162,12 @@ return new class extends Migration
                 50
             );
 
-
             /*
             | Line number within the liquidation report.
             */
             $table->unsignedInteger(
                 'line_no'
             );
-
 
             /*
             |--------------------------------------------------------------------------
@@ -183,7 +179,6 @@ return new class extends Migration
                 'item_date'
             );
 
-
             /*
             |--------------------------------------------------------------------------
             | Requested By
@@ -192,7 +187,7 @@ return new class extends Migration
             | users.user_id
             |
             */
-            $table->integer(
+            $table->unsignedBigInteger(
                 'requested_by'
             )->nullable();
 
@@ -200,7 +195,6 @@ return new class extends Migration
                 ->references('user_id')
                 ->on('users')
                 ->nullOnDelete();
-
 
             /*
             |--------------------------------------------------------------------------
@@ -220,7 +214,6 @@ return new class extends Migration
                 'account_buyer'
             );
 
-
             /*
             |--------------------------------------------------------------------------
             | Amount
@@ -239,7 +232,6 @@ return new class extends Migration
                 2
             );
 
-
             /*
             |--------------------------------------------------------------------------
             | Remarks
@@ -249,7 +241,6 @@ return new class extends Migration
             $table->text(
                 'remarks'
             )->nullable();
-
 
             /*
             |--------------------------------------------------------------------------
@@ -265,7 +256,6 @@ return new class extends Migration
                 'receipt_image'
             )->nullable();
 
-
             /*
             |--------------------------------------------------------------------------
             | Timestamps
@@ -273,7 +263,6 @@ return new class extends Migration
             */
 
             $table->timestamps();
-
 
             /*
             |--------------------------------------------------------------------------
@@ -306,7 +295,6 @@ return new class extends Migration
             );
         });
     }
-
 
     public function down(): void
     {

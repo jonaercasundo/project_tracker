@@ -27,7 +27,9 @@
             }
         </style>
     </head>
-    <body class="antialiased bg-slate-50 text-slate-800 min-h-full relative selection:bg-blue-600 selection:text-white">
+    <body x-data="{ accountingMenuOpen: false }" @keydown.escape.window="accountingMenuOpen = false" class="antialiased bg-slate-50 text-slate-800 min-h-full relative selection:bg-blue-600 selection:text-white">
+        <div class="flex items-center justify-between border-b bg-white px-4 py-3 lg:hidden"><span class="text-sm font-bold">MI Accounting</span><button type="button" @click="accountingMenuOpen = !accountingMenuOpen" :aria-expanded="accountingMenuOpen" aria-controls="accounting-sidebar" class="rounded-lg border px-3 py-2 text-xs font-semibold">Menu</button></div>
+        <button x-cloak x-show="accountingMenuOpen" @click="accountingMenuOpen = false" aria-label="Close menu" class="fixed inset-0 z-40 bg-slate-900/30 lg:hidden"></button>
         
         {{-- BACKDROP DECORATIVE ORBS --}}
         <div class="absolute inset-0 overflow-hidden pointer-events-none -z-50">
@@ -38,11 +40,11 @@
         {{-- MAIN LAYOUT ENGINE CONTAINER --}}
         <div class="min-h-screen flex flex-col relative">
             
-            <aside class="w-64 bg-white border-r border-slate-200/80 shadow-sm fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto">
+            <aside id="accounting-sidebar" :class="{ '!translate-x-0': accountingMenuOpen }" class="w-64 -translate-x-full lg:translate-x-0 bg-white border-r border-slate-200/80 shadow-sm fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto">
                 @include('components.accounting-sidebar')
             </aside>
 
-            <div class="flex-1 pl-64 flex flex-col min-h-screen">
+            <div class="flex-1 min-w-0 lg:pl-64 flex flex-col min-h-screen">
                 
                 @isset($header)
                     <header class="glass-header bg-white/75 sticky top-0 z-40 border-b border-slate-200/60 transition-all duration-300 dynamic-header py-4">

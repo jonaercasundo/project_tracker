@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Services\MiFinancialAmount;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MI_Liquidation extends Model
 {
@@ -33,7 +34,7 @@ class MI_Liquidation extends Model
     protected $casts = [
         'date_prepared' => 'date',
         'exchange_rate' => 'decimal:4',
-        'pcf_amount'    => 'decimal:2',
+        'pcf_amount' => 'decimal:2',
     ];
 
     /**
@@ -79,9 +80,7 @@ class MI_Liquidation extends Model
     public function getTotalVndAttribute(): float
     {
         return round(
-            (float) $this->items->sum(
-                fn ($item) => (float) $item->amount_vnd
-            ),
+            (float) MiFinancialAmount::sum($this->items->pluck('amount_vnd'), 'items', '999999999999.99'),
             2
         );
     }
@@ -157,5 +156,10 @@ class MI_Liquidation extends Model
     public function getIsOverLiquidatedAttribute(): bool
     {
         return $this->cash_on_hand_vnd < 0;
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(FinancialActivity::class, 'record_id')->where('record_type', $this->getTable())->orderBy('id');
     }
 }

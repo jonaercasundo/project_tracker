@@ -1,14 +1,17 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Models\Inventory;
-use App\Models\Project;
 use App\Models\InventoryHistory;
 use App\Models\Item;
+use App\Models\Project;
 use App\Models\Warehouse;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class InventoryController extends Controller
 {
@@ -38,13 +41,22 @@ class InventoryController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        $projects = \App\Models\Project::orderBy('project_name')->get();
+        $projects = Project::orderBy('project_name')->get();
 
         return view('operation.warehouse.inventory.index', compact('inventories', 'projects'));
     }
-    public function operation_index(Request $request)
+
+    public function operation_index(Request $request): View
     {
-        $query = Inventory::with('item');
+        $request->validate([
+            'warehouse_id' => ['nullable', 'integer', Rule::exists(Warehouse::class, 'warehouse_id')],
+        ]);
+
+        $query = Inventory::with(['item', 'warehouse']);
+
+        if ($request->filled('warehouse_id')) {
+            $query->where('warehouse_id', $request->integer('warehouse_id'));
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -68,10 +80,13 @@ class InventoryController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        $projects = \App\Models\Project::orderBy('project_name')->get();
+        $projects = Project::orderBy('project_name')->get();
 
-        return view('inventory.index', compact('inventories', 'projects'));
+        $warehouses = Warehouse::orderBy('warehouse_name')->get();
+
+        return view('inventory.index', compact('inventories', 'projects', 'warehouses'));
     }
+
     public function create()
     {
         $items = Item::orderBy('item_name')->get();
@@ -80,10 +95,10 @@ class InventoryController extends Controller
 
         return view('inventory.create', [
             'items' => $items,
-            'warehouses' => $warehouses
+            'warehouses' => $warehouses,
         ]);
     }
-    
+
     public function store(Request $request)
     {
         $request->validate([
@@ -93,7 +108,6 @@ class InventoryController extends Controller
             'inventory_status' => 'required',
             'remarks' => 'nullable|string|max:255',
         ]);
-
 
         DB::beginTransaction();
 
@@ -132,22 +146,15 @@ class InventoryController extends Controller
 
             ]);
 
-
-
             DB::commit();
-
 
             return redirect()
                 ->route('inventory.index')
                 ->with('success', 'Inventory added successfully.');
 
-
-
         } catch (\Exception $e) {
 
-
             DB::rollBack();
-
 
             return back()
                 ->withInput()
@@ -159,12 +166,14 @@ class InventoryController extends Controller
     public function show($id)
     {
         $inventory = Inventory::with('item')->findOrFail($id);
+
         return view('inventory.show', compact('inventory'));
     }
 
     public function edit($id)
     {
         $inventory = Inventory::with('item')->findOrFail($id);
+
         return view('inventory.edit', compact('inventory'));
     }
 
@@ -172,7 +181,7 @@ class InventoryController extends Controller
     {
         $request->validate([
             'qty' => 'required|integer|min:0',
-            'inventory_status' => 'required'
+            'inventory_status' => 'required',
         ]);
 
         $inventory = Inventory::findOrFail($id);
@@ -185,13 +194,13 @@ class InventoryController extends Controller
         return redirect()->route('inventory.index')
             ->with('success', 'Inventory updated successfully.');
     }
+
     public function summary(Request $request)
     {
         $query = Inventory::with([
             'item',
-            'warehouse'
+            'warehouse',
         ]);
-
 
         // Search Item
         if ($request->filled('search')) {
@@ -206,7 +215,6 @@ class InventoryController extends Controller
 
         }
 
-
         // Warehouse Filter
         if ($request->filled('warehouse_id')) {
 
@@ -216,7 +224,6 @@ class InventoryController extends Controller
             );
 
         }
-
 
         // Status Filter
         if ($request->filled('inventory_status')) {
@@ -228,21 +235,17 @@ class InventoryController extends Controller
 
         }
 
-
         $inventories = $query
             ->latest()
             ->paginate(50)
             ->withQueryString();
 
-
-        $warehouses = \App\Models\Warehouse::orderBy('warehouse_name')
+        $warehouses = Warehouse::orderBy('warehouse_name')
             ->get();
-
 
         $statuses = Inventory::select('inventory_status')
             ->distinct()
             ->pluck('inventory_status');
-
 
         return view('inventory.summary', compact(
             'inventories',
@@ -250,6 +253,7 @@ class InventoryController extends Controller
             'statuses'
         ));
     }
+
     public function history(Request $request)
     {
         $batchExpr = "IFNULL(batch_no, CONCAT('IND-', history_id))";
@@ -276,7 +280,7 @@ class InventoryController extends Controller
             )
             ->with([
                 'item',
-                'warehouse'
+                'warehouse',
             ]);
 
         /*
@@ -344,7 +348,7 @@ class InventoryController extends Controller
         $histories->getCollection()->transform(function ($history) use ($historyMap) {
 
             $first = $historyMap[$history->first_history_id] ?? null;
-            $last  = $historyMap[$history->last_history_id] ?? null;
+            $last = $historyMap[$history->last_history_id] ?? null;
 
             if ($first && $last) {
                 $history->old_qty = $first->old_qty;
@@ -362,6 +366,7 @@ class InventoryController extends Controller
             'warehouses'
         ));
     }
+
     public function destroy($id)
     {
         //

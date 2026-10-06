@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Throwable;
 
 class UserController extends Controller
 {
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -30,41 +33,43 @@ class UserController extends Controller
 
         try {
 
-            $user = User::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'username' => $validated['email'],
-                'employee_id' => $validated['employee_id'],
-                'department' => $validated['department'],
-                'position' => 'Staff',
+            DB::transaction(function () use ($validated): void {
+                $user = User::create([
+                    'name' => $validated['name'],
+                    'email' => $validated['email'],
+                    'username' => $validated['email'],
+                    'employee_id' => $validated['employee_id'],
+                    'department' => $validated['department'],
+                    'position' => 'Staff',
 
-                // Legacy users.role column
-                'role' => $validated['roles'][0],
+                    // Legacy users.role column
+                    'role' => $validated['roles'][0],
 
-                'password' => Hash::make($validated['password']),
-            ]);
+                    'password' => Hash::make($validated['password']),
+                ]);
 
-            // Attach multiple companies
-            $user->companies()->attach($validated['company_ids']);
+                // Attach multiple companies
+                $user->companies()->attach($validated['company_ids']);
 
-            // Assign role
-            $user->assignRole($validated['roles']);
+                // Assign role
+                $user->assignRole($validated['roles']);
+            });
 
             return back()->with(
                 'success',
                 'User created successfully.'
             );
 
-        } catch (\Exception $e) {
+        } catch (Throwable $exception) {
+            report($exception);
 
             return back()
-                ->withInput()
+                ->withInput($request->except(['password', 'password_confirmation']))
                 ->withErrors([
-                    'error' => $e->getMessage()
+                    'error' => 'Unable to create the user. Please try again.',
                 ]);
         }
     }
-
 
     public function update(Request $request)
     {
@@ -129,6 +134,7 @@ class UserController extends Controller
                 'User deleted successfully.'
             );
     }
+
     public function resetPassword(Request $request)
     {
         $validated = $request->validate([
@@ -153,7 +159,7 @@ class UserController extends Controller
 
         return back()->with(
             'success',
-            'Password reset successfully for ' . $user->name . '.'
+            'Password reset successfully for '.$user->name.'.'
         );
     }
 }

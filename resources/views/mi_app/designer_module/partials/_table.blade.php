@@ -1324,7 +1324,7 @@
 
                         </style>
 
-                    </head>
+                    <\/head>
 
                     <body>
 
@@ -1347,7 +1347,7 @@
                             ${txEscapeHtml(txQrCurrentUrl)}
                         </div>
 
-                    </body>
+                    <\/body>
 
                     </html>
                 `);

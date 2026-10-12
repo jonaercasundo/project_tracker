@@ -111,6 +111,5 @@
                 Waiting time is shown from recorded timestamps. Overdue labels require a confirmed due-date or service-level policy.
             </p>
         </div>
-
     </div>
 </x-accounting_app>

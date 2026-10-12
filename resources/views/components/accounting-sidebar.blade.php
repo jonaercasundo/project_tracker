@@ -44,7 +44,8 @@
      * link the user cannot see (or that has no section definition), so groups
      * with nothing visible don't render an orphan heading.
      */
-    $navGroups = [];
+    $navGroups     = [];
+    $activeGroupIds = [];
     foreach ($groups as $groupLabel => $links) {
         $items = [];
 
@@ -69,7 +70,12 @@
         }
 
         if ($items) {
-            $navGroups[] = ['id' => 'nav-' . Str::slug($groupLabel), 'label' => $groupLabel, 'items' => $items];
+            $groupId = 'nav-' . Str::slug($groupLabel);
+            $navGroups[] = ['id' => $groupId, 'label' => $groupLabel, 'items' => $items];
+
+            if (collect($items)->contains('active', true)) {
+                $activeGroupIds[] = $groupId;
+            }
         }
     }
 
@@ -79,13 +85,62 @@
     $linkOff   = 'text-slate-600 hover:bg-slate-50 hover:text-slate-900';
 @endphp
 
-<div class="flex min-h-full flex-col bg-white">
+<style>[x-cloak]{display:none!important}</style>
 
-    {{-- Brand --}}
-    <div class="border-b border-slate-100 px-5 py-5">
-        <p class="text-sm font-extrabold text-blue-600">MI Accounting</p>
-        <p class="mt-1 text-xs text-slate-500">Workflow control center</p>
+<div x-data="{
+         collapsed: false,
+         closed: [],
+         activeGroups: @js($activeGroupIds),
+         storageKey: 'accounting.sidebar',
+         init() {
+             try {
+                 const saved = JSON.parse(localStorage.getItem(this.storageKey) || '{}');
+                 this.collapsed = saved.collapsed === true;
+                 this.closed = Array.isArray(saved.closed) ? saved.closed : [];
+             } catch (e) {}
+             // The group holding the current page always starts open.
+             this.closed = this.closed.filter(id => !this.activeGroups.includes(id));
+             this.$watch('collapsed', () => this.save());
+             this.$watch('closed', () => this.save());
+         },
+         save() {
+             try {
+                 localStorage.setItem(this.storageKey, JSON.stringify({ collapsed: this.collapsed, closed: this.closed }));
+             } catch (e) {}
+         },
+         isOpen(id) { return !this.closed.includes(id); },
+         toggleGroup(id) {
+             this.closed = this.isOpen(id) ? [...this.closed, id] : this.closed.filter(g => g !== id);
+         },
+     }"
+     :class="collapsed ? 'w-16' : 'w-full'"
+     class="flex min-h-full flex-col bg-white transition-[width] duration-150 motion-reduce:transition-none">
+
+
+    {{-- Brand + sidebar toggle --}}
+    <div class="flex items-center gap-2 border-b border-slate-100 py-4"
+         :class="collapsed ? 'justify-center px-2' : 'justify-between px-5'">
+        <div x-show="!collapsed" x-cloak>
+            <p class="text-sm font-extrabold text-blue-600">MI Accounting</p>
+            <p class="mt-1 text-xs text-slate-500">Workflow control center</p>
+        </div>
+
+        <button type="button"
+                @click="collapsed = !collapsed"
+                :aria-expanded="(!collapsed).toString()"
+                :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+                aria-controls="accounting-sidebar-body"
+                class="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900
+                       focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+            <svg class="h-5 w-5 transition-transform motion-reduce:transition-none" :class="collapsed ? 'rotate-180' : ''"
+                 viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5l-5 5 5 5" />
+            </svg>
+        </button>
     </div>
+
+    <div id="accounting-sidebar-body" x-show="!collapsed" x-cloak class="flex flex-1 flex-col">
 
     {{-- Company switcher --}}
     <div class="border-b border-slate-100 p-4">
@@ -129,11 +184,24 @@
 
         @foreach ($navGroups as $group)
             <div role="group" aria-labelledby="{{ $group['id'] }}">
-                <p id="{{ $group['id'] }}" class="px-3 pb-2 text-xs font-semibold text-slate-500">
-                    {{ $group['label'] }}
-                </p>
+                <button type="button"
+                        id="{{ $group['id'] }}"
+                        @click="toggleGroup('{{ $group['id'] }}')"
+                        :aria-expanded="isOpen('{{ $group['id'] }}').toString()"
+                        aria-controls="{{ $group['id'] }}-list"
+                        class="mb-1 flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500
+                               transition-colors hover:text-slate-900
+                               focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+                    <span>{{ $group['label'] }}</span>
+                    <svg class="h-4 w-4 transition-transform motion-reduce:transition-none"
+                         :class="isOpen('{{ $group['id'] }}') ? 'rotate-90' : ''"
+                         viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M8 5l5 5-5 5" />
+                    </svg>
+                </button>
 
-                <ul class="space-y-1">
+                <ul id="{{ $group['id'] }}-list" x-show="isOpen('{{ $group['id'] }}')" class="space-y-1">
                     @foreach ($group['items'] as $item)
                         <li>
                             <a href="{{ $item['url'] }}"
@@ -183,4 +251,5 @@
             </button>
         </form>
     </div>
+    </div>{{-- /#accounting-sidebar-body --}}
 </div>

@@ -487,8 +487,8 @@ Route::middleware(['auth'])->group(function () {
         | MI ROUTES
         |--------------------------------------------------------------------------
     */
-    Route::get('/mi/approvals', [MIApprovalController::class, 'index'])->middleware(['auth', 'company.context:MI'])->name('mi.approvals');
-    Route::post('/mi/approvals/{type}/{recordId}', [MIApprovalController::class, 'decide'])->middleware(['auth', 'company.context:MI'])->whereIn('type', ['budget', 'travel'])->whereNumber('recordId')->name('mi.approvals.decide');
+    Route::get('/mi/approvals', [MIApprovalController::class, 'index'])->middleware(['company.context:MI'])->name('mi.approvals');
+    Route::post('/mi/approvals/{type}/{recordId}', [MIApprovalController::class, 'decide'])->middleware(['company.context:MI'])->whereIn('type', ['budget', 'travel'])->whereNumber('recordId')->name('mi.approvals.decide');
     Route::middleware(['company.context:MI', 'role:user,Accounting,Executive,executive'])->group(function () {
 
         Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
@@ -547,7 +547,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Balance-check sign-off (the dashed box in your diagram)
     });
-    Route::middleware(['auth', 'company.context:MI'])->group(function () {
+    Route::middleware(['company.context:MI'])->group(function () {
         Route::post('/budget-requests/{budgetRequest}/approve', [BudgetRequestController::class, 'approve'])->name('budget_requests.approve');
         Route::post('/travel_liquidation/{liquidation}/approve', [TravelLiquidationController::class, 'approve'])->name('travel_liquidation.approve');
         Route::get('/mi/processing/budgets/{budgetRequest}', [BudgetRequestController::class, 'processing'])->name('budget_requests.processing');
@@ -558,7 +558,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['company.context:MI', 'role:user,Executive,executive,Accounting'])->group(function () {
         Route::get('/mi-liquidation-receipts/{item}', [LiquidationController::class, 'receipt'])->name('liquidation.receipt');
     });
-    Route::middleware(['auth', 'company.context:MI', 'role:accounting'])->group(function () {
+    Route::middleware(['company.context:MI', 'role:accounting'])->group(function () {
         Route::post('/budget-requests/{budgetRequest}/note', [BudgetRequestController::class, 'noteByAccounting'])->name('budget_requests.note');
         Route::post('/budget-requests/{budgetRequest}/release', [BudgetRequestController::class, 'release'])->name('budget_requests.release');
         Route::post('/travel_liquidation/{liquidation}/note', [TravelLiquidationController::class, 'noteByAccounting'])->name('travel_liquidation.note');

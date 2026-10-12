@@ -782,6 +782,7 @@ class MIAppController extends Controller
             'productType',
             'collection',
             'images',
+            'factoryCosts',
         ]);
 
         return view('mi_app.designer_module.show', compact('product'));

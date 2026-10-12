@@ -437,6 +437,29 @@ it('shows the selected primary image first in the internal and scanned product g
     expect($public->getContent())->toMatch('/id="pdGalleryImg"\s+src="https:\/\/example\.com\/primary\.jpg"/');
 });
 
+it('shows the primary factory cost and product prices on the detail page', function () {
+    $product = MI_Product::factory()->create(['purchase_cost' => '88.25', 'price' => '120.50']);
+    MI_Product_Factory_Cost::factory()->for($product, 'product')->create([
+        'factory_name' => 'Other Factory',
+        'factory_cost' => '61.11',
+    ]);
+    MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create([
+        'factory_name' => 'Selected Factory',
+        'factory_cost' => '63.75',
+    ]);
+    $this->signInMI($this->miUser());
+
+    $this->get(route('mi_app.show', $product))
+        ->assertSee('Primary Factory Cost')
+        ->assertSee('Selected Factory')
+        ->assertSee('PHP 63.75')
+        ->assertSee('Purchase Price')
+        ->assertSee('PHP 88.25')
+        ->assertSee('Selling Price')
+        ->assertSee('PHP 120.50')
+        ->assertDontSee('PHP 61.11');
+});
+
 it('adds the first factory cost as primary without changing legacy cost or selling price', function (string $amount, string $storedAmount) {
     $product = MI_Product::factory()->create();
     $this->signInMI($this->miUser());

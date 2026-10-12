@@ -79,6 +79,8 @@
         $colors = is_array($product->color)
             ? $product->color
             : (empty($product->color) ? [] : [$product->color]);
+
+        $primaryFactoryCost = $product->factoryCosts->firstWhere('is_primary', true);
     @endphp
 
     <style>
@@ -1423,6 +1425,97 @@
                             <div class="pd-field-value {{ $product->designed_by ? '' : 'empty' }}">
                                 {{ $product->designed_by ?? 'Not set' }}
                             </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            {{-- =====================================================
+                 PRICING
+            ====================================================== --}}
+            <section class="pd-card">
+
+                <div class="pd-card-header">
+
+                    <span class="pd-card-icon green">
+                        PHP
+                    </span>
+
+                    <div class="pd-card-heading">
+
+                        <h2>Pricing</h2>
+
+                        <p>
+                            Primary factory cost, purchase price, and selling price.
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <div class="pd-card-body">
+
+                    <div class="pd-grid pd-grid-3">
+
+                        <div>
+
+                            <span class="pd-field-label">
+                                Primary Factory Cost
+                            </span>
+
+                            @if($primaryFactoryCost)
+                                <div class="pd-field-value">
+                                    PHP {{ $primaryFactoryCost->factory_cost }}
+                                </div>
+                                <span class="pd-reference green">
+                                    {{ $primaryFactoryCost->factory_name }}
+                                </span>
+                            @else
+                                <div class="pd-field-value empty">
+                                    Not set
+                                </div>
+                            @endif
+
+                        </div>
+
+                        <div>
+
+                            <span class="pd-field-label">
+                                Purchase Price
+                            </span>
+
+                            @if($product->purchase_cost !== null)
+                                <div class="pd-field-value">
+                                    PHP {{ $product->purchase_cost }}
+                                </div>
+                            @else
+                                <div class="pd-field-value empty">
+                                    Not set
+                                </div>
+                            @endif
+
+                        </div>
+
+                        <div>
+
+                            <span class="pd-field-label">
+                                Selling Price
+                            </span>
+
+                            @if($product->price !== null)
+                                <div class="pd-field-value">
+                                    PHP {{ $product->price }}
+                                </div>
+                            @else
+                                <div class="pd-field-value empty">
+                                    Not set
+                                </div>
+                            @endif
 
                         </div>
 

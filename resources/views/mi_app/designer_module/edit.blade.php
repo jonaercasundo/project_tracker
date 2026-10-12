@@ -7,62 +7,62 @@
     @include('mi_app.designer_module.partials._product-form-styles')
 
     <style>
-        .tx-product-edit [hidden] { display: none !important; }
-        .tx-product-edit :is(a, button, input[type="radio"], input[type="checkbox"]):focus-visible {
+        .tx-product-form [hidden] { display: none !important; }
+        .tx-product-form :is(a, button, input[type="radio"], input[type="checkbox"]):focus-visible {
             outline: 2px solid var(--tx-primary);
             outline-offset: 3px;
         }
-        .tx-product-edit .tx-header-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-        .tx-product-edit .tx-edit-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
-        .tx-product-edit .tx-edit-badge { padding: 5px 9px; border: 1px solid var(--tx-line); border-radius: 8px; background: var(--tx-surface); color: var(--tx-ink-soft); font-size: 10px; font-weight: 600; }
-        .tx-product-edit .tx-edit-status { color: var(--tx-success); background: var(--tx-success-soft); border-color: var(--tx-success-soft); }
-        .tx-product-edit .tx-edit-span-all { grid-column: 1 / -1; }
-        .tx-product-edit .tx-edit-inline { display: flex; align-items: center; gap: 8px; }
-        .tx-product-edit .tx-edit-inline .tx-field { min-width: 0; flex: 1; }
-        .tx-product-edit .tx-edit-inline .tx-btn-small { margin: 0; min-height: 41px; flex-shrink: 0; }
-        .tx-product-edit .ts-wrapper { min-height: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
-        .tx-product-edit .ts-wrapper.field-invalid .ts-control { border-color: var(--tx-danger); }
-        .tx-product-edit .tx-edit-heading-actions { margin-left: auto; }
-        .tx-product-edit .tx-edit-heading-actions .tx-btn-small { margin-top: 0; }
-        .tx-product-edit .tx-edit-image-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-        .tx-product-edit .tx-edit-image { min-width: 0; overflow: hidden; border: 1px solid var(--tx-line); border-radius: 14px; background: var(--tx-surface-soft); }
-        .tx-product-edit .tx-edit-image:has(input[type="checkbox"]:checked) { border-color: var(--tx-danger); }
-        .tx-product-edit .tx-edit-image-preview { position: relative; border-bottom: 1px solid var(--tx-line); background: var(--tx-surface); }
-        .tx-product-edit .tx-edit-image-preview img { width: 100%; height: 190px; padding: 12px; object-fit: contain; }
-        .tx-product-edit .tx-edit-image:has(input[type="checkbox"]:checked) .tx-edit-image-preview img { opacity: .45; }
-        .tx-product-edit .tx-edit-image-placeholder { display: flex; align-items: center; justify-content: center; min-height: 190px; font-size: 12px; color: var(--tx-ink-faint); }
-        .tx-product-edit .tx-edit-primary { position: absolute; top: 12px; left: 12px; padding: 5px 9px; border-radius: 8px; background: var(--tx-primary); color: var(--tx-primary-ink); font-size: 10px; font-weight: 700; }
-        .tx-product-edit .tx-edit-image-body { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
-        .tx-product-edit .tx-edit-image-type { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--tx-ink-faint); }
-        .tx-product-edit .tx-edit-preview-link { font-size: 11px; font-weight: 600; color: var(--tx-primary); text-decoration: underline; text-underline-offset: 3px; }
-        .tx-product-edit .tx-edit-choice { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--tx-ink-soft); cursor: pointer; }
-        .tx-product-edit .tx-edit-choice input { accent-color: var(--tx-primary); }
-        .tx-product-edit .tx-edit-choice:has(input:disabled) { opacity: .55; cursor: not-allowed; }
-        .tx-product-edit .tx-edit-danger { color: var(--tx-danger); }
-        .tx-product-edit .tx-edit-danger input { accent-color: var(--tx-danger); }
-        .tx-product-edit .tx-edit-image-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--tx-line); padding-top: 12px; }
-        .tx-product-edit .tx-edit-image-actions .tx-btn-small { margin: 0; }
-        .tx-product-edit .tx-edit-removal-note { margin: 0; padding: 9px 10px; border-radius: 8px; background: var(--tx-danger-soft); color: var(--tx-danger); font-size: 10px; line-height: 1.5; }
-        .tx-product-edit .tx-edit-empty { grid-column: 1 / -1; padding: 28px; border: 1px dashed var(--tx-line); border-radius: 14px; text-align: center; background: var(--tx-surface-soft); color: var(--tx-ink-soft); font-size: 12px; }
-        .tx-product-edit .tx-edit-empty p { margin: 5px 0 0; }
-        .tx-product-edit .tx-edit-new-images { margin-top: 5px; padding-top: 20px; border-top: 1px solid var(--tx-line); }
-        .tx-product-edit .tx-edit-new-images h3 { margin: 0 0 14px; font-family: var(--tx-font-display); font-size: 13px; font-weight: 700; color: var(--tx-ink); }
-        .tx-product-edit .tx-edit-new-image { display: grid; gap: 10px; padding: 17px; border: 1px dashed var(--tx-line); border-radius: 14px; background: var(--tx-surface-soft); }
-        .tx-product-edit .tx-edit-new-image-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-        .tx-product-edit .tx-edit-new-image-head .tx-label { margin: 0; }
-        .tx-product-edit .tx-edit-new-image-head button { padding: 0; background: transparent; border: 0; font-size: 10px; font-weight: 600; color: var(--tx-danger); cursor: pointer; }
-        .tx-product-edit .tx-edit-new-image .tx-label { margin-bottom: 0; }
-        .tx-product-edit .tx-edit-new-image img { width: 100%; height: 160px; border: 1px solid var(--tx-line); border-radius: 10px; background: var(--tx-surface); object-fit: contain; }
-        .tx-product-edit .tx-edit-success { border-color: var(--tx-success); background: var(--tx-success-soft); color: var(--tx-success); }
-        .tx-product-edit .tx-edit-footer-status { margin: 0 0 10px; padding: 0 4px; font-size: 11px; color: var(--tx-ink-soft); }
-        .tx-product-edit .tx-edit-reference { word-break: break-word; }
-        @media (min-width: 650px) { .tx-product-edit .tx-edit-image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (min-width: 1100px) { .tx-product-edit #existing_images { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        .tx-product-form .tx-header-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+        .tx-product-form .tx-edit-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+        .tx-product-form .tx-edit-badge { padding: 5px 9px; border: 1px solid var(--tx-line); border-radius: 8px; background: var(--tx-surface); color: var(--tx-ink-soft); font-size: 10px; font-weight: 600; }
+        .tx-product-form .tx-edit-status { color: var(--tx-success); background: var(--tx-success-soft); border-color: var(--tx-success-soft); }
+        .tx-product-form .tx-edit-span-all { grid-column: 1 / -1; }
+        .tx-product-form .tx-edit-inline { display: flex; align-items: center; gap: 8px; }
+        .tx-product-form .tx-edit-inline .tx-field { min-width: 0; flex: 1; }
+        .tx-product-form .tx-edit-inline .tx-btn-small { margin: 0; min-height: 41px; flex-shrink: 0; }
+        .tx-product-form .ts-wrapper { min-height: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
+        .tx-product-form .ts-wrapper.field-invalid .ts-control { border-color: var(--tx-danger); }
+        .tx-product-form .tx-edit-heading-actions { margin-left: auto; }
+        .tx-product-form .tx-edit-heading-actions .tx-btn-small { margin-top: 0; }
+        .tx-product-form .tx-edit-image-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+        .tx-product-form .tx-edit-image { min-width: 0; overflow: hidden; border: 1px solid var(--tx-line); border-radius: 14px; background: var(--tx-surface-soft); }
+        .tx-product-form .tx-edit-image:has(input[type="checkbox"]:checked) { border-color: var(--tx-danger); }
+        .tx-product-form .tx-edit-image-preview { position: relative; border-bottom: 1px solid var(--tx-line); background: var(--tx-surface); }
+        .tx-product-form .tx-edit-image-preview img { width: 100%; height: 190px; padding: 12px; object-fit: contain; }
+        .tx-product-form .tx-edit-image:has(input[type="checkbox"]:checked) .tx-edit-image-preview img { opacity: .45; }
+        .tx-product-form .tx-edit-image-placeholder { display: flex; align-items: center; justify-content: center; min-height: 190px; font-size: 12px; color: var(--tx-ink-faint); }
+        .tx-product-form .tx-edit-primary { position: absolute; top: 12px; left: 12px; padding: 5px 9px; border-radius: 8px; background: var(--tx-primary); color: var(--tx-primary-ink); font-size: 10px; font-weight: 700; }
+        .tx-product-form .tx-edit-image-body { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+        .tx-product-form .tx-edit-image-type { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--tx-ink-faint); }
+        .tx-product-form .tx-edit-preview-link { font-size: 11px; font-weight: 600; color: var(--tx-primary); text-decoration: underline; text-underline-offset: 3px; }
+        .tx-product-form .tx-edit-choice { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--tx-ink-soft); cursor: pointer; }
+        .tx-product-form .tx-edit-choice input { accent-color: var(--tx-primary); }
+        .tx-product-form .tx-edit-choice:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+        .tx-product-form .tx-edit-danger { color: var(--tx-danger); }
+        .tx-product-form .tx-edit-danger input { accent-color: var(--tx-danger); }
+        .tx-product-form .tx-edit-image-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--tx-line); padding-top: 12px; }
+        .tx-product-form .tx-edit-image-actions .tx-btn-small { margin: 0; }
+        .tx-product-form .tx-edit-removal-note { margin: 0; padding: 9px 10px; border-radius: 8px; background: var(--tx-danger-soft); color: var(--tx-danger); font-size: 10px; line-height: 1.5; }
+        .tx-product-form .tx-edit-empty { grid-column: 1 / -1; padding: 28px; border: 1px dashed var(--tx-line); border-radius: 14px; text-align: center; background: var(--tx-surface-soft); color: var(--tx-ink-soft); font-size: 12px; }
+        .tx-product-form .tx-edit-empty p { margin: 5px 0 0; }
+        .tx-product-form .tx-edit-new-images { margin-top: 5px; padding-top: 20px; border-top: 1px solid var(--tx-line); }
+        .tx-product-form .tx-edit-new-images h3 { margin: 0 0 14px; font-family: var(--tx-font-display); font-size: 13px; font-weight: 700; color: var(--tx-ink); }
+        .tx-product-form .tx-edit-new-image { display: grid; gap: 10px; padding: 17px; border: 1px dashed var(--tx-line); border-radius: 14px; background: var(--tx-surface-soft); }
+        .tx-product-form .tx-edit-new-image-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+        .tx-product-form .tx-edit-new-image-head .tx-label { margin: 0; }
+        .tx-product-form .tx-edit-new-image-head button { padding: 0; background: transparent; border: 0; font-size: 10px; font-weight: 600; color: var(--tx-danger); cursor: pointer; }
+        .tx-product-form .tx-edit-new-image .tx-label { margin-bottom: 0; }
+        .tx-product-form .tx-edit-new-image img { width: 100%; height: 160px; border: 1px solid var(--tx-line); border-radius: 10px; background: var(--tx-surface); object-fit: contain; }
+        .tx-product-form .tx-edit-success { border-color: var(--tx-success); background: var(--tx-success-soft); color: var(--tx-success); }
+        .tx-product-form .tx-edit-footer-status { margin: 0 0 10px; padding: 0 4px; font-size: 11px; color: var(--tx-ink-soft); }
+        .tx-product-form .tx-edit-reference { word-break: break-word; }
+        @media (min-width: 650px) { .tx-product-form .tx-edit-image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (min-width: 1100px) { .tx-product-form #existing_images { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
         @media (max-width: 800px) {
-            .tx-product-edit .tx-header-actions { width: 100%; }
-            .tx-product-edit .tx-header-actions > * { flex: 1; }
-            .tx-product-edit .tx-card-head { flex-wrap: wrap; }
-            .tx-product-edit .tx-edit-heading-actions { margin-left: 51px; }
+            .tx-product-form .tx-header-actions { width: 100%; }
+            .tx-product-form .tx-header-actions > * { flex: 1; }
+            .tx-product-form .tx-card-head { flex-wrap: wrap; }
+            .tx-product-form .tx-edit-heading-actions { margin-left: 51px; }
         }
     </style>
 
@@ -73,7 +73,7 @@
         $primaryId = old('primary_image_id', $product->images->firstWhere('is_primary', true)?->id ?? $product->images->first()?->id);
     @endphp
 
-    <div class="tx-console tx-product-edit">
+    <div class="tx-console tx-product-form">
         <div class="tx-shell">
             <header class="tx-header">
                 <div class="tx-header-content">

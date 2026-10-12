@@ -1,6 +1,6 @@
 @php
     $removedFactoryCostIds = array_map('intval', (array) old('remove_factory_cost_ids', []));
-    $savedFactoryCosts = $product->factoryCosts->map(fn (\App\Models\MI_Product_Factory_Cost $cost): array => [
+    $savedFactoryCosts = isset($product) ? $product->factoryCosts->map(fn (\App\Models\MI_Product_Factory_Cost $cost): array => [
         'id' => $cost->id,
         'factory_name' => $cost->factory_name,
         'factory_cost' => $cost->factory_cost,
@@ -8,7 +8,7 @@
         'effective_date' => $cost->effective_date?->format('Y-m-d'),
         'remarks' => $cost->remarks,
         'is_primary' => $cost->is_primary,
-    ])->all();
+    ])->all() : [];
     $hasFactoryCostInput = old('factory_costs_present') || session()->hasOldInput('factory_costs') || session()->hasOldInput('remove_factory_cost_ids');
     $factoryCosts = $hasFactoryCostInput ? old('factory_costs', []) : $savedFactoryCosts;
     $factoryCosts = array_map(
@@ -23,26 +23,36 @@
 @endphp
 
 <style>
-    .tx-product-edit .tx-factory-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--tx-line); border-radius: 12px; background: var(--tx-line); }
-    .tx-product-edit .tx-factory-summary > div { min-width: 0; padding: 16px; background: var(--tx-surface-soft); }
-    .tx-product-edit .tx-factory-summary > div:last-child { background: var(--tx-primary-soft); }
-    .tx-product-edit .tx-factory-summary dt { color: var(--tx-ink-soft); font-size: 10px; line-height: 1.5; }
-    .tx-product-edit .tx-factory-summary dd { margin: 8px 0 0; overflow-wrap: anywhere; color: var(--tx-ink); font-family: var(--tx-font-mono); font-size: 15px; font-weight: 600; }
-    .tx-product-edit .tx-factory-summary > div:last-child dd { color: var(--tx-primary); }
-    .tx-product-edit .tx-factory-rows { display: grid; gap: 16px; }
-    .tx-product-edit .tx-factory-row { min-width: 0; border: 1px solid var(--tx-line); border-radius: 12px; background: var(--tx-surface); }
-    .tx-product-edit .tx-factory-row[data-primary="true"] { border-color: var(--tx-primary); }
-    .tx-product-edit .tx-factory-row[data-removed="true"] { border-color: var(--tx-danger); }
-    .tx-product-edit .tx-factory-row[data-removed="true"] .tx-factory-fields { opacity: .55; }
-    .tx-product-edit .tx-factory-row-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--tx-line); background: var(--tx-surface-soft); border-radius: 12px 12px 0 0; }
-    .tx-product-edit .tx-factory-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px; }
-    .tx-product-edit .tx-factory-fields > div { min-width: 0; }
-    .tx-product-edit .tx-factory-row-head .tx-btn-small { margin: 0; }
-    .tx-product-edit .tx-factory-row .tx-edit-removal-note { margin: 0 16px 16px; }
-    .tx-product-edit #add_factory_cost:disabled { cursor: not-allowed; opacity: .5; }
+    .tx-product-form .tx-factory-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--tx-line); border-radius: 12px; background: var(--tx-line); }
+    .tx-product-form .tx-factory-summary > div { min-width: 0; padding: 16px; background: var(--tx-surface-soft); }
+    .tx-product-form .tx-factory-summary > div:last-child { background: var(--tx-primary-soft); }
+    .tx-product-form .tx-factory-summary dt { color: var(--tx-ink-soft); font-size: 10px; line-height: 1.5; }
+    .tx-product-form .tx-factory-summary dd { margin: 8px 0 0; overflow-wrap: anywhere; color: var(--tx-ink); font-family: var(--tx-font-mono); font-size: 15px; font-weight: 600; }
+    .tx-product-form .tx-factory-summary > div:last-child dd { color: var(--tx-primary); }
+    .tx-product-form .tx-factory-rows { display: grid; gap: 16px; }
+    .tx-product-form .tx-factory-row { min-width: 0; border: 1px solid var(--tx-line); border-radius: 12px; background: var(--tx-surface); }
+    .tx-product-form .tx-factory-row[data-primary="true"] { border-color: var(--tx-primary); }
+    .tx-product-form .tx-factory-row[data-removed="true"] { border-color: var(--tx-danger); }
+    .tx-product-form .tx-factory-row[data-removed="true"] .tx-factory-fields { opacity: .55; }
+    .tx-product-form .tx-factory-row-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--tx-line); background: var(--tx-surface-soft); border-radius: 12px 12px 0 0; }
+    .tx-product-form .tx-factory-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px; }
+    .tx-product-form .tx-factory-fields > div { min-width: 0; }
+    .tx-product-form .tx-factory-row-head .tx-btn-small { margin: 0; }
+    .tx-product-form .tx-factory-row .tx-edit-removal-note { margin: 0 16px 16px; }
+    .tx-product-form .tx-edit-heading-actions { margin-left: auto; }
+    .tx-product-form .tx-edit-heading-actions .tx-btn-small { margin-top: 0; }
+    .tx-product-form .tx-edit-choice { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--tx-ink-soft); cursor: pointer; }
+    .tx-product-form .tx-edit-choice input { accent-color: var(--tx-primary); }
+    .tx-product-form .tx-edit-choice:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+    .tx-product-form .tx-edit-danger { color: var(--tx-danger); }
+    .tx-product-form .tx-edit-danger input { accent-color: var(--tx-danger); }
+    .tx-product-form .tx-edit-removal-note { padding: 9px 10px; border-radius: 8px; background: var(--tx-danger-soft); color: var(--tx-danger); font-size: 10px; line-height: 1.5; }
+    .tx-product-form .tx-edit-empty { grid-column: 1 / -1; padding: 28px; border: 1px dashed var(--tx-line); border-radius: 14px; text-align: center; background: var(--tx-surface-soft); color: var(--tx-ink-soft); font-size: 12px; }
+    .tx-product-form .tx-edit-empty p { margin: 5px 0 0; }
+    .tx-product-form #add_factory_cost:disabled { cursor: not-allowed; opacity: .5; }
     @media (min-width: 650px) {
-        .tx-product-edit .tx-factory-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-        .tx-product-edit .tx-factory-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .tx-product-form .tx-factory-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .tx-product-form .tx-factory-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 </style>
 
@@ -54,7 +64,7 @@
     </div>
     <div class="tx-card-body">
         <input type="hidden" name="factory_costs_present" value="1">
-        <p class="tx-hint">All costs are in PHP. Changes and removals apply when you save the product. Add up to 100 factory costs.</p>
+        <p class="tx-hint">All costs are in PHP. @if(isset($product))Changes and removals apply when you save the product.@else Factory costs will be saved with the new product.@endif Add up to 100 factory costs.</p>
         @foreach(['factory_costs', 'remove_factory_cost_ids', 'remove_factory_cost_ids.*'] as $field)
             @foreach($errors->get($field) as $messages)
                 @foreach((array) $messages as $message)<p class="tx-error">{{ $message }}</p>@endforeach

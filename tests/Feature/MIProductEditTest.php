@@ -391,24 +391,62 @@ it('allows the existing executive role variants to edit products', function (str
     $this->assertDatabaseHas('mi_products', ['product_id' => $product->getKey(), 'item_name' => 'Executive update']);
 })->with(['Executive', 'executive']);
 
-it('creates a product with media then loads its shared options and saves an edit', function () {
+it('creates a product with prices factory costs and media then loads its shared options and saves an edit', function () {
     Storage::fake('public');
     $fixture = MI_Product::factory()->create();
     $this->signInMI($this->miUser());
     $this->freezeTime();
-    $payload = array_replace(miProductEditPayload($fixture), ['item_name' => 'New create fixture', 'image_links' => ['https://example.com/create.jpg'], 'product_images' => [UploadedFile::fake()->image('created.png')]]);
+    $payload = array_replace(miProductEditPayload($fixture), [
+        'item_name' => 'New create fixture',
+        'purchase_cost' => '42.25',
+        'price' => '75.50',
+        'factory_costs' => [[
+            'factory_name' => 'Create Supplier',
+            'factory_cost' => '35.75',
+            'currency' => 'PHP',
+            'is_primary' => '1',
+        ]],
+        'image_links' => ['https://example.com/create.jpg'],
+        'product_images' => [UploadedFile::fake()->image('created.png')],
+    ]);
 
     $this->post(route('mi_app.store_1'), $payload)->assertRedirect(route('mi_app.index'))->assertSessionHasNoErrors();
 
     $created = MI_Product::where('item_name', 'New create fixture')->sole();
+    $createdFactoryCost = $created->factoryCosts()->sole();
+    expect($created->purchase_cost)->toBe('42.25');
+    expect($created->price)->toBe('75.50');
+    expect($createdFactoryCost->factory_name)->toBe('Create Supplier');
+    expect($createdFactoryCost->factory_cost)->toBe('35.75');
+    expect($createdFactoryCost->is_primary)->toBeTrue();
     expect($created->sku)->not->toBeEmpty();
     expect($created->draft_number)->toBe('DR-'.now()->format('Y').'-'.str_pad((string) $created->getKey(), 4, '0', STR_PAD_LEFT));
     expect($created->images()->count())->toBe(2);
     expect($created->images()->where('is_primary', true)->count())->toBe(1);
     $this->get(route('mi_app.create'))->assertSee('Acacia Wood')->assertSee('Natural');
+    $this->get(route('mi_app.create'))->assertSee('name="purchase_cost"', false)->assertSee('name="price"', false)
+        ->assertSee('id="section_factory_costs"', false)->assertSee('data-factory-costs', false);
     $this->get(route('mi_app.edit', $created))->assertSee('Acacia Wood')->assertSee('Natural');
     $this->put(route('mi_app.update', $created), miProductEditPayload($created))->assertSessionHasNoErrors();
     expect($created->images()->count())->toBe(2);
+});
+
+it('rejects multiple primary factory costs when creating a product', function () {
+    $fixture = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+    $payload = array_replace(miProductEditPayload($fixture), [
+        'item_name' => 'Rejected create fixture',
+        'factory_costs' => [
+            ['factory_name' => 'First Supplier', 'factory_cost' => '35.75', 'is_primary' => '1'],
+            ['factory_name' => 'Second Supplier', 'factory_cost' => '36.25', 'is_primary' => '1'],
+        ],
+    ]);
+
+    $this->from(route('mi_app.create'))->post(route('mi_app.store_1'), $payload)
+        ->assertRedirect(route('mi_app.create'))
+        ->assertSessionHasErrors('factory_costs');
+
+    expect(MI_Product::where('item_name', 'Rejected create fixture')->exists())->toBeFalse();
 });
 
 it('stops the new index migration on duplicate legacy codes without altering product data', function () {

@@ -21,7 +21,7 @@
     @include('mi_app.designer_module.partials._product-form-styles')
 
 
-    <div class="tx-console">
+    <div class="tx-console tx-product-form">
 
         <div class="tx-shell">
 
@@ -53,7 +53,7 @@
 
                     <p class="tx-subtitle">
                         Add the product classification, specifications,
-                        dimensions, materials, and product media.
+                        dimensions, pricing, factory costs, materials, and product media.
                     </p>
 
                 </div>
@@ -1120,6 +1120,27 @@
 
                             </div>
 
+                            <div class="tx-subpanel">
+                                <div class="tx-subpanel-head">
+                                    <div>
+                                        <h3>Pricing</h3>
+                                        <p>Purchase price and selling price</p>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                    <div>
+                                        <label for="purchase_cost" class="tx-label">Purchase Price</label>
+                                        <input id="purchase_cost" name="purchase_cost" type="number" min="0" max="9999999999.99" step="0.01" inputmode="decimal" value="{{ old('purchase_cost') }}" class="tx-field @error('purchase_cost') field-invalid @enderror" @error('purchase_cost') aria-invalid="true" aria-describedby="purchase_cost_error" @enderror>
+                                        @error('purchase_cost')<p id="purchase_cost_error" class="tx-error">{{ $message }}</p>@enderror
+                                    </div>
+                                    <div>
+                                        <label for="price" class="tx-label">Selling Price</label>
+                                        <input id="price" name="price" type="number" min="0" max="9999999999.99" step="0.01" inputmode="decimal" value="{{ old('price') }}" class="tx-field @error('price') field-invalid @enderror" @error('price') aria-invalid="true" aria-describedby="price_error" @enderror>
+                                        @error('price')<p id="price_error" class="tx-error">{{ $message }}</p>@enderror
+                                    </div>
+                                </div>
+                            </div>
+
                             <script>
                                 (function () {
                                     const CM_TO_IN = 2.54;
@@ -1158,9 +1179,10 @@
 
                 </section>
 
+                @include('mi_app.designer_module.partials._factory-costs')
 
                 {{-- =================================================
-                    SECTION 04 — MEDIA
+                    SECTION 05 — MEDIA
                     ================================================= --}}
 
                 <section class="tx-card lvl-3">
@@ -1168,7 +1190,7 @@
                     <div class="tx-card-head">
 
                         <span class="tx-card-icon">
-                            04
+                            05
                         </span>
 
                         <div>

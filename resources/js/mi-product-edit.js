@@ -307,3 +307,9 @@ if (form) {
         markDirty();
     });
 }
+
+const createForm = document.getElementById('product_form');
+
+if (createForm) {
+    initializeFactoryCosts(createForm, () => {});
+}

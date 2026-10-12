@@ -374,7 +374,7 @@ class MIAppController extends Controller
         return $path;
     }
 
-    public function store(Request $request)
+    public function store(Request $request, MIProductFactoryCostService $factoryCosts)
     {
         // Remove blank image link values before validation so optional empty inputs do not fail the URL rule.
         if ($request->has('image_links')) {
@@ -422,8 +422,19 @@ class MIAppController extends Controller
             'carton_length' => 'nullable|numeric',
             'carton_depth' => 'nullable|numeric',
 
-            // Cost
-            'purchase_cost' => 'nullable|numeric',
+            // Pricing
+            'price' => 'nullable|numeric|min:0|max:9999999999.99',
+            'purchase_cost' => 'nullable|numeric|min:0|max:9999999999.99',
+
+            // Factory Costs
+            'factory_costs' => 'nullable|array|max:100',
+            'factory_costs.*' => ['required', 'array:factory_name,factory_cost,currency,effective_date,remarks,is_primary'],
+            'factory_costs.*.factory_name' => 'required|string|max:255',
+            'factory_costs.*.factory_cost' => ['required', 'numeric', 'regex:/\A[0-9]{1,13}(?:\.[0-9]{1,2})?\z/'],
+            'factory_costs.*.currency' => 'sometimes|required|in:PHP',
+            'factory_costs.*.effective_date' => 'nullable|date_format:Y-m-d',
+            'factory_costs.*.remarks' => 'nullable|string|max:2000',
+            'factory_costs.*.is_primary' => 'sometimes|boolean',
 
             // Media
             'product_images' => 'nullable|array',
@@ -431,6 +442,12 @@ class MIAppController extends Controller
             'image_links' => 'nullable|array',
             'image_links.*' => 'nullable|url|max:1000',
         ]);
+
+        $factoryCostRows = $validated['factory_costs'] ?? [];
+        if (collect($factoryCostRows)->filter(fn (array $cost): bool => (bool) ($cost['is_primary'] ?? false))->count() > 1) {
+            throw ValidationException::withMessages(['factory_costs' => 'Select only one primary factory cost.']);
+        }
+        unset($validated['factory_costs']);
 
         $this->validateProductTaxonomy($validated);
         $uploadedPaths = [];
@@ -446,6 +463,7 @@ class MIAppController extends Controller
         try {
 
             $product = MI_Product::create($validated);
+            $factoryCosts->synchronize($product, $factoryCostRows, []);
 
             if ($request->image_links) {
                 foreach ($request->image_links as $index => $url) {

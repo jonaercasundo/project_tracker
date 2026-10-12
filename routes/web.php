@@ -489,7 +489,7 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::get('/mi/approvals', [MIApprovalController::class, 'index'])->middleware(['company.context:MI'])->name('mi.approvals');
     Route::post('/mi/approvals/{type}/{recordId}', [MIApprovalController::class, 'decide'])->middleware(['company.context:MI'])->whereIn('type', ['budget', 'travel'])->whereNumber('recordId')->name('mi.approvals.decide');
-    Route::middleware(['company.context:MI', 'role:user,Accounting,Executive,executive'])->group(function () {
+    Route::middleware(['company.context:MI', 'role:user,accounting,Executive,executive'])->group(function () {
 
         Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
         Route::get('/mi/settings', [MIAppController::class, 'settings'])->name('mi_app.settings');
@@ -555,7 +555,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/travel_liquidation/{liquidation}/settlement', [TravelLiquidationController::class, 'recordSettlement'])->name('travel_liquidation.settlement');
         Route::post('/travel_liquidation/{liquidation}/close', [TravelLiquidationController::class, 'close'])->name('travel_liquidation.close');
     });
-    Route::middleware(['company.context:MI', 'role:user,Executive,executive,Accounting'])->group(function () {
+    Route::middleware(['company.context:MI', 'role:user,Executive,executive,accounting'])->group(function () {
         Route::get('/mi-liquidation-receipts/{item}', [LiquidationController::class, 'receipt'])->name('liquidation.receipt');
     });
     Route::middleware(['company.context:MI', 'role:accounting'])->group(function () {

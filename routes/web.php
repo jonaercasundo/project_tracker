@@ -558,7 +558,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['auth', 'company.context:MI', 'role:user,Executive,executive,Accounting'])->group(function () {
         Route::get('/mi-liquidation-receipts/{item}', [LiquidationController::class, 'receipt'])->name('liquidation.receipt');
     });
-    Route::middleware(['auth', 'company.context:MI', 'role:Accounting'])->group(function () {
+    Route::middleware(['auth', 'company.context:MI', 'role:accounting'])->group(function () {
         Route::post('/budget-requests/{budgetRequest}/note', [BudgetRequestController::class, 'noteByAccounting'])->name('budget_requests.note');
         Route::post('/budget-requests/{budgetRequest}/release', [BudgetRequestController::class, 'release'])->name('budget_requests.release');
         Route::post('/travel_liquidation/{liquidation}/note', [TravelLiquidationController::class, 'noteByAccounting'])->name('travel_liquidation.note');

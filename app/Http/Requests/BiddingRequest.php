@@ -106,6 +106,8 @@ abstract class BiddingRequest extends FormRequest
         }
 
         $rules = [
+            'school_plan' => ['sometimes', 'string', 'max:2000000'],
+            'school_token' => ['required_with:school_plan', 'uuid'],
             'hierarchy_present' => ['sometimes', 'boolean'],
             'hierarchy_complete' => ['required_if:hierarchy_present,1', 'boolean'],
             'project_code' => [$required, 'required', Rule::in(['SME', 'SFP', 'MT', 'Textbook', 'DCP'])],

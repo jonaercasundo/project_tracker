@@ -130,7 +130,7 @@ function initializeBidding(form) {
     function recalculate() {
         let documentTotal = 0n;
         for (const lot of allLots()) {
-            let lotTotal = 0n;
+            let lotTotal = BigInt(lot.dataset.schoolTotal || '0');
             for (const row of lot.querySelectorAll('[data-bidding-item]')) lotTotal += recalculateRow(row) ?? 0n;
             lot.querySelector('[data-bidding-lot-total]').textContent = displayMoney(lotTotal);
             documentTotal += lotTotal;
@@ -139,6 +139,8 @@ function initializeBidding(form) {
         const empty = form.querySelector('[data-bidding-empty-lots]');
         if (empty) empty.hidden = allLots().length > 0;
     }
+
+    form.addEventListener('school-totals', recalculate);
 
     const locationSelect = (lot, level) => lot.querySelector(`[data-location="${level}"]`);
     const locationLabel = level => level === 'city' ? 'city / municipality' : level;

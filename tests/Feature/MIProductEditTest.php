@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\MI_Product;
+use App\Models\MI_Product_Factory_Cost;
 use App\Models\MI_Product_Image;
+use Illuminate\Database\QueryException;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +25,7 @@ beforeEach(function () {
         '2026_08_17_000000_add_price_to_products_table.php',
         '2026_10_06_040342_create_mi_product_images_table.php',
         '2026_10_06_085134_add_unique_item_code_to_mi_products_table.php',
+        '2026_10_12_055813_create_mi_product_factory_costs_table.php',
     ] as $migration) {
         (require database_path('migrations/'.$migration))->up();
     }
@@ -240,12 +243,14 @@ it('rejects inconsistent taxonomy with 422 and preserves the product', function 
 
 it('returns 403 for disallowed roles and company contexts on edit and update', function (string $role, string $company, string $method) {
     $product = MI_Product::factory()->create();
+    $cost = MI_Product_Factory_Cost::factory()->for($product, 'product')->create(['factory_cost' => '75.00', 'is_primary' => true]);
     $this->signInMI($this->miUser($role, $company));
     $route = $method === 'get' ? 'mi_app.edit' : 'mi_app.update';
 
-    $this->{$method}(route($route, $product), miProductEditPayload($product))->assertForbidden();
+    $this->{$method}(route($route, $product), array_replace(miProductEditPayload($product), ['remove_factory_cost_ids' => [$cost->id]]))->assertForbidden();
 
     expect($product->fresh()->item_name)->toBe($product->item_name);
+    expect($cost->fresh()->factory_cost)->toBe('75.00');
 })->with([
     'accounting edit' => ['accounting', 'MI', 'get'], 'accounting update' => ['accounting', 'MI', 'put'],
     'finance edit' => ['finance', 'MI', 'get'], 'finance update' => ['finance', 'MI', 'patch'],
@@ -265,6 +270,7 @@ it('rolls back product image changes and cleans new uploads after a later image 
     $product = MI_Product::factory()->create();
     Storage::disk('public')->put('product_images/retained.png', 'original');
     $image = $product->images()->create(['image_type' => 'upload', 'image_path' => 'product_images/retained.png', 'is_primary' => true]);
+    $cost = MI_Product_Factory_Cost::factory()->for($product, 'product')->create(['factory_cost' => '75.00', 'is_primary' => true]);
     $this->signInMI($this->miUser());
     MI_Product_Image::creating(function (MI_Product_Image $image): void {
         if ($image->image_type === 'upload') {
@@ -275,6 +281,8 @@ it('rolls back product image changes and cleans new uploads after a later image 
         $this->from(route('mi_app.edit', $product))->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
             'item_name' => 'Attempted change', 'remove_image_ids' => [$image->id],
             'image_links' => ['https://example.com/new.jpg'], 'product_images' => [UploadedFile::fake()->image('new.png')],
+            'remove_factory_cost_ids' => [$cost->id],
+            'factory_costs' => [['factory_name' => 'Attempted new factory', 'factory_cost' => '99.95']],
         ]))->assertRedirect(route('mi_app.edit', $product))->assertSessionHasErrors(['error' => 'Unable to save the product. Your existing data has been preserved. Please try again.']);
     } finally {
         MI_Product_Image::flushEventListeners();
@@ -283,6 +291,9 @@ it('rolls back product image changes and cleans new uploads after a later image 
     expect($product->fresh()->item_name)->toBe($product->item_name);
     expect($product->images()->pluck('id')->all())->toBe([$image->id]);
     expect($image->fresh()->is_primary)->toBeTrue();
+    expect($product->factoryCosts()->pluck('id')->all())->toBe([$cost->id]);
+    expect($cost->fresh()->factory_cost)->toBe('75.00');
+    expect($cost->fresh()->is_primary)->toBeTrue();
     Storage::disk('public')->assertExists('product_images/retained.png');
     expect(Storage::disk('public')->allFiles('product_images'))->toBe(['product_images/retained.png']);
 });
@@ -424,4 +435,296 @@ it('shows the selected primary image first in the internal and scanned product g
 
     expect($internal->getContent())->toMatch('/id="galleryPreview"\s+src="https:\/\/example\.com\/primary\.jpg"/');
     expect($public->getContent())->toMatch('/id="pdGalleryImg"\s+src="https:\/\/example\.com\/primary\.jpg"/');
+});
+
+it('adds the first factory cost as primary without changing legacy cost or selling price', function (string $amount, string $storedAmount) {
+    $product = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+
+    $this->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'factory_costs' => [['factory_name' => 'First supplier', 'factory_cost' => $amount]],
+    ]))->assertRedirect(route('mi_app.edit', $product))->assertSessionHasNoErrors()->assertSessionHas('success');
+
+    $cost = $product->factoryCosts()->sole();
+    expect($cost->factory_name)->toBe('First supplier');
+    expect($cost->factory_cost)->toBe($storedAmount);
+    expect($cost->is_primary)->toBeTrue();
+    expect($cost->currency)->toBe('PHP');
+    expect($cost->effective_date)->toBeNull();
+    expect($cost->remarks)->toBeNull();
+    expect($cost->product->getKey())->toBe($product->getKey());
+    expect($product->fresh()->purchase_cost)->toBe('12.34');
+    expect($product->fresh()->price)->toBe('25.50');
+})->with([
+    'zero' => ['0', '0.00'],
+    'one decimal place' => ['12.3', '12.30'],
+    'large decimal amount' => ['999999999999.99', '999999999999.99'],
+]);
+
+it('saves multiple factory costs and reloads every editable value with the selected primary', function () {
+    $product = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+
+    $this->patch(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'factory_costs' => [
+            ['factory_name' => 'Factory A', 'factory_cost' => '1250.00', 'currency' => 'PHP', 'effective_date' => '2026-10-12', 'remarks' => 'Includes packing'],
+            ['factory_name' => 'Factory B', 'factory_cost' => '1180.00', 'is_primary' => true],
+            ['factory_name' => 'Factory C', 'factory_cost' => '1350.00'],
+        ],
+    ]))->assertRedirect(route('mi_app.edit', $product))->assertSessionHasNoErrors();
+
+    $this->assertDatabaseCount('mi_product_factory_costs', 3);
+    $this->assertDatabaseHas('mi_product_factory_costs', [
+        'product_id' => $product->getKey(), 'factory_name' => 'Factory A', 'factory_cost' => '1250.00',
+        'currency' => 'PHP', 'remarks' => 'Includes packing', 'is_primary' => false,
+    ]);
+    expect($product->factoryCosts()->where('factory_name', 'Factory A')->sole()->effective_date->format('Y-m-d'))->toBe('2026-10-12');
+    expect($product->factoryCosts()->where('is_primary', true)->pluck('factory_name')->all())->toBe(['Factory B']);
+    $response = $this->get(route('mi_app.edit', $product))->assertSee('Factory Cost Management')
+        ->assertSee('Includes packing')->assertSee('2026-10-12');
+    foreach ($product->factoryCosts as $cost) {
+        $response->assertSee($cost->factory_name)->assertSee('value="'.$cost->factory_cost.'"', false)
+            ->assertSee('data-factory-cost-id="'.$cost->id.'"', false);
+    }
+});
+
+it('updates a saved factory cost and switches primary while preserving omitted entries', function () {
+    $product = MI_Product::factory()->create();
+    $original = MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create(['factory_cost' => '1250.00']);
+    $selected = MI_Product_Factory_Cost::factory()->for($product, 'product')->create(['effective_date' => '2026-10-01', 'remarks' => 'Old remarks']);
+    $this->signInMI($this->miUser());
+
+    $this->patch(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'factory_costs' => [[
+            'id' => $selected->id, 'factory_name' => 'Renamed supplier', 'factory_cost' => '1125.25',
+            'effective_date' => null, 'remarks' => null, 'is_primary' => true,
+        ]],
+        'purchase_cost' => '40.00', 'price' => '95.00',
+    ]))->assertRedirect(route('mi_app.edit', $product))->assertSessionHasNoErrors();
+
+    $this->assertDatabaseCount('mi_product_factory_costs', 2);
+    $this->assertDatabaseHas('mi_product_factory_costs', [
+        'id' => $selected->id, 'factory_name' => 'Renamed supplier', 'factory_cost' => '1125.25',
+        'effective_date' => null, 'remarks' => null, 'is_primary' => true,
+    ]);
+    expect($original->fresh()->factory_cost)->toBe('1250.00');
+    expect($product->factoryCosts()->where('is_primary', true)->pluck('id')->all())->toBe([$selected->id]);
+    expect($product->fresh()->purchase_cost)->toBe('40.00');
+    expect($product->fresh()->price)->toBe('95.00');
+});
+
+it('preserves every saved factory cost when the request omits entries without explicitly removing them', function (array $input) {
+    $product = MI_Product::factory()->create();
+    $primary = MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create();
+    $secondary = MI_Product_Factory_Cost::factory()->for($product, 'product')->create();
+    $this->signInMI($this->miUser());
+
+    $this->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), $input))
+        ->assertSessionHasNoErrors();
+
+    $this->assertModelExists($primary);
+    $this->assertModelExists($secondary);
+    expect($product->factoryCosts()->count())->toBe(2);
+    expect($primary->fresh()->is_primary)->toBeTrue();
+})->with(['omitted section' => [[]], 'empty section' => [['factory_costs' => []]]]);
+
+it('removes a saved primary factory cost and selects a remaining cost', function () {
+    $product = MI_Product::factory()->create();
+    $primary = MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create();
+    $remaining = MI_Product_Factory_Cost::factory()->for($product, 'product')->create();
+    $this->signInMI($this->miUser());
+
+    $this->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'remove_factory_cost_ids' => [$primary->id],
+    ]))->assertSessionHasNoErrors();
+
+    $this->assertModelMissing($primary);
+    expect($product->factoryCosts()->where('is_primary', true)->pluck('id')->all())->toBe([$remaining->id]);
+    expect($product->fresh()->purchase_cost)->toBe('12.34');
+    expect($product->fresh()->price)->toBe('25.50');
+});
+
+it('removes the last factory cost without recreating it from the legacy purchase cost', function () {
+    $product = MI_Product::factory()->create();
+    $cost = MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create();
+    $this->signInMI($this->miUser());
+
+    $this->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'remove_factory_cost_ids' => [$cost->id],
+    ]))->assertSessionHasNoErrors();
+
+    $this->assertDatabaseCount('mi_product_factory_costs', 0);
+    $this->get(route('mi_app.edit', $product))->assertSee('Factory Cost Management');
+    expect($product->factoryCosts()->count())->toBe(0);
+    expect($product->fresh()->purchase_cost)->toBe('12.34');
+});
+
+it('rejects invalid factory costs with 422 before changing the product', function (mixed $amount) {
+    $product = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+
+    $this->putJson(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'item_name' => 'Rejected product name',
+        'factory_costs' => [['factory_name' => 'Factory A', 'factory_cost' => $amount]],
+    ]))->assertUnprocessable()->assertJsonValidationErrors('factory_costs.0.factory_cost');
+
+    expect($product->fresh()->item_name)->toBe($product->item_name);
+    $this->assertDatabaseCount('mi_product_factory_costs', 0);
+})->with([
+    'negative' => ['-0.01'], 'non-numeric' => ['not a price'], 'too precise' => ['1.001'],
+    'overflow' => ['10000000000000.00'], 'scientific notation' => ['1e3'], 'formatted amount' => ['1,250.00'],
+    'array' => [['12.50']], 'missing value' => [null],
+]);
+
+it('rejects malformed factory cost entries and unsupported metadata with 422', function (array $input, string $field) {
+    $product = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+
+    $this->putJson(route('mi_app.update', $product), array_replace(miProductEditPayload($product), $input))
+        ->assertUnprocessable()->assertJsonValidationErrors($field);
+
+    $this->assertDatabaseCount('mi_product_factory_costs', 0);
+})->with([
+    'non array list' => [['factory_costs' => 'Factory A'], 'factory_costs'],
+    'non array entry' => [['factory_costs' => ['Factory A']], 'factory_costs.0'],
+    'missing required fields' => [['factory_costs' => [[]]], 'factory_costs.0.factory_name'],
+    'unsupported currency' => [['factory_costs' => [['factory_name' => 'Factory A', 'factory_cost' => '12.00', 'currency' => 'USD']]], 'factory_costs.0.currency'],
+    'invalid effective date' => [['factory_costs' => [['factory_name' => 'Factory A', 'factory_cost' => '12.00', 'effective_date' => '2026-02-30']]], 'factory_costs.0.effective_date'],
+    'invalid primary indicator' => [['factory_costs' => [['factory_name' => 'Factory A', 'factory_cost' => '12.00', 'is_primary' => 'yes']]], 'factory_costs.0.is_primary'],
+    'mass assignment key' => [['factory_costs' => [['factory_name' => 'Factory A', 'factory_cost' => '12.00', 'product_id' => 999]]], 'factory_costs.0'],
+    'non array removals' => [['remove_factory_cost_ids' => '1'], 'remove_factory_cost_ids'],
+]);
+
+it('rejects another products factory cost identifiers with 422 before changing either product', function (string $operation) {
+    $product = MI_Product::factory()->create();
+    $other = MI_Product::factory()->create();
+    $foreign = MI_Product_Factory_Cost::factory()->for($other, 'product')->primary()->create(['factory_cost' => '75.00']);
+    $this->signInMI($this->miUser());
+    $input = $operation === 'update'
+        ? ['factory_costs' => [['id' => $foreign->id, 'factory_name' => 'Stolen supplier', 'factory_cost' => '1.00']]]
+        : ['remove_factory_cost_ids' => [$foreign->id]];
+    $field = $operation === 'update' ? 'factory_costs.0.id' : 'remove_factory_cost_ids.0';
+
+    $this->putJson(route('mi_app.update', $product), array_replace(miProductEditPayload($product), ['item_name' => 'Unauthorized change'], $input))
+        ->assertUnprocessable()->assertJsonValidationErrors($field);
+
+    expect($product->fresh()->item_name)->toBe($product->item_name);
+    expect($foreign->fresh()->product_id)->toBe($other->getKey());
+    expect($foreign->fresh()->factory_cost)->toBe('75.00');
+    expect($foreign->fresh()->is_primary)->toBeTrue();
+    expect($product->factoryCosts()->count())->toBe(0);
+})->with(['update', 'remove']);
+
+it('rejects duplicate or conflicting saved factory cost identifiers with 422', function (string $operation) {
+    $product = MI_Product::factory()->create();
+    $cost = MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create(['factory_cost' => '75.00']);
+    $this->signInMI($this->miUser());
+    $row = ['id' => $cost->id, 'factory_name' => 'Attempted change', 'factory_cost' => '1.00'];
+    $input = match ($operation) {
+        'duplicate update' => ['factory_costs' => [$row, $row]],
+        'duplicate removal' => ['remove_factory_cost_ids' => [$cost->id, $cost->id]],
+        'update and remove' => ['factory_costs' => [$row], 'remove_factory_cost_ids' => [$cost->id]],
+    };
+    $field = match ($operation) {
+        'duplicate update' => 'factory_costs.0.id',
+        'duplicate removal' => 'remove_factory_cost_ids.0',
+        'update and remove' => 'remove_factory_cost_ids',
+    };
+
+    $this->putJson(route('mi_app.update', $product), array_replace(miProductEditPayload($product), $input))
+        ->assertUnprocessable()->assertJsonValidationErrors($field);
+
+    expect($cost->fresh()->factory_cost)->toBe('75.00');
+    expect($cost->fresh()->is_primary)->toBeTrue();
+    $this->assertDatabaseCount('mi_product_factory_costs', 1);
+})->with(['duplicate update', 'duplicate removal', 'update and remove']);
+
+it('rejects multiple submitted primary factory costs with 422', function () {
+    $product = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+
+    $this->putJson(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'factory_costs' => [
+            ['factory_name' => 'Factory A', 'factory_cost' => '12.00', 'is_primary' => true],
+            ['factory_name' => 'Factory B', 'factory_cost' => '15.00', 'is_primary' => true],
+        ],
+    ]))->assertUnprocessable()->assertJsonValidationErrors(['factory_costs' => 'Select only one primary factory cost.']);
+
+    $this->assertDatabaseCount('mi_product_factory_costs', 0);
+});
+
+it('limits the final saved factory cost count including omitted existing entries', function () {
+    $product = MI_Product::factory()->create();
+    $primary = MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create();
+    MI_Product_Factory_Cost::factory()->for($product, 'product')->count(99)->create();
+    $this->signInMI($this->miUser());
+
+    $this->putJson(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'item_name' => 'Attempted change',
+        'factory_costs' => [['factory_name' => 'One too many', 'factory_cost' => '12.00']],
+    ]))->assertUnprocessable()->assertJsonValidationErrors(['factory_costs' => 'A product may have at most 100 factory costs.']);
+
+    $this->assertDatabaseCount('mi_product_factory_costs', 100);
+    expect($primary->fresh()->is_primary)->toBeTrue();
+    expect($product->fresh()->item_name)->toBe($product->item_name);
+});
+
+it('allows replacing a factory cost at the row limit in the same save', function () {
+    $product = MI_Product::factory()->create();
+    $primary = MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create();
+    MI_Product_Factory_Cost::factory()->for($product, 'product')->count(99)->create();
+    $this->signInMI($this->miUser());
+
+    $this->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'remove_factory_cost_ids' => [$primary->id],
+        'factory_costs' => [['factory_name' => 'Replacement', 'factory_cost' => '12.00', 'is_primary' => true]],
+    ]))->assertSessionHasNoErrors();
+
+    $this->assertModelMissing($primary);
+    $this->assertDatabaseCount('mi_product_factory_costs', 100);
+    expect($product->factoryCosts()->where('is_primary', true)->pluck('factory_name')->all())->toBe(['Replacement']);
+});
+
+it('redisplays submitted factory costs inline errors and pending removals after validation fails', function () {
+    $product = MI_Product::factory()->create();
+    $saved = MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create();
+    $this->signInMI($this->miUser());
+
+    $this->from(route('mi_app.edit', $product))->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'remove_factory_cost_ids' => [$saved->id],
+        'factory_costs' => [['factory_name' => 'Unsaved supplier', 'factory_cost' => '-12.00', 'remarks' => 'Keep these notes']],
+    ]))->assertRedirect(route('mi_app.edit', $product))
+        ->assertSessionHasErrors(['factory_costs.0.factory_cost' => 'Enter a non-negative amount with no more than two decimal places.'])
+        ->assertSessionHasInput('factory_costs.0.factory_name', 'Unsaved supplier')
+        ->assertSessionHasInput('remove_factory_cost_ids.0', $saved->id);
+
+    $response = $this->get(route('mi_app.edit', $product))->assertSee('Unsaved supplier')->assertSee('Keep these notes')
+        ->assertSee('value="-12.00"', false)->assertSee('Enter a non-negative amount with no more than two decimal places.');
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+    expect($xpath->query('//input[@name="remove_factory_cost_ids[]"][@value="'.$saved->id.'"][@checked]')->length)->toBe(1);
+    expect($saved->fresh()->is_primary)->toBeTrue();
+    $this->assertDatabaseCount('mi_product_factory_costs', 1);
+});
+
+it('escapes saved factory names and remarks in the edit form', function () {
+    $product = MI_Product::factory()->create();
+    $unsafe = '<script>alert("factory")</script>';
+    MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create(['factory_name' => $unsafe, 'remarks' => $unsafe]);
+    $this->signInMI($this->miUser());
+
+    $this->get(route('mi_app.edit', $product))->assertSee($unsafe)->assertDontSee($unsafe, false);
+});
+
+it('enforces a single primary factory cost per product at the database boundary', function () {
+    $product = MI_Product::factory()->create();
+    $primary = MI_Product_Factory_Cost::factory()->for($product, 'product')->primary()->create();
+    $secondary = MI_Product_Factory_Cost::factory()->for($product, 'product')->create();
+
+    expect(fn () => DB::table('mi_product_factory_costs')->where('id', $secondary->id)->update(['is_primary' => true]))
+        ->toThrow(QueryException::class);
+
+    expect($product->factoryCosts()->where('is_primary', true)->pluck('id')->all())->toBe([$primary->id]);
+    expect($secondary->fresh()->is_primary)->toBeFalse();
 });

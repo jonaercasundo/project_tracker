@@ -215,17 +215,20 @@
                             <div class="tx-subpanel">
                                 <div class="tx-subpanel-head"><div><h3>Pricing</h3><p>Purchase cost and selling price</p></div></div>
                                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                    @include('mi_app.designer_module.partials._edit-field', ['name' => 'purchase_cost', 'label' => 'Purchase Cost', 'inputType' => 'number', 'required' => false])
+                                    @include('mi_app.designer_module.partials._edit-field', ['name' => 'purchase_cost', 'label' => 'Purchase Cost (Legacy)', 'inputType' => 'number', 'required' => false])
                                     @include('mi_app.designer_module.partials._edit-field', ['name' => 'price', 'label' => 'Selling Price', 'inputType' => 'number', 'required' => false])
                                 </div>
+                                <p class="tx-hint">The existing purchase cost is kept separately. Factory cost comparisons below do not change purchase cost or selling price.</p>
                             </div>
                         </div>
                     </div>
                 </section>
 
+                @include('mi_app.designer_module.partials._factory-costs')
+
                 <section id="section_images" class="tx-card lvl-3" aria-labelledby="images_heading">
                     <div class="tx-card-head">
-                        <span class="tx-card-icon">04</span>
+                        <span class="tx-card-icon">05</span>
                         <div><h2 id="images_heading">Product Media</h2><p>Manage existing photos, upload images, or add image links</p></div>
                         <div class="tx-edit-heading-actions"><button type="button" id="add_image" class="tx-btn-small">+ Add another image</button></div>
                     </div>

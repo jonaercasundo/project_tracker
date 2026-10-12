@@ -171,6 +171,7 @@ it('runs the MI migration command without requiring the legacy delivery module a
 
     expect(Schema::hasTable('mi_product_quotations'))->toBeTrue();
     expect(Schema::hasTable('mi_costing_analyses'))->toBeTrue();
+    expect(Schema::hasTable('mi_product_factory_costs'))->toBeTrue();
     expect(Schema::hasTable('financial_activities'))->toBeTrue();
     expect(Schema::hasTable('delivery_proofs'))->toBeFalse();
     expect(Schema::hasTable('package_status'))->toBeFalse();

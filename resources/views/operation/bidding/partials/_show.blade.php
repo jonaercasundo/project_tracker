@@ -13,6 +13,7 @@
         </dl>
         <div class="grid grid-cols-1 gap-4 border-t border-slate-100 bg-slate-50 p-5 sm:grid-cols-2"><div><p class="text-xs text-slate-500">Approved Budget for the Contract</p><p class="mt-1 font-mono text-xl font-semibold tabular-nums text-slate-900">PHP {{ $formatBiddingMoney($project->approved_budget_contract_abc) }}</p></div><div><p class="text-xs text-slate-500">Calculated item total</p><p class="mt-1 font-mono text-xl font-semibold tabular-nums text-blue-700">PHP {{ $formatBiddingMoney($calculatedTotal ?? $project->calculated_total ?? '0.00') }}</p></div></div>
     </section>
+    @include('operation.bidding.partials._schools', ['schoolReadOnly' => true])
     @forelse($project->lots as $lot)
         <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3"><h2 class="text-sm font-semibold text-slate-900">{{ $lot->lot_no }}</h2><p class="font-mono text-sm font-semibold tabular-nums text-slate-700">PHP {{ $formatBiddingMoney($lot->calculated_item_total ?? '0.00') }}</p></div>
             <div class="space-y-4 p-5"><p class="text-xs text-slate-500">{{ collect([$lot->country, $lot->region, $lot->province, $lot->city_municipality, $lot->barangay])->filter()->implode(' / ') ?: 'Location not provided' }}</p>

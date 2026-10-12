@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Models\BudgetRequest;
 use App\Models\Liquidation;
 use App\Models\MI_Liquidation;
+use App\Models\MI_Product;
 use App\Models\ProjectInformation;
 use App\Policies\BudgetRequestPolicy;
 use App\Policies\MILiquidationPolicy;
+use App\Policies\MIProductPolicy;
 use App\Policies\ProjectInformationPolicy;
 use App\Policies\TravelLiquidationPolicy;
 use App\Services\AccountingWorkspace;
@@ -29,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(BudgetRequest::class, BudgetRequestPolicy::class);
         Gate::policy(Liquidation::class, TravelLiquidationPolicy::class);
         Gate::policy(MI_Liquidation::class, MILiquidationPolicy::class);
+        Gate::policy(MI_Product::class, MIProductPolicy::class);
         Gate::policy(ProjectInformation::class, ProjectInformationPolicy::class);
         View::composer('components.accounting-sidebar', function ($view): void {
             $user = auth()->user();

@@ -22,7 +22,7 @@ class BiddingService
 {
     public const MAX_AMOUNT = '9999999999999.99';
 
-    public function __construct(private BiddingDocumentService $documentService) {}
+    public function __construct(private BiddingDocumentService $documentService, private BiddingSchoolService $schools) {}
 
     /** @param array<string, mixed> $data */
     public function store(array $data): ProjectInformation
@@ -32,6 +32,7 @@ class BiddingService
                 'procuring_entity' => '', 'approved_budget_contract_abc' => '0.00', 'status' => 'Draft',
             ], $this->parentAttributes($data)));
             $this->syncLots($project, $data['lots']);
+            $this->schools->sync($project, $data, true);
             $this->refreshTotal($project);
 
             return $project;
@@ -43,10 +44,12 @@ class BiddingService
     {
         return $this->saveTransaction(function () use ($bidding, $data): ProjectInformation {
             $project = ProjectInformation::query()->whereKey($bidding->getKey())->lockForUpdate()->firstOrFail();
+            $this->schools->assertFresh($project, $data);
             $project->update($this->parentAttributes($data));
             if (array_key_exists('lots', $data)) {
                 $this->syncLots($project, $data['lots']);
             }
+            $this->schools->sync($project, $data, false);
             $this->refreshTotal($project);
 
             return $project;
@@ -71,6 +74,7 @@ class BiddingService
     {
         DB::transaction(function () use ($bidding): void {
             $project = ProjectInformation::query()->whereKey($bidding->getKey())->lockForUpdate()->firstOrFail();
+            $this->schools->guardDeletion($project->lots()->pluck('id')->all());
             $this->documentService->deleteBiddingFiles($project);
             $project->keyStages()->delete();
             $project->delete();
@@ -175,6 +179,7 @@ class BiddingService
     private function deleteChild(Model $model): void
     {
         if ($model instanceof ProjectLot) {
+            $this->schools->guardDeletion([$model->id]);
             foreach ($model->addresses()->where('project_id', $model->project_id)->get() as $address) {
                 $this->deleteChild($address);
             }

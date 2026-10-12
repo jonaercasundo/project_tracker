@@ -1,3 +1,5 @@
+import { initializeFactoryCosts } from './mi-product-factory-costs.js';
+
 const form = document.getElementById('edit_product_form');
 
 if (form) {
@@ -8,6 +10,7 @@ if (form) {
         dirty = true;
         status.textContent = 'You have unsaved changes.';
     };
+    initializeFactoryCosts(form, markDirty);
     form.addEventListener('input', markDirty);
     form.addEventListener('change', markDirty);
     window.addEventListener('beforeunload', (event) => {

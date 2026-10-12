@@ -8,6 +8,8 @@ class School extends Model
 {
     protected $table = 'school';
 
+    protected $primaryKey = 'school_id';
+
     public $incrementing = false;
 
     protected $keyType = 'string';
@@ -22,6 +24,6 @@ class School extends Model
         'contact',
         'municipality',
         'division',
-        'region'
+        'region',
     ];
 }

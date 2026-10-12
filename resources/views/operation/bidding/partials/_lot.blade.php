@@ -19,7 +19,8 @@
         @if(!empty($lotData['id']) && is_scalar($lotData['id']))<input type="hidden" name="{{ $namePrefix }}[id]" value="{{ $lotData['id'] }}">@endif
         <input type="hidden" name="{{ $namePrefix }}[addresses_present]" value="1"><input type="hidden" name="{{ $namePrefix }}[legacy_items_present]" value="1">
         <x-input-error :messages="$errors->get($dotPrefix.'.lot_no')" class="text-xs" />
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <details @if(count($addresses) || !empty($lotData['legacy_location'])) open @endif><summary class="cursor-pointer text-xs font-semibold text-slate-600">Other / manual delivery destinations</summary>
+        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             @if($readOnlyGeography)
                 <div class="flex flex-col gap-1.5"><p class="text-xs font-semibold text-slate-600">Country</p><p class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{{ $lotData['legacy_country'] }}</p><p class="text-[11px] text-slate-500">Saved country retained.</p></div>
             @else
@@ -50,6 +51,7 @@
             @endforeach
         </div>
         <button type="button" data-bidding-action="add-address" class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100">+ Add delivery address</button>
+        </details>
         @if(count($legacyItems))
             <section class="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4"><div><h3 class="text-xs font-semibold text-amber-900">Existing lot items</h3><p class="mt-1 text-xs text-amber-800">These saved items have no address or key stage. Their existing values remain here until you change them. Add a unit cost before changing a quantity when its price is missing.</p></div>
                 @include('operation.bidding.partials._item_table', ['items' => $legacyItems, 'legacy' => true, 'itemsPrefix' => $namePrefix.'[legacy_items]', 'itemsDot' => $dotPrefix.'.legacy_items', 'itemsUid' => $uid.'-legacy'])

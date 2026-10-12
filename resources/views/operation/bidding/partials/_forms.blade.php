@@ -56,13 +56,14 @@
         </div>
     </section>
     <section class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3"><div><h2 class="text-sm font-semibold text-slate-900">Lots and delivery destinations</h2><p class="mt-1 text-xs text-slate-500">Add addresses, key stages and item quantities within each lot.</p></div><button type="button" data-bidding-action="add-lot" class="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">+ Add lot</button></div>
+        <div class="flex flex-wrap items-center justify-between gap-3"><div><h2 class="text-sm font-semibold text-slate-900">Lots, key stages & school assignments</h2><p class="mt-1 text-xs text-slate-500">Create lots, configure school packages, or add manual delivery destinations.</p></div><button type="button" data-bidding-action="add-lot" class="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">+ Add lot</button></div>
         <div data-bidding-lots data-collection="lots" data-name-prefix="lots" class="space-y-4">
             @foreach($formLots as $index => $lot)
                 @continue(!is_array($lot))
                 @include('operation.bidding.partials._lot', ['index' => $index, 'lot' => is_array($lot) ? $lot : [], 'namePrefix' => 'lots['.$index.']', 'dotPrefix' => 'lots.'.$index, 'uid' => 'lot-'.$index])
             @endforeach
         </div>
+        @include('operation.bidding.partials._schools')
         <p data-bidding-empty-lots @if(count($formLots)) hidden @endif class="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">Add a lot to continue.</p>
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-5 py-4"><div><p class="text-xs font-semibold text-blue-900">Calculated item total</p><p class="mt-1 text-xs text-blue-700">Quantity x unit cost across all lots. The approved budget stays separate.</p></div><p class="font-mono text-xl font-semibold tabular-nums text-blue-900">PHP <span data-bidding-calculated-total>{{ $calculatedTotal ?? '0.00' }}</span></p></div>
         <p data-bidding-feedback role="status" aria-live="polite" class="text-sm text-red-700"></p>

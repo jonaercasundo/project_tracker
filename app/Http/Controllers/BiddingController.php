@@ -6,17 +6,19 @@ use App\Http\Requests\StoreBiddingRequest;
 use App\Http\Requests\UpdateBiddingRequest;
 use App\Models\New\Item;
 use App\Models\ProjectInformation;
+use App\Services\BiddingSchoolService;
 use App\Services\BiddingService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class BiddingController extends Controller
 {
-    public function __construct(private BiddingService $biddingService) {}
+    public function __construct(private BiddingService $biddingService, private BiddingSchoolService $schools) {}
 
     public function index(Request $request): View
     {
@@ -69,6 +71,7 @@ class BiddingController extends Controller
             'catalogItems' => $this->catalogItems(),
             'biddingRoutePrefix' => $biddingRoutePrefix,
             'biddingLots' => [],
+            'schoolPlan' => ['packages' => []],
             'calculatedTotal' => '0.00',
         ]);
     }
@@ -115,6 +118,9 @@ class BiddingController extends Controller
 
         return view($area.'.bidding.'.$page, [
             'project' => $bidding,
+            'schoolPlan' => $this->schools->plan($bidding),
+            'schoolRevision' => $this->schools->fingerprint($bidding),
+            'schoolImportHistory' => DB::table('bidding_imports')->where('project_id', $bidding->id)->latest('id')->limit(10)->get(),
             'biddingLots' => $biddingLots,
             'biddingRoutePrefix' => $biddingRoutePrefix,
             'catalogItems' => $page === 'edit' ? $this->catalogItems($bidding) : collect(),

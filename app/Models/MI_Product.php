@@ -183,6 +183,12 @@ class MI_Product extends Model
         return $this->belongsTo(MI_Collection::class);
     }
 
+    public function factoryCosts(): HasMany
+    {
+        return $this->hasMany(MI_Product_Factory_Cost::class, 'product_id', 'product_id')
+            ->orderBy('id');
+    }
+
     public function images(): HasMany
     {
         return $this->hasMany(

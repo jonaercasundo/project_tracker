@@ -7,6 +7,7 @@ use App\Http\Controllers\ActionCrawlerController;
 use App\Http\Controllers\BiddingController;
 use App\Http\Controllers\BiddingDocumentController;
 use App\Http\Controllers\BiddingFolderController;
+use App\Http\Controllers\BiddingSchoolController;
 use App\Http\Controllers\BudgetRequestController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardLaunchController;
@@ -266,6 +267,9 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('project/bidding/catalog', [BiddingController::class, 'catalog'])->name('project.bidding.catalog');
 
+        Route::get('project/bidding/schools/search', [BiddingSchoolController::class, 'search'])->name('project.bidding.schools.search');
+        Route::post('project/bidding/schools/workspace', [BiddingSchoolController::class, 'workspace'])->middleware('throttle:60,1')->name('project.bidding.schools.workspace');
+
         Route::get('project/bidding/create', [BiddingController::class, 'project_create'])
             ->name('project.bidding.create');
 
@@ -336,6 +340,9 @@ Route::middleware(['auth'])->group(function () {
             ->name('bidding.index');
 
         Route::get('/bidding/catalog', [BiddingController::class, 'catalog'])->name('bidding.catalog');
+
+        Route::get('bidding/schools/search', [BiddingSchoolController::class, 'search'])->name('bidding.schools.search');
+        Route::post('bidding/schools/workspace', [BiddingSchoolController::class, 'workspace'])->middleware('throttle:60,1')->name('bidding.schools.workspace');
 
         Route::get('/bidding/create', [BiddingController::class, 'create'])
             ->name('bidding.create');
@@ -548,7 +555,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/travel_liquidation/{liquidation}/settlement', [TravelLiquidationController::class, 'recordSettlement'])->name('travel_liquidation.settlement');
         Route::post('/travel_liquidation/{liquidation}/close', [TravelLiquidationController::class, 'close'])->name('travel_liquidation.close');
     });
-    Route::middleware(['auth', 'company.context:MI', 'role:user,Executive,executive,accounting'])->group(function () {
+    Route::middleware(['auth', 'company.context:MI', 'role:user,Executive,accounting,executive,accounting'])->group(function () {
         Route::get('/mi-liquidation-receipts/{item}', [LiquidationController::class, 'receipt'])->name('liquidation.receipt');
     });
     Route::middleware(['auth', 'company.context:MI', 'role:accounting'])->group(function () {

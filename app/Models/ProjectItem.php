@@ -20,6 +20,7 @@ class ProjectItem extends Model
         'remarks',
         'keystage_id',
         'catalog_item_id',
+        'bidding_package_id',
     ];
 
     public function lot(): BelongsTo

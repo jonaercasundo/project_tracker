@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateMIProductRequest;
 use App\Models\MI_Category;
 use App\Models\MI_Collection;
 use App\Models\MI_Material;
@@ -9,6 +10,7 @@ use App\Models\MI_Product;
 use App\Models\MI_Product_Image;
 use App\Models\MI_ProductType;
 use App\Models\MI_SubCategory;
+use App\Services\MIProductFactoryCostService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -16,9 +18,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class MIAppController extends Controller
@@ -575,7 +577,8 @@ class MIAppController extends Controller
 
     public function edit(MI_Product $product): View
     {
-        $product->load(['category', 'subCategory', 'productType', 'collection', 'images']);
+        Gate::authorize('update', $product);
+        $product->load(['category', 'subCategory', 'productType', 'collection', 'images', 'factoryCosts']);
         $categories = MI_Category::orderBy('name')->get();
         $subCategories = MI_SubCategory::orderBy('name')->get();
         $productTypes = MI_ProductType::orderBy('name')->get();
@@ -584,47 +587,14 @@ class MIAppController extends Controller
         return view('mi_app.designer_module.edit', compact('product', 'categories', 'subCategories', 'productTypes', 'collections'));
     }
 
-    public function update(Request $request, MI_Product $product): RedirectResponse
+    public function update(UpdateMIProductRequest $request, MI_Product $product, MIProductFactoryCostService $factoryCosts): RedirectResponse
     {
-        $ownedImage = Rule::exists('mi_product_images', 'id')->where('product_id', $product->getKey());
-        $rules = [
-            'item_name' => 'required|string|max:255',
-            'item_code' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('mi_products', 'item_code')->ignore($product)],
-            'description' => 'sometimes|nullable|string|max:20000',
-            'type_of_sample' => 'required|string|max:255',
-            'designed_by' => 'sometimes|nullable|string|max:255',
-            'category_id' => 'required|integer|exists:mi_categories,id',
-            'sub_category_id' => 'sometimes|required|integer|exists:mi_sub_categories,id',
-            'product_type_id' => 'sometimes|nullable|integer|exists:mi_product_types,id',
-            'collection_id' => 'sometimes|nullable|integer|exists:mi_collections,id',
-            'materials' => 'required|array|min:1|max:100',
-            'materials.*' => 'required|string|max:255',
-            'color' => 'sometimes|nullable|array|max:100',
-            'color.*' => 'required|string|max:255',
-            'type' => 'sometimes|nullable|string|max:255',
-            'price' => 'sometimes|nullable|numeric|min:0|max:9999999999.99',
-            'purchase_cost' => 'sometimes|nullable|numeric|min:0|max:9999999999.99',
-            'image_links' => 'nullable|array|max:30',
-            'image_links.*' => 'nullable|url:http,https|max:1000',
-            'product_images' => 'nullable|array|max:30',
-            'product_images.*' => 'file|image|mimes:jpeg,png,jpg,webp|max:20480',
-            'remove_image_ids' => 'nullable|array|max:100',
-            'remove_image_ids.*' => ['integer', 'distinct', $ownedImage],
-            'primary_image_id' => ['nullable', 'integer', $ownedImage],
-            'image_order' => 'nullable|array|max:100',
-            'image_order.*' => ['integer', 'distinct', $ownedImage],
-        ];
-        foreach (['product', 'carton'] as $prefix) {
-            foreach (['height', 'width', 'length', 'depth'] as $dimension) {
-                $rules[$prefix.'_'.$dimension] = 'sometimes|nullable|numeric|min:0|max:99999999.99';
-            }
-        }
-        $validated = $request->validate($rules);
+        $validated = $request->validated();
         $removeIds = array_map('intval', $validated['remove_image_ids'] ?? []);
         if (in_array((int) ($validated['primary_image_id'] ?? 0), $removeIds, true)) {
             throw ValidationException::withMessages(['primary_image_id' => 'Select an image that is not marked for removal.']);
         }
-        $controls = ['image_links', 'product_images', 'remove_image_ids', 'primary_image_id', 'image_order'];
+        $controls = ['image_links', 'product_images', 'remove_image_ids', 'primary_image_id', 'image_order', 'factory_costs', 'remove_factory_cost_ids'];
         $attributes = Arr::except($validated, $controls);
         $attributes['materials'] = $this->normalizeArrayInput($attributes['materials']);
         if (array_key_exists('color', $attributes)) {
@@ -634,11 +604,14 @@ class MIAppController extends Controller
         $removedPaths = [];
 
         try {
-            DB::transaction(function () use ($product, $attributes, $validated, $request, $removeIds, &$uploadedPaths, &$removedPaths): void {
+            DB::transaction(function () use ($product, $attributes, $validated, $request, $removeIds, $factoryCosts, &$uploadedPaths, &$removedPaths): void {
                 $lockedProduct = MI_Product::whereKey($product->getKey())->lockForUpdate()->firstOrFail();
                 $validatedTaxonomy = array_replace($lockedProduct->only(['category_id', 'sub_category_id', 'product_type_id', 'collection_id']), $attributes);
                 $this->validateProductTaxonomy($validatedTaxonomy);
                 $lockedProduct->fill($attributes)->save();
+                if (array_key_exists('factory_costs', $validated) || array_key_exists('remove_factory_cost_ids', $validated)) {
+                    $factoryCosts->synchronize($lockedProduct, $validated['factory_costs'] ?? [], $validated['remove_factory_cost_ids'] ?? []);
+                }
                 $images = $lockedProduct->images()->lockForUpdate()->get();
                 $imageIds = $images->modelKeys();
                 $submittedIds = array_merge($removeIds, $validated['image_order'] ?? [], isset($validated['primary_image_id']) ? [$validated['primary_image_id']] : []);

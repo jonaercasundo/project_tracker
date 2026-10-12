@@ -56,7 +56,7 @@
             
             <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-xs sm:text-sm font-semibold mb-8">
                 <span class="w-2 h-2 rounded-full bg-brand-500 animate-pulse"></span>
-                METRO v2.1 Pipeline Engine Releaseds
+                METRO v2.1 Pipeline Engine Released
             </div>
 
             <h1 class="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.1] max-w-4xl mx-auto">

@@ -36,7 +36,7 @@ class AccountingWorkspace
     public function records(User $user): Builder
     {
         $companyId = $user->currentCompany()?->getKey();
-        abort_unless($user->hasRole('accounting') && $user->currentCompany()?->code === 'MI' && $user->currentCompany()->is_active, 403);
+        abort_unless($user->hasAccountingRole() && $user->currentCompany()?->code === 'MI' && $user->currentCompany()->is_active, 403);
         $budgets = DB::table('budget_requests as b')->join('users as u', 'u.user_id', '=', 'b.employee_id')
             ->whereIn('b.id', BudgetRequest::where('company_id', $companyId)->select('id'))
             ->selectRaw("b.id, 'budget' as type, b.control_id as reference, u.name as employee, b.employee_id, b.department, b.objectives as purpose, b.budget_total as amount, 'Unspecified' as currency, b.status, b.created_at, COALESCE(b.received_at, b.released_at, b.noted_at, b.approved_at, b.created_at) as waiting_since, CASE WHEN b.status = 'approved' AND b.noted_at IS NULL THEN 'budget-review' WHEN b.status = 'approved' AND b.noted_at IS NOT NULL AND b.noted_by IS NOT NULL AND b.released_at IS NULL THEN 'releases' WHEN b.status = 'released' AND b.received_at IS NULL THEN 'acknowledgment' ELSE 'visibility' END as stage, 0 as missing")

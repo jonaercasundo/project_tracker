@@ -35,7 +35,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ProjectInformation::class, ProjectInformationPolicy::class);
         View::composer('components.accounting-sidebar', function ($view): void {
             $user = auth()->user();
-            $view->with('accountingCounters', $user?->hasRole('accounting') && $user->currentCompany()?->code === 'MI'
+            $view->with('accountingCounters', $user?->hasAccountingRole() && $user->currentCompany()?->code === 'MI'
                 ? app(AccountingWorkspace::class)->counters($user) : []);
         });
         View::composer(['components.mi-sidebar', 'components.accounting-sidebar'], function ($view): void {

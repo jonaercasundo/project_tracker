@@ -100,7 +100,6 @@ class DashboardService
             'MI' => [
                 'Administrator' => 'admin.dashboard',
                 'user' => 'mi_app.dashboard',
-                'Accounting' => 'accounting.mi.dashboard',
             ],
             default => [],
         };
@@ -109,6 +108,10 @@ class DashboardService
             if ($user->hasRole($role)) {
                 return redirect()->route($route);
             }
+        }
+
+        if ($company->code === 'MI' && $user->hasAccountingRole()) {
+            return redirect()->route('accounting.mi.dashboard');
         }
 
         if ($company->code === 'MI' && $user->canAccessMIApprovals()) {

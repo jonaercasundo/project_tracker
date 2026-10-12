@@ -129,7 +129,7 @@ class MIWorkflowTestCase extends TestCase
     {
         $user = User::factory()->create(['username' => fake()->unique()->userName(), 'role' => $role]);
         $user->assignRole(Role::findOrCreate($role, 'web'));
-        if ($role === 'accounting') {
+        if ($user->hasAccountingRole()) {
             foreach (['mi.accounting.dashboard.view', 'mi.budget.view', 'mi.budget.review', 'mi.budget.release', 'mi.liquidation.view', 'mi.liquidation.review', 'mi.settlement.view', 'mi.financial-reports.view', 'mi.audit.view'] as $permission) {
                 $user->givePermissionTo(Permission::findOrCreate($permission, 'web'));
             }

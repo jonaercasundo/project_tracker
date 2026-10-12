@@ -36,12 +36,12 @@ class BudgetRequestPolicy
 
     public function noteByAccounting(User $user, BudgetRequest $budgetRequest): bool
     {
-        return $this->companyMatches($user, $budgetRequest) && $user->hasRole('accounting') && $user->can('mi.budget.review');
+        return $this->companyMatches($user, $budgetRequest) && $user->hasAccountingRole() && $user->can('mi.budget.review');
     }
 
     public function release(User $user, BudgetRequest $budgetRequest): bool
     {
-        return $this->companyMatches($user, $budgetRequest) && $user->hasRole('accounting') && $user->can('mi.budget.release');
+        return $this->companyMatches($user, $budgetRequest) && $user->hasAccountingRole() && $user->can('mi.budget.release');
     }
 
     public function markReceived(User $user, BudgetRequest $budgetRequest): bool
@@ -57,7 +57,7 @@ class BudgetRequestPolicy
     public function viewProcessing(User $user, BudgetRequest $budgetRequest): bool
     {
         return $this->companyMatches($user, $budgetRequest)
-            && (($user->hasRole('accounting') && $user->can('mi.budget.view')) || $user->canApproveMI('mi.budget.approve'));
+            && (($user->hasAccountingRole() && $user->can('mi.budget.view')) || $user->canApproveMI('mi.budget.approve'));
     }
 
     public function submit(User $user, BudgetRequest $budgetRequest): bool

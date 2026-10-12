@@ -26,6 +26,17 @@ it('provisions only explicitly requested read-only Accounting access idempotentl
     $this->get(route('accounting.mi.dashboard'))->assertOk();
 });
 
+it('provisions dashboard access for accounts with the capitalized Accounting role', function () {
+    $accountant = $this->miUser('Accounting');
+    $accountant->syncPermissions([]);
+    $this->app->make(Kernel::class)->registerCommand(app(GrantMIAccountingAccess::class));
+
+    $this->artisan('mi:accounting-access', ['email' => $accountant->email, '--read-only' => true])->assertSuccessful();
+    $this->signInMI($accountant);
+
+    $this->get(route('accounting.mi.dashboard'))->assertOk();
+});
+
 it('refuses implicit access employee escalation and unsupported authority grants', function () {
     $employee = $this->miUser();
     $accountant = $this->miUser('accounting');

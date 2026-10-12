@@ -94,6 +94,11 @@ class User extends Authenticatable
         return $this->currentCompany()?->code === 'MI' && $this->hasAnyRole(['user', 'Executive', 'executive']);
     }
 
+    public function hasAccountingRole(): bool
+    {
+        return $this->hasAnyRole(['accounting', 'Accounting']);
+    }
+
     public function canApproveMI(string $permission): bool
     {
         return $this->currentCompany()?->code === 'MI'

@@ -140,7 +140,7 @@ it('uses the selected company and existing role destinations consistently', func
     $this->actingAs($user)->get(route('dashboard.launch'))->assertRedirect(route($destination))
         ->assertSessionHas('company_id', $user->companies()->sole()->getKey());
 })->with([
-    ['MI', 'Administrator', 'admin.dashboard'], ['MI', 'accounting', 'accounting.mi.dashboard'], ['MI', 'Executive', 'mi.approvals'],
+    ['MI', 'Administrator', 'admin.dashboard'], ['MI', 'accounting', 'accounting.mi.dashboard'], ['MI', 'Accounting', 'accounting.mi.dashboard'], ['MI', 'Executive', 'mi.approvals'],
     ['MMC', 'Administrator', 'admin.dashboard'], ['MMC', 'finance', 'finance.dashboard'], ['MMC', 'IT', 'it.dashboard'],
     ['MMC', 'Warehouse_officer', 'warehouse.dashboard'], ['MI', 'IT', 'site.maintenance'],
 ]);

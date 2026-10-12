@@ -20,7 +20,7 @@ class MILiquidationPolicy
 
         return $company?->code === 'MI' && $company->is_active
             && (int) $liquidation->company_id === (int) $company->getKey()
-            && (($user->hasRole('accounting') && $user->can('mi.liquidation.view')) || ($user->hasMIUserAccess()
+            && (($user->hasAccountingRole() && $user->can('mi.liquidation.view')) || ($user->hasMIUserAccess()
                 && (int) $liquidation->prepared_by === (int) $user->getKey()));
     }
 

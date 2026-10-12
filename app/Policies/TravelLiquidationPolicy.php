@@ -29,7 +29,7 @@ class TravelLiquidationPolicy
 
     public function noteByAccounting(User $user, Liquidation $liquidation): bool
     {
-        return $this->companyMatches($user, $liquidation) && $user->hasRole('accounting') && $user->can('mi.liquidation.review');
+        return $this->companyMatches($user, $liquidation) && $user->hasAccountingRole() && $user->can('mi.liquidation.review');
     }
 
     public function approve(User $user, Liquidation $liquidation): bool
@@ -46,12 +46,12 @@ class TravelLiquidationPolicy
     public function viewProcessing(User $user, Liquidation $liquidation): bool
     {
         return $this->companyMatches($user, $liquidation)
-            && (($user->hasRole('accounting') && $user->can('mi.liquidation.view')) || $user->canApproveMI('mi.travel.approve'));
+            && (($user->hasAccountingRole() && $user->can('mi.liquidation.view')) || $user->canApproveMI('mi.travel.approve'));
     }
 
     public function recordSettlement(User $user, Liquidation $liquidation): bool
     {
-        return $this->companyMatches($user, $liquidation) && $user->hasRole('accounting')
+        return $this->companyMatches($user, $liquidation) && $user->hasAccountingRole()
             && $user->can('mi.travel.settle') && config('mi_financial.settlement_recording_enabled');
     }
 

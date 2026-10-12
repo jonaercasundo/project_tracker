@@ -38,7 +38,7 @@ class GrantMIAccountingAccess extends Command
             return self::FAILURE;
         }
         $user = User::where('email', $this->argument('email'))->first();
-        if (! $user || ! $user->hasRole('accounting') || ! $user->companies()->where('code', 'MI')->where('companies.is_active', true)->exists()) {
+        if (! $user || ! $user->hasAccountingRole() || ! $user->companies()->where('code', 'MI')->where('companies.is_active', true)->exists()) {
             $this->error('An existing Accounting user with active MI membership is required.');
 
             return self::FAILURE;

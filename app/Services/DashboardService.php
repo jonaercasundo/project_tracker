@@ -100,7 +100,7 @@ class DashboardService
             'MI' => [
                 'Administrator' => 'admin.dashboard',
                 'user' => 'mi_app.dashboard',
-                'accounting' => 'accounting.mi.dashboard',
+                'Accounting' => 'accounting.mi.dashboard',
             ],
             default => [],
         };

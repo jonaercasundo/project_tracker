@@ -106,9 +106,9 @@ class LogisticsChannelConsoleKernel extends Illuminate\Foundation\Console\Kernel
 
 pest()->extend(LogisticsChannelTestCase::class)->in(__FILE__);
 
-function logisticsChannelAdmin(bool $administrator = true): array
+function logisticsChannelAccount(bool $userRole = true): array
 {
-    $roleName = $administrator ? 'Administrator' : 'user';
+    $roleName = $userRole ? 'user' : 'Administrator';
     $user = User::factory()->create(['username' => fake()->unique()->userName(), 'role' => $roleName]);
     $user->assignRole(Role::findOrCreate($roleName, 'web'));
     $company = Company::query()->firstOrCreate(['code' => 'MMC'], ['name' => 'MMC', 'is_active' => true]);
@@ -155,14 +155,14 @@ function logisticsChannelPayload(array $overrides = []): array
     ], $overrides);
 }
 
-it('shows the management page only to MMC administrators', function () {
-    [$admin, $company] = logisticsChannelAdmin();
-    $this->withoutVite()->actingAs($admin)->withSession(['company_id' => $company->company_id]);
+it('shows the management page only to MMC users', function () {
+    [$operator, $company] = logisticsChannelAccount();
+    $this->withoutVite()->actingAs($operator)->withSession(['company_id' => $company->company_id]);
 
     $this->get('/logistics-channel?tab=overview')->assertOk()->assertSee('Logistics Channel')->assertSee('Queue');
 
-    [$operator, $operatorCompany] = logisticsChannelAdmin(false);
-    $this->actingAs($operator)->withSession(['company_id' => $operatorCompany->company_id]);
+    [$administrator, $administratorCompany] = logisticsChannelAccount(false);
+    $this->actingAs($administrator)->withSession(['company_id' => $administratorCompany->company_id]);
     $this->get('/logistics-channel')->assertForbidden();
 });
 
@@ -192,7 +192,7 @@ it('rolls back and reapplies only the additive management migration', function (
 });
 
 it('creates an integration with encrypted one-time credentials, exact scope, and audit record', function () {
-    [$admin, $company] = logisticsChannelAdmin();
+    [$admin, $company] = logisticsChannelAccount();
     $this->actingAs($admin)->withSession(['company_id' => $company->company_id]);
 
     $response = $this->post('/logistics-channel/integrations', logisticsChannelIntegrationData());
@@ -212,7 +212,7 @@ it('creates an integration with encrypted one-time credentials, exact scope, and
 });
 
 it('requires explicit permission before omitting school restrictions', function () {
-    [$admin, $company] = logisticsChannelAdmin();
+    [$admin, $company] = logisticsChannelAccount();
     $this->actingAs($admin)->withSession(['company_id' => $company->company_id]);
     $data = logisticsChannelIntegrationData();
     unset($data['school_scopes']);
@@ -226,7 +226,7 @@ it('requires explicit permission before omitting school restrictions', function 
 });
 
 it('authenticates database credentials and refuses disabled integrations', function () {
-    [$admin, $company] = logisticsChannelAdmin();
+    [$admin, $company] = logisticsChannelAccount();
     DB::table('deliveries')->insert([
         ['project_id' => 502698, 'school_id' => '134967', 'dr_no' => '0035470', 'status' => 'warehouse', 'keystage_id' => 64],
         ['project_id' => 502698, 'school_id' => '134967', 'dr_no' => '0035470', 'status' => 'warehouse', 'keystage_id' => 65],
@@ -252,7 +252,7 @@ it('authenticates database credentials and refuses disabled integrations', funct
 });
 
 it('updates an integration without changing credentials and narrows its project and school scope', function () {
-    [$admin, $company] = logisticsChannelAdmin();
+    [$admin, $company] = logisticsChannelAccount();
     $created = app(LogisticsChannelService::class)->create(logisticsChannelIntegrationData(), $admin->user_id, '127.0.0.1');
     DB::table('deliveries')->insert([
         ['project_id' => 502698, 'school_id' => '134967', 'dr_no' => '0035470', 'status' => 'warehouse'],
@@ -281,7 +281,7 @@ it('updates an integration without changing credentials and narrows its project 
 });
 
 it('adopts an environment integration without changing its key or project scope', function () {
-    [$admin, $company] = logisticsChannelAdmin();
+    [$admin, $company] = logisticsChannelAccount();
     config(['logistics-webhooks.keys' => ['logistics-mmc-sme2' => 'existing-test-secret']]);
     config(['logistics-webhooks.integration_scopes' => ['logistics-mmc-sme2' => ['project_ids' => [502698], 'school_ids' => []]]]);
     DB::table('deliveries')->insert(['project_id' => 502698, 'school_id' => '134967', 'dr_no' => '0035470', 'status' => 'warehouse']);
@@ -300,7 +300,7 @@ it('adopts an environment integration without changing its key or project scope'
 });
 
 it('rotates keys with overlap, revokes credentials, and never lists stored secrets', function () {
-    [$admin, $company] = logisticsChannelAdmin();
+    [$admin, $company] = logisticsChannelAccount();
     $created = app(LogisticsChannelService::class)->create(logisticsChannelIntegrationData(), $admin->user_id, '127.0.0.1');
     $this->actingAs($admin)->withSession(['company_id' => $company->company_id]);
 
@@ -319,7 +319,7 @@ it('rotates keys with overlap, revokes credentials, and never lists stored secre
 });
 
 it('filters event history without exposing payloads and retries only stored failed events', function () {
-    [$admin, $company] = logisticsChannelAdmin();
+    [$admin, $company] = logisticsChannelAccount();
     $created = app(LogisticsChannelService::class)->create(logisticsChannelIntegrationData(), $admin->user_id, '127.0.0.1');
     DB::table('logistics_webhook_events')->insert([
         'integration_id' => 'logistics-mmc-test',

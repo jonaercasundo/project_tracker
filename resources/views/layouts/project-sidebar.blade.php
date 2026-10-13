@@ -250,7 +250,7 @@
             <span>Automated PDF Population</span>
         </a>
 
-        @if($currentUser?->hasRole('Administrator') && $currentCompany?->code === 'MMC' && $currentCompany?->is_active)
+        @if($currentUser?->hasRole('user') && $currentCompany?->code === 'MMC' && $currentCompany?->is_active)
         <!-- Logistics Channel -->
         <a href="{{ route('logistics-channel.index') }}"
            @if(request()->routeIs('logistics-channel.*')) aria-current="page" @endif

@@ -12,7 +12,7 @@ class LogisticsIntegrationPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasRole('Administrator');
+        return $user->hasRole('user');
     }
 
     /**
@@ -20,7 +20,7 @@ class LogisticsIntegrationPolicy
      */
     public function view(User $user, LogisticsIntegration $logisticsIntegration): bool
     {
-        return $user->hasRole('Administrator');
+        return $user->hasRole('user');
     }
 
     /**
@@ -28,7 +28,7 @@ class LogisticsIntegrationPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole('Administrator');
+        return $user->hasRole('user');
     }
 
     /**
@@ -36,7 +36,7 @@ class LogisticsIntegrationPolicy
      */
     public function update(User $user, LogisticsIntegration $logisticsIntegration): bool
     {
-        return $user->hasRole('Administrator');
+        return $user->hasRole('user');
     }
 
     /**
@@ -44,7 +44,7 @@ class LogisticsIntegrationPolicy
      */
     public function delete(User $user, LogisticsIntegration $logisticsIntegration): bool
     {
-        return $user->hasRole('Administrator');
+        return $user->hasRole('user');
     }
 
     /**
@@ -52,7 +52,7 @@ class LogisticsIntegrationPolicy
      */
     public function restore(User $user, LogisticsIntegration $logisticsIntegration): bool
     {
-        return $user->hasRole('Administrator');
+        return $user->hasRole('user');
     }
 
     /**
@@ -60,6 +60,6 @@ class LogisticsIntegrationPolicy
      */
     public function forceDelete(User $user, LogisticsIntegration $logisticsIntegration): bool
     {
-        return $user->hasRole('Administrator');
+        return $user->hasRole('user');
     }
 }

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Item extends Model
 {
-    protected $table = 'items'; // change if your table is named items
+    protected $table = 'item'; // change if your table is named items
 
     protected $primaryKey = 'item_id'; // change if your PK is different
 

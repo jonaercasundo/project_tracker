@@ -1,6 +1,5 @@
 <x-project_app-layout>
     @php
-        use Illuminate\Support\Carbon;
 
         $tabs = [
             'overview' => 'Overview',
@@ -34,7 +33,7 @@
                 return '—';
             }
             try {
-                return Carbon::parse($value)->timezone(config('app.timezone'))->format($withTime ? 'M j, Y g:i A' : 'M j, Y');
+                return \Illuminate\Support\Carbon::parse($value)->timezone(config('app.timezone'))->format($withTime ? 'M j, Y g:i A' : 'M j, Y');
             } catch (\Throwable $e) {
                 return (string) $value;
             }
@@ -407,7 +406,7 @@
                                     <td class="px-3 py-3">{{ $row['project_name'] ?? 'Project '.$row['project_id'] }}</td>
                                     <td class="px-3 py-3">{{ $row['school_name'] ?: $row['school_id'] }}</td>
                                     <td class="px-3 py-3"><span class="rounded-full px-2.5 py-1 font-bold {{ $row['logistics_status'] === 'delivered' ? 'bg-emerald-50 text-emerald-800' : 'bg-blue-50 text-blue-800' }}">{{ $row['logistics_status'] === 'delivered' ? 'Logistics Delivered' : 'Logistics Received' }}</span></td>
-                                    <td class="whitespace-nowrap px-3 py-3"><time datetime="{{ Carbon::parse($row['last_logistics_update'])->toIso8601String() }}">{{ $fmt($row['last_logistics_update']) }}</time></td>
+                                    <td class="whitespace-nowrap px-3 py-3"><time datetime="{{ \Illuminate\Support\Carbon::parse($row['last_logistics_update'])->toIso8601String() }}">{{ $fmt($row['last_logistics_update']) }}</time></td>
                                     <td class="whitespace-nowrap px-3 py-3">{{ $humanize($row['mmc_receiving_status']) }} · <span class="tabular-nums">{{ $row['mmc_received_package_count'] }}/{{ $row['mmc_expected_package_count'] }}</span> packages</td>
                                     <td class="px-3 py-3"><span class="rounded-full px-2.5 py-1 font-bold {{ $pill($row['reconciliation_status']) }}">{{ $humanize($row['reconciliation_status']) }}</span></td>
                                 </tr>
@@ -512,7 +511,7 @@
                         <tbody class="divide-y divide-slate-100">
                             @forelse($auditRows as $audit)
                                 <tr class="align-top hover:bg-slate-50/60">
-                                    <td class="whitespace-nowrap px-4 py-3"><time datetime="{{ Carbon::parse($audit->created_at)->toIso8601String() }}">{{ $fmt($audit->created_at) }}</time></td>
+                                    <td class="whitespace-nowrap px-4 py-3"><time datetime="{{ \Illuminate\Support\Carbon::parse($audit->created_at)->toIso8601String() }}">{{ $fmt($audit->created_at) }}</time></td>
                                     <td class="px-4 py-3 font-mono">{{ $audit->integration_reference ?? '—' }}</td>
                                     <td class="px-4 py-3 font-bold">{{ $humanize($audit->action) }}</td>
                                     <td class="px-4 py-3">{{ $audit->actor_user_id ? 'User '.$audit->actor_user_id : 'System' }}</td>

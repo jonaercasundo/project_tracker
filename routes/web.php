@@ -32,7 +32,9 @@ use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\RoleAccessPermissionController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SchoolController;
 use App\Http\Controllers\SchoolImportController;
+use App\Http\Controllers\SchoolManagementImportController;
 use App\Http\Controllers\TikTokController;
 use App\Http\Controllers\TravelLiquidationController;
 use App\Http\Controllers\UserController;
@@ -182,6 +184,15 @@ Route::middleware(['auth'])->group(function () {
             | Allocation List Import
             |--------------------------------------------------------------------------
         */
+
+        Route::get('/schools/import', [SchoolManagementImportController::class, 'index'])->name('schools.import');
+        Route::post('/schools/import/preview', [SchoolManagementImportController::class, 'preview'])->middleware('throttle:10,1')->name('schools.import.preview');
+        Route::post('/schools/import/confirm', [SchoolManagementImportController::class, 'confirm'])->middleware('throttle:10,1')->name('schools.import.confirm');
+        Route::get('/schools/template', [SchoolManagementImportController::class, 'template'])->name('schools.template');
+        Route::get('/schools/view/{school}', [SchoolController::class, 'show'])->where('school', '.+')->name('schools.show');
+        Route::get('/schools/edit/{school}', [SchoolController::class, 'edit'])->where('school', '.+')->name('schools.edit');
+        Route::match(['put', 'patch'], '/schools/record/{school}', [SchoolController::class, 'update'])->where('school', '.+')->name('schools.update');
+        Route::resource('schools', SchoolController::class)->only(['index', 'create', 'store']);
 
         Route::get('/school/import', [SchoolImportController::class, 'index'])->name('school.index');
         Route::post('/school/preview', [SchoolImportController::class, 'preview'])->name('school.preview');

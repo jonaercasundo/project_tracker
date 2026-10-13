@@ -34,8 +34,8 @@
         </div>
 
         {{-- MAIN LAYOUT ENGINE CONTAINER --}}
-        @php($hasMobileNavigation = request()->routeIs('deliveries.monitoring', 'project.bidding.*'))
-        <div class="min-h-screen flex flex-col relative {{ request()->routeIs('project.bidding.*') ? 'overflow-x-clip' : '' }}" @if($hasMobileNavigation) x-data="{ monitoringNavOpen: false }" @keydown.escape.window="monitoringNavOpen = false" @endif>
+        @php($hasMobileNavigation = request()->routeIs('deliveries.monitoring', 'project.bidding.*', 'schools.*'))
+        <div class="min-h-screen flex flex-col relative {{ request()->routeIs('project.bidding.*', 'schools.*') ? 'overflow-x-clip' : '' }}" @if($hasMobileNavigation) x-data="{ monitoringNavOpen: false }" @keydown.escape.window="monitoringNavOpen = false" @endif>
             
             @if($hasMobileNavigation)
                 <button type="button" x-show="monitoringNavOpen" x-cloak @click="monitoringNavOpen = false" class="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" aria-label="Close navigation"></button>
@@ -57,7 +57,7 @@
                 
                 @isset($header)
                     <header class="glass-header bg-white/75 sticky top-0 z-40 border-b border-slate-200/60 transition-all duration-300 dynamic-header py-4">
-                        <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between {{ request()->routeIs('project.bidding.*') ? 'flex-wrap gap-3' : '' }}">
+                        <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between {{ request()->routeIs('project.bidding.*', 'schools.*') ? 'flex-wrap gap-3' : '' }}">
                             <div class="text-base font-bold tracking-tight text-slate-900 sm:text-lg transition-all duration-300 header-title">
                                 {{ $header }}
                             </div>

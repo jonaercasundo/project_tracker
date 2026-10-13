@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\CheckCompany;
 use App\Http\Middleware\RoleMiddleware;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -28,6 +29,17 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->render(function (QueryException $exception, Request $request): ?Response {
+            if (! $request->routeIs('schools.*')) {
+                return null;
+            }
+
+            $message = 'School records are temporarily unavailable. Please try again later.';
+
+            return $request->expectsJson()
+                ? response()->json(['message' => $message], 503)
+                : response($message, 503);
+        });
         $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $exception): bool {
             return $request->is('api/jarvis/*') || $request->expectsJson();
         });

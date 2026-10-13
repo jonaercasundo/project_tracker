@@ -18,6 +18,10 @@ class School extends Model
 
     protected $fillable = [
         'school_id',
+        'project_id',
+        'project_no',
+        'project',
+        'total_contract_price',
         'school_name',
         'address',
         'contact_person',
@@ -26,4 +30,9 @@ class School extends Model
         'division',
         'region',
     ];
+
+    protected function casts(): array
+    {
+        return ['total_contract_price' => 'decimal:2'];
+    }
 }

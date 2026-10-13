@@ -210,15 +210,18 @@
 
                         <div>
                             <div class="mb-1 flex items-center justify-between gap-2">
-                                <label for="authorized-projects" class="block text-xs font-bold text-slate-600">Authorized projects</label>
+                                <span id="authorized-projects-label" class="block text-xs font-bold text-slate-600">Authorized projects</span>
                                 <span id="project-count" class="text-[11px] text-slate-500" aria-live="polite"></span>
                             </div>
-                            <select id="authorized-projects" name="project_ids[]" multiple required size="6" aria-describedby="projects-help" class="{{ $field }}">
+                            <div id="authorized-projects" role="group" aria-labelledby="authorized-projects-label" aria-describedby="projects-help" class="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
                                 @foreach($projects as $project)
-                                    <option value="{{ $project->project_id }}" @selected(in_array((int) $project->project_id, array_map('intval', old('project_ids', $selectedProjects)), true))>{{ $project->project_name ?: 'Project '.$project->project_id }} · {{ $project->project_id }}</option>
+                                    <label class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 transition hover:bg-slate-50 motion-reduce:transition-none">
+                                        <input type="checkbox" name="project_ids[]" value="{{ $project->project_id }}" @checked(in_array((int) $project->project_id, array_map('intval', old('project_ids', $selectedProjects)), true)) class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-cyan-700 focus:ring-cyan-600">
+                                        <span class="min-w-0 break-words">{{ $project->project_name ?: 'Project '.$project->project_id }} <span class="whitespace-nowrap text-xs text-slate-500">· {{ $project->project_id }}</span></span>
+                                    </label>
                                 @endforeach
-                            </select>
-                            <p id="projects-help" class="mt-1 text-[11px] text-slate-500">Use Ctrl or Command to select multiple projects. A project is never added implicitly.</p>
+                            </div>
+                            <p id="projects-help" class="mt-1 text-[11px] text-slate-500">Select each authorized project. A project is never added implicitly.</p>
                         </div>
 
                         <div>
@@ -578,7 +581,7 @@
             let schoolOptionsFailed = false;
 
             const updateProjectCount = () => {
-                const n = projects.selectedOptions.length;
+                const n = projects.querySelectorAll('input[name="project_ids[]"]:checked').length;
                 projectCount.textContent = n ? `${n} selected` : 'None selected';
             };
             const setSchoolState = (state, message = '') => {
@@ -613,7 +616,7 @@
 
             projects.addEventListener('change', async () => {
                 updateProjectCount();
-                const projectIds = Array.from(projects.selectedOptions, o => o.value);
+                const projectIds = Array.from(projects.querySelectorAll('input[name="project_ids[]"]:checked'), input => input.value);
                 // Keep whatever the person already picked when the list refreshes.
                 const keep = new Set([...initial, ...Array.from(schools.selectedOptions, o => o.value)]);
                 requestController?.abort();

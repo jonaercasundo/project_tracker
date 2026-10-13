@@ -9,6 +9,9 @@ use App\Http\Controllers\BiddingDocumentController;
 use App\Http\Controllers\BiddingFolderController;
 use App\Http\Controllers\BiddingSchoolController;
 use App\Http\Controllers\BudgetRequestController;
+use App\Http\Controllers\BillingDashboardController;
+use App\Http\Controllers\BillingRecordController;
+use App\Http\Controllers\BillingScannerController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardLaunchController;
 use App\Http\Controllers\DeliveryController;
@@ -590,6 +593,49 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/accounting/liquidation/{liquidation}', [Accounting_LiquidationController::class, 'show'])->name('accounting.mi.liquidation.show');
         Route::get('/accounting/liquidation/{liquidation}/pdf', [Accounting_LiquidationController::class, 'downloadPdf'])->name('accounting.mi.liquidation.pdf');
     });
+
+    Route::prefix('billing')
+        ->name('billing.')
+        ->middleware('company.context:MMC')
+        ->group(function (): void {
+            Route::get('/dashboard', [BillingDashboardController::class, 'index'])
+                ->middleware('can:billing.records.view')
+                ->name('dashboard');
+
+            Route::get('/scanner', [BillingScannerController::class, 'index'])
+                ->middleware('can:billing.qr.scan')
+                ->name('scanner');
+            Route::get('/scanner/lookup', [BillingScannerController::class, 'lookup'])
+                ->middleware('can:billing.qr.scan')
+                ->name('scanner.lookup');
+            Route::post('/records/{delivery}/for-billing', [BillingScannerController::class, 'markForBilling'])
+                ->whereNumber('delivery')
+                ->middleware('can:billing.for-billing.mark')
+                ->name('for-billing');
+            Route::post('/records/{delivery}/billed', [BillingScannerController::class, 'confirmBilled'])
+                ->whereNumber('delivery')
+                ->middleware('can:billing.billed.confirm')
+                ->name('billed');
+            Route::post('/records/{delivery}/hold', [BillingScannerController::class, 'placeOnHold'])
+                ->whereNumber('delivery')
+                ->middleware('can:billing.exceptions.manage')
+                ->name('hold');
+            Route::post('/records/{delivery}/release-hold', [BillingScannerController::class, 'releaseHold'])
+                ->whereNumber('delivery')
+                ->middleware('can:billing.exceptions.manage')
+                ->name('release-hold');
+
+            Route::get('/records', [BillingRecordController::class, 'index'])
+                ->middleware('can:billing.records.view')
+                ->name('records.index');
+            Route::get('/records/export', [BillingRecordController::class, 'export'])
+                ->middleware('can:billing.reports.export')
+                ->name('records.export');
+            Route::get('/records/{delivery}', [BillingRecordController::class, 'show'])
+                ->whereNumber('delivery')
+                ->middleware('can:billing.records.view')
+                ->name('records.show');
+        });
 });
 
 Route::get('/it.assets/{asset}', [ITinventoryController::class, 'show'])->name('it.asset.show');

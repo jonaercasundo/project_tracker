@@ -33,7 +33,7 @@ return new class extends Migration
                 $table->foreign('delivery_id')
                     ->references('delivery_id')
                     ->on('deliveries')
-                    ->cascadeOnDelete();
+                    ->restrictOnDelete();
                 $table->foreign('invoice_id')
                     ->references('invoice_id')
                     ->on('invoices')
@@ -54,7 +54,7 @@ return new class extends Migration
                 $table->id();
                 $table->foreignId('delivery_billing_record_id')
                     ->constrained('delivery_billing_records')
-                    ->cascadeOnDelete();
+                    ->restrictOnDelete();
                 $table->string('previous_status', 32)->nullable();
                 $table->string('new_status', 32);
                 $table->integer('invoice_id')->nullable();
@@ -65,7 +65,7 @@ return new class extends Migration
                 $table->foreign('invoice_id')
                     ->references('invoice_id')
                     ->on('invoices')
-                    ->nullOnDelete();
+                    ->restrictOnDelete();
                 $table->foreign('changed_by')
                     ->references('user_id')
                     ->on('users')

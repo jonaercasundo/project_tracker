@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
         // 3. THEN seed user
         $this->call([
             AdminUserSeeder::class,
+            BillingPermissionSeeder::class,
         ]);
     }
 }

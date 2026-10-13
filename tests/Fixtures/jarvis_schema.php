@@ -38,6 +38,12 @@ Schema::create('deliveries', function (Blueprint $table): void {
     $table->integer('received_qty')->nullable();
 });
 
+Schema::create('delivery_billing_records', function (Blueprint $table): void {
+    $table->increments('id');
+    $table->integer('delivery_id')->unique();
+    $table->string('status');
+});
+
 Schema::create('school', function (Blueprint $table): void {
     $table->string('school_id')->primary();
     $table->integer('project_id')->nullable();

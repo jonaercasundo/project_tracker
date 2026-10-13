@@ -1,4 +1,4 @@
-<div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+<div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
     @foreach([
         ['Active Projects', $report['summary']['active_projects_count'], null],
         ['Total DRs', $report['summary']['total_deliveries_count'], 'receipts'],
@@ -6,6 +6,7 @@
         ['Delivered / Accepted', $report['summary']['completed_deliveries_count'], 'DRs'],
         ['Entered Billing', $report['summary']['pipeline']['billing']['completed'], 'DR/group records'],
         ['Billed', $report['summary']['billed_groups_count'], 'DR/group records'],
+        ['Delivery-level Billed', $report['summary']['billed_deliveries_count'], 'delivery records'],
         ['Overall Operational Progress', $report['summary']['overall_progress'], '%'],
     ] as [$label, $value, $unit])
         <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

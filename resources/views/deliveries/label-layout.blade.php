@@ -144,6 +144,35 @@
             text-align: left;
         }
 
+        .delivery-qr-list {
+            display: block;
+            margin-top: 4px;
+        }
+
+        .delivery-qr-tag {
+            display: inline-block;
+            vertical-align: top;
+            text-align: center;
+            border: 1px solid #888;
+            background: #fff;
+            padding: 2px 3px;
+            margin: 2px 3px 0 0;
+        }
+
+        .delivery-qr-tag img {
+            width: 32px;
+            height: 32px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .delivery-qr-tag small {
+            display: block;
+            font-size: 6px;
+            line-height: 8px;
+            white-space: nowrap;
+        }
+
         /*
         |--------------------------------------------------------------------------
         | LOT QR CODE
@@ -638,6 +667,16 @@
                             LOT {{ $lotName }}
                         @else
                             NO LOT
+                        @endif
+                        @if(!empty($lot['delivery_qrs']))
+                            <div class="delivery-qr-list">
+                                @foreach($lot['delivery_qrs'] as $deliveryQr)
+                                    <span class="delivery-qr-tag">
+                                        <img src="{{ $deliveryQr['qr'] }}" alt="Billing QR for DR {{ $deliveryQr['dr_no'] }}">
+                                        <small>DR {{ $deliveryQr['dr_no'] }}</small>
+                                    </span>
+                                @endforeach
+                            </div>
                         @endif
 
                     </td>

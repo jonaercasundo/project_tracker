@@ -343,12 +343,33 @@ class ProjectDeliveryProgressService
             ->groupBy('receipt.project_id');
     }
 
+    /** @param array<string, mixed> $filters */
+    private function deliveryBillingStats(array $filters): Builder
+    {
+        $deliveries = $this->deliveries($filters)
+            ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
+            ->select('d.project_id')
+            ->selectRaw('COUNT(DISTINCT d.delivery_id) as delivery_billing_records_count')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN billing.delivery_id IS NULL OR billing.status = 'pending_billing' THEN d.delivery_id END) as pending_billing_deliveries_count")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'for_billing' THEN d.delivery_id END) as for_billing_deliveries_count")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'billed' THEN d.delivery_id END) as billed_deliveries_count")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'on_hold' THEN d.delivery_id END) as on_hold_deliveries_count")
+            ->groupBy('d.project_id');
+
+        if (isset($filters['delivery_status'])) {
+            $deliveries->where('d.status', $filters['delivery_status']);
+        }
+
+        return $deliveries;
+    }
+
     /** Each join is already reduced to at most one row per project. @param array<string, mixed> $filters */
     public function recordsQuery(array $filters): Builder
     {
         $query = $this->projects($filters)
             ->leftJoinSub($this->deliveryStats($filters), 'delivery_stats', 'delivery_stats.project_id', '=', 'p.project_id')
             ->leftJoinSub($this->billingStats($filters), 'billing_stats', 'billing_stats.project_id', '=', 'p.project_id')
+            ->leftJoinSub($this->deliveryBillingStats($filters), 'delivery_billing_stats', 'delivery_billing_stats.project_id', '=', 'p.project_id')
             ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'delivery_stats.last_delivery_date', 'delivery_stats.last_accepted_date', 'delivery_stats.last_dr_date', 'billing_stats.last_billing_date']);
         if (! (bool) ($filters['compact'] ?? false)) {
             $lotNames = $this->deliveries($filters)
@@ -368,6 +389,9 @@ class ProjectDeliveryProgressService
         }
         foreach (['billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count'] as $column) {
             $query->selectRaw("COALESCE(billing_stats.{$column}, 0) as {$column}");
+        }
+        foreach (['delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count'] as $column) {
+            $query->selectRaw("COALESCE(delivery_billing_stats.{$column}, 0) as {$column}");
         }
 
         $sortColumns = [
@@ -646,7 +670,7 @@ class ProjectDeliveryProgressService
                 $summary[$column] = (int) $projects->sum($column);
             }
         }
-        foreach (['total_deliveries_count', 'delivery_rows_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count', 'billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count'] as $column) {
+        foreach (['total_deliveries_count', 'delivery_rows_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count', 'billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count', 'delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count'] as $column) {
             $summary[$column] ??= 0;
         }
         $summary['progress_basis'] = $summary['total_deliveries_count'] > 0 ? 'delivery_receipts' : 'no_delivery_receipts';
@@ -704,6 +728,13 @@ class ProjectDeliveryProgressService
                 'label' => 'Billed', 'context' => 'Current billed status; paid is shown separately in details',
                 'source' => 'grouping.status = billed for matched billing_grouped records',
                 'milestone_percent' => $this->percentage($counts['billed_groups_count'] + $counts['paid_groups_count'], $counts['billing_groups_count']),
+            ],
+            'delivery_billing' => $this->stage($counts['billed_deliveries_count'], $counts['delivery_billing_records_count'], 'delivery records') + [
+                'label' => 'Delivery billing', 'context' => 'Per-delivery scanner workflow; independent from shared legacy billing groups',
+                'source' => 'delivery_billing_records joined by delivery_id; missing records are pending billing',
+                'pending_billing' => $counts['pending_billing_deliveries_count'],
+                'for_billing' => $counts['for_billing_deliveries_count'],
+                'on_hold' => $counts['on_hold_deliveries_count'],
             ],
         ];
     }

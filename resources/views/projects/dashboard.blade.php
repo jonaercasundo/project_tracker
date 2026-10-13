@@ -9,9 +9,14 @@
                 Monitor projects, deliveries, warehouse inventory, and logistics from one centralized dashboard.
             </p>
         </div>
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 select-none">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            Operational
+        <div class="flex flex-wrap items-center gap-3">
+            @can('billing.records.view')
+                <a href="{{ route('billing.dashboard') }}" class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Billing desk</a>
+            @endcan
+            <div class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-bold text-slate-600 select-none">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Operational
+            </div>
         </div>
     </div>
 

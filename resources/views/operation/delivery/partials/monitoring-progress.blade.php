@@ -6,4 +6,5 @@
     @if($project['overall_progress'] !== null)<div class="h-full rounded-full bg-blue-600" style="width: {{ min(100, max(0, $project['overall_progress'])) }}%"></div>@endif
 </div>
 <p class="mt-2 text-[11px] leading-4 text-slate-500">{{ number_format($project['completed_packages_count']) }} delivered / accepted allocations &middot; {{ number_format($project['for_billing_groups_count']) }} for billing &middot; {{ number_format($project['billed_groups_count']) }} billed records</p>
+<p class="mt-1 text-[11px] leading-4 text-slate-500">Delivery billing: {{ number_format($project['pending_billing_deliveries_count']) }} pending &middot; {{ number_format($project['for_billing_deliveries_count']) }} for billing &middot; {{ number_format($project['billed_deliveries_count']) }} billed &middot; {{ number_format($project['on_hold_deliveries_count']) }} on hold</p>
 @if($project['overall_progress'] === null)<p class="mt-1 text-[11px] leading-4 text-slate-500">Overall needs complete, compatible stage quantities. Inventory is project-wide; delivery filters and separate units remain explicit.</p>@endif

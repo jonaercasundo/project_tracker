@@ -2,21 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Models\ARSetting;
+use App\Models\Delivery;
+use App\Models\PackageStatus;
+use App\Services\DeliveryBillingQrCodeService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
-use App\Models\Delivery;
-use App\Models\ARSetting;
-use App\Models\PackageStatus;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use setasign\Fpdi\Fpdi;
 
 class DeliveryController extends Controller
 {
-
-
     public function entry(Request $request, $id)
     {
         $delivery_id = $request->query('delivery_id');
@@ -26,6 +28,7 @@ class DeliveryController extends Controller
             'delivery_id' => $delivery_id,
         ]);
     }
+
     public function scan(Request $request, $id)
     {
         $delivery_id = $request->query('delivery_id');
@@ -52,7 +55,7 @@ class DeliveryController extends Controller
             ->select('l.lot_id', 'l.project_id', 'p.project_name')
             ->first();
 
-        if (!$lot) {
+        if (! $lot) {
             return response()->json(['error' => 'Lot not found.'], 404);
         }
 
@@ -76,8 +79,12 @@ class DeliveryController extends Controller
             ->select('s.region as region')
             ->whereNotNull('s.region');
 
-        if ($request->filled('project')) $query->where('d.project_id', $request->project);
-        if ($request->filled('lot'))     $query->where('d.lot_id', $request->lot);
+        if ($request->filled('project')) {
+            $query->where('d.project_id', $request->project);
+        }
+        if ($request->filled('lot')) {
+            $query->where('d.lot_id', $request->lot);
+        }
 
         return response()->json(
             $query->distinct()->orderBy('s.region')->get()
@@ -91,9 +98,15 @@ class DeliveryController extends Controller
             ->select('s.division')
             ->distinct();
 
-        if ($request->filled('project')) $query->where('d.project_id', $request->project);
-        if ($request->filled('lot'))     $query->where('d.lot_id', $request->lot);
-        if ($request->filled('region'))  $query->where('s.region', $request->region);
+        if ($request->filled('project')) {
+            $query->where('d.project_id', $request->project);
+        }
+        if ($request->filled('lot')) {
+            $query->where('d.lot_id', $request->lot);
+        }
+        if ($request->filled('region')) {
+            $query->where('s.region', $request->region);
+        }
 
         return response()->json(
             $query->orderBy('s.division')->get()
@@ -107,10 +120,18 @@ class DeliveryController extends Controller
             ->select('s.municipality')
             ->distinct();
 
-        if ($request->filled('project'))  $query->where('d.project_id', $request->project);
-        if ($request->filled('lot'))      $query->where('d.lot_id', $request->lot);
-        if ($request->filled('region'))   $query->where('s.region', $request->region);
-        if ($request->filled('division')) $query->where('s.division', $request->division);
+        if ($request->filled('project')) {
+            $query->where('d.project_id', $request->project);
+        }
+        if ($request->filled('lot')) {
+            $query->where('d.lot_id', $request->lot);
+        }
+        if ($request->filled('region')) {
+            $query->where('s.region', $request->region);
+        }
+        if ($request->filled('division')) {
+            $query->where('s.division', $request->division);
+        }
 
         return response()->json(
             $query->orderBy('s.municipality')->get()
@@ -121,312 +142,328 @@ class DeliveryController extends Controller
     // INDEX
     // =========================
 
-public function index(Request $request)
-{
-    $limit = (int) $request->input('per_page', 10);
-    if (!in_array($limit, [10, 20, 30, 50, 100])) $limit = 10;
-
-    $page   = max(1, (int) $request->get('page', 1));
-    $offset = ($page - 1) * $limit;
-
-    // =========================
-    // BASE QUERY (no item joins)
-    // =========================
-    $baseQuery = DB::table('deliveries as d')
-        ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
-        ->join('lot as l',          'l.lot_id',       '=', 'd.lot_id')
-        ->join('projects as p',     'p.project_id',   '=', 'd.project_id')
-        ->join('school as s',       's.school_id',    '=', 'd.school_id');
-
-    // =========================
-    // SEARCH
-    // =========================
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $baseQuery->where(function ($q) use ($search) {
-            $q->where('d.dr_no',        'like', "%{$search}%")
-            ->orWhere('p.project_name', 'like', "%{$search}%")
-            ->orWhere('s.school_name',  'like', "%{$search}%")
-            ->orWhere('l.lot_name',     'like', "%{$search}%");
-        });
-    }
-
-    // =========================
-    // FILTERS
-    // =========================
-    if ($request->filled('status'))       $baseQuery->where('d.status',      $request->status);
-    if ($request->filled('project'))      $baseQuery->where('d.project_id',  $request->project);
-    if ($request->filled('lot'))          $baseQuery->where('d.lot_id',      $request->lot);
-    if ($request->filled('region'))       $baseQuery->where('s.region',      $request->region);
-    if ($request->filled('division'))     $baseQuery->where('s.division',    $request->division);
-    if ($request->filled('municipality')) $baseQuery->where('s.municipality',$request->municipality);
-    if ($request->filled('year'))         $baseQuery->whereYear('d.delivery_date', $request->year);
-
-    // =========================
-    // TOTAL (DISTINCT DR NUMBERS, not delivery rows)
-    // Pagination is now per DR# group, so count distinct dr_no.
-    // =========================
-    $total_rows  = (clone $baseQuery)->distinct()->count('d.dr_no');
-    $total_pages = (int) ceil($total_rows / $limit);
-
-    // =========================
-    // PAGINATED DR NUMBERS ONLY
-    // =========================
-    $drNos = (clone $baseQuery)
-        ->select('d.dr_no')
-        ->distinct()
-        ->orderBy('d.dr_no', 'asc')
-        ->limit($limit)
-        ->offset($offset)
-        ->pluck('d.dr_no');
-
-    // =========================
-    // FULL DATA WITH ITEMS
-    // only for paginated DR numbers
-    // =========================
-    $rows = DB::table('deliveries as d')
-    ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
-    ->join('lot as l',          'l.lot_id',       '=', 'd.lot_id')
-    ->join('projects as p',     'p.project_id',   '=', 'd.project_id')
-    ->join('school as s',       's.school_id',    '=', 'd.school_id')
-    ->leftJoin('package as pk', function ($join) {
-        $join->where(function ($j) {
-            $j->whereNotNull('d.keystage_id')
-            ->whereColumn('pk.keystage_id', '=', 'd.keystage_id');
-        })->orWhere(function ($j) {
-            $j->whereNull('d.keystage_id')
-            ->whereColumn('pk.lot_id', '=', 'd.lot_id');
-        });
-    })
-    ->leftJoin('package_content as pc', 'pc.package_id', '=', 'pk.package_id')
-    ->leftJoin('item as i',             'i.item_id',      '=', 'pc.item_id')
-    ->leftJoin('package_status as ps', function ($join) {
-        $join->on('ps.delivery_id', '=', 'd.delivery_id')
-            ->on('ps.package_id',  '=', 'pk.package_id');
-    })
-    ->whereIn('d.dr_no', $drNos)
-    ->select(
-        'd.delivery_id',
-        'd.dr_no',
-        'd.delivery_date',
-        'd.status',
-        'd.school_id',
-        'd.project_id',
-        'd.package_qty',
-        'p.project_name',
-        's.school_name',
-        's.address',
-        's.region',
-        's.division',
-        's.municipality',
-        'k.keystage_num',
-        'k.description',
-        'l.lot_name',
-        'pk.package_id',
-        'ps.status as package_status',
-        'i.item_name',
-        'pc.qty as content_qty'
-    )
-    ->orderByRaw('CAST(d.dr_no AS UNSIGNED) ASC')
-    ->orderBy('pk.package_id')
-    ->get();
-
-    // =========================
-    // GROUP BY DR + DELIVERY
-    // =========================
-    $grouped = [];
-
-    foreach ($rows as $row) {
-
-        $dr = $row->dr_no;
-
-        if (!isset($grouped[$dr])) {
-            $grouped[$dr] = [
-                'dr_no'         => $dr,
-                'delivery_id'   => $row->delivery_id,
-                'project_id'    => $row->project_id,
-                'project_name'  => $row->project_name,
-                'school_id'     => $row->school_id,
-                'school_name'   => $row->school_name,
-                'address'       => $row->address,
-                'region'        => $row->region,
-                'division'      => $row->division,
-                'municipality'  => $row->municipality,
-                'delivery_date' => $row->delivery_date,
-                'status'        => $row->status,
-                'deliveries'    => [],
-            ];
+    public function index(Request $request)
+    {
+        $limit = (int) $request->input('per_page', 10);
+        if (! in_array($limit, [10, 20, 30, 50, 100])) {
+            $limit = 10;
         }
 
-        $deliveryId = $row->delivery_id;
+        $page = max(1, (int) $request->get('page', 1));
+        $offset = ($page - 1) * $limit;
 
-        if (!isset($grouped[$dr]['deliveries'][$deliveryId])) {
-            $delivery = clone $row;
-            $delivery->packages = [];
-            $grouped[$dr]['deliveries'][$deliveryId] = $delivery;
-        }
+        // =========================
+        // BASE QUERY (no item joins)
+        // =========================
+        $baseQuery = DB::table('deliveries as d')
+            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
+            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
+            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
+            ->join('school as s', 's.school_id', '=', 'd.school_id');
 
-        $delivery = $grouped[$dr]['deliveries'][$deliveryId];
-
-        if (!empty($row->package_id)) {
-
-            if (!isset($delivery->packages[$row->package_id])) {
-                $delivery->packages[$row->package_id] = [
-                    'package_id' => $row->package_id,
-                    'status'     => $row->package_status ?: 'pending',
-                    'items'      => [],
-                ];
-            }
-
-            if (!empty($row->item_name)) {
-                $qty = (int) ($row->content_qty ?? 1) * (int) ($row->package_qty ?? 1);
-                $delivery->packages[$row->package_id]['items'][$row->item_name] =
-                    $row->item_name . ' (' . $qty . ')';
-            }
-        }
-    }
-
-    // =========================
-    // FINALIZE: package rn/total, clean items, reindex,
-    // AND compute each DR group's overall status
-    // (uniform across every package in every delivery under that DR;
-    //  otherwise flagged as 'mixed').
-    // =========================
-    foreach ($grouped as &$g) {
-
-        $allStatusesInGroup = [];
-
-        foreach ($g['deliveries'] as &$delivery) {
-
-            $packages = array_values($delivery->packages);
-            usort($packages, fn($a, $b) => $a['package_id'] <=> $b['package_id']);
-
-            $total = count($packages);
-
-            $delivery->packages = array_values(array_map(function ($pkg, $i) use ($total) {
-                return [
-                    'package_num'    => $i + 1,
-                    'total_packages' => $total,
-                    'status'         => $pkg['status'],
-                    'items'          => array_values($pkg['items']),
-                ];
-            }, $packages, array_keys($packages)));
-
-            foreach ($delivery->packages as $pkg) {
-                $allStatusesInGroup[] = strtolower($pkg['status']);
-            }
-
-            unset($delivery->items_list);
-        }
-        unset($delivery);
-
-        $g['deliveries'] = array_values($g['deliveries']);
-
-        // Overall DR status: uniform status if every package agrees, else 'mixed'.
-        // No packages at all -> null (nothing to report).
-        if (empty($allStatusesInGroup)) {
-            $g['overall_status'] = null;
-        } else {
-            $unique = array_unique($allStatusesInGroup);
-            $g['overall_status'] = count($unique) === 1 ? $unique[0] : 'mixed';
-        }
-    }
-    unset($g);
-
-    // =========================
-    // SUMMARY CARDS
-    // scoped to the SAME filters as $baseQuery (project/year/lot/region/etc),
-    // but NOT paginated — these are DR-level totals across the full filtered set.
-    //
-    // Pending / Released / Delivered now reflect DR#s where ALL packages
-    // across ALL of that DR's deliveries (every lot/keystage) share the
-    // same status. A DR with mixed package statuses is not counted in
-    // any of the three buckets (it's "in progress").
-    // =========================
-    $packageStatusQuery = (clone $baseQuery)
-        ->join('package as pk', function ($join) {
-            $join->where(function ($j) {
-                $j->whereNotNull('d.keystage_id')
-                  ->whereColumn('pk.keystage_id', '=', 'd.keystage_id');
-            })->orWhere(function ($j) {
-                $j->whereNull('d.keystage_id')
-                  ->whereColumn('pk.lot_id', '=', 'd.lot_id');
+        // =========================
+        // SEARCH
+        // =========================
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $baseQuery->where(function ($q) use ($search) {
+                $q->where('d.dr_no', 'like', "%{$search}%")
+                    ->orWhere('p.project_name', 'like', "%{$search}%")
+                    ->orWhere('s.school_name', 'like', "%{$search}%")
+                    ->orWhere('l.lot_name', 'like', "%{$search}%");
             });
-        })
-        ->leftJoin('package_status as ps', function ($join) {
-            $join->on('ps.delivery_id', '=', 'd.delivery_id')
-                 ->on('ps.package_id',  '=', 'pk.package_id');
-        })
-        ->select('d.dr_no', 'pk.package_id', 'd.delivery_id', DB::raw('COALESCE(ps.status, "pending") as pkg_status'))
-        ->distinct()
-        ->get();
-
-    $drStatusMap = [];
-    foreach ($packageStatusQuery as $row) {
-        $drStatusMap[$row->dr_no][] = strtolower($row->pkg_status);
-    }
-
-    $dr_status_counts = [
-        'pending'   => 0,
-        'released'  => 0,
-        'delivered' => 0,
-        'warehouse' => 0,
-        'mixed'     => 0,
-    ];
-
-    foreach ($drStatusMap as $drNo => $statuses) {
-        $unique = array_unique($statuses);
-
-        if (count($unique) === 1) {
-            $status = $unique[0];
-            if (array_key_exists($status, $dr_status_counts)) {
-                $dr_status_counts[$status]++;
-            }
-        } else {
-            $dr_status_counts['mixed']++;
         }
+
+        // =========================
+        // FILTERS
+        // =========================
+        if ($request->filled('status')) {
+            $baseQuery->where('d.status', $request->status);
+        }
+        if ($request->filled('project')) {
+            $baseQuery->where('d.project_id', $request->project);
+        }
+        if ($request->filled('lot')) {
+            $baseQuery->where('d.lot_id', $request->lot);
+        }
+        if ($request->filled('region')) {
+            $baseQuery->where('s.region', $request->region);
+        }
+        if ($request->filled('division')) {
+            $baseQuery->where('s.division', $request->division);
+        }
+        if ($request->filled('municipality')) {
+            $baseQuery->where('s.municipality', $request->municipality);
+        }
+        if ($request->filled('year')) {
+            $baseQuery->whereYear('d.delivery_date', $request->year);
+        }
+
+        // =========================
+        // TOTAL (DISTINCT DR NUMBERS, not delivery rows)
+        // Pagination is now per DR# group, so count distinct dr_no.
+        // =========================
+        $total_rows = (clone $baseQuery)->distinct()->count('d.dr_no');
+        $total_pages = (int) ceil($total_rows / $limit);
+
+        // =========================
+        // PAGINATED DR NUMBERS ONLY
+        // =========================
+        $drNos = (clone $baseQuery)
+            ->select('d.dr_no')
+            ->distinct()
+            ->orderBy('d.dr_no', 'asc')
+            ->limit($limit)
+            ->offset($offset)
+            ->pluck('d.dr_no');
+
+        // =========================
+        // FULL DATA WITH ITEMS
+        // only for paginated DR numbers
+        // =========================
+        $rows = DB::table('deliveries as d')
+            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
+            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
+            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
+            ->join('school as s', 's.school_id', '=', 'd.school_id')
+            ->leftJoin('package as pk', function ($join) {
+                $join->where(function ($j) {
+                    $j->whereNotNull('d.keystage_id')
+                        ->whereColumn('pk.keystage_id', '=', 'd.keystage_id');
+                })->orWhere(function ($j) {
+                    $j->whereNull('d.keystage_id')
+                        ->whereColumn('pk.lot_id', '=', 'd.lot_id');
+                });
+            })
+            ->leftJoin('package_content as pc', 'pc.package_id', '=', 'pk.package_id')
+            ->leftJoin('item as i', 'i.item_id', '=', 'pc.item_id')
+            ->leftJoin('package_status as ps', function ($join) {
+                $join->on('ps.delivery_id', '=', 'd.delivery_id')
+                    ->on('ps.package_id', '=', 'pk.package_id');
+            })
+            ->whereIn('d.dr_no', $drNos)
+            ->select(
+                'd.delivery_id',
+                'd.dr_no',
+                'd.delivery_date',
+                'd.status',
+                'd.school_id',
+                'd.project_id',
+                'd.package_qty',
+                'p.project_name',
+                's.school_name',
+                's.address',
+                's.region',
+                's.division',
+                's.municipality',
+                'k.keystage_num',
+                'k.description',
+                'l.lot_name',
+                'pk.package_id',
+                'ps.status as package_status',
+                'i.item_name',
+                'pc.qty as content_qty'
+            )
+            ->orderByRaw('CAST(d.dr_no AS UNSIGNED) ASC')
+            ->orderBy('pk.package_id')
+            ->get();
+
+        // =========================
+        // GROUP BY DR + DELIVERY
+        // =========================
+        $grouped = [];
+
+        foreach ($rows as $row) {
+
+            $dr = $row->dr_no;
+
+            if (! isset($grouped[$dr])) {
+                $grouped[$dr] = [
+                    'dr_no' => $dr,
+                    'delivery_id' => $row->delivery_id,
+                    'project_id' => $row->project_id,
+                    'project_name' => $row->project_name,
+                    'school_id' => $row->school_id,
+                    'school_name' => $row->school_name,
+                    'address' => $row->address,
+                    'region' => $row->region,
+                    'division' => $row->division,
+                    'municipality' => $row->municipality,
+                    'delivery_date' => $row->delivery_date,
+                    'status' => $row->status,
+                    'deliveries' => [],
+                ];
+            }
+
+            $deliveryId = $row->delivery_id;
+
+            if (! isset($grouped[$dr]['deliveries'][$deliveryId])) {
+                $delivery = clone $row;
+                $delivery->packages = [];
+                $grouped[$dr]['deliveries'][$deliveryId] = $delivery;
+            }
+
+            $delivery = $grouped[$dr]['deliveries'][$deliveryId];
+
+            if (! empty($row->package_id)) {
+
+                if (! isset($delivery->packages[$row->package_id])) {
+                    $delivery->packages[$row->package_id] = [
+                        'package_id' => $row->package_id,
+                        'status' => $row->package_status ?: 'pending',
+                        'items' => [],
+                    ];
+                }
+
+                if (! empty($row->item_name)) {
+                    $qty = (int) ($row->content_qty ?? 1) * (int) ($row->package_qty ?? 1);
+                    $delivery->packages[$row->package_id]['items'][$row->item_name] =
+                        $row->item_name.' ('.$qty.')';
+                }
+            }
+        }
+
+        // =========================
+        // FINALIZE: package rn/total, clean items, reindex,
+        // AND compute each DR group's overall status
+        // (uniform across every package in every delivery under that DR;
+        //  otherwise flagged as 'mixed').
+        // =========================
+        foreach ($grouped as &$g) {
+
+            $allStatusesInGroup = [];
+
+            foreach ($g['deliveries'] as &$delivery) {
+
+                $packages = array_values($delivery->packages);
+                usort($packages, fn ($a, $b) => $a['package_id'] <=> $b['package_id']);
+
+                $total = count($packages);
+
+                $delivery->packages = array_values(array_map(function ($pkg, $i) use ($total) {
+                    return [
+                        'package_num' => $i + 1,
+                        'total_packages' => $total,
+                        'status' => $pkg['status'],
+                        'items' => array_values($pkg['items']),
+                    ];
+                }, $packages, array_keys($packages)));
+
+                foreach ($delivery->packages as $pkg) {
+                    $allStatusesInGroup[] = strtolower($pkg['status']);
+                }
+
+                unset($delivery->items_list);
+            }
+            unset($delivery);
+
+            $g['deliveries'] = array_values($g['deliveries']);
+
+            // Overall DR status: uniform status if every package agrees, else 'mixed'.
+            // No packages at all -> null (nothing to report).
+            if (empty($allStatusesInGroup)) {
+                $g['overall_status'] = null;
+            } else {
+                $unique = array_unique($allStatusesInGroup);
+                $g['overall_status'] = count($unique) === 1 ? $unique[0] : 'mixed';
+            }
+        }
+        unset($g);
+
+        // =========================
+        // SUMMARY CARDS
+        // scoped to the SAME filters as $baseQuery (project/year/lot/region/etc),
+        // but NOT paginated — these are DR-level totals across the full filtered set.
+        //
+        // Pending / Released / Delivered now reflect DR#s where ALL packages
+        // across ALL of that DR's deliveries (every lot/keystage) share the
+        // same status. A DR with mixed package statuses is not counted in
+        // any of the three buckets (it's "in progress").
+        // =========================
+        $packageStatusQuery = (clone $baseQuery)
+            ->join('package as pk', function ($join) {
+                $join->where(function ($j) {
+                    $j->whereNotNull('d.keystage_id')
+                        ->whereColumn('pk.keystage_id', '=', 'd.keystage_id');
+                })->orWhere(function ($j) {
+                    $j->whereNull('d.keystage_id')
+                        ->whereColumn('pk.lot_id', '=', 'd.lot_id');
+                });
+            })
+            ->leftJoin('package_status as ps', function ($join) {
+                $join->on('ps.delivery_id', '=', 'd.delivery_id')
+                    ->on('ps.package_id', '=', 'pk.package_id');
+            })
+            ->select('d.dr_no', 'pk.package_id', 'd.delivery_id', DB::raw('COALESCE(ps.status, "pending") as pkg_status'))
+            ->distinct()
+            ->get();
+
+        $drStatusMap = [];
+        foreach ($packageStatusQuery as $row) {
+            $drStatusMap[$row->dr_no][] = strtolower($row->pkg_status);
+        }
+
+        $dr_status_counts = [
+            'pending' => 0,
+            'released' => 0,
+            'delivered' => 0,
+            'warehouse' => 0,
+            'mixed' => 0,
+        ];
+
+        foreach ($drStatusMap as $drNo => $statuses) {
+            $unique = array_unique($statuses);
+
+            if (count($unique) === 1) {
+                $status = $unique[0];
+                if (array_key_exists($status, $dr_status_counts)) {
+                    $dr_status_counts[$status]++;
+                }
+            } else {
+                $dr_status_counts['mixed']++;
+            }
+        }
+
+        $stats = [
+            'total_pending' => $dr_status_counts['pending'],
+            'total_released' => $dr_status_counts['released'],
+            'total_delivered' => $dr_status_counts['delivered'],
+            'total_warehouse' => $dr_status_counts['warehouse'],
+            'total_mixed' => $dr_status_counts['mixed'],
+
+            // TODO: no collection/billing columns exist in the schema you shared.
+            // Swap this in once you point me at the right table/columns —
+            // e.g. a `billing` table keyed by delivery_id, or a `unit_price`
+            // on `item` multiplied by qty. Placeholder below assumes columns
+            // `d.collection_amount` / `d.billed_amount` on `deliveries`.
+        ];
+
+        // =========================
+        // DROPDOWNS
+        // =========================
+        $years = DB::table('deliveries')
+            ->selectRaw('YEAR(delivery_date) as year')
+            ->distinct()
+            ->orderBy('year', 'desc')
+            ->pluck('year');
+
+        $projects = DB::table('projects')->get();
+
+        $lots = $request->filled('project')
+            ? DB::table('lot')->where('project_id', $request->project)->orderBy('lot_name')->get()
+            : collect();
+
+        return view('deliveries.index', [
+            'grouped_deliveries' => $grouped,
+            'projects' => $projects,
+            'lots' => $lots,
+            'years' => $years,
+            'page' => $page,
+            'total_pages' => $total_pages,
+            'total_rows' => $total_rows,
+            'stats' => $stats,
+        ]);
     }
-
-    $stats = [
-        'total_pending'    => $dr_status_counts['pending'],
-        'total_released'   => $dr_status_counts['released'],
-        'total_delivered'  => $dr_status_counts['delivered'],
-        'total_warehouse'  => $dr_status_counts['warehouse'],
-        'total_mixed'      => $dr_status_counts['mixed'],
-
-        // TODO: no collection/billing columns exist in the schema you shared.
-        // Swap this in once you point me at the right table/columns —
-        // e.g. a `billing` table keyed by delivery_id, or a `unit_price`
-        // on `item` multiplied by qty. Placeholder below assumes columns
-        // `d.collection_amount` / `d.billed_amount` on `deliveries`.
-    ];
-
-    // =========================
-    // DROPDOWNS
-    // =========================
-    $years = DB::table('deliveries')
-        ->selectRaw('YEAR(delivery_date) as year')
-        ->distinct()
-        ->orderBy('year', 'desc')
-        ->pluck('year');
-
-    $projects = DB::table('projects')->get();
-
-    $lots = $request->filled('project')
-        ? DB::table('lot')->where('project_id', $request->project)->orderBy('lot_name')->get()
-        : collect();
-
-    return view('deliveries.index', [
-        'grouped_deliveries' => $grouped,
-        'projects'           => $projects,
-        'lots'               => $lots,
-        'years'              => $years,
-        'page'               => $page,
-        'total_pages'        => $total_pages,
-        'total_rows'         => $total_rows,
-        'stats'              => $stats,
-    ]);
-}
 
     // =========================
     // GENERATE QR PDF
@@ -435,8 +472,8 @@ public function index(Request $request)
     public function generate(Request $request)
     {
         $ids = collect(explode(',', $request->ids))
-            ->map(fn($v) => trim($v))
-            ->filter(fn($v) => is_numeric($v) && $v > 0)
+            ->map(fn ($v) => trim($v))
+            ->filter(fn ($v) => is_numeric($v) && $v > 0)
             ->values();
 
         if ($ids->isEmpty()) {
@@ -495,10 +532,10 @@ public function index(Request $request)
             'keystage',
             'packageStatuses.package.packageContent.item',
         ])
-        ->whereIn('delivery_id', $ids)
-        ->orderBy('dr_no')
-        ->orderBy('keystage_id')
-        ->get();
+            ->whereIn('delivery_id', $ids)
+            ->orderBy('dr_no')
+            ->orderBy('keystage_id')
+            ->get();
 
         if ($deliveries->isEmpty()) {
             abort(404, 'No deliveries found.');
@@ -522,7 +559,7 @@ public function index(Request $request)
 
             $packageQuery = DB::table('package');
 
-            if (!empty($delivery->keystage_id)) {
+            if (! empty($delivery->keystage_id)) {
 
                 $packageQuery->where(
                     'keystage_id',
@@ -539,7 +576,6 @@ public function index(Request $request)
 
             $packageIds = $packageQuery
                 ->pluck('package_id');
-
 
             /*
             |--------------------------------------------------------------------------
@@ -558,17 +594,16 @@ public function index(Request $request)
                     ->where('package_id', $packageId)
                     ->exists();
 
-                if (!$exists) {
+                if (! $exists) {
 
                     DB::table('package_status')->insert([
                         'delivery_id' => $delivery->delivery_id,
-                        'package_id'  => $packageId,
-                        'status'      => 'pending',
-                        'remarks'     => null,
+                        'package_id' => $packageId,
+                        'status' => 'pending',
+                        'remarks' => null,
                     ]);
                 }
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -579,9 +614,8 @@ public function index(Request $request)
             $statuses = PackageStatus::with([
                 'package.packageContent.item',
             ])
-            ->where('delivery_id', $delivery->delivery_id)
-            ->get();
-
+                ->where('delivery_id', $delivery->delivery_id)
+                ->get();
 
             /*
             |--------------------------------------------------------------------------
@@ -589,7 +623,7 @@ public function index(Request $request)
             |--------------------------------------------------------------------------
             */
 
-            if (!empty($delivery->keystage_id)) {
+            if (! empty($delivery->keystage_id)) {
 
                 $statuses = $statuses
                     ->filter(function ($status) use ($delivery) {
@@ -614,7 +648,6 @@ public function index(Request $request)
                     ->values();
             }
 
-
             /*
             |--------------------------------------------------------------------------
             | Set filtered statuses back onto delivery
@@ -629,7 +662,6 @@ public function index(Request $request)
             $delivery->ar =
                 $delivery->project->arSetting ?? null;
 
-
             /*
             |--------------------------------------------------------------------------
             | Generate QR codes
@@ -638,7 +670,7 @@ public function index(Request $request)
 
             foreach ($statuses as $status) {
 
-                if (!$status->package_status_id) {
+                if (! $status->package_status_id) {
                     continue;
                 }
 
@@ -648,14 +680,13 @@ public function index(Request $request)
                     $delivery->delivery_id
                 );
 
-                $result = (new PngWriter())->write(
+                $result = (new PngWriter)->write(
                     new QrCode($url)
                 );
 
                 $qrCodes[$status->package_status_id] =
-                    'data:image/png;base64,' .
+                    'data:image/png;base64,'.
                     base64_encode($result->getString());
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -677,8 +708,7 @@ public function index(Request $request)
                 if ($status->package) {
 
                     foreach (
-                        $status->package->packageContent
-                        as $content
+                        $status->package->packageContent as $content
                     ) {
 
                         if ($content->item) {
@@ -697,7 +727,6 @@ public function index(Request $request)
                     : 'Unknown Item';
             }
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -724,7 +753,7 @@ public function index(Request $request)
 
         $tempFiles = [];
 
-        $mergedPdf = new \setasign\Fpdi\Fpdi();
+        $mergedPdf = new Fpdi;
 
         $runningTotalPages = 0;
 
@@ -750,12 +779,12 @@ public function index(Request $request)
 
                 $html = view('deliveries.ar-layout', [
                     'deliveries' => $drDeliveries->values(),
-                    'qrCodes'    => $qrCodes,
+                    'qrCodes' => $qrCodes,
                     'signerName' => Auth::user()?->name
                         ?? 'Authorized Representative',
                 ])->render();
 
-                $dompdfOptions = new \Dompdf\Options();
+                $dompdfOptions = new Options;
                 $dompdfOptions->set('isHtml5ParserEnabled', true);
                 $dompdfOptions->set('isRemoteEnabled', true);
                 $dompdfOptions->set('defaultPaperSize', 'legal');
@@ -773,7 +802,7 @@ public function index(Request $request)
                     storage_path(),
                 ]);
 
-                $dompdf = new \Dompdf\Dompdf($dompdfOptions);
+                $dompdf = new Dompdf($dompdfOptions);
                 $dompdf->setPaper('legal', 'portrait');
                 $dompdf->loadHtml($html);
                 $dompdf->render();
@@ -782,13 +811,11 @@ public function index(Request $request)
 
                 unset($dompdf, $html);
 
-
-                $tempPath = tempnam(sys_get_temp_dir(), 'ar_dr_') . '.pdf';
+                $tempPath = tempnam(sys_get_temp_dir(), 'ar_dr_').'.pdf';
 
                 file_put_contents($tempPath, $drPdfContent);
 
                 $tempFiles[] = $tempPath;
-
 
                 /*
                 |----------------------------------------------------------------
@@ -823,7 +850,6 @@ public function index(Request $request)
 
                 $runningTotalPages += $pageCount;
 
-
                 /*
                 |----------------------------------------------------------------
                 | ALWAYS PAD WITH A BLANK PAGE IF THIS DR IS ODD
@@ -852,7 +878,6 @@ public function index(Request $request)
                     $runningTotalPages += 1;
                 }
 
-
                 Log::info(sprintf(
                     'AR generate(): DR %s | own page count=%d | additional blank page=%d | total page (this DR)=%d | running total=%d',
                     $drNo,
@@ -862,7 +887,6 @@ public function index(Request $request)
                     $runningTotalPages
                 ));
             }
-
 
             $mergedOutput = $mergedPdf->Output('S');
 
@@ -882,20 +906,17 @@ public function index(Request $request)
             }
         }
 
-
         return response($mergedOutput, 200, [
-            'Content-Type'        => 'application/pdf',
+            'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="deliveries-batch.pdf"',
         ]);
     }
-
 
     // =========================
     // GENERATE LABELS PDF
     // =========================
 
-
-    public function generateLabels(Request $request)
+    public function generateLabels(Request $request, DeliveryBillingQrCodeService $billingQrCodes)
     {
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
@@ -917,7 +938,6 @@ public function index(Request $request)
         if ($selectedIds->isEmpty()) {
             abort(422, 'No deliveries selected.');
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -947,14 +967,12 @@ public function index(Request $request)
             abort(404, 'Selected deliveries not found.');
         }
 
-
         $projectIds = $selectedDeliveries
             ->pluck('project_id')
             ->filter(fn ($id) => (int) $id > 0)
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values();
-
 
         $schoolIds = $selectedDeliveries
             ->pluck('school_id')
@@ -963,7 +981,6 @@ public function index(Request $request)
             ->unique()
             ->values();
 
-
         if ($projectIds->isEmpty()) {
             abort(404, 'No project found.');
         }
@@ -971,7 +988,6 @@ public function index(Request $request)
         if ($schoolIds->isEmpty()) {
             abort(404, 'No schools found.');
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -1047,14 +1063,12 @@ public function index(Request $request)
 
             ->get();
 
-
         if ($deliveries->isEmpty()) {
             abort(
                 404,
                 'No deliveries found for the selected project and school(s).'
             );
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -1067,10 +1081,9 @@ public function index(Request $request)
             ->filter()
             ->first();
 
-        if (!$projectId) {
+        if (! $projectId) {
             abort(404, 'No project found.');
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -1082,7 +1095,6 @@ public function index(Request $request)
             'project_id',
             $projectId
         )->first();
-
 
         $showSchoolID = (bool) (
             $arSettings?->label_school_id ?? false
@@ -1099,7 +1111,6 @@ public function index(Request $request)
         $showRegion = (bool) (
             $arSettings?->label_region ?? false
         );
-
 
         /*
         |--------------------------------------------------------------------------
@@ -1118,7 +1129,6 @@ public function index(Request $request)
 
         $data = [];
 
-
         /*
         |--------------------------------------------------------------------------
         | 6b. LOT QR CACHE
@@ -1132,7 +1142,6 @@ public function index(Request $request)
         */
 
         $lotQrCache = [];
-
 
         /*
         |--------------------------------------------------------------------------
@@ -1161,35 +1170,31 @@ public function index(Request $request)
             |--------------------------------------------------------------------------
             */
 
-            if (!isset($data[$deliveryProjectId])) {
+            if (! isset($data[$deliveryProjectId])) {
 
                 $data[$deliveryProjectId] = [
 
                     'info' => [
 
-                        'project_id' =>
-                            $delivery->project_id,
+                        'project_id' => $delivery->project_id,
 
-                        'project_name' =>
-                            trim(
-                                (string) (
-                                    $delivery->project_name ?? ''
-                                )
-                            ),
+                        'project_name' => trim(
+                            (string) (
+                                $delivery->project_name ?? ''
+                            )
+                        ),
 
-                        'division' =>
-                            trim(
-                                (string) (
-                                    $delivery->division ?? ''
-                                )
-                            ),
+                        'division' => trim(
+                            (string) (
+                                $delivery->division ?? ''
+                            )
+                        ),
 
-                        'region' =>
-                            trim(
-                                (string) (
-                                    $delivery->region ?? ''
-                                )
-                            ),
+                        'region' => trim(
+                            (string) (
+                                $delivery->region ?? ''
+                            )
+                        ),
                     ],
 
                     'schools' => [],
@@ -1205,39 +1210,33 @@ public function index(Request $request)
             |--------------------------------------------------------------------------
             */
 
-            if (!isset(
-                $data[$deliveryProjectId]
-                    ['schools'][$schoolId]
+            if (! isset(
+                $data[$deliveryProjectId]['schools'][$schoolId]
             )) {
 
-                $data[$deliveryProjectId]
-                    ['schools'][$schoolId] = [
+                $data[$deliveryProjectId]['schools'][$schoolId] = [
 
-                    'info' => [
+                        'info' => [
 
-                        'school_name' =>
-                            trim(
+                            'school_name' => trim(
                                 (string) (
                                     $delivery->school_name ?? ''
                                 )
                             ),
 
-                        'school_id' =>
-                            $delivery->school_id ?? '',
+                            'school_id' => $delivery->school_id ?? '',
 
-                        'municipality' =>
-                            trim(
+                            'municipality' => trim(
                                 (string) (
                                     $delivery->municipality ?? ''
                                 )
                             ),
-                    ],
+                        ],
 
-                    'lots' => [],
-                    'delivery_ids' => [],
-                ];
+                        'lots' => [],
+                        'delivery_ids' => [],
+                    ];
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -1260,16 +1259,14 @@ public function index(Request $request)
                 ? (int) $delivery->lot_id
                 : null;
 
-
             if ($lotId !== null && $lotId > 0) {
 
-                $lotKey = 'lot-' . $lotId;
+                $lotKey = 'lot-'.$lotId;
 
             } else {
 
                 $lotKey = 'no-lot';
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -1287,17 +1284,14 @@ public function index(Request $request)
                 $lotName = 'NO LOT';
             }
 
-
             /*
             |--------------------------------------------------------------------------
             | CREATE LOT
             |--------------------------------------------------------------------------
             */
 
-            if (!isset(
-                $data[$deliveryProjectId]
-                    ['schools'][$schoolId]
-                    ['lots'][$lotKey]
+            if (! isset(
+                $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]
             )) {
 
                 /*
@@ -1316,36 +1310,43 @@ public function index(Request $request)
                     ? (string) $lotId
                     : $lotName;
 
-                if (!isset($lotQrCache[$lotQrValue])) {
+                if (! isset($lotQrCache[$lotQrValue])) {
 
-                    $lotQrResult = (new PngWriter())->write(
+                    $lotQrResult = (new PngWriter)->write(
                         new QrCode($lotQrValue)
                     );
 
                     $lotQrCache[$lotQrValue] =
-                        'data:image/png;base64,' .
+                        'data:image/png;base64,'.
                         base64_encode($lotQrResult->getString());
                 }
 
+                $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey] = [
 
-                $data[$deliveryProjectId]
-                    ['schools'][$schoolId]
-                    ['lots'][$lotKey] = [
+                        'lot_id' => $lotId,
 
-                    'lot_id' =>
-                        $lotId,
+                        'lot_name' => $lotName,
 
-                    'lot_name' =>
-                        $lotName,
+                        'lot_qr' => $lotQrCache[$lotQrValue],
 
-                    'lot_qr' =>
-                        $lotQrCache[$lotQrValue],
-
-                    'keystages' => [],
-                    'delivery_ids' => [],
-                ];
+                        'keystages' => [],
+                        'delivery_ids' => [],
+                        'delivery_qrs' => [],
+                    ];
             }
 
+            if (! isset(
+                $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['delivery_qrs'][$deliveryId]
+            )) {
+                $deliveryQr = (new PngWriter)->write(
+                    new QrCode($billingQrCodes->makePayload($deliveryId))
+                );
+
+                $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['delivery_qrs'][$deliveryId] = [
+                        'dr_no' => (string) $delivery->dr_no,
+                        'qr' => 'data:image/png;base64,'.base64_encode($deliveryQr->getString()),
+                    ];
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -1354,10 +1355,9 @@ public function index(Request $request)
             */
 
             $deliveryKeystageId =
-                !empty($delivery->keystage_id)
+                ! empty($delivery->keystage_id)
                     ? (int) $delivery->keystage_id
                     : null;
-
 
             /*
             |--------------------------------------------------------------------------
@@ -1381,7 +1381,6 @@ public function index(Request $request)
 
             $packageQuery = DB::table('package');
 
-
             /*
             |--------------------------------------------------------------------------
             | MATCH LOT
@@ -1401,7 +1400,6 @@ public function index(Request $request)
                     'lot_id'
                 );
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -1423,7 +1421,6 @@ public function index(Request $request)
                 );
             }
 
-
             /*
             |--------------------------------------------------------------------------
             | GET PACKAGES
@@ -1444,7 +1441,6 @@ public function index(Request $request)
 
                 ->get();
 
-
             /*
             |--------------------------------------------------------------------------
             | 11. PROCESS PACKAGES
@@ -1458,7 +1454,6 @@ public function index(Request $request)
                 if ($packageId <= 0) {
                     continue;
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -1475,7 +1470,6 @@ public function index(Request $request)
                         continue;
                     }
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -1494,7 +1488,6 @@ public function index(Request $request)
                     }
                 }
 
-
                 /*
                 |--------------------------------------------------------------------------
                 | 12. DETERMINE KEYSTAGE
@@ -1506,12 +1499,10 @@ public function index(Request $request)
                         ? (int) $package->keystage_id
                         : $deliveryKeystageId;
 
-
                 $keystageKey =
                     $keystageId !== null
-                        ? 'keystage-' . $keystageId
+                        ? 'keystage-'.$keystageId
                         : 'no-keystage';
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -1530,7 +1521,6 @@ public function index(Request $request)
                         )
                         ->first();
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -1557,7 +1547,7 @@ public function index(Request $request)
                     if ($number !== '') {
 
                         $parts[] =
-                            'Keystage ' . $number;
+                            'Keystage '.$number;
                     }
 
                     if ($description !== '') {
@@ -1566,15 +1556,14 @@ public function index(Request $request)
                             $description;
                     }
 
-                    $keystageLabel = !empty($parts)
+                    $keystageLabel = ! empty($parts)
                         ? implode(' - ', $parts)
-                        : 'Keystage ' . $keystageId;
+                        : 'Keystage '.$keystageId;
 
                 } else {
 
                     $keystageLabel = 'No Keystage';
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -1582,29 +1571,20 @@ public function index(Request $request)
                 |--------------------------------------------------------------------------
                 */
 
-                if (!isset(
-                    $data[$deliveryProjectId]
-                        ['schools'][$schoolId]
-                        ['lots'][$lotKey]
-                        ['keystages'][$keystageKey]
+                if (! isset(
+                    $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['keystages'][$keystageKey]
                 )) {
 
-                    $data[$deliveryProjectId]
-                        ['schools'][$schoolId]
-                        ['lots'][$lotKey]
-                        ['keystages'][$keystageKey] = [
+                    $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['keystages'][$keystageKey] = [
 
-                        'keystage_id' =>
-                            $keystageId,
+                            'keystage_id' => $keystageId,
 
-                        'label' =>
-                            $keystageLabel,
+                            'label' => $keystageLabel,
 
-                        'items' => [],
-                        'delivery_ids' => [],
-                    ];
+                            'items' => [],
+                            'delivery_ids' => [],
+                        ];
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -1637,7 +1617,6 @@ public function index(Request $request)
 
                     ->get();
 
-
                 /*
                 |--------------------------------------------------------------------------
                 | 17. PROCESS ITEMS
@@ -1652,7 +1631,6 @@ public function index(Request $request)
                         continue;
                     }
 
-
                     $itemName = trim(
                         (string) (
                             $content->item_name ?? ''
@@ -1662,7 +1640,6 @@ public function index(Request $request)
                     if ($itemName === '') {
                         continue;
                     }
-
 
                     /*
                     |--------------------------------------------------------------------------
@@ -1678,7 +1655,6 @@ public function index(Request $request)
                         $contentQty = 1;
                     }
 
-
                     /*
                     |--------------------------------------------------------------------------
                     | DELIVERY PACKAGE QTY
@@ -1693,7 +1669,6 @@ public function index(Request $request)
                         $packageQty = 1;
                     }
 
-
                     /*
                     |--------------------------------------------------------------------------
                     | FINAL QUANTITY
@@ -1704,11 +1679,9 @@ public function index(Request $request)
                         $contentQty *
                         $packageQty;
 
-
                     if ($finalQty <= 0) {
                         continue;
                     }
-
 
                     /*
                     |--------------------------------------------------------------------------
@@ -1717,8 +1690,7 @@ public function index(Request $request)
                     */
 
                     $itemKey =
-                        'item-' . $itemId;
-
+                        'item-'.$itemId;
 
                     /*
                     |--------------------------------------------------------------------------
@@ -1727,12 +1699,7 @@ public function index(Request $request)
                     */
 
                     $items =
-                        $data[$deliveryProjectId]
-                            ['schools'][$schoolId]
-                            ['lots'][$lotKey]
-                            ['keystages'][$keystageKey]
-                            ['items'];
-
+                        $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['keystages'][$keystageKey]['items'];
 
                     /*
                     |--------------------------------------------------------------------------
@@ -1759,24 +1726,19 @@ public function index(Request $request)
 
                         $items[$itemKey] = [
 
-                            'item_id' =>
-                                $itemId,
+                            'item_id' => $itemId,
 
-                            'item_name' =>
-                                $itemName,
+                            'item_name' => $itemName,
 
-                            'qty' =>
-                                $finalQty,
+                            'qty' => $finalQty,
 
-                            'unit' =>
-                                trim(
-                                    (string) (
-                                        $content->unit ?? ''
-                                    )
-                                ),
+                            'unit' => trim(
+                                (string) (
+                                    $content->unit ?? ''
+                                )
+                            ),
                         ];
                     }
-
 
                     /*
                     |--------------------------------------------------------------------------
@@ -1784,15 +1746,10 @@ public function index(Request $request)
                     |--------------------------------------------------------------------------
                     */
 
-                    $data[$deliveryProjectId]
-                        ['schools'][$schoolId]
-                        ['lots'][$lotKey]
-                        ['keystages'][$keystageKey]
-                        ['items'] = $items;
+                    $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['keystages'][$keystageKey]['items'] = $items;
                 }
             }
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -1809,11 +1766,11 @@ public function index(Request $request)
             */
 
             uasort($project['schools'], function ($a, $b) {
-                $aDeliveryId = !empty($a['delivery_ids'])
+                $aDeliveryId = ! empty($a['delivery_ids'])
                     ? min($a['delivery_ids'])
                     : PHP_INT_MAX;
 
-                $bDeliveryId = !empty($b['delivery_ids'])
+                $bDeliveryId = ! empty($b['delivery_ids'])
                     ? min($b['delivery_ids'])
                     : PHP_INT_MAX;
 
@@ -1821,18 +1778,15 @@ public function index(Request $request)
             });
 
             foreach (
-                $project['schools']
-                as $schoolId => &$school
+                $project['schools'] as $schoolId => &$school
             ) {
 
                 foreach (
-                    $school['lots']
-                    as $lotKey => &$lot
+                    $school['lots'] as $lotKey => &$lot
                 ) {
 
                     foreach (
-                        $lot['keystages']
-                        as $keystageKey => &$keystage
+                        $lot['keystages'] as $keystageKey => &$keystage
                     ) {
 
                         if (
@@ -1848,7 +1802,6 @@ public function index(Request $request)
                             continue;
                         }
 
-
                         $keystage['items'] =
                             array_values(
                                 $keystage['items']
@@ -1856,7 +1809,6 @@ public function index(Request $request)
                     }
 
                     unset($keystage);
-
 
                     /*
                     |--------------------------------------------------------------------------
@@ -1877,7 +1829,6 @@ public function index(Request $request)
                         continue;
                     }
 
-
                     /*
                     |--------------------------------------------------------------------------
                     | REINDEX KEYSTAGES
@@ -1891,7 +1842,6 @@ public function index(Request $request)
                 }
 
                 unset($lot);
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -1912,7 +1862,6 @@ public function index(Request $request)
                     continue;
                 }
 
-
                 /*
                 |--------------------------------------------------------------------------
                 | REINDEX LOTS
@@ -1926,7 +1875,6 @@ public function index(Request $request)
             }
 
             unset($school);
-
 
             /*
             |--------------------------------------------------------------------------
@@ -1949,7 +1897,6 @@ public function index(Request $request)
         }
 
         unset($project);
-
 
         /*
         |--------------------------------------------------------------------------
@@ -2020,21 +1967,19 @@ public function index(Request $request)
         |--------------------------------------------------------------------------
         */
 
-            return Pdf::loadView(
-                'deliveries.label-layout',
-                [
-                    'data' => $data,
-                    'showSchoolID' => $showSchoolID,
-                    'showMunicipality' => $showMunicipality,
-                    'showDivision' => $showDivision,
-                    'showRegion' => $showRegion,
-                ]
-            )
-                ->setPaper('a4', 'portrait')
-                ->stream(
-                    'Packing_List_' . now()->format('Ymd_His') . '.pdf'
-                );
+        return Pdf::loadView(
+            'deliveries.label-layout',
+            [
+                'data' => $data,
+                'showSchoolID' => $showSchoolID,
+                'showMunicipality' => $showMunicipality,
+                'showDivision' => $showDivision,
+                'showRegion' => $showRegion,
+            ]
+        )
+            ->setPaper('a4', 'portrait')
+            ->stream(
+                'Packing_List_'.now()->format('Ymd_His').'.pdf'
+            );
     }
-
-
 }

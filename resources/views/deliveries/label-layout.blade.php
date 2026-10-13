@@ -647,19 +647,10 @@
 
                     {{-- QR CODE --}}
 
-                    <td class="lot-qr">
-
-                        @if($lotQrSrc)
-                            <img src="{{ $lotQrSrc }}" alt="QR">
-                        @endif
-
-                    </td>
-
-
                     {{-- LOT NAME --}}
 
                     <td
-                        colspan="3"
+                        colspan="4"
                         class="lot-title"
                     >
 

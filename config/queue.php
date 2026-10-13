@@ -43,6 +43,15 @@ return [
             'after_commit' => false,
         ],
 
+        'logistics_webhooks' => [
+            'driver' => 'database',
+            'connection' => env('LOGISTICS_WEBHOOK_DB_CONNECTION'),
+            'table' => env('LOGISTICS_WEBHOOK_QUEUE_TABLE', 'jobs'),
+            'queue' => 'logistics-webhooks',
+            'retry_after' => 90,
+            'after_commit' => true,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

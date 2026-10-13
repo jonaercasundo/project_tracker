@@ -8,21 +8,29 @@ if (root) {
     const cameraSupport = document.querySelector('#camera-support');
     const searchForm = document.querySelector('#manual-search');
     const searchInput = document.querySelector('#dr-search');
-    const hardwareInput = document.querySelector('#billing-hardware-input');
     const hardwareStatus = document.querySelector('#hardware-scanner-status');
-    const focusHardwareButton = document.querySelector('#focus-hardware-scanner');
     const feedback = document.querySelector('#billing-feedback');
     const results = document.querySelector('#billing-results');
+    const selectAllCheckbox = document.querySelector('#billing-select-all');
+    const clearRecordsButton = document.querySelector('#billing-clear-records');
+    const selectionSummary = document.querySelector('#billing-selection-summary');
+    const bulkButtons = document.querySelector('#billing-bulk-buttons');
+    const bulkBilledForm = document.querySelector('#billing-bulk-billed-form');
+    const bulkBilledLabel = document.querySelector('#billing-bulk-billed-label');
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     let stream = null;
     let detector = null;
     let lookupInProgress = false;
     let lastPayload = '';
     let records = [];
+    const selectedDeliveryIds = new Set();
     let scannerQueue = [];
     let processingScannerQueue = false;
     let lastHardwarePayload = '';
     let lastHardwareScanAt = 0;
+    let scannerInputBuffer = '';
+    let scannerInputTimer = null;
+    let lastScannerKeyAt = 0;
 
     const urls = {
         lookup: root.dataset.lookupUrl,
@@ -69,17 +77,6 @@ if (root) {
         return template.replace('__delivery__', encodeURIComponent(deliveryId));
     }
 
-    function focusHardwareScanner() {
-        hardwareInput.value = '';
-        hardwareInput.focus();
-        hardwareStatus.textContent = 'Scanner ready. Scan a delivery label; press Enter if your scanner asks.';
-    }
-
-    function isInteractiveElement(element) {
-        return element instanceof HTMLElement
-            && ['BUTTON', 'A', 'INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
-    }
-
     async function postAction(url, body, confirmation) {
         if (!window.confirm(confirmation)) {
             return;
@@ -104,11 +101,60 @@ if (root) {
 
             showFeedback(payload.message, 'success');
             records = records.map((record) => record.delivery_id === payload.record.delivery_id ? payload.record : record);
+            selectedDeliveryIds.delete(payload.record.delivery_id);
             renderRecords();
         } catch (error) {
             showFeedback('The billing request could not be completed. Check the connection and try again.', 'error');
             console.error(error);
         }
+    }
+
+    async function postBatchAction(actionRecords, urlTemplate, body, actionLabel) {
+        const recordList = actionRecords.map((record) => `DR ${record.dr_no}`).join(', ');
+        if (!window.confirm(`${actionLabel} ${actionRecords.length} selected record(s)?\n\n${recordList}`)) {
+            return;
+        }
+
+        let completed = 0;
+        const failures = [];
+
+        for (const record of actionRecords) {
+            try {
+                const response = await fetch(endpoint(urlTemplate, record.delivery_id), {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify(body),
+                });
+                const payload = await response.json();
+
+                if (!response.ok) {
+                    failures.push(`DR ${record.dr_no}: ${payload.message ?? 'The billing status was not changed.'}`);
+                    continue;
+                }
+
+                records = records.map((current) => current.delivery_id === payload.record.delivery_id ? payload.record : current);
+                selectedDeliveryIds.delete(payload.record.delivery_id);
+                completed += 1;
+                renderRecords();
+            } catch (error) {
+                failures.push(`DR ${record.dr_no}: the billing request could not be completed.`);
+                console.error(error);
+            }
+        }
+
+        if (failures.length > 0) {
+            showFeedback(
+                `${completed} record(s) updated. ${failures.length} could not be updated: ${failures.join(' ')}`,
+                completed > 0 ? 'warning' : 'error'
+            );
+            return;
+        }
+
+        showFeedback(`${completed} record(s) ${actionLabel.toLowerCase()} successfully.`, 'success');
     }
 
     function renderRecord(record) {
@@ -120,10 +166,26 @@ if (root) {
         const dr = document.createElement('h3');
         dr.className = 'font-mono text-base font-bold text-slate-950';
         dr.textContent = `DR ${record.dr_no}`;
+        const recordCheckbox = document.createElement('input');
+        recordCheckbox.type = 'checkbox';
+        recordCheckbox.checked = selectedDeliveryIds.has(record.delivery_id);
+        recordCheckbox.className = 'rounded border-slate-300 text-blue-700 focus:ring-blue-600';
+        recordCheckbox.setAttribute('aria-label', `Select DR ${record.dr_no}, ${record.school ?? record.school_id}, ${record.project ?? ''}`);
+        recordCheckbox.addEventListener('change', () => {
+            if (recordCheckbox.checked) {
+                selectedDeliveryIds.add(record.delivery_id);
+            } else {
+                selectedDeliveryIds.delete(record.delivery_id);
+            }
+            renderBulkActions();
+        });
         const status = document.createElement('span');
         status.className = 'rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-slate-800';
         status.textContent = record.billing_status.replaceAll('_', ' ');
-        header.append(dr, status);
+        const identity = document.createElement('div');
+        identity.className = 'flex items-center gap-3';
+        identity.append(recordCheckbox, dr);
+        header.append(identity, status);
 
         const details = document.createElement('dl');
         details.className = 'grid gap-4 p-5 sm:grid-cols-2';
@@ -242,6 +304,35 @@ if (root) {
         return card;
     }
 
+    function renderBulkActions() {
+        const selectedRecords = records.filter((record) => selectedDeliveryIds.has(record.delivery_id));
+        const forBillingRecords = selectedRecords.filter((record) => record.next_action === 'mark_for_billing');
+        const billedRecords = selectedRecords.filter((record) => record.next_action === 'confirm_billed');
+
+        selectAllCheckbox.disabled = records.length === 0;
+        selectAllCheckbox.checked = records.length > 0 && selectedRecords.length === records.length;
+        selectAllCheckbox.indeterminate = selectedRecords.length > 0 && selectedRecords.length < records.length;
+        clearRecordsButton.disabled = records.length === 0;
+        selectionSummary.textContent = `${selectedRecords.length} of ${records.length} record(s) selected. `
+            + `${forBillingRecords.length} ready for For Billing; ${billedRecords.length} ready for Billed.`;
+        bulkButtons.replaceChildren();
+
+        if (forBillingRecords.length > 0) {
+            bulkButtons.append(actionButton(
+                `Confirm For Billing (${forBillingRecords.length})`,
+                'rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600',
+                () => postBatchAction(forBillingRecords, urls.mark, {}, 'Mark For Billing')
+            ));
+        }
+
+        if (billedRecords.length > 0) {
+            bulkBilledLabel.textContent = `Invoice details will be applied to ${billedRecords.length} selected record(s).`;
+            bulkBilledForm.classList.remove('hidden');
+        } else {
+            bulkBilledForm.classList.add('hidden');
+        }
+    }
+
     function renderRecords() {
         results.replaceChildren();
         if (records.length === 0) {
@@ -249,9 +340,10 @@ if (root) {
             empty.className = 'rounded-xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center text-sm text-slate-500';
             empty.textContent = 'No delivery records are available.';
             results.append(empty);
-            return;
+        } else {
+            records.forEach((record) => results.append(renderRecord(record)));
         }
-        records.forEach((record) => results.append(renderRecord(record)));
+        renderBulkActions();
     }
 
     async function lookup(value, source) {
@@ -268,15 +360,31 @@ if (root) {
             const payload = await response.json();
 
             if (!response.ok) {
-                records = [];
-                renderRecords();
                 showFeedback(payload.message ?? 'Unable to identify a delivery from that input.', response.status === 410 ? 'warning' : 'error');
                 return;
             }
 
-            records = payload.records;
+            const knownDeliveryIds = new Set(records.map((record) => record.delivery_id));
+            const newRecords = payload.records.filter((record) => {
+                if (knownDeliveryIds.has(record.delivery_id)) {
+                    return false;
+                }
+                knownDeliveryIds.add(record.delivery_id);
+                return true;
+            });
+            records = [...records, ...newRecords];
             renderRecords();
-            showFeedback(payload.message, records.length > 1 ? 'warning' : 'success');
+            if (newRecords.length === 0) {
+                showFeedback('This delivery was already scanned. No duplicate was added.', 'warning');
+                hardwareStatus.textContent = 'Repeated delivery ignored. Ready for the next label.';
+            } else {
+                const duplicateCount = payload.records.length - newRecords.length;
+                const message = duplicateCount > 0
+                    ? `${newRecords.length} record(s) added; ${duplicateCount} duplicate record(s) ignored.`
+                    : `${newRecords.length} record(s) added. ${payload.message}`;
+                showFeedback(message, duplicateCount > 0 || newRecords.length > 1 ? 'warning' : 'success');
+                hardwareStatus.textContent = `${records.length} unique delivery record(s) scanned. Ready for the next label.`;
+            }
         } catch (error) {
             showFeedback('The delivery lookup could not be completed. Check the connection and try again.', 'error');
             console.error(error);
@@ -289,37 +397,19 @@ if (root) {
         if (processingScannerQueue) {
             return;
         }
-
         processingScannerQueue = true;
         while (scannerQueue.length > 0) {
             const payload = scannerQueue.shift();
             await lookup(payload, 'qr');
         }
         processingScannerQueue = false;
-        hardwareStatus.textContent = scannerQueue.length > 0
-            ? 'Reading the next scanned label…'
-            : 'Scanner ready. Scan another delivery label.';
-        focusHardwareScanner();
+        if (scannerQueue.length === 0) {
+            hardwareStatus.textContent = 'Ready — scan another delivery label.';
+        }
     }
 
-    hardwareInput.addEventListener('blur', () => {
-        window.setTimeout(() => {
-            if (isInteractiveElement(document.activeElement)) {
-                return;
-            }
-
-            focusHardwareScanner();
-        }, 50);
-    });
-
-    hardwareInput.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter') {
-            return;
-        }
-
-        event.preventDefault();
-        const payload = hardwareInput.value.trim();
-        hardwareInput.value = '';
+    function queueHardwarePayload(value) {
+        const payload = value.trim();
         if (!payload) {
             return;
         }
@@ -335,16 +425,96 @@ if (root) {
         scannerQueue.push(payload);
         hardwareStatus.textContent = 'Reading scanned label…';
         processScannerQueue();
+    }
+
+    document.addEventListener('keydown', (event) => {
+        const target = event.target;
+        if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) {
+            return;
+        }
+
+        if (event.ctrlKey || event.metaKey || event.altKey) {
+            return;
+        }
+
+        const queueBufferedScan = () => {
+            const payload = scannerInputBuffer;
+            scannerInputBuffer = '';
+            scannerInputTimer = null;
+            if (payload.trim().length >= 2) {
+                queueHardwarePayload(payload);
+            }
+        };
+
+        if (event.key === 'Enter' || event.key === 'Tab') {
+            if (scannerInputBuffer.length >= 2) {
+                event.preventDefault();
+                window.clearTimeout(scannerInputTimer);
+                queueBufferedScan();
+            }
+            return;
+        }
+
+        if (event.key.length !== 1) {
+            return;
+        }
+
+        const now = Date.now();
+        if (now - lastScannerKeyAt > 150) {
+            scannerInputBuffer = '';
+        }
+        lastScannerKeyAt = now;
+        scannerInputBuffer = (scannerInputBuffer + event.key).slice(-2048);
+        window.clearTimeout(scannerInputTimer);
+        scannerInputTimer = window.setTimeout(queueBufferedScan, 180);
+    }, true);
+
+    selectAllCheckbox.addEventListener('change', () => {
+        if (selectAllCheckbox.checked) {
+            records.forEach((record) => selectedDeliveryIds.add(record.delivery_id));
+        } else {
+            records.forEach((record) => selectedDeliveryIds.delete(record.delivery_id));
+        }
+        renderRecords();
     });
 
-    focusHardwareButton.addEventListener('click', focusHardwareScanner);
+    clearRecordsButton.addEventListener('click', () => {
+        records = [];
+        selectedDeliveryIds.clear();
+        renderRecords();
+        showFeedback('Scanned list cleared.', 'info');
+    });
+
+    bulkBilledForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!bulkBilledForm.reportValidity()) {
+            return;
+        }
+        const billedRecords = records.filter((record) => (
+            selectedDeliveryIds.has(record.delivery_id) && record.next_action === 'confirm_billed'
+        ));
+        if (billedRecords.length === 0) {
+            showFeedback('Select at least one eligible For Billing record first.', 'warning');
+            return;
+        }
+        await postBatchAction(
+            billedRecords,
+            urls.billed,
+            Object.fromEntries(new FormData(bulkBilledForm).entries()),
+            'Confirm Billed'
+        );
+    });
 
     searchForm.addEventListener('submit', (event) => {
         event.preventDefault();
         const value = searchInput.value.trim();
+        if (!value) {
+            return;
+        }
         const isQrPayload = value.startsWith('MMCBILLING:1:') || value.startsWith('MMCBILLING:2:')
             || /^https:\/\/philgeps\.metro-mobilia\.com\/entry\.php(?:\?|$)/i.test(value);
         lookup(value, isQrPayload ? 'qr' : 'manual');
+        searchInput.value = '';
     });
 
     async function scanFrame() {
@@ -425,5 +595,4 @@ if (root) {
     });
 
     window.addEventListener('pagehide', () => stream?.getTracks().forEach((track) => track.stop()));
-    window.addEventListener('DOMContentLoaded', focusHardwareScanner, { once: true });
 }

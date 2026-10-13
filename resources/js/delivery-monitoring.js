@@ -1,6 +1,110 @@
 const monitoring = document.getElementById('delivery-monitoring');
 
 if (monitoring) {
+    const logistics = document.getElementById('logistics-tracking');
+    const logisticsForm = document.getElementById('logistics-filters');
+    const logisticsError = document.getElementById('logistics-error');
+    let logisticsRequest;
+    let logisticsPoll;
+    let logisticsBusy = false;
+
+    function logisticsUrl() {
+        const url = new URL(logistics.dataset.endpoint);
+        for (const [name, value] of new FormData(logisticsForm)) {
+            if (value !== '') {
+                url.searchParams.set(name, value);
+            }
+        }
+
+        return url;
+    }
+
+    async function refreshLogistics({ page, interrupt = false } = {}) {
+        if (!logistics || logisticsBusy) {
+            if (!interrupt) return;
+            logisticsRequest?.abort();
+        }
+        if (page) logisticsForm.elements.page.value = String(page);
+        logisticsBusy = true;
+        const request = new AbortController();
+        logisticsRequest = request;
+        logistics.setAttribute('aria-busy', 'true');
+        logisticsError.classList.add('hidden');
+        try {
+            const response = await fetch(logisticsUrl(), {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                signal: request.signal,
+            });
+            if (!response.headers.get('content-type')?.includes('application/json')) {
+                throw new Error('Your session has expired. Sign in again to refresh Logistics tracking.');
+            }
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(Object.values(result.errors ?? {}).flat()[0] ?? 'Logistics tracking could not be refreshed.');
+            }
+            document.getElementById('logistics-content').innerHTML = result.html;
+            document.getElementById('logistics-updated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        } catch (exception) {
+            if (exception.name !== 'AbortError') {
+                logisticsError.textContent = exception.message;
+                logisticsError.classList.remove('hidden');
+            }
+        } finally {
+            if (logisticsRequest === request) {
+                logisticsRequest = undefined;
+                logisticsBusy = false;
+                logistics.removeAttribute('aria-busy');
+            }
+        }
+    }
+
+    function startLogisticsPolling() {
+        if (!logisticsPoll && !document.hidden) {
+            logisticsPoll = window.setInterval(() => refreshLogistics(), 7000);
+        }
+    }
+
+    function stopLogisticsPolling() {
+        if (logisticsPoll) {
+            window.clearInterval(logisticsPoll);
+            logisticsPoll = undefined;
+        }
+        logisticsRequest?.abort();
+    }
+
+    if (logistics && logisticsForm) {
+        logisticsForm.addEventListener('submit', event => {
+            event.preventDefault();
+            logisticsForm.elements.page.value = '1';
+            refreshLogistics({ interrupt: true });
+        });
+        logisticsForm.addEventListener('reset', event => {
+            if (logisticsForm.dataset.resetting) return;
+            event.preventDefault();
+            logisticsForm.dataset.resetting = 'true';
+            logisticsForm.reset();
+            delete logisticsForm.dataset.resetting;
+            logisticsForm.elements.page.value = '1';
+            refreshLogistics({ interrupt: true });
+        });
+        logistics.addEventListener('click', event => {
+            const pageButton = event.target.closest('[data-logistics-page]');
+            if (pageButton && !pageButton.disabled) {
+                refreshLogistics({ page: pageButton.dataset.logisticsPage, interrupt: true });
+            }
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) stopLogisticsPolling();
+            else {
+                refreshLogistics();
+                startLogisticsPolling();
+            }
+        });
+        window.addEventListener('pagehide', stopLogisticsPolling, { once: true });
+        startLogisticsPolling();
+    }
+
     const form = document.getElementById('monitoring-filters');
     const region = form.elements.region;
     const division = form.elements.division;

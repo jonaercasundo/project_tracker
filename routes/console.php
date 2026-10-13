@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote')->hourly();
 
 Schedule::command('bidding:cleanup-files --limit=100')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('logistics:webhooks:recover --limit=100')->everyMinute()->withoutOverlapping(1);

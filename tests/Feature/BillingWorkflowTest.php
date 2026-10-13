@@ -73,8 +73,10 @@ it('shows pending status until a user explicitly confirms For Billing', function
     $this->get(route('billing.scanner'))
         ->assertOk()
         ->assertSee('Handheld scanner')
-        ->assertSee('Focus scanner')
-        ->assertSee('billing-hardware-input');
+        ->assertSee('Select all scanned records')
+        ->assertSee('Clear scanned list')
+        ->assertSee('billing-bulk-billed-form')
+        ->assertDontSee('Focus scanner');
 
     $this->getJson(route('billing.scanner.lookup', ['q' => $qrPayload, 'source' => 'qr']))
         ->assertOk()

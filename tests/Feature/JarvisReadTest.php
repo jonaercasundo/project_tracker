@@ -4,11 +4,13 @@ use App\Models\Company;
 use App\Models\User;
 use App\Services\ProjectDeliveryProgressService;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
@@ -152,6 +154,62 @@ function jarvisOperations(): void
     DB::table('grouping')->insert(['group_id' => 1, 'status' => 'billed']);
     DB::table('billing_grouped')->insert(['id' => 1, 'group_id' => 1, 'dr_no' => 3502]);
     DB::table('items')->insert(['id' => 1, 'item_id' => 'KIT-0001', 'code_prefix' => 'KIT', 'item_name' => 'Catalog kit', 'project_id' => 'BID-2026', 'lot_id' => 90, 'active' => 1, 'price' => 10]);
+}
+
+function createJarvisLogisticsTables(): void
+{
+    Schema::create('logistics_webhook_events', function (Blueprint $table): void {
+        $table->id();
+        $table->string('integration_id');
+        $table->string('external_event_id');
+        $table->string('event_type');
+        $table->string('dr_reference');
+        $table->unsignedInteger('resolved_project_id')->nullable();
+        $table->string('resolved_school_id')->nullable();
+        $table->dateTime('event_occurred_at');
+        $table->string('processing_status');
+        $table->string('reconciliation_status');
+    });
+
+    Schema::create('logistics_dr_tracking', function (Blueprint $table): void {
+        $table->id();
+        $table->string('integration_id');
+        $table->unsignedInteger('project_id');
+        $table->string('school_id');
+        $table->string('dr_reference');
+        $table->char('school_scope_hash', 64);
+        $table->char('dr_reference_hash', 64);
+        $table->string('logistics_status');
+        $table->string('latest_event_id');
+        $table->unsignedInteger('latest_webhook_event_row_id');
+        $table->dateTime('event_occurred_at');
+        $table->unsignedBigInteger('latest_sequence');
+        $table->dateTime('last_synchronized_at');
+        $table->string('reconciliation_status');
+        $table->timestamps();
+        $table->unique(['integration_id', 'project_id', 'school_scope_hash', 'dr_reference_hash']);
+    });
+}
+
+function insertJarvisLogisticsTracking(int $projectId, string $schoolId, string $drReference, string $status, string $occurredAt, string $integrationId = 'logistics-test'): int
+{
+    return (int) DB::table('logistics_dr_tracking')->insertGetId([
+        'integration_id' => $integrationId,
+        'project_id' => $projectId,
+        'school_id' => $schoolId,
+        'dr_reference' => $drReference,
+        'school_scope_hash' => hash('sha256', $schoolId),
+        'dr_reference_hash' => hash('sha256', $drReference),
+        'logistics_status' => $status,
+        'latest_event_id' => 'event-'.$projectId.'-'.$schoolId.'-'.$drReference,
+        'latest_webhook_event_row_id' => 1,
+        'event_occurred_at' => $occurredAt,
+        'latest_sequence' => 1,
+        'last_synchronized_at' => $occurredAt,
+        'reconciliation_status' => 'synchronized',
+        'created_at' => $occurredAt,
+        'updated_at' => $occurredAt,
+    ]);
 }
 
 it('counts completed DRs once regardless of delivery rows packages items and quantities', function () {
@@ -1512,3 +1570,128 @@ it('preserves JSON errors and retry headers when rate limited', function () {
 
     $response->assertTooManyRequests()->assertJsonPath('success', false)->assertHeader('Retry-After');
 });
+
+it('shows each repeated DR as its own project and school Logistics scope', function () {
+    jarvisOperations();
+    createJarvisLogisticsTables();
+    DB::table('deliveries')->insert([
+        'delivery_id' => 4,
+        'project_id' => 2,
+        'school_id' => '002',
+        'lot_id' => 2,
+        'dr_no' => '3502',
+        'status' => 'pending',
+        'delivery_date' => '2026-10-04',
+        'package_qty' => 1,
+    ]);
+    DB::table('school')->insert(['school_id' => '003', 'school_name' => 'West School']);
+    DB::table('deliveries')->insert([
+        'delivery_id' => 5,
+        'project_id' => 1,
+        'school_id' => '003',
+        'lot_id' => 1,
+        'dr_no' => '3502',
+        'status' => 'pending',
+        'delivery_date' => '2026-10-04',
+        'package_qty' => 1,
+    ]);
+    insertJarvisLogisticsTracking(1, '001', '3502', 'logistics_received', '2026-10-13 08:00:00');
+    insertJarvisLogisticsTracking(2, '002', '3502', 'delivered', '2026-10-13 09:00:00');
+    insertJarvisLogisticsTracking(1, '003', '3502', 'logistics_received', '2026-10-13 07:30:00');
+    DB::table('logistics_webhook_events')->insert([
+        ['integration_id' => 'logistics-test', 'external_event_id' => 'review-1', 'event_type' => 'delivery.delivered', 'dr_reference' => '3502', 'resolved_project_id' => 1, 'resolved_school_id' => '001', 'event_occurred_at' => '2026-10-13 08:00:00', 'processing_status' => 'processed', 'reconciliation_status' => 'ambiguous'],
+        ['integration_id' => 'logistics-test', 'external_event_id' => 'review-2', 'event_type' => 'delivery.delivered', 'dr_reference' => '3502', 'resolved_project_id' => 1, 'resolved_school_id' => '001', 'event_occurred_at' => '2026-10-13 08:01:00', 'processing_status' => 'processed', 'reconciliation_status' => 'ambiguous'],
+    ]);
+    $user = jarvisReader();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $response = $this->getJson('/deliveries/monitoring/logistics');
+
+    $response->assertOk()
+        ->assertJsonPath('pagination.total', 3)
+        ->assertJsonPath('summary.logistics_received', 2)
+        ->assertJsonPath('summary.logistics_delivered', 1)
+        ->assertJsonPath('summary.pending_updates', 2)
+        ->assertJsonPath('summary.reconciliation_required', 1);
+    expect(substr_count($response->json('html'), '3502'))->toBe(3)
+        ->and($response->json('html'))->toContain('Science Kits')
+        ->and($response->json('html'))->toContain('Furniture')
+        ->and($response->json('html'))->toContain('West School')
+        ->and($response->json('html'))->toContain('Logistics Received')
+        ->and($response->json('html'))->toContain('Logistics Delivered');
+});
+
+it('filters and paginates the Logistics section on the server', function () {
+    jarvisOperations();
+    createJarvisLogisticsTables();
+    insertJarvisLogisticsTracking(1, '001', '3502', 'delivered', '2026-10-13 09:00:00');
+    insertJarvisLogisticsTracking(1, '001', '3502-X', 'delivered', '2026-10-13 08:00:00');
+    insertJarvisLogisticsTracking(2, '002', '3503', 'logistics_received', '2026-10-13 07:00:00');
+    for ($index = 0; $index < 9; $index++) {
+        insertJarvisLogisticsTracking(1, '001', 'PAG-'.str_pad((string) $index, 2, '0', STR_PAD_LEFT), 'delivered', '2026-10-12 08:00:00');
+    }
+    $user = jarvisReader();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->getJson('/deliveries/monitoring/logistics?status=delivered&per_page=10&page=2')
+        ->assertOk()
+        ->assertJsonPath('pagination.total', 11)
+        ->assertJsonPath('pagination.current_page', 2)
+        ->assertJsonPath('pagination.per_page', 10)
+        ->assertJsonPath('summary.logistics_delivered', 11)
+        ->assertJsonPath('summary.pending_updates', 0);
+
+    $this->getJson('/deliveries/monitoring/logistics?project_id=1&dr_reference=3502&school=Central&date_from=2026-10-13&date_to=2026-10-13')
+        ->assertOk()
+        ->assertJsonPath('pagination.total', 1)
+        ->assertJsonPath('summary.logistics_delivered', 1);
+});
+
+it('shows a changed Logistics status on the next section refresh', function () {
+    jarvisOperations();
+    createJarvisLogisticsTables();
+    $trackingId = insertJarvisLogisticsTracking(1, '001', '3502', 'logistics_received', '2026-10-13 08:00:00');
+    $user = jarvisReader();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->getJson('/deliveries/monitoring/logistics?project_id=1&dr_reference=3502')
+        ->assertOk()->assertJsonPath('summary.logistics_received', 1);
+    DB::table('logistics_dr_tracking')->where('id', $trackingId)->update([
+        'logistics_status' => 'delivered',
+        'event_occurred_at' => '2026-10-13 09:00:00',
+    ]);
+
+    $this->getJson('/deliveries/monitoring/logistics?project_id=1&dr_reference=3502')
+        ->assertOk()
+        ->assertJsonPath('summary.logistics_delivered', 1)
+        ->assertJsonPath('summary.logistics_received', 0)
+        ->assertSee('Logistics Delivered');
+});
+
+it('does not invent a Logistics status when a DR has no webhook tracking row', function () {
+    jarvisOperations();
+    $user = jarvisReader();
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->get('/deliveries/monitoring')
+        ->assertOk()
+        ->assertSee('No Logistics events match these filters')
+        ->assertSee('Pending Logistics updates')
+        ->assertDontSee('Logistics Received</span>');
+});
+
+it('protects the Logistics feed with the same MMC company and dashboard role boundary', function (string $condition) {
+    if ($condition === 'guest') {
+        $this->get('/deliveries/monitoring/logistics')->assertRedirect('/login');
+
+        return;
+    }
+    $user = jarvisReader($condition !== 'other company', true, false);
+    if ($condition === 'wrong role') {
+        $user->syncRoles(Role::findOrCreate('finance', 'web'));
+    }
+    $this->actingAs($user)->withSession(['company_id' => $condition === 'no selected company' ? null : $user->companies()->first()->company_id]);
+
+    $this->getJson('/deliveries/monitoring/logistics')->assertForbidden();
+})->with(['guest', 'wrong role', 'other company', 'no selected company']);

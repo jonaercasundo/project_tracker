@@ -48,27 +48,23 @@
                     <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
                         <div>
                             <p class="text-sm font-semibold text-white">Handheld scanner</p>
-                            <p id="hardware-scanner-status" class="mt-1 text-xs text-slate-400" role="status">Scanner ready. Scan a delivery label; press Enter if your scanner asks.</p>
+                            <p id="hardware-scanner-status" class="mt-1 text-xs text-slate-400" role="status">Ready — scan labels without clicking an input. Results are added once each.</p>
                         </div>
-                        <button id="focus-hardware-scanner" type="button" class="rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300">Focus scanner</button>
                     </div>
                 </div>
             </div>
 
-            <input id="billing-hardware-input" type="text" autocomplete="off" maxlength="2048" aria-hidden="true" tabindex="-1"
-                   style="position: absolute; left: -9999px; top: 0; opacity: 0; width: 1px; height: 1px; pointer-events: none;">
-
             <section class="rounded-xl border border-slate-200 bg-white p-5">
                 <div>
                     <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">Keyboard / handheld scanner</p>
-                    <h2 class="mt-1 font-bold text-slate-900">Find by DR number or scanner</h2>
-                    <p class="mt-1 text-sm text-slate-500">Type a DR number, or use a USB/Bluetooth scanner to enter a delivery QR payload. Press Enter to search.</p>
+                    <h2 class="mt-1 font-bold text-slate-900">Manual DR number search</h2>
+                    <p class="mt-1 text-sm text-slate-500">Use this fallback if you cannot scan a label.</p>
                 </div>
                 <form id="manual-search" class="mt-4 flex flex-col gap-2 sm:flex-row">
                     <label for="dr-search" class="sr-only">DR number</label>
                     <input id="dr-search" name="q" autocomplete="off" maxlength="2048" required
                            class="min-w-0 flex-1 rounded-lg border-slate-300 font-mono text-sm focus:border-blue-500 focus:ring-blue-500"
-                           placeholder="Enter a DR number or scan a delivery QR">
+                           placeholder="Enter a DR number">
                     <button class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Search</button>
                 </form>
                 <p class="mt-3 text-xs leading-5 text-slate-500">If a DR number has multiple delivery rows, select the matching school and project below. Legacy lot-only QRs are not treated as delivery IDs.</p>
@@ -84,6 +80,41 @@
                 <p class="text-right text-xs text-slate-500">No change happens until you confirm the action.</p>
             </div>
             <div id="billing-feedback" class="hidden rounded-lg border px-4 py-3 text-sm" role="status" aria-live="polite"></div>
+            <section class="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                        <input id="billing-select-all" type="checkbox" class="rounded border-slate-300 text-blue-700 focus:ring-blue-600" disabled>
+                        Select all scanned records
+                    </label>
+                    <button id="billing-clear-records" type="button" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-rose-400 hover:text-rose-700" disabled>Clear scanned list</button>
+                </div>
+                <p id="billing-selection-summary" class="text-sm text-slate-500">No records selected.</p>
+                <div id="billing-bulk-buttons" class="flex flex-wrap gap-2"></div>
+                <form id="billing-bulk-billed-form" class="hidden grid gap-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4 sm:grid-cols-2">
+                    <p id="billing-bulk-billed-label" class="sm:col-span-2 text-sm font-bold text-slate-900">Invoice details are required before confirming selected records as Billed.</p>
+                    <label class="space-y-1 text-xs font-semibold text-slate-600">Invoice number
+                        <input name="invoice_no" maxlength="100" required class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                    <label class="space-y-1 text-xs font-semibold text-slate-600">Invoice date
+                        <input name="invoice_date" type="date" required class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                    <label class="space-y-1 text-xs font-semibold text-slate-600">Invoice total
+                        <input name="amount" type="number" min="0" step="0.01" required class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                    <label class="space-y-1 text-xs font-semibold text-slate-600">Delivery billing amount (optional)
+                        <input name="billing_amount" type="number" min="0" step="0.01" class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                    <label class="space-y-1 text-xs font-semibold text-slate-600 sm:col-span-2">Billing reference
+                        <input name="billing_reference" maxlength="255" class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                    <label class="space-y-1 text-xs font-semibold text-slate-600 sm:col-span-2">Remarks
+                        <textarea name="billing_remarks" rows="2" maxlength="5000" class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                    </label>
+                    <div class="sm:col-span-2">
+                        <button class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">Review and confirm selected as Billed</button>
+                    </div>
+                </form>
+            </section>
             <div id="billing-results" class="space-y-4">
                 <div class="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center">
                     <p class="font-semibold text-slate-800">Waiting for a delivery</p>

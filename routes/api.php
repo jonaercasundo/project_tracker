@@ -2,9 +2,15 @@
 
 use App\Http\Controllers\JarvisReadController;
 use App\Http\Controllers\JarvisTestController;
+use App\Http\Controllers\LogisticsWebhookController;
 use App\Http\Middleware\EnsureJarvisCompany;
 use App\Http\Middleware\EnsureJarvisToken;
+use App\Http\Middleware\EnsureLogisticsWebhookSignature;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/v1/logistics/webhooks/delivery-status', LogisticsWebhookController::class)
+    ->middleware(['throttle:120,1', EnsureLogisticsWebhookSignature::class])
+    ->name('api.v1.logistics.webhooks.delivery-status');
 
 Route::prefix('jarvis')->name('jarvis.')
     ->middleware(['auth:sanctum', EnsureJarvisToken::class, 'throttle:60,1'])

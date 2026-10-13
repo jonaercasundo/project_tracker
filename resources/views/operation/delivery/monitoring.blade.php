@@ -100,6 +100,66 @@
                 @include('operation.delivery.partials.monitoring-projects', ['report' => $report])
             </div>
         </section>
+
+        <section id="logistics-tracking" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+                 data-endpoint="{{ route('deliveries.monitoring.logistics') }}" aria-labelledby="logistics-heading">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-indigo-600">External carrier updates</p>
+                    <h2 id="logistics-heading" class="mt-1 text-lg font-extrabold text-slate-900">Logistics DR Tracking</h2>
+                    <p class="mt-1 text-xs text-slate-500">Logistics milestones are separate from MMC receiving and acceptance.</p>
+                </div>
+                <span id="logistics-updated" class="text-xs text-slate-500" aria-live="polite">Refreshes every 7 seconds while this page is active</span>
+            </div>
+
+            <form id="logistics-filters" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                <div>
+                    <label for="logistics-project" class="mb-1 block text-xs font-semibold text-slate-600">Project</label>
+                    <select id="logistics-project" name="project_id" class="w-full rounded-xl border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">All projects</option>
+                        @foreach($projects as $project)
+                            <option value="{{ $project->project_id }}">{{ $project->project_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="logistics-dr" class="mb-1 block text-xs font-semibold text-slate-600">DR#</label>
+                    <input id="logistics-dr" name="dr_reference" type="search" maxlength="100" autocomplete="off" placeholder="Exact DR number" class="w-full rounded-xl border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="logistics-school" class="mb-1 block text-xs font-semibold text-slate-600">School</label>
+                    <input id="logistics-school" name="school" type="search" maxlength="255" autocomplete="off" placeholder="School name or ID" class="w-full rounded-xl border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="logistics-status" class="mb-1 block text-xs font-semibold text-slate-600">Logistics status</label>
+                    <select id="logistics-status" name="status" class="w-full rounded-xl border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">All statuses</option>
+                        <option value="logistics_received">Logistics Received</option>
+                        <option value="delivered">Logistics Delivered</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="logistics-date-from" class="mb-1 block text-xs font-semibold text-slate-600">From</label>
+                    <input id="logistics-date-from" name="date_from" type="date" class="w-full rounded-xl border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="logistics-date-to" class="mb-1 block text-xs font-semibold text-slate-600">To</label>
+                    <input id="logistics-date-to" name="date_to" type="date" class="w-full rounded-xl border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <input type="hidden" name="per_page" value="25">
+                <input type="hidden" name="page" value="1">
+                <div class="flex items-end gap-2 sm:col-span-2 xl:col-span-6">
+                    <button type="submit" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Apply filters</button>
+                    <button type="reset" id="logistics-reset" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Reset</button>
+                    <p id="logistics-error" role="alert" class="ml-2 hidden text-sm text-rose-600"></p>
+                </div>
+            </form>
+
+            <div id="logistics-content" aria-live="polite">
+                @include('operation.delivery.partials.monitoring-logistics-tracking', ['logistics' => $logistics])
+            </div>
+        </section>
+
         <details class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-xs text-slate-500">
             <summary class="cursor-pointer font-semibold text-slate-700">How progress is calculated</summary>
             <dl class="mt-3 grid gap-3">

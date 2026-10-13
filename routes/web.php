@@ -8,10 +8,10 @@ use App\Http\Controllers\BiddingController;
 use App\Http\Controllers\BiddingDocumentController;
 use App\Http\Controllers\BiddingFolderController;
 use App\Http\Controllers\BiddingSchoolController;
-use App\Http\Controllers\BudgetRequestController;
 use App\Http\Controllers\BillingDashboardController;
 use App\Http\Controllers\BillingRecordController;
 use App\Http\Controllers\BillingScannerController;
+use App\Http\Controllers\BudgetRequestController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardLaunchController;
 use App\Http\Controllers\DeliveryController;
@@ -68,6 +68,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/deliveries/monitoring', [DeliveryMonitoringController::class, 'index'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring');
+    Route::get('/deliveries/monitoring/logistics', [DeliveryMonitoringController::class, 'logistics'])
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.monitoring.logistics');
     Route::get('/deliveries/monitoring/locations', [DeliveryMonitoringController::class, 'locations'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring.locations');

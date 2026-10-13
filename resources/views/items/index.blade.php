@@ -3,7 +3,7 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
                 <h1 class="text-2xl font-extrabold tracking-tight text-slate-900">Items Management</h1>
-                <p class="mt-1 text-sm text-slate-500">Manage standalone item records.</p>
+                <p class="mt-1 text-sm text-slate-500">Manage item records.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('catalog-items.import', $filters) }}" class="inline-flex items-center justify-center gap-2 rounded-full bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-900/10 transition hover:bg-slate-50">

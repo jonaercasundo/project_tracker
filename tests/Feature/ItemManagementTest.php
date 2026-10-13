@@ -61,7 +61,7 @@ describe('access and listing', function () {
         $this->get(route('catalog-items.import'))->assertRedirect(route('login'));
     });
 
-    it('searches and filters standalone records and preserves sorting and pagination', function () {
+    it('searches and filters item records and preserves sorting and pagination', function () {
         $this->signInBiddingUser();
         foreach (range(1, 28) as $number) {
             CatalogItem::query()->create(catalogItemPayload([
@@ -92,19 +92,30 @@ describe('access and listing', function () {
         ]);
     });
 
-    it('does not expose linked catalog records in listing, detail, edit, or update routes', function () {
+    it('shows linked item records without displaying or changing project details', function () {
         $this->signInBiddingUser();
         $project = BiddingProjectFixtureFactory::new()->create();
         $linkedItem = BiddingCatalogFixtureFactory::new()->create(['item_name' => 'Unrelated linked item']);
         DB::table('items')->where('id', $linkedItem->id)->update(['project_id' => $project->id]);
 
-        $this->get(route('catalog-items.index'))->assertOk()->assertDontSee('Unrelated linked item');
-        $this->get(route('catalog-items.show', ['item' => $linkedItem->id]))->assertNotFound();
-        $this->get(route('catalog-items.edit', ['item' => $linkedItem->id]))->assertNotFound();
+        $this->get(route('catalog-items.index'))->assertOk()->assertSee('Unrelated linked item');
+        $this->get(route('catalog-items.show', ['item' => $linkedItem->id]))
+            ->assertOk()
+            ->assertSee('Unrelated linked item')
+            ->assertDontSee((string) $project->project_id)
+            ->assertDontSee('project_id');
+        $this->get(route('catalog-items.edit', ['item' => $linkedItem->id]))
+            ->assertOk()
+            ->assertSee('Unrelated linked item')
+            ->assertDontSee('name="project_id"', false);
         $this->put(route('catalog-items.update', ['item' => $linkedItem->id]), catalogItemPayload())
-            ->assertNotFound();
+            ->assertRedirect(route('catalog-items.index'))->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('items', ['id' => $linkedItem->id, 'project_id' => $project->id, 'item_name' => 'Unrelated linked item']);
+        $this->assertDatabaseHas('items', [
+            'id' => $linkedItem->id,
+            'project_id' => $project->id,
+            'item_name' => 'Test standalone item',
+        ]);
     });
 
     it('validates requested sort columns against supported item attributes', function () {
@@ -116,7 +127,7 @@ describe('access and listing', function () {
 });
 
 describe('saving items', function () {
-    it('creates a standalone item and ignores unsupported request attributes', function () {
+    it('creates an item and ignores unsupported relationship attributes', function () {
         $this->signInBiddingUser();
 
         $response = $this->post(route('catalog-items.store', [
@@ -168,7 +179,10 @@ describe('saving items', function () {
 
     it('updates item attributes while preserving generated identifier and the list state', function () {
         $this->signInBiddingUser();
+        $project = BiddingProjectFixtureFactory::new()->create();
         $item = CatalogItem::query()->create(catalogItemPayload(['code_prefix' => 'EDIT']));
+        DB::table('items')->where('id', $item->id)->update(['project_id' => (string) $project->id]);
+        $item->refresh();
         $state = ['search' => 'Test', 'active' => '1', 'sort' => 'item_name', 'direction' => 'desc', 'page' => '2'];
 
         $this->put(route('catalog-items.update', ['item' => $item->id, ...$state]), [
@@ -182,7 +196,7 @@ describe('saving items', function () {
             'item_id' => 'EDIT-0001',
             'item_name' => 'Updated standalone item',
             'price' => '20.00',
-            'project_id' => null,
+            'project_id' => (string) $project->id,
         ]);
         $this->assertDatabaseMissing('items', ['item_id' => 'CHANGED-0001']);
     });

@@ -38,7 +38,6 @@ class CatalogItem extends Model
 
             $item->code_prefix = $prefix;
             $lastItemId = self::query()
-                ->whereNull('project_id')
                 ->where('code_prefix', $prefix)
                 ->orderByDesc('id')
                 ->value('item_id');

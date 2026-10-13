@@ -23,7 +23,7 @@ class ItemController extends Controller
     public function index(Request $request): View
     {
         $filters = self::listQuery($request);
-        $query = CatalogItem::query()->whereNull('project_id');
+        $query = CatalogItem::query();
 
         if (isset($filters['search'])) {
             $query->where(function (Builder $query) use ($filters): void {
@@ -123,6 +123,6 @@ class ItemController extends Controller
 
     private function findStandaloneItem(int $id): CatalogItem
     {
-        return CatalogItem::query()->whereNull('project_id')->whereKey($id)->firstOrFail();
+        return CatalogItem::query()->whereKey($id)->firstOrFail();
     }
 }

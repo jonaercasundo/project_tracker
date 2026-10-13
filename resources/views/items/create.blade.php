@@ -3,7 +3,7 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-2xl font-extrabold tracking-tight text-slate-900">Add New Item</h1>
-                <p class="mt-1 text-sm text-slate-500">Create a standalone item record.</p>
+                <p class="mt-1 text-sm text-slate-500">Create an item record.</p>
             </div>
             <a href="{{ route('catalog-items.index', $listQuery) }}" class="text-sm font-semibold text-blue-600 hover:text-blue-800">Back to items</a>
         </div>

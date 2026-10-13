@@ -107,7 +107,7 @@ class ItemImportService
                 $row['errors'] = ['This item duplicates row '.$seen[$key].' in this file.'];
             } elseif (isset($existingKeys[$key])) {
                 $row['status'] = 'duplicate';
-                $row['errors'] = ['An identical standalone item already exists. Existing items will not be changed.'];
+                $row['errors'] = ['An identical item already exists. Existing items will not be changed.'];
             }
             $seen[$key] ??= $row['row'];
         }
@@ -159,7 +159,7 @@ class ItemImportService
                         $key = $this->comparisonKey($row['data']);
                         if (isset($existingKeys[$key])) {
                             $row['status'] = 'duplicate';
-                            $row['errors'] = ['An identical standalone item now exists. The existing item was not changed.'];
+                            $row['errors'] = ['An identical item now exists. The existing item was not changed.'];
 
                             continue;
                         }
@@ -286,9 +286,7 @@ class ItemImportService
     /** @return array<string, true> */
     private function existingKeys(): array
     {
-        $items = CatalogItem::query()
-            ->whereNull('project_id')
-            ->get(self::HEADERS);
+        $items = CatalogItem::query()->get(self::HEADERS);
 
         $keys = [];
         foreach ($items as $item) {

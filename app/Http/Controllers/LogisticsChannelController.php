@@ -250,8 +250,11 @@ class LogisticsChannelController extends Controller
         $query = DB::table('logistics_webhook_events as events')
             ->leftJoin('projects', 'projects.project_id', '=', 'events.resolved_project_id')
             ->leftJoin('school', function ($join): void {
-                $join->on('school.school_id', '=', 'events.resolved_school_id')
-                    ->on('school.project_id', '=', 'events.resolved_project_id');
+                if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+                    $join->whereRaw('BINARY school.school_id = BINARY events.resolved_school_id');
+                } else {
+                    $join->whereRaw('school.school_id = events.resolved_school_id COLLATE BINARY');
+                }
             })
             ->select([
                 'events.id', 'events.integration_id', 'events.external_event_id', 'events.dr_reference',

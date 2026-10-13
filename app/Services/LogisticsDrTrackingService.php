@@ -180,7 +180,6 @@ class LogisticsDrTrackingService
         $query = DB::table('logistics_dr_tracking as tracking')
             ->leftJoin('projects as project', 'project.project_id', '=', 'tracking.project_id')
             ->leftJoin('school as school', function (JoinClause $join): void {
-                $join->on('school.school_id', '=', 'tracking.school_id');
                 $this->whereColumnExact($join, 'school.school_id', 'tracking.school_id');
             })
             ->select('tracking.*', 'project.project_name', 'school.school_name');
@@ -229,7 +228,6 @@ class LogisticsDrTrackingService
             $pendingQuery = DB::table('deliveries as delivery')
                 ->join('projects as project', 'project.project_id', '=', 'delivery.project_id')
                 ->leftJoin('school as school', function (JoinClause $join): void {
-                    $join->on('school.school_id', '=', 'delivery.school_id');
                     $this->whereColumnExact($join, 'school.school_id', 'delivery.school_id');
                 })
                 ->whereNotNull('delivery.dr_no')
@@ -249,7 +247,6 @@ class LogisticsDrTrackingService
         } else {
             $pendingQuery = DB::table('deliveries as delivery')
                 ->leftJoin('school as school', function (JoinClause $join): void {
-                    $join->on('school.school_id', '=', 'delivery.school_id');
                     $this->whereColumnExact($join, 'school.school_id', 'delivery.school_id');
                 })
                 ->whereNotNull('delivery.dr_no')->where('delivery.dr_no', '<>', '');
@@ -306,7 +303,7 @@ class LogisticsDrTrackingService
     private function whereExact(Builder $query, string $column, string $value): void
     {
         $query->where($column, $value);
-        if (DB::connection()->getDriverName() === 'mysql') {
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
             $query->whereRaw('BINARY '.$column.' = BINARY ?', [$value]);
         } else {
             $query->whereRaw($column.' = ? COLLATE BINARY', [$value]);
@@ -325,7 +322,7 @@ class LogisticsDrTrackingService
 
     private function whereColumnExact(Builder $query, string $left, string $right): void
     {
-        if (DB::connection()->getDriverName() === 'mysql') {
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
             $query->whereRaw('BINARY '.$left.' = BINARY '.$right);
         } else {
             $query->whereRaw($left.' = '.$right.' COLLATE BINARY');
@@ -334,7 +331,7 @@ class LogisticsDrTrackingService
 
     private function groupExactScope(Builder $query, string $alias): void
     {
-        if (DB::connection()->getDriverName() === 'mysql') {
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
             $query->select([])->selectRaw('BINARY '.$alias.'.school_id as school_scope, BINARY '.$alias.'.dr_no as dr_scope');
             $query->groupByRaw($alias.'.project_id, BINARY '.$alias.'.school_id, BINARY '.$alias.'.dr_no');
         } else {
@@ -345,7 +342,7 @@ class LogisticsDrTrackingService
 
     private function groupExactReconciliationScope(Builder $query): void
     {
-        if (DB::connection()->getDriverName() === 'mysql') {
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
             $query->select([])->selectRaw('BINARY integration_id as integration_scope, resolved_project_id, BINARY resolved_school_id as school_scope, BINARY dr_reference as dr_scope');
             $query->groupByRaw('BINARY integration_id, resolved_project_id, BINARY resolved_school_id, BINARY dr_reference');
         } else {

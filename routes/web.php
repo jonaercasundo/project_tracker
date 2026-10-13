@@ -97,7 +97,7 @@ Route::middleware(['auth'])->group(function () {
     | ADMIN ROUTES
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['role:Administrator'])->group(function () {
+    Route::middleware(['role:user'])->group(function () {
 
         Route::middleware(['company.context:MMC'])->prefix('logistics-channel')->name('logistics-channel.')->group(function () {
             Route::get('/', [LogisticsChannelController::class, 'index'])->name('index');

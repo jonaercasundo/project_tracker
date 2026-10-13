@@ -73,6 +73,11 @@ class ItemImportService
             }
             $validator = Validator::make($data, SaveCatalogItemRequest::itemRules());
             $errors = array_values(array_unique(array_merge($errors, $validator->errors()->all())));
+            if ($errors === []) {
+                $data['price'] = number_format((float) $data['price'], 2, '.', '');
+                $data['supplier_price'] = number_format((float) $data['supplier_price'], 2, '.', '');
+                $data['active'] = filter_var($data['active'], FILTER_VALIDATE_BOOLEAN) ? '1' : '0';
+            }
             $rows[] = [
                 'row' => $index + 2,
                 'data' => $data,

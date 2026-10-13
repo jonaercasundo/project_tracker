@@ -41,6 +41,20 @@ function catalogItemsCsv(array $rows): UploadedFile
     return UploadedFile::fake()->createWithContent('items.csv', $content);
 }
 
+/** @param list<array<string, mixed>> $rows
+ * @return array<string, mixed>
+ */
+function catalogItemsPreview(array $rows): array
+{
+    $preview = test()->post(route('catalog-items.import.preview'), ['file' => catalogItemsCsv($rows)])
+        ->assertOk()
+        ->assertViewIs('items.import')
+        ->viewData('preview');
+    test()->withCookie(config('session.cookie'), session()->getId());
+
+    return $preview;
+}
+
 describe('access and listing', function () {
     it('requires authentication for item management routes', function () {
         $this->get(route('catalog-items.index'))->assertRedirect(route('login'));
@@ -181,7 +195,7 @@ describe('saving items', function () {
             ->assertDontSee('name="project_id"', false)
             ->assertDontSee('name="lot_id"', false);
         $this->get(route('catalog-items.show', ['item' => $item->id]))
-            ->assertSee('&lt;script&gt;')
+            ->assertSee('&lt;script&gt;', false)
             ->assertDontSee('<script>alert("item")</script>', false)
             ->assertDontSee('project_id');
         $this->get(route('catalog-items.edit', ['item' => $item->id]))
@@ -205,12 +219,12 @@ describe('item imports', function () {
         CatalogItem::query()->create(catalogItemPayload(['code_prefix' => 'OLD', 'item_name' => 'Existing standalone item']));
         $ready = catalogItemPayload(['code_prefix' => 'NEW', 'item_name' => 'New imported item']);
 
-        $preview = $this->post(route('catalog-items.import.preview'), ['file' => catalogItemsCsv([
+        $preview = catalogItemsPreview([
             $ready,
             $ready,
             catalogItemPayload(['code_prefix' => 'OLD', 'item_name' => 'Existing standalone item']),
             catalogItemPayload(['item_name' => 'Invalid import', 'price' => '-2']),
-        ])])->assertOk()->assertViewIs('items.import')->viewData('preview');
+        ]);
 
         expect($preview['summary'])->toMatchArray(['ready' => 1, 'skipped' => 2, 'failed' => 1, 'total' => 4]);
         expect($preview['rows'][3])->toMatchArray(['row' => 5, 'status' => 'failed']);

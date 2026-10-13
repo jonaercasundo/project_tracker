@@ -30,7 +30,8 @@
             </div>
             <div class="rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
                 <ul class="list-disc space-y-1.5 pl-4">
-                    <li>Keep all 7 template column headers. Required values: <strong>code_prefix, item_name, price, supplier_price, active</strong>.</li>
+                    <li>Keep all 7 template column headers. Required values: <strong>item_name, price, supplier_price, active</strong>.</li>
+                    <li>Code prefix is optional. If blank, the default prefix <strong>ITEM</strong> is used to generate the item ID.</li>
                     <li>Leave description or unit blank when they are not available. Set active to <strong>1</strong> or <strong>0</strong>.</li>
                     <li>Item IDs are generated when ready rows are saved. Existing items and repeated rows are skipped and never overwritten.</li>
                     <li>Excel files must contain one worksheet. Each preview expires 15 minutes after upload.</li>

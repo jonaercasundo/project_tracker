@@ -5,12 +5,12 @@
             <input id="item-id" value="{{ $item->item_id }}" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-600">
         </div>
     @else
-        <p class="sm:col-span-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">An item ID will be generated from the code prefix when the item is saved.</p>
+        <p class="sm:col-span-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">An item ID will be generated when the item is saved. If no code prefix is entered, the default prefix ITEM is used.</p>
     @endif
 
     <div>
-        <label for="code-prefix" class="mb-1.5 block text-xs font-bold text-slate-600">Code prefix <span class="text-red-600" aria-hidden="true">*</span></label>
-        <input id="code-prefix" name="code_prefix" type="text" maxlength="255" required value="{{ old('code_prefix', $item?->code_prefix) }}" autocomplete="off" aria-invalid="{{ $errors->has('code_prefix') ? 'true' : 'false' }}" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+        <label for="code-prefix" class="mb-1.5 block text-xs font-bold text-slate-600">Code prefix <span class="font-medium text-slate-400">(optional)</span></label>
+        <input id="code-prefix" name="code_prefix" type="text" maxlength="255" value="{{ old('code_prefix', $item?->code_prefix) }}" autocomplete="off" aria-invalid="{{ $errors->has('code_prefix') ? 'true' : 'false' }}" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
         <x-input-error :messages="$errors->get('code_prefix')" class="mt-1" />
     </div>
     <div>

@@ -150,6 +150,22 @@ describe('saving items', function () {
         $this->assertDatabaseCount('items', 1);
     });
 
+    it('creates an item without a code prefix using the default prefix', function () {
+        $this->signInBiddingUser();
+
+        $this->post(route('catalog-items.store'), [
+            ...catalogItemPayload(),
+            'code_prefix' => '',
+        ])->assertRedirect(route('catalog-items.index'))->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('items', [
+            'item_id' => 'ITEM-0001',
+            'code_prefix' => 'ITEM',
+            'item_name' => 'Test standalone item',
+            'project_id' => null,
+        ]);
+    });
+
     it('updates item attributes while preserving generated identifier and the list state', function () {
         $this->signInBiddingUser();
         $item = CatalogItem::query()->create(catalogItemPayload(['code_prefix' => 'EDIT']));
@@ -176,7 +192,8 @@ describe('saving items', function () {
 
         $this->from(route('catalog-items.create'))
             ->post(route('catalog-items.store'), [])
-            ->assertSessionHasErrors(['code_prefix', 'item_name', 'price', 'supplier_price', 'active']);
+            ->assertSessionHasErrors(['item_name', 'price', 'supplier_price', 'active'])
+            ->assertSessionDoesntHaveErrors('code_prefix');
 
         $this->from(route('catalog-items.create'))
             ->post(route('catalog-items.store'), catalogItemPayload(['price' => '-1.00', 'supplier_price' => '1.234']))
@@ -191,6 +208,7 @@ describe('saving items', function () {
 
         $this->get(route('catalog-items.create'))
             ->assertSee('name="code_prefix"', false)
+            ->assertDontSee('name="code_prefix" type="text" maxlength="255" required', false)
             ->assertSee('name="supplier_price"', false)
             ->assertDontSee('name="project_id"', false)
             ->assertDontSee('name="lot_id"', false);
@@ -217,7 +235,7 @@ describe('item imports', function () {
     it('previews file duplicates, existing duplicates, and invalid rows before importing ready items', function () {
         $this->signInBiddingUser();
         CatalogItem::query()->create(catalogItemPayload(['code_prefix' => 'OLD', 'item_name' => 'Existing standalone item']));
-        $ready = catalogItemPayload(['code_prefix' => 'NEW', 'item_name' => 'New imported item']);
+        $ready = catalogItemPayload(['code_prefix' => '', 'item_name' => 'New imported item']);
 
         $preview = catalogItemsPreview([
             $ready,
@@ -238,7 +256,7 @@ describe('item imports', function () {
             ->assertViewHas('importResult', fn (array $result): bool => $result['summary']['imported'] === 1
                 && $result['summary']['skipped'] === 2 && $result['summary']['failed'] === 1);
 
-        $this->assertDatabaseHas('items', ['item_id' => 'NEW-0001', 'item_name' => 'New imported item', 'project_id' => null]);
+        $this->assertDatabaseHas('items', ['item_id' => 'ITEM-0001', 'item_name' => 'New imported item', 'project_id' => null]);
         $this->assertDatabaseHas('items', ['item_name' => 'Existing standalone item']);
         $this->assertDatabaseCount('items', 2);
     });
@@ -248,7 +266,7 @@ describe('item imports', function () {
         $book = new Spreadsheet;
         $book->getActiveSheet()->fromArray([
             ItemImportService::HEADERS,
-            array_values(catalogItemPayload(['code_prefix' => 'XLSX', 'item_name' => 'Workbook item'])),
+            array_values(catalogItemPayload(['code_prefix' => '', 'item_name' => 'Workbook item'])),
         ]);
         ob_start();
         (new Xlsx($book))->save('php://output');
@@ -261,7 +279,7 @@ describe('item imports', function () {
 
         expect($response->viewData('preview')['summary']['ready'])->toBe(1);
         expect($response->viewData('preview')['rows'][0]['data'])->toMatchArray([
-            'code_prefix' => 'XLSX',
+            'code_prefix' => 'ITEM',
             'item_name' => 'Workbook item',
             'price' => '12.50',
         ]);

@@ -69,7 +69,11 @@ class ItemImportService
             }
 
             if (is_string($data['code_prefix'])) {
-                $data['code_prefix'] = mb_strtoupper(trim($data['code_prefix']));
+                $data['code_prefix'] = trim($data['code_prefix']) === ''
+                    ? CatalogItem::DEFAULT_CODE_PREFIX
+                    : mb_strtoupper(trim($data['code_prefix']));
+            } else {
+                $data['code_prefix'] = CatalogItem::DEFAULT_CODE_PREFIX;
             }
             $validator = Validator::make($data, SaveCatalogItemRequest::itemRules());
             $errors = array_values(array_unique(array_merge($errors, $validator->errors()->all())));

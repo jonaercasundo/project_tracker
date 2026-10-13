@@ -21,7 +21,7 @@ class SaveCatalogItemRequest extends FormRequest
     public static function itemRules(): array
     {
         return [
-            'code_prefix' => ['required', 'string', 'max:255'],
+            'code_prefix' => ['nullable', 'string', 'max:255'],
             'item_name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'unit' => ['nullable', 'string', 'max:255'],
@@ -36,7 +36,8 @@ class SaveCatalogItemRequest extends FormRequest
         $prefix = $this->input('code_prefix');
 
         if (is_string($prefix)) {
-            $this->merge(['code_prefix' => mb_strtoupper(trim($prefix))]);
+            $prefix = trim($prefix);
+            $this->merge(['code_prefix' => $prefix === '' ? null : mb_strtoupper($prefix)]);
         }
     }
 }

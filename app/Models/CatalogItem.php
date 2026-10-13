@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
 
 class CatalogItem extends Model
 {
+    public const DEFAULT_CODE_PREFIX = 'ITEM';
+
     protected $table = 'items';
 
     protected $fillable = [
@@ -33,9 +34,7 @@ class CatalogItem extends Model
     {
         static::creating(function (CatalogItem $item): void {
             $prefix = Str::upper(trim((string) $item->code_prefix));
-            if ($prefix === '') {
-                throw new InvalidArgumentException('An item code prefix is required.');
-            }
+            $prefix = $prefix === '' ? self::DEFAULT_CODE_PREFIX : $prefix;
 
             $item->code_prefix = $prefix;
             $lastItemId = self::query()

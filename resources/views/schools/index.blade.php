@@ -101,7 +101,6 @@
                             <th scope="col" class="whitespace-nowrap px-4 py-3">Address</th>
                             <th scope="col" class="whitespace-nowrap px-4 py-3">Contact</th>
                             <th scope="col" class="whitespace-nowrap px-4 py-3">Area</th>
-                            <th scope="col" class="whitespace-nowrap px-4 py-3 text-right">Contract Price</th>
                             <th scope="col" class="sticky right-0 whitespace-nowrap bg-slate-50 px-5 py-3 text-right shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.08)]">Actions</th>
                         </tr>
                     </thead>

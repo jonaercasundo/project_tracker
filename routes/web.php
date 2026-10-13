@@ -18,6 +18,7 @@ use App\Http\Controllers\EntryController;
 use App\Http\Controllers\Finance_Item;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\ItemManagementImportController;
 use App\Http\Controllers\ITinventoryController;
 use App\Http\Controllers\LiquidationController;
 use App\Http\Controllers\LocationController;
@@ -204,12 +205,18 @@ Route::middleware(['auth'])->group(function () {
             | ITEMS
             |--------------------------------------------------------------------------
         */
-        Route::get('/items', [ItemController::class, 'index'])->name('items.index');
-        Route::get('/items/create', [ItemController::class, 'create'])->name('items.create');
-        Route::post('/items', [ItemController::class, 'store'])->name('items.store');
-        Route::get('/items/{item}/edit', [ItemController::class, 'edit'])->name('items.edit');
-        Route::put('/items/{item}', [ItemController::class, 'update'])->name('items.update');
-        Route::delete('/items/{item}', [ItemController::class, 'destroy'])->name('items.destroy');
+        Route::get('/items/import', [ItemManagementImportController::class, 'index'])->name('catalog-items.import');
+        Route::post('/items/import/preview', [ItemManagementImportController::class, 'preview'])
+            ->middleware('throttle:10,1')->name('catalog-items.import.preview');
+        Route::post('/items/import/confirm', [ItemManagementImportController::class, 'confirm'])
+            ->middleware('throttle:10,1')->name('catalog-items.import.confirm');
+        Route::get('/items/template', [ItemManagementImportController::class, 'template'])->name('catalog-items.template');
+        Route::get('/items', [ItemController::class, 'index'])->name('catalog-items.index');
+        Route::get('/items/create', [ItemController::class, 'create'])->name('catalog-items.create');
+        Route::post('/items', [ItemController::class, 'store'])->name('catalog-items.store');
+        Route::get('/items/{item}/edit', [ItemController::class, 'edit'])->whereNumber('item')->name('catalog-items.edit');
+        Route::match(['put', 'patch'], '/items/{item}', [ItemController::class, 'update'])->whereNumber('item')->name('catalog-items.update');
+        Route::get('/items/{item}', [ItemController::class, 'show'])->whereNumber('item')->name('catalog-items.show');
         /*
             |--------------------------------------------------------------------------
             | DELIVERIES

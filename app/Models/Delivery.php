@@ -10,6 +10,7 @@ use App\Models\PackageStatus;
 use App\Models\Item;
 use App\Models\Package;
 use App\Models\Lot;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Delivery extends Model
 {
@@ -53,6 +54,12 @@ class Delivery extends Model
     {
         return $this->hasMany(PackageStatus::class, 'delivery_id', 'delivery_id');
     }
+
+    public function billingRecord(): HasOne
+    {
+        return $this->hasOne(DeliveryBillingRecord::class, 'delivery_id', 'delivery_id');
+    }
+
     public function items()
     {
         return $this->hasMany(

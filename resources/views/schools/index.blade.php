@@ -9,7 +9,6 @@
         'region' => 'Region',
     ];
     $activeFilters = array_filter(Arr::only($filters ?? [], array_keys($filterLabels)), fn ($v) => filled($v));
-    $price = fn ($school) => $school->total_contract_price !== null ? '₱' . number_format((float) $school->total_contract_price, 2) : '—';
     $initials = fn ($name) => collect(preg_split('/\s+/', trim((string) $name)))->filter()->take(2)->map(fn ($w) => Str::upper(Str::substr($w, 0, 1)))->implode('');
 @endphp
 
@@ -99,10 +98,8 @@
                     <thead class="bg-slate-50/80 text-xs font-semibold text-slate-500">
                         <tr>
                             <th scope="col" class="whitespace-nowrap px-6 py-3.5">School</th>
-                            <th scope="col" class="whitespace-nowrap px-4 py-3.5">Address</th>
+                            <th scope="col" class="whitespace-nowrap px-4 py-3.5">Location</th>
                             <th scope="col" class="whitespace-nowrap px-4 py-3.5">Contact</th>
-                            <th scope="col" class="whitespace-nowrap px-4 py-3.5">Area</th>
-                            <th scope="col" class="whitespace-nowrap px-4 py-3.5 text-right">Contract Price</th>
                             <th scope="col" class="sticky right-0 whitespace-nowrap bg-slate-50 px-6 py-3.5 text-right shadow-[-10px_0_10px_-10px_rgba(15,23,42,0.1)]"><span class="sr-only">Actions</span></th>
                         </tr>
                     </thead>
@@ -118,8 +115,9 @@
                                         </div>
                                     </div>
                                 </th>
-                                <td class="min-w-[220px] max-w-[300px] px-4 py-4">
-                                    <p class="line-clamp-2 leading-snug" title="{{ $school->address }}">{{ $school->address ?: '—' }}</p>
+                                <td class="min-w-[260px] max-w-[340px] px-4 py-4">
+                                    <p class="line-clamp-2 leading-snug text-slate-800" title="{{ $school->address }}">{{ $school->address ?: '—' }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ collect([$school->municipality, $school->division, $school->region])->filter()->implode(' · ') ?: '—' }}</p>
                                 </td>
                                 <td class="min-w-[170px] px-4 py-4">
                                     <div class="font-medium text-slate-800">{{ $school->contact_person ?? '—' }}</div>
@@ -127,11 +125,6 @@
                                         <a href="tel:{{ preg_replace('/[^0-9+]/', '', $school->contact) }}" class="mt-0.5 inline-block whitespace-nowrap text-xs text-slate-500 transition hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">{{ $school->contact }}</a>
                                     @endif
                                 </td>
-                                <td class="min-w-[170px] px-4 py-4">
-                                    <div class="whitespace-nowrap font-medium text-slate-800">{{ $school->municipality ?? '—' }}</div>
-                                    <div class="mt-0.5 whitespace-nowrap text-xs text-slate-500">{{ $school->division }} · {{ $school->region }}</div>
-                                </td>
-                                <td class="whitespace-nowrap px-4 py-4 text-right font-semibold tabular-nums text-slate-900">{{ $price($school) }}</td>
                                 <td class="sticky right-0 whitespace-nowrap bg-white px-6 py-4 shadow-[-10px_0_10px_-10px_rgba(15,23,42,0.1)] group-hover:bg-blue-50/60">
                                     <div class="flex items-center justify-end gap-1.5">
                                         <a href="{{ route('schools.show', ['school' => $school->school_id] + $listQuery) }}" aria-label="View {{ $school->school_name }}" title="View" class="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 ring-1 ring-slate-900/10 transition hover:bg-white hover:text-slate-900 hover:ring-slate-900/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
@@ -145,7 +138,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-6 py-16 text-center">
+                                <td colspan="4" class="px-6 py-16 text-center">
                                     @include('schools._empty')
                                 </td>
                             </tr>
@@ -164,14 +157,15 @@
                                 <h3 class="font-semibold leading-snug text-slate-900">{{ $school->school_name }}</h3>
                                 <p class="mt-0.5 font-mono text-xs text-slate-500">{{ $school->school_id }}</p>
                             </div>
-                            <p class="shrink-0 text-sm font-bold tabular-nums text-slate-900">{{ $price($school) }}</p>
                         </div>
                         <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                            <div class="col-span-2"><dt class="font-semibold text-slate-500">Address</dt><dd class="mt-0.5 text-slate-700">{{ $school->address ?: '—' }}</dd></div>
+                            <div class="col-span-2">
+                                <dt class="font-semibold text-slate-500">Location</dt>
+                                <dd class="mt-0.5 text-slate-700">{{ $school->address ?: '—' }}</dd>
+                                <dd class="mt-0.5 text-slate-500">{{ collect([$school->municipality, $school->division, $school->region])->filter()->implode(' · ') ?: '—' }}</dd>
+                            </div>
                             <div><dt class="font-semibold text-slate-500">Contact person</dt><dd class="mt-0.5 text-slate-700">{{ $school->contact_person ?? '—' }}</dd></div>
                             <div><dt class="font-semibold text-slate-500">Contact</dt><dd class="mt-0.5 text-slate-700">{{ $school->contact ?? '—' }}</dd></div>
-                            <div><dt class="font-semibold text-slate-500">Municipality</dt><dd class="mt-0.5 text-slate-700">{{ $school->municipality ?? '—' }}</dd></div>
-                            <div><dt class="font-semibold text-slate-500">Division · Region</dt><dd class="mt-0.5 text-slate-700">{{ $school->division }} · {{ $school->region }}</dd></div>
                         </dl>
                         <div class="flex gap-2">
                             <a href="{{ route('schools.show', ['school' => $school->school_id] + $listQuery) }}" aria-label="View {{ $school->school_name }}" class="flex-1 rounded-xl py-2.5 text-center text-xs font-bold text-slate-700 ring-1 ring-slate-900/10 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">View</a>

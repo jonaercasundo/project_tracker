@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-project_app-layout>
     <x-slot name="header">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -115,4 +115,4 @@
             <div class="border-t border-slate-200 px-5 py-4">{{ $records->links() }}</div>
         </section>
     </div>
-</x-app-layout>
+</x-project_app-layout>

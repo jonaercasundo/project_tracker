@@ -45,8 +45,18 @@
                         <span class="self-center text-xs text-slate-400">Camera access requires a secure connection (HTTPS or localhost).</span>
                     </div>
                     <p id="camera-support" class="hidden rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100" role="status"></p>
+                    <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
+                        <div>
+                            <p class="text-sm font-semibold text-white">Handheld scanner</p>
+                            <p id="hardware-scanner-status" class="mt-1 text-xs text-slate-400" role="status">Scanner ready. Scan a delivery label; press Enter if your scanner asks.</p>
+                        </div>
+                        <button id="focus-hardware-scanner" type="button" class="rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300">Focus scanner</button>
+                    </div>
                 </div>
             </div>
+
+            <input id="billing-hardware-input" type="text" autocomplete="off" maxlength="2048" aria-hidden="true" tabindex="-1"
+                   style="position: absolute; left: -9999px; top: 0; opacity: 0; width: 1px; height: 1px; pointer-events: none;">
 
             <section class="rounded-xl border border-slate-200 bg-white p-5">
                 <div>

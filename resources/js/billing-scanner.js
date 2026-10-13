@@ -8,6 +8,9 @@ if (root) {
     const cameraSupport = document.querySelector('#camera-support');
     const searchForm = document.querySelector('#manual-search');
     const searchInput = document.querySelector('#dr-search');
+    const hardwareInput = document.querySelector('#billing-hardware-input');
+    const hardwareStatus = document.querySelector('#hardware-scanner-status');
+    const focusHardwareButton = document.querySelector('#focus-hardware-scanner');
     const feedback = document.querySelector('#billing-feedback');
     const results = document.querySelector('#billing-results');
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
@@ -16,6 +19,10 @@ if (root) {
     let lookupInProgress = false;
     let lastPayload = '';
     let records = [];
+    let scannerQueue = [];
+    let processingScannerQueue = false;
+    let lastHardwarePayload = '';
+    let lastHardwareScanAt = 0;
 
     const urls = {
         lookup: root.dataset.lookupUrl,
@@ -60,6 +67,17 @@ if (root) {
 
     function endpoint(template, deliveryId) {
         return template.replace('__delivery__', encodeURIComponent(deliveryId));
+    }
+
+    function focusHardwareScanner() {
+        hardwareInput.value = '';
+        hardwareInput.focus();
+        hardwareStatus.textContent = 'Scanner ready. Scan a delivery label; press Enter if your scanner asks.';
+    }
+
+    function isInteractiveElement(element) {
+        return element instanceof HTMLElement
+            && ['BUTTON', 'A', 'INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
     }
 
     async function postAction(url, body, confirmation) {
@@ -267,6 +285,60 @@ if (root) {
         }
     }
 
+    async function processScannerQueue() {
+        if (processingScannerQueue) {
+            return;
+        }
+
+        processingScannerQueue = true;
+        while (scannerQueue.length > 0) {
+            const payload = scannerQueue.shift();
+            await lookup(payload, 'qr');
+        }
+        processingScannerQueue = false;
+        hardwareStatus.textContent = scannerQueue.length > 0
+            ? 'Reading the next scanned label…'
+            : 'Scanner ready. Scan another delivery label.';
+        focusHardwareScanner();
+    }
+
+    hardwareInput.addEventListener('blur', () => {
+        window.setTimeout(() => {
+            if (isInteractiveElement(document.activeElement)) {
+                return;
+            }
+
+            focusHardwareScanner();
+        }, 50);
+    });
+
+    hardwareInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') {
+            return;
+        }
+
+        event.preventDefault();
+        const payload = hardwareInput.value.trim();
+        hardwareInput.value = '';
+        if (!payload) {
+            return;
+        }
+
+        const now = Date.now();
+        if (payload === lastHardwarePayload && now - lastHardwareScanAt < 1500) {
+            hardwareStatus.textContent = 'Repeated scan ignored. Ready for the next label.';
+            return;
+        }
+
+        lastHardwarePayload = payload;
+        lastHardwareScanAt = now;
+        scannerQueue.push(payload);
+        hardwareStatus.textContent = 'Reading scanned label…';
+        processScannerQueue();
+    });
+
+    focusHardwareButton.addEventListener('click', focusHardwareScanner);
+
     searchForm.addEventListener('submit', (event) => {
         event.preventDefault();
         const value = searchInput.value.trim();
@@ -353,4 +425,5 @@ if (root) {
     });
 
     window.addEventListener('pagehide', () => stream?.getTracks().forEach((track) => track.stop()));
+    window.addEventListener('DOMContentLoaded', focusHardwareScanner, { once: true });
 }

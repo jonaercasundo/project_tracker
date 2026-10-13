@@ -70,6 +70,12 @@ it('shows pending status until a user explicitly confirms For Billing', function
     $deliveryId = createBillingDelivery();
     $qrPayload = app(DeliveryBillingQrCodeService::class)->makePayload($deliveryId);
 
+    $this->get(route('billing.scanner'))
+        ->assertOk()
+        ->assertSee('Handheld scanner')
+        ->assertSee('Focus scanner')
+        ->assertSee('billing-hardware-input');
+
     $this->getJson(route('billing.scanner.lookup', ['q' => $qrPayload, 'source' => 'qr']))
         ->assertOk()
         ->assertJsonPath('records.0.billing_status', 'pending_billing')

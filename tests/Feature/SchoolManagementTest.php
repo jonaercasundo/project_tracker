@@ -30,10 +30,6 @@ function schoolManagementPayload(): array
 {
     return [
         'school_id' => '000123',
-        'project_id' => null,
-        'project_no' => 'DEPED-2026-17',
-        'project' => 'Classroom Furniture',
-        'total_contract_price' => '1234567.80',
         'school_name' => 'Bacsil Elementary School',
         'address' => '12 Main Street',
         'contact_person' => 'Ana Reyes',
@@ -105,12 +101,12 @@ describe('listing and forms', function () {
     it('finds schools by a global search without exposing other records', function (string $search) {
         $this->signInBiddingUser();
         SchoolManagementFixtureFactory::new()->create(schoolManagementPayload());
-        SchoolManagementFixtureFactory::new()->create(['school_name' => 'Unrelated School', 'project_no' => 'OTHER', 'address' => 'Other address', 'contact_person' => 'Other person']);
+        SchoolManagementFixtureFactory::new()->create(['school_name' => 'Unrelated School', 'address' => 'Other address', 'contact_person' => 'Other person']);
 
         $this->get(route('schools.index', ['search' => $search]))
             ->assertViewHas('schools', fn ($schools): bool => $schools->total() === 1 && $schools->first()->school_id === '000123')
-            ->assertSee('1,234,567.80')->assertDontSee('Unrelated School');
-    })->with(['000123', 'Bacsil', 'DEPED-2026-17', '12 Main', 'Ana Reyes']);
+            ->assertSee('Bacsil Elementary School')->assertDontSee('Unrelated School');
+    })->with(['000123', 'Bacsil', '12 Main', 'Ana Reyes']);
 
     it('combines municipality division and region filters and keeps them on pagination links', function () {
         $this->signInBiddingUser();
@@ -131,10 +127,19 @@ describe('listing and forms', function () {
         $this->signInBiddingUser();
         $school = SchoolManagementFixtureFactory::new()->create(['school_id' => '000123', 'school_name' => '<script>alert("school")</script>', 'address' => '<img src=x onerror=alert(1)>']);
 
-        $this->get(route('schools.create'))->assertSee('name="school_id"', false)->assertSee('name="project_id"', false)->assertSee('name="contact_person"', false);
-        $this->get(route('schools.show', $school))->assertSee($school->school_name)->assertSee($school->address)->assertDontSee($school->school_name, false)->assertDontSee($school->address, false)->assertSee('1,234,567.80');
-        $this->get(route('schools.edit', $school))->assertSee($school->school_name)->assertSee('000123')->assertSee('DEPED-2026-17');
-        $this->get(route('schools.index'))->assertSee($school->school_name)->assertDontSee($school->school_name, false);
+        $this->get(route('schools.create'))
+            ->assertSee('name="school_id"', false)->assertSee('name="contact_person"', false)
+            ->assertDontSee('Project details')->assertDontSee('name="project_id"', false);
+        $this->get(route('schools.show', $school))
+            ->assertSee($school->school_name)->assertSee($school->address)
+            ->assertDontSee($school->school_name, false)->assertDontSee($school->address, false)
+            ->assertDontSee('Project ID')->assertDontSee('Project number')->assertDontSee('Total contract price');
+        $this->get(route('schools.edit', $school))
+            ->assertSee($school->school_name)->assertSee('000123')
+            ->assertDontSee('name="project_id"', false);
+        $this->get(route('schools.index'))
+            ->assertSee($school->school_name)->assertDontSee($school->school_name, false)
+            ->assertDontSee('Contract Price')->assertDontSee('Project No.');
     });
 
     it('returns 404 for a school that does not exist', function () {
@@ -147,26 +152,38 @@ describe('listing and forms', function () {
 });
 
 describe('saving schools', function () {
-    it('creates all twelve fields and preserves leading zero identifiers and listing state', function () {
+    it('creates school details and ignores removed project fields', function () {
         $this->signInBiddingUser();
-        BiddingProjectFixtureFactory::new()->create(['id' => 42]);
         $state = ['search' => 'Bacsil', 'municipality' => 'Bacarra', 'division' => 'Ilocos Norte', 'region' => 'Region I', 'page' => '2'];
-        $payload = array_replace(schoolManagementPayload(), ['project_id' => '42']);
+        $payload = schoolManagementPayload();
 
-        $this->post(route('schools.store', $state), $payload)
+        $this->post(route('schools.store', $state), [
+            ...$payload,
+            'project_id' => '999',
+            'project_no' => 'REMOVED',
+            'project' => 'Removed project data',
+            'total_contract_price' => '1000.00',
+        ])
             ->assertRedirect(route('schools.index', $state))->assertSessionHas('success')->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('school', $payload);
+        $this->assertDatabaseHas('school', [
+            'school_id' => '000123',
+            'project_id' => null,
+            'project_no' => null,
+            'project' => null,
+            'total_contract_price' => null,
+        ]);
         $this->assertDatabaseCount('school', 1);
     });
 
     it('accepts nullable optional fields without inserting empty strings', function () {
         $this->signInBiddingUser();
-        $payload = array_replace(schoolManagementPayload(), array_fill_keys(['project_id', 'project_no', 'project', 'total_contract_price', 'contact_person', 'contact', 'municipality'], ''));
+        $payload = array_replace(schoolManagementPayload(), array_fill_keys(['contact_person', 'contact', 'municipality'], ''));
 
         $this->post(route('schools.store'), $payload)->assertSessionHasNoErrors()->assertRedirect(route('schools.index'));
 
-        $this->assertDatabaseHas('school', ['school_id' => '000123', 'project_id' => null, 'project_no' => null, 'project' => null, 'total_contract_price' => null, 'contact_person' => null, 'contact' => null, 'municipality' => null]);
+        $this->assertDatabaseHas('school', ['school_id' => '000123', 'contact_person' => null, 'contact' => null, 'municipality' => null]);
     });
 
     it('requires the five mandatory school fields', function () {
@@ -179,31 +196,27 @@ describe('saving schools', function () {
         $this->assertDatabaseCount('school', 0);
     });
 
-    it('rejects fields exceeding the existing table string sizes', function () {
+    it('rejects an import template containing removed project columns', function () {
         $this->signInBiddingUser();
-        $fields = ['school_id', 'school_name', 'address', 'contact_person', 'contact', 'municipality', 'division', 'region', 'project'];
-        $payload = array_replace(schoolManagementPayload(), array_fill_keys($fields, str_repeat('x', 256)), ['project_no' => str_repeat('x', 51)]);
+        $legacyFile = UploadedFile::fake()->createWithContent(
+            'schools.csv',
+            "school_id,project_id,project_no,project,total_contract_price,school_name,address,contact_person,contact,municipality,division,region\n000123,,,,,School,Address,,,,Division,Region\n",
+        );
 
-        $this->post(route('schools.store'), $payload)->assertInvalid(array_fill_keys([...$fields, 'project_no'], 'greater than'));
+        $this->post(route('schools.import.preview'), ['file' => $legacyFile])->assertInvalid(['file']);
 
         $this->assertDatabaseCount('school', 0);
     });
 
-    it('rejects invalid numeric values before writing', function (string $field, string $value) {
+    it('rejects fields exceeding the existing table string sizes', function () {
         $this->signInBiddingUser();
+        $fields = ['school_id', 'school_name', 'address', 'contact_person', 'contact', 'municipality', 'division', 'region'];
+        $payload = array_replace(schoolManagementPayload(), array_fill_keys($fields, str_repeat('x', 256)));
 
-        $this->post(route('schools.store'), array_replace(schoolManagementPayload(), [$field => $value]))->assertInvalid([$field]);
+        $this->post(route('schools.store'), $payload)->assertInvalid(array_fill_keys($fields, 'greater than'));
 
         $this->assertDatabaseCount('school', 0);
-    })->with([
-        'negative project ID' => ['project_id', '-1'],
-        'fractional project ID' => ['project_id', '1.5'],
-        'overflowing project ID' => ['project_id', '18446744073709551616'],
-        'nonnumeric price' => ['total_contract_price', 'not a price'],
-        'excess price precision' => ['total_contract_price', '1.234'],
-        'overflowing price' => ['total_contract_price', '10000000000.00'],
-        'underflowing price' => ['total_contract_price', '-10000000000.00'],
-    ]);
+    });
 
     it('refuses duplicate school IDs without overwriting the original', function () {
         $this->signInBiddingUser();
@@ -215,26 +228,42 @@ describe('saving schools', function () {
         $this->assertDatabaseCount('school', 1);
     });
 
-    it('rejects a project reference that does not exist', function () {
-        $this->signInBiddingUser();
-
-        $this->post(route('schools.store'), array_replace(schoolManagementPayload(), ['project_id' => '999']))->assertInvalid(['project_id' => 'Choose an existing project ID or leave it blank.']);
-
-        $this->assertDatabaseCount('school', 0);
-    });
-
-    it('updates editable fields and returns to the current search filters and page', function () {
+    it('updates school details while preserving project and coordinate data', function () {
         $this->signInBiddingUser();
         BiddingProjectFixtureFactory::new()->create(['id' => 73]);
-        $school = SchoolManagementFixtureFactory::new()->create(['school_id' => '000123', 'latitude' => '18.2500000', 'longitude' => '120.6200000']);
+        $school = SchoolManagementFixtureFactory::new()->create([
+            'school_id' => '000123',
+            'project_id' => 73,
+            'project_no' => 'EXISTING-73',
+            'project' => 'Existing project data',
+            'total_contract_price' => '800.00',
+            'latitude' => '18.2500000',
+            'longitude' => '120.6200000',
+        ]);
         $state = ['search' => 'School', 'municipality' => 'Bacarra', 'division' => 'Ilocos Norte', 'region' => 'Region I', 'page' => '3'];
-        $payload = array_replace(schoolManagementPayload(), ['school_name' => 'Updated School', 'project_id' => '73', 'project_no' => 'NEW-42', 'project' => 'Revised project', 'total_contract_price' => '-123.40', 'address' => 'Updated address', 'contact_person' => 'Updated contact', 'contact' => '00123', 'municipality' => 'Laoag', 'division' => 'New division', 'region' => 'New region']);
+        $payload = array_replace(schoolManagementPayload(), ['school_name' => 'Updated School', 'address' => 'Updated address', 'contact_person' => 'Updated contact', 'contact' => '00123', 'municipality' => 'Laoag', 'division' => 'New division', 'region' => 'New region']);
 
-        $this->put(route('schools.update', ['school' => $school, ...$state]), [...$payload, 'latitude' => '0', 'longitude' => '0'])
+        $this->put(route('schools.update', ['school' => $school, ...$state]), [
+            ...$payload,
+            'project_id' => '999',
+            'project_no' => 'CHANGED',
+            'project' => 'Changed project data',
+            'total_contract_price' => '1000.00',
+            'latitude' => '0',
+            'longitude' => '0',
+        ])
             ->assertRedirect(route('schools.index', $state))->assertSessionHas('success')->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('school', $payload);
-        $this->assertDatabaseHas('school', ['school_id' => '000123', 'latitude' => '18.2500000', 'longitude' => '120.6200000']);
+        $this->assertDatabaseHas('school', [
+            'school_id' => '000123',
+            'project_id' => 73,
+            'project_no' => 'EXISTING-73',
+            'project' => 'Existing project data',
+            'total_contract_price' => '800.00',
+            'latitude' => '18.2500000',
+            'longitude' => '120.6200000',
+        ]);
         $this->assertDatabaseCount('school', 1);
     });
 
@@ -273,13 +302,13 @@ describe('saving schools', function () {
 });
 
 describe('importing schools', function () {
-    it('downloads a CSV template containing the twelve supported columns', function () {
+    it('downloads a CSV template containing the eight supported columns', function () {
         $this->signInBiddingUser();
 
         $response = $this->get(route('schools.template'))->assertDownload();
 
         expect(str_getcsv(trim($response->streamedContent(), "\xEF\xBB\xBF\r\n")))->toBe([
-            'school_id', 'project_id', 'project_no', 'project', 'total_contract_price', 'school_name', 'address', 'contact_person', 'contact', 'municipality', 'division', 'region',
+            'school_id', 'school_name', 'address', 'contact_person', 'contact', 'municipality', 'division', 'region',
         ]);
     });
 
@@ -290,12 +319,12 @@ describe('importing schools', function () {
             schoolManagementPayload(),
             array_replace(schoolManagementPayload(), ['school_name' => 'Duplicate in file']),
             array_replace(schoolManagementPayload(), ['school_id' => 'existing']),
-            array_replace(schoolManagementPayload(), ['school_id' => 'bad-row', 'address' => '', 'total_contract_price' => 'bad']),
+            array_replace(schoolManagementPayload(), ['school_id' => 'bad-row', 'address' => '']),
         ]);
 
         expect($preview['summary'])->toMatchArray(['ready' => 1, 'duplicate' => 2, 'failed' => 1, 'total' => 4]);
         expect($preview['rows'][3])->toMatchArray(['row' => 5, 'status' => 'failed']);
-        expect(implode(' ', $preview['rows'][3]['errors']))->toContain('address', 'price');
+        expect(implode(' ', $preview['rows'][3]['errors']))->toContain('address');
         $this->assertDatabaseCount('school', 1);
 
         $this->post(route('schools.import.confirm'), ['token' => $preview['token']])->assertRedirect(route('schools.import'))->assertSessionHas('import_result_token');
@@ -319,16 +348,6 @@ describe('importing schools', function () {
             ->assertOk()->assertViewHas('preview');
 
         expect($response->viewData('preview')['rows'][0]['data'])->toMatchArray(['school_id' => '000123', 'contact' => '09171234567']);
-        $this->assertDatabaseCount('school', 0);
-    });
-
-    it('marks a missing project reference as a failed import row', function () {
-        $this->signInBiddingUser();
-
-        $preview = schoolManagementPreview([array_replace(schoolManagementPayload(), ['project_id' => '999'])]);
-
-        expect($preview['summary'])->toMatchArray(['ready' => 0, 'failed' => 1]);
-        expect(implode(' ', $preview['rows'][0]['errors']))->toContain('project');
         $this->assertDatabaseCount('school', 0);
     });
 

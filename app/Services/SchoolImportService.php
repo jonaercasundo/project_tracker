@@ -22,8 +22,7 @@ use ZipArchive;
 class SchoolImportService
 {
     public const HEADERS = [
-        'school_id', 'project_id', 'project_no', 'project', 'total_contract_price',
-        'school_name', 'address', 'contact_person', 'contact', 'municipality', 'division', 'region',
+        'school_id', 'school_name', 'address', 'contact_person', 'contact', 'municipality', 'division', 'region',
     ];
 
     private const MAX_ROWS = 1000;
@@ -47,7 +46,7 @@ class SchoolImportService
         }
         if (count($headers) !== count(self::HEADERS) || count(array_unique($headers)) !== count(self::HEADERS)
             || array_diff(self::HEADERS, $headers) !== []) {
-            throw ValidationException::withMessages(['file' => 'The first row must contain exactly the 12 column headers from the CSV template.']);
+            throw ValidationException::withMessages(['file' => 'The first row must contain exactly the 8 column headers from the CSV template.']);
         }
 
         $rows = [];
@@ -55,7 +54,7 @@ class SchoolImportService
             if (count(array_filter($cells, fn ($value): bool => $value !== null && trim((string) $value) !== '')) === 0) {
                 continue;
             }
-            $errors = count($cells) > count($headers) ? ['This row contains more than 12 columns.'] : [];
+            $errors = count($cells) > count($headers) ? ['This row contains more than 8 columns.'] : [];
             $data = [];
             foreach ($headers as $column => $header) {
                 $value = trim((string) ($cells[$column] ?? ''));
@@ -233,18 +232,20 @@ class SchoolImportService
         $reader->setReadEmptyCells(false);
         $info = $reader->listWorksheetInfo($path);
         if (count($info) !== 1 || $info[0]['totalRows'] > self::MAX_ROWS + 1 || $info[0]['totalColumns'] > count(self::HEADERS)) {
-            throw ValidationException::withMessages(['file' => 'Use one worksheet with the 12 template columns and at most 1,000 school rows.']);
+            throw ValidationException::withMessages(['file' => 'Use one worksheet with the 8 template columns and at most 1,000 school rows.']);
         }
         $reader->setReadFilter(new class implements IReadFilter
         {
             public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
             {
-                return $row <= 1001 && Coordinate::columnIndexFromString($columnAddress) <= 12;
+                return $row <= 1001 && Coordinate::columnIndexFromString($columnAddress) <= count(SchoolImportService::HEADERS);
             }
         });
         $book = $reader->load($path);
         try {
-            return $book->getSheet(0)->rangeToArray('A1:L'.max(1, $info[0]['totalRows']), null, false, false);
+            $lastColumn = Coordinate::stringFromColumnIndex(count(self::HEADERS));
+
+            return $book->getSheet(0)->rangeToArray('A1:'.$lastColumn.max(1, $info[0]['totalRows']), null, false, false);
         } finally {
             $book->disconnectWorksheets();
         }

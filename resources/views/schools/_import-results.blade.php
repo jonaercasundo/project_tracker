@@ -49,7 +49,7 @@
                             <details>
                                 <summary class="cursor-pointer rounded text-xs font-bold text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">Review all fields</summary>
                                 <dl class="mt-3 space-y-2">
-                                    @foreach (['school_id' => 'School ID', 'school_name' => 'School name', 'address' => 'Address', 'municipality' => 'Municipality', 'division' => 'Division', 'region' => 'Region', 'project_id' => 'Project ID', 'project_no' => 'Project number', 'project' => 'Project', 'total_contract_price' => 'Total contract price', 'contact_person' => 'Contact person', 'contact' => 'Contact'] as $fieldName => $label)
+                                    @foreach (['school_id' => 'School ID', 'school_name' => 'School name', 'address' => 'Address', 'municipality' => 'Municipality', 'division' => 'Division', 'region' => 'Region', 'contact_person' => 'Contact person', 'contact' => 'Contact'] as $fieldName => $label)
                                         <div>
                                             <dt class="text-[11px] font-bold text-slate-500">{{ $label }}</dt>
                                             <dd class="break-words text-xs text-slate-700">{{ $row['data'][$fieldName] ?? '—' }}</dd>

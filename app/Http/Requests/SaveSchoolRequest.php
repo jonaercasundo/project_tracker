@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use App\Models\School;
-use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -39,19 +38,6 @@ class SaveSchoolRequest extends FormRequest
     {
         return [
             'school_id' => ['required', 'string', 'max:255'],
-            'project_id' => [
-                'bail', 'nullable', 'regex:/\A[0-9]{1,20}\z/',
-                function (string $attribute, mixed $value, Closure $fail): void {
-                    $digits = ltrim((string) $value, '0');
-                    if (strlen($digits) === 20 && strcmp($digits, '18446744073709551615') > 0) {
-                        $fail('The project ID must be an unsigned whole number no greater than 18446744073709551615.');
-                    }
-                },
-                Rule::exists('project_information', 'id'),
-            ],
-            'project_no' => ['nullable', 'string', 'max:50'],
-            'project' => ['nullable', 'string', 'max:255'],
-            'total_contract_price' => ['nullable', 'regex:/\A-?[0-9]{1,10}(?:\.[0-9]{1,2})?\z/'],
             'school_name' => ['required', 'string', 'max:255'],
             'address' => ['required', 'string', 'max:255'],
             'contact_person' => ['nullable', 'string', 'max:255'],
@@ -67,9 +53,6 @@ class SaveSchoolRequest extends FormRequest
     {
         return [
             'school_id.in' => 'The school ID cannot be changed.',
-            'project_id.regex' => 'The project ID must be an unsigned whole number.',
-            'project_id.exists' => 'Choose an existing project ID or leave it blank.',
-            'total_contract_price.regex' => 'Enter a contract price between -9999999999.99 and 9999999999.99 with at most two decimal places and no thousands separators.',
         ];
     }
 }

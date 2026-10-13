@@ -30,8 +30,8 @@
             </div>
             <div class="rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
                 <ul class="list-disc space-y-1.5 pl-4">
-                    <li>Keep all 12 template column headers. Required values: <strong>school_id, school_name, address, division, region</strong>.</li>
-                    <li>Leave optional values blank. Enter project IDs as whole numbers and contract prices with up to two decimal places, without thousands separators.</li>
+                    <li>Keep all 8 template column headers. Required values: <strong>school_id, school_name, address, division, region</strong>.</li>
+                    <li>Leave optional contact and municipality values blank when they are not available.</li>
                     <li>Format school IDs and phone numbers as text in Excel to preserve leading zeros.</li>
                     <li>Excel files must contain one worksheet. Each preview expires 15 minutes after upload.</li>
                     <li>Existing school IDs and repeated IDs in the file are skipped. Existing school records are never overwritten.</li>

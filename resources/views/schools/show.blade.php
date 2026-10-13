@@ -15,12 +15,10 @@
         @include('schools._alerts')
 
         <dl class="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm sm:grid-cols-2">
-            @foreach (['school_id' => 'School ID', 'school_name' => 'School name', 'address' => 'Address', 'municipality' => 'Municipality', 'division' => 'Division', 'region' => 'Region', 'project_id' => 'Project ID', 'project_no' => 'Project number', 'project' => 'Project', 'total_contract_price' => 'Total contract price', 'contact_person' => 'Contact person', 'contact' => 'Contact'] as $fieldName => $label)
+            @foreach (['school_id' => 'School ID', 'school_name' => 'School name', 'address' => 'Address', 'municipality' => 'Municipality', 'division' => 'Division', 'region' => 'Region', 'contact_person' => 'Contact person', 'contact' => 'Contact'] as $fieldName => $label)
                 <div class="min-w-0 bg-white p-5">
                     <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $label }}</dt>
-                    <dd class="mt-2 break-words text-sm font-medium text-slate-900 {{ $fieldName === 'total_contract_price' ? 'tabular-nums' : '' }}">
-                        {{ $fieldName === 'total_contract_price' && $school->{$fieldName} !== null ? number_format((float) $school->{$fieldName}, 2) : ($school->{$fieldName} ?? '—') }}
-                    </dd>
+                    <dd class="mt-2 break-words text-sm font-medium text-slate-900">{{ $school->{$fieldName} ?? '—' }}</dd>
                 </div>
             @endforeach
         </dl>

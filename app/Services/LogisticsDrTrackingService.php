@@ -174,15 +174,101 @@ class LogisticsDrTrackingService
         ];
     }
 
-    /** @param array<string, mixed> $filters */
-    private function trackingQuery(array $filters): Builder
+    /**
+     * Return summary counts without retrieving or paginating the tracking rows.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array{logistics_received: int, logistics_delivered: int, pending_updates: int, reconciliation_required: int}
+     */
+    public function dashboardSummary(array $filters = []): array
     {
-        $query = DB::table('logistics_dr_tracking as tracking')
-            ->leftJoin('projects as project', 'project.project_id', '=', 'tracking.project_id')
-            ->leftJoin('school as school', function (JoinClause $join): void {
+        $summary = ['logistics_received' => 0, 'logistics_delivered' => 0, 'pending_updates' => 0, 'reconciliation_required' => 0];
+        $hasTrackingRows = Schema::hasTable('logistics_dr_tracking')
+            && DB::table('logistics_dr_tracking')->exists();
+
+        if ($hasTrackingRows) {
+            $statusCounts = $this->trackingQuery($filters, withDisplayNames: false)->select([])->selectRaw(
+                "COUNT(CASE WHEN tracking.logistics_status = 'logistics_received' THEN 1 END) as logistics_received, COUNT(CASE WHEN tracking.logistics_status = 'delivered' THEN 1 END) as logistics_delivered"
+            )->first();
+            $summary['logistics_received'] = (int) ($statusCounts->logistics_received ?? 0);
+            $summary['logistics_delivered'] = (int) ($statusCounts->logistics_delivered ?? 0);
+        }
+
+        $pendingQuery = DB::table('deliveries as delivery')
+            ->whereNotNull('delivery.dr_no')
+            ->where('delivery.dr_no', '<>', '');
+
+        if (isset($filters['school']) && $filters['school'] !== '') {
+            $pendingQuery->leftJoin('school as school', function (JoinClause $join): void {
+                $this->whereColumnExact($join, 'school.school_id', 'delivery.school_id');
+            });
+        }
+
+        $this->applyPendingFilters($pendingQuery, $filters);
+
+        if ($hasTrackingRows) {
+            $pendingQuery->whereNotExists(function (Builder $trackingQuery): void {
+                $trackingQuery->selectRaw('1')
+                    ->from('logistics_dr_tracking as tracking')
+                    ->whereColumn('tracking.project_id', 'delivery.project_id');
+
+                if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+                    $trackingQuery->whereRaw('tracking.school_scope_hash = SHA2(CAST(delivery.school_id AS BINARY), 256)')
+                        ->whereRaw('tracking.dr_reference_hash = SHA2(CAST(delivery.dr_no AS BINARY), 256)')
+                        ->whereRaw('BINARY tracking.school_id = BINARY delivery.school_id')
+                        ->whereRaw('BINARY tracking.dr_reference = BINARY delivery.dr_no');
+                } else {
+                    $this->whereColumnExact($trackingQuery, 'tracking.school_id', 'delivery.school_id');
+                    $this->whereColumnExact($trackingQuery, 'tracking.dr_reference', 'delivery.dr_no');
+                }
+            });
+        }
+
+        $pendingScopes = $pendingQuery->select(['delivery.project_id', 'delivery.school_id', 'delivery.dr_no']);
+        $this->groupExactScope($pendingScopes, 'delivery');
+        $summary['pending_updates'] = (int) DB::query()->fromSub($pendingScopes, 'pending_scopes')->count();
+
+        if (Schema::hasTable('logistics_webhook_events')) {
+            $reconciliationQuery = DB::table('logistics_webhook_events')
+                ->where('processing_status', 'processed')
+                ->whereIn('reconciliation_status', ['ambiguous', 'unknown', 'out_of_scope', 'out_of_order', 'stale', 'duplicate_sequence'])
+                ->when(isset($filters['project_id']) && $filters['project_id'] !== '', fn ($query) => $query->where('resolved_project_id', (int) $filters['project_id']))
+                ->when(isset($filters['school']) && $filters['school'] !== '', fn ($query) => $query->where('resolved_school_id', 'like', '%'.$filters['school'].'%'))
+                ->when(isset($filters['dr_reference']) && $filters['dr_reference'] !== '', fn ($query) => $this->whereExact($query, 'dr_reference', (string) $filters['dr_reference']))
+                ->when(isset($filters['date_from']) && $filters['date_from'] !== '', fn ($query) => $query->where('event_occurred_at', '>=', $this->utcDateBoundary($filters['date_from'])))
+                ->when(isset($filters['date_to']) && $filters['date_to'] !== '', fn ($query) => $query->where('event_occurred_at', '<', $this->utcDateBoundary($filters['date_to'], true)));
+
+            if (isset($filters['status']) && $filters['status'] !== '') {
+                $reconciliationQuery->where('event_type', $filters['status'] === 'delivered' ? 'delivery.delivered' : 'delivery.logistics_received');
+            }
+
+            $reconciliationScopes = $reconciliationQuery->select(['integration_id', 'resolved_project_id', 'resolved_school_id', 'dr_reference']);
+            $this->groupExactReconciliationScope($reconciliationScopes);
+            $summary['reconciliation_required'] = (int) DB::query()->fromSub($reconciliationScopes, 'reconciliation_scopes')->count();
+        }
+
+        return $summary;
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function trackingQuery(array $filters, bool $withDisplayNames = true): Builder
+    {
+        $query = DB::table('logistics_dr_tracking as tracking')->select('tracking.*');
+
+        if ($withDisplayNames) {
+            $query->leftJoin('projects as project', 'project.project_id', '=', 'tracking.project_id')
+                ->addSelect('project.project_name');
+        } else {
+            $query->selectRaw('NULL as project_name');
+        }
+
+        if ($withDisplayNames || (isset($filters['school']) && $filters['school'] !== '')) {
+            $query->leftJoin('school as school', function (JoinClause $join): void {
                 $this->whereColumnExact($join, 'school.school_id', 'tracking.school_id');
-            })
-            ->select('tracking.*', 'project.project_name', 'school.school_name');
+            })->addSelect('school.school_name');
+        } else {
+            $query->selectRaw('NULL as school_name');
+        }
 
         if (isset($filters['project_id']) && $filters['project_id'] !== '') {
             $query->where('tracking.project_id', (int) $filters['project_id']);
@@ -207,75 +293,6 @@ class LogisticsDrTrackingService
         }
 
         return $query;
-    }
-
-    /**
-     * @param  array<string, mixed>  $filters
-     * @return array{logistics_received: int, logistics_delivered: int, pending_updates: int, reconciliation_required: int}
-     */
-    private function dashboardSummary(array $filters): array
-    {
-        $summary = ['logistics_received' => 0, 'logistics_delivered' => 0, 'pending_updates' => 0, 'reconciliation_required' => 0];
-
-        if (Schema::hasTable('logistics_dr_tracking')) {
-            $summaryQuery = $this->trackingQuery($filters)->select([])->selectRaw(
-                "COUNT(CASE WHEN tracking.logistics_status = 'logistics_received' THEN 1 END) as logistics_received, COUNT(CASE WHEN tracking.logistics_status = 'delivered' THEN 1 END) as logistics_delivered"
-            );
-            $statusCounts = $summaryQuery->first();
-            $summary['logistics_received'] = (int) ($statusCounts->logistics_received ?? 0);
-            $summary['logistics_delivered'] = (int) ($statusCounts->logistics_delivered ?? 0);
-
-            $pendingQuery = DB::table('deliveries as delivery')
-                ->join('projects as project', 'project.project_id', '=', 'delivery.project_id')
-                ->leftJoin('school as school', function (JoinClause $join): void {
-                    $this->whereColumnExact($join, 'school.school_id', 'delivery.school_id');
-                })
-                ->whereNotNull('delivery.dr_no')
-                ->where('delivery.dr_no', '<>', '');
-            $this->applyPendingFilters($pendingQuery, $filters);
-            if (Schema::hasTable('logistics_dr_tracking')) {
-                $pendingQuery->whereNotExists(function ($trackingQuery) {
-                    $trackingQuery->selectRaw('1')->from('logistics_dr_tracking as tracking')
-                        ->whereColumn('tracking.project_id', 'delivery.project_id');
-                    $this->whereColumnExact($trackingQuery, 'tracking.school_id', 'delivery.school_id');
-                    $this->whereColumnExact($trackingQuery, 'tracking.dr_reference', 'delivery.dr_no');
-                });
-            }
-            $pendingScopes = $pendingQuery->select(['delivery.project_id', 'delivery.school_id', 'delivery.dr_no']);
-            $this->groupExactScope($pendingScopes, 'delivery');
-            $summary['pending_updates'] = (int) DB::query()->fromSub($pendingScopes, 'pending_scopes')->count();
-        } else {
-            $pendingQuery = DB::table('deliveries as delivery')
-                ->leftJoin('school as school', function (JoinClause $join): void {
-                    $this->whereColumnExact($join, 'school.school_id', 'delivery.school_id');
-                })
-                ->whereNotNull('delivery.dr_no')->where('delivery.dr_no', '<>', '');
-            $this->applyPendingFilters($pendingQuery, $filters);
-            $pendingScopes = $pendingQuery->select(['delivery.project_id', 'delivery.school_id', 'delivery.dr_no']);
-            $this->groupExactScope($pendingScopes, 'delivery');
-            $summary['pending_updates'] = (int) DB::query()->fromSub($pendingScopes, 'pending_scopes')->count();
-        }
-
-        if (Schema::hasTable('logistics_webhook_events')) {
-            $reconciliationQuery = DB::table('logistics_webhook_events')
-                ->where('processing_status', 'processed')
-                ->whereIn('reconciliation_status', ['ambiguous', 'unknown', 'out_of_scope', 'out_of_order', 'stale', 'duplicate_sequence'])
-                ->when(isset($filters['project_id']) && $filters['project_id'] !== '', fn ($query) => $query->where('resolved_project_id', (int) $filters['project_id']))
-                ->when(isset($filters['school']) && $filters['school'] !== '', fn ($query) => $query->where('resolved_school_id', 'like', '%'.$filters['school'].'%'))
-                ->when(isset($filters['dr_reference']) && $filters['dr_reference'] !== '', fn ($query) => $this->whereExact($query, 'dr_reference', (string) $filters['dr_reference']))
-                ->when(isset($filters['date_from']) && $filters['date_from'] !== '', fn ($query) => $query->where('event_occurred_at', '>=', $this->utcDateBoundary($filters['date_from'])))
-                ->when(isset($filters['date_to']) && $filters['date_to'] !== '', fn ($query) => $query->where('event_occurred_at', '<', $this->utcDateBoundary($filters['date_to'], true)));
-
-            if (isset($filters['status']) && $filters['status'] !== '') {
-                $reconciliationQuery->where('event_type', $filters['status'] === 'delivered' ? 'delivery.delivered' : 'delivery.logistics_received');
-            }
-
-            $reconciliationScopes = $reconciliationQuery->select(['integration_id', 'resolved_project_id', 'resolved_school_id', 'dr_reference']);
-            $this->groupExactReconciliationScope($reconciliationScopes);
-            $summary['reconciliation_required'] = (int) DB::query()->fromSub($reconciliationScopes, 'reconciliation_scopes')->count();
-        }
-
-        return $summary;
     }
 
     private function applyPendingFilters(Builder $query, array $filters): void

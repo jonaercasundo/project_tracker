@@ -63,7 +63,6 @@ class LogisticsChannelController extends Controller
                 'status' => 'active',
                 'project_ids' => $this->integrations->scope($id)['project_ids'],
             ])->values();
-        $metrics = $this->dashboardMetrics();
         $projects = DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']);
         $selectedProjects = array_values(array_filter(array_map('intval', (array) ($request->input('project_ids', [])))));
         if ($selectedProjects === [] && $editing !== null) {
@@ -97,6 +96,7 @@ class LogisticsChannelController extends Controller
                 'page' => $request->integer('page', 1),
             ])
             : null;
+        $metrics = $this->dashboardMetrics($tab === 'overview', $trackingRows['summary'] ?? null);
         $webhookUrl = route('api.v1.logistics.webhooks.delivery-status');
 
         return view('logistics-channel.index', compact(
@@ -206,7 +206,7 @@ class LogisticsChannelController extends Controller
         return to_route('logistics-channel.index', ['tab' => 'events'])->with('status', 'Stored event queued for validation again.');
     }
 
-    private function dashboardMetrics(): array
+    private function dashboardMetrics(bool $includeSummary, ?array $summaryOverride = null): array
     {
         $registeredIds = LogisticsIntegration::query()->pluck('integration_id')->all();
         $legacyIds = array_values(array_diff($this->integrations->environmentIntegrationIds(), $registeredIds));
@@ -215,7 +215,9 @@ class LogisticsChannelController extends Controller
             $authorizedProjectIds = array_merge($authorizedProjectIds, $this->integrations->scope($legacyId)['project_ids']);
         }
         $projectCount = count(array_unique($authorizedProjectIds));
-        $tracking = $this->tracking->dashboardPage(['per_page' => 1]);
+        $summary = $summaryOverride ?? ($includeSummary
+            ? $this->tracking->dashboardSummary()
+            : ['logistics_received' => 0, 'logistics_delivered' => 0, 'pending_updates' => 0, 'reconciliation_required' => 0]);
         $queueConnectionName = config('queue.connections.logistics_webhooks.connection') ?: config('database.default');
         $queueConnection = DB::connection($queueConnectionName);
         $queueTable = config('queue.connections.logistics_webhooks.table', 'jobs');
@@ -223,7 +225,9 @@ class LogisticsChannelController extends Controller
         $queueJobs = $queueReady ? $queueConnection->table($queueTable)->where('queue', 'logistics-webhooks') : null;
         $queueDepth = $queueJobs === null ? null : (clone $queueJobs)->whereNull('reserved_at')->count();
         $reservedQueueJobs = $queueJobs === null ? null : (clone $queueJobs)->whereNotNull('reserved_at')->count();
-        $lastSuccess = DB::table('logistics_dr_tracking')->max('last_synchronized_at');
+        $hasTrackingTable = Schema::hasTable('logistics_dr_tracking');
+        $hasEventTable = Schema::hasTable('logistics_webhook_events');
+        $lastSuccess = $hasTrackingTable ? DB::table('logistics_dr_tracking')->max('last_synchronized_at') : null;
         $recentActivity = $lastSuccess !== null && now()->diffInMinutes($lastSuccess) <= 5;
 
         return [
@@ -233,11 +237,11 @@ class LogisticsChannelController extends Controller
                     ->where(fn ($expiry) => $expiry->whereNull('expires_at')->orWhere('expires_at', '>', now())))
                 ->count() + count($legacyIds),
             'authorized_projects' => $projectCount,
-            'received_events' => DB::table('logistics_webhook_events')->count(),
-            'synchronized_drs' => DB::table('logistics_dr_tracking')->count(),
-            'pending_updates' => $tracking['summary']['pending_updates'],
-            'failed_events' => DB::table('logistics_webhook_events')->where('processing_status', 'failed')->count(),
-            'reconciliation_required' => $tracking['summary']['reconciliation_required'],
+            'received_events' => $hasEventTable ? DB::table('logistics_webhook_events')->count() : 0,
+            'synchronized_drs' => $hasTrackingTable ? DB::table('logistics_dr_tracking')->count() : 0,
+            'pending_updates' => $summary['pending_updates'],
+            'failed_events' => $hasEventTable ? DB::table('logistics_webhook_events')->where('processing_status', 'failed')->count() : 0,
+            'reconciliation_required' => $summary['reconciliation_required'],
             'last_successful_sync' => $lastSuccess,
             'queue_depth' => $queueDepth,
             'reserved_queue_jobs' => $reservedQueueJobs,

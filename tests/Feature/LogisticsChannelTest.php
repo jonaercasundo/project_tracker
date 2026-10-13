@@ -166,6 +166,24 @@ it('shows the management page only to MMC users', function () {
     $this->get('/logistics-channel')->assertForbidden();
 });
 
+it('builds Overview metrics from summary counts without paginating tracking rows', function () {
+    [$operator, $company] = logisticsChannelAccount();
+    $tracking = Mockery::mock(LogisticsDrTrackingService::class);
+    $tracking->shouldReceive('dashboardSummary')->once()->andReturn([
+        'logistics_received' => 0,
+        'logistics_delivered' => 0,
+        'pending_updates' => 0,
+        'reconciliation_required' => 0,
+    ]);
+    $tracking->shouldNotReceive('dashboardPage');
+    app()->instance(LogisticsDrTrackingService::class, $tracking);
+    $this->withoutVite()->actingAs($operator)->withSession(['company_id' => $company->company_id]);
+
+    $this->get('/logistics-channel?tab=overview')
+        ->assertOk()
+        ->assertSee('Pending updates');
+});
+
 it('rolls back and reapplies only the additive management migration', function () {
     $migration = database_path('migrations/2026_10_13_082243_create_logistics_channel_management_tables.php');
 

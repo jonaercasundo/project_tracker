@@ -66,6 +66,7 @@ class LogisticsWebhookTestCase extends TestCase
             $table->string('school_id');
             $table->string('dr_no', 100);
             $table->string('status')->default('pending');
+            $table->date('delivery_date')->nullable();
             $table->unsignedInteger('keystage_id')->nullable();
             $table->unsignedInteger('lot_id')->nullable();
         });
@@ -157,9 +158,76 @@ function insertDeliveryFixture(int $projectId, string $schoolId, string $drNumbe
         'school_id' => $schoolId,
         'dr_no' => $drNumber,
         'status' => $status,
+        'delivery_date' => '2026-10-13',
         'lot_id' => $lotId,
     ], 'delivery_id');
 }
+
+it('counts distinct pending DR scopes while Logistics tracking is empty', function () {
+    insertDeliveryFixture(10, 'school-A', 'DR-100');
+    insertDeliveryFixture(10, 'school-A', 'DR-100');
+    insertDeliveryFixture(10, 'school-B', 'DR-100');
+    insertDeliveryFixture(11, 'school-A', 'DR-100');
+
+    expect(app(LogisticsDrTrackingService::class)->dashboardSummary())->toBe([
+        'logistics_received' => 0,
+        'logistics_delivered' => 0,
+        'pending_updates' => 3,
+        'reconciliation_required' => 0,
+    ]);
+});
+
+it('removes a verified DR scope from pending counts after Logistics Received', function () {
+    insertDeliveryFixture(10, 'school-A', 'DR-150', 'warehouse');
+    insertDeliveryFixture(10, 'school-A', 'DR-150', 'warehouse');
+    $payload = logisticsWebhookPayload(['dr_reference' => 'DR-150']);
+    logisticsWebhookRequest($this, json_encode($payload, JSON_THROW_ON_ERROR))->assertAccepted();
+    processLogisticsWebhookEvent($payload['event_id']);
+
+    expect(app(LogisticsDrTrackingService::class)->dashboardSummary())->toMatchArray([
+        'logistics_received' => 1,
+        'logistics_delivered' => 0,
+        'pending_updates' => 0,
+    ]);
+});
+
+it('filters pending scope summaries and keeps exact scope counts', function () {
+    DB::table('school')->insert([
+        ['school_id' => 'school-A', 'school_name' => 'Central School'],
+        ['school_id' => 'school-B', 'school_name' => 'West School'],
+    ]);
+    insertDeliveryFixture(10, 'school-A', 'DR-200');
+    insertDeliveryFixture(10, 'school-A', 'DR-200');
+    insertDeliveryFixture(10, 'school-B', 'DR-200');
+    insertDeliveryFixture(11, 'school-A', 'DR-201');
+
+    $summary = app(LogisticsDrTrackingService::class)->dashboardSummary([
+        'project_id' => 10,
+        'dr_reference' => 'DR-200',
+        'school' => 'Central',
+        'date_from' => '2026-10-10',
+        'date_to' => '2026-10-15',
+    ]);
+
+    expect($summary['pending_updates'])->toBe(1);
+});
+
+it('uses exact collation-safe school joins and skips the tracking anti-join when empty', function () {
+    DB::table('school')->insert(['school_id' => 'school-A', 'school_name' => 'Central School']);
+    insertDeliveryFixture(10, 'school-A', 'DR-300');
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+
+    app(LogisticsDrTrackingService::class)->dashboardSummary(['school' => 'Central']);
+
+    $pendingQueries = array_values(array_filter($queries, fn (string $sql): bool => str_contains($sql, 'pending_scopes')));
+    expect($pendingQueries)->toHaveCount(1)
+        ->and(str_contains($pendingQueries[0], 'COLLATE BINARY'))->toBeTrue()
+        ->and(str_contains(strtolower($pendingQueries[0]), 'not exists'))->toBeFalse()
+        ->and(str_contains(strtolower($pendingQueries[0]), 'join `projects`'))->toBeFalse();
+});
 
 it('authenticates, stores, queues and resolves a DR event without changing delivery data', function () {
     $deliveryId = insertDeliveryFixture(10, 'school-A', '000123-DR', 'warehouse');

@@ -152,8 +152,7 @@
                         <th class="px-5 py-3.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Supplier Price</th>
  
                         <th class="px-5 py-3.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
- 
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
+
  
                     </tr>
  

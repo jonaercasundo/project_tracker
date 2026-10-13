@@ -1335,18 +1335,7 @@ class DeliveryController extends Controller
                     ];
             }
 
-            if (! isset(
-                $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['delivery_qrs'][$deliveryId]
-            ) && trim((string) $delivery->dr_no) !== '') {
-                $deliveryQr = (new PngWriter)->write(
-                    new QrCode($billingQrCodes->makeDrNumberPayload((string) $delivery->dr_no))
-                );
-
-                $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['delivery_qrs'][$deliveryId] = [
-                        'dr_no' => (string) $delivery->dr_no,
-                        'qr' => 'data:image/png;base64,'.base64_encode($deliveryQr->getString()),
-                    ];
-            }
+            $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['delivery_ids'][] = $deliveryId;
 
             /*
             |--------------------------------------------------------------------------
@@ -1896,6 +1885,42 @@ class DeliveryController extends Controller
             }
         }
 
+        unset($project);
+
+        $drNumbersWithBillingQr = [];
+        $drNumberByDeliveryId = $deliveries->mapWithKeys(
+            fn (object $delivery): array => [(int) $delivery->delivery_id => trim((string) $delivery->dr_no)]
+        );
+
+        foreach ($data as &$project) {
+            foreach ($project['schools'] as &$school) {
+                foreach ($school['lots'] as &$lot) {
+                    foreach ($lot['delivery_ids'] as $deliveryId) {
+                        $drNumber = $drNumberByDeliveryId[$deliveryId] ?? '';
+                        if ($drNumber === '') {
+                            continue;
+                        }
+
+                        $drNumberKey = 'dr:'.$drNumber;
+                        if (isset($drNumbersWithBillingQr[$drNumberKey])) {
+                            continue;
+                        }
+
+                        $deliveryQr = (new PngWriter)->write(
+                            new QrCode($billingQrCodes->makeDrNumberPayload($drNumber))
+                        );
+
+                        $lot['delivery_qrs'][$drNumberKey] = [
+                            'dr_no' => $drNumber,
+                            'qr' => 'data:image/png;base64,'.base64_encode($deliveryQr->getString()),
+                        ];
+                        $drNumbersWithBillingQr[$drNumberKey] = true;
+                    }
+                }
+                unset($lot);
+            }
+            unset($school);
+        }
         unset($project);
 
         /*

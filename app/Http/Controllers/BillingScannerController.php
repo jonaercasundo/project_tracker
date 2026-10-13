@@ -36,20 +36,28 @@ class BillingScannerController extends Controller
 
         if ($validated['source'] === 'qr') {
             try {
-                $deliveryId = $this->qrCodes->resolveDeliveryId($validated['q']);
+                $target = $this->qrCodes->resolveTarget($validated['q']);
             } catch (ExpiredBillingQrCodeException $exception) {
                 return response()->json(['message' => $exception->getMessage()], 410);
             } catch (InvalidBillingQrCodeException $exception) {
                 return response()->json(['message' => $exception->getMessage()], 422);
             }
 
-            if ($deliveryId === null) {
+            if ($target === null) {
                 return response()->json([
                     'message' => 'This QR code does not identify a delivery. Scan a delivery label or search by DR number.',
                 ], 422);
             }
 
-            $rows = $this->deliveryQuery()->where('d.delivery_id', $deliveryId)->limit(1)->get();
+            $query = $this->deliveryQuery();
+            if (isset($target['delivery_id'])) {
+                $query->where('d.delivery_id', $target['delivery_id'])->limit(1);
+            } else {
+                $query->where('d.dr_no', $target['dr_no'])
+                    ->orderBy('d.delivery_id')
+                    ->limit(50);
+            }
+            $rows = $query->get();
         } else {
             $rows = $this->deliveryQuery()
                 ->where('d.dr_no', trim($validated['q']))

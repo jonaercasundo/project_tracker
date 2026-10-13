@@ -68,7 +68,7 @@ function confirmDeliveryForBilling(int $deliveryId): void
 it('shows pending status until a user explicitly confirms For Billing', function () {
     signInBillingUser();
     $deliveryId = createBillingDelivery();
-    $qrPayload = app(DeliveryBillingQrCodeService::class)->makePayload($deliveryId);
+    $qrPayload = app(DeliveryBillingQrCodeService::class)->makeDrNumberPayload('DR-1001');
 
     $this->get(route('billing.scanner'))
         ->assertOk()
@@ -98,6 +98,21 @@ it('shows pending status until a user explicitly confirms For Billing', function
         'changed_by_name' => 'Billing Tester',
     ]);
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $deliveryId, 'status' => 'accepted']);
+});
+
+it('resolves the signed DR number QR to every delivery row with that DR number', function () {
+    signInBillingUser();
+    $firstDeliveryId = createBillingDelivery('DR-SHARED');
+    $secondDeliveryId = createBillingDelivery('DR-SHARED');
+    $qrPayload = app(DeliveryBillingQrCodeService::class)->makeDrNumberPayload('DR-SHARED');
+
+    $this->getJson(route('billing.scanner.lookup', ['q' => $qrPayload, 'source' => 'qr']))
+        ->assertOk()
+        ->assertJsonCount(2, 'records')
+        ->assertJsonPath('records.0.dr_no', 'DR-SHARED')
+        ->assertJsonPath('records.1.dr_no', 'DR-SHARED')
+        ->assertJsonPath('records.0.delivery_id', $firstDeliveryId)
+        ->assertJsonPath('records.1.delivery_id', $secondDeliveryId);
 });
 
 it('confirms Billed with a shared invoice header and keeps payment separate', function () {
@@ -244,8 +259,15 @@ it('rejects invalid, expired, unknown and lot-only QR payloads', function () {
     $deliveryId = createBillingDelivery();
     $qrPayload = app(DeliveryBillingQrCodeService::class)->makePayload($deliveryId);
     $invalidPayload = substr($qrPayload, 0, -64).str_repeat('0', 64);
+    $drNumber = base64_encode('DR-1001');
+    $drNumber = rtrim(strtr($drNumber, '+/', '-_'), '=');
+    $invalidDrPayload = app(DeliveryBillingQrCodeService::class)->makeDrNumberPayload('DR-1001');
+    $invalidDrPayload = substr($invalidDrPayload, 0, -64).str_repeat('0', 64);
 
     $this->getJson(route('billing.scanner.lookup', ['q' => $invalidPayload, 'source' => 'qr']))
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'This billing QR code is not valid.');
+    $this->getJson(route('billing.scanner.lookup', ['q' => $invalidDrPayload, 'source' => 'qr']))
         ->assertUnprocessable()
         ->assertJsonPath('message', 'This billing QR code is not valid.');
 
@@ -253,11 +275,18 @@ it('rejects invalid, expired, unknown and lot-only QR payloads', function () {
     $signed = "MMCBILLING:1:{$deliveryId}:{$expiresAt}";
     $expiredPayload = $signed.':'.hash_hmac('sha256', $signed, config('app.key'));
     $this->getJson(route('billing.scanner.lookup', ['q' => $expiredPayload, 'source' => 'qr']))
-        ->assertStatus(410)
+        ->assertGone()
+        ->assertJsonPath('message', 'This billing QR code has expired. Print a current delivery label.');
+    $expiredDrSigned = "MMCBILLING:2:{$drNumber}:{$expiresAt}";
+    $expiredDrPayload = $expiredDrSigned.':'.hash_hmac('sha256', $expiredDrSigned, config('app.key'));
+    $this->getJson(route('billing.scanner.lookup', ['q' => $expiredDrPayload, 'source' => 'qr']))
+        ->assertGone()
         ->assertJsonPath('message', 'This billing QR code has expired. Print a current delivery label.');
 
     $unknownPayload = app(DeliveryBillingQrCodeService::class)->makePayload(9999);
     $this->getJson(route('billing.scanner.lookup', ['q' => $unknownPayload, 'source' => 'qr']))->assertNotFound();
+    $unknownDrPayload = app(DeliveryBillingQrCodeService::class)->makeDrNumberPayload('DR-UNKNOWN');
+    $this->getJson(route('billing.scanner.lookup', ['q' => $unknownDrPayload, 'source' => 'qr']))->assertNotFound();
     $this->getJson(route('billing.scanner.lookup', ['q' => '42', 'source' => 'qr']))->assertUnprocessable();
 });
 

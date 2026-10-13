@@ -160,16 +160,16 @@
         }
 
         .delivery-qr-tag img {
-            width: 32px;
-            height: 32px;
+            width: 48px;
+            height: 48px;
             display: block;
             margin: 0 auto;
         }
 
         .delivery-qr-tag small {
             display: block;
-            font-size: 6px;
-            line-height: 8px;
+            font-size: 7px;
+            line-height: 9px;
             white-space: nowrap;
         }
 
@@ -673,7 +673,7 @@
                                 @foreach($lot['delivery_qrs'] as $deliveryQr)
                                     <span class="delivery-qr-tag">
                                         <img src="{{ $deliveryQr['qr'] }}" alt="Billing QR for DR {{ $deliveryQr['dr_no'] }}">
-                                        <small>DR {{ $deliveryQr['dr_no'] }}</small>
+                                        <small>BILLING · DR {{ $deliveryQr['dr_no'] }}</small>
                                     </span>
                                 @endforeach
                             </div>

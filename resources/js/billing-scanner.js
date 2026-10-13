@@ -342,7 +342,7 @@ if (root) {
     searchForm.addEventListener('submit', (event) => {
         event.preventDefault();
         const value = searchInput.value.trim();
-        const isQrPayload = value.startsWith('MMCBILLING:1:')
+        const isQrPayload = value.startsWith('MMCBILLING:1:') || value.startsWith('MMCBILLING:2:')
             || /^https:\/\/philgeps\.metro-mobilia\.com\/entry\.php(?:\?|$)/i.test(value);
         lookup(value, isQrPayload ? 'qr' : 'manual');
     });

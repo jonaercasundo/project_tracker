@@ -1337,9 +1337,9 @@ class DeliveryController extends Controller
 
             if (! isset(
                 $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['delivery_qrs'][$deliveryId]
-            )) {
+            ) && trim((string) $delivery->dr_no) !== '') {
                 $deliveryQr = (new PngWriter)->write(
-                    new QrCode($billingQrCodes->makePayload($deliveryId))
+                    new QrCode($billingQrCodes->makeDrNumberPayload((string) $delivery->dr_no))
                 );
 
                 $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['delivery_qrs'][$deliveryId] = [

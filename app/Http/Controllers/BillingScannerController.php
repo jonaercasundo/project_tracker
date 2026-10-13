@@ -9,6 +9,7 @@ use App\Models\DeliveryBillingRecord;
 use App\Models\User;
 use App\Services\DeliveryBillingQrCodeService;
 use App\Services\DeliveryBillingService;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -146,7 +147,7 @@ class BillingScannerController extends Controller
         ]);
     }
 
-    private function deliveryQuery(): \Illuminate\Database\Query\Builder
+    private function deliveryQuery(): Builder
     {
         return DB::table('deliveries as d')
             ->leftJoin('projects as p', 'p.project_id', '=', 'd.project_id')
@@ -186,9 +187,9 @@ class BillingScannerController extends Controller
             DeliveryBillingRecord::PENDING_BILLING => $eligible && $user->can('billing.for-billing.mark')
                 ? 'mark_for_billing'
                 : ($eligible ? 'awaiting_authorized_user' : 'ineligible'),
-            DeliveryBillingRecord::FOR_BILLING => $user->can('billing.billed.confirm')
-                ? 'confirm_billed'
-                : 'awaiting_authorized_user',
+            DeliveryBillingRecord::FOR_BILLING => ! $eligible
+                ? 'ineligible'
+                : ($user->can('billing.billed.confirm') ? 'confirm_billed' : 'awaiting_authorized_user'),
             DeliveryBillingRecord::ON_HOLD => $user->can('billing.exceptions.manage')
                 ? 'release_hold'
                 : 'on_hold',

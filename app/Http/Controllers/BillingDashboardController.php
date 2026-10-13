@@ -67,7 +67,7 @@ class BillingDashboardController extends Controller
                 'history.new_status',
                 'history.remarks',
                 'history.created_at',
-                'actor.name as actor_name',
+                DB::raw('COALESCE(history.changed_by_name, actor.name) as actor_name'),
                 'd.delivery_id',
                 'd.dr_no',
                 'invoice.invoice_no',

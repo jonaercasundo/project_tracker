@@ -89,6 +89,7 @@ it('shows pending status until a user explicitly confirms For Billing', function
         'previous_status' => 'pending_billing',
         'new_status' => 'for_billing',
         'changed_by' => auth()->id(),
+        'changed_by_name' => 'Billing Tester',
     ]);
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $deliveryId, 'status' => 'accepted']);
 });
@@ -170,6 +171,51 @@ it('requires invoice number, date and amount before confirming Billed', function
     $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
     $this->assertDatabaseCount('invoices', 0);
     $this->assertDatabaseCount('delivery_billing_histories', 1);
+});
+
+it('requires an eligible logistics status at each billing transition', function () {
+    signInBillingUser();
+    $deliveryId = createBillingDelivery();
+    confirmDeliveryForBilling($deliveryId);
+    DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['status' => 'pending']);
+
+    $this->getJson(route('billing.scanner.lookup', ['q' => 'DR-1001', 'source' => 'manual']))
+        ->assertOk()
+        ->assertJsonPath('records.0.next_action', 'ineligible');
+
+    $this->postJson(route('billing.billed', $deliveryId), [
+        'invoice_no' => 'INV-INELIGIBLE',
+        'invoice_date' => '2026-09-21',
+        'amount' => '100.00',
+    ])->assertUnprocessable();
+
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
+    $this->assertDatabaseCount('invoices', 0);
+});
+
+it('links multiple deliveries to the same project invoice without duplicating it', function () {
+    signInBillingUser();
+    $firstDeliveryId = createBillingDelivery('DR-1001');
+    $secondDeliveryId = (int) DB::table('deliveries')->insertGetId([
+        'project_id' => 1,
+        'school_id' => 'SCH-0001',
+        'dr_no' => 'DR-1002',
+        'delivery_date' => '2026-09-16',
+        'status' => 'accepted',
+    ], 'delivery_id');
+
+    foreach ([$firstDeliveryId, $secondDeliveryId] as $deliveryId) {
+        $this->postJson(route('billing.for-billing', $deliveryId))->assertOk();
+        $this->postJson(route('billing.billed', $deliveryId), [
+            'invoice_no' => 'INV-SHARED',
+            'invoice_date' => '2026-09-20',
+            'amount' => '300.00',
+        ])->assertOk();
+    }
+
+    $this->assertDatabaseCount('invoices', 1);
+    $this->assertDatabaseCount('delivery_billing_records', 2);
+    $this->assertDatabaseCount('delivery_billing_histories', 4);
 });
 
 it('denies billing confirmation to an operator without the permission', function () {
@@ -263,6 +309,32 @@ it('does not advance an already billed record and includes accurate project dash
             'on_hold' => 1,
             'completion_percentage' => 25.0,
         ]);
+});
+
+it('filters billing records, shows their audit history and exports CSV', function () {
+    signInBillingUser();
+    $deliveryId = createBillingDelivery();
+    confirmDeliveryForBilling($deliveryId);
+    $this->postJson(route('billing.billed', $deliveryId), [
+        'invoice_no' => 'INV-RECORDS',
+        'invoice_date' => '2026-09-20',
+        'amount' => '300.00',
+    ])->assertOk();
+
+    $this->get(route('billing.records.index', [
+        'dr_no' => 'DR-1001',
+        'billing_status' => 'billed',
+    ]))->assertOk()->assertSee('INV-RECORDS');
+
+    $this->get(route('billing.records.show', $deliveryId))
+        ->assertOk()
+        ->assertSee('Billing history')
+        ->assertSee('Billing Tester')
+        ->assertSee('INV-RECORDS');
+
+    $this->get(route('billing.records.export', ['dr_no' => 'DR-1001']))
+        ->assertOk()
+        ->assertDownload('billing-records.csv');
 });
 
 it('blocks users outside the MMC company context from billing routes', function () {

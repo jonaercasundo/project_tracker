@@ -51,15 +51,15 @@
             <section class="rounded-xl border border-slate-200 bg-white p-5">
                 <div>
                     <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">Keyboard / handheld scanner</p>
-                    <h2 class="mt-1 font-bold text-slate-900">Find by DR number</h2>
-                    <p class="mt-1 text-sm text-slate-500">USB and Bluetooth scanners that type into a field are supported. Press Enter to search.</p>
+                    <h2 class="mt-1 font-bold text-slate-900">Find by DR number or scanner</h2>
+                    <p class="mt-1 text-sm text-slate-500">Type a DR number, or use a USB/Bluetooth scanner to enter a delivery QR payload. Press Enter to search.</p>
                 </div>
                 <form id="manual-search" class="mt-4 flex flex-col gap-2 sm:flex-row">
                     <label for="dr-search" class="sr-only">DR number</label>
-                    <input id="dr-search" name="q" autocomplete="off" maxlength="100" required
+                    <input id="dr-search" name="q" autocomplete="off" maxlength="2048" required
                            class="min-w-0 flex-1 rounded-lg border-slate-300 font-mono text-sm focus:border-blue-500 focus:ring-blue-500"
-                           placeholder="Enter or scan a DR number">
-                    <button class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Search DR</button>
+                           placeholder="Enter a DR number or scan a delivery QR">
+                    <button class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Search</button>
                 </form>
                 <p class="mt-3 text-xs leading-5 text-slate-500">If a DR number has multiple delivery rows, select the matching school and project below. Legacy lot-only QRs are not treated as delivery IDs.</p>
             </section>

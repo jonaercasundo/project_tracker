@@ -52,7 +52,7 @@ class BillingRecordController extends Controller
                 'history.new_status',
                 'history.remarks',
                 'history.created_at',
-                'actor.name as actor_name',
+                DB::raw('COALESCE(history.changed_by_name, actor.name) as actor_name'),
                 'invoice.invoice_no',
                 'invoice.invoice_date',
                 'invoice.amount as invoice_amount',
@@ -112,7 +112,7 @@ class BillingRecordController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      */
     private function recordsQuery(array $filters): Builder
     {
@@ -133,6 +133,7 @@ class BillingRecordController extends Controller
                 'invoice.invoice_no',
                 'invoice.invoice_date',
                 'invoice.amount as invoice_amount',
+                'invoice.status as invoice_status',
                 'billing.billing_amount',
                 'billing.billing_reference',
                 'billing.billing_remarks',

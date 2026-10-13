@@ -178,7 +178,7 @@ if (root) {
         if (record.next_action === 'ineligible') {
             const note = document.createElement('p');
             note.className = 'text-sm font-medium text-amber-800';
-            note.textContent = 'Billing can start only after logistics status is Delivered or Accepted.';
+            note.textContent = 'Billing transitions are available only while logistics status is Delivered or Accepted.';
             actions.append(note);
         } else if (record.next_action === 'awaiting_authorized_user') {
             const note = document.createElement('p');
@@ -269,7 +269,10 @@ if (root) {
 
     searchForm.addEventListener('submit', (event) => {
         event.preventDefault();
-        lookup(searchInput.value.trim(), 'manual');
+        const value = searchInput.value.trim();
+        const isQrPayload = value.startsWith('MMCBILLING:1:')
+            || /^https:\/\/philgeps\.metro-mobilia\.com\/entry\.php(?:\?|$)/i.test(value);
+        lookup(value, isQrPayload ? 'qr' : 'manual');
     });
 
     async function scanFrame() {

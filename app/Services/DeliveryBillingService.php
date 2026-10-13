@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Exceptions\BillingTransitionException;
 use App\Models\Delivery;
-use App\Models\DeliveryBillingHistory;
 use App\Models\DeliveryBillingRecord;
 use App\Models\Invoice;
 use App\Models\User;
@@ -37,7 +36,7 @@ class DeliveryBillingService
     }
 
     /**
-     * @param array{invoice_no: string, invoice_date: string, amount: string|float|int, billing_amount?: string|float|null, billing_reference?: string|null, billing_remarks?: string|null} $data
+     * @param  array{invoice_no: string, invoice_date: string, amount: string|float|int, billing_amount?: string|float|null, billing_reference?: string|null, billing_remarks?: string|null}  $data
      */
     public function confirmBilled(int $deliveryId, array $data, User $actor): DeliveryBillingRecord
     {
@@ -184,6 +183,7 @@ class DeliveryBillingService
             'new_status' => $newStatus,
             'invoice_id' => $invoiceId,
             'changed_by' => $actor->getKey(),
+            'changed_by_name' => $actor->name,
             'remarks' => $remarks,
             'created_at' => now(),
         ]);

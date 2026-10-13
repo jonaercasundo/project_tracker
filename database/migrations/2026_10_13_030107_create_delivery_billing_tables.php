@@ -59,6 +59,7 @@ return new class extends Migration
                 $table->string('new_status', 32);
                 $table->integer('invoice_id')->nullable();
                 $table->integer('changed_by')->nullable();
+                $table->string('changed_by_name')->nullable();
                 $table->text('remarks')->nullable();
                 $table->timestamp('created_at')->useCurrent();
 

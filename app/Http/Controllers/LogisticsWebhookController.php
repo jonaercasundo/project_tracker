@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\LogisticsIntegrationRegistry;
 use App\Services\LogisticsWebhookEventService;
 use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +13,7 @@ use JsonException;
 
 class LogisticsWebhookController extends Controller
 {
-    public function __invoke(Request $request, LogisticsWebhookEventService $events): JsonResponse
+    public function __invoke(Request $request, LogisticsWebhookEventService $events, LogisticsIntegrationRegistry $integrations): JsonResponse
     {
         $rawPayload = $request->getContent();
 
@@ -35,9 +36,10 @@ class LogisticsWebhookController extends Controller
             ], 400);
         }
 
+        $integrationId = (string) $request->attributes->get('logistics_integration_id');
         $validator = Validator::make($payload, [
             'event_id' => ['required', 'string', 'max:191'],
-            'event_type' => ['required', 'string', Rule::in(config('logistics-webhooks.allowed_event_types', []))],
+            'event_type' => ['required', 'string', Rule::in($integrations->enabledEventTypes($integrationId))],
             'dr_reference' => ['required', 'string', 'max:100'],
             'occurred_at' => ['required', 'string', 'max:64'],
             'sequence' => ['required', 'integer', 'min:1', 'max:9223372036854775807'],
@@ -77,7 +79,7 @@ class LogisticsWebhookController extends Controller
         $result = $events->accept(
             $payload,
             $rawPayload,
-            (string) $request->attributes->get('logistics_integration_id')
+            $integrationId
         );
 
         if ($result['result'] === 'conflict') {

@@ -250,15 +250,21 @@
             <span>Automated PDF Population</span>
         </a>
 
+        @if($currentUser?->hasRole('Administrator') && $currentCompany?->code === 'MMC' && $currentCompany?->is_active)
         <!-- Logistics Channel -->
-        <a href="#"
-           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80 transition-all duration-150">
+        <a href="{{ route('logistics-channel.index') }}"
+           @if(request()->routeIs('logistics-channel.*')) aria-current="page" @endif
+           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('logistics-channel.*') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+            @if(request()->routeIs('logistics-channel.*'))
+                <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
+            @endif
             <svg class="w-4 h-4 shrink-0 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25A7.5 7.5 0 1119.5 10.5z"></path>
             </svg>
             <span>Logistics Channel</span>
         </a>
+        @endif
 
     </nav>
 

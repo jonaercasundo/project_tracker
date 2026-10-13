@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 
 class LogisticsDrResolver
 {
+    public function __construct(private LogisticsIntegrationRegistry $integrations) {}
+
     /**
      * Resolve a DR to exactly one project and school receipt scope.
      *
@@ -44,17 +46,26 @@ class LogisticsDrResolver
             return $this->scopeResult($mappedDeliveries, 'approved_mapping');
         }
 
-        $scope = config('logistics-webhooks.integration_scopes.'.$integrationId, []);
-        $projectIds = array_map('intval', is_array($scope['project_ids'] ?? null) ? $scope['project_ids'] : []);
-        $schoolIds = array_map('strval', is_array($scope['school_ids'] ?? null) ? $scope['school_ids'] : []);
+        $scope = $this->integrations->scope($integrationId);
+        $projectIds = $scope['project_ids'];
+        $schoolIds = $scope['school_ids'];
+        $schoolScopes = $scope['school_scopes'];
 
         if ($projectIds === []) {
             return $this->unresolved('out_of_scope', 'No project scope or approved DR mapping is configured for this integration.');
         }
 
-        $scopedDeliveries = $deliveries->filter(function (object $delivery) use ($projectIds, $schoolIds): bool {
-            return in_array((int) $delivery->project_id, $projectIds, true)
-                && ($schoolIds === [] || in_array((string) $delivery->school_id, $schoolIds, true));
+        $scopedDeliveries = $deliveries->filter(function (object $delivery) use ($projectIds, $schoolIds, $schoolScopes): bool {
+            if (! in_array((int) $delivery->project_id, $projectIds, true)) {
+                return false;
+            }
+
+            if ($schoolScopes !== []) {
+                return collect($schoolScopes)->contains(fn (array $allowedScope): bool => $allowedScope['project_id'] === (int) $delivery->project_id
+                    && $allowedScope['school_id'] === (string) $delivery->school_id);
+            }
+
+            return $schoolIds === [] || in_array((string) $delivery->school_id, $schoolIds, true);
         });
 
         if ($scopedDeliveries->isEmpty()) {

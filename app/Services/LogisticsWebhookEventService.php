@@ -130,6 +130,44 @@ class LogisticsWebhookEventService
         return ['queued' => $queued, 'failed' => $failed];
     }
 
+    public function retryFailedEvent(int $eventId): bool
+    {
+        $eligible = DB::transaction(function () use ($eventId): bool {
+            $event = DB::table('logistics_webhook_events')->where('id', $eventId)->lockForUpdate()->first();
+            if ($event === null || $event->processing_status !== 'failed' || (int) $event->processing_attempts >= 10) {
+                return false;
+            }
+
+            DB::table('logistics_webhook_events')->where('id', $eventId)->update([
+                'processing_status' => 'received',
+                'resolution_status' => 'pending',
+                'reconciliation_status' => 'pending',
+                'reconciliation_details' => null,
+                'error_details' => null,
+                'processed_at' => null,
+                'queued_at' => null,
+                'updated_at' => now(),
+            ]);
+
+            return true;
+        }, 3);
+
+        if (! $eligible) {
+            return false;
+        }
+
+        try {
+            $this->dispatchPendingEvent($eventId);
+        } catch (Throwable $exception) {
+            Log::warning('Unable to queue a manually retried logistics webhook event.', [
+                'event_row_id' => $eventId,
+                'exception' => $exception::class,
+            ]);
+        }
+
+        return true;
+    }
+
     private function dispatchPendingEvent(int $eventId): bool
     {
         $event = DB::table('logistics_webhook_events')

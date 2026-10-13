@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\LogisticsIntegrationRegistry;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -9,6 +10,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureLogisticsWebhookSignature
 {
+    public function __construct(private LogisticsIntegrationRegistry $integrations) {}
+
     /**
      * Handle an incoming request.
      *
@@ -38,14 +41,13 @@ class EnsureLogisticsWebhookSignature
         $integrationId = $request->header('X-Integration-Key-Id');
         $timestamp = $request->header('X-Webhook-Timestamp');
         $signature = $request->header('X-Webhook-Signature');
-        $keys = config('logistics-webhooks.keys', []);
+        $credential = is_string($integrationId) ? $this->integrations->credential($integrationId) : null;
 
         if (! is_string($integrationId)
             || preg_match('/\A[A-Za-z0-9._-]{1,64}\z/', $integrationId) !== 1
-            || ! is_array($keys)
-            || ! isset($keys[$integrationId])
-            || ! is_string($keys[$integrationId])
-            || $keys[$integrationId] === ''
+            || $credential === null
+            || ! $credential['enabled']
+            || $credential['secret'] === ''
             || ! is_string($timestamp)
             || preg_match('/\A[0-9]{10}\z/', $timestamp) !== 1
             || ! is_string($signature)
@@ -63,13 +65,15 @@ class EnsureLogisticsWebhookSignature
         }
 
         $signedContent = $integrationId."\n".$timestamp."\n".$payload;
-        $expectedSignature = hash_hmac('sha256', $signedContent, $keys[$integrationId]);
+        $expectedSignature = hash_hmac('sha256', $signedContent, $credential['secret']);
 
         if (! hash_equals($expectedSignature, $matches[1])) {
             return $this->unauthorized();
         }
 
-        $rateLimitKey = 'logistics-webhook:'.hash('sha256', $integrationId.'|'.$request->ip());
+        $this->integrations->markCredentialUsed($integrationId);
+
+        $rateLimitKey = 'logistics-webhook:'.hash('sha256', $credential['integration_id'].'|'.$request->ip());
         $rateLimit = (int) config('logistics-webhooks.rate_limit_per_minute', 120);
 
         if (RateLimiter::tooManyAttempts($rateLimitKey, $rateLimit)) {
@@ -83,7 +87,7 @@ class EnsureLogisticsWebhookSignature
         }
 
         RateLimiter::hit($rateLimitKey, 60);
-        $request->attributes->set('logistics_integration_id', $integrationId);
+        $request->attributes->set('logistics_integration_id', $credential['integration_id']);
 
         return $next($request);
     }

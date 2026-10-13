@@ -25,6 +25,7 @@ use App\Http\Controllers\ItemManagementImportController;
 use App\Http\Controllers\ITinventoryController;
 use App\Http\Controllers\LiquidationController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\LogisticsChannelController;
 use App\Http\Controllers\MIAppController;
 use App\Http\Controllers\MIApprovalController;
 use App\Http\Controllers\PplFormController;
@@ -97,6 +98,17 @@ Route::middleware(['auth'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware(['role:Administrator'])->group(function () {
+
+        Route::middleware(['company.context:MMC'])->prefix('logistics-channel')->name('logistics-channel.')->group(function () {
+            Route::get('/', [LogisticsChannelController::class, 'index'])->name('index');
+            Route::post('/integrations', [LogisticsChannelController::class, 'store'])->middleware('throttle:20,1')->name('integrations.store');
+            Route::patch('/integrations/{integration}', [LogisticsChannelController::class, 'update'])->middleware('throttle:20,1')->name('integrations.update');
+            Route::post('/integrations/{integration}/rotate', [LogisticsChannelController::class, 'rotate'])->middleware('throttle:10,1')->name('integrations.rotate');
+            Route::post('/integrations/{integration}/credentials/{credential}/revoke', [LogisticsChannelController::class, 'revoke'])->middleware('throttle:10,1')->name('integrations.credentials.revoke');
+            Route::post('/integrations/adopt-environment', [LogisticsChannelController::class, 'adopt'])->middleware('throttle:5,1')->name('integrations.adopt');
+            Route::get('/schools', [LogisticsChannelController::class, 'schools'])->name('schools');
+            Route::post('/events/{event}/retry', [LogisticsChannelController::class, 'retryEvent'])->whereNumber('event')->middleware('throttle:10,1')->name('events.retry');
+        });
 
         Route::post('/users', [UserController::class, 'store'])
             ->name('users.store');

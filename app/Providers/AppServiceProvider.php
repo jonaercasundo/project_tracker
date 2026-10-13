@@ -4,10 +4,12 @@ namespace App\Providers;
 
 use App\Models\BudgetRequest;
 use App\Models\Liquidation;
+use App\Models\LogisticsIntegration;
 use App\Models\MI_Liquidation;
 use App\Models\MI_Product;
 use App\Models\ProjectInformation;
 use App\Policies\BudgetRequestPolicy;
+use App\Policies\LogisticsIntegrationPolicy;
 use App\Policies\MILiquidationPolicy;
 use App\Policies\MIProductPolicy;
 use App\Policies\ProjectInformationPolicy;
@@ -33,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(MI_Liquidation::class, MILiquidationPolicy::class);
         Gate::policy(MI_Product::class, MIProductPolicy::class);
         Gate::policy(ProjectInformation::class, ProjectInformationPolicy::class);
+        Gate::policy(LogisticsIntegration::class, LogisticsIntegrationPolicy::class);
         View::composer('components.accounting-sidebar', function ($view): void {
             $user = auth()->user();
             $view->with('accountingCounters', $user?->hasAccountingRole() && $user->currentCompany()?->code === 'MI'

@@ -180,7 +180,7 @@
                                     </span>
                                     @if(!empty($project->contract_number))
                                         <span class="text-slate-300">·</span>
-                                        <span>Contract No. {{ $project->contract_number }}</span>
+                                        <span>Project No. {{ $project->contract_number }}</span>
                                     @endif
                                     @if(!empty($project->agency))
                                         <span class="text-slate-300">·</span>

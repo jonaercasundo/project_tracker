@@ -9,11 +9,16 @@ return new class extends Migration
 {
     public function up(): void
     {
+        foreach (['project_financial_plans', 'project_financial_plan_versions', 'project_financial_plan_cost_items'] as $table) {
+            if (Schema::hasTable($table)) {
+                throw new RuntimeException("{$table} already exists. Inspect the failed migration's partial schema and data before retrying.");
+            }
+        }
+
         Schema::create('project_financial_plans', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('company_id')->constrained('companies', 'company_id')->restrictOnDelete();
             $table->unsignedInteger('project_id')->nullable();
-            $table->foreign('project_id')->references('project_id')->on('projects')->nullOnDelete();
             $table->foreignId('project_information_id')->nullable()->constrained('project_information')->nullOnDelete();
             $table->foreignId('lot_id')->nullable()->constrained('lots')->nullOnDelete();
             $table->foreignId('ppl_form_id')->nullable()->constrained('ppl_forms')->nullOnDelete();
@@ -25,6 +30,7 @@ return new class extends Migration
 
             $table->index(['company_id', 'status', 'updated_at'], 'project_financial_plans_company_status_updated_index');
             $table->index(['company_id', 'project_id'], 'project_financial_plans_company_project_index');
+            $table->index('project_id', 'project_financial_plans_project_index');
         });
 
         Schema::create('project_financial_plan_versions', function (Blueprint $table): void {

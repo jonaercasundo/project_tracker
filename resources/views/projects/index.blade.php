@@ -433,12 +433,12 @@
 
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Notice to Proceed Start Date</label>
+                            <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Start Date</label>
                             <input type="date" name="start_date" value="{{ old('start_date') }}" required
                                 class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Notice to Proceed End Date</label>
+                            <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">End Date</label>
                             <input type="date" name="end_date" value="{{ old('end_date') }}" required
                                 class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                         </div>

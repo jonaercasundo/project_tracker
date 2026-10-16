@@ -7,8 +7,10 @@ use App\Models\ProjectFinancialPlan;
 use App\Models\ProjectInformation;
 use App\Models\ProjectLot;
 use App\Services\ProjectFinancialPlanCalculator;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\FinancialPlanTestCase;
 
 pest()->extend(FinancialPlanTestCase::class)->in(__FILE__);
@@ -159,6 +161,58 @@ it('requires explicit project-specific financial rates instead of assuming missi
         ->assertSessionHasErrors(['inputs.pf1_rate']);
 
     expect(ProjectFinancialPlan::query()->count())->toBe(0);
+});
+
+it('resumes a partial financial schema without dropping data and tolerates repeated execution', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $migration = require base_path('database/migrations/2026_10_16_074412_create_project_financial_plan_tables.php');
+    $migration->down();
+
+    Schema::create('project_financial_plans', function (Blueprint $table): void {
+        $table->id();
+        $table->foreignId('company_id');
+        $table->unsignedInteger('project_id')->nullable();
+        $table->foreignId('project_information_id')->nullable();
+        $table->foreignId('lot_id')->nullable();
+        $table->foreignId('ppl_form_id')->nullable();
+        $table->string('name');
+        $table->string('status', 24)->default('draft');
+        $table->foreignId('created_by');
+        $table->foreignId('updated_by');
+        $table->timestamps();
+    });
+    $planId = DB::table('project_financial_plans')->insertGetId([
+        'company_id' => $user->currentCompany()->company_id,
+        'project_id' => null,
+        'project_information_id' => null,
+        'lot_id' => null,
+        'ppl_form_id' => null,
+        'name' => 'Preserved partial record',
+        'status' => 'draft',
+        'created_by' => $user->user_id,
+        'updated_by' => $user->user_id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $migration->up();
+    $migration->up();
+
+    Schema::table('project_financial_plans', function (Blueprint $table): void {
+        $table->dropIndex('project_financial_plans_project_index');
+    });
+    $preview = DB::connection()->pretend(fn (): mixed => $migration->up());
+
+    expect(DB::table('project_financial_plans')->where('id', $planId)->value('name'))->toBe('Preserved partial record')
+        ->and(Schema::hasTable('project_financial_plan_versions'))->toBeTrue()
+        ->and(Schema::hasTable('project_financial_plan_cost_items'))->toBeTrue()
+        ->and(collect($preview)->pluck('query')->implode("\n"))->toContain('project_financial_plans_project_index')
+        ->and(Schema::hasIndex('project_financial_plans', 'project_financial_plans_project_index'))->toBeFalse()
+        ->and(Schema::hasIndex('project_financial_plans', ['company_id', 'status', 'updated_at']))->toBeTrue()
+        ->and(count(Schema::getForeignKeys('project_financial_plans')))->toBe(7);
+
+    $migration->up();
+    expect(Schema::hasIndex('project_financial_plans', 'project_financial_plans_project_index'))->toBeTrue();
 });
 
 it('creates later immutable versions instead of overwriting the prior financial estimate', function () {

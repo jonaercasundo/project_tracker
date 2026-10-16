@@ -246,7 +246,7 @@ return new class extends Migration
             'integer_unsigned' => (in_array($base, ['int', 'integer'], true) && $unsigned) || (DB::connection()->getDriverName() === 'sqlite' && in_array($base, ['int', 'integer'], true)),
             'bigint_unsigned' => ($base === 'bigint' && $unsigned) || (DB::connection()->getDriverName() === 'sqlite' && in_array($base, ['int', 'integer'], true)),
             'string' => in_array($base, ['varchar', 'char', 'text', 'tinytext', 'mediumtext', 'longtext'], true),
-            'json' => in_array($base, ['json', 'text'], true),
+            'json' => in_array($base, ['json', 'text', 'longtext'], true),
             'decimal' => in_array($base, ['decimal', 'numeric'], true),
             'timestamp' => in_array($base, ['timestamp', 'datetime'], true),
             default => false,

@@ -163,7 +163,7 @@ it('requires explicit project-specific financial rates instead of assuming missi
     expect(ProjectFinancialPlan::query()->count())->toBe(0);
 });
 
-it('resumes a partial financial schema without dropping data and tolerates repeated execution', function () {
+it('resumes a partial financial schema without dropping data and tolerates repeated execution', function (?string $jsonType) {
     $user = $this->signInBiddingUser('finance', 'MMC');
     $migration = require base_path('database/migrations/2026_10_16_074412_create_project_financial_plan_tables.php');
     $migration->down();
@@ -195,6 +195,19 @@ it('resumes a partial financial schema without dropping data and tolerates repea
         'updated_at' => now(),
     ]);
 
+    $schema = Schema::getFacadeRoot();
+    $schemaProxy = Mockery::mock($schema);
+    $schemaProxy->shouldReceive('getColumns')->andReturnUsing(function (string $table) use ($schema, $jsonType): array {
+        return array_map(function (array $column) use ($jsonType): array {
+            if (in_array($column['name'], ['input_data', 'calculation_results', 'assumptions_snapshot', 'factory_cost_snapshot', 'source_snapshot'], true)) {
+                $column['type'] = $jsonType ?? $column['type'];
+            }
+
+            return $column;
+        }, $schema->getColumns($table));
+    });
+    Schema::swap($schemaProxy);
+
     $migration->up();
     $migration->up();
 
@@ -213,6 +226,33 @@ it('resumes a partial financial schema without dropping data and tolerates repea
 
     $migration->up();
     expect(Schema::hasIndex('project_financial_plans', 'project_financial_plans_project_index'))->toBeTrue();
+})->with([
+    'native JSON column metadata' => [null],
+    'MariaDB JSON columns reported as longtext' => ['longtext'],
+]);
+
+it('rejects incompatible financial JSON columns without losing stored versions', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $this->post(route('finance.plans.store'), financialPlanPayload())->assertRedirect();
+    $version = ProjectFinancialPlan::query()->sole()->versions()->sole();
+    $schema = Schema::getFacadeRoot();
+    $schemaProxy = Mockery::mock($schema);
+    $schemaProxy->shouldReceive('getColumns')->andReturnUsing(function (string $table) use ($schema): array {
+        return array_map(function (array $column): array {
+            if ($column['name'] === 'input_data') {
+                $column['type'] = 'integer';
+            }
+
+            return $column;
+        }, $schema->getColumns($table));
+    });
+    Schema::swap($schemaProxy);
+    $migration = require base_path('database/migrations/2026_10_16_074412_create_project_financial_plan_tables.php');
+
+    expect(fn () => $migration->up())
+        ->toThrow(RuntimeException::class, 'input_data has type integer (expected json)');
+
+    $this->assertDatabaseHas('project_financial_plan_versions', $version->getRawOriginal());
 });
 
 it('creates later immutable versions instead of overwriting the prior financial estimate', function () {

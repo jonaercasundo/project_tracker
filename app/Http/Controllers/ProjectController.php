@@ -54,7 +54,7 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'ref_no' => ['required', 'string', 'max:50', Rule::unique('projects', 'ref_no')],
             'contract_number' => ['nullable', 'string', 'max:255'],
-            'project_name' => 'required|string|max:255',
+            'project_name' => 'required|string',
             'agency' => 'required|string|max:255',
             'other_agency' => 'exclude_unless:agency,__other__|required|string|max:255',
             'contract_amount' => 'required|numeric|min:0.01',
@@ -119,7 +119,7 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'ref_no' => ['required', 'string', 'max:50', Rule::unique('projects', 'ref_no')->ignore($project->getKey(), 'project_id')],
             'contract_number' => ['nullable', 'string', 'max:255'],
-            'project_name' => ['required', 'string', 'max:255'],
+            'project_name' => ['required', 'string'],
             'agency' => ['required', 'string', 'max:255'],
             'contract_amount' => ['required', 'numeric', 'min:0.01'],
             'ABC' => ['required', 'numeric', 'min:0.01'],

@@ -955,13 +955,13 @@ it('links a matching manually created project without duplicating it or changing
         ->and($existing->fresh()->status)->toBe('Ongoing');
 });
 
-it('keeps manual project creation independent of bidding documents', function () {
+it('keeps manual project creation independent of bidding documents', function (string $projectName) {
     $this->signInBiddingUser();
 
     $this->post(route('projects.store'), [
         'ref_no' => 'MANUAL-REF-001',
         'contract_number' => 'MANUAL-PROJECT-001',
-        'project_name' => 'Manual project',
+        'project_name' => $projectName,
         'agency' => '__other__',
         'other_agency' => 'Local Agency',
         'contract_amount' => '500.00',
@@ -973,15 +973,19 @@ it('keeps manual project creation independent of bidding documents', function ()
 
     $project = Project::query()->sole();
     expect($project->project_code)->toBe('MANUAL-PROJECT-001')
+        ->and($project->project_name)->toBe($projectName)
         ->and($project->project_information_id)->toBeNull()
         ->and($project->agency)->toBe('Local Agency');
-});
+})->with([
+    'short name' => 'Manual project',
+    'long name' => str_repeat('Project scope ', 18).'for all schools',
+]);
 
-it('edits a project from the project directory and redirects after saving changes', function () {
+it('edits a project from the project directory and redirects after saving changes', function (string $originalName, string $updatedName) {
     $this->signInBiddingUser();
     $project = Project::create([
         'ref_no' => 'EDIT-REF-001',
-        'project_name' => 'Original project name',
+        'project_name' => $originalName,
         'agency' => 'Original agency',
         'contract_amount' => '500.00',
         'ABC' => 600,
@@ -992,35 +996,80 @@ it('edits a project from the project directory and redirects after saving change
 
     $this->get(route('projects.index'))
         ->assertOk()
-        ->assertSee('Edit Original project name')
-        ->assertSee('Delete Original project name');
+        ->assertSee('Edit '.$originalName)
+        ->assertSee('Delete '.$originalName);
 
-    $this->get(route('projects.edit', $project))
+    $editPage = $this->get(route('projects.edit', $project))
         ->assertOk()
         ->assertSee('Edit project')
-        ->assertSee('Original project name')
+        ->assertSee($originalName)
         ->assertSee('Save changes');
+    $document = new DOMDocument;
+    $document->loadHTML($editPage->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $projectNameInput = (new DOMXPath($document))->query('//input[@name="project_name"]')->item(0);
+    expect($projectNameInput->getAttribute('value'))->toBe($originalName);
+    expect($projectNameInput->hasAttribute('maxlength'))->toBe(false);
 
     $this->put(route('projects.update', $project), [
         'ref_no' => 'EDIT-REF-002',
         'contract_number' => 'EDIT-PROJECT-002',
-        'project_name' => 'Updated project name',
+        'project_name' => $updatedName,
         'agency' => 'Updated agency',
         'contract_amount' => '750.00',
         'ABC' => '900.00',
         'start_date' => '2026-12-01',
         'end_date' => '2027-03-01',
         'status' => 'Ongoing',
-    ])->assertRedirect(route('projects.index'))->assertSessionHas('success', 'Project updated successfully.');
+    ])->assertRedirect(route('projects.index'))->assertSessionHasNoErrors()->assertSessionHas('success', 'Project updated successfully.');
 
     $this->assertDatabaseHas('projects', [
         'project_id' => $project->getKey(),
         'ref_no' => 'EDIT-REF-002',
         'project_code' => 'EDIT-PROJECT-002',
-        'project_name' => 'Updated project name',
+        'project_name' => $updatedName,
         'agency' => 'Updated agency',
     ]);
-});
+})->with([
+    'short name' => ['Original project name', 'Updated project name'],
+    'unchanged long name' => [str_repeat('Project scope ', 18).'for all schools', str_repeat('Project scope ', 18).'for all schools'],
+    'amended long name' => [str_repeat('Project scope ', 18).'for all schools', str_repeat('Project scope ', 18).'for additional schools'],
+]);
+
+it('rejects invalid project names without changing the project', function (string|array $projectName, string $message) {
+    $this->signInBiddingUser();
+    $project = Project::create([
+        'ref_no' => 'INVALID-NAME-REF',
+        'project_name' => 'Original project name',
+        'agency' => 'Original agency',
+        'contract_amount' => '500.00',
+        'ABC' => 600,
+        'status' => 'Pending',
+        'start_date' => '2026-11-01',
+        'end_date' => '2027-01-01',
+    ]);
+
+    $this->from(route('projects.edit', $project))->put(route('projects.update', $project), [
+        'ref_no' => 'INVALID-NAME-REF',
+        'project_name' => $projectName,
+        'agency' => 'Updated agency',
+        'contract_amount' => '750.00',
+        'ABC' => '900.00',
+        'start_date' => '2026-12-01',
+        'end_date' => '2027-03-01',
+        'status' => 'Ongoing',
+    ])->assertRedirect(route('projects.edit', $project))->assertSessionHasErrors(['project_name' => $message]);
+
+    $this->assertDatabaseHas('projects', [
+        'project_id' => $project->getKey(),
+        'project_name' => 'Original project name',
+        'agency' => 'Original agency',
+        'contract_amount' => 500,
+        'status' => 'Pending',
+    ]);
+})->with([
+    'blank name' => ['   ', 'The project name field is required.'],
+    'name is an array' => [['Invalid name'], 'The project name field must be a string.'],
+]);
 
 it('deletes an unlinked project from the project directory', function () {
     $this->signInBiddingUser();
@@ -1078,7 +1127,7 @@ it('requires an authorized explicit award reversal and retains project data', fu
     $this->assertDatabaseHas('project_award_events', ['project_information_id' => $bidding->id, 'event_type' => 'award_reversed']);
 });
 
-it('synchronizes project-owned shared fields back to bidding without changing procurement-only fields', function () {
+it('synchronizes project-owned shared fields back to bidding without changing procurement-only fields', function (string $projectName) {
     $this->signInBiddingUser();
     $payload = completeAwardPayload($this);
     $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
@@ -1088,7 +1137,7 @@ it('synchronizes project-owned shared fields back to bidding without changing pr
     $this->putJson(route('projects.update', $project), [
         'ref_no' => 'EDITED-PHILGEPS-1',
         'contract_number' => 'IMPLEMENTATION-NO-1',
-        'project_name' => 'Implementation owned title',
+        'project_name' => $projectName,
         'agency' => 'Updated agency',
         'contract_amount' => '910.00',
         'ABC' => '1250.00',
@@ -1099,13 +1148,17 @@ it('synchronizes project-owned shared fields back to bidding without changing pr
 
     expect($bidding->fresh()->reference_no)->toBe('EDITED-PHILGEPS-1')
         ->and($bidding->fresh()->project_id)->toBe('IMPLEMENTATION-NO-1')
-        ->and($bidding->fresh()->project_name)->toBe('Implementation owned title')
+        ->and($bidding->fresh()->project_name)->toBe($projectName)
         ->and($bidding->fresh()->procuring_entity)->toBe('Updated agency')
         ->and($bidding->fresh()->contract_amount)->toBe('910.00')
         ->and($bidding->fresh()->approved_budget_contract_abc)->toBe('1250.00')
         ->and($bidding->fresh()->status)->toBe('Awarded')
         ->and($bidding->fresh()->delivery_period)->toBe('30');
-});
+    expect($project->fresh()->project_name)->toBe($projectName);
+})->with([
+    'short name' => 'Implementation owned title',
+    'long name' => str_repeat('Project scope ', 18).'for all schools',
+]);
 
 it('uses a database uniqueness guard to prevent a second implementation project link', function () {
     $this->signInBiddingUser();

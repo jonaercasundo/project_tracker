@@ -36,7 +36,7 @@
                 </div>
                 <div class="flex flex-col gap-1.5 sm:col-span-2">
                     <label for="project-name" class="text-xs font-semibold text-slate-600">Project name</label>
-                    <input id="project-name" name="project_name" value="{{ old('project_name', $project->project_name) }}" required maxlength="255" class="w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    <input id="project-name" name="project_name" value="{{ old('project_name', $project->project_name) }}" required class="w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
                     <x-input-error :messages="$errors->get('project_name')" class="text-xs" />
                 </div>
                 <div class="flex flex-col gap-1.5 sm:col-span-2">

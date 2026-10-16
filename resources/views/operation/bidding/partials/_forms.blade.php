@@ -62,7 +62,6 @@
             @include('operation.bidding.partials._field', ['field' => ['key' => 'project_name', 'label' => 'Project name', 'type' => 'textarea', 'required' => true, 'wide' => true]])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'reference_no', 'label' => 'PhilGEPS Reference Number', 'max' => 50]])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'procuring_entity', 'label' => 'Agency']])
-            @include('operation.bidding.partials._field', ['field' => ['key' => 'contract_amount', 'label' => 'Awarded Contract Amount (PHP)', 'type' => 'number']])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'approved_budget_contract_abc', 'label' => 'ABC (PHP)', 'type' => 'number']])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'delivery_period', 'label' => 'Delivery period (calendar days)', 'type' => 'number', 'step' => '1', 'max' => 36500]])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'date_of_pre_bid_conference', 'label' => 'Pre-bid conference', 'type' => 'date']])

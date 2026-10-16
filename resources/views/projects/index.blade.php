@@ -1,6 +1,6 @@
 <x-project_app-layout>
 <div
-    x-data="{ addProjectOpen: false }"
+    x-data="{ addProjectOpen: @js($errors->any()) }"
     @keydown.escape.window="addProjectOpen = false"
     class="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
 >
@@ -300,22 +300,30 @@
 
                 <div class="px-6 py-5 space-y-4">
 
+                    @if($errors->any())
+                        <ul role="alert" class="text-sm text-rose-500 space-y-1">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    @endif
+
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">PhilGEPS Ref No</label>
-                            <input type="text" name="ref_no" required
+                            <input type="text" name="ref_no" value="{{ old('ref_no') }}" required
                                 class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Project No.</label>
-                            <input type="text" name="contract_number"
+                            <input type="text" name="contract_number" value="{{ old('contract_number') }}"
                                 class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
 
                     <div>
                         <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Project Name</label>
-                        <input type="text" name="project_name" required
+                        <input type="text" name="project_name" value="{{ old('project_name') }}" required
                             class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                     </div>
 
@@ -341,6 +349,7 @@
                                     autocomplete="off"
                                     placeholder="0.00"
                                     x-ref="amountInput"
+                                    x-init="formatCurrencyBlur('amount', { target: $el })"
                                     @input="formatCurrencyInput('amount', $event)"
                                     @blur="formatCurrencyBlur('amount', $event)"
                                     @focus="selectAllOnFocus($event)"
@@ -373,6 +382,7 @@
                                     autocomplete="off"
                                     placeholder="0.00"
                                     x-ref="abcInput"
+                                    x-init="formatCurrencyBlur('abc', { target: $el })"
                                     @input="formatCurrencyInput('abc', $event)"
                                     @blur="formatCurrencyBlur('abc', $event)"
                                     @focus="selectAllOnFocus($event)"
@@ -391,17 +401,29 @@
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Agency</label>
-                        <select name="agency" x-model="agency" required
+                        <label for="project_agency" class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Agency</label>
+                        <select id="project_agency" name="agency" x-model="agency" required
                             class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                             <option value="">Select Agency</option>
-                            <option value="Deped">Deped</option>
-                            <option value="Dpwh">Dpwh</option>
+                            @foreach($agencyOptions as $agencyOption)
+                                <option value="{{ $agencyOption }}">{{ $agencyOption }}</option>
+                            @endforeach
+                            <option value="__other__">Others</option>
                         </select>
+                    </div>
+
+                    <div x-show="agency === '__other__'" x-cloak>
+                        <label for="other_agency" class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Agency Name</label>
+                        <input type="text" id="other_agency" name="other_agency" maxlength="255"
+                            value="{{ is_string(old('other_agency')) ? old('other_agency') : '' }}"
+                            placeholder="Enter agency name"
+                            :required="agency === '__other__'" :disabled="agency !== '__other__'"
+                            class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                     </div>
 
                     <div x-show="agency === 'Deped'" x-cloak class="flex items-center gap-2">
                         <input type="checkbox" name="keystage" value="1" id="keystage"
+                            @checked(old('keystage'))
                             class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         <label for="keystage" class="text-sm text-slate-600">Include Keystage</label>
                     </div>
@@ -409,19 +431,19 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Start Date</label>
-                            <input type="date" name="start_date" required
+                            <input type="date" name="start_date" value="{{ old('start_date') }}" required
                                 class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">End Date</label>
-                            <input type="date" name="end_date" required
+                            <input type="date" name="end_date" value="{{ old('end_date') }}" required
                                 class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
 
                     <div>
                         <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Status</label>
-                        <select name="status" required
+                        <select name="status" required x-init="$el.value = @js(old('status', 'Pending'))"
                             class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                             <option value="">Select Status</option>
                             <option value="Pending" selected>Pending</option>
@@ -488,9 +510,9 @@
      */
     function projectForm() {
         return {
-            agency: '',
-            amount: { raw: '', display: '' },
-            abc: { raw: '', display: '' },
+            agency: @js(old('agency', '')),
+            amount: { raw: @js(old('contract_amount', '')), display: '' },
+            abc: { raw: @js(old('ABC', '')), display: '' },
             errors: { amount: '', abc: '' },
 
             selectAllOnFocus(event) {

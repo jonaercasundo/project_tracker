@@ -293,3 +293,117 @@ it('renders empty projects and empty filtered pages without changing their count
     $this->getJson('/projects/1/items-data')->assertJsonPath('total', 0)->assertSee('No items found');
     $this->getJson('/projects/1/packages-data')->assertJsonPath('total', 0)->assertSee('No packages found');
 });
+
+/**
+ * @return array{ref_no: string, project_name: string, agency: string, contract_amount: int, ABC: int, start_date: string, end_date: string, status: string}
+ */
+function projectAgencyPayload(): array
+{
+    return [
+        'ref_no' => 'AGENCY-001',
+        'project_name' => 'Community equipment',
+        'agency' => '__other__',
+        'contract_amount' => 1000,
+        'ABC' => 1200,
+        'start_date' => '2026-10-01',
+        'end_date' => '2026-11-01',
+        'status' => 'Pending',
+    ];
+}
+
+describe('project agencies', function () {
+    it('saves the trimmed custom agency name when Others is selected', function () {
+        projectDetailsUser();
+        $payload = [...projectAgencyPayload(), 'other_agency' => '  City Housing Office  '];
+
+        $response = $this->from(route('projects.index'))->post(route('projects.store'), $payload);
+
+        $response->assertRedirect(route('projects.index'))->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Project added successfully.');
+        $this->assertDatabaseCount('projects', 1);
+        $this->assertDatabaseHas('projects', ['ref_no' => 'AGENCY-001', 'agency' => 'City Housing Office']);
+    });
+
+    it('rejects invalid agency input without creating a project', function (array $input, string $field, string $message) {
+        projectDetailsUser();
+
+        $response = $this->from(route('projects.index'))->post(route('projects.store'), [...projectAgencyPayload(), ...$input]);
+
+        $response->assertRedirect(route('projects.index'))->assertSessionHasErrors([$field => $message]);
+        $this->assertDatabaseCount('projects', 0);
+    })->with([
+        'missing custom name' => [[], 'other_agency', 'Please enter an agency name.'],
+        'whitespace custom name' => [['other_agency' => '   '], 'other_agency', 'Please enter an agency name.'],
+        'custom name too long' => [['other_agency' => str_repeat('A', 256)], 'other_agency', 'The other agency field must not be greater than 255 characters.'],
+        'custom name is an array' => [['other_agency' => ['City Housing Office']], 'other_agency', 'The other agency field must be a string.'],
+        'selected name too long' => [['agency' => str_repeat('A', 256)], 'agency', 'The agency field must not be greater than 255 characters.'],
+    ]);
+
+    it('reuses the selected agency and ignores an unused custom name', function (string $agency) {
+        projectDetailsUser();
+        DB::table('projects')->insert(['project_name' => 'Existing project', 'agency' => $agency]);
+        $payload = [...projectAgencyPayload(), 'agency' => $agency, 'other_agency' => ['Unused input']];
+
+        $response = $this->from(route('projects.index'))->post(route('projects.store'), $payload);
+
+        $response->assertRedirect(route('projects.index'))->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('projects', 2);
+        $this->assertDatabaseHas('projects', ['ref_no' => 'AGENCY-001', 'agency' => $agency]);
+    })->with(['Deped', 'Dpwh', 'City Housing Office']);
+
+    it('restores the custom agency and entered project fields after validation fails', function () {
+        projectDetailsUser();
+        DB::connection()->getPdo()->sqliteCreateFunction('YEAR', static fn (?string $date): ?int => $date === null ? null : (int) substr($date, 0, 4), 1);
+        $payload = [
+            ...projectAgencyPayload(),
+            'other_agency' => 'Housing "Office"',
+            'contract_number' => 'CONTRACT-42',
+            'end_date' => '2026-09-01',
+        ];
+
+        $rejected = $this->from(route('projects.index'))->post(route('projects.store'), $payload);
+
+        $rejected->assertRedirect(route('projects.index'))->assertSessionHasErrors('end_date')
+            ->assertSessionHasInput('agency', '__other__')
+            ->assertSessionHasInput('contract_amount', 1000)
+            ->assertSessionHasInput('ABC', 1200);
+        $this->assertDatabaseCount('projects', 0);
+        $response = $this->get(route('projects.index'));
+        $response->assertSee('The end date field must be a date after or equal to start date.');
+        $document = new DOMDocument;
+        $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new DOMXPath($document);
+        foreach (['ref_no', 'project_name', 'contract_number', 'other_agency', 'start_date', 'end_date'] as $field) {
+            expect($xpath->evaluate('string(//form[@id="addProjectForm"]//input[@name="'.$field.'"]/@value)'))->toBe($payload[$field]);
+        }
+        expect($xpath->evaluate('string(//form[@id="addProjectForm"]//*[@role="alert"])'))
+            ->toContain('The end date field must be a date after or equal to start date.');
+    });
+
+    it('offers saved agencies once and escapes custom names in the agency dropdown', function () {
+        projectDetailsUser();
+        DB::connection()->getPdo()->sqliteCreateFunction('YEAR', static fn (?string $date): ?int => $date === null ? null : (int) substr($date, 0, 4), 1);
+        $customAgency = 'Housing "Office" <script>alert(1)</script>';
+        foreach (['Deped', $customAgency, $customAgency, '', null] as $index => $agency) {
+            DB::table('projects')->insert([
+                ...projectAgencyPayload(),
+                'ref_no' => 'EXISTING-'.$index,
+                'agency' => $agency,
+                'created_at' => '2026-10-01 00:00:00',
+            ]);
+        }
+
+        $response = $this->get(route('projects.index'));
+
+        $response->assertSee($customAgency)->assertDontSee($customAgency, false);
+        $document = new DOMDocument;
+        $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new DOMXPath($document);
+        $options = [];
+        foreach ($xpath->query('//select[@id="project_agency"]/option') as $option) {
+            $options[] = $option->getAttribute('value');
+        }
+        expect($options)->toHaveCount(5)->toContain('', 'Deped', 'Dpwh', $customAgency, '__other__');
+        expect($xpath->evaluate('string(//select[@id="project_agency"]/option[@value="__other__"])'))->toBe('Others');
+    });
+});

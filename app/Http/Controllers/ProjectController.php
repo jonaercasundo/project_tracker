@@ -7,12 +7,13 @@ use App\Services\ProjectDetailsService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ProjectController extends Controller
 {
-    public function index()
+    public function index(): View
     {
         $projects = Project::orderBy('project_id')->paginate(10);
 
@@ -21,12 +22,18 @@ class ProjectController extends Controller
             ->pluck('year');
 
         $agencies = Project::distinct()->pluck('agency');
+        $agencyOptions = collect(['Deped', 'Dpwh'])
+            ->merge($agencies)
+            ->filter(fn (?string $agency): bool => filled($agency) && $agency !== '__other__')
+            ->unique()
+            ->values();
         $statuses = Project::distinct()->pluck('status');
 
         return view('projects.index', [
             'projects' => $projects,
             'years' => $years,
             'agencies' => $agencies,
+            'agencyOptions' => $agencyOptions,
             'statuses' => $statuses,
 
             'totalProjects' => Project::count(),
@@ -35,12 +42,13 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'ref_no' => 'required|string|max:255|unique:projects,ref_no',
             'project_name' => 'required|string|max:255',
-            'agency' => 'required|string',
+            'agency' => 'required|string|max:255',
+            'other_agency' => 'exclude_unless:agency,__other__|required|string|max:255',
             'contract_amount' => 'required|numeric|min:0.01',
             'ABC' => 'required|numeric|min:0.01',
             'start_date' => 'required|date',
@@ -48,7 +56,14 @@ class ProjectController extends Controller
             'status' => 'required|string',
         ], [
             'ref_no.unique' => 'A project with this Reference No. already exists.',
+            'other_agency.required' => 'Please enter an agency name.',
         ]);
+
+        if ($validated['agency'] === '__other__') {
+            $validated['agency'] = $validated['other_agency'];
+        }
+
+        unset($validated['other_agency']);
 
         try {
             Project::create($validated);

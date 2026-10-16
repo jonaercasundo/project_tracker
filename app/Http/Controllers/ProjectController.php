@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Services\ProjectAwardSynchronizationService;
 use App\Services\ProjectDetailsService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\QueryException;
@@ -10,14 +11,19 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
 {
     public function index(): View
     {
-        $projects = Project::orderBy('project_id')->paginate(10);
+        $projects = Project::with('bidding')->orderBy('project_id')->paginate(10);
 
-        $years = Project::selectRaw('YEAR(created_at) year')
+        $yearExpression = DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y', created_at)"
+            : 'YEAR(created_at)';
+        $years = Project::selectRaw($yearExpression.' year')
             ->distinct()
             ->pluck('year');
 
@@ -45,7 +51,8 @@ class ProjectController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'ref_no' => 'required|string|max:255|unique:projects,ref_no',
+            'ref_no' => ['required', 'string', 'max:50', Rule::unique('projects', 'ref_no')],
+            'contract_number' => ['nullable', 'string', 'max:255'],
             'project_name' => 'required|string|max:255',
             'agency' => 'required|string|max:255',
             'other_agency' => 'exclude_unless:agency,__other__|required|string|max:255',
@@ -53,7 +60,7 @@ class ProjectController extends Controller
             'ABC' => 'required|numeric|min:0.01',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'status' => 'required|string',
+            'status' => ['required', Rule::in($this->projectStatuses())],
         ], [
             'ref_no.unique' => 'A project with this Reference No. already exists.',
             'other_agency.required' => 'Please enter an agency name.',
@@ -64,6 +71,9 @@ class ProjectController extends Controller
         }
 
         unset($validated['other_agency']);
+
+        $validated['project_code'] = $validated['contract_number'] ?? null;
+        unset($validated['contract_number']);
 
         try {
             Project::create($validated);
@@ -85,23 +95,34 @@ class ProjectController extends Controller
         );
     }
 
-    public function update(Request $request, Project $project)
+    public function update(Request $request, Project $project, ProjectAwardSynchronizationService $projectSync): JsonResponse
     {
-        $request->validate([
-            'ref_no' => 'required',
-            'project_name' => 'required',
-            'contract_amount' => 'required|numeric',
-            'ABC' => 'required|numeric',
-            'start_date' => 'required',
-            'end_date' => 'required',
-            'status' => 'required',
+        if (($bidding = $project->bidding()->first()) !== null) {
+            Gate::authorize('update', $bidding);
+        }
+
+        $validated = $request->validate([
+            'ref_no' => ['required', 'string', 'max:50', Rule::unique('projects', 'ref_no')->ignore($project->getKey(), 'project_id')],
+            'contract_number' => ['nullable', 'string', 'max:255'],
+            'project_name' => ['required', 'string', 'max:255'],
+            'agency' => ['required', 'string', 'max:255'],
+            'contract_amount' => ['required', 'numeric', 'min:0.01'],
+            'ABC' => ['required', 'numeric', 'min:0.01'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'status' => ['required', Rule::in($this->projectStatuses())],
         ]);
 
-        $project->update($request->all());
+        $validated['project_code'] = $validated['contract_number'] ?? null;
+        unset($validated['contract_number']);
 
-        return response()->json([
-            'success' => true,
-        ]);
+        DB::transaction(function () use ($project, $validated, $projectSync): void {
+            $lockedProject = Project::query()->whereKey($project->getKey())->lockForUpdate()->firstOrFail();
+            $lockedProject->update($validated);
+            $projectSync->syncFromProject($lockedProject, $validated);
+        }, 3);
+
+        return response()->json(['success' => true]);
     }
 
     public function filter(Request $request)
@@ -138,6 +159,7 @@ class ProjectController extends Controller
 
     public function show(Project $project, ProjectDetailsService $details): View
     {
+        $project->load('bidding.awardEvents');
         /*
         |--------------------------------------------------------------------------
         | AR SETTINGS
@@ -300,6 +322,14 @@ class ProjectController extends Controller
             'arSettings' => $arSettings,
             'logoFiles' => $logoFiles,
         ] + $summary);
+    }
+
+    /** @return list<string> */
+    private function projectStatuses(): array
+    {
+        return [
+            'Pending', 'Ongoing', 'Implementation', 'PDI', 'Delivered', 'Completed', 'Cancelled',
+        ];
     }
 
     public function schoolsData(Request $request, Project $project, ProjectDetailsService $details): JsonResponse

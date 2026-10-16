@@ -3,13 +3,16 @@
 use App\Models\BiddingDeliveryAddress;
 use App\Models\BiddingKeyStage;
 use App\Models\New\Item;
+use App\Models\Project;
 use App\Models\ProjectInformation;
 use App\Models\ProjectItem;
 use App\Models\ProjectLot;
 use App\Policies\ProjectInformationPolicy;
 use App\Services\BiddingService;
+use App\Services\ProjectAwardSynchronizationService;
 use Database\Factories\BiddingDeliveryAddressFactory;
 use Database\Factories\BiddingKeyStageFactory;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Validation\ValidationException;
@@ -853,4 +856,227 @@ it('rejects more than one thousand aggregate items even when each collection is 
     $this->assertDatabaseCount('project_information', 0);
     $this->assertDatabaseCount('lots', 0);
     $this->assertDatabaseCount('project_items', 0);
+});
+
+function completeAwardPayload(BiddingTestCase $test): array
+{
+    return array_replace($test->validBiddingPayload(), [
+        'reference_no' => fake()->unique()->bothify('PHILGEPS-########'),
+        'contract_amount' => '875.25',
+        'approved_budget_contract_abc' => '1000.00',
+        'start_date' => '2026-11-01',
+        'end_date' => '2027-02-01',
+        'notice_of_award_date' => '2026-10-15',
+        'status' => 'Awarded',
+    ]);
+}
+
+it('creates a pending implementation project once a bidding document is awarded', function () {
+    $this->signInBiddingUser();
+    $payload = completeAwardPayload($this);
+
+    $response = $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    $bidding = ProjectInformation::query()->sole();
+    $project = Project::query()->sole();
+
+    expect($project->project_information_id)->toBe($bidding->id)
+        ->and($project->project_code)->toBe($payload['project_id'])
+        ->and($project->ref_no)->toBe($payload['reference_no'])
+        ->and($project->contract_amount)->toBe('875.25')
+        ->and((float) $project->ABC)->toBe(1000.0)
+        ->and($project->status)->toBe('Pending');
+    $this->assertDatabaseHas('project_award_events', [
+        'project_information_id' => $bidding->id,
+        'event_type' => 'awarded',
+        'event_date' => '2026-10-15',
+        'status_before' => 'Draft',
+    ]);
+    $this->get(route('projects.index'))
+        ->assertOk()
+        ->assertSee($payload['project_name'])
+        ->assertSee('Procurement: Awarded');
+});
+
+it('requires complete project information before an award can be saved', function () {
+    $this->signInBiddingUser();
+    $payload = completeAwardPayload($this);
+    $payload['reference_no'] = null;
+    $payload['contract_amount'] = null;
+
+    $this->post(route('project.bidding.store'), $payload)
+        ->assertSessionHasErrors(['reference_no', 'contract_amount']);
+
+    $this->assertDatabaseCount('project_information', 0);
+    $this->assertDatabaseCount('projects', 0);
+});
+
+it('updates a linked project idempotently and preserves implementation status and separate amounts', function () {
+    $this->signInBiddingUser();
+    $payload = completeAwardPayload($this);
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    $bidding = ProjectInformation::query()->sole();
+    $project = Project::query()->sole();
+    $project->update(['status' => 'Implementation']);
+    $update = $this->biddingHierarchyPayload($bidding);
+    $update['status'] = 'Awarded';
+    $update['contract_amount'] = '900.00';
+    $update['approved_budget_contract_abc'] = '1200.00';
+    $update['project_name'] = 'Updated awarded project';
+
+    $this->put(route('project.bidding.update', $bidding), $update)->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(Project::query()->count())->toBe(1)
+        ->and($project->fresh()->status)->toBe('Implementation')
+        ->and($project->fresh()->contract_amount)->toBe('900.00')
+        ->and((float) $project->fresh()->ABC)->toBe(1200.0)
+        ->and($project->fresh()->project_name)->toBe('Updated awarded project');
+    $this->assertDatabaseCount('project_award_events', 1);
+});
+
+it('links a matching manually created project without duplicating it or changing its lifecycle status', function () {
+    $this->signInBiddingUser();
+    $payload = completeAwardPayload($this);
+    $existing = Project::create([
+        'ref_no' => $payload['reference_no'],
+        'project_code' => 'legacy-code',
+        'project_name' => 'Legacy project name',
+        'agency' => 'Legacy agency',
+        'contract_amount' => '300.00',
+        'ABC' => 450,
+        'status' => 'Ongoing',
+        'start_date' => '2026-01-01',
+        'end_date' => '2027-01-01',
+    ]);
+
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(Project::query()->count())->toBe(1)
+        ->and($existing->fresh()->project_information_id)->toBe(ProjectInformation::query()->sole()->id)
+        ->and($existing->fresh()->status)->toBe('Ongoing');
+});
+
+it('keeps manual project creation independent of bidding documents', function () {
+    $this->signInBiddingUser();
+
+    $this->post(route('projects.store'), [
+        'ref_no' => 'MANUAL-REF-001',
+        'contract_number' => 'MANUAL-PROJECT-001',
+        'project_name' => 'Manual project',
+        'agency' => '__other__',
+        'other_agency' => 'Local Agency',
+        'contract_amount' => '500.00',
+        'ABC' => '600.00',
+        'start_date' => '2026-11-01',
+        'end_date' => '2027-01-01',
+        'status' => 'Pending',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $project = Project::query()->sole();
+    expect($project->project_code)->toBe('MANUAL-PROJECT-001')
+        ->and($project->project_information_id)->toBeNull()
+        ->and($project->agency)->toBe('Local Agency');
+});
+
+it('requires an authorized explicit award reversal and retains project data', function () {
+    $this->signInBiddingUser();
+    $payload = completeAwardPayload($this);
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    $bidding = ProjectInformation::query()->sole();
+    $project = Project::query()->sole();
+    $project->update(['status' => 'Implementation']);
+
+    $this->post(route('project.bidding.award-reversal', $bidding), ['reason' => 'Wrong contract record'])->assertForbidden();
+    $update = $this->biddingHierarchyPayload($bidding);
+    $update['status'] = 'Published';
+    $this->put(route('project.bidding.update', $bidding), $update)->assertSessionHasErrors('status');
+    expect($bidding->fresh()->status)->toBe('Awarded');
+
+    $this->signInBiddingUser('finance');
+    $this->post(route('bidding.award-reversal', $bidding), ['reason' => 'Award was entered in error'])
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($bidding->fresh()->status)->toBe('Draft')
+        ->and($project->fresh()->status)->toBe('Implementation')
+        ->and($project->fresh()->project_information_id)->toBe($bidding->id);
+    $this->assertDatabaseHas('project_award_events', ['project_information_id' => $bidding->id, 'event_type' => 'award_reversed']);
+});
+
+it('synchronizes project-owned shared fields back to bidding without changing procurement-only fields', function () {
+    $this->signInBiddingUser();
+    $payload = completeAwardPayload($this);
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    $bidding = ProjectInformation::query()->sole();
+    $project = Project::query()->sole();
+
+    $this->putJson(route('projects.update', $project), [
+        'ref_no' => 'EDITED-PHILGEPS-1',
+        'contract_number' => 'IMPLEMENTATION-NO-1',
+        'project_name' => 'Implementation owned title',
+        'agency' => 'Updated agency',
+        'contract_amount' => '910.00',
+        'ABC' => '1250.00',
+        'start_date' => '2026-12-01',
+        'end_date' => '2027-03-01',
+        'status' => 'Implementation',
+    ])->assertOk()->assertJson(['success' => true]);
+
+    expect($bidding->fresh()->reference_no)->toBe('EDITED-PHILGEPS-1')
+        ->and($bidding->fresh()->project_id)->toBe('IMPLEMENTATION-NO-1')
+        ->and($bidding->fresh()->project_name)->toBe('Implementation owned title')
+        ->and($bidding->fresh()->procuring_entity)->toBe('Updated agency')
+        ->and($bidding->fresh()->contract_amount)->toBe('910.00')
+        ->and($bidding->fresh()->approved_budget_contract_abc)->toBe('1250.00')
+        ->and($bidding->fresh()->status)->toBe('Awarded')
+        ->and($bidding->fresh()->delivery_period)->toBe('30');
+});
+
+it('uses a database uniqueness guard to prevent a second implementation project link', function () {
+    $this->signInBiddingUser();
+    $payload = completeAwardPayload($this);
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    $bidding = ProjectInformation::query()->sole();
+
+    expect(fn () => Project::create([
+        'project_information_id' => $bidding->id,
+        'ref_no' => 'SECOND-REF-001',
+        'project_name' => 'Duplicate linked project',
+        'agency' => 'Fixture Agency',
+        'contract_amount' => '10.00',
+        'ABC' => 10,
+        'status' => 'Pending',
+    ]))->toThrow(QueryException::class);
+
+    $this->assertDatabaseCount('projects', 1);
+});
+
+it('refuses to overwrite a historical project during award reconciliation when shared fields differ', function () {
+    $bidding = BiddingProjectFixtureFactory::new()->create([
+        'status' => 'Awarded',
+        'reference_no' => 'HISTORIC-REF-001',
+        'contract_amount' => '100.00',
+        'approved_budget_contract_abc' => '150.00',
+        'procuring_entity' => 'Historic Agency',
+        'start_date' => '2026-11-01',
+        'end_date' => '2027-01-01',
+        'notice_of_award_date' => '2026-10-01',
+    ]);
+    $existing = Project::create([
+        'ref_no' => 'HISTORIC-REF-001',
+        'project_code' => 'Old project number',
+        'project_name' => 'Preserve this project name',
+        'agency' => 'Historic Agency',
+        'contract_amount' => '100.00',
+        'ABC' => 150,
+        'status' => 'Implementation',
+        'start_date' => '2026-11-01',
+        'end_date' => '2027-01-01',
+    ]);
+
+    expect(fn () => app(ProjectAwardSynchronizationService::class)
+        ->syncFromBidding($bidding, true, true, null, null, true))
+        ->toThrow(ValidationException::class);
+
+    expect($existing->fresh()->project_name)->toBe('Preserve this project name')
+        ->and($existing->fresh()->project_information_id)->toBeNull();
+    $this->assertDatabaseCount('project_award_events', 0);
 });

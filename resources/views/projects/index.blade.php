@@ -178,13 +178,16 @@
                                     <span class="inline-flex items-center gap-1 font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                                         {{ $project->ref_no }}
                                     </span>
-                                    @if(!empty($project->contract_number))
+                                    @if($project->bidding?->project_id || $project->project_code)
                                         <span class="text-slate-300">·</span>
-                                        <span>Project No. {{ $project->contract_number }}</span>
+                                        <span>Project No. {{ $project->bidding?->project_id ?? $project->project_code }}</span>
                                     @endif
                                     @if(!empty($project->agency))
                                         <span class="text-slate-300">·</span>
                                         <span>{{ $project->agency }}</span>
+                                    @endif
+                                    @if($project->bidding)
+                                        <span class="rounded bg-indigo-50 px-1.5 py-0.5 font-semibold text-indigo-700">Procurement: {{ $project->bidding->status }}</span>
                                     @endif
                                 </div>
                             </div>
@@ -195,14 +198,14 @@
                         </td>
 
                         <td class="py-3 px-4 text-slate-500 text-center whitespace-nowrap text-xs font-medium">
-                            {{ $project->start_date->format('M d, Y') }}
+                            {{ $project->start_date?->format('M d, Y') ?? '—' }}
                             <span class="text-slate-300 mx-1">→</span>
-                            {{ $project->end_date->format('M d, Y') }}
+                            {{ $project->end_date?->format('M d, Y') ?? '—' }}
                         </td>
 
                         <td class="py-3 px-4">
                             @php
-                                $statusLower = strtolower($project->status);
+                                $statusLower = strtolower($project->status ?? '');
                                 [$badgeClasses, $dotClasses] = match(true) {
                                     str_contains($statusLower, 'complete') || str_contains($statusLower, 'deliver') => ['bg-emerald-50 text-emerald-700 border-emerald-200', 'bg-emerald-500'],
                                     str_contains($statusLower, 'pend') || str_contains($statusLower, 'progress') => ['bg-amber-50 text-amber-700 border-amber-200', 'bg-amber-500'],
@@ -212,7 +215,7 @@
                             @endphp
                             <span class="whitespace-nowrap inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold border {{ $badgeClasses }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $dotClasses }}"></span>
-                                {{ strtoupper($project->status) }}
+                                {{ strtoupper($project->status ?? 'Unknown') }}
                             </span>
                         </td>
 
@@ -448,24 +451,9 @@
                             <option value="">Select Status</option>
                             <option value="Pending" selected>Pending</option>
                             <option value="Ongoing">Ongoing</option>
-                            <option value="Completed">Awarded</option>
-                            <option value="For NOA">For NOA</option>
-                            <option value="For RTA">For RTA</option>
-                            <option value="For Contract Signing">For Contract Signing</option>
-                            <option value="For NTP">For NTP</option>
-                            <option value="Bid Evaluation">Bid Evaluation</option>
-                            <option value="Bidding">Bidding</option>
-                            <option value="Post Qualification">Post Qualification</option>
+                            <option value="Completed">Completed</option>
                             <option value="Implementation">Implementation</option>
                             <option value="Delivered">Delivered</option>
-                            <option value="For Billing">For Billing</option>
-                            <option value="For Collection">For Collection</option>
-                            <option value="Collected">Collected</option>
-                            <option value="For Development">For Development</option>
-                            <option value="For Procurement">Pre Procurement</option>
-                            <option value="Upcoming">Upcoming</option>
-                            <option value="On Going">On Going</option>
-                            <option value="For Rebid">For Rebid</option>
                         </select>
                     </div>
 

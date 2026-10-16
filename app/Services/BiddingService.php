@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\BiddingDeliveryAddress;
 use App\Models\BiddingKeyStage;
 use App\Models\New\Item;
+use App\Models\Project;
 use App\Models\ProjectInformation;
 use App\Models\ProjectItem;
 use App\Models\ProjectLot;
+use App\Models\User;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +24,11 @@ class BiddingService
 {
     public const MAX_AMOUNT = '9999999999999.99';
 
-    public function __construct(private BiddingDocumentService $documentService, private BiddingSchoolService $schools) {}
+    public function __construct(
+        private BiddingDocumentService $documentService,
+        private BiddingSchoolService $schools,
+        private ProjectAwardSynchronizationService $projectSync,
+    ) {}
 
     /** @param array<string, mixed> $data */
     public function store(array $data): ProjectInformation
@@ -34,6 +40,9 @@ class BiddingService
             $this->syncLots($project, $data['lots']);
             $this->schools->sync($project, $data, true);
             $this->refreshTotal($project);
+            if ($project->status === 'Awarded') {
+                $this->projectSync->syncFromBidding($project, true, true, 'Draft', auth()->id());
+            }
 
             return $project;
         }, $data);
@@ -44,6 +53,13 @@ class BiddingService
     {
         return $this->saveTransaction(function () use ($bidding, $data): ProjectInformation {
             $project = ProjectInformation::query()->whereKey($bidding->getKey())->lockForUpdate()->firstOrFail();
+            $statusBefore = $project->status;
+            $newStatus = $data['status'] ?? $statusBefore;
+            if ($statusBefore === 'Awarded' && $newStatus !== 'Awarded') {
+                throw ValidationException::withMessages([
+                    'status' => 'Use the authorized award reversal workflow to change an awarded bidding document status.',
+                ]);
+            }
             $this->schools->assertFresh($project, $data);
             $project->update($this->parentAttributes($data));
             if (array_key_exists('lots', $data)) {
@@ -51,6 +67,15 @@ class BiddingService
             }
             $this->schools->sync($project, $data, false);
             $this->refreshTotal($project);
+
+            $project = $project->fresh();
+            $this->projectSync->syncFromBidding(
+                $project,
+                $project->status === 'Awarded',
+                $statusBefore !== 'Awarded' && $project->status === 'Awarded',
+                $statusBefore,
+                auth()->id(),
+            );
 
             return $project;
         }, $data, $bidding->getKey());
@@ -65,6 +90,9 @@ class BiddingService
             if (isset($data['project_id']) && ProjectInformation::query()->where('project_id', $data['project_id'])->when($id !== null, fn ($query) => $query->whereKeyNot($id))->exists()) {
                 throw ValidationException::withMessages(['project_id' => 'A bidding document with this Project ID already exists.']);
             }
+            if (isset($data['reference_no']) && Project::query()->where('ref_no', $data['reference_no'])->exists()) {
+                throw ValidationException::withMessages(['reference_no' => 'A project with this PhilGEPS Reference Number already exists. Resolve the existing project before awarding.']);
+            }
 
             throw $exception;
         }
@@ -74,6 +102,11 @@ class BiddingService
     {
         DB::transaction(function () use ($bidding): void {
             $project = ProjectInformation::query()->whereKey($bidding->getKey())->lockForUpdate()->firstOrFail();
+            if ($project->implementationProject()->exists()) {
+                throw ValidationException::withMessages([
+                    'status' => 'A bidding document linked to a project cannot be deleted. Reverse the award first; the project and its implementation records will be retained.',
+                ]);
+            }
             $this->schools->guardDeletion($project->lots()->pluck('id')->all());
             $this->documentService->deleteBiddingFiles($project);
             $project->keyStages()->delete();
@@ -81,11 +114,52 @@ class BiddingService
         });
     }
 
+    public function reverseAward(ProjectInformation $bidding, string $reason, User $actor): void
+    {
+        DB::transaction(function () use ($bidding, $reason, $actor): void {
+            $project = ProjectInformation::query()->whereKey($bidding->getKey())->lockForUpdate()->firstOrFail();
+            if ($project->status !== 'Awarded') {
+                throw ValidationException::withMessages(['status' => 'Only an awarded bidding document can be reversed.']);
+            }
+
+            $awardEvent = DB::table('project_award_events')
+                ->where('project_information_id', $project->getKey())
+                ->where('event_type', 'awarded')
+                ->latest('id')
+                ->first();
+            $previousStatus = $awardEvent?->status_before;
+            if (! in_array($previousStatus, ['Draft', 'For Review', 'Published', 'Cancelled'], true)) {
+                $previousStatus = 'Published';
+            }
+
+            $project->update(['status' => $previousStatus]);
+            $linkedProject = $project->implementationProject()->lockForUpdate()->first();
+            DB::table('project_award_events')->insert([
+                'project_information_id' => $project->getKey(),
+                'project_id' => $linkedProject?->getKey(),
+                'event_type' => 'award_reversed',
+                'actor_user_id' => $actor->getKey(),
+                'event_date' => now()->toDateString(),
+                'status_before' => 'Awarded',
+                'reason' => $reason,
+                'project_snapshot' => $linkedProject === null ? null : json_encode([
+                    'project_id' => $linkedProject->getKey(),
+                    'project_status' => $linkedProject->status,
+                    'ref_no' => $linkedProject->ref_no,
+                    'project_code' => $linkedProject->project_code,
+                ], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }, 3);
+    }
+
     /** @param array<string, mixed> $data @return array<string, mixed> */
     private function parentAttributes(array $data): array
     {
         $attributes = Arr::only($data, ['project_code', 'project_name', 'project_id', 'procuring_entity',
-            'approved_budget_contract_abc', 'delivery_period', 'date_of_bid_opening', 'status',
+            'reference_no', 'approved_budget_contract_abc', 'contract_amount', 'start_date', 'end_date',
+            'notice_of_award_date', 'delivery_period', 'date_of_bid_opening', 'status',
             'prepared_by', 'prepared_date', 'verified_by', 'notes_special_condition']);
         if (array_key_exists('date_of_pre_bid_conference', $data)) {
             $attributes['pre_bid_conf'] = $data['date_of_pre_bid_conference'];

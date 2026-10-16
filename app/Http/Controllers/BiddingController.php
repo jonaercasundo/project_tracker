@@ -142,6 +142,18 @@ class BiddingController extends Controller
         return redirect()->route('project.bidding.show', $bidding)->with('success', 'Bidding document updated successfully.');
     }
 
+    public function reverseAward(Request $request, ProjectInformation $bidding): RedirectResponse
+    {
+        Gate::authorize('reverseAward', $bidding);
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:2000'],
+        ]);
+
+        $this->biddingService->reverseAward($bidding, $validated['reason'], $request->user());
+
+        return back()->with('success', 'Award reversed. The linked project and implementation data were retained.');
+    }
+
     public function destroy(ProjectInformation $bidding): RedirectResponse
     {
         Gate::authorize('delete', $bidding);

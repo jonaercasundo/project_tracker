@@ -40,6 +40,11 @@ class ProjectInformationPolicy
         return $this->viewAny($user);
     }
 
+    public function reverseAward(User $user, ProjectInformation $bidding): bool
+    {
+        return $user->hasRole('finance');
+    }
+
     public function uploadDocument(User $user, ProjectInformation $bidding): bool
     {
         return $this->update($user, $bidding);

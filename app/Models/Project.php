@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
-use App\Models\ARSetting;
+use App\Models\New\Item;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Project extends Model
 {
     protected $primaryKey = 'project_id';
+
     protected $table = 'projects';
 
     public $incrementing = true;
+
     public $timestamps = false;
 
     protected $keyType = 'int';
@@ -24,13 +27,21 @@ class Project extends Model
         'start_date',
         'keystage',
         'ABC',
+        'status',
+        'project_information_id',
         'end_date',
     ];
 
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'contract_amount' => 'decimal:2',
     ];
+
+    public function bidding(): BelongsTo
+    {
+        return $this->belongsTo(ProjectInformation::class, 'project_information_id');
+    }
 
     public function arSetting()
     {
@@ -44,7 +55,7 @@ class Project extends Model
     public function items()
     {
         return $this->hasMany(
-            \App\Models\New\Item::class,
+            Item::class,
             'project_id',
             'project_id'
         );

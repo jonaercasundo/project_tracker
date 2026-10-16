@@ -39,7 +39,7 @@
                 </select>
                 <x-input-error :messages="$errors->get('project_code')" class="text-xs" />
             </div>
-            @include('operation.bidding.partials._field', ['field' => ['key' => 'project_id', 'label' => 'Project ID', 'required' => true]])
+                @include('operation.bidding.partials._field', ['field' => ['key' => 'project_id', 'label' => 'Project Number / Project ID', 'required' => true]])
             <div class="flex flex-col gap-1.5">
                 <label for="bidding-status" class="text-xs font-semibold text-slate-600">Status</label>
                 <select id="bidding-status" name="status" required class="w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
@@ -48,8 +48,13 @@
                 <x-input-error :messages="$errors->get('status')" class="text-xs" />
             </div>
             @include('operation.bidding.partials._field', ['field' => ['key' => 'project_name', 'label' => 'Project name', 'type' => 'textarea', 'required' => true, 'wide' => true]])
-            @include('operation.bidding.partials._field', ['field' => ['key' => 'procuring_entity', 'label' => 'Procuring entity / agency']])
-            @include('operation.bidding.partials._field', ['field' => ['key' => 'approved_budget_contract_abc', 'label' => 'Approved Budget for the Contract (PHP)', 'type' => 'number']])
+            @include('operation.bidding.partials._field', ['field' => ['key' => 'reference_no', 'label' => 'PhilGEPS Reference Number', 'max' => 50]])
+            @include('operation.bidding.partials._field', ['field' => ['key' => 'procuring_entity', 'label' => 'Agency']])
+            @include('operation.bidding.partials._field', ['field' => ['key' => 'contract_amount', 'label' => 'Awarded Contract Amount (PHP)', 'type' => 'number']])
+            @include('operation.bidding.partials._field', ['field' => ['key' => 'approved_budget_contract_abc', 'label' => 'ABC (PHP)', 'type' => 'number']])
+            @include('operation.bidding.partials._field', ['field' => ['key' => 'start_date', 'label' => 'Project start date', 'type' => 'date']])
+            @include('operation.bidding.partials._field', ['field' => ['key' => 'end_date', 'label' => 'Project end date', 'type' => 'date']])
+            @include('operation.bidding.partials._field', ['field' => ['key' => 'notice_of_award_date', 'label' => 'Award date', 'type' => 'date']])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'delivery_period', 'label' => 'Delivery period (calendar days)', 'type' => 'number', 'step' => '1', 'max' => 36500]])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'date_of_pre_bid_conference', 'label' => 'Pre-bid conference', 'type' => 'date']])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'date_of_bid_opening', 'label' => 'Bid opening', 'type' => 'date']])

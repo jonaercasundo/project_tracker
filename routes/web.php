@@ -321,6 +321,9 @@ Route::middleware(['auth'])->group(function () {
         Route::put('project/bidding/{bidding}', [BiddingController::class, 'project_update'])
             ->name('project.bidding.update');
 
+        Route::post('project/bidding/{bidding}/award-reversal', [BiddingController::class, 'reverseAward'])
+            ->name('project.bidding.award-reversal');
+
         Route::delete('project/bidding/{bidding}', [BiddingController::class, 'project_destroy'])
             ->name('project.bidding.destroy');
 
@@ -394,6 +397,9 @@ Route::middleware(['auth'])->group(function () {
 
         Route::put('/bidding/{bidding}', [BiddingController::class, 'update'])
             ->name('bidding.update');
+
+        Route::post('/bidding/{bidding}/award-reversal', [BiddingController::class, 'reverseAward'])
+            ->name('bidding.award-reversal');
 
         Route::delete('/bidding/{bidding}', [BiddingController::class, 'destroy'])
             ->name('bidding.destroy');

@@ -107,6 +107,28 @@
 
     </div>
 
+    @if($project->bidding)
+        <section class="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-indigo-600">Linked procurement</p>
+                    <h2 class="mt-1 text-sm font-bold text-slate-900">{{ $project->bidding->project_id }} · {{ $project->bidding->project_name }}</h2>
+                    <p class="mt-1 text-xs text-slate-600">Bidding status: <span class="font-semibold">{{ $project->bidding->status }}</span>@if($project->bidding->notice_of_award_date) · Award date: {{ $project->bidding->notice_of_award_date->format('M d, Y') }}@endif</p>
+                </div>
+                <a href="{{ route('project.bidding.show', $project->bidding) }}" class="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">View bidding document</a>
+            </div>
+            @if($project->bidding->awardEvents->isNotEmpty())
+                <div class="mt-4 border-t border-indigo-100 pt-3">
+                    <h3 class="text-xs font-semibold text-slate-700">Award audit history</h3>
+                    <ul class="mt-2 space-y-1 text-xs text-slate-600">
+                        @foreach($project->bidding->awardEvents->sortByDesc('id') as $event)
+                            <li>{{ str_replace('_', ' ', ucfirst($event->event_type)) }} · {{ $event->event_date?->format('M d, Y') ?? $event->created_at?->format('M d, Y') ?? 'Date unavailable' }}@if($event->reason) — {{ $event->reason }}@endif</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </section>
+    @endif
 
     {{-- TABS --}}
     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

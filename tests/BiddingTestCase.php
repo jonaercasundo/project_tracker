@@ -63,6 +63,8 @@ class BiddingTestCase extends TestCase
             'database/migrations/2026_10_04_101906_create_bidding_document_management_tables.php',
             'tests/Fixtures/bidding_school_schema.php',
             'database/migrations/2026_10_07_094920_create_bidding_school_assignments.php',
+            'tests/Fixtures/migrations/2026_10_16_000001_create_legacy_projects_table.php',
+            'database/migrations/2026_10_16_071700_add_project_award_synchronization.php',
         ]];
     }
 

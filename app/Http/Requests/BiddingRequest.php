@@ -105,16 +105,25 @@ abstract class BiddingRequest extends FormRequest
             $unique->ignore($this->route('bidding')->getKey());
         }
 
+        $effectiveStatus = $this->input('status', $updating ? $this->route('bidding')->status : 'Draft');
+        $isNewAward = $effectiveStatus === 'Awarded' && (! $updating || $this->route('bidding')->status !== 'Awarded');
+        $awardFieldsRequired = $isNewAward ? 'required' : 'sometimes';
+
         $rules = [
             'school_plan' => ['sometimes', 'string', 'max:2000000'],
             'school_token' => ['required_with:school_plan', 'uuid'],
             'hierarchy_present' => ['sometimes', 'boolean'],
             'hierarchy_complete' => ['required_if:hierarchy_present,1', 'boolean'],
             'project_code' => [$required, 'required', Rule::in(['SME', 'SFP', 'MT', 'Textbook', 'DCP'])],
-            'project_name' => [$required, 'required', 'string', 'max:255'],
-            'project_id' => [$required, 'required', 'string', 'max:255', $unique],
-            'procuring_entity' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'approved_budget_contract_abc' => ['sometimes', 'nullable', ...$this->decimalRules()],
+            'project_name' => [$awardFieldsRequired, $required, 'required', 'string', 'max:255'],
+            'project_id' => [$awardFieldsRequired, $required, 'required', 'string', 'max:255', $unique],
+            'reference_no' => [$awardFieldsRequired, 'nullable', 'string', 'max:50'],
+            'procuring_entity' => [$awardFieldsRequired, 'nullable', 'string', 'max:255'],
+            'approved_budget_contract_abc' => [$awardFieldsRequired, 'nullable', ...$this->decimalRules()],
+            'contract_amount' => [$awardFieldsRequired, 'nullable', ...$this->decimalRules()],
+            'start_date' => [$awardFieldsRequired, 'nullable', 'date_format:Y-m-d'],
+            'end_date' => [$awardFieldsRequired, 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'notice_of_award_date' => [$awardFieldsRequired, 'nullable', 'date_format:Y-m-d'],
             'delivery_period' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:36500'],
             'date_of_pre_bid_conference' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
             'date_of_bid_opening' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
@@ -222,6 +231,13 @@ abstract class BiddingRequest extends FormRequest
             'project_id.unique' => 'A bidding document with this Project ID already exists.',
             'hierarchy_complete.required_if' => 'The form was truncated. Reduce its size or ask your administrator to increase the server input limit; nothing was saved.',
             '*.regex' => 'Use a nonnegative amount with at most 13 integer digits and two decimal places.',
+            'reference_no.required' => 'Enter the PhilGEPS Reference Number before awarding this project.',
+            'contract_amount.required' => 'Enter the awarded contract amount before awarding this project.',
+            'approved_budget_contract_abc.required' => 'Enter the ABC before awarding this project.',
+            'procuring_entity.required' => 'Enter the agency before awarding this project.',
+            'start_date.required' => 'Enter the project start date before awarding this project.',
+            'end_date.required' => 'Enter the project end date before awarding this project.',
+            'notice_of_award_date.required' => 'Enter the award date before changing the bidding status to Awarded.',
         ];
     }
 }

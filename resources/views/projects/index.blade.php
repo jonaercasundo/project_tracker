@@ -307,7 +307,7 @@
                                 class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Contract No.</label>
+                            <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Project No.</label>
                             <input type="text" name="contract_number"
                                 class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                         </div>

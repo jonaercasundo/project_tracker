@@ -76,21 +76,21 @@
                     <div class="grid grid-cols-3 gap-2.5">
                         <div>
                             <label for="noa_months" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">NOA <span class="normal-case font-normal text-slate-400">(mo from bid)</span></label>
-                            <input type="number" step="0.01" id="noa_months" name="noa_months" value="{{ old('noa_months') }}" placeholder="0.00"
+                            <input type="number" step="1" id="noa_months" name="noa_months" value="{{ old('noa_months') }}" placeholder="0.00"
                                 class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition @error('noa_months') border-red-400 @enderror">
                             @error('noa_months') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="ntp_months" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">NTP <span class="normal-case font-normal text-slate-400">(mo from NOA)</span></label>
-                            <input type="number" step="0.01" id="ntp_months" name="ntp_months" value="{{ old('ntp_months') }}" placeholder="0.00"
+                            <input type="number" step="1" id="ntp_months" name="ntp_months" value="{{ old('ntp_months') }}" placeholder="0.00"
                                 class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition @error('ntp_months') border-red-400 @enderror">
                             @error('ntp_months') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="delivery_days" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Delivery <span class="normal-case font-normal text-slate-400">(days post-prod)</span></label>
-                            <input type="number" id="delivery_days" name="delivery_days" value="{{ old('delivery_days') }}" placeholder="0"
-                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition @error('delivery_days') border-red-400 @enderror">
-                            @error('delivery_days') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
+                            <label for="delivery_days_after_production" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Delivery <span class="normal-case font-normal text-slate-400">(days post-prod)</span></label>
+                            <input type="number" id="delivery_days_after_production" name="delivery_days_after_production" value="{{ old('delivery_days_after_production') }}" placeholder="0"
+                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition @error('delivery_days_after_production') border-red-400 @enderror">
+                            @error('delivery_days_after_production') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="production_lead_time" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Prod. Lead Time</label>
@@ -130,10 +130,10 @@
                             @error('abc') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="lcb" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">LCB (ABC)</label>
-                            <input type="number" step="0.01" id="lcb" name="lcb" value="{{ old('lcb') }}" placeholder="0.00"
-                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition @error('lcb') border-red-400 @enderror">
-                            @error('lcb') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
+                            <label for="lcb_abc" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">LCB (ABC)</label>
+                            <input type="number" step="0.01" id="lcb_abc" name="lcb_abc" value="{{ old('lcb_abc') }}" placeholder="0.00"
+                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition @error('lcb_abc') border-red-400 @enderror">
+                            @error('lcb_abc') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="forex" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">FOREX</label>
@@ -160,22 +160,22 @@
                             @error('full_payment_after_delivery') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="pf1" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">PF1 <span class="normal-case font-normal text-slate-300">Contract</span></label>
-                            <input type="number" step="0.01" id="pf1" name="pf1" value="{{ old('pf1') }}" placeholder="0.00"
-                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition @error('pf1') border-red-400 @enderror">
-                            @error('pf1') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
+                            <label for="pf1_contract_amt" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">PF1 <span class="normal-case font-normal text-slate-300">Contract</span></label>
+                            <input type="number" step="0.01" id="pf1_contract_amt" name="pf1_contract_amt" value="{{ old('pf1_contract_amt') }}" placeholder="0.00"
+                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition @error('pf1_contract_amt') border-red-400 @enderror">
+                            @error('pf1_contract_amt') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="pf2" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">PF2 <span class="normal-case font-normal text-slate-300">Contract</span></label>
-                            <input type="number" step="0.01" id="pf2" name="pf2" value="{{ old('pf2') }}" placeholder="0.00"
-                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition @error('pf2') border-red-400 @enderror">
-                            @error('pf2') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
+                            <label for="pf2_contract_amt" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">PF2 <span class="normal-case font-normal text-slate-300">Contract</span></label>
+                            <input type="number" step="0.01" id="pf2_contract_amt" name="pf2_contract_amt" value="{{ old('pf2_contract_amt') }}" placeholder="0.00"
+                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition @error('pf2_contract_amt') border-red-400 @enderror">
+                            @error('pf2_contract_amt') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div class="col-span-2">
-                            <label for="pf3" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">PF3 <span class="normal-case font-normal text-slate-300">Contract</span></label>
-                            <input type="number" step="0.01" id="pf3" name="pf3" value="{{ old('pf3') }}" placeholder="0.00"
-                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition @error('pf3') border-red-400 @enderror">
-                            @error('pf3') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
+                            <label for="pf3_contract_amt" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">PF3 <span class="normal-case font-normal text-slate-300">Contract</span></label>
+                            <input type="number" step="0.01" id="pf3_contract_amt" name="pf3_contract_amt" value="{{ old('pf3_contract_amt') }}" placeholder="0.00"
+                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition @error('pf3_contract_amt') border-red-400 @enderror">
+                            @error('pf3_contract_amt') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
                 </div>
@@ -194,10 +194,10 @@
                             @error('warehouse_location') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="shipping_container" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Containers</label>
-                            <input type="number" id="shipping_container" name="shipping_container" value="{{ old('shipping_container') }}" placeholder="0"
-                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition @error('shipping_container') border-red-400 @enderror">
-                            @error('shipping_container') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
+                            <label for="shipping_brokerage_containers" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Containers</label>
+                            <input type="number" id="shipping_brokerage_containers" name="shipping_brokerage_containers" value="{{ old('shipping_brokerage_containers') }}" placeholder="0"
+                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition @error('shipping_brokerage_containers') border-red-400 @enderror">
+                            @error('shipping_brokerage_containers') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="rate_per_container" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Rate/Container</label>
@@ -206,22 +206,22 @@
                             @error('rate_per_container') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="warehouse_area" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Area <span class="normal-case font-normal text-slate-300">(sqm)</span></label>
-                            <input type="number" step="0.01" id="warehouse_area" name="warehouse_area" value="{{ old('warehouse_area') }}" placeholder="0.00"
-                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition @error('warehouse_area') border-red-400 @enderror">
-                            @error('warehouse_area') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
+                            <label for="warehouse_area_sqm" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Area <span class="normal-case font-normal text-slate-300">(sqm)</span></label>
+                            <input type="number" step="0.01" id="warehouse_area_sqm" name="warehouse_area_sqm" value="{{ old('warehouse_area_sqm') }}" placeholder="0.00"
+                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition @error('warehouse_area_sqm') border-red-400 @enderror">
+                            @error('warehouse_area_sqm') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="warehouse_rental" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Rate/sqm</label>
-                            <input type="number" step="0.01" id="warehouse_rental" name="warehouse_rental" value="{{ old('warehouse_rental') }}" placeholder="0.00"
-                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition @error('warehouse_rental') border-red-400 @enderror">
-                            @error('warehouse_rental') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
+                            <label for="warehouse_rental_per_sqm" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Rate/sqm</label>
+                            <input type="number" step="0.01" id="warehouse_rental_per_sqm" name="warehouse_rental_per_sqm" value="{{ old('warehouse_rental_per_sqm') }}" placeholder="0.00"
+                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition @error('warehouse_rental_per_sqm') border-red-400 @enderror">
+                            @error('warehouse_rental_per_sqm') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="warehouse_months" class="Duration block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Duration <span class="normal-case font-normal text-slate-300">(mo)</span></label>
-                            <input type="number" id="warehouse_months" name="warehouse_months" value="{{ old('warehouse_months') }}" placeholder="0"
-                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition @error('warehouse_months') border-red-400 @enderror">
-                            @error('warehouse_months') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
+                            <label for="warehouse_rental_months" class="Duration block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Duration <span class="normal-case font-normal text-slate-300">(mo)</span></label>
+                            <input type="number" id="warehouse_rental_months" name="warehouse_rental_months" value="{{ old('warehouse_rental_months') }}" placeholder="0"
+                                class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition @error('warehouse_rental_months') border-red-400 @enderror">
+                            @error('warehouse_rental_months') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
                 </div>
@@ -262,10 +262,10 @@
                         @error('collection_date') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div class="col-span-2 sm:col-span-1">
-                        <label for="year_revenue_recognition" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Rev. Rec. Year</label>
-                        <input type="number" id="year_revenue_recognition" name="year_revenue_recognition" value="{{ old('year_revenue_recognition', '2026') }}" placeholder="2026"
-                            class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-rose-500 focus:ring-2 focus:ring-rose-100 transition @error('year_revenue_recognition') border-red-400 @enderror">
-                        @error('year_revenue_recognition') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
+                        <label for="year_of_revenue_recognition" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Rev. Rec. Year</label>
+                        <input type="number" id="year_of_revenue_recognition" name="year_of_revenue_recognition" value="{{ old('year_of_revenue_recognition', '2026') }}" placeholder="2026"
+                            class="w-full h-9 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-800 focus:border-rose-500 focus:ring-2 focus:ring-rose-100 transition @error('year_of_revenue_recognition') border-red-400 @enderror">
+                        @error('year_of_revenue_recognition') <p class="text-[10px] text-red-500 mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </div>

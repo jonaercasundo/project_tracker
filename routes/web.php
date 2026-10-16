@@ -33,6 +33,7 @@ use App\Http\Controllers\ProductScanController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectDashboardController;
+use App\Http\Controllers\ProjectFinancialPlanController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\RoleAccessPermissionController;
@@ -349,6 +350,24 @@ Route::middleware(['auth'])->group(function () {
         |--------------------------------------------------------------------------
     */
     Route::middleware(['role:finance'])->group(function () {
+        Route::get('/dashboard', [ProjectFinancialPlanController::class, 'dashboard'])
+            ->name('finance.dashboard');
+
+        Route::get('/finance/plans', [ProjectFinancialPlanController::class, 'index'])
+            ->name('finance.plans.index');
+        Route::get('/finance/plans/create', [ProjectFinancialPlanController::class, 'create'])
+            ->name('finance.plans.create');
+        Route::post('/finance/plans', [ProjectFinancialPlanController::class, 'store'])
+            ->name('finance.plans.store');
+        Route::get('/finance/plans/{financialPlan}/edit', [ProjectFinancialPlanController::class, 'edit'])
+            ->whereNumber('financialPlan')
+            ->name('finance.plans.edit');
+        Route::put('/finance/plans/{financialPlan}', [ProjectFinancialPlanController::class, 'update'])
+            ->whereNumber('financialPlan')
+            ->name('finance.plans.update');
+        Route::get('/finance/plans/{financialPlan}', [ProjectFinancialPlanController::class, 'show'])
+            ->whereNumber('financialPlan')
+            ->name('finance.plans.show');
 
         Route::get('/ppl-forms', [PplFormController::class, 'index'])
             ->name('ppl_forms.index');
@@ -365,10 +384,6 @@ Route::middleware(['auth'])->group(function () {
 
         Route::post('/ppl-forms/import', [PplFormController::class, 'import'])
             ->name('ppl_forms.import');
-
-        Route::get('/dashboard', function () {
-            return view('finance.dashboard');
-        })->name('finance.dashboard');
 
         /*
             |--------------------------------------------------------------------------

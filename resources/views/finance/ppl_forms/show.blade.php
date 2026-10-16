@@ -20,11 +20,6 @@
         </div>
 
         <div class="flex gap-2">
-            <a href="/ppl-forms/{{ $data->id }}/edit"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                Edit
-            </a>
             <a href="/ppl-forms"
                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition-colors">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -46,7 +41,7 @@
 
         <div class="bg-white border border-slate-100 rounded-xl p-4">
             <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-1">LCB / ABC</div>
-            <div class="text-xl font-semibold text-emerald-600">{{ number_format($data->lcb_abc, 2) }}%</div>
+            <div class="text-xl font-semibold text-emerald-600">?{{ number_format($data->lcb_abc, 2) }}</div>
         </div>
 
         <div class="bg-white border border-slate-100 rounded-xl p-4">
@@ -70,7 +65,7 @@
                     'Bid opening'     => $data->bid_opening,
                     'NOA'             => $data->noa_months . ' mo',
                     'NTP'             => $data->ntp_months . ' mo',
-                    'Delivery'        => $data->delivery_days . ' days',
+                    'Delivery'        => $data->delivery_days_after_production . ' days',
                     'Production'      => $data->production_lead_time,
                     'Collection'      => $data->collection_period,
                     'Delivery period' => $data->delivery_period,
@@ -98,7 +93,7 @@
                     'PF1'              => $data->pf1_contract_amt . '%',
                     'PF2'              => $data->pf2_contract_amt . '%',
                     'PF3'              => $data->pf3_contract_amt . '%',
-                    'LL com'           => $data->ll_com_factory_cost . '%',
+                    'LL com'           => $data->ll_comm_factory_cost . '%',
                     'Interest + DST'   => $data->interest_rate_dst . '%',
                     'Full payment'     => $data->full_payment_after_delivery . '%',
                 ] as $label => $value)
@@ -122,8 +117,8 @@
                     'Area'            => $data->warehouse_area_sqm,
                     'Container rate'  => $data->rate_per_container,
                     'Rent / sqm'      => $data->warehouse_rental_per_sqm,
-                    'Rent months'     => $data->warehouse_rental_no_of_months,
-                    'Other expenses'  => '₱' . number_format($data->other_expenses_contract_amt, 2),
+                    'Rent months'     => $data->warehouse_rental_months,
+                    'Other expenses'  => '₱' . number_format($data->other_expenses, 2),
                 ] as $label => $value)
                 <div class="flex justify-between items-center py-2">
                     <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide">{{ $label }}</span>
@@ -146,11 +141,11 @@
             </div>
             <div class="space-y-0 divide-y divide-slate-50">
                 @foreach ([
-                    'Manpower'     => $data->manpower_abc,
-                    'Assembly'     => $data->assembly_abc,
-                    'R&D'          => $data->rnd_abc,
-                    'Facilitation' => $data->facilitation_abc,
-                    'OPEX'         => $data->opex_net_sales,
+                    'Manpower'     => $data->manpower_others,
+                    'Assembly'     => $data->assembly_service_center,
+                    'R&D'          => $data->rd_expenses,
+                    'Facilitation' => $data->facilitation,
+                    'OPEX'         => $data->opex,
                 ] as $label => $value)
                 <div class="flex justify-between items-center py-2">
                     <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide">{{ $label }}</span>
@@ -168,9 +163,9 @@
             </div>
             <div class="space-y-0 divide-y divide-slate-50">
                 @foreach ([
-                    'Income tax'     => $data->income_tax_net_sales,
-                    'Incentive'      => $data->incentive_net_profit,
-                    'Import VAT'     => $data->importation_vat_cogs,
+                    'Income tax'     => $data->income_tax,
+                    'Incentive'      => $data->incentive,
+                    'Import VAT'     => $data->importation_vat,
                     'Output VAT'     => $data->output_vat,
                     'Business cycle' => $data->business_cycle,
                 ] as $label => $value)

@@ -64,8 +64,6 @@
             @include('operation.bidding.partials._field', ['field' => ['key' => 'procuring_entity', 'label' => 'Agency']])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'contract_amount', 'label' => 'Awarded Contract Amount (PHP)', 'type' => 'number']])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'approved_budget_contract_abc', 'label' => 'ABC (PHP)', 'type' => 'number']])
-            @include('operation.bidding.partials._field', ['field' => ['key' => 'start_date', 'label' => 'Notice to Proceed Start Date', 'type' => 'date']])
-            @include('operation.bidding.partials._field', ['field' => ['key' => 'end_date', 'label' => 'Notice to Proceed End Date', 'type' => 'date']])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'delivery_period', 'label' => 'Delivery period (calendar days)', 'type' => 'number', 'step' => '1', 'max' => 36500]])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'date_of_pre_bid_conference', 'label' => 'Pre-bid conference', 'type' => 'date']])
             @include('operation.bidding.partials._field', ['field' => ['key' => 'date_of_bid_opening', 'label' => 'Bid opening', 'type' => 'date']])

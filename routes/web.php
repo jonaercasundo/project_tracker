@@ -185,8 +185,14 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/projects', [ProjectController::class, 'store'])
             ->name('projects.store');
 
-        Route::put('/projects/{project}', [ProjectController::class, 'update'])
+        Route::get('/projects/{project:project_id}/edit', [ProjectController::class, 'edit'])
+            ->name('projects.edit');
+
+        Route::put('/projects/{project:project_id}', [ProjectController::class, 'update'])
             ->name('projects.update');
+
+        Route::delete('/projects/{project:project_id}', [ProjectController::class, 'destroy'])
+            ->name('projects.destroy');
         Route::post('/deliveries/qr-generate', [DeliveryController::class, 'generate']);
 
         Route::post('/projects/filter', [ProjectController::class, 'filter'])

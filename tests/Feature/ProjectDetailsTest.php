@@ -294,6 +294,17 @@ it('renders empty projects and empty filtered pages without changing their count
     $this->getJson('/projects/1/packages-data')->assertJsonPath('total', 0)->assertSee('No packages found');
 });
 
+it('preserves projects that already have delivery records', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+
+    $this->delete(route('projects.destroy', 1))
+        ->assertRedirect(route('projects.index'))
+        ->assertSessionHas('error', 'This project has linked records and cannot be deleted.');
+
+    $this->assertDatabaseHas('projects', ['project_id' => 1]);
+});
+
 /**
  * @return array{ref_no: string, project_name: string, agency: string, contract_amount: int, ABC: int, start_date: string, end_date: string, status: string}
  */

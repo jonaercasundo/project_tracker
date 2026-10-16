@@ -977,6 +977,83 @@ it('keeps manual project creation independent of bidding documents', function ()
         ->and($project->agency)->toBe('Local Agency');
 });
 
+it('edits a project from the project directory and redirects after saving changes', function () {
+    $this->signInBiddingUser();
+    $project = Project::create([
+        'ref_no' => 'EDIT-REF-001',
+        'project_name' => 'Original project name',
+        'agency' => 'Original agency',
+        'contract_amount' => '500.00',
+        'ABC' => 600,
+        'status' => 'Pending',
+        'start_date' => '2026-11-01',
+        'end_date' => '2027-01-01',
+    ]);
+
+    $this->get(route('projects.index'))
+        ->assertOk()
+        ->assertSee('Edit Original project name')
+        ->assertSee('Delete Original project name');
+
+    $this->get(route('projects.edit', $project))
+        ->assertOk()
+        ->assertSee('Edit project')
+        ->assertSee('Original project name')
+        ->assertSee('Save changes');
+
+    $this->put(route('projects.update', $project), [
+        'ref_no' => 'EDIT-REF-002',
+        'contract_number' => 'EDIT-PROJECT-002',
+        'project_name' => 'Updated project name',
+        'agency' => 'Updated agency',
+        'contract_amount' => '750.00',
+        'ABC' => '900.00',
+        'start_date' => '2026-12-01',
+        'end_date' => '2027-03-01',
+        'status' => 'Ongoing',
+    ])->assertRedirect(route('projects.index'))->assertSessionHas('success', 'Project updated successfully.');
+
+    $this->assertDatabaseHas('projects', [
+        'project_id' => $project->getKey(),
+        'ref_no' => 'EDIT-REF-002',
+        'project_code' => 'EDIT-PROJECT-002',
+        'project_name' => 'Updated project name',
+        'agency' => 'Updated agency',
+    ]);
+});
+
+it('deletes an unlinked project from the project directory', function () {
+    $this->signInBiddingUser();
+    $project = Project::create([
+        'ref_no' => 'DELETE-REF-001',
+        'project_name' => 'Project to delete',
+        'agency' => 'Local Agency',
+        'contract_amount' => '500.00',
+        'ABC' => 600,
+        'status' => 'Pending',
+        'start_date' => '2026-11-01',
+        'end_date' => '2027-01-01',
+    ]);
+
+    $this->delete(route('projects.destroy', $project))
+        ->assertRedirect(route('projects.index'))
+        ->assertSessionHas('success', 'Project deleted successfully.');
+
+    $this->assertModelMissing($project);
+});
+
+it('keeps implementation projects linked to bidding records', function () {
+    $this->signInBiddingUser();
+    $this->post(route('project.bidding.store'), completeAwardPayload($this))->assertRedirect()->assertSessionHasNoErrors();
+    $project = Project::query()->sole();
+
+    $this->delete(route('projects.destroy', $project))
+        ->assertRedirect(route('projects.index'))
+        ->assertSessionHas('error', 'Manage this project through its linked bidding record.');
+
+    $this->assertModelExists($project);
+});
+
 it('requires an authorized explicit award reversal and retains project data', function () {
     $this->signInBiddingUser();
     $payload = completeAwardPayload($this);

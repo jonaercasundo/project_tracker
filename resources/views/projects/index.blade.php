@@ -35,6 +35,12 @@
         </div>
     </div>
 
+    @if(session('success') || session('error'))
+        <div role="status" class="rounded-xl border {{ session('error') ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' }} px-4 py-3 text-sm font-medium">
+            {{ session('error') ?? session('success') }}
+        </div>
+    @endif
+
     {{-- FILTERS --}}
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
 
@@ -220,14 +226,36 @@
                         </td>
 
                         <td class="py-3 px-5 text-right whitespace-nowrap">
+                            <div class="inline-flex items-center justify-end gap-1.5">
+                                <a href="{{ route('projects.edit', $project) }}"
+                                   class="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                   aria-label="Edit {{ $project->project_name }}">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 2.651 2.651M4 20l4.15-.83L19.5 7.82a1.875 1.875 0 0 0-2.652-2.651L5.5 16.52 4 20Z" />
+                                    </svg>
+                                    Edit
+                                </a>
+                                <form method="POST" action="{{ route('projects.destroy', $project) }}" onsubmit="return confirm('Delete this project? Projects with linked records cannot be deleted.')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            class="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                                            aria-label="Delete {{ $project->project_name }}">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 3h6m-9 4h12m-10 0 .6 13h4.8L14 7M10 11v5m4-5v5" />
+                                        </svg>
+                                        Delete
+                                    </button>
+                                </form>
                             <a href="{{ route('projects.show', $project) }}"
                                class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors inline-flex"
-                               title="View Details">
+                               title="View Details" aria-label="View {{ $project->project_name }}">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path>
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                 </svg>
                             </a>
+                            </div>
                         </td>
 
                     </tr>

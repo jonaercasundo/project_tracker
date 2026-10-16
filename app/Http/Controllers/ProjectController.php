@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
@@ -95,7 +96,21 @@ class ProjectController extends Controller
         );
     }
 
-    public function update(Request $request, Project $project, ProjectAwardSynchronizationService $projectSync): JsonResponse
+    public function edit(Project $project): View
+    {
+        if (($bidding = $project->bidding()->first()) !== null) {
+            Gate::authorize('update', $bidding);
+        }
+
+        $projectStatuses = $this->projectStatuses();
+        if (is_string($project->status) && ! in_array($project->status, $projectStatuses, true)) {
+            $projectStatuses[] = $project->status;
+        }
+
+        return view('projects.edit', compact('project', 'projectStatuses'));
+    }
+
+    public function update(Request $request, Project $project, ProjectAwardSynchronizationService $projectSync): JsonResponse|RedirectResponse
     {
         if (($bidding = $project->bidding()->first()) !== null) {
             Gate::authorize('update', $bidding);
@@ -110,7 +125,7 @@ class ProjectController extends Controller
             'ABC' => ['required', 'numeric', 'min:0.01'],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-            'status' => ['required', Rule::in($this->projectStatuses())],
+            'status' => ['required', Rule::in(array_values(array_unique([...$this->projectStatuses(), $project->status])))],
         ]);
 
         $validated['project_code'] = $validated['contract_number'] ?? null;
@@ -122,7 +137,41 @@ class ProjectController extends Controller
             $projectSync->syncFromProject($lockedProject, $validated);
         }, 3);
 
-        return response()->json(['success' => true]);
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true]);
+        }
+
+        return redirect()->route('projects.index')->with('success', 'Project updated successfully.');
+    }
+
+    public function destroy(Project $project): RedirectResponse
+    {
+        return DB::transaction(function () use ($project): RedirectResponse {
+            $lockedProject = Project::query()->whereKey($project->getKey())->lockForUpdate()->firstOrFail();
+
+            if (Schema::hasColumn('projects', 'project_information_id') && $lockedProject->bidding()->exists()) {
+                return redirect()->route('projects.index')->with('error', 'Manage this project through its linked bidding record.');
+            }
+
+            if ($this->hasDependentRecords($lockedProject)) {
+                return redirect()->route('projects.index')->with('error', 'This project has linked records and cannot be deleted.');
+            }
+
+            $lockedProject->delete();
+
+            return redirect()->route('projects.index')->with('success', 'Project deleted successfully.');
+        }, 3);
+    }
+
+    private function hasDependentRecords(Project $project): bool
+    {
+        foreach (['AR_settings', 'deliveries', 'documents', 'invoices', 'item', 'items', 'lot', 'sales_generation', 'schools_project', 'project_items', 'project_financial_plans'] as $table) {
+            if (Schema::hasTable($table) && Schema::hasColumn($table, 'project_id') && DB::table($table)->where('project_id', $project->getKey())->exists()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function filter(Request $request)

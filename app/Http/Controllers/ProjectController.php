@@ -59,6 +59,7 @@ class ProjectController extends Controller
             'other_agency' => 'exclude_unless:agency,__other__|required|string|max:255',
             'contract_amount' => 'required|numeric|min:0.01',
             'ABC' => 'required|numeric|min:0.01',
+            'notice_of_award_date' => 'nullable|date_format:Y-m-d',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'status' => ['required', Rule::in($this->projectStatuses())],

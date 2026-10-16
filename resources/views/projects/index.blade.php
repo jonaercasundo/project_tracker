@@ -459,6 +459,13 @@
                         <label for="keystage" class="text-sm text-slate-600">Include Keystage</label>
                     </div>
 
+                    <div>
+                        <label for="project_notice_of_award_date" class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Date awarded</label>
+                        <input type="date" id="project_notice_of_award_date" name="notice_of_award_date"
+                            value="{{ old('notice_of_award_date') }}"
+                            class="w-full text-sm rounded-xl border-slate-200 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Notice to Proceed Start Date</label>

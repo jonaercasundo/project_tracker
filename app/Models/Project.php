@@ -24,6 +24,7 @@ class Project extends Model
         'ref_no',
         'agency',
         'contract_amount',
+        'notice_of_award_date',
         'start_date',
         'keystage',
         'ABC',
@@ -33,6 +34,7 @@ class Project extends Model
     ];
 
     protected $casts = [
+        'notice_of_award_date' => 'date',
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'contract_amount' => 'decimal:2',

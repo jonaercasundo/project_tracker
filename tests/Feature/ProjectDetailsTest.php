@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Company;
+use App\Models\Project;
 use App\Models\User;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Schema\Blueprint;
@@ -43,6 +44,7 @@ class ProjectDetailsTestCase extends TestCase
     {
         parent::setUp();
         require __DIR__.'/../Fixtures/jarvis_schema.php';
+        (require database_path('migrations/2026_10_16_093347_add_notice_of_award_date_to_projects_table.php'))->up();
         Schema::create('AR_settings', function (Blueprint $table): void {
             $table->integer('project_id');
             foreach (['project_name', 'company', 'client', 'ar_company_footer', 'ar_address_footer', 'ar_contact_footer', 'ar_logo'] as $column) {
@@ -369,6 +371,7 @@ describe('project agencies', function () {
             ...projectAgencyPayload(),
             'other_agency' => 'Housing "Office"',
             'contract_number' => 'CONTRACT-42',
+            'notice_of_award_date' => '2026-09-23',
             'end_date' => '2026-09-01',
         ];
 
@@ -377,16 +380,20 @@ describe('project agencies', function () {
         $rejected->assertRedirect(route('projects.index'))->assertSessionHasErrors('end_date')
             ->assertSessionHasInput('agency', '__other__')
             ->assertSessionHasInput('contract_amount', 1000)
-            ->assertSessionHasInput('ABC', 1200);
+            ->assertSessionHasInput('ABC', 1200)
+            ->assertSessionHasInput('notice_of_award_date', '2026-09-23');
         $this->assertDatabaseCount('projects', 0);
         $response = $this->get(route('projects.index'));
         $response->assertSee('The end date field must be a date after or equal to start date.');
         $document = new DOMDocument;
         $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
         $xpath = new DOMXPath($document);
-        foreach (['ref_no', 'project_name', 'contract_number', 'other_agency', 'start_date', 'end_date'] as $field) {
+        foreach (['ref_no', 'project_name', 'contract_number', 'other_agency', 'notice_of_award_date', 'start_date', 'end_date'] as $field) {
             expect($xpath->evaluate('string(//form[@id="addProjectForm"]//input[@name="'.$field.'"]/@value)'))->toBe($payload[$field]);
         }
+        expect($xpath->evaluate('string(//form[@id="addProjectForm"]//label[@for="project_notice_of_award_date"])'))->toContain('Date awarded');
+        expect($xpath->evaluate('string(//form[@id="addProjectForm"]//input[@name="notice_of_award_date"]/@type)'))->toBe('date');
+        expect($xpath->query('//form[@id="addProjectForm"]//input[@name="notice_of_award_date"]/@required'))->toHaveCount(0);
         expect($xpath->evaluate('string(//form[@id="addProjectForm"]//*[@role="alert"])'))
             ->toContain('The end date field must be a date after or equal to start date.');
     });
@@ -417,4 +424,38 @@ describe('project agencies', function () {
         expect($options)->toHaveCount(5)->toContain('', 'Deped', 'Dpwh', $customAgency, '__other__');
         expect($xpath->evaluate('string(//select[@id="project_agency"]/option[@value="__other__"])'))->toBe('Others');
     });
+});
+
+describe('project award dates', function () {
+    it('creates a project with an optional award date', function (array $awardInput, ?string $expectedDate) {
+        projectDetailsUser();
+        $payload = [...projectAgencyPayload(), 'agency' => 'Deped', ...$awardInput];
+
+        $response = $this->from(route('projects.index'))->post(route('projects.store'), $payload);
+
+        $response->assertRedirect(route('projects.index'))->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Project added successfully.');
+        $this->assertDatabaseCount('projects', 1);
+        $project = Project::query()->where('ref_no', 'AGENCY-001')->firstOrFail();
+        expect($project->notice_of_award_date?->toDateString())->toBe($expectedDate);
+    })->with([
+        'provided date' => [['notice_of_award_date' => '2026-09-23'], '2026-09-23'],
+        'omitted date' => [[], null],
+        'blank date' => [['notice_of_award_date' => ''], null],
+    ]);
+
+    it('rejects invalid award dates without creating a project', function (string $awardDate) {
+        projectDetailsUser();
+        $payload = [...projectAgencyPayload(), 'agency' => 'Deped', 'notice_of_award_date' => $awardDate];
+
+        $response = $this->from(route('projects.index'))->post(route('projects.store'), $payload);
+
+        $response->assertRedirect(route('projects.index'))->assertSessionHasErrors([
+            'notice_of_award_date' => 'The notice of award date field must match the format Y-m-d.',
+        ]);
+        $this->assertDatabaseCount('projects', 0);
+    })->with([
+        'impossible calendar date' => '2026-02-30',
+        'wrong date format' => '23/09/2026',
+    ]);
 });

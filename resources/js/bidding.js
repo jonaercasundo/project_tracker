@@ -26,6 +26,18 @@ function initializeBidding(form) {
     const message = (text = '') => { if (feedback) feedback.textContent = text; };
     const allLots = () => [...form.querySelectorAll('[data-bidding-lot]')];
 
+    function syncProjectCode(focus = false) {
+        const select = form.querySelector('[data-project-code]');
+        const container = form.querySelector('[data-project-code-other]');
+        const input = container?.querySelector('input');
+        if (!select || !container || !input) return;
+        const isOther = select.value === 'Others';
+        container.hidden = !isOther;
+        input.disabled = !isOther;
+        input.required = isOther;
+        if (isOther && focus) input.focus();
+    }
+
     async function getJson(url, signal) {
         const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal });
         if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Your session has expired. Sign in and reload this page.');
@@ -301,6 +313,7 @@ function initializeBidding(form) {
     });
     form.addEventListener('change', event => {
         const target = event.target;
+        if (target.matches('[data-project-code]')) syncProjectCode(true);
         if (target.matches('[data-location]')) changeLocation(target);
         if (target.matches('[data-catalog-item]')) {
             const option = target.selectedOptions[0];
@@ -327,11 +340,13 @@ function initializeBidding(form) {
         form.querySelector('[data-bidding-save-status]').textContent = 'Saving bidding document...';
     });
     window.addEventListener('pageshow', () => {
+        syncProjectCode();
         const save = form.querySelector('[data-bidding-save]');
         if (save) save.disabled = false;
         const status = form.querySelector('[data-bidding-save-status]');
         if (status) status.textContent = '';
     });
+    syncProjectCode();
     form.querySelectorAll('[data-location]').forEach(syncLocationValue);
     form.querySelectorAll('[data-collection]').forEach(initializeCounter);
     recalculate();

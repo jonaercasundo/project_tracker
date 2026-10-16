@@ -161,6 +161,9 @@ class BiddingService
             'reference_no', 'approved_budget_contract_abc', 'contract_amount', 'start_date', 'end_date',
             'notice_of_award_date', 'delivery_period', 'date_of_bid_opening', 'status',
             'prepared_by', 'prepared_date', 'verified_by', 'notes_special_condition']);
+        if (($attributes['project_code'] ?? null) === 'Others') {
+            $attributes['project_code'] = $data['project_code_other'];
+        }
         if (array_key_exists('date_of_pre_bid_conference', $data)) {
             $attributes['pre_bid_conf'] = $data['date_of_pre_bid_conference'];
         }

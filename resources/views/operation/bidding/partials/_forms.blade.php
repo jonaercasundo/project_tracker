@@ -6,6 +6,10 @@
         }
         return is_scalar($value) ? (string) $value : '';
     };
+    $projectCodes = ['SME', 'SFP', 'MT', 'Textbook', 'DCP'];
+    $projectCode = $fieldValue('project_code', $project->project_code ?? '');
+    $isOtherProjectCode = $projectCode !== '' && !in_array($projectCode, $projectCodes, true);
+    $otherProjectCode = $fieldValue('project_code_other', $isOtherProjectCode && !session()->hasOldInput('project_code') ? $projectCode : '');
     $formLots = session()->hasOldInput('hierarchy_present') ? old('lots', []) : ($biddingLots ?? [['lot_no' => 'Lot 1', 'country_code' => 'PH', 'addresses' => []]]);
     $formLots = is_array($formLots) ? $formLots : [];
     $legacyOriginals = [];
@@ -33,11 +37,19 @@
         <div class="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
             <div class="flex flex-col gap-1.5">
                 <label for="bidding-project_code" class="text-xs font-semibold text-slate-600">Project code <span class="text-red-600" aria-hidden="true">*</span></label>
-                <select id="bidding-project_code" name="project_code" required class="w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
+                <select id="bidding-project_code" name="project_code" data-project-code required class="w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
                     <option value="">Select project code</option>
-                    @foreach(['SME', 'SFP', 'MT', 'Textbook', 'DCP'] as $code)<option value="{{ $code }}" @selected($fieldValue('project_code', $project->project_code ?? '') === $code)>{{ $code }}</option>@endforeach
+                    @foreach($projectCodes as $code)<option value="{{ $code }}" @selected($projectCode === $code)>{{ $code }}</option>@endforeach
+                    <option value="Others" @selected($isOtherProjectCode)>Others</option>
                 </select>
                 <x-input-error :messages="$errors->get('project_code')" class="text-xs" />
+                <div data-project-code-other @if(!$isOtherProjectCode) hidden @endif>
+                    <div class="flex flex-col gap-1.5">
+                        <label for="bidding-project_code_other" class="text-xs font-semibold text-slate-600">Other project code <span class="text-red-600" aria-hidden="true">*</span></label>
+                        <input id="bidding-project_code_other" name="project_code_other" type="text" value="{{ $otherProjectCode }}" maxlength="255" placeholder="Enter project code" @required($isOtherProjectCode) @disabled(!$isOtherProjectCode) class="w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
+                        <x-input-error :messages="$errors->get('project_code_other')" class="text-xs" />
+                    </div>
+                </div>
             </div>
                 @include('operation.bidding.partials._field', ['field' => ['key' => 'project_id', 'label' => 'Project Number / Project ID', 'required' => true]])
             <div class="flex flex-col gap-1.5">

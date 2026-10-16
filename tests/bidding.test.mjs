@@ -64,6 +64,72 @@ async function open(html = fixture(), handler = standardLookup, scripts = [sourc
 }
 async function clickWithin(parent, action) { await parent.locator(`[data-bidding-action="${action}"]`).first().click(); }
 
+function projectCodeFixture(selected = '', otherCode = '') {
+    const fields = `<label for="bidding-project_code">Project Code</label><select id="bidding-project_code" name="project_code" data-project-code><option value="">Select project code</option><option value="SCI" ${selected === 'SCI' ? 'selected' : ''}>SCI</option><option value="Others" ${selected === 'Others' ? 'selected' : ''}>Others</option></select><div data-project-code-other hidden><label for="bidding-project_code_other">Other Project Code</label><input id="bidding-project_code_other" name="project_code_other" maxlength="255" value="${otherCode}" disabled></div>`;
+    return fixture().replace('<input type="hidden" name="hierarchy_present"', `${fields}<input type="hidden" name="hierarchy_present"`);
+}
+
+test('Others requires a custom project code and preserves it when switching project codes', async () => {
+    const { page, errors } = await open(projectCodeFixture());
+    const select = page.getByLabel('Project Code', { exact: true });
+    const input = page.getByLabel('Other Project Code', { exact: true });
+    assert.equal(await input.isVisible(), false);
+    assert.equal(await input.isDisabled(), true);
+    assert.equal(await input.evaluate(input => input.required), false);
+
+    await select.selectOption('Others');
+
+    assert.equal(await input.isVisible(), true);
+    assert.equal(await input.isEnabled(), true);
+    assert.equal(await input.evaluate(input => input.validity.valueMissing), true);
+    await input.fill('CUSTOM-2026-001');
+    const customValues = await page.locator('form').evaluate(form => Object.fromEntries(new FormData(form)));
+    assert.equal(customValues.project_code, 'Others');
+    assert.equal(customValues.project_code_other, 'CUSTOM-2026-001');
+    await select.selectOption('SCI');
+    assert.equal(await input.isVisible(), false);
+    assert.equal(await input.isDisabled(), true);
+    assert.equal(await input.evaluate(input => input.required), false);
+    const presetValues = await page.locator('form').evaluate(form => Object.fromEntries(new FormData(form)));
+    assert.equal(presetValues.project_code, 'SCI');
+    assert.equal(Object.hasOwn(presetValues, 'project_code_other'), false);
+    await select.selectOption('Others');
+    assert.equal(await input.inputValue(), 'CUSTOM-2026-001');
+    assert.equal(await input.evaluate(input => input.checkValidity()), true);
+    assert.deepEqual(errors, []);
+    await page.close();
+});
+
+test('restored custom project codes are usable on initialization and browser history restoration', async () => {
+    const { page, errors } = await open(projectCodeFixture('Others', 'RESTORED-2026-002'));
+    const select = page.getByLabel('Project Code', { exact: true });
+    const input = page.getByLabel('Other Project Code', { exact: true });
+    assert.equal(await input.isVisible(), true);
+    assert.equal(await input.isEnabled(), true);
+    assert.equal(await input.evaluate(input => input.required), true);
+    assert.equal(await input.inputValue(), 'RESTORED-2026-002');
+
+    await select.selectOption('SCI');
+    await select.evaluate(select => {
+        select.value = 'Others';
+        window.dispatchEvent(new Event('pageshow'));
+    });
+
+    assert.equal(await input.isVisible(), true);
+    assert.equal(await input.isEnabled(), true);
+    assert.equal(await input.evaluate(input => input.required), true);
+    assert.equal(await input.inputValue(), 'RESTORED-2026-002');
+    await select.evaluate(select => {
+        select.value = '';
+        window.dispatchEvent(new Event('pageshow'));
+    });
+    assert.equal(await input.isVisible(), false);
+    assert.equal(await input.isDisabled(), true);
+    assert.equal(await input.evaluate(input => input.required), false);
+    assert.deepEqual(errors, []);
+    await page.close();
+});
+
 test('one click adds one node at each level; stable counters survive deleting highest restored indices', async () => {
     const { page, errors } = await open(fixture({ nested: true, sparse: true }));
     await page.addScriptTag({ content: `{${source}}` });
@@ -391,6 +457,15 @@ test('actual isolated Blade pages render responsive forms with no page overflow'
             return standardLookup(url);
         }, [source, documentSource, alpineSource]);
         if (css) await page.addStyleTag({ content: css });
+        if (file === 'project-bidding-create.html') {
+            await page.getByLabel(/^Project code/).selectOption('Others');
+            const otherProjectCode = page.getByLabel(/^Other project code/);
+            assert.equal(await otherProjectCode.isVisible(), true);
+            await otherProjectCode.fill('CUSTOM-2026-003');
+            const values = await page.locator('[data-bidding-form]').evaluate(form => Object.fromEntries(new FormData(form)));
+            assert.equal(values.project_code, 'Others');
+            assert.equal(values.project_code_other, 'CUSTOM-2026-003');
+        }
         if (file.includes('selected-edit')) assert(await page.locator('[data-catalog-item]').evaluateAll(selects => selects.every(select => [...select.options].filter(option => option.value).length <= 51)));
         if (file.includes('legacy-country')) {
             assert((await page.locator('[data-bidding-lot]').first().textContent()).includes('Japan'));

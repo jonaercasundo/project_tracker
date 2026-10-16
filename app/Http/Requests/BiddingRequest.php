@@ -114,7 +114,8 @@ abstract class BiddingRequest extends FormRequest
             'school_token' => ['required_with:school_plan', 'uuid'],
             'hierarchy_present' => ['sometimes', 'boolean'],
             'hierarchy_complete' => ['required_if:hierarchy_present,1', 'boolean'],
-            'project_code' => [$required, 'required', Rule::in(['SME', 'SFP', 'MT', 'Textbook', 'DCP'])],
+            'project_code' => [$required, 'required', 'string', Rule::in(['SME', 'SFP', 'MT', 'Textbook', 'DCP', 'Others'])],
+            'project_code_other' => ['exclude_unless:project_code,Others', 'required', 'string', 'max:255'],
             'project_name' => [$awardFieldsRequired, $required, 'required', 'string', 'max:255'],
             'project_id' => [$awardFieldsRequired, $required, 'required', 'string', 'max:255', $unique],
             'reference_no' => [$awardFieldsRequired, 'nullable', 'string', 'max:50'],
@@ -228,6 +229,7 @@ abstract class BiddingRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'project_code_other.required' => 'Enter the other project code.',
             'project_id.unique' => 'A bidding document with this Project ID already exists.',
             'hierarchy_complete.required_if' => 'The form was truncated. Reduce its size or ask your administrator to increase the server input limit; nothing was saved.',
             '*.regex' => 'Use a nonnegative amount with at most 13 integer digits and two decimal places.',

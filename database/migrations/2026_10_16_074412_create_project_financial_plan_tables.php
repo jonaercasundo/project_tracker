@@ -132,7 +132,7 @@ return new class extends Migration
                 $table->timestamps();
                 $table->unique(['project_financial_plan_id', 'version_number'], 'project_financial_plan_versions_number_unique');
                 $table->index(['project_financial_plan_id', 'created_at'], 'project_financial_plan_versions_history_index');
-                $table->foreign('project_financial_plan_id', 'project_financial_plan_versions_project_financial_plan_id_foreign')->references('id')->on('project_financial_plans')->cascadeOnDelete();
+                $table->foreign('project_financial_plan_id', 'project_financial_plan_versions_plan_fk')->references('id')->on('project_financial_plans')->cascadeOnDelete();
                 $table->foreign('created_by', 'project_financial_plan_versions_created_by_foreign')->references('user_id')->on('users')->onDelete('restrict');
             });
 
@@ -180,7 +180,7 @@ return new class extends Migration
                 $table->json('source_snapshot')->nullable();
                 $table->timestamps();
                 $table->index(['project_financial_plan_version_id', 'category'], 'project_financial_plan_cost_category_index');
-                $table->foreign('project_financial_plan_version_id', 'project_financial_plan_cost_items_project_financial_plan_version_id_foreign')->references('id')->on('project_financial_plan_versions')->cascadeOnDelete();
+                $table->foreign('project_financial_plan_version_id', 'project_financial_plan_cost_items_version_fk')->references('id')->on('project_financial_plan_versions')->cascadeOnDelete();
             });
 
             if ($this->isPretending()) {
@@ -432,7 +432,7 @@ return new class extends Migration
             throw new RuntimeException("Foreign key {$table}.{$column} has values without matching {$parentTable}.{$parentColumn} records.");
         }
 
-        $foreignKeyName = $table.'_'.$column.'_foreign';
+        $foreignKeyName = $this->foreignKeyName($table, $column);
         $existingNames = collect($this->schemaRead(fn (): array => Schema::getForeignKeys($table)))->pluck('name');
         if ($existingNames->contains($foreignKeyName)) {
             throw new RuntimeException("Foreign key name {$foreignKeyName} is already used with a different definition.");
@@ -444,6 +444,15 @@ return new class extends Migration
                 ->on($parentTable)
                 ->onDelete($onDelete);
         });
+    }
+
+    private function foreignKeyName(string $table, string $column): string
+    {
+        return match ($table.'.'.$column) {
+            'project_financial_plan_versions.project_financial_plan_id' => 'project_financial_plan_versions_plan_fk',
+            'project_financial_plan_cost_items.project_financial_plan_version_id' => 'project_financial_plan_cost_items_version_fk',
+            default => $table.'_'.$column.'_foreign',
+        };
     }
 
     private function isPretending(): bool

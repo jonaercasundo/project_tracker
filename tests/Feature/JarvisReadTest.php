@@ -1124,6 +1124,41 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
     $api = jarvisRead('projects/delivery-progress', $token, ['search' => 'REF-001', 'sort' => 'progress', 'direction' => 'desc', 'compact' => 0]);
     expect($dashboard->json('summary'))->toBe($api->json('data.summary'));
     expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
+    $this->get('/deliveries/monitoring?project_id=2')->assertOk()
+        ->assertSee('The selected project is inactive and Active projects only is enabled.');
+});
+
+it('keeps an explicitly selected active project when no delivery matches the date or status filter', function () {
+    jarvisOperations();
+    DB::table('projects')->insert(['project_id' => 3, 'project_name' => 'Implementation without receipts', 'status' => 'Implementation']);
+    $service = app(ProjectDeliveryProgressService::class);
+
+    $statusQuery = $service->recordsQuery(['project_id' => 1, 'active_only' => 1, 'delivery_status' => 'cancelled']);
+    $statusSql = strtolower($statusQuery->toSql());
+    $statusReport = $service->report(['project_id' => 1, 'active_only' => 1, 'delivery_status' => 'cancelled']);
+    $yearReport = $service->report(['project_id' => 1, 'active_only' => 1, 'year' => 2025]);
+    $locationReport = $service->report(['project_id' => 1, 'active_only' => 1, 'region' => 'Region II']);
+    $emptyProjectReport = $service->report(['project_id' => 3, 'active_only' => 1, 'delivery_status' => 'pending']);
+    $inactiveIncludedReport = $service->report(['project_id' => 2, 'active_only' => 0, 'delivery_status' => 'accepted']);
+    $inactiveExcludedReport = $service->report(['project_id' => 2, 'active_only' => 1]);
+    $unselectedStatusReport = $service->report(['active_only' => 0, 'delivery_status' => 'pending']);
+
+    expect($statusReport['projects'])->toHaveCount(1)
+        ->and($statusReport['projects']->first())->toMatchArray(['project_id' => 1, 'total_deliveries_count' => 0])
+        ->and($yearReport['projects'])->toHaveCount(1)
+        ->and($yearReport['projects']->first()['total_deliveries_count'])->toBe(0)
+        ->and($locationReport['projects'])->toHaveCount(1)
+        ->and($locationReport['projects']->first()['total_deliveries_count'])->toBe(0)
+        ->and($emptyProjectReport['projects'])->toHaveCount(1)
+        ->and($emptyProjectReport['projects']->first())->toMatchArray(['project_id' => 3, 'progress_basis' => 'no_delivery_receipts'])
+        ->and($inactiveIncludedReport['projects'])->toHaveCount(1)
+        ->and($inactiveIncludedReport['projects']->first()['project_id'])->toBe(2)
+        ->and($unselectedStatusReport['projects']->pluck('project_id')->all())->toBe([2])
+        ->and($inactiveExcludedReport['projects'])->toBeEmpty()
+        ->and($inactiveExcludedReport['empty_reason'])->toBe('inactive_project')
+        ->and(preg_match('/delivery_stats.{0,32}project_id.{0,32}is not null/', $statusSql))->toBe(0)
+        ->and($statusQuery->getBindings())->toContain(1)
+        ->and($statusQuery->getBindings())->toContain('cancelled');
 });
 
 it('returns 403 on Operations monitoring without the existing role or selected MMC company', function (string $condition) {

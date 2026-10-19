@@ -169,11 +169,14 @@ it('counts distinct pending DR scopes while Logistics tracking is empty', functi
     insertDeliveryFixture(10, 'school-B', 'DR-100');
     insertDeliveryFixture(11, 'school-A', 'DR-100');
 
-    expect(app(LogisticsDrTrackingService::class)->dashboardSummary())->toBe([
+    expect(app(LogisticsDrTrackingService::class)->dashboardSummary())->toMatchArray([
         'logistics_received' => 0,
         'logistics_delivered' => 0,
         'pending_updates' => 3,
         'reconciliation_required' => 0,
+        'total_scoped_drs' => 3,
+        'delivery_performance_percentage' => 0,
+        'partner_performance' => [],
     ]);
 });
 
@@ -488,6 +491,20 @@ it('progresses a verified DR from Logistics Received to Delivered without changi
         ->and(DB::table('logistics_dr_tracking')->value('latest_event_id'))->toBe($delivered['event_id'])
         ->and(DB::table('deliveries')->where('delivery_id', $deliveryId)->value('status'))->toBe('warehouse')
         ->and(DB::table('package_status')->where('delivery_id', $deliveryId)->value('status'))->toBe('released');
+
+    expect(app(LogisticsDrTrackingService::class)->dashboardSummary())->toMatchArray([
+        'logistics_received' => 0,
+        'logistics_delivered' => 1,
+        'pending_updates' => 0,
+        'total_scoped_drs' => 1,
+        'delivery_performance_percentage' => 100,
+        'partner_performance' => [[
+            'integration_id' => 'logistics-test',
+            'total_scopes' => 1,
+            'delivered_scopes' => 1,
+            'performance_percentage' => 100,
+        ]],
+    ]);
 });
 
 it('quarantines a delivered event that arrives before Logistics Received', function () {

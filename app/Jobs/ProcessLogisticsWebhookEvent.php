@@ -18,6 +18,8 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
 
     public int $tries = 3;
 
+    public int $timeout = 75;
+
     /** @var array<int, int> */
     public array $backoff = [10, 60];
 

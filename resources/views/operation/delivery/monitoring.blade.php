@@ -112,13 +112,31 @@
                 <span id="logistics-updated" class="text-xs text-slate-500" aria-live="polite">Refreshes every 7 seconds while this page is active</span>
             </div>
 
-            <form id="logistics-filters" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <form id="logistics-filters" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-8">
                 <div>
                     <label for="logistics-project" class="mb-1 block text-xs font-semibold text-slate-600">Project</label>
                     <select id="logistics-project" name="project_id" class="w-full rounded-xl border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                         <option value="">All projects</option>
                         @foreach($projects as $project)
                             <option value="{{ $project->project_id }}">{{ $project->project_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="logistics-lot" class="mb-1 block text-xs font-semibold text-slate-600">Lot</label>
+                    <select id="logistics-lot" name="lot_id" class="w-full rounded-xl border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">All lots</option>
+                        @foreach($lots as $lot)
+                            <option value="{{ $lot->lot_id }}">{{ $lot->lot_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="logistics-partner" class="mb-1 block text-xs font-semibold text-slate-600">Logistics partner</label>
+                    <select id="logistics-partner" name="integration_id" class="w-full rounded-xl border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">All partners</option>
+                        @foreach($logisticsIntegrations as $integration)
+                            <option value="{{ $integration->integration_id }}">{{ $integration->name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -148,7 +166,7 @@
                 </div>
                 <input type="hidden" name="per_page" value="25">
                 <input type="hidden" name="page" value="1">
-                <div class="flex items-end gap-2 sm:col-span-2 xl:col-span-6">
+                <div class="flex items-end gap-2 sm:col-span-2 xl:col-span-8">
                     <button type="submit" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Apply filters</button>
                     <button type="reset" id="logistics-reset" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Reset</button>
                     <p id="logistics-error" role="alert" class="ml-2 hidden text-sm text-rose-600"></p>

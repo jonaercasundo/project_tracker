@@ -217,6 +217,25 @@
                                 </span>
                             @endif
 
+                            @php
+                                $logisticsStatus = $dr_group['logistics']['status'] ?? null;
+                                $logisticsStyles = [
+                                    'logistics_received' => 'border-blue-200 bg-blue-50 text-blue-700',
+                                    'delivered' => 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                                ];
+                            @endphp
+                            <div class="flex flex-col items-end gap-1.5">
+                                <span class="whitespace-nowrap rounded-full border px-3 py-1 text-[10px] font-bold {{ $logisticsStyles[$logisticsStatus] ?? 'border-amber-200 bg-amber-50 text-amber-700' }}">
+                                    {{ $logisticsStatus === 'logistics_received' ? 'LOGISTICS RECEIVED' : ($logisticsStatus === 'delivered' ? 'LOGISTICS DELIVERED' : 'PENDING LOGISTICS') }}
+                                </span>
+                                @if($dr_group['logistics'])
+                                    <span class="text-[10px] text-slate-500">
+                                        {{ $dr_group['logistics']['partner'] }} · {{ \Illuminate\Support\Carbon::parse($dr_group['logistics']['occurred_at'])->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
+                                    </span>
+                                    <span class="text-[10px] text-slate-400">Reconciliation: {{ str_replace('_', ' ', $dr_group['logistics']['reconciliation_status']) }}</span>
+                                @endif
+                            </div>
+
                             <div class="flex items-center gap-2">
                                 <button type="button"
                                     onclick="generateQR()"

@@ -378,7 +378,7 @@ class ProjectDeliveryProgressService
                 ->groupBy('d.project_id');
             $query->leftJoinSub($lotNames, 'project_lots', 'project_lots.project_id', '=', 'p.project_id')->addSelect('project_lots.lot_names');
         }
-        if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status', 'lot_id'])) {
+        if (! isset($filters['project_id']) && array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status', 'lot_id'])) {
             $query->whereNotNull('delivery_stats.project_id');
         }
         foreach (array_merge(['total_deliveries_count', 'completed_deliveries_count', 'delivery_rows_count'], array_map(fn (string $status): string => str_replace(' ', '_', $status).'_deliveries_count', self::DELIVERY_STATUSES)) as $column) {
@@ -689,7 +689,18 @@ class ProjectDeliveryProgressService
             $summary['overall_progress'] = null;
         }
 
-        return ['projects' => $projects, 'summary' => $summary, 'definitions' => $this->definitions()];
+        $emptyReason = null;
+        if ($projects->isEmpty()) {
+            $emptyReason = 'no_match';
+            if (isset($filters['project_id']) && (bool) ($filters['active_only'] ?? true)) {
+                $selectedProjectStatus = DB::table('projects')->where('project_id', $filters['project_id'])->value('status');
+                if ($selectedProjectStatus !== null && in_array(strtolower($selectedProjectStatus), array_map('strtolower', self::INACTIVE_PROJECT_STATUSES), true)) {
+                    $emptyReason = 'inactive_project';
+                }
+            }
+        }
+
+        return ['projects' => $projects, 'summary' => $summary, 'definitions' => $this->definitions(), 'empty_reason' => $emptyReason];
     }
 
     /** @param array<string, mixed> $counts */

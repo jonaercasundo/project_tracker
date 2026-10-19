@@ -11,6 +11,7 @@ use App\Services\ProjectDeliveryProgressService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DeliveryMonitoringController extends Controller
 {
@@ -83,6 +84,10 @@ class DeliveryMonitoringController extends Controller
             'logistics' => $logistics,
             'filters' => $filters,
             'projects' => DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']),
+            'logisticsIntegrations' => Schema::hasTable('logistics_integrations')
+                ? DB::table('logistics_integrations')->where('status', 'active')->orderBy('name')->get(['integration_id', 'name'])
+                : collect(),
+            'lots' => DB::table('lot')->orderBy('lot_name')->get(['lot_id', 'lot_name']),
             'locations' => DB::table('school')->whereNotNull('region')->where('region', '<>', '')->distinct()->orderBy('region')->pluck('region'),
             'years' => DB::table('deliveries')->whereNotNull('delivery_date')->selectRaw(DB::connection()->getDriverName() === 'sqlite' ? "CAST(strftime('%Y', delivery_date) AS INTEGER) as year" : 'YEAR(delivery_date) as year')->distinct()->orderByDesc('year')->pluck('year'),
         ]);

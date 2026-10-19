@@ -25,6 +25,8 @@ class DeliveryMonitoringLogisticsRequest extends FormRequest
     {
         return [
             'project_id' => ['nullable', 'integer', 'min:1'],
+            'lot_id' => ['nullable', 'integer', 'min:1'],
+            'integration_id' => ['nullable', 'string', 'max:64'],
             'dr_reference' => ['nullable', 'string', 'max:100'],
             'school' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', Rule::in(['logistics_received', 'delivered'])],

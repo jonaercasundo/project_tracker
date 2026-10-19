@@ -161,6 +161,19 @@
             </select>
         </div>
 
+        {{-- Logistics Status --}}
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+                Logistics Status
+            </label>
+            <select name="logistics_status" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+                <option value="">All Logistics Statuses</option>
+                <option value="pending" @selected(request('logistics_status') === 'pending')>Pending Logistics</option>
+                <option value="logistics_received" @selected(request('logistics_status') === 'logistics_received')>Logistics Received</option>
+                <option value="delivered" @selected(request('logistics_status') === 'delivered')>Logistics Delivered</option>
+            </select>
+        </div>
+
     </div>
 
     {{-- ACTION BUTTONS --}}

@@ -11,10 +11,13 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use setasign\Fpdi\Fpdi;
 
 class DeliveryController extends Controller
@@ -198,24 +201,66 @@ class DeliveryController extends Controller
         if ($request->filled('year')) {
             $baseQuery->whereYear('d.delivery_date', $request->year);
         }
+        if (in_array($request->input('logistics_status'), ['pending', 'logistics_received', 'delivered'], true)) {
+            $status = $request->input('logistics_status');
+            $trackingMatch = function (Builder $trackingQuery): void {
+                $trackingQuery->selectRaw('1')
+                    ->from('logistics_dr_tracking as tracking')
+                    ->whereColumn('tracking.project_id', 'd.project_id');
+                if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+                    $trackingQuery->whereRaw('BINARY tracking.school_id = BINARY d.school_id')
+                        ->whereRaw('BINARY tracking.dr_reference = BINARY d.dr_no');
+                } else {
+                    $trackingQuery->whereRaw('tracking.school_id = d.school_id COLLATE BINARY')
+                        ->whereRaw('tracking.dr_reference = d.dr_no COLLATE BINARY');
+                }
+            };
+
+            if ($status === 'pending') {
+                if (Schema::hasTable('logistics_dr_tracking')) {
+                    $baseQuery->whereNotExists($trackingMatch);
+                }
+            } elseif (Schema::hasTable('logistics_dr_tracking')) {
+                $baseQuery->whereExists(function (Builder $trackingQuery) use ($trackingMatch, $status): void {
+                    $trackingMatch($trackingQuery);
+                    $trackingQuery->where('tracking.logistics_status', $status);
+                });
+            } else {
+                $baseQuery->whereRaw('1 = 0');
+            }
+        }
 
         // =========================
         // TOTAL (DISTINCT DR NUMBERS, not delivery rows)
         // Pagination is now per DR# group, so count distinct dr_no.
         // =========================
-        $total_rows = (clone $baseQuery)->distinct()->count('d.dr_no');
+        $scopedDrQuery = clone $baseQuery;
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            $scopedDrQuery->selectRaw('d.project_id, BINARY d.school_id as school_id, BINARY d.dr_no as dr_no');
+        } else {
+            $scopedDrQuery->select('d.project_id', 'd.school_id', 'd.dr_no');
+        }
+        $scopedDrQuery->distinct();
+        $total_rows = DB::query()->fromSub($scopedDrQuery, 'scoped_deliveries')->count();
         $total_pages = (int) ceil($total_rows / $limit);
 
         // =========================
         // PAGINATED DR NUMBERS ONLY
         // =========================
-        $drNos = (clone $baseQuery)
-            ->select('d.dr_no')
+        $drScopesQuery = clone $baseQuery;
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            $drScopesQuery->selectRaw('d.project_id, BINARY d.school_id as school_id, BINARY d.dr_no as dr_no');
+        } else {
+            $drScopesQuery->select('d.project_id', 'd.school_id', 'd.dr_no');
+        }
+        $drScopes = $drScopesQuery
             ->distinct()
             ->orderBy('d.dr_no', 'asc')
+            ->orderBy('d.project_id')
+            ->orderBy('d.school_id')
             ->limit($limit)
             ->offset($offset)
-            ->pluck('d.dr_no');
+            ->get();
 
         // =========================
         // FULL DATA WITH ITEMS
@@ -241,7 +286,21 @@ class DeliveryController extends Controller
                 $join->on('ps.delivery_id', '=', 'd.delivery_id')
                     ->on('ps.package_id', '=', 'pk.package_id');
             })
-            ->whereIn('d.dr_no', $drNos)
+            ->where(function ($query) use ($drScopes): void {
+                if ($drScopes->isEmpty()) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                foreach ($drScopes as $scope) {
+                    $query->orWhere(function ($scopeQuery) use ($scope): void {
+                        $scopeQuery->where('d.project_id', $scope->project_id);
+                        $this->whereExactColumnValue($scopeQuery, 'd.school_id', (string) $scope->school_id);
+                        $this->whereExactColumnValue($scopeQuery, 'd.dr_no', (string) $scope->dr_no);
+                    });
+                }
+            })
             ->select(
                 'd.delivery_id',
                 'd.dr_no',
@@ -272,14 +331,15 @@ class DeliveryController extends Controller
         // GROUP BY DR + DELIVERY
         // =========================
         $grouped = [];
+        $logisticsByScope = $this->latestLogisticsByScope($drScopes);
 
         foreach ($rows as $row) {
 
-            $dr = $row->dr_no;
+            $scopeKey = $this->deliveryScopeKey((int) $row->project_id, (string) $row->school_id, (string) $row->dr_no);
 
-            if (! isset($grouped[$dr])) {
-                $grouped[$dr] = [
-                    'dr_no' => $dr,
+            if (! isset($grouped[$scopeKey])) {
+                $grouped[$scopeKey] = [
+                    'dr_no' => $row->dr_no,
                     'delivery_id' => $row->delivery_id,
                     'project_id' => $row->project_id,
                     'project_name' => $row->project_name,
@@ -291,19 +351,20 @@ class DeliveryController extends Controller
                     'municipality' => $row->municipality,
                     'delivery_date' => $row->delivery_date,
                     'status' => $row->status,
+                    'logistics' => $logisticsByScope[$scopeKey] ?? null,
                     'deliveries' => [],
                 ];
             }
 
             $deliveryId = $row->delivery_id;
 
-            if (! isset($grouped[$dr]['deliveries'][$deliveryId])) {
+            if (! isset($grouped[$scopeKey]['deliveries'][$deliveryId])) {
                 $delivery = clone $row;
                 $delivery->packages = [];
-                $grouped[$dr]['deliveries'][$deliveryId] = $delivery;
+                $grouped[$scopeKey]['deliveries'][$deliveryId] = $delivery;
             }
 
-            $delivery = $grouped[$dr]['deliveries'][$deliveryId];
+            $delivery = $grouped[$scopeKey]['deliveries'][$deliveryId];
 
             if (! empty($row->package_id)) {
 
@@ -394,13 +455,14 @@ class DeliveryController extends Controller
                 $join->on('ps.delivery_id', '=', 'd.delivery_id')
                     ->on('ps.package_id', '=', 'pk.package_id');
             })
-            ->select('d.dr_no', 'pk.package_id', 'd.delivery_id', DB::raw('COALESCE(ps.status, "pending") as pkg_status'))
+            ->select('d.project_id', 'd.school_id', 'd.dr_no', 'pk.package_id', 'd.delivery_id', DB::raw('COALESCE(ps.status, "pending") as pkg_status'))
             ->distinct()
             ->get();
 
         $drStatusMap = [];
         foreach ($packageStatusQuery as $row) {
-            $drStatusMap[$row->dr_no][] = strtolower($row->pkg_status);
+            $scopeKey = $this->deliveryScopeKey((int) $row->project_id, (string) $row->school_id, (string) $row->dr_no);
+            $drStatusMap[$scopeKey][] = strtolower($row->pkg_status);
         }
 
         $dr_status_counts = [
@@ -411,7 +473,7 @@ class DeliveryController extends Controller
             'mixed' => 0,
         ];
 
-        foreach ($drStatusMap as $drNo => $statuses) {
+        foreach ($drStatusMap as $scopeKey => $statuses) {
             $unique = array_unique($statuses);
 
             if (count($unique) === 1) {
@@ -463,6 +525,75 @@ class DeliveryController extends Controller
             'total_rows' => $total_rows,
             'stats' => $stats,
         ]);
+    }
+
+    /**
+     * @param  Collection<int, object>  $scopes
+     * @return array<string, array{status: string, partner: string, occurred_at: string, reconciliation_status: string}>
+     */
+    private function latestLogisticsByScope(Collection $scopes): array
+    {
+        if ($scopes->isEmpty() || ! Schema::hasTable('logistics_dr_tracking')) {
+            return [];
+        }
+
+        $query = DB::table('logistics_dr_tracking as tracking')
+            ->leftJoin('logistics_integrations as integration', 'integration.integration_id', '=', 'tracking.integration_id')
+            ->select([
+                'tracking.project_id',
+                'tracking.school_id',
+                'tracking.dr_reference',
+                'tracking.integration_id',
+                'tracking.logistics_status',
+                'tracking.event_occurred_at',
+                'tracking.reconciliation_status',
+                'tracking.latest_sequence',
+                'integration.name as partner_name',
+            ])
+            ->where(function ($trackingQuery) use ($scopes): void {
+                foreach ($scopes as $scope) {
+                    $trackingQuery->orWhere(function ($scopeQuery) use ($scope): void {
+                        $scopeQuery->where('tracking.project_id', $scope->project_id);
+                        $this->whereExactColumnValue($scopeQuery, 'tracking.school_id', (string) $scope->school_id);
+                        $this->whereExactColumnValue($scopeQuery, 'tracking.dr_reference', (string) $scope->dr_no);
+                    });
+                }
+            })
+            ->orderByDesc('tracking.event_occurred_at')
+            ->orderByDesc('tracking.latest_sequence');
+
+        $latestByScope = [];
+        foreach ($query->get() as $tracking) {
+            $key = $this->deliveryScopeKey((int) $tracking->project_id, (string) $tracking->school_id, (string) $tracking->dr_reference);
+            if (isset($latestByScope[$key])) {
+                continue;
+            }
+
+            $latestByScope[$key] = [
+                'status' => (string) $tracking->logistics_status,
+                'partner' => (string) ($tracking->partner_name ?? $tracking->integration_id ?? 'Unknown partner'),
+                'occurred_at' => (string) $tracking->event_occurred_at,
+                'reconciliation_status' => (string) $tracking->reconciliation_status,
+            ];
+        }
+
+        return $latestByScope;
+    }
+
+    private function deliveryScopeKey(int $projectId, string $schoolId, string $drReference): string
+    {
+        return $projectId.':'.hash('sha256', $schoolId).':'.hash('sha256', $drReference);
+    }
+
+    private function whereExactColumnValue(Builder $query, string $column, string $value): void
+    {
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            $query->whereRaw('BINARY '.$column.' = BINARY ?', [$value]);
+
+            return;
+        }
+
+        $query->whereRaw($column.' = ? COLLATE BINARY', [$value]);
     }
 
     // =========================
@@ -1216,26 +1347,26 @@ class DeliveryController extends Controller
 
                 $data[$deliveryProjectId]['schools'][$schoolId] = [
 
-                        'info' => [
+                    'info' => [
 
-                            'school_name' => trim(
-                                (string) (
-                                    $delivery->school_name ?? ''
-                                )
-                            ),
+                        'school_name' => trim(
+                            (string) (
+                                $delivery->school_name ?? ''
+                            )
+                        ),
 
-                            'school_id' => $delivery->school_id ?? '',
+                        'school_id' => $delivery->school_id ?? '',
 
-                            'municipality' => trim(
-                                (string) (
-                                    $delivery->municipality ?? ''
-                                )
-                            ),
-                        ],
+                        'municipality' => trim(
+                            (string) (
+                                $delivery->municipality ?? ''
+                            )
+                        ),
+                    ],
 
-                        'lots' => [],
-                        'delivery_ids' => [],
-                    ];
+                    'lots' => [],
+                    'delivery_ids' => [],
+                ];
             }
 
             /*
@@ -1323,16 +1454,16 @@ class DeliveryController extends Controller
 
                 $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey] = [
 
-                        'lot_id' => $lotId,
+                    'lot_id' => $lotId,
 
-                        'lot_name' => $lotName,
+                    'lot_name' => $lotName,
 
-                        'lot_qr' => $lotQrCache[$lotQrValue],
+                    'lot_qr' => $lotQrCache[$lotQrValue],
 
-                        'keystages' => [],
-                        'delivery_ids' => [],
-                        'delivery_qrs' => [],
-                    ];
+                    'keystages' => [],
+                    'delivery_ids' => [],
+                    'delivery_qrs' => [],
+                ];
             }
 
             $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['delivery_ids'][] = $deliveryId;
@@ -1566,13 +1697,13 @@ class DeliveryController extends Controller
 
                     $data[$deliveryProjectId]['schools'][$schoolId]['lots'][$lotKey]['keystages'][$keystageKey] = [
 
-                            'keystage_id' => $keystageId,
+                        'keystage_id' => $keystageId,
 
-                            'label' => $keystageLabel,
+                        'label' => $keystageLabel,
 
-                            'items' => [],
-                            'delivery_ids' => [],
-                        ];
+                        'items' => [],
+                        'delivery_ids' => [],
+                    ];
                 }
 
                 /*

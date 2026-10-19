@@ -187,8 +187,23 @@ class LogisticsDrTrackingService
             && DB::table('logistics_dr_tracking')->exists();
 
         if ($hasTrackingRows) {
-            $statusCounts = $this->trackingQuery($filters, withDisplayNames: false)->select([])->selectRaw(
-                "COUNT(CASE WHEN tracking.logistics_status = 'logistics_received' THEN 1 END) as logistics_received, COUNT(CASE WHEN tracking.logistics_status = 'delivered' THEN 1 END) as logistics_delivered"
+            $statusScopes = $this->trackingQuery($filters, withDisplayNames: false)
+                ->select('tracking.project_id');
+            if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+                $statusScopes->selectRaw('BINARY tracking.school_id as school_id, BINARY tracking.dr_reference as dr_reference');
+            } else {
+                $statusScopes->addSelect('tracking.school_id', 'tracking.dr_reference');
+            }
+            $statusScopes
+                ->selectRaw("MAX(CASE WHEN tracking.logistics_status = 'logistics_received' THEN 1 ELSE 0 END) as has_received, MAX(CASE WHEN tracking.logistics_status = 'delivered' THEN 1 ELSE 0 END) as has_delivered")
+                ->groupBy('tracking.project_id');
+            if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+                $statusScopes->groupByRaw('BINARY tracking.school_id, BINARY tracking.dr_reference');
+            } else {
+                $statusScopes->groupBy('tracking.school_id', 'tracking.dr_reference');
+            }
+            $statusCounts = DB::query()->fromSub($statusScopes, 'tracking_scopes')->selectRaw(
+                'SUM(CASE WHEN has_delivered = 0 THEN has_received ELSE 0 END) as logistics_received, SUM(has_delivered) as logistics_delivered'
             )->first();
             $summary['logistics_received'] = (int) ($statusCounts->logistics_received ?? 0);
             $summary['logistics_delivered'] = (int) ($statusCounts->logistics_delivered ?? 0);
@@ -204,13 +219,40 @@ class LogisticsDrTrackingService
             });
         }
 
+        if (isset($filters['integration_id']) && $filters['integration_id'] !== '') {
+            $pendingQuery->whereExists(function (Builder $integrationQuery) use ($filters): void {
+                $integrationQuery->selectRaw('1')
+                    ->from('logistics_integrations as integration')
+                    ->join('logistics_integration_projects as integration_project', 'integration_project.integration_id', '=', 'integration.id')
+                    ->where('integration.integration_id', $filters['integration_id'])
+                    ->whereColumn('integration_project.project_id', 'delivery.project_id')
+                    ->where(function (Builder $schoolScopeQuery): void {
+                        $schoolScopeQuery->whereNotExists(function (Builder $unrestrictedScope): void {
+                            $unrestrictedScope->selectRaw('1')
+                                ->from('logistics_integration_schools as configured_school')
+                                ->whereColumn('configured_school.integration_id', 'integration.id')
+                                ->whereColumn('configured_school.project_id', 'delivery.project_id');
+                        })->orWhereExists(function (Builder $authorizedSchool): void {
+                            $authorizedSchool->selectRaw('1')
+                                ->from('logistics_integration_schools as configured_school')
+                                ->whereColumn('configured_school.integration_id', 'integration.id')
+                                ->whereColumn('configured_school.project_id', 'delivery.project_id');
+                            $this->whereColumnExact($authorizedSchool, 'configured_school.school_id', 'delivery.school_id');
+                        });
+                    });
+            });
+        }
+
         $this->applyPendingFilters($pendingQuery, $filters);
 
         if ($hasTrackingRows) {
-            $pendingQuery->whereNotExists(function (Builder $trackingQuery): void {
+            $pendingQuery->whereNotExists(function (Builder $trackingQuery) use ($filters): void {
                 $trackingQuery->selectRaw('1')
                     ->from('logistics_dr_tracking as tracking')
                     ->whereColumn('tracking.project_id', 'delivery.project_id');
+                if (isset($filters['integration_id']) && $filters['integration_id'] !== '') {
+                    $trackingQuery->where('tracking.integration_id', (string) $filters['integration_id']);
+                }
 
                 if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
                     $trackingQuery->whereRaw('tracking.school_scope_hash = SHA2(CAST(delivery.school_id AS BINARY), 256)')
@@ -227,14 +269,43 @@ class LogisticsDrTrackingService
         $pendingScopes = $pendingQuery->select(['delivery.project_id', 'delivery.school_id', 'delivery.dr_no']);
         $this->groupExactScope($pendingScopes, 'delivery');
         $summary['pending_updates'] = (int) DB::query()->fromSub($pendingScopes, 'pending_scopes')->count();
+        $summary['total_scoped_drs'] = $summary['pending_updates'] + $summary['logistics_received'] + $summary['logistics_delivered'];
+        $summary['delivery_performance_percentage'] = $summary['total_scoped_drs'] === 0
+            ? 0
+            : round(($summary['logistics_delivered'] / $summary['total_scoped_drs']) * 100, 1);
+
+        $summary['partner_performance'] = $hasTrackingRows
+            ? $this->trackingQuery($filters, withDisplayNames: false)
+                ->select('tracking.integration_id')
+                ->selectRaw('COUNT(*) as total_scopes, COUNT(CASE WHEN tracking.logistics_status = \'delivered\' THEN 1 END) as delivered_scopes')
+                ->groupBy('tracking.integration_id')
+                ->get()
+                ->map(fn (object $partner): array => [
+                    'integration_id' => $partner->integration_id,
+                    'total_scopes' => (int) $partner->total_scopes,
+                    'delivered_scopes' => (int) $partner->delivered_scopes,
+                    'performance_percentage' => (int) $partner->total_scopes === 0 ? 0 : round(((int) $partner->delivered_scopes / (int) $partner->total_scopes) * 100, 1),
+                ])->all()
+            : [];
 
         if (Schema::hasTable('logistics_webhook_events')) {
             $reconciliationQuery = DB::table('logistics_webhook_events')
                 ->where('processing_status', 'processed')
                 ->whereIn('reconciliation_status', ['ambiguous', 'unknown', 'out_of_scope', 'out_of_order', 'stale', 'duplicate_sequence'])
                 ->when(isset($filters['project_id']) && $filters['project_id'] !== '', fn ($query) => $query->where('resolved_project_id', (int) $filters['project_id']))
+                ->when(isset($filters['integration_id']) && $filters['integration_id'] !== '', fn ($query) => $query->where('integration_id', (string) $filters['integration_id']))
                 ->when(isset($filters['school']) && $filters['school'] !== '', fn ($query) => $query->where('resolved_school_id', 'like', '%'.$filters['school'].'%'))
                 ->when(isset($filters['dr_reference']) && $filters['dr_reference'] !== '', fn ($query) => $this->whereExact($query, 'dr_reference', (string) $filters['dr_reference']))
+                ->when(isset($filters['lot_id']) && $filters['lot_id'] !== '', function ($query) use ($filters): void {
+                    $query->whereExists(function (Builder $deliveryQuery) use ($filters): void {
+                        $deliveryQuery->selectRaw('1')
+                            ->from('deliveries as reconciliation_delivery')
+                            ->whereColumn('reconciliation_delivery.project_id', 'logistics_webhook_events.resolved_project_id')
+                            ->where('reconciliation_delivery.lot_id', (int) $filters['lot_id']);
+                        $this->whereColumnExact($deliveryQuery, 'reconciliation_delivery.school_id', 'logistics_webhook_events.resolved_school_id');
+                        $this->whereColumnExact($deliveryQuery, 'reconciliation_delivery.dr_no', 'logistics_webhook_events.dr_reference');
+                    });
+                })
                 ->when(isset($filters['date_from']) && $filters['date_from'] !== '', fn ($query) => $query->where('event_occurred_at', '>=', $this->utcDateBoundary($filters['date_from'])))
                 ->when(isset($filters['date_to']) && $filters['date_to'] !== '', fn ($query) => $query->where('event_occurred_at', '<', $this->utcDateBoundary($filters['date_to'], true)));
 
@@ -273,6 +344,19 @@ class LogisticsDrTrackingService
         if (isset($filters['project_id']) && $filters['project_id'] !== '') {
             $query->where('tracking.project_id', (int) $filters['project_id']);
         }
+        if (isset($filters['integration_id']) && $filters['integration_id'] !== '') {
+            $query->where('tracking.integration_id', $filters['integration_id']);
+        }
+        if (isset($filters['lot_id']) && $filters['lot_id'] !== '') {
+            $query->whereExists(function (Builder $deliveryQuery) use ($filters): void {
+                $deliveryQuery->selectRaw('1')
+                    ->from('deliveries as scoped_delivery')
+                    ->whereColumn('scoped_delivery.project_id', 'tracking.project_id')
+                    ->where('scoped_delivery.lot_id', (int) $filters['lot_id']);
+                $this->whereColumnExact($deliveryQuery, 'scoped_delivery.school_id', 'tracking.school_id');
+                $this->whereColumnExact($deliveryQuery, 'scoped_delivery.dr_no', 'tracking.dr_reference');
+            });
+        }
         if (isset($filters['dr_reference']) && $filters['dr_reference'] !== '') {
             $this->whereExact($query, 'tracking.dr_reference', (string) $filters['dr_reference']);
         }
@@ -299,6 +383,9 @@ class LogisticsDrTrackingService
     {
         if (isset($filters['project_id']) && $filters['project_id'] !== '') {
             $query->where('delivery.project_id', (int) $filters['project_id']);
+        }
+        if (isset($filters['lot_id']) && $filters['lot_id'] !== '') {
+            $query->where('delivery.lot_id', (int) $filters['lot_id']);
         }
         if (isset($filters['dr_reference']) && $filters['dr_reference'] !== '') {
             $this->whereExact($query, 'delivery.dr_no', (string) $filters['dr_reference']);

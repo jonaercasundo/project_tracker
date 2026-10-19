@@ -111,14 +111,15 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/events/{event}/retry', [LogisticsChannelController::class, 'retryEvent'])->whereNumber('event')->middleware('throttle:10,1')->name('events.retry');
         });
 
+    });
+    Route::middleware(['role:Administrator'])->group(function () {
+    
         Route::post('/users', [UserController::class, 'store'])
             ->name('users.store');
 
         Route::delete('/users/{user}', [UserController::class, 'destroy'])
-            ->name('users.destroy');
-    });
-    Route::middleware(['role:Administrator'])->group(function () {
-        /*
+            ->name('users.destroy');   
+    /*
         |--------------------------------------------------------------------------
         | ADMIN DASHBOARD
         |--------------------------------------------------------------------------

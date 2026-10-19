@@ -2,7 +2,9 @@
 
 use App\Models\User;
 use App\Services\DeliveryBillingQrCodeService;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\BillingWorkflowTestCase;
 
 pest()->extend(BillingWorkflowTestCase::class)->in(__FILE__);
@@ -64,6 +66,36 @@ function confirmDeliveryForBilling(int $deliveryId): void
 {
     test()->postJson(route('billing.for-billing', $deliveryId))->assertOk();
 }
+
+it('repairs the history index after a partial migration without losing billing data', function () {
+    signInBillingUser();
+    $deliveryId = createBillingDelivery();
+    confirmDeliveryForBilling($deliveryId);
+    Schema::table('delivery_billing_histories', function (Blueprint $table): void {
+        $table->dropIndex('delivery_billing_history_record_created_idx');
+    });
+
+    $migration = require database_path('migrations/2026_10_13_030107_create_delivery_billing_tables.php');
+    $migration->up();
+    $migration->up();
+
+    expect(Schema::hasIndex('delivery_billing_histories', ['delivery_billing_record_id', 'created_at']))->toBeTrue();
+    $this->assertDatabaseCount('delivery_billing_records', 1);
+    $this->assertDatabaseCount('delivery_billing_histories', 1);
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
+});
+
+it('previews a missing history index without changing the billing schema', function () {
+    Schema::table('delivery_billing_histories', function (Blueprint $table): void {
+        $table->dropIndex('delivery_billing_history_record_created_idx');
+    });
+    $migration = require database_path('migrations/2026_10_13_030107_create_delivery_billing_tables.php');
+
+    $queries = DB::connection()->pretend(fn () => $migration->up());
+
+    expect(collect($queries)->contains(fn (array $query): bool => str_contains($query['query'], 'delivery_billing_history_record_created_idx')))->toBeTrue();
+    expect(Schema::hasIndex('delivery_billing_histories', ['delivery_billing_record_id', 'created_at']))->toBeFalse();
+});
 
 it('shows pending status until a user explicitly confirms For Billing', function () {
     signInBillingUser();

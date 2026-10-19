@@ -8,13 +8,16 @@ return new class extends Migration
 {
     public function up(): void
     {
+        $hasTable = fn (string $table): bool => Schema::getConnection()
+            ->withoutPretending(fn (): bool => Schema::hasTable($table));
+
         foreach (['deliveries', 'invoices', 'users'] as $table) {
-            if (! Schema::hasTable($table)) {
+            if (! $hasTable($table)) {
                 throw new RuntimeException("The legacy {$table} table must exist before delivery billing can be installed.");
             }
         }
 
-        if (! Schema::hasTable('delivery_billing_records')) {
+        if (! $hasTable('delivery_billing_records')) {
             Schema::create('delivery_billing_records', function (Blueprint $table): void {
                 $table->id();
                 $table->integer('delivery_id')->unique();
@@ -49,7 +52,7 @@ return new class extends Migration
             });
         }
 
-        if (! Schema::hasTable('delivery_billing_histories')) {
+        if (! $hasTable('delivery_billing_histories')) {
             Schema::create('delivery_billing_histories', function (Blueprint $table): void {
                 $table->id();
                 $table->foreignId('delivery_billing_record_id')
@@ -71,7 +74,16 @@ return new class extends Migration
                     ->references('user_id')
                     ->on('users')
                     ->nullOnDelete();
-                $table->index(['delivery_billing_record_id', 'created_at']);
+            });
+        }
+
+        $hasHistoryIndex = Schema::getConnection()->withoutPretending(
+            fn (): bool => Schema::hasIndex('delivery_billing_histories', ['delivery_billing_record_id', 'created_at'])
+        );
+
+        if (! $hasHistoryIndex) {
+            Schema::table('delivery_billing_histories', function (Blueprint $table): void {
+                $table->index(['delivery_billing_record_id', 'created_at'], 'delivery_billing_history_record_created_idx');
             });
         }
     }

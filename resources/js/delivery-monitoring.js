@@ -276,7 +276,7 @@ if (monitoring) {
             form.elements[name].value = filters.get(name) ?? '';
         }
         form.elements.direction.value = filters.get('direction') ?? 'asc';
-        document.getElementById('monitoring-active').checked = filters.get('active_only') !== '0';
+        document.getElementById('monitoring-active').checked = filters.get('active_only') === '1';
         fillLocations(division, 'division', [], filters.get('division') ?? '');
         fillLocations(municipality, 'municipality', [], filters.get('municipality') ?? '');
         updateLocations();

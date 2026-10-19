@@ -69,6 +69,7 @@ class DeliveryMonitoringController extends Controller
     public function index(DeliveryMonitoringRequest $request): View|JsonResponse
     {
         $filters = array_filter($request->validated(), fn (mixed $value): bool => $value !== null && $value !== '');
+        $filters['active_only'] ??= 0;
         $report = $this->progress->report($filters);
         if ($request->expectsJson()) {
             return response()->json($report + [

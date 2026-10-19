@@ -23,7 +23,9 @@ class ProjectDeliveryProgressService
     {
         $query = DB::table('projects as p');
         if ((bool) ($filters['active_only'] ?? true)) {
-            $query->whereNotIn('p.status', self::INACTIVE_PROJECT_STATUSES);
+            $inactiveStatuses = array_map('strtolower', self::INACTIVE_PROJECT_STATUSES);
+            $placeholders = implode(', ', array_fill(0, count($inactiveStatuses), '?'));
+            $query->whereRaw("LOWER(TRIM(COALESCE(p.status, ''))) NOT IN ({$placeholders})", $inactiveStatuses);
         }
         if (isset($filters['project_id'])) {
             $query->where('p.project_id', $filters['project_id']);
@@ -636,7 +638,7 @@ class ProjectDeliveryProgressService
                     $project[$column] = (int) $value;
                 }
             }
-            $project['is_active'] = ! in_array(strtolower($project['project_status'] ?? ''), array_map('strtolower', self::INACTIVE_PROJECT_STATUSES), true);
+            $project['is_active'] = $this->isActiveProjectStatus($project['project_status'] ?? null);
             $project['completed_packages_count'] = $project['delivered_packages_count'] + $project['accepted_packages_count'];
             $project['remaining_packages_count'] = $project['total_packages_count'] - $project['completed_packages_count'];
             $project['remaining_deliveries_count'] = $project['total_deliveries_count'] - $project['completed_deliveries_count'] - $project['cancelled_deliveries_count'];
@@ -694,13 +696,18 @@ class ProjectDeliveryProgressService
             $emptyReason = 'no_match';
             if (isset($filters['project_id']) && (bool) ($filters['active_only'] ?? true)) {
                 $selectedProjectStatus = DB::table('projects')->where('project_id', $filters['project_id'])->value('status');
-                if ($selectedProjectStatus !== null && in_array(strtolower($selectedProjectStatus), array_map('strtolower', self::INACTIVE_PROJECT_STATUSES), true)) {
+                if (! $this->isActiveProjectStatus($selectedProjectStatus)) {
                     $emptyReason = 'inactive_project';
                 }
             }
         }
 
         return ['projects' => $projects, 'summary' => $summary, 'definitions' => $this->definitions(), 'empty_reason' => $emptyReason];
+    }
+
+    private function isActiveProjectStatus(?string $status): bool
+    {
+        return ! in_array(strtolower(trim($status ?? '')), array_map('strtolower', self::INACTIVE_PROJECT_STATUSES), true);
     }
 
     /** @param array<string, mixed> $counts */

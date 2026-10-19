@@ -57,7 +57,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-4 sm:col-span-2 xl:col-span-3">
                     <div class="flex items-center gap-2">
                         <input type="hidden" name="active_only" value="0">
-                        <input type="checkbox" id="monitoring-active" name="active_only" value="1" @checked($filters['active_only'] ?? true) class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        <input type="checkbox" id="monitoring-active" name="active_only" value="1" @checked($filters['active_only'] ?? false) class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         <label for="monitoring-active" class="text-sm text-slate-600">Active projects only</label>
                     </div>
                     <div class="flex items-center gap-3">

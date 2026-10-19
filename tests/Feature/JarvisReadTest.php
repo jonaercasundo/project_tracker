@@ -1124,8 +1124,39 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
     $api = jarvisRead('projects/delivery-progress', $token, ['search' => 'REF-001', 'sort' => 'progress', 'direction' => 'desc', 'compact' => 0]);
     expect($dashboard->json('summary'))->toBe($api->json('data.summary'));
     expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
-    $this->get('/deliveries/monitoring?project_id=2')->assertOk()
+    $this->get('/deliveries/monitoring?project_id=2&active_only=1')->assertOk()
         ->assertSee('The selected project is inactive and Active projects only is enabled.');
+});
+
+it('shows every project status by default and keeps the optional active filter explicit', function () {
+    jarvisOperations();
+    DB::table('projects')->where('project_id', 1)->update(['project_name' => 'SME 1', 'status' => 'Completed']);
+    DB::table('projects')->where('project_id', 2)->update(['project_name' => 'SME 2']);
+    $user = jarvisReader(true, true, false);
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $defaultPage = $this->get('/deliveries/monitoring')->assertOk()->assertSee('SME 1')->assertSee('SME 2');
+    $activePage = $this->get('/deliveries/monitoring?active_only=1')->assertOk()->assertSee('SME 1');
+    $defaultReport = $this->getJson('/deliveries/monitoring')->assertOk();
+    $activeReport = $this->getJson('/deliveries/monitoring?active_only=1')->assertOk();
+    $selectedSme2 = $this->getJson('/deliveries/monitoring?project_id=2&active_only=0&year=2025')->assertOk();
+
+    expect($defaultPage->viewData('filters')['active_only'])->toBe(0)
+        ->and(preg_match('/<input(?=[^>]*id="monitoring-active")(?=[^>]*\\schecked(?:\\s|=|>))[^>]*>/s', $defaultPage->getContent()))->toBe(0)
+        ->and(preg_match('/<input(?=[^>]*id="monitoring-active")(?=[^>]*\\schecked(?:\\s|=|>))[^>]*>/s', $activePage->getContent()))->toBe(1)
+        ->and($defaultPage->viewData('report')['projects']->pluck('project_name')->all())->toContain('SME 2')
+        ->and($activePage->viewData('report')['projects']->pluck('project_name')->all())->not->toContain('SME 2')
+        ->and($defaultReport->json('projects'))->toHaveCount(2)
+        ->and($activeReport->json('projects'))->toHaveCount(1)
+        ->and($activeReport->json('projects.0.project_name'))->toBe('SME 1')
+        ->and($selectedSme2->json('projects'))->toHaveCount(1)
+        ->and($selectedSme2->json('projects.0'))->toMatchArray(['project_name' => 'SME 2', 'project_status' => 'Delivered', 'is_active' => false, 'total_deliveries_count' => 1]);
+
+    $details = app(ProjectDeliveryProgressService::class);
+    expect($details->detailRecords(['project_id' => 2, 'active_only' => 0, 'year' => 2025], 'dr', 10, 1)->total())->toBe(1)
+        ->and($details->detailRecords(['project_id' => 2, 'active_only' => 0, 'year' => 2025], 'warehouse', 10, 1)->total())->toBe(1)
+        ->and($details->detailRecords(['project_id' => 2, 'active_only' => 0, 'year' => 2025], 'billing', 10, 1)->total())->toBe(0);
 });
 
 it('keeps an explicitly selected active project when no delivery matches the date or status filter', function () {
@@ -1159,6 +1190,56 @@ it('keeps an explicitly selected active project when no delivery matches the dat
         ->and(preg_match('/delivery_stats.{0,32}project_id.{0,32}is not null/', $statusSql))->toBe(0)
         ->and($statusQuery->getBindings())->toContain(1)
         ->and($statusQuery->getBindings())->toContain('cancelled');
+});
+
+it('classifies active projects consistently across the supported project statuses', function () {
+    jarvisOperations();
+    DB::table('projects')->insert([
+        ['project_id' => 3, 'project_name' => 'Pending Project', 'status' => 'Pending'],
+        ['project_id' => 4, 'project_name' => 'Implementation Project', 'status' => 'Implementation'],
+        ['project_id' => 5, 'project_name' => 'Completed Project', 'status' => 'Completed'],
+        ['project_id' => 6, 'project_name' => 'Unspecified Project', 'status' => null],
+        ['project_id' => 7, 'project_name' => 'Whitespace Delivered Project', 'status' => ' delivered '],
+        ['project_id' => 8, 'project_name' => 'For Billing Project', 'status' => 'For Billing'],
+        ['project_id' => 9, 'project_name' => 'For Collection Project', 'status' => 'For Collection'],
+        ['project_id' => 10, 'project_name' => 'Collected Project', 'status' => 'Collected'],
+        ['project_id' => 11, 'project_name' => 'Cancelled Project', 'status' => 'Cancelled'],
+        ['project_id' => 12, 'project_name' => 'Dropped Project', 'status' => 'Dropped'],
+        ['project_id' => 13, 'project_name' => 'Mixed Case Delivered Project', 'status' => 'dElIvErEd'],
+    ]);
+    $service = app(ProjectDeliveryProgressService::class);
+
+    $activeReport = $service->report(['active_only' => 1]);
+    $allProjectsReport = $service->report(['active_only' => 0]);
+
+    expect($activeReport['projects']->pluck('project_id')->all())->toBe([1, 3, 4, 5, 6])
+        ->and($activeReport['projects']->pluck('is_active')->unique()->all())->toBe([true])
+        ->and($allProjectsReport['projects']->pluck('project_id')->all())->toBe(range(1, 13))
+        ->and($allProjectsReport['projects']->where('is_active', false)->pluck('project_id')->all())->toBe([2, 7, 8, 9, 10, 11, 12, 13]);
+});
+
+it('shows selected active projects with their operational data', function () {
+    jarvisOperations();
+    DB::table('projects')->where('project_id', 1)->update(['project_name' => 'Selected active project']);
+    $service = app(ProjectDeliveryProgressService::class);
+
+    $activeReport = $service->report(['active_only' => 1, 'project_id' => 1]);
+    $allProjectsReport = $service->report(['active_only' => 0, 'project_id' => 1]);
+    $project = $activeReport['projects']->first();
+    $deliveryDetails = $service->detailRecords(['project_id' => 1, 'active_only' => 1], 'dr', 10, 1);
+    $inventoryDetails = $service->detailRecords(['project_id' => 1, 'active_only' => 1], 'warehouse', 10, 1);
+    $billingDetails = $service->detailRecords(['project_id' => 1, 'active_only' => 1], 'billing', 10, 1);
+
+    expect($activeReport['projects'])->toHaveCount(1)
+        ->and($allProjectsReport['projects'])->toHaveCount(1)
+        ->and($project)->toMatchArray(['project_name' => 'Selected active project', 'project_status' => 'Ongoing', 'is_active' => true])
+        ->and($project['total_deliveries_count'])->toBe(2)
+        ->and($project['total_packages_count'])->toBeGreaterThan(0)
+        ->and($project['billing_groups_count'])->toBe(1)
+        ->and($project['warehouse_readiness']['required'])->toBeGreaterThan(0)
+        ->and($deliveryDetails->total())->toBe(2)
+        ->and($inventoryDetails->total())->toBe(1)
+        ->and($billingDetails->total())->toBe(1);
 });
 
 it('returns 403 on Operations monitoring without the existing role or selected MMC company', function (string $condition) {

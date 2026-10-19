@@ -66,9 +66,7 @@ Route::get('/', function () {
 */
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard/launch', DashboardLaunchController::class)->name('dashboard.launch');
-    Route::get('/admin/dashboard', [RoleAccessPermissionController::class, 'index'])
-        ->middleware(['company.context:MMC', 'role:Administrator'])
-        ->name('admin.dashboard');
+
     Route::get('/deliveries/monitoring', [DeliveryMonitoringController::class, 'index'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring');
@@ -118,13 +116,18 @@ Route::middleware(['auth'])->group(function () {
 
         Route::delete('/users/{user}', [UserController::class, 'destroy'])
             ->name('users.destroy');
-
+    });
+    Route::middleware(['role:Administrator'])->group(function () {
         /*
         |--------------------------------------------------------------------------
         | ADMIN DASHBOARD
         |--------------------------------------------------------------------------
         */
 
+        Route::get('/admin/dashboard', [
+            RoleAccessPermissionController::class,
+            'index',
+        ])->name('admin.dashboard');
 
         /*
         |--------------------------------------------------------------------------

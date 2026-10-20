@@ -14,15 +14,19 @@ use App\Services\ProjectFinancialPlanCalculator;
 use App\Services\ProjectFinancialPlanService;
 use Brick\Math\BigDecimal;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ProjectFinancialPlanController extends Controller
 {
-    public function dashboard(): View
+    public function dashboard(Request $request): View
     {
         $companyId = $this->currentCompanyId();
+        $isMmcPplWorkspace = request()->user()?->currentCompany()?->code === 'MMC';
         $plans = ProjectFinancialPlan::query()
             ->forCompany($companyId)
             ->with('latestVersion')
@@ -30,12 +34,60 @@ class ProjectFinancialPlanController extends Controller
             ->get();
         $versions = $plans->map(fn (ProjectFinancialPlan $plan) => $plan->latestVersion)->filter();
 
+        $monitoringPlans = null;
+        $monitoringYears = collect();
+        $monitoringStatuses = collect();
+        $filters = ['year' => null, 'status' => null];
+
+        if ($isMmcPplWorkspace) {
+            $filters = $request->validate([
+                'year' => ['nullable', 'digits:4'],
+                'status' => ['nullable', 'string', 'max:50'],
+            ]);
+
+            $monitoringQuery = ProjectFinancialPlan::query()
+                ->forCompany($companyId)
+                ->with(['latestVersion', 'project', 'bidding', 'lot', 'pplForm'])
+                ->latest('updated_at');
+
+            if (! empty($filters['year'])) {
+                $monitoringQuery->whereHas('pplForm', fn (Builder $query) => $query->where('year_of_revenue_recognition', $filters['year']));
+            }
+
+            if (! empty($filters['status'])) {
+                $status = $filters['status'];
+                $monitoringQuery->where(function (Builder $query) use ($status): void {
+                    $query->where('status', $status)
+                        ->orWhereHas('project', fn (Builder $projectQuery) => $projectQuery->where('status', $status))
+                        ->orWhereHas('bidding', fn (Builder $biddingQuery) => $biddingQuery->where('status', $status));
+                });
+            }
+
+            $monitoringPlans = $monitoringQuery->paginate(25)->withQueryString();
+            $monitoringYears = PplForm::query()
+                ->whereNotNull('year_of_revenue_recognition')
+                ->distinct()
+                ->orderBy('year_of_revenue_recognition')
+                ->pluck('year_of_revenue_recognition');
+            $monitoringStatuses = collect(['draft'])
+                ->merge(Project::query()->whereNotNull('status')->distinct()->orderBy('status')->pluck('status'))
+                ->merge(ProjectInformation::query()->whereNotNull('status')->distinct()->orderBy('status')->pluck('status'))
+                ->unique()
+                ->sort()
+                ->values();
+        }
+
         return view('finance.dashboard', [
             'planCount' => $plans->count(),
             'draftCount' => $plans->where('status', 'draft')->count(),
             'projectCount' => $plans->whereNotNull('project_id')->pluck('project_id')->unique()->count(),
             'projectedPplTotal' => $this->sumCalculation($versions, 'ppl'),
             'recentPlans' => $plans->take(8),
+            'isMmcPplWorkspace' => $isMmcPplWorkspace,
+            'monitoringPlans' => $monitoringPlans,
+            'monitoringYears' => $monitoringYears,
+            'monitoringStatuses' => $monitoringStatuses,
+            'filters' => $filters,
         ]);
     }
 
@@ -100,12 +152,22 @@ class ProjectFinancialPlanController extends Controller
     {
         $companyCode = request()->user()?->currentCompany()?->code;
         $canLinkMmcRecords = $companyCode === 'MMC';
+        $projectColumns = ['project_id', 'project_name', 'project_code'];
+        foreach (['ABC', 'contract_amount'] as $column) {
+            if (Schema::hasColumn('projects', $column)) {
+                $projectColumns[] = $column;
+            }
+        }
+        $biddingColumns = ['id', 'project_id', 'project_name', 'status', 'approved_budget_contract_abc'];
+        if (Schema::hasColumn('project_information', 'contract_amount')) {
+            $biddingColumns[] = 'contract_amount';
+        }
 
         return [
-            'projects' => $canLinkMmcRecords ? Project::query()->orderBy('project_name')->get(['project_id', 'project_name', 'project_code']) : collect(),
-            'biddingDocuments' => $canLinkMmcRecords ? ProjectInformation::query()->orderBy('project_name')->get(['id', 'project_id', 'project_name', 'status']) : collect(),
+            'projects' => $canLinkMmcRecords ? Project::query()->orderBy('project_name')->get($projectColumns) : collect(),
+            'biddingDocuments' => $canLinkMmcRecords ? ProjectInformation::query()->orderBy('project_name')->get($biddingColumns) : collect(),
             'lots' => $canLinkMmcRecords ? ProjectLot::query()->with('project')->orderBy('lot_no')->get(['id', 'project_id', 'lot_no']) : collect(),
-            'pplForms' => $canLinkMmcRecords ? PplForm::query()->latest('id')->limit(100)->get(['id', 'project_code', 'lot_number', 'project_title']) : collect(),
+            'pplForms' => $canLinkMmcRecords ? PplForm::query()->latest('id')->get(['id', 'project_code', 'lot_number', 'project_title', 'abc']) : collect(),
             'factoryCosts' => $this->factoryCosts(),
             'defaultInputs' => [
                 'contract_amount' => '', 'abc' => '', 'factory_cost' => '',

@@ -94,6 +94,18 @@ it('calculates workbook PPL outputs with safe zero-sales margins and the correct
     expect($zeroSales['gpm'])->toBeNull()->and($zeroSales['npm'])->toBeNull();
 });
 
+it('calculates the tax lawyer allowance from ABC when ABC differs from net sales', function () {
+    $results = app(ProjectFinancialPlanCalculator::class)->calculate([
+        'contract_amount' => '1120000.00',
+        'abc' => '750000.00',
+        'factory_cost' => '0.00',
+        'tax_lawyer_rate' => '0.05',
+    ]);
+
+    expect($results['net_sales'])->toBe('1000000.00')
+        ->and($results['costs']['tax_lawyer_allowance'])->toBe('37500.00');
+});
+
 it('uses the workbook bases for every PPL expense and profitability measure', function () {
     $inputs = [
         'contract_amount' => '1120000', 'abc' => '1000000', 'factory_cost' => '500000',
@@ -301,6 +313,84 @@ it('supports existing project links and optional bidding lots without changing p
         ->and($plan->bidding->status)->toBe('Awarded');
 });
 
+it('fills blank ABC and contract inputs from selected MMC sources and preserves entered values', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $bidding = ProjectInformation::query()->create([
+        'project_id' => 'BID-'.fake()->unique()->numerify('####'),
+        'project_name' => 'Awarded procurement record',
+        'procuring_entity' => 'Test agency',
+        'approved_budget_contract_abc' => '250000.00',
+        'contract_amount' => '224000.00',
+        'status' => 'Awarded',
+    ]);
+    $pplForm = PplForm::query()->create([
+        'project_code' => 'HIST-ABC',
+        'lot_number' => '1',
+        'project_title' => 'Historical PPL source',
+        'abc' => '200000.00',
+    ]);
+    $payload = financialPlanPayload([
+        'project_information_id' => $bidding->id,
+        'ppl_form_id' => $pplForm->id,
+    ]);
+    unset($payload['inputs']['abc'], $payload['inputs']['contract_amount']);
+
+    $this->post(route('finance.plans.store'), $payload)->assertRedirect();
+
+    $version = ProjectFinancialPlan::query()->sole()->latestVersion;
+    expect($version->input_data['inputs']['abc'])->toBe('250000.00')
+        ->and($version->input_data['inputs']['contract_amount'])->toBe('224000.00')
+        ->and($version->input_data['source_mapping']['abc'])->toBe([
+            'source' => 'bidding_document',
+            'record_id' => (string) $bidding->id,
+            'value' => '250000.00',
+        ])
+        ->and($version->input_data['source_mapping']['contract_amount']['source'])->toBe('bidding_document');
+
+    $manualPayload = financialPlanPayload([
+        'name' => 'Manually overridden estimate',
+        'project_information_id' => $bidding->id,
+        'inputs' => ['abc' => '175000.00', 'contract_amount' => '196000.00'],
+    ]);
+    $this->post(route('finance.plans.store'), $manualPayload)->assertRedirect();
+
+    $manualVersion = ProjectFinancialPlan::query()->where('name', 'Manually overridden estimate')->sole()->latestVersion;
+    expect($manualVersion->input_data['inputs']['abc'])->toBe('175000.00')
+        ->and($manualVersion->input_data['inputs']['contract_amount'])->toBe('196000.00')
+        ->and($manualVersion->input_data['source_mapping'])->toBe([]);
+
+    $project = makeLegacyProject(['ABC' => '180000.00', 'contract_amount' => '168000.00']);
+    $projectPayload = financialPlanPayload([
+        'name' => 'Implementation source estimate',
+        'project_id' => $project->project_id,
+    ]);
+    unset($projectPayload['inputs']['abc'], $projectPayload['inputs']['contract_amount']);
+    $this->post(route('finance.plans.store'), $projectPayload)->assertRedirect();
+
+    $projectVersion = ProjectFinancialPlan::query()->where('name', 'Implementation source estimate')->sole()->latestVersion;
+    expect($projectVersion->input_data['inputs']['abc'])->toBe('180000')
+        ->and($projectVersion->input_data['inputs']['contract_amount'])->toBe('168000.00')
+        ->and($projectVersion->input_data['source_mapping']['abc']['record_id'])->toBe((string) $project->project_id);
+});
+
+it('makes all existing MMC PPL records available as financial plan sources without changing them', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    foreach (range(1, 174) as $index) {
+        PplForm::query()->create([
+            'project_code' => 'HIST-'.$index,
+            'lot_number' => '1',
+            'project_title' => 'Historical PPL '.$index,
+            'abc' => 100000,
+        ]);
+    }
+
+    $this->get(route('finance.plans.create'))
+        ->assertOk()
+        ->assertViewHas('pplForms', fn ($pplForms): bool => $pplForms->count() === 174);
+
+    expect(PplForm::query()->count())->toBe(174);
+});
+
 it('keeps historical PPL records and manually created projects independent of financial drafts', function () {
     $historical = PplForm::query()->create([
         'project_code' => 'HIST-1', 'lot_number' => '1', 'project_title' => 'Historical PPL', 'abc' => 250000,
@@ -345,6 +435,22 @@ it('denies non-finance users and isolates plans between company workspaces', fun
     $this->get(route('finance.plans.index'))->assertForbidden();
     $this->post(route('finance.plans.store'), financialPlanPayload())->assertForbidden();
 
+});
+
+it('restricts legacy PPL forms to the MMC company context while keeping MI standalone planning available', function () {
+    $this->signInBiddingUser('finance', 'MI');
+    $this->get(route('ppl_forms.index'))->assertForbidden();
+    $this->get(route('ppl_forms.create'))->assertForbidden();
+
+    $this->get(route('finance.plans.create'))
+        ->assertOk()
+        ->assertViewHas('pplForms', fn ($pplForms): bool => $pplForms->isEmpty());
+
+    $this->post(route('finance.plans.store'), financialPlanPayload(['name' => 'MI standalone draft']))
+        ->assertRedirect();
+
+    expect(ProjectFinancialPlan::query()->sole()->company_id)
+        ->toBe(auth()->user()->currentCompany()->company_id);
 });
 
 it('ignores client supplied status changes so a financial draft cannot alter project lifecycle status', function () {
@@ -416,4 +522,28 @@ it('shows a company-scoped finance dashboard using the latest version for each p
         ->assertViewHas('planCount', 1)
         ->assertViewHas('draftCount', 1)
         ->assertViewHas('recentPlans', fn ($plans): bool => $plans->count() === 1 && $plans->first()->name === 'MI standalone estimate');
+});
+
+it('filters MMC PPL monitoring by historical revenue year and linked project status', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $project = makeLegacyProject(['status' => 'Ongoing']);
+    $pplForm = PplForm::query()->create([
+        'project_code' => 'PPL-2026',
+        'lot_number' => '1',
+        'project_title' => 'Monitoring source',
+        'abc' => '100000.00',
+        'year_of_revenue_recognition' => '2026',
+    ]);
+    $payload = financialPlanPayload([
+        'project_id' => $project->project_id,
+        'ppl_form_id' => $pplForm->id,
+    ]);
+    unset($payload['inputs']['abc']);
+    $this->post(route('finance.plans.store'), $payload)->assertRedirect();
+    $plan = ProjectFinancialPlan::query()->sole();
+
+    $this->get(route('finance.dashboard', ['year' => '2026', 'status' => 'Ongoing']))
+        ->assertOk()
+        ->assertViewHas('monitoringPlans', fn ($plans): bool => $plans->count() === 1 && $plans->first()->is($plan))
+        ->assertViewHas('isMmcPplWorkspace', true);
 });

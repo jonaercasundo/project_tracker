@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Models\Company;
 use App\Models\MI_Product_Factory_Cost;
 use App\Models\PplForm;
+use App\Models\Project;
 use App\Models\ProjectFinancialPlan;
 use App\Models\ProjectFinancialPlanVersion;
+use App\Models\ProjectInformation;
 use App\Models\ProjectLot;
 use App\Models\User;
 use Illuminate\Support\Arr;
@@ -128,6 +130,7 @@ class ProjectFinancialPlanService
     private function createVersion(ProjectFinancialPlan $plan, array $data, User $user, int $versionNumber): ProjectFinancialPlanVersion
     {
         $inputs = array_replace(self::INPUT_DEFAULTS, Arr::except($data['inputs'], ['factory_cost_id']));
+        [$inputs, $pplForm, $sourceMapping] = $this->populateKnownSourceInputs($inputs, $data);
         $requiredInputs = [
             'contract_amount', 'abc', 'factory_cost', 'pf1_rate', 'pf2_rate', 'pf3_rate',
             'll_commission_rate', 'interest_dst_rate', 'shipping_containers', 'rate_per_container',
@@ -148,7 +151,6 @@ class ProjectFinancialPlanService
         $assumptions = array_replace($this->calculator->defaultAssumptions(), $data['assumptions'] ?? []);
         $additionalCosts = $data['cost_items'] ?? [];
         $results = $this->calculator->calculate($inputs, $assumptions, $additionalCosts);
-        $pplForm = isset($data['ppl_form_id']) ? PplForm::query()->findOrFail($data['ppl_form_id']) : null;
         $factoryCostSnapshot = $this->factoryCostSnapshot($inputs, $data);
 
         $version = $plan->versions()->create([
@@ -159,6 +161,7 @@ class ProjectFinancialPlanService
                 'inputs' => $inputs,
                 'additional_cost_items' => $additionalCosts,
                 'source_ppl_form' => $pplForm?->getAttributes(),
+                'source_mapping' => $sourceMapping,
             ],
             'calculation_results' => $results,
             'assumptions_snapshot' => [
@@ -167,6 +170,7 @@ class ProjectFinancialPlanService
                 'rates' => $assumptions,
                 'formula_manifest' => $this->calculator->formulaManifest(),
                 'corrections' => [
+                    'Tax lawyer allowance uses ABC per workbook PPL column X.',
                     'Municipal tax uses first-tier and excess rates only on their corresponding portions of net sales.',
                     'Zero net sales returns a null margin instead of a spreadsheet division error.',
                 ],
@@ -205,6 +209,59 @@ class ProjectFinancialPlanService
         }
 
         return $version;
+    }
+
+    /**
+     * Fill only blank ABC and contract inputs from explicitly linked MMC records.
+     * User-entered values remain authoritative and are preserved in each version.
+     *
+     * @param  array<string, mixed>  $inputs
+     * @param  array<string, mixed>  $data
+     * @return array{array<string, mixed>, ?PplForm, array<string, array{source: string, record_id: string, value: string}>}
+     */
+    private function populateKnownSourceInputs(array $inputs, array $data): array
+    {
+        $project = ! empty($data['project_id']) ? Project::query()->findOrFail($data['project_id']) : null;
+        $bidding = ! empty($data['project_information_id'])
+            ? ProjectInformation::query()->findOrFail($data['project_information_id'])
+            : null;
+        $pplForm = ! empty($data['ppl_form_id']) ? PplForm::query()->findOrFail($data['ppl_form_id']) : null;
+
+        $sourceCandidates = [
+            'abc' => [
+                ['source' => 'bidding_document', 'record' => $bidding, 'value' => $bidding?->approved_budget_contract_abc],
+                ['source' => 'implementation_project', 'record' => $project, 'value' => $project?->ABC],
+                ['source' => 'ppl_form', 'record' => $pplForm, 'value' => $pplForm?->abc],
+            ],
+            'contract_amount' => [
+                ['source' => 'bidding_document', 'record' => $bidding, 'value' => $bidding?->contract_amount],
+                ['source' => 'implementation_project', 'record' => $project, 'value' => $project?->contract_amount],
+            ],
+        ];
+        $sourceMapping = [];
+
+        foreach ($sourceCandidates as $inputKey => $candidates) {
+            if (isset($inputs[$inputKey]) && $inputs[$inputKey] !== '') {
+                continue;
+            }
+
+            foreach ($candidates as $candidate) {
+                $value = $candidate['value'];
+                if ($value === null || $value === '') {
+                    continue;
+                }
+
+                $inputs[$inputKey] = (string) $value;
+                $sourceMapping[$inputKey] = [
+                    'source' => $candidate['source'],
+                    'record_id' => (string) $candidate['record']->getKey(),
+                    'value' => (string) $value,
+                ];
+                break;
+            }
+        }
+
+        return [$inputs, $pplForm, $sourceMapping];
     }
 
     /** @param array<string, mixed> $data */

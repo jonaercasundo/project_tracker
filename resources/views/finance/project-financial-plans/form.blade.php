@@ -94,7 +94,7 @@
                         <select id="project_id" name="project_id" class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-emerald-700 focus:ring-emerald-700">
                             <option value="">Standalone / not linked</option>
                             @foreach ($projects as $project)
-                                <option value="{{ $project->project_id }}" @selected((string) old('project_id', $plan->project_id ?? '') === (string) $project->project_id)>{{ $project->project_code }} · {{ $project->project_name }}</option>
+                                <option value="{{ $project->project_id }}" data-abc="{{ $project->ABC ?? '' }}" data-contract-amount="{{ $project->contract_amount ?? '' }}" @selected((string) old('project_id', $plan->project_id ?? '') === (string) $project->project_id)>{{ $project->project_code }} · {{ $project->project_name }}</option>
                             @endforeach
                         </select>
                         @error('project_id')<p class="mt-1 text-sm text-rose-700">{{ $message }}</p>@enderror
@@ -104,7 +104,7 @@
                         <select id="project_information_id" name="project_information_id" class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-emerald-700 focus:ring-emerald-700">
                             <option value="">No bidding document</option>
                             @foreach ($biddingDocuments as $document)
-                                <option value="{{ $document->id }}" @selected((string) old('project_information_id', $plan->project_information_id ?? '') === (string) $document->id)>{{ $document->project_id }} · {{ $document->project_name }} ({{ $document->status }})</option>
+                                <option value="{{ $document->id }}" data-abc="{{ $document->approved_budget_contract_abc ?? '' }}" data-contract-amount="{{ $document->contract_amount ?? '' }}" @selected((string) old('project_information_id', $plan->project_information_id ?? '') === (string) $document->id)>{{ $document->project_id }} · {{ $document->project_name }} ({{ $document->status }})</option>
                             @endforeach
                         </select>
                         @error('project_information_id')<p class="mt-1 text-sm text-rose-700">{{ $message }}</p>@enderror
@@ -124,10 +124,14 @@
                         <select id="ppl_form_id" name="ppl_form_id" class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-emerald-700 focus:ring-emerald-700">
                             <option value="">No historical PPL source</option>
                             @foreach ($pplForms as $pplForm)
-                                <option value="{{ $pplForm->id }}" @selected((string) old('ppl_form_id', $plan->ppl_form_id ?? '') === (string) $pplForm->id)>{{ $pplForm->project_code }} / Lot {{ $pplForm->lot_number }} · {{ $pplForm->project_title }}</option>
+                                <option value="{{ $pplForm->id }}" data-abc="{{ $pplForm->abc ?? '' }}" @selected((string) old('ppl_form_id', $plan->ppl_form_id ?? '') === (string) $pplForm->id)>{{ $pplForm->project_code }} / Lot {{ $pplForm->lot_number }} · {{ $pplForm->project_title }}</option>
                             @endforeach
                         </select>
                         @error('ppl_form_id')<p class="mt-1 text-sm text-rose-700">{{ $message }}</p>@enderror
+                    </div>
+                    <div class="md:col-span-2 rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+                        <p class="text-sm text-emerald-950">Blank ABC and contract amount fields can be filled from linked records. Bidding values take priority, followed by implementation project values; historical PPL ABC is used when neither provides ABC. Existing entries are kept. Factory cost and rates still need verified project-specific values.</p>
+                        <button type="button" id="populate-linked-financial-inputs" class="mt-3 rounded-lg border border-emerald-700 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100">Fill blank linked values</button>
                     </div>
                     <div class="md:col-span-2">
                         <label for="change_summary" class="mb-1.5 block text-sm font-medium text-slate-700">Version note</label>
@@ -218,7 +222,31 @@
         (() => {
             const list = document.getElementById('cost-rows');
             const template = document.getElementById('cost-row-template');
+            const populateButton = document.getElementById('populate-linked-financial-inputs');
             let nextIndex = list.querySelectorAll('[data-cost-row]').length;
+
+            populateButton.addEventListener('click', () => {
+                const biddingOption = document.querySelector('#project_information_id').selectedOptions[0];
+                const projectOption = document.querySelector('#project_id').selectedOptions[0];
+                const pplFormOption = document.querySelector('#ppl_form_id').selectedOptions[0];
+                const sources = {
+                    abc: [biddingOption?.dataset.abc, projectOption?.dataset.abc, pplFormOption?.dataset.abc],
+                    contract_amount: [biddingOption?.dataset.contractAmount, projectOption?.dataset.contractAmount],
+                };
+
+                for (const [key, values] of Object.entries(sources)) {
+                    const input = document.getElementById(`input-${key}`);
+                    if (input.value !== '') {
+                        continue;
+                    }
+
+                    const value = values.find((candidate) => candidate !== undefined && candidate !== '');
+                    if (value !== undefined) {
+                        input.value = value;
+                    }
+                }
+            });
+
             document.getElementById('add-cost-row').addEventListener('click', () => {
                 const row = template.content.firstElementChild.cloneNode(true);
                 row.querySelectorAll('[data-name]').forEach((input) => {

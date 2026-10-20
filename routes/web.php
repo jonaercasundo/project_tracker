@@ -113,17 +113,17 @@ Route::middleware(['auth'])->group(function () {
 
     });
     Route::middleware(['role:Administrator'])->group(function () {
-    
+
         Route::post('/users', [UserController::class, 'store'])
             ->name('users.store');
 
         Route::delete('/users/{user}', [UserController::class, 'destroy'])
-            ->name('users.destroy');   
-    /*
-        |--------------------------------------------------------------------------
-        | ADMIN DASHBOARD
-        |--------------------------------------------------------------------------
-        */
+            ->name('users.destroy');
+        /*
+            |--------------------------------------------------------------------------
+            | ADMIN DASHBOARD
+            |--------------------------------------------------------------------------
+            */
 
         Route::get('/admin/dashboard', [
             RoleAccessPermissionController::class,
@@ -377,21 +377,23 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('financialPlan')
             ->name('finance.plans.show');
 
-        Route::get('/ppl-forms', [PplFormController::class, 'index'])
-            ->name('ppl_forms.index');
+        Route::middleware('company.context:MMC')->group(function (): void {
+            Route::get('/ppl-forms', [PplFormController::class, 'index'])
+                ->name('ppl_forms.index');
 
-        Route::get('/ppl-forms/create', [PplFormController::class, 'create'])
-            ->name('ppl_forms.create');
+            Route::get('/ppl-forms/create', [PplFormController::class, 'create'])
+                ->name('ppl_forms.create');
 
-        Route::post('/ppl-forms/store', [PplFormController::class, 'store'])
-            ->name('ppl_forms.store');
+            Route::post('/ppl-forms/store', [PplFormController::class, 'store'])
+                ->name('ppl_forms.store');
 
-        // ✅ FIXED HERE
-        Route::get('/ppl-forms/{id}', [PplFormController::class, 'show'])
-            ->name('ppl_forms.show');
+            // ✅ FIXED HERE
+            Route::get('/ppl-forms/{id}', [PplFormController::class, 'show'])
+                ->name('ppl_forms.show');
 
-        Route::post('/ppl-forms/import', [PplFormController::class, 'import'])
-            ->name('ppl_forms.import');
+            Route::post('/ppl-forms/import', [PplFormController::class, 'import'])
+                ->name('ppl_forms.import');
+        });
 
         /*
             |--------------------------------------------------------------------------

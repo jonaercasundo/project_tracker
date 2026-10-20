@@ -105,8 +105,9 @@
             <span>Finance Dashboard</span>
         </a>
 
-        {{-- PPL FORMS --}}
-        <a href="{{ route('ppl_forms.index') }}"
+        @if (auth()->user()?->currentCompany()?->code === 'MMC')
+            {{-- PPL FORMS --}}
+            <a href="{{ route('ppl_forms.index') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
            {{ request()->routeIs('ppl_forms.*') ? 'bg-emerald-50/80 text-emerald-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
 
@@ -121,7 +122,8 @@
             </svg>
 
             <span>PPL Forms</span>
-        </a>
+            </a>
+        @endif
 
         {{-- BIDDING DOCUMENT --}}
         <a href="{{ route('bidding.index') }}"

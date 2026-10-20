@@ -35,6 +35,84 @@
             </div>
         </div>
 
+        @if ($isMmcPplWorkspace)
+            <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-200 px-5 py-4">
+                    <h2 class="font-semibold text-slate-950">MMC PPL monitoring</h2>
+                    <p class="mt-1 text-xs text-slate-500">Revenue uses net sales; costs, profit, and margins come from each plan's latest saved version. Year comes from the linked historical PPL revenue-recognition year.</p>
+                </div>
+                <form method="GET" action="{{ route('finance.dashboard') }}" class="grid gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
+                    <div>
+                        <label for="monitoring-year" class="mb-1 block text-xs font-semibold text-slate-600">Revenue year</label>
+                        <select id="monitoring-year" name="year" class="w-full rounded-lg border-slate-300 bg-white text-sm">
+                            <option value="">All years</option>
+                            @foreach ($monitoringYears as $year)
+                                <option value="{{ $year }}" @selected((string) ($filters['year'] ?? '') === (string) $year)>{{ $year }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="monitoring-status" class="mb-1 block text-xs font-semibold text-slate-600">Plan, project, or bidding status</label>
+                        <select id="monitoring-status" name="status" class="w-full rounded-lg border-slate-300 bg-white text-sm">
+                            <option value="">All statuses</option>
+                            @foreach ($monitoringStatuses as $status)
+                                <option value="{{ $status }}" @selected(($filters['status'] ?? '') === $status)>{{ ucfirst($status) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button type="submit" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">Filter</button>
+                    <a href="{{ route('finance.dashboard') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-100">Clear</a>
+                </form>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead class="bg-white text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <tr>
+                                <th class="px-4 py-3">Project / lot</th>
+                                <th class="px-4 py-3">Year</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3 text-right">Revenue</th>
+                                <th class="px-4 py-3 text-right">Total costs</th>
+                                <th class="px-4 py-3 text-right">Gross profit</th>
+                                <th class="px-4 py-3 text-right">GPM</th>
+                                <th class="px-4 py-3 text-right">Projected PPL</th>
+                                <th class="px-4 py-3 text-right">NPM</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @forelse ($monitoringPlans as $plan)
+                                @php
+                                    $version = $plan->latestVersion;
+                                    $results = $version?->calculation_results ?? [];
+                                    $projectName = $plan->project?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? 'Standalone pre-award';
+                                    $lotNumber = $plan->lot?->lot_no ?? $plan->pplForm?->lot_number;
+                                    $monitoringStatus = $plan->project?->status ?? $plan->bidding?->status ?? ucfirst($plan->status);
+                                @endphp
+                                <tr>
+                                    <td class="px-4 py-3">
+                                        <a href="{{ route('finance.plans.show', $plan) }}" class="font-semibold text-emerald-800 hover:underline">{{ $projectName }}</a>
+                                        <p class="mt-1 text-xs text-slate-500">{{ $plan->name }}@if($lotNumber) · Lot {{ $lotNumber }}@endif</p>
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-700">{{ $plan->pplForm?->year_of_revenue_recognition ?? 'Not set' }}</td>
+                                    <td class="px-4 py-3 text-slate-700">{{ $monitoringStatus }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['net_sales'] ?? 0), 2) }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['total_cost_of_sales'] ?? 0), 2) }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['gross_profit'] ?? 0), 2) }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">{{ isset($results['gpm']) ? number_format((float) $results['gpm'] * 100, 2).'%' : '—' }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">₱{{ number_format((float) ($results['ppl'] ?? 0), 2) }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">{{ isset($results['npm']) ? number_format((float) $results['npm'] * 100, 2).'%' : '—' }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="9" class="px-5 py-10 text-center text-sm text-slate-500">No financial plans match these monitoring filters.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if ($monitoringPlans->hasPages())
+                    <div class="border-t border-slate-200 px-5 py-4">{{ $monitoringPlans->links() }}</div>
+                @endif
+            </section>
+        @endif
+
         <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
                 <div><h2 class="font-semibold text-slate-950">Recently updated</h2><p class="mt-1 text-xs text-slate-500">Each saved change becomes a separate financial version.</p></div>

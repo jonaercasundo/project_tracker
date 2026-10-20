@@ -1429,7 +1429,7 @@
                         </div>
 
                         <div>
-                            <span class="pd-field-label">Country of Production</span>
+                            <span class="pd-field-label">COP</span>
                             <div class="pd-field-value {{ $product->country_of_production ? '' : 'empty' }}">
                                 {{ $product->country_of_production ?: 'Not Set' }}
                             </div>

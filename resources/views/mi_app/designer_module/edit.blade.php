@@ -163,7 +163,7 @@
                             $customCountry = old('custom_country', $countrySelection === 'Other' ? $storedCountry : '');
                         @endphp
                         <div>
-                            <label for="country_of_production" class="tx-label">Country of Production <span class="tx-required">*</span></label>
+                            <label for="country_of_production" class="tx-label">COP <span class="tx-required">*</span></label>
                             <div class="tx-select-wrap">
                                 <select id="country_of_production" name="country_of_production" required class="tx-field @error('country_of_production') field-invalid @enderror">
                                     <option value="">Select country</option>

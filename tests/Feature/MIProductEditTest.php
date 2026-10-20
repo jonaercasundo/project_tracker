@@ -519,8 +519,8 @@ it('shows unset COP on legacy products and requires a country when they are next
     $product = MI_Product::factory()->create(['country_of_production' => null]);
     $this->signInMI($this->miUser());
 
-    $this->get(route('mi_app.show', $product))->assertOk()->assertSee('Country of Production')->assertSee('Not Set');
-    $this->get(route('mi_app.edit', $product))->assertOk()->assertSee('Country of Production')->assertSee('value=""', false);
+    $this->get(route('mi_app.show', $product))->assertOk()->assertSee('COP')->assertSee('Not Set');
+    $this->get(route('mi_app.edit', $product))->assertOk()->assertSee('COP')->assertSee('value=""', false);
     $legacyPayload = miProductEditPayload($product);
     unset($legacyPayload['country_of_production']);
     $this->from(route('mi_app.edit', $product))->put(route('mi_app.update', $product), $legacyPayload)

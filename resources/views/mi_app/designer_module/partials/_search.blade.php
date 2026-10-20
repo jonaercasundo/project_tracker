@@ -56,7 +56,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01"/></svg>
         <span>{{ number_format($missingCopCount) }} {{ \Illuminate\Support\Str::plural('product', $missingCopCount) }} need COP updates</span>
     @else
-        <span>All products have a Country of Production.</span>
+        <span>All products have a COP.</span>
     @endif
 </div>
 
@@ -77,7 +77,7 @@
     {{-- Missing COP --}}
     <div class="tx-filter-wrap">
         <div class="tx-filter-select-outer">
-            <select name="missing_cop" aria-label="Filter products missing Country of Production">
+            <select name="missing_cop" aria-label="Filter products missing COP">
                 <option value="">All COP Statuses</option>
                 <option value="1" @selected(request()->boolean('missing_cop'))>Missing COP ({{ number_format($missingCopCount) }})</option>
             </select>
@@ -97,10 +97,10 @@
         </div>
     </div>
 
-    {{-- Country of Production --}}
+    {{-- COP --}}
     <div class="tx-filter-wrap">
         <div class="tx-filter-select-outer">
-            <select name="country_of_production" aria-label="Filter by Country of Production">
+            <select name="country_of_production" aria-label="Filter by COP">
                 <option value="">All Countries</option>
                 <option value="__not_set" @selected(request('country_of_production') === '__not_set')>Not Set</option>
                 @foreach(collect(['Vietnam', 'China'])->merge($countriesOfProduction)->unique()->sort() as $country)

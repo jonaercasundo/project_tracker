@@ -710,7 +710,7 @@
                         </div>
 
                         <div class="col-span-2">
-                            <label for="country_of_production" class="tx-label">Country of Production <span class="tx-required">*</span></label>
+                            <label for="country_of_production" class="tx-label">COP <span class="tx-required">*</span></label>
                             <div class="tx-select-wrap">
                                 <select id="country_of_production" name="country_of_production" required data-required class="tx-field">
                                     <option value="">-- Select Country --</option>

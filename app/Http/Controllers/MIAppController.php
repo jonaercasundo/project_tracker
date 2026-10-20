@@ -21,6 +21,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -35,13 +36,18 @@ class MIAppController extends Controller
             'collection',
         ]);
 
-        $countriesOfProduction = MI_Product::query()
-            ->whereNotNull('country_of_production')
-            ->whereRaw("TRIM(country_of_production) <> ''")
-            ->distinct()
-            ->orderBy('country_of_production')
-            ->pluck('country_of_production');
-        $missingCopCount = $this->whereCopIsMissing(MI_Product::query())->count();
+        $hasCountryOfProductionColumn = Schema::hasColumn('mi_products', 'country_of_production');
+        $countriesOfProduction = $hasCountryOfProductionColumn
+            ? MI_Product::query()
+                ->whereNotNull('country_of_production')
+                ->whereRaw("TRIM(country_of_production) <> ''")
+                ->distinct()
+                ->orderBy('country_of_production')
+                ->pluck('country_of_production')
+            : collect();
+        $missingCopCount = $hasCountryOfProductionColumn
+            ? $this->whereCopIsMissing(MI_Product::query())->count()
+            : MI_Product::count();
 
         // Search
         if ($request->filled('search')) {
@@ -91,7 +97,7 @@ class MIAppController extends Controller
             $query->where('status', $request->status);
         }
 
-        if ($request->filled('country_of_production')) {
+        if ($hasCountryOfProductionColumn && $request->filled('country_of_production')) {
             if ($request->input('country_of_production') === '__not_set') {
                 $this->whereCopIsMissing($query);
             } else {
@@ -99,7 +105,7 @@ class MIAppController extends Controller
             }
         }
 
-        if ($request->boolean('missing_cop')) {
+        if ($hasCountryOfProductionColumn && $request->boolean('missing_cop')) {
             $this->whereCopIsMissing($query);
         }
 

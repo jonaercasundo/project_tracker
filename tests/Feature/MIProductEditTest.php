@@ -4,9 +4,11 @@ use App\Models\MI_Product;
 use App\Models\MI_Product_Factory_Cost;
 use App\Models\MI_Product_Image;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\MIWorkflowTestCase;
 
@@ -582,6 +584,17 @@ it('replaces a missing COP warning with a green country indicator after save', f
 
     $this->assertDatabaseHas('mi_products', ['product_id' => $product->getKey(), 'country_of_production' => 'China']);
     $this->get(route('mi_app.index'))->assertDontSee('Needs COP Update')->assertSee('class="tx-cop-state complete"', false)->assertSee('China');
+});
+
+it('keeps the product list available while the additive COP migration is pending', function () {
+    MI_Product::factory()->count(2)->create();
+    Schema::table('mi_products', function (Blueprint $table): void {
+        $table->dropColumn('country_of_production');
+    });
+    $this->signInMI($this->miUser());
+
+    $this->get(route('mi_app.index'))
+        ->assertOk()->assertSee('2 products need COP updates')->assertSee('Needs COP Update');
 });
 
 it('shows the primary factory cost and product prices on the detail page', function () {

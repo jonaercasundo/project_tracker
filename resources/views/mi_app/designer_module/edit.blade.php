@@ -157,6 +157,29 @@
                         </div>
                         @include('mi_app.designer_module.partials._edit-field', ['name' => 'designed_by', 'label' => 'Designed By', 'required' => false])
                         @include('mi_app.designer_module.partials._edit-field', ['name' => 'type', 'label' => 'Product Type / Finish', 'required' => false])
+                        @php
+                            $storedCountry = $product->country_of_production;
+                            $countrySelection = old('country_of_production', in_array($storedCountry, ['Vietnam', 'China'], true) ? $storedCountry : ($storedCountry ? 'Other' : ''));
+                            $customCountry = old('custom_country', $countrySelection === 'Other' ? $storedCountry : '');
+                        @endphp
+                        <div>
+                            <label for="country_of_production" class="tx-label">Country of Production <span class="tx-required">*</span></label>
+                            <div class="tx-select-wrap">
+                                <select id="country_of_production" name="country_of_production" required class="tx-field @error('country_of_production') field-invalid @enderror">
+                                    <option value="">Select country</option>
+                                    @foreach(['Vietnam', 'China', 'Other'] as $country)
+                                        <option value="{{ $country }}" @selected($countrySelection === $country)>{{ $country }}</option>
+                                    @endforeach
+                                </select>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+                            </div>
+                            @error('country_of_production')<p class="tx-error">{{ $message }}</p>@enderror
+                            <div id="custom_country_wrap" @if($countrySelection !== 'Other') hidden @endif>
+                                <label for="custom_country" class="tx-label">Country Name <span class="tx-required">*</span></label>
+                                <input id="custom_country" name="custom_country" type="text" maxlength="100" value="{{ $customCountry }}" class="tx-field" @if($countrySelection === 'Other') required @endif>
+                                @error('custom_country')<p class="tx-error">{{ $message }}</p>@enderror
+                            </div>
+                        </div>
                         <div class="tx-edit-span-all">
                             <label for="description" class="tx-label">Description</label>
                             <textarea id="description" name="description" rows="4" maxlength="20000" class="tx-field @error('description') field-invalid @enderror" @error('description') aria-invalid="true" aria-describedby="description_error" @enderror>{{ old('description', $product->description) }}</textarea>
@@ -289,6 +312,21 @@
                         <button type="submit" data-save class="tx-btn-submit">Save Changes</button>
                     </div>
                 </footer>
+                <script>
+                    (() => {
+                        const countrySelect = document.getElementById('country_of_production');
+                        const customCountryWrap = document.getElementById('custom_country_wrap');
+                        const customCountryInput = document.getElementById('custom_country');
+                        const syncCustomCountry = () => {
+                            const isOther = countrySelect.value === 'Other';
+                            customCountryWrap.hidden = !isOther;
+                            customCountryInput.required = isOther;
+                            customCountryInput.disabled = !isOther;
+                        };
+                        countrySelect.addEventListener('change', syncCustomCountry);
+                        syncCustomCountry();
+                    })();
+                </script>
             </form>
             <template id="new_image_template">@include('mi_app.designer_module.partials._new-image', ['index' => '__INDEX__', 'url' => ''])</template>
         </div>

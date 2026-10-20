@@ -26,6 +26,7 @@ beforeEach(function () {
         '2026_10_06_040342_create_mi_product_images_table.php',
         '2026_10_06_085134_add_unique_item_code_to_mi_products_table.php',
         '2026_10_12_055813_create_mi_product_factory_costs_table.php',
+        '2026_10_20_082229_add_country_of_production_to_mi_products_table.php',
     ] as $migration) {
         (require database_path('migrations/'.$migration))->up();
     }
@@ -34,7 +35,9 @@ beforeEach(function () {
 /** @return array<string, mixed> */
 function miProductEditPayload(MI_Product $product): array
 {
-    return $product->only(['item_name', 'category_id', 'sub_category_id', 'type_of_sample', 'materials']);
+    return array_merge($product->only(['item_name', 'category_id', 'sub_category_id', 'type_of_sample', 'materials']), [
+        'country_of_production' => $product->country_of_production ?? 'Vietnam',
+    ]);
 }
 
 it('renders product 139 with saved values custom attributes and image identities', function () {
@@ -473,6 +476,112 @@ it('shows the selected primary image first in the internal and scanned product g
 
     expect($internal->getContent())->toMatch('/id="galleryPreview"\s+src="https:\/\/example\.com\/primary\.jpg"/');
     expect($public->getContent())->toMatch('/id="pdGalleryImg"\s+src="https:\/\/example\.com\/primary\.jpg"/');
+});
+
+it('creates products with a standard or custom country of production and requires a country name for other', function () {
+    $fixture = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+    $payload = array_replace(miProductEditPayload($fixture), ['item_name' => 'Custom COP product', 'country_of_production' => 'Other', 'custom_country' => 'Japan']);
+
+    $this->post(route('mi_app.store_1'), $payload)->assertRedirect(route('mi_app.index'))->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('mi_products', ['item_name' => 'Custom COP product', 'country_of_production' => 'Japan']);
+
+    $this->from(route('mi_app.create'))->post(route('mi_app.store_1'), array_replace($payload, ['item_name' => 'Missing custom COP', 'custom_country' => '']))
+        ->assertRedirect(route('mi_app.create'))->assertSessionHasErrors('custom_country');
+    expect(MI_Product::where('item_name', 'Missing custom COP')->exists())->toBeFalse();
+    $missingCountryPayload = array_replace($payload, ['item_name' => 'Missing COP']);
+    unset($missingCountryPayload['country_of_production'], $missingCountryPayload['custom_country']);
+    $this->from(route('mi_app.create'))->post(route('mi_app.store_1'), $missingCountryPayload)
+        ->assertRedirect(route('mi_app.create'))->assertSessionHasErrors('country_of_production');
+    expect(MI_Product::where('item_name', 'Missing COP')->exists())->toBeFalse();
+    $this->get(route('mi_app.create'))->assertSee('name="country_of_production" required', false)
+        ->assertSee('value="Vietnam"', false)->assertSee('value="China"', false)->assertSee('value="Other"', false)
+        ->assertSee('name="custom_country"', false);
+});
+
+it('requires a country on product updates and saves custom country names', function () {
+    $product = MI_Product::factory()->create(['country_of_production' => 'Vietnam']);
+    $this->signInMI($this->miUser());
+
+    $this->from(route('mi_app.edit', $product))->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'item_name' => 'Rejected COP update', 'country_of_production' => 'Other', 'custom_country' => '',
+    ]))->assertRedirect(route('mi_app.edit', $product))->assertSessionHasErrors('custom_country');
+    $this->assertDatabaseHas('mi_products', ['product_id' => $product->getKey(), 'item_name' => $product->item_name, 'country_of_production' => 'Vietnam']);
+
+    $this->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), ['country_of_production' => 'Other', 'custom_country' => 'Japan']))
+        ->assertRedirect(route('mi_app.edit', $product))->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('mi_products', ['product_id' => $product->getKey(), 'country_of_production' => 'Japan']);
+});
+
+it('shows unset COP on legacy products and requires a country when they are next edited', function () {
+    $product = MI_Product::factory()->create(['country_of_production' => null]);
+    $this->signInMI($this->miUser());
+
+    $this->get(route('mi_app.show', $product))->assertOk()->assertSee('Country of Production')->assertSee('Not Set');
+    $this->get(route('mi_app.edit', $product))->assertOk()->assertSee('Country of Production')->assertSee('value=""', false);
+    $legacyPayload = miProductEditPayload($product);
+    unset($legacyPayload['country_of_production']);
+    $this->from(route('mi_app.edit', $product))->put(route('mi_app.update', $product), $legacyPayload)
+        ->assertRedirect(route('mi_app.edit', $product))->assertSessionHasErrors('country_of_production');
+    $this->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), ['country_of_production' => 'China']))
+        ->assertRedirect(route('mi_app.edit', $product))->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('mi_products', ['product_id' => $product->getKey(), 'country_of_production' => 'China']);
+});
+
+it('filters MI products by standard custom and unset COP while retaining other query filters', function () {
+    MI_Product::factory()->create(['item_name' => 'Vietnam fixture', 'country_of_production' => 'Vietnam']);
+    MI_Product::factory()->create(['item_name' => 'China fixture', 'country_of_production' => 'China']);
+    MI_Product::factory()->create(['item_name' => 'Japan fixture', 'country_of_production' => 'Japan']);
+    MI_Product::factory()->create(['item_name' => 'Unset fixture', 'country_of_production' => null]);
+    $this->signInMI($this->miUser());
+
+    $this->get(route('mi_app.index', ['country_of_production' => 'Japan', 'status' => 'Active']))
+        ->assertOk()->assertSee('Japan fixture')->assertDontSee('Vietnam fixture')->assertDontSee('China fixture')
+        ->assertSee('name="country_of_production"', false)->assertSee('value="Japan" selected', false);
+    $this->get(route('mi_app.index', ['country_of_production' => '__not_set']))
+        ->assertOk()->assertSee('Unset fixture')->assertDontSee('Japan fixture');
+});
+
+it('marks null empty and whitespace COP values with a warning and direct edit links', function () {
+    $missingProducts = collect([null, '', '   '])->map(fn (?string $country, int $index): MI_Product => MI_Product::factory()->create([
+        'item_name' => 'Missing COP '.$index,
+        'country_of_production' => $country,
+    ]));
+    $completeProduct = MI_Product::factory()->create(['item_name' => 'Complete COP', 'country_of_production' => 'Japan']);
+    $this->signInMI($this->miUser());
+
+    $response = $this->get(route('mi_app.index'))->assertOk()->assertSee('Needs COP Update')->assertSee('Japan');
+    foreach ($missingProducts as $product) {
+        $response->assertSee(route('mi_app.edit', $product));
+    }
+    $response->assertSee(route('mi_app.edit', $completeProduct));
+    expect(substr_count($response->getContent(), 'class="tx-cop-state missing"'))->toBe(3)
+        ->and(substr_count($response->getContent(), 'class="tx-cop-state complete"'))->toBe(1);
+});
+
+it('filters all missing COP values and shows their count while keeping existing filters', function () {
+    MI_Product::factory()->create(['item_name' => 'Unset COP', 'country_of_production' => null]);
+    MI_Product::factory()->create(['item_name' => 'Empty COP', 'country_of_production' => '']);
+    MI_Product::factory()->create(['item_name' => 'Whitespace COP', 'country_of_production' => '   ']);
+    MI_Product::factory()->create(['item_name' => 'Known COP', 'country_of_production' => 'Vietnam']);
+    $this->signInMI($this->miUser());
+
+    $this->get(route('mi_app.index', ['missing_cop' => '1', 'status' => 'Active']))
+        ->assertOk()->assertSee('Unset COP')->assertSee('Empty COP')->assertSee('Whitespace COP')->assertDontSee('Known COP')
+        ->assertSee('3 products need COP updates')->assertSee('Missing COP (3)')
+        ->assertSee('name="status"', false)->assertSee('name="country_of_production"', false);
+});
+
+it('replaces a missing COP warning with a green country indicator after save', function () {
+    $product = MI_Product::factory()->create(['country_of_production' => null]);
+    $this->signInMI($this->miUser());
+    $this->get(route('mi_app.index'))->assertSee('Needs COP Update');
+
+    $this->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), ['country_of_production' => 'China']))
+        ->assertRedirect(route('mi_app.edit', $product))->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('mi_products', ['product_id' => $product->getKey(), 'country_of_production' => 'China']);
+    $this->get(route('mi_app.index'))->assertDontSee('Needs COP Update')->assertSee('class="tx-cop-state complete"', false)->assertSee('China');
 });
 
 it('shows the primary factory cost and product prices on the detail page', function () {

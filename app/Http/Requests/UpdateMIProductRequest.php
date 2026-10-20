@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\MI_Product;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -22,7 +23,7 @@ class UpdateMIProductRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -34,6 +35,8 @@ class UpdateMIProductRequest extends FormRequest
             'item_code' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('mi_products', 'item_code')->ignore($product)],
             'description' => 'sometimes|nullable|string|max:20000',
             'type_of_sample' => 'required|string|max:255',
+            'country_of_production' => ['required', Rule::in(['Vietnam', 'China', 'Other'])],
+            'custom_country' => ['required_if:country_of_production,Other', 'nullable', 'string', 'max:100'],
             'designed_by' => 'sometimes|nullable|string|max:255',
             'category_id' => 'required|integer|exists:mi_categories,id',
             'sub_category_id' => 'sometimes|required|integer|exists:mi_sub_categories,id',

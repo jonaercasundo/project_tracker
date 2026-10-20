@@ -89,6 +89,12 @@
         color: var(--tx-ink-faint);
     }
 
+    .tx-cop-state { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; font-size: .75rem; font-weight: 650; }
+    .tx-cop-state svg { width: 1rem; height: 1rem; flex: none; }
+    .tx-cop-state.missing { color: #a16207; }
+    .tx-cop-state.missing a { color: #92400e; text-decoration: underline; text-underline-offset: 2px; }
+    .tx-cop-state.complete { color: #15803d; }
+
     /* ---------------------------------------------------------
        SKU
        --------------------------------------------------------- */
@@ -595,6 +601,7 @@
                 <th>Sub Category</th>
                 <th>Collection</th>
                 <th>Item Name</th>
+                <th>COP</th>
                 <th class="actions-col">Actions</th>
             </tr>
         </thead>
@@ -714,6 +721,22 @@
                         {{ strtoupper($itemName) }}
                     </td>
 
+
+                    @php($countryOfProduction = trim((string) $product->country_of_production))
+                    <td>
+                        @if($countryOfProduction === '')
+                            <span class="tx-cop-state missing" aria-label="Country of Production missing">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01"/></svg>
+                                <span>Needs COP Update</span>
+                                <a href="{{ route('mi_app.edit', ['product' => $productId]) }}">Edit</a>
+                            </span>
+                        @else
+                            <span class="tx-cop-state complete">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                                <span>{{ $countryOfProduction }}</span>
+                            </span>
+                        @endif
+                    </td>
 
                     {{-- Actions --}}
                     <td>

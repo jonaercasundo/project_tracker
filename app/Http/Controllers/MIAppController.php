@@ -12,6 +12,7 @@ use App\Models\MI_ProductType;
 use App\Models\MI_SubCategory;
 use App\Services\MIProductFactoryCostService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,6 +34,14 @@ class MIAppController extends Controller
             'productType',
             'collection',
         ]);
+
+        $countriesOfProduction = MI_Product::query()
+            ->whereNotNull('country_of_production')
+            ->whereRaw("TRIM(country_of_production) <> ''")
+            ->distinct()
+            ->orderBy('country_of_production')
+            ->pluck('country_of_production');
+        $missingCopCount = $this->whereCopIsMissing(MI_Product::query())->count();
 
         // Search
         if ($request->filled('search')) {
@@ -82,9 +91,29 @@ class MIAppController extends Controller
             $query->where('status', $request->status);
         }
 
-        $products = $query->latest()->paginate(15);
+        if ($request->filled('country_of_production')) {
+            if ($request->input('country_of_production') === '__not_set') {
+                $this->whereCopIsMissing($query);
+            } else {
+                $query->where('country_of_production', $request->input('country_of_production'));
+            }
+        }
 
-        return view('mi_app.designer_module.index', compact('products'));
+        if ($request->boolean('missing_cop')) {
+            $this->whereCopIsMissing($query);
+        }
+
+        $products = $query->latest()->paginate(15)->withQueryString();
+
+        return view('mi_app.designer_module.index', compact('products', 'countriesOfProduction', 'missingCopCount'));
+    }
+
+    private function whereCopIsMissing(Builder $query): Builder
+    {
+        return $query->where(function (Builder $missingCopQuery): void {
+            $missingCopQuery->whereNull('country_of_production')
+                ->orWhereRaw("TRIM(country_of_production) = ''");
+        });
     }
 
     public function dashboard()
@@ -399,6 +428,8 @@ class MIAppController extends Controller
 
             // Product Details
             'type_of_sample' => 'required|string|max:255',
+            'country_of_production' => 'required|in:Vietnam,China,Other',
+            'custom_country' => 'required_if:country_of_production,Other|nullable|string|max:100',
             'designed_by' => 'nullable|string|max:255',
 
             // Attributes
@@ -442,6 +473,11 @@ class MIAppController extends Controller
             'image_links' => 'nullable|array',
             'image_links.*' => 'nullable|url|max:1000',
         ]);
+
+        $validated['country_of_production'] = $validated['country_of_production'] === 'Other'
+            ? trim($validated['custom_country'])
+            : $validated['country_of_production'];
+        unset($validated['custom_country']);
 
         $factoryCostRows = $validated['factory_costs'] ?? [];
         if (collect($factoryCostRows)->filter(fn (array $cost): bool => (bool) ($cost['is_primary'] ?? false))->count() > 1) {
@@ -614,6 +650,10 @@ class MIAppController extends Controller
         }
         $controls = ['image_links', 'product_images', 'remove_image_ids', 'primary_image_id', 'image_order', 'factory_costs', 'remove_factory_cost_ids'];
         $attributes = Arr::except($validated, $controls);
+        if (($attributes['country_of_production'] ?? null) === 'Other') {
+            $attributes['country_of_production'] = trim($attributes['custom_country']);
+        }
+        unset($attributes['custom_country']);
         $attributes['materials'] = $this->normalizeArrayInput($attributes['materials']);
         if (array_key_exists('color', $attributes)) {
             $attributes['color'] = $this->normalizeArrayInput($attributes['color']);

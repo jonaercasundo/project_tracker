@@ -32,6 +32,7 @@ class MI_Product extends Model
         'collection_id',
 
         'type_of_sample',
+        'country_of_production',
         'classification',
         'designed_by',
 

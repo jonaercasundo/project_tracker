@@ -24,6 +24,7 @@ class MIProductFactoryCostSchemaTestCase extends MIWorkflowTestCase
             'database/migrations/2026_08_17_000000_add_price_to_products_table.php',
             'database/migrations/2026_10_06_085134_add_unique_item_code_to_mi_products_table.php',
             'database/migrations/2026_10_12_055813_create_mi_product_factory_costs_table.php',
+            'database/migrations/2026_10_20_082229_add_country_of_production_to_mi_products_table.php',
         ]]);
     }
 }

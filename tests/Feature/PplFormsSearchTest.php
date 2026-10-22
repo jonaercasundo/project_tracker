@@ -196,6 +196,47 @@ it('opens the existing PPL Form edit page with saved values', function () {
     $this->get(route('ppl_forms.edit', ['id' => 999999]))->assertNotFound();
 });
 
+it('renders workbook input columns without filling blank historical assumptions', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($user, [
+        'project_code' => 'SME 2026',
+        'lot_number' => '4',
+        'project_id_no' => '2026-BLR4-001-B2-CB-008',
+        'abc' => '327523242.63',
+        'lcb_abc' => null,
+        'pf3_contract_amt' => null,
+        'bidder' => '15.00%',
+    ]);
+
+    $this->get(route('ppl_forms.edit', $fixture['form']->id))
+        ->assertOk()
+        ->assertSee('1. FORM source')
+        ->assertSee('SME 2026')
+        ->assertSee('2026-BLR4-001-B2-CB-008')
+        ->assertSee('name="lcb_abc"', false)
+        ->assertSee('name="pf3_contract_amt"', false)
+        ->assertSee('name="allowance_tax_lawyer"', false)
+        ->assertSee('name="year_of_revenue_recognition"', false)
+        ->assertSee('15.00%')
+        ->assertSee('Blank saved fields remain blank')
+        ->assertSee('value="327523242.63"', false);
+});
+
+it('rejects workbook rate precision that the historical PPL columns cannot retain', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($user, ['abc' => '327523242.63', 'lcb_abc' => null]);
+
+    $this->put(route('ppl_forms.update', $fixture['form']->id), [
+        'project_code' => $fixture['form']->project_code,
+        'lot_number' => $fixture['form']->lot_number,
+        'project_title' => $fixture['form']->project_title,
+        'abc' => '327523242.63',
+        'lcb_abc' => '0.2202',
+    ])->assertSessionHasErrors('lcb_abc');
+
+    expect($fixture['form']->fresh()->lcb_abc)->toBeNull();
+});
+
 it('updates only validated historical form fields and retains source links and saved plan versions', function () {
     $user = $this->signInBiddingUser('finance', 'MMC');
     $fixture = makePplListingFixture($user, ['project_title' => 'Original PPL title', 'abc' => '500.00'], 'Implementation');

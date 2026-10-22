@@ -485,7 +485,7 @@ class PplFormController extends Controller
             $query->where(fn ($ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $company->company_id));
         }
 
-        return view('finance.ppl_forms.create', ['data' => $query->firstOrFail()]);
+        return view('finance.ppl_forms.edit', ['data' => $query->firstOrFail()]);
     }
 
     public function update(UpdatePplFormRequest $request, DashboardService $dashboards, int $id)

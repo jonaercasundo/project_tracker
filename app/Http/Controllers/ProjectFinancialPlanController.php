@@ -43,7 +43,7 @@ class ProjectFinancialPlanController extends Controller
         if ($isMmcPplWorkspace) {
             $filters = $this->monitoringFilters($request);
             $monitoringPlans = $this->monitoringQuery($companyId, $filters)->paginate(25)->withQueryString();
-            $monitoringYears = PplForm::query()
+            $linkedFormYears = PplForm::query()
                 ->whereIn('id', ProjectFinancialPlan::query()
                     ->forCompany($companyId)
                     ->whereNotNull('ppl_form_id')
@@ -52,6 +52,10 @@ class ProjectFinancialPlanController extends Controller
                 ->distinct()
                 ->orderBy('year_of_revenue_recognition')
                 ->pluck('year_of_revenue_recognition');
+            $importedPlanYears = Schema::hasColumn('project_financial_plans', 'revenue_year')
+                ? ProjectFinancialPlan::query()->forCompany($companyId)->whereNotNull('revenue_year')->distinct()->orderBy('revenue_year')->pluck('revenue_year')
+                : collect();
+            $monitoringYears = $linkedFormYears->merge($importedPlanYears)->unique()->sort()->values();
             $monitoringStatuses = collect(['draft'])
                 ->merge(Project::query()->whereNotNull('status')->distinct()->orderBy('status')->pluck('status'))
                 ->merge(ProjectInformation::query()->whereNotNull('status')->distinct()->orderBy('status')->pluck('status'))
@@ -103,7 +107,7 @@ class ProjectFinancialPlanController extends Controller
                     fputcsv($output, [
                         $fputCsv($plan->project?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? $plan->name),
                         $plan->lot?->lot_no ?? $plan->pplForm?->lot_number,
-                        $plan->pplForm?->year_of_revenue_recognition,
+                        $plan->revenue_year ?? $plan->pplForm?->year_of_revenue_recognition ?? data_get($version?->input_data, 'workbook_import.revenue_year'),
                         $fputCsv($plan->project?->status ?? $plan->bidding?->status ?? $plan->status),
                         $results['abc'] ?? '', $results['contract_amount'] ?? '', $results['net_sales'] ?? '',
                         $results['factory_cost'] ?? '', $results['total_cost_of_sales'] ?? '', $results['opex'] ?? '',
@@ -237,7 +241,16 @@ class ProjectFinancialPlanController extends Controller
             ->latest('updated_at');
 
         if (! empty($filters['year'])) {
-            $query->whereHas('pplForm', fn (Builder $pplQuery) => $pplQuery->where('year_of_revenue_recognition', $filters['year']));
+            $query->where(function (Builder $planQuery) use ($filters): void {
+                if (Schema::hasColumn('project_financial_plans', 'revenue_year')) {
+                    $planQuery->where('revenue_year', $filters['year'])
+                        ->orWhereHas('pplForm', fn (Builder $pplQuery) => $pplQuery->where('year_of_revenue_recognition', $filters['year']));
+
+                    return;
+                }
+
+                $planQuery->whereHas('pplForm', fn (Builder $pplQuery) => $pplQuery->where('year_of_revenue_recognition', $filters['year']));
+            });
         }
 
         if (! empty($filters['status'])) {

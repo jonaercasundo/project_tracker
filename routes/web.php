@@ -28,6 +28,7 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\LogisticsChannelController;
 use App\Http\Controllers\MIAppController;
 use App\Http\Controllers\MIApprovalController;
+use App\Http\Controllers\MmcPplWorkbookImportController;
 use App\Http\Controllers\PplFormController;
 use App\Http\Controllers\ProductScanController;
 use App\Http\Controllers\ProfileController;
@@ -362,6 +363,15 @@ Route::middleware(['auth'])->group(function () {
             ->name('finance.dashboard');
         Route::get('/finance/plans/monitoring/export', [ProjectFinancialPlanController::class, 'exportMonitoring'])
             ->name('finance.plans.monitoring.export');
+
+        Route::middleware('company.context:MMC')->prefix('/finance/ppl-import')->name('finance.ppl-import.')->group(function (): void {
+            Route::get('/', [MmcPplWorkbookImportController::class, 'index'])->name('index');
+            Route::post('/', [MmcPplWorkbookImportController::class, 'store'])->name('store');
+            Route::get('/{batch}', [MmcPplWorkbookImportController::class, 'show'])->whereNumber('batch')->name('show');
+            Route::post('/{batch}/confirm', [MmcPplWorkbookImportController::class, 'confirm'])->whereNumber('batch')->name('confirm');
+            Route::post('/{batch}/cancel', [MmcPplWorkbookImportController::class, 'cancel'])->whereNumber('batch')->name('cancel');
+            Route::get('/{batch}/download', [MmcPplWorkbookImportController::class, 'download'])->whereNumber('batch')->name('download');
+        });
 
         Route::get('/finance/plans', [ProjectFinancialPlanController::class, 'index'])
             ->name('finance.plans.index');

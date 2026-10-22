@@ -1,0 +1,62 @@
+<x-finance_app-layout>
+    <main class="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <a href="{{ route('finance.ppl-import.index') }}" class="text-sm font-semibold text-emerald-800 hover:underline">← Import history</a>
+                <h1 class="mt-3 text-2xl font-bold tracking-tight text-slate-900">{{ $batch->original_file_name }}</h1>
+                <p class="mt-1 text-sm text-slate-600">Preview created {{ $batch->previewed_at?->format('M j, Y g:i A') }} · SHA-256 <span class="break-all font-mono text-xs">{{ $batch->file_sha256 }}</span></p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ route('finance.ppl-import.download', $batch) }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Download source</a>
+                <span class="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">{{ ucfirst($batch->status) }}</span>
+            </div>
+        </div>
+
+        @if (session('status'))<div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{{ session('status') }}</div>@endif
+        @if ($errors->any())<div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"><ul class="list-disc space-y-1 pl-5">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+        @if ($batch->error_message)<div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{{ $batch->error_message }}</div>@endif
+
+        <section class="grid gap-3 sm:grid-cols-4">
+            @foreach ([['Workbook rows', $batch->summary['form_rows'] ?? 0], ['Ready', $batch->summary['ready'] ?? 0], ['Warnings', $batch->summary['warnings'] ?? 0], ['Blocked', $batch->summary['blocked'] ?? 0]] as [$label, $value])
+                <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $label }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-slate-900">{{ $value }}</p></div>
+            @endforeach
+        </section>
+
+        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 px-5 py-4"><h2 class="font-semibold text-slate-900">Row-by-row source and calculation review</h2><p class="mt-1 text-sm text-slate-600">Only ready and acknowledged warning rows can create new MMC financial plans. Existing PPL Forms stay unchanged.</p></div>
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-[1150px] text-left text-sm">
+                    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">Workbook row</th><th class="px-4 py-3">Project / lot</th><th class="px-4 py-3">Status</th><th class="px-4 py-3 text-right">ABC</th><th class="px-4 py-3 text-right">Contract</th><th class="px-4 py-3 text-right">Factory cost</th><th class="px-4 py-3">Data links and checks</th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach ($batch->rows as $row)
+                            @php($normalized = $row->normalized_data ?? [])
+                            @php($inputs = data_get($normalized, 'plan.inputs', []))
+                            <tr class="align-top">
+                                <td class="px-4 py-4 font-mono text-xs text-slate-600">{{ $row->source_sheet }}!{{ $row->source_row }}</td>
+                                <td class="px-4 py-4"><p class="font-semibold text-slate-900">{{ $row->project_code }} · Lot {{ $row->lot_number }}</p><p class="mt-1 text-xs text-slate-500">{{ data_get($normalized, 'project_title') }}</p><p class="mt-1 text-xs text-slate-500">PPL Form #{{ data_get($normalized, 'plan.ppl_form_id') ?? 'not matched' }}</p></td>
+                                <td class="px-4 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $row->status === 'blocked' ? 'bg-rose-100 text-rose-800' : ($row->status === 'warning' ? 'bg-amber-100 text-amber-900' : ($row->status === 'imported' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700')) }}">{{ ucfirst($row->status) }}</span>@if($row->financial_plan_id)<p class="mt-2"><a class="font-semibold text-emerald-800 hover:underline" href="{{ route('finance.plans.show', $row->financial_plan_id) }}">Plan #{{ $row->financial_plan_id }}</a></p>@endif</td>
+                                <td class="px-4 py-4 text-right tabular-nums">{{ is_numeric($inputs['abc'] ?? null) ? '₱'.number_format((float) $inputs['abc'], 2) : '—' }}</td>
+                                <td class="px-4 py-4 text-right tabular-nums">{{ is_numeric($inputs['contract_amount'] ?? null) ? '₱'.number_format((float) $inputs['contract_amount'], 2) : '—' }}</td>
+                                <td class="px-4 py-4 text-right tabular-nums">{{ is_numeric($inputs['factory_cost'] ?? null) ? '₱'.number_format((float) $inputs['factory_cost'], 2) : '—' }}</td>
+                                <td class="px-4 py-4"><ul class="space-y-2">@foreach(($row->errors ?? []) as $message)<li class="text-xs text-rose-800">• {{ $message }}</li>@endforeach @foreach(($row->warnings ?? []) as $message)<li class="text-xs text-amber-900">• {{ $message }}</li>@endforeach @foreach(data_get($normalized, 'reconciliation.differences', []) as $metric => $difference)<li class="text-xs text-amber-900">{{ str($metric)->replace('_', ' ')->title() }} differs: workbook ₱{{ number_format((float) $difference['workbook'], 2) }}, calculated ₱{{ number_format((float) $difference['calculated'], 2) }} ({{ $difference['cell'] }})</li>@endforeach @if(empty($row->errors) && empty($row->warnings) && empty(data_get($normalized, 'reconciliation.differences', [])))<li class="text-xs text-emerald-800">No blocking issues or reconciliation differences.</li>@endif</ul><p class="mt-2 text-xs text-slate-500">Linked PPL #{{ data_get($normalized, 'plan.ppl_form_id') ?? '—' }} · bidding #{{ data_get($normalized, 'plan.project_information_id') ?? '—' }} · lot #{{ data_get($normalized, 'plan.lot_id') ?? '—' }}</p></td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        @if (in_array($batch->status, ['previewed', 'failed'], true))
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <p class="text-sm text-slate-700">Confirmation creates new MMC financial plans and first version snapshots for importable rows. It does not update or bulk-convert existing PPL Forms. The import is transactional and duplicate project/lot sources are skipped.</p>
+                <form method="POST" action="{{ route('finance.ppl-import.confirm', $batch) }}" class="mt-4 space-y-4">@csrf
+                    @if (($batch->summary['warnings'] ?? 0) > 0)
+                        <label class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><input name="acknowledge_warnings" type="checkbox" value="1" class="mt-0.5 rounded border-amber-400 text-emerald-700 focus:ring-emerald-600"><span>I reviewed the workbook-to-database differences, unmatched source links, and row warnings shown above. Continue importing eligible warning rows.</span></label>
+                    @endif
+                    <div class="flex flex-wrap gap-3"><button type="submit" class="rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Confirm import</button></div>
+                </form>
+                <form method="POST" action="{{ route('finance.ppl-import.cancel', $batch) }}" class="mt-3">@csrf<button type="submit" class="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel preview</button></form>
+            </section>
+        @endif
+    </main>
+</x-finance_app-layout>

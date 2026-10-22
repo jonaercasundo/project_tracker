@@ -9,6 +9,9 @@
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('finance.plans.index') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">View all plans</a>
                 <a href="{{ route('finance.plans.create') }}" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800">New financial draft</a>
+                @if ($isMmcPplWorkspace)
+                    <a href="{{ route('finance.ppl-import.index') }}" class="rounded-lg border border-emerald-700 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">Import PPL workbook</a>
+                @endif
             </div>
         </div>
 
@@ -104,7 +107,7 @@
                                         <a href="{{ route('finance.plans.show', $plan) }}" class="font-semibold text-emerald-800 hover:underline">{{ $projectName }}</a>
                                         <p class="mt-1 text-xs text-slate-500">{{ $plan->name }}@if($lotNumber) · Lot {{ $lotNumber }}@endif</p>
                                     </td>
-                                    <td class="px-4 py-3 text-slate-700">{{ $plan->pplForm?->year_of_revenue_recognition ?? 'Not set' }}</td>
+                                    <td class="px-4 py-3 text-slate-700">{{ $plan->revenue_year ?? $plan->pplForm?->year_of_revenue_recognition ?? data_get($plan->latestVersion?->input_data, 'workbook_import.revenue_year') ?? 'Not set' }}</td>
                                     <td class="px-4 py-3 text-slate-700">{{ $monitoringStatus }}</td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['abc'] ?? $inputs['abc'] ?? 0), 2) }}</td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['contract_amount'] ?? $inputs['contract_amount'] ?? 0), 2) }}</td>

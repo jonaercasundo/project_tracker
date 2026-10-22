@@ -16,6 +16,7 @@ class ProjectFinancialPlan extends Model
         'project_information_id',
         'lot_id',
         'ppl_form_id',
+        'revenue_year',
         'name',
         'status',
         'created_by',

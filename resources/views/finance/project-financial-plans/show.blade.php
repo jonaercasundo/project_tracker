@@ -2,7 +2,9 @@
     @php
         $latest = $plan->versions->first();
         $results = $latest?->calculation_results ?? [];
-        $costs = $latest?->costItems ?? collect();
+        $allCosts = $latest?->costItems ?? collect();
+        $costs = $allCosts->reject(fn ($cost) => $cost->category === 'factory_cost_detail');
+        $factoryCostItems = $allCosts->where('category', 'factory_cost_detail');
         $money = fn ($value) => '₱'.number_format((float) ($value ?? 0), 2);
     @endphp
     <div class="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -54,6 +56,19 @@
                     </div>
                 </section>
             </div>
+
+            @if ($factoryCostItems->isNotEmpty())
+                <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <details>
+                        <summary class="cursor-pointer border-b border-slate-200 px-5 py-4 font-semibold text-slate-950">Imported factory-cost breakdown <span class="ml-2 text-xs font-medium text-slate-500">{{ $factoryCostItems->count() }} source item(s) · detail only, already included in the factory-cost input</span></summary>
+                        <div class="divide-y divide-slate-100">
+                            @foreach ($factoryCostItems as $cost)
+                                <div class="flex justify-between gap-4 px-5 py-3 text-sm"><div><p class="font-medium text-slate-800">{{ $cost->label }}</p>@if($cost->source_reference)<p class="mt-0.5 text-xs text-slate-500">{{ $cost->source_reference }}</p>@endif</div><p class="shrink-0 font-medium tabular-nums text-slate-900">{{ $money($cost->amount) }}</p></div>
+                            @endforeach
+                        </div>
+                    </details>
+                </section>
+            @endif
 
             <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-5 py-4"><h2 class="font-semibold text-slate-950">Version history</h2><p class="mt-1 text-xs text-slate-500">Old inputs, assumptions, factory-cost sources, and calculations are preserved.</p></div>

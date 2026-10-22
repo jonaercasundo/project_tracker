@@ -13,7 +13,7 @@ class StorePplFormRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'project_code' => ['required', 'string', 'max:255'],
             'lot_number' => ['required', 'string', 'max:50'],
             'project_title' => ['required', 'string', 'max:255'],
@@ -71,6 +71,23 @@ class StorePplFormRequest extends FormRequest
             'bidder' => ['nullable', 'string', 'max:255'],
             'authorized_signatory' => ['nullable', 'string', 'max:255'],
         ];
+
+        foreach ([
+            'lcb_abc', 'factory_downpayment', 'full_payment_after_delivery',
+            'pf1_contract_amt', 'pf2_contract_amt', 'pf3_contract_amt',
+            'll_comm_factory_cost', 'logistics_abc', 'other_expenses',
+            'manpower_others', 'assembly_service_center', 'rd_expenses',
+            'facilitation', 'allowance_tax_lawyer', 'opex', 'income_tax',
+            'incentive', 'importation_vat', 'output_vat', 'hold_out', 'retention',
+        ] as $rateField) {
+            $rules[$rateField][] = 'decimal:0,2';
+        }
+
+        $rules['interest_rate_dst'][] = 'decimal:0,4';
+        $rules['interest_rate_dst_per_annum'][] = 'decimal:0,4';
+        $rules['forex'][] = 'decimal:0,6';
+
+        return $rules;
     }
 
     protected function prepareForValidation(): void

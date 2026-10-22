@@ -512,6 +512,43 @@ it('validates and persists PPL form fields using the actual database column name
     expect(PplForm::query()->count())->toBe(1);
 });
 
+it('shows workbook input columns on the create page and rejects rates the PPL schema would round', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+
+    $this->get(route('ppl_forms.create'))
+        ->assertOk()
+        ->assertSee('1. FORM source')
+        ->assertSee('name="source_project_information_id"', false)
+        ->assertSee('name="lcb_abc"', false)
+        ->assertSee('name="pf3_contract_amt"', false)
+        ->assertSee('name="allowance_tax_lawyer"', false)
+        ->assertSee('name="year_of_revenue_recognition"', false)
+        ->assertSee('name="bidder"', false)
+        ->assertSee('name="authorized_signatory"', false)
+        ->assertSee('Project Code, Project ID No., ABC, and financial assumptions stay Finance-controlled');
+
+    $payload = [
+        'project_code' => 'SME 2026',
+        'lot_number' => '4',
+        'project_title' => 'SME 2026 Lot 4',
+        'abc' => '327523242.63',
+        'lcb_abc' => '0.2202',
+        'pf3_contract_amt' => '',
+    ];
+
+    $this->post(route('ppl_forms.store'), $payload)->assertSessionHasErrors('lcb_abc');
+    expect(PplForm::query()->count())->toBe(0);
+
+    $this->post(route('ppl_forms.store'), array_replace($payload, ['lcb_abc' => '0.22']))
+        ->assertRedirect(route('ppl_forms.index'));
+
+    $form = PplForm::query()->sole();
+    expect((string) $form->project_code)->toBe('SME 2026')
+        ->and((string) $form->lot_number)->toBe('4')
+        ->and((float) $form->lcb_abc)->toBe(0.22)
+        ->and($form->pf3_contract_amt)->toBeNull();
+});
+
 it('prefills verified PPL project and lot fields from the existing MMC Operations Bidding Form', function () {
     $this->signInBiddingUser('finance', 'MMC');
     $bidding = ProjectInformation::query()->create([

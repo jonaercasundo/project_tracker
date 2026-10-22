@@ -13,6 +13,7 @@ use App\Models\ProjectInformation;
 use App\Models\ProjectLot;
 use App\Services\DashboardService;
 use App\Services\MmcPplSourceLinkService;
+use App\Services\PplFormFinancialSummary;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class PplFormController extends Controller
 {
-    public function index(Request $request, DashboardService $dashboards): View
+    public function index(Request $request, DashboardService $dashboards, PplFormFinancialSummary $financialSummary): View
     {
         $company = $dashboards->currentCompany($request->user(), $request->session());
         abort_unless($company?->code === 'MMC', 403);
@@ -161,6 +162,8 @@ class PplFormController extends Controller
             $query->whereDate('created_at', '<=', $filters['created_to']);
         }
 
+        $summary = $hasFinancialPlans ? $financialSummary->forFilteredForms(clone $query, (int) $company->company_id) : null;
+
         $sortBy = $filters['sort_by'] ?? 'id';
         $sortOrder = $filters['sort_order'] ?? 'desc';
         $query->orderBy($sortBy, $sortOrder)->orderBy('id', 'desc');
@@ -171,6 +174,7 @@ class PplFormController extends Controller
                     $plans->whereNull('deleted_at');
                 }
             }]);
+            $query->with(['financialPlans' => fn ($plans) => $plans->where('company_id', $company->company_id)->with('latestVersion')]);
         }
         $data = $query->with($hasSourceLinks ? [
             'sourceLink' => fn ($links) => $verifiedLink($links),
@@ -210,6 +214,7 @@ class PplFormController extends Controller
             'biddingRecords' => $biddingRecords,
             'hasSourceLinks' => $hasSourceLinks,
             'hasFinancialPlans' => $hasFinancialPlans,
+            'financialSummary' => $summary,
             'activeFilterCount' => count(array_filter($filters, fn ($value, $key): bool => ! in_array($key, ['sort_by', 'sort_order', 'per_page'], true) && $value !== null && $value !== '', ARRAY_FILTER_USE_BOTH)),
         ]);
     }

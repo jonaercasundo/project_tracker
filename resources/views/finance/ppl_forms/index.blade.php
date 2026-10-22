@@ -85,10 +85,48 @@
             </div>
         @endif
 
+        @if ($financialSummary)
+            <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Filtered financial totals">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div><h2 class="text-sm font-bold text-slate-900">Filtered lot totals</h2><p class="text-xs text-slate-600">Historical PPL Form ABC: <strong>&#8369;{{ number_format((float) $financialSummary['form_abc'], 2) }}</strong>. The amounts below use the latest saved version of one active MMC plan per matching form, across all filtered pages.</p></div>
+                    <p class="text-xs font-semibold text-slate-700">{{ number_format($financialSummary['plan_count']) }} versioned plans included @if ($financialSummary['ambiguous_count']) &middot; {{ number_format($financialSummary['ambiguous_count']) }} forms with multiple or incomplete plans excluded @endif</p>
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
+                    @foreach (['abc' => 'ABC', 'contract_amount' => 'Contract', 'net_sales' => 'Net sales', 'factory_cost' => 'Factory cost', 'pf1' => 'PF1', 'pf2' => 'PF2', 'pf3' => 'PF3', 'interest_dst_working_capital' => 'Interest / DST', 'total_cost_of_sales' => 'Total cost', 'gross_profit' => 'Gross profit', 'opex' => 'OPEX', 'net_profit_before_tax' => 'Before tax', 'income_tax_provision' => 'Income tax', 'net_profit_after_tax' => 'After tax', 'ppl' => 'PPL', 'working_capital_needed' => 'Working capital'] as $key => $label)
+                        <div class="rounded-xl bg-slate-50 px-3 py-2"><p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{{ $label }}</p><p class="mt-1 text-sm font-bold tabular-nums {{ (float) $financialSummary['amounts'][$key] < 0 ? 'text-rose-800' : 'text-slate-900' }}">&#8369;{{ number_format((float) $financialSummary['amounts'][$key], 2) }}</p></div>
+                    @endforeach
+                </div>
+                <p class="mt-3 text-xs text-slate-600">Gross margin: <strong>{{ $financialSummary['gpm'] === null ? 'N/A' : number_format((float) $financialSummary['gpm'] * 100, 2).'%' }}</strong> &middot; Net margin: <strong>{{ $financialSummary['npm'] === null ? 'N/A' : number_format((float) $financialSummary['npm'] * 100, 2).'%' }}</strong>. Margins use summed profit divided by summed net sales; rates are never summed.</p>
+            </section>
+        @endif
+
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[850px] border-collapse text-sm text-left">
-                    <thead class="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500"><tr><th class="px-5 py-4">Project ledger</th><th class="px-5 py-4">Operational status</th><th class="px-5 py-4">Year</th><th class="px-5 py-4 text-right">ABC</th><th class="px-5 py-4">Created</th><th class="px-5 py-4 text-right">Actions</th></tr></thead>
+                @php
+                    $financialColumns = [
+                        'contract_amount' => 'Contract', 'net_sales' => 'Net sales', 'factory_cost' => 'Factory cost',
+                        'pf1' => 'PF1', 'pf2' => 'PF2', 'pf3' => 'PF3',
+                        'interest_dst_working_capital' => 'Interest / DST', 'total_cost_of_sales' => 'Total cost',
+                        'gross_profit' => 'Gross profit', 'gpm' => 'Gross margin', 'opex' => 'OPEX',
+                        'net_profit_before_tax' => 'Before tax', 'income_tax_provision' => 'Income tax',
+                        'net_profit_after_tax' => 'After tax', 'ppl' => 'PPL', 'npm' => 'Net margin',
+                        'working_capital_needed' => 'Working capital',
+                    ];
+                @endphp
+                <table class="w-max min-w-full border-collapse text-left text-xs" aria-label="PPL Forms project and lot financial table">
+                    <thead class="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                        <tr>
+                            <th scope="col" class="sticky left-0 z-10 min-w-[300px] max-w-[380px] bg-slate-50 px-4 py-3">Project / lot</th>
+                            <th scope="col" class="min-w-[125px] px-3 py-3">Project status</th>
+                            <th scope="col" class="min-w-[70px] px-3 py-3">Year</th>
+                            <th scope="col" class="min-w-[135px] px-3 py-3 text-right">ABC</th>
+                            <th scope="col" class="min-w-[95px] px-3 py-3 text-right">LCB discount</th>
+                            @foreach ($financialColumns as $label)
+                                <th scope="col" class="min-w-[135px] px-3 py-3 text-right">{{ $label }}</th>
+                            @endforeach
+                            <th scope="col" class="min-w-[100px] px-3 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
                     <tbody class="divide-y divide-slate-100">
                         @forelse ($data as $row)
                             @php
@@ -96,31 +134,32 @@
                                 $verifiedProject = $source?->match_status === 'verified' ? $source->project : null;
                                 $verifiedBidding = $source?->match_status === 'verified' ? $source->bidding : null;
                                 $operationalStatus = $verifiedProject?->status ?? 'Unlinked';
-                                $agency = $verifiedProject?->agency ?? $verifiedBidding?->procuring_entity;
+                                $plans = $hasFinancialPlans ? $row->financialPlans : collect();
+                                $version = $plans->count() === 1 ? $plans->first()?->latestVersion : null;
+                                $results = $version?->calculation_results ?? [];
+                                $lcbRate = $version?->input_data['workbook_import']['source_cells']['1. FORM']['N']['value'] ?? $row->lcb_abc;
                                 $returnParams = request()->query();
                             @endphp
-                            <tr class="align-top hover:bg-slate-50/60">
-                                <td class="max-w-[420px] px-5 py-4">
-                                    <div class="flex flex-wrap items-center gap-2"><span class="rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-blue-700">{{ $row->project_code ?: 'No code' }}</span><span class="font-mono text-[10px] text-slate-500">PPL #{{ $row->id }} · Ref {{ $row->project_id_no ?: '—' }} · Lot {{ $row->lot_number ?: '—' }}</span></div>
-                                    <p class="mt-1 line-clamp-2 break-words font-bold text-slate-900" title="{{ $row->project_title }}">{{ $row->project_title }}</p>
-                                    <p class="mt-1 truncate text-[10px] text-slate-500">{{ $agency ?: 'Agency not linked' }} · {{ $row->region ?: 'No region' }}</p>
-                                    @if ($verifiedBidding)<p class="mt-1 text-[10px] font-medium text-indigo-700">Bidding #{{ $verifiedBidding->id }} · {{ $verifiedBidding->project_name }}</p>@endif
+                            <tr class="align-middle hover:bg-slate-50/70">
+                                <td class="sticky left-0 z-10 max-w-[380px] bg-white px-4 py-3 group-hover:bg-slate-50">
+                                    <p class="line-clamp-2 max-w-[350px] break-words font-bold leading-5 text-slate-900" title="{{ $row->project_title }}">{{ $row->project_title ?: $row->project_code }}</p>
+                                    <p class="mt-1 text-[11px] text-slate-600">Lot {{ $row->lot_number ?: 'N/A' }} &middot; PPL #{{ $row->id }} &middot; {{ $row->project_code ?: 'No code' }}</p>
+                                    <p class="max-w-[350px] truncate text-[10px] text-slate-500" title="{{ $row->project_id_no }}">{{ $row->project_id_no ?: 'No project reference' }} @if ($verifiedProject) &middot; Project #{{ $verifiedProject->getKey() }} @endif @if ($verifiedBidding) &middot; Bidding #{{ $verifiedBidding->id }} @endif</p>
                                 </td>
-                                <td class="px-5 py-4"><span class="inline-flex max-w-40 rounded-full px-2.5 py-1 text-[10px] font-semibold {{ $operationalStatus === 'Unlinked' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-800' }}">{{ $operationalStatus }}</span></td>
-                                <td class="px-5 py-4 tabular-nums text-slate-700">{{ $row->year_of_revenue_recognition ?: '—' }}</td>
-                                <td class="px-5 py-4 text-right tabular-nums font-semibold text-slate-900">₱{{ number_format((float) ($row->abc ?? 0), 2) }}</td>
-                                <td class="px-5 py-4 whitespace-nowrap text-xs text-slate-600">{{ $row->created_at?->format('M j, Y') ?? '—' }}</td>
-                                <td class="px-5 py-4"><div class="flex justify-end gap-2"><a href="{{ route('ppl_forms.show', ['id' => $row->id] + $returnParams) }}" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">View</a><a href="{{ url('/ppl-forms/'.$row->id.'/edit') }}" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">Edit</a></div></td>
+                                <td class="px-3 py-3"><span class="rounded-full px-2 py-1 font-semibold {{ $verifiedProject ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-700' }}">{{ $operationalStatus }}</span></td>
+                                <td class="px-3 py-3 tabular-nums">{{ $row->year_of_revenue_recognition ?: 'N/A' }}</td>
+                                <td class="px-3 py-3 text-right font-semibold tabular-nums" title="Historical PPL Form lot ABC">@if ($row->abc === null) &mdash; @else &#8369;{{ number_format((float) $row->abc, 2) }} @endif @if (isset($results['abc']) && $row->abc !== null && number_format((float) $results['abc'], 2, '.', '') !== number_format((float) $row->abc, 2, '.', '')) <span class="block text-[10px] text-amber-800" title="Saved financial plan ABC differs from the historical PPL Form ABC">Plan ABC differs</span> @endif</td>
+                                <td class="px-3 py-3 text-right tabular-nums" title="LCB discount rate from the imported workbook when available, otherwise the historical PPL Form">{{ ! is_numeric($lcbRate) ? 'N/A' : number_format((float) $lcbRate * 100, 2).'%' }}</td>
+                                @foreach ($financialColumns as $key => $label)
+                                    @php $value = in_array($key, ['pf1', 'pf2', 'pf3', 'interest_dst_working_capital'], true) ? data_get($results, 'costs.'.$key) : ($results[$key] ?? null); @endphp
+                                    <td class="px-3 py-3 text-right tabular-nums {{ $value !== null && (float) $value < 0 ? 'bg-rose-50 font-semibold text-rose-800' : 'text-slate-800' }}" @if ($value !== null && (float) $value < 0) title="Negative financial result" @endif>
+                                        @if ($value === null) &mdash; @elseif (in_array($key, ['gpm', 'npm'], true)) {{ number_format((float) $value * 100, 2) }}% @else &#8369;{{ number_format((float) $value, 2) }} @endif
+                                    </td>
+                                @endforeach
+                                <td class="px-3 py-3 text-right"><div class="flex justify-end gap-1"><a href="{{ route('ppl_forms.show', ['id' => $row->id] + $returnParams) }}" class="rounded border border-slate-200 px-2 py-1 font-semibold hover:bg-slate-100">View</a><a href="{{ url('/ppl-forms/'.$row->id.'/edit') }}" class="rounded border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100">Edit</a></div></td>
                             </tr>
-                            <tr class="bg-slate-50/40"><td colspan="6" class="px-5 pb-5 pt-0">
-                                <div class="grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 text-[11px] md:grid-cols-3">
-                                    <div class="space-y-2"><p class="font-bold uppercase tracking-wide text-slate-400">Timeline</p><p class="flex justify-between gap-3"><span class="text-slate-500">Bid opening</span><span>{{ $row->bid_opening?->format('M j, Y') ?? '—' }}</span></p><p class="flex justify-between gap-3"><span class="text-slate-500">NOA / NTP</span><span>{{ $row->noa_months ?? 0 }} / {{ $row->ntp_months ?? 0 }} mo</span></p><p class="flex justify-between gap-3"><span class="text-slate-500">Delivery days</span><span>{{ $row->delivery_days_after_production ?? 0 }}</span></p></div>
-                                    <div class="space-y-2"><p class="font-bold uppercase tracking-wide text-slate-400">Financial</p><p class="flex justify-between gap-3"><span class="text-slate-500">LCB ABC</span><span class="font-semibold text-emerald-700">₱{{ number_format((float) ($row->lcb_abc ?? 0), 2) }}</span></p><p class="flex justify-between gap-3"><span class="text-slate-500">Factory downpayment</span><span>₱{{ number_format((float) ($row->factory_downpayment ?? 0), 2) }}</span></p><p class="flex justify-between gap-3"><span class="text-slate-500">OPEX</span><span>₱{{ number_format((float) ($row->opex ?? 0), 2) }}</span></p></div>
-                                    <div class="space-y-2"><p class="font-bold uppercase tracking-wide text-slate-400">Location & linkage</p><p class="flex justify-between gap-3"><span class="text-slate-500">Warehouse</span><span class="max-w-48 truncate" title="{{ $row->warehouse_location }}">{{ $row->warehouse_location ?: '—' }}</span></p><p class="flex justify-between gap-3"><span class="text-slate-500">Area</span><span>{{ $row->warehouse_area_sqm ?? '—' }} sqm</span></p><p class="flex justify-between gap-3"><span class="text-slate-500">Financial plan</span><span>@if ($hasFinancialPlans && $row->has_financial_plan > 0) Linked @else Not linked @endif</span></p></div>
-                                </div>
-                            </td></tr>
                         @empty
-                            <tr><td colspan="6" class="px-6 py-16 text-center"><p class="font-semibold text-slate-800">No PPL Forms match these search and filter settings.</p><p class="mt-1 text-xs text-slate-500">Clear one or more filters, or try another project name, code, reference, or lot number.</p></td></tr>
+                            <tr><td colspan="{{ 6 + count($financialColumns) }}" class="px-6 py-16 text-center"><p class="font-semibold text-slate-800">No PPL Forms match these search and filter settings.</p><p class="mt-1 text-xs text-slate-500">Clear one or more filters, or try another project name, code, reference, or lot number.</p></td></tr>
                         @endforelse
                     </tbody>
                 </table>

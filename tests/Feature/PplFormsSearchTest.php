@@ -203,6 +203,169 @@ it('sorts by permitted columns and preserves filters in pagination and form link
         ->assertSee(route('ppl_forms.index', $filters));
 });
 
+it('shows workbook financial columns from the latest saved version and totals only filtered MMC plans', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $included = makePplListingFixture($user, [
+        'project_title' => str_repeat('Long verified project title ', 8),
+        'lot_number' => '2',
+        'abc' => '200.00',
+        'lcb_abc' => '0.10',
+    ], 'Implementation');
+    $excluded = makePplListingFixture($user, ['lot_number' => '9', 'abc' => '900.00']);
+
+    $plan = ProjectFinancialPlan::query()->create([
+        'company_id' => $user->currentCompany()->company_id,
+        'ppl_form_id' => $included['form']->id,
+        'name' => 'Lot 2 plan',
+        'status' => 'draft',
+        'created_by' => $user->user_id,
+        'updated_by' => $user->user_id,
+    ]);
+    foreach ([1 => '10.00', 2 => '30.00'] as $number => $profit) {
+        $plan->versions()->create([
+            'version_number' => $number,
+            'status' => 'draft',
+            'input_data' => [],
+            'calculation_results' => [
+                'abc' => '200.00', 'contract_amount' => '180.00', 'net_sales' => '100.00',
+                'factory_cost' => '40.00', 'costs' => ['pf1' => '2.00', 'pf2' => '3.00', 'pf3' => '0.00', 'interest_dst_working_capital' => '4.00'],
+                'total_cost_of_sales' => '70.00', 'gross_profit' => $profit,
+                'gpm' => $number === 1 ? '0.10' : '0.30', 'opex' => '5.00',
+                'net_profit_before_tax' => '25.00', 'income_tax_provision' => '2.00',
+                'net_profit_after_tax' => '23.00', 'ppl' => '20.00', 'npm' => '0.20',
+                'working_capital_needed' => '60.00',
+            ],
+            'assumptions_snapshot' => [],
+            'factory_cost_snapshot' => [],
+            'created_by' => $user->user_id,
+        ]);
+    }
+    $second = makePplListingFixture($user, ['project_title' => 'Another Lot 2 plan', 'lot_number' => '2', 'abc' => '300.00']);
+    $secondPlan = ProjectFinancialPlan::query()->create([
+        'company_id' => $user->currentCompany()->company_id,
+        'ppl_form_id' => $second['form']->id,
+        'name' => 'Second Lot 2 plan',
+        'status' => 'draft',
+        'created_by' => $user->user_id,
+        'updated_by' => $user->user_id,
+    ]);
+    $secondPlan->versions()->create([
+        'version_number' => 1,
+        'status' => 'draft',
+        'input_data' => [],
+        'calculation_results' => [
+            'abc' => '300.00', 'net_sales' => '300.00', 'gross_profit' => '30.00',
+            'ppl' => '15.00', 'gpm' => '0.10', 'npm' => '0.05',
+        ],
+        'assumptions_snapshot' => [],
+        'factory_cost_snapshot' => [],
+        'created_by' => $user->user_id,
+    ]);
+    $foreignCompany = Company::query()->create(['code' => 'MI', 'name' => 'MI', 'is_active' => true]);
+    ProjectFinancialPlan::query()->create([
+        'company_id' => $foreignCompany->company_id,
+        'ppl_form_id' => $included['form']->id,
+        'name' => 'Foreign plan',
+        'status' => 'draft',
+        'created_by' => $user->user_id,
+        'updated_by' => $user->user_id,
+    ]);
+
+    $response = $this->get(route('ppl_forms.index', ['lot' => '2', 'per_page' => 10]))->assertOk();
+
+    $response->assertSee('PPL Forms project and lot financial table')
+        ->assertSee('line-clamp-2')
+        ->assertSee('Interest / DST')
+        ->assertSee('Working capital')
+        ->assertSee('30.00%')
+        ->assertSee('10.00%')
+        ->assertSee('15.00%')
+        ->assertSee('8.75%')
+        ->assertDontSee('Lot 9 plan');
+    expect($response->viewData('financialSummary')['amounts']['gross_profit'])->toBe('60.00')
+        ->and($response->viewData('financialSummary')['amounts']['abc'])->toBe('500.00')
+        ->and($response->viewData('financialSummary')['form_abc'])->toBe('500.00')
+        ->and($response->viewData('financialSummary')['gpm'])->toBe('0.150000')
+        ->and($response->viewData('financialSummary')['npm'])->toBe('0.087500')
+        ->and($response->viewData('financialSummary')['plan_count'])->toBe(2)
+        ->and((float) $included['form']->fresh()->abc)->toBe(200.0)
+        ->and((float) $excluded['form']->fresh()->abc)->toBe(900.0);
+});
+
+it('excludes ambiguous plan links from filtered totals without hiding the historical form', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($user, ['project_title' => 'Review two plans']);
+    foreach (['First', 'Second'] as $name) {
+        ProjectFinancialPlan::query()->create([
+            'company_id' => $user->currentCompany()->company_id,
+            'ppl_form_id' => $fixture['form']->id,
+            'name' => $name,
+            'status' => 'draft',
+            'created_by' => $user->user_id,
+            'updated_by' => $user->user_id,
+        ]);
+    }
+
+    $response = $this->get(route('ppl_forms.index', ['search' => 'Review two plans']))->assertSee('Review two plans');
+
+    expect($response->viewData('financialSummary')['ambiguous_count'])->toBe(1)
+        ->and($response->viewData('financialSummary')['plan_count'])->toBe(0)
+        ->and($response->viewData('financialSummary')['gpm'])->toBeNull();
+});
+
+it('aggregates the three SME lot snapshots like PPL VERTICAL without adding project subtotals', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $rows = [
+        ['2', '157751301.52', '126626272.8125', '118844587.84908006', '7781684.963419944', '-1082154.1334550562'],
+        ['9', '188467107.19', '166636749.99107143', '159249168.11950898', '7387581.8715624511', '-944255.62799112126'],
+        ['11', '249563999.56', '204822761.625', '183726829.27875394', '21095932.346246064', '5744588.1776216533'],
+    ];
+    foreach ($rows as [$lot, $abc, $netSales, $costOfSales, $grossProfit, $ppl]) {
+        $fixture = makePplListingFixture($user, [
+            'project_code' => 'SME 2025 2, 9, 11',
+            'project_title' => 'SME 2025 2, 9, 11',
+            'lot_number' => $lot,
+            'abc' => $abc,
+        ]);
+        $plan = ProjectFinancialPlan::query()->create([
+            'company_id' => $user->currentCompany()->company_id,
+            'ppl_form_id' => $fixture['form']->id,
+            'name' => 'SME Lot '.$lot,
+            'status' => 'draft',
+            'created_by' => $user->user_id,
+            'updated_by' => $user->user_id,
+        ]);
+        $plan->versions()->create([
+            'version_number' => 1,
+            'status' => 'draft',
+            'input_data' => [],
+            'calculation_results' => [
+                'abc' => $abc,
+                'net_sales' => $netSales,
+                'total_cost_of_sales' => $costOfSales,
+                'gross_profit' => $grossProfit,
+                'ppl' => $ppl,
+            ],
+            'assumptions_snapshot' => [],
+            'factory_cost_snapshot' => [],
+            'created_by' => $user->user_id,
+        ]);
+    }
+
+    $response = $this->get(route('ppl_forms.index', ['search' => 'SME 2025 2, 9, 11', 'per_page' => 10]))->assertOk();
+    $summary = $response->viewData('financialSummary');
+
+    expect($summary['plan_count'])->toBe(3)
+        ->and($summary['form_abc'])->toBe('595782408.27')
+        ->and($summary['amounts']['abc'])->toBe('595782408.27')
+        ->and($summary['amounts']['net_sales'])->toBe('498085784.43')
+        ->and($summary['amounts']['total_cost_of_sales'])->toBe('461820585.25')
+        ->and($summary['amounts']['gross_profit'])->toBe('36265199.18')
+        ->and($summary['amounts']['ppl'])->toBe('3718178.42')
+        ->and($summary['gpm'])->toBe('0.072809')
+        ->and($summary['npm'])->toBe('0.007465');
+});
+
 it('validates filter parameters and restricts the listing to authorized MMC Finance users', function () {
     $financeUser = $this->signInBiddingUser('finance', 'MMC');
     makePplListingFixture($financeUser, ['project_title' => 'MMC private form']);

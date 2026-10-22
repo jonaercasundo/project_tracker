@@ -21,6 +21,9 @@
         @if (session('success'))
             <div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{{ session('success') }}</div>
         @endif
+        @if ($financialSchemaIncomplete)
+            <p role="status" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">Financial-plan schema is incomplete. Historical PPL Form values remain visible; saved plan totals are unavailable until migration review.</p>
+        @endif
 
         <form action="{{ route('ppl_forms.index') }}" method="GET" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -156,7 +159,7 @@
                                         @if ($value === null) &mdash; @elseif (in_array($key, ['gpm', 'npm'], true)) {{ number_format((float) $value * 100, 2) }}% @else &#8369;{{ number_format((float) $value, 2) }} @endif
                                     </td>
                                 @endforeach
-                                <td class="px-3 py-3 text-right"><div class="flex justify-end gap-1"><a href="{{ route('ppl_forms.show', ['id' => $row->id] + $returnParams) }}" class="rounded border border-slate-200 px-2 py-1 font-semibold hover:bg-slate-100">View</a><a href="{{ route('ppl_forms.edit', ['id' => $row->id] + $returnParams) }}" class="rounded border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100">Edit</a></div></td>
+                                <td class="px-3 py-3 text-right"><div class="flex justify-end gap-1"><a href="{{ route('ppl_forms.show', ['id' => $row->id] + $returnParams) }}" class="rounded border border-slate-200 px-2 py-1 font-semibold hover:bg-slate-100">View</a><a href="{{ route('ppl_forms.edit', ['id' => $row->id] + $returnParams) }}" class="rounded border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100">Edit</a>@unless ($verifiedProject)<a href="{{ route('finance.ppl.sources.index', ['search' => $row->id]) }}" class="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 font-semibold text-emerald-800 hover:bg-emerald-100">Link Project</a>@endunless</div></td>
                             </tr>
                         @empty
                             <tr><td colspan="{{ 6 + count($financialColumns) }}" class="px-6 py-16 text-center"><p class="font-semibold text-slate-800">No PPL Forms match these search and filter settings.</p><p class="mt-1 text-xs text-slate-500">Clear one or more filters, or try another project name, code, reference, or lot number.</p></td></tr>

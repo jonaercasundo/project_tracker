@@ -106,22 +106,22 @@
         </a>
 
         @if (auth()->user()?->currentCompany()?->code === 'MMC')
-            {{-- PPL FORMS --}}
-            <a href="{{ route('ppl_forms.index') }}"
+            {{-- Dedicated MMC PPL workspace --}}
+            <a href="{{ route('finance.ppl.dashboard') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
-           {{ request()->routeIs('ppl_forms.*') ? 'bg-emerald-50/80 text-emerald-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
+           {{ request()->routeIs('finance.ppl.*') ? 'bg-emerald-50/80 text-emerald-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
 
-            @if(request()->routeIs('ppl_forms.*'))
+            @if(request()->routeIs('finance.ppl.*'))
                 <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-emerald-600 rounded-r-md"></div>
             @endif
 
-            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('ppl_forms.*') ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-600' }}"
+            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('finance.ppl.*') ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-600' }}"
                  fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round"
                       d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"/>
             </svg>
 
-            <span>PPL Forms</span>
+            <span>PPL Management</span>
             </a>
         @endif
 

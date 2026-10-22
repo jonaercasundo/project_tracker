@@ -27,7 +27,14 @@ class ProjectFinancialPlanController extends Controller
     public function dashboard(Request $request): View
     {
         $companyId = $this->currentCompanyId();
-        $isMmcPplWorkspace = request()->user()?->currentCompany()?->code === 'MMC';
+        $isMmcPplWorkspace = $request->routeIs('finance.ppl.dashboard');
+        if ($isMmcPplWorkspace) {
+            abort_unless($request->user()?->currentCompany()?->code === 'MMC', 403);
+            if (! Schema::hasTable('project_financial_plans') || ! Schema::hasTable('project_financial_plan_versions')
+                || ! Schema::hasColumn('project_financial_plans', 'deleted_at')) {
+                return view('finance.ppl_management.schema_required');
+            }
+        }
         $plans = ProjectFinancialPlan::query()
             ->forCompany($companyId)
             ->with('latestVersion')
@@ -74,6 +81,7 @@ class ProjectFinancialPlanController extends Controller
             'monitoringYears' => $monitoringYears,
             'monitoringStatuses' => $monitoringStatuses,
             'filters' => $filters,
+            'hasVerifiedSourceLinks' => Schema::hasTable('mmc_ppl_source_links'),
         ]);
     }
 
@@ -83,8 +91,9 @@ class ProjectFinancialPlanController extends Controller
 
         $filters = $this->monitoringFilters($request);
         $plans = $this->monitoringQuery($this->currentCompanyId(), $filters);
+        $hasSourceLinks = Schema::hasTable('mmc_ppl_source_links');
 
-        return response()->streamDownload(function () use ($plans): void {
+        return response()->streamDownload(function () use ($plans, $hasSourceLinks): void {
             $output = fopen('php://output', 'wb');
             if ($output === false) {
                 throw new \RuntimeException('Unable to open the MMC PPL monitoring report stream.');
@@ -97,17 +106,20 @@ class ProjectFinancialPlanController extends Controller
                 'Net margin', 'Version', 'Project ID', 'Bidding ID', 'PPL Form ID',
             ]);
 
-            $plans->chunk(500, function ($rows) use ($output): void {
+            $plans->chunk(500, function ($rows) use ($output, $hasSourceLinks): void {
                 foreach ($rows as $plan) {
                     $version = $plan->latestVersion;
                     $results = $version?->calculation_results ?? [];
                     $fputCsv = fn (mixed $value): mixed => is_string($value) ? $this->safeCsvValue($value) : $value;
 
+                    $project = $plan->ppl_form_id !== null
+                        ? ($hasSourceLinks ? $plan->pplForm?->sourceLink?->project : null)
+                        : $plan->project;
                     fputcsv($output, [
                         $fputCsv($plan->project?->project_name ?? $plan->bidding?->implementationProject?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? $plan->name),
                         $plan->lot?->lot_no ?? $plan->pplForm?->lot_number,
                         $plan->revenue_year ?? $plan->pplForm?->year_of_revenue_recognition ?? data_get($version?->input_data, 'workbook_import.revenue_year'),
-                        $fputCsv($plan->project?->status ?? $plan->bidding?->implementationProject?->status ?? 'Not linked'),
+                        $fputCsv($project?->status ?? 'Unlinked'),
                         $results['abc'] ?? '', $results['contract_amount'] ?? '', $results['net_sales'] ?? '',
                         $results['factory_cost'] ?? '', $results['total_cost_of_sales'] ?? '', $results['opex'] ?? '',
                         $results['gross_profit'] ?? '', $results['gpm'] ?? '',
@@ -275,9 +287,14 @@ class ProjectFinancialPlanController extends Controller
                     $biddingQuery->with(['implementationProject' => $projectOwnerScope]);
                 },
                 'lot',
-                'pplForm' => function ($pplQuery) use ($companyId): void {
+                'pplForm' => function ($pplQuery) use ($companyId, $projectOwnerScope): void {
                     if (Schema::hasColumn('ppl_forms', 'company_id')) {
                         $pplQuery->where(fn (Builder $ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $companyId));
+                    }
+                    if (Schema::hasTable('mmc_ppl_source_links')) {
+                        $pplQuery->with(['sourceLink' => function ($links) use ($companyId, $projectOwnerScope): void {
+                            $links->where('company_id', $companyId)->where('match_status', 'verified')->with(['project' => $projectOwnerScope]);
+                        }]);
                     }
                 },
             ])
@@ -299,22 +316,23 @@ class ProjectFinancialPlanController extends Controller
         if (! empty($filters['status'])) {
             $status = $filters['status'];
             $query->where(function (Builder $planQuery) use ($status): void {
-                $planQuery->whereHas('project', function (Builder $projectQuery) use ($status): void {
+                $planQuery->whereNull('ppl_form_id')->whereHas('project', function (Builder $projectQuery) use ($status): void {
                     $projectQuery->where('status', $status);
                     if (Schema::hasColumn('projects', 'company_id')) {
                         $projectQuery->where(fn (Builder $ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $this->currentCompanyId()));
                     }
-                })->orWhereHas('bidding', function (Builder $biddingQuery) use ($status): void {
-                    if (Schema::hasColumn('project_information', 'company_id')) {
-                        $biddingQuery->where(fn (Builder $ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $this->currentCompanyId()));
-                    }
-                    $biddingQuery->whereHas('implementationProject', function (Builder $projectQuery) use ($status): void {
-                        $projectQuery->where('status', $status);
-                        if (Schema::hasColumn('projects', 'company_id')) {
-                            $projectQuery->where(fn (Builder $ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $this->currentCompanyId()));
-                        }
-                    });
                 });
+                if (Schema::hasTable('mmc_ppl_source_links')) {
+                    $planQuery->orWhereHas('pplForm.sourceLink', function (Builder $links) use ($status): void {
+                        $links->where('company_id', $this->currentCompanyId())->where('match_status', 'verified')
+                            ->whereHas('project', function (Builder $projects) use ($status): void {
+                                $projects->where('status', $status);
+                                if (Schema::hasColumn('projects', 'company_id')) {
+                                    $projects->where(fn (Builder $owners) => $owners->whereNull('company_id')->orWhere('company_id', $this->currentCompanyId()));
+                                }
+                            });
+                    });
+                }
             });
         }
 

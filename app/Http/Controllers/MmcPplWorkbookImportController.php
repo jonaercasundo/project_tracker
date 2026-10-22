@@ -13,8 +13,10 @@ use App\Services\MmcPplWorkbookImportService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MmcPplWorkbookImportController extends Controller
@@ -22,18 +24,23 @@ class MmcPplWorkbookImportController extends Controller
     public function index(Request $request): View
     {
         $companyId = (int) $request->user()->currentCompany()->company_id;
+        $canImport = Schema::hasTable('mmc_ppl_import_batches') && Schema::hasTable('mmc_ppl_import_rows');
 
         return view('finance.ppl-import.index', [
-            'batches' => MmcPplImportBatch::query()
+            'canImport' => $canImport,
+            'batches' => $canImport ? MmcPplImportBatch::query()
                 ->where('company_id', $companyId)
                 ->withCount(['rows as imported_rows_count' => fn ($query) => $query->where('status', 'imported')])
                 ->latest()
-                ->paginate(20),
+                ->paginate(20) : new LengthAwarePaginator([], 0, 20),
         ]);
     }
 
     public function store(MmcPplWorkbookUploadRequest $request, MmcPplWorkbookImportService $service): RedirectResponse
     {
+        if (! Schema::hasTable('mmc_ppl_import_batches') || ! Schema::hasTable('mmc_ppl_import_rows')) {
+            throw ValidationException::withMessages(['file' => 'The MMC workbook import schema must be reviewed and applied before uploading.']);
+        }
         $result = $service->stage(
             $request->file('file'),
             $request->user(),

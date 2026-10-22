@@ -201,7 +201,7 @@ it('previews and confirms a workbook into a new versioned plan without changing 
         $this->assertDatabaseHas('ppl_forms', ['id' => $form->id, 'project_title' => 'Existing historical form', 'abc' => 200]);
         $this->assertDatabaseCount('ppl_forms', 1);
         $this->assertDatabaseCount('mmc_ppl_import_source_mappings', 1);
-        $this->get(route('finance.dashboard', ['year' => 2026]))
+        $this->get(route('finance.ppl.dashboard', ['year' => 2026]))
             ->assertOk()
             ->assertSee('Synthetic import fixture');
     } finally {

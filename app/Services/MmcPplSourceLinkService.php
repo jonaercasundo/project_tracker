@@ -27,13 +27,27 @@ class MmcPplSourceLinkService
             $pplFormsQuery->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $company->company_id));
         }
         $pplForms = $pplFormsQuery->get();
-        $projects = Project::query()->get();
-        $biddings = ProjectInformation::query()->get();
+        $projects = Project::query()
+            ->when(Schema::hasColumn('projects', 'company_id'), fn ($query) => $query->where(fn ($owners) => $owners->whereNull('company_id')->orWhere('company_id', $company->company_id)))
+            ->get();
+        $biddings = ProjectInformation::query()
+            ->when(Schema::hasColumn('project_information', 'company_id'), fn ($query) => $query->where(fn ($owners) => $owners->whereNull('company_id')->orWhere('company_id', $company->company_id)))
+            ->get();
         $biddingLots = Schema::hasTable('lots') ? ProjectLot::query()->get() : collect();
         $legacyLots = Schema::hasTable('lot') ? LegacyLot::query()->get() : collect();
-        $sourceLinks = Schema::hasTable('mmc_ppl_source_links')
-            ? MmcPplSourceLink::query()->get()->keyBy('ppl_form_id')
-            : collect();
+        $sourceLinks = collect();
+        if (Schema::hasTable('mmc_ppl_source_links')) {
+            $linkQuery = MmcPplSourceLink::query()->where('company_id', $company->company_id);
+            if (Schema::hasColumn('projects', 'company_id')) {
+                $linkQuery->where(fn ($links) => $links->whereNull('project_id')
+                    ->orWhereHas('project', fn ($project) => $project->whereNull('company_id')->orWhere('company_id', $company->company_id)));
+            }
+            if (Schema::hasColumn('project_information', 'company_id')) {
+                $linkQuery->where(fn ($links) => $links->whereNull('project_information_id')
+                    ->orWhereHas('bidding', fn ($bidding) => $bidding->whereNull('company_id')->orWhere('company_id', $company->company_id)));
+            }
+            $sourceLinks = $linkQuery->with(['confirmer:user_id,name', 'project'])->get()->keyBy('ppl_form_id');
+        }
 
         $rows = $pplForms->map(function (PplForm $pplForm) use ($company, $projects, $biddings, $biddingLots, $legacyLots, $sourceLinks): array {
             $resolved = $this->resolveHistoricalMatch($pplForm, $projects, $biddings, $biddingLots, $legacyLots);
@@ -57,6 +71,7 @@ class MmcPplSourceLinkService
             return [
                 'ppl_form_id' => $pplForm->getKey(),
                 'project_code' => $pplForm->project_code,
+                'project_title' => $pplForm->project_title,
                 'lot_number' => $pplForm->lot_number,
                 'project_identifier' => $pplForm->project_id_no,
                 'status' => $status,
@@ -64,13 +79,70 @@ class MmcPplSourceLinkService
                 'bidding_id' => $resolved['bidding']?->getKey(),
                 'candidate_bidding_ids' => $resolved['candidate_bidding_ids'] ?? [],
                 'candidate_biddings' => $resolved['candidate_biddings'] ?? [],
+                'candidate_projects' => $resolved['candidate_projects'] ?? ($resolved['project'] === null ? [] : [[
+                    'id' => $resolved['project']->getKey(),
+                    'name' => $resolved['project']->project_name,
+                    'identifier' => $resolved['project']->ref_no ?: $resolved['project']->project_code,
+                ]]),
                 'bidding_lot_id' => $resolved['bidding_lot']?->getKey(),
                 'legacy_lot_id' => $resolved['legacy_lot']?->getKey(),
                 'reasons' => $resolved['reasons'],
+                'existing_link' => $existingLink,
             ];
         })->values()->all();
 
         return ['rows' => $rows, 'summary' => collect($rows)->countBy('status')->all()];
+    }
+
+    /** @param array{project_id?: int|null, project_information_id?: int|null, bidding_lot_id?: int|null, legacy_lot_id?: int|null} $sourceIds */
+    public function confirmHistoricalLink(int $pplFormId, array $sourceIds, User $user): MmcPplSourceLink
+    {
+        if (! Schema::hasTable('mmc_ppl_source_links') || ! Schema::hasColumn('ppl_forms', 'company_id')
+            || ! Schema::hasColumn('projects', 'company_id') || ! Schema::hasColumn('project_information', 'company_id')) {
+            throw ValidationException::withMessages(['schema' => 'The MMC PPL source-link migration must be reviewed and applied before confirming links.']);
+        }
+
+        $company = Company::query()->where('code', 'MMC')->firstOrFail();
+        $this->assertMmcFinanceUser($user, (int) $company->company_id);
+
+        return DB::transaction(function () use ($pplFormId, $sourceIds, $user, $company): MmcPplSourceLink {
+            $pplForm = PplForm::query()->whereKey($pplFormId)->lockForUpdate()->firstOrFail();
+            $existing = MmcPplSourceLink::query()->where('ppl_form_id', $pplFormId)->lockForUpdate()->first();
+            if ($existing !== null) {
+                throw ValidationException::withMessages(['source' => 'This PPL Form already has a source link. Review its audit history before changing it.']);
+            }
+
+            $match = collect($this->dryRunHistoricalLinks()['rows'])->firstWhere('ppl_form_id', $pplFormId);
+            if ($match === null || ! in_array($match['status'], ['auto_matched', 'ambiguous', 'needs_review', 'unmatched'], true)) {
+                throw ValidationException::withMessages(['source' => 'This PPL Form cannot be linked from the current review.']);
+            }
+
+            if ($match['status'] === 'auto_matched') {
+                foreach (['project_id', 'bidding_id', 'bidding_lot_id', 'legacy_lot_id'] as $key) {
+                    $inputKey = $key === 'bidding_id' ? 'project_information_id' : $key;
+                    if (($sourceIds[$inputKey] ?? null) !== null && (int) $sourceIds[$inputKey] !== (int) $match[$key]) {
+                        throw ValidationException::withMessages(['source' => 'The proposed source changed. Refresh the review before confirming.']);
+                    }
+                    $sourceIds[$inputKey] = $match[$key];
+                }
+            } elseif (empty($sourceIds['project_id']) || empty($sourceIds['project_information_id'])
+                || (empty($sourceIds['bidding_lot_id']) && empty($sourceIds['legacy_lot_id']))) {
+                throw ValidationException::withMessages(['source' => 'Select a verified Project List, bidding record, and matching lot for manual review.']);
+            }
+
+            $link = $this->recordManualPplLink($pplForm, $sourceIds, $user, (int) $company->company_id);
+            if ($link === null || $link->project_id === null || $link->project_information_id === null) {
+                throw ValidationException::withMessages(['source' => 'A verified project and bidding relationship is required.']);
+            }
+            if ($match['status'] === 'auto_matched') {
+                $link->forceFill(['match_origin' => 'automatic'])->save();
+            }
+
+            ProjectFinancialPlan::query()->forCompany((int) $company->company_id)
+                ->where('ppl_form_id', $pplFormId)->update(['mmc_ppl_source_link_id' => $link->getKey()]);
+
+            return $link;
+        }, 3);
     }
 
     /** @return array{linked: int, skipped: int, rows: list<array<string, mixed>>} */
@@ -201,7 +273,9 @@ class MmcPplSourceLinkService
                 throw ValidationException::withMessages(['project_information_id' => 'The selected project and bidding record do not have a verified relationship.']);
             }
             if ($project === null && $bidding !== null) {
-                $relatedProjects = Project::query()->get()->filter(fn (Project $candidate): bool => $this->projectsAreRelated($candidate, $bidding));
+                $relatedProjects = Project::query()
+                    ->when(Schema::hasColumn('projects', 'company_id'), fn ($query) => $query->where(fn ($owners) => $owners->whereNull('company_id')->orWhere('company_id', $companyId)))
+                    ->get()->filter(fn (Project $candidate): bool => $this->projectsAreRelated($candidate, $bidding));
                 if ($relatedProjects->count() === 1) {
                     $project = $relatedProjects->first();
                 }
@@ -307,6 +381,10 @@ class MmcPplSourceLinkService
                     'name' => $bidding->project_name,
                     'identifier' => $bidding->project_id_no ?: ($bidding->reference_no ?: $bidding->project_id),
                 ]],
+                'candidate_projects' => $projectMatches->map(fn (Project $candidate): array => [
+                    'id' => $candidate->getKey(), 'name' => $candidate->project_name,
+                    'identifier' => $candidate->ref_no ?: $candidate->project_code,
+                ])->all(),
                 'reasons' => ['No unique verified Project List relationship exists.'],
             ];
         }

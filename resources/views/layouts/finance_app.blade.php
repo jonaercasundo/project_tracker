@@ -36,14 +36,19 @@
         </div>
 
         {{-- MAIN LAYOUT ENGINE CONTAINER --}}
-        @php($hasMobileNavigation = request()->routeIs('bidding.*'))
+        @php($isPplManagement = auth()->user()?->currentCompany()?->code === 'MMC' && request()->routeIs('finance.ppl.*', 'finance.ppl-import.*', 'ppl_forms.*', 'finance.plans.*'))
+        @php($hasMobileNavigation = request()->routeIs('bidding.*') || $isPplManagement)
         <div class="min-h-screen flex flex-col relative {{ $hasMobileNavigation ? 'overflow-x-clip' : '' }}" @if($hasMobileNavigation) x-data="{ biddingNavOpen: false }" @keydown.escape.window="biddingNavOpen = false" @endif>
             
             @if($hasMobileNavigation)
                 <button type="button" x-show="biddingNavOpen" x-cloak @click="biddingNavOpen = false" class="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" aria-label="Close navigation"></button>
             @endif
             <aside @if($hasMobileNavigation) :class="biddingNavOpen ? 'translate-x-0' : '-translate-x-full'" @endif class="w-64 bg-white border-r border-slate-200/80 shadow-sm fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto {{ $hasMobileNavigation ? '-translate-x-full lg:translate-x-0 transition-transform' : '' }}">
-                @include('layouts.finance-sidebar')
+                @if ($isPplManagement)
+                    @include('layouts.ppl-sidebar')
+                @else
+                    @include('layouts.finance-sidebar')
+                @endif
             </aside>
 
             <div class="flex-1 {{ $hasMobileNavigation ? 'lg:pl-64 min-w-0' : 'pl-64' }} flex flex-col min-h-screen">
@@ -51,7 +56,7 @@
                     <div class="px-4 pt-4 lg:hidden">
                         <button type="button" @click="biddingNavOpen = !biddingNavOpen" :aria-expanded="biddingNavOpen" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-                            Finance menu
+                            {{ $isPplManagement ? 'PPL menu' : 'Finance menu' }}
                         </button>
                     </div>
                 @endif

@@ -36,7 +36,8 @@ class PplFormController extends Controller
         $hasSourceLinks = Schema::hasTable('mmc_ppl_source_links');
         $hasFinancialPlans = Schema::hasTable('project_financial_plans')
             && Schema::hasColumn('project_financial_plans', 'ppl_form_id')
-            && Schema::hasColumn('project_financial_plans', 'company_id');
+            && Schema::hasColumn('project_financial_plans', 'company_id')
+            && Schema::hasColumn('project_financial_plans', 'deleted_at');
         $query = PplForm::query();
         if (Schema::hasColumn('ppl_forms', 'company_id')) {
             $query->where(fn ($ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $company->company_id));
@@ -215,6 +216,7 @@ class PplFormController extends Controller
             'biddingRecords' => $biddingRecords,
             'hasSourceLinks' => $hasSourceLinks,
             'hasFinancialPlans' => $hasFinancialPlans,
+            'financialSchemaIncomplete' => Schema::hasTable('project_financial_plans') && ! $hasFinancialPlans,
             'financialSummary' => $summary,
             'activeFilterCount' => count(array_filter($filters, fn ($value, $key): bool => ! in_array($key, ['sort_by', 'sort_order', 'per_page'], true) && $value !== null && $value !== '', ARRAY_FILTER_USE_BOTH)),
         ]);
@@ -498,15 +500,18 @@ class PplFormController extends Controller
         }
 
         $plans = collect();
+        $financialSchemaIncomplete = Schema::hasTable('project_financial_plans')
+            && ! Schema::hasColumn('project_financial_plans', 'deleted_at');
         if (Schema::hasTable('project_financial_plans')
             && Schema::hasTable('project_financial_plan_versions')
             && Schema::hasColumn('project_financial_plans', 'company_id')
-            && Schema::hasColumn('project_financial_plans', 'ppl_form_id')) {
+            && Schema::hasColumn('project_financial_plans', 'ppl_form_id')
+            && ! $financialSchemaIncomplete) {
             $plans = ProjectFinancialPlan::query()->forCompany((int) $company->company_id)
                 ->where('ppl_form_id', $data->getKey())->with('latestVersion')->orderBy('id')->get();
         }
 
-        return view('finance.ppl_forms.show', compact('data', 'source', 'plans'));
+        return view('finance.ppl_forms.show', compact('data', 'source', 'plans', 'financialSchemaIncomplete'));
     }
 
     public function edit(Request $request, DashboardService $dashboards, int $id): View

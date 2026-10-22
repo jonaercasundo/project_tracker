@@ -2,6 +2,7 @@
 
 use App\Models\Lot as LegacyLot;
 use App\Models\MI_Product;
+use App\Models\MmcPplSourceLink;
 use App\Models\PplForm;
 use App\Models\Project;
 use App\Models\ProjectFinancialPlan;
@@ -361,8 +362,17 @@ it('shows linked implementation status and all bidding PPL and lot sources in MM
         'lot_id' => $lot->id,
         'ppl_form_id' => $pplForm->id,
     ]))->assertRedirect();
+    MmcPplSourceLink::query()->create([
+        'company_id' => auth()->user()->currentCompany()->company_id,
+        'ppl_form_id' => $pplForm->id,
+        'project_id' => $project->project_id,
+        'project_information_id' => $bidding->id,
+        'bidding_lot_id' => $lot->id,
+        'match_status' => 'verified',
+        'match_origin' => 'manual',
+    ]);
 
-    $this->get(route('finance.dashboard'))
+    $this->get(route('finance.ppl.dashboard'))
         ->assertOk()
         ->assertSee('Implementation')
         ->assertSee('Bid: SME 2025 2, 9, 11')
@@ -835,8 +845,15 @@ it('filters MMC PPL monitoring by historical revenue year and linked project sta
     unset($payload['inputs']['abc']);
     $this->post(route('finance.plans.store'), $payload)->assertRedirect();
     $plan = ProjectFinancialPlan::query()->sole();
+    MmcPplSourceLink::query()->create([
+        'company_id' => auth()->user()->currentCompany()->company_id,
+        'ppl_form_id' => $pplForm->id,
+        'project_id' => $project->project_id,
+        'match_status' => 'verified',
+        'match_origin' => 'manual',
+    ]);
 
-    $this->get(route('finance.dashboard', ['year' => '2026', 'status' => 'Ongoing']))
+    $this->get(route('finance.ppl.dashboard', ['year' => '2026', 'status' => 'Ongoing']))
         ->assertOk()
         ->assertSee('ABC')
         ->assertSee('Factory cost')
@@ -904,7 +921,7 @@ it('searches monitoring by plan name and renders long project names with compact
         'project_id' => $project->project_id,
     ]))->assertRedirect();
 
-    $this->get(route('finance.dashboard', ['search' => 'Searchable monitoring']))
+    $this->get(route('finance.ppl.dashboard', ['search' => 'Searchable monitoring']))
         ->assertOk()
         ->assertSee('Searchable monitoring plan')
         ->assertSee('line-clamp-2')
@@ -912,7 +929,7 @@ it('searches monitoring by plan name and renders long project names with compact
         ->assertSee('Actions')
         ->assertSee('Delete financial plan?');
 
-    $this->get(route('finance.dashboard', ['search' => 'no matching plan']))
+    $this->get(route('finance.ppl.dashboard', ['search' => 'no matching plan']))
         ->assertOk()
         ->assertSee('No financial plans match these monitoring filters.');
 });
@@ -933,7 +950,7 @@ it('paginates monitoring results while keeping search and filters in the query s
         ]);
     }
 
-    $this->get(route('finance.dashboard', ['search' => 'Pageable plan', 'status' => 'Implementation', 'page' => 2]))
+    $this->get(route('finance.ppl.dashboard', ['search' => 'Pageable plan', 'status' => 'Implementation', 'page' => 2]))
         ->assertOk()
         ->assertViewHas('monitoringPlans', fn ($plans): bool => $plans->count() === 1
             && $plans->currentPage() === 2
@@ -956,10 +973,10 @@ it('filters PPL monitoring by Project List status and keeps financial status ind
         'updated_by' => $userId,
     ]);
 
-    $this->get(route('finance.dashboard', ['status' => 'Implementation']))
+    $this->get(route('finance.ppl.dashboard', ['status' => 'Implementation']))
         ->assertOk()
         ->assertViewHas('monitoringPlans', fn ($plans): bool => $plans->total() === 1);
-    $this->get(route('finance.dashboard', ['status' => 'draft']))
+    $this->get(route('finance.ppl.dashboard', ['status' => 'draft']))
         ->assertOk()
         ->assertViewHas('monitoringPlans', fn ($plans): bool => $plans->total() === 0);
 });
@@ -980,6 +997,13 @@ it('exports the MMC monitoring report with saved calculations version and source
     ]);
     unset($payload['inputs']['abc']);
     $this->post(route('finance.plans.store'), $payload)->assertRedirect();
+    MmcPplSourceLink::query()->create([
+        'company_id' => auth()->user()->currentCompany()->company_id,
+        'ppl_form_id' => $pplForm->id,
+        'project_id' => $project->project_id,
+        'match_status' => 'verified',
+        'match_origin' => 'manual',
+    ]);
 
     $response = $this->get(route('finance.plans.monitoring.export', ['year' => '2026', 'status' => 'Ongoing']))
         ->assertOk()

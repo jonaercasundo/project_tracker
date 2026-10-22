@@ -36,6 +36,9 @@
 @endphp
 
 <div class="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
+    @if ($financialSchemaIncomplete)
+        <p role="status" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">Financial-plan schema is incomplete. Saved plan values and versions cannot be shown until migration review.</p>
+    @endif
     <header class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
         <div class="min-w-0">
             <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">MMC Finance · PPL Form #{{ $data->id }}</p>

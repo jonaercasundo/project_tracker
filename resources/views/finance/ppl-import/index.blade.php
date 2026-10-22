@@ -19,14 +19,15 @@
         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             <h2 class="text-lg font-semibold text-slate-900">Stage a workbook</h2>
             <p class="mt-1 text-sm text-slate-600">Required worksheets: 1. FORM, 2. FACTORY COST, 3. MUNICIPAL TAX &amp; INSURANCE, and PPL. Formula results are read from the workbook’s saved values for reconciliation.</p>
+            @unless ($canImport)<p class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900" role="status">Workbook import is unavailable until the reviewed MMC import migration is applied. No workbook can be uploaded to this database.</p>@endunless
             <form class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end" method="POST" action="{{ route('finance.ppl-import.store') }}" enctype="multipart/form-data">
                 @csrf
                 <div class="min-w-0 flex-1">
                     <label for="file" class="mb-2 block text-sm font-medium text-slate-700">Excel workbook (.xlsx, up to 20 MB)</label>
-                    <input id="file" name="file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required class="block w-full rounded-lg border border-slate-300 bg-white text-sm text-slate-700 file:mr-4 file:border-0 file:bg-slate-100 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-slate-700">
+                    <input id="file" name="file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required @disabled(! $canImport) class="block w-full rounded-lg border border-slate-300 bg-white text-sm text-slate-700 file:mr-4 file:border-0 file:bg-slate-100 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-slate-700">
                     @error('file')<p class="mt-1 text-sm text-rose-700">{{ $message }}</p>@enderror
                 </div>
-                <button type="submit" class="rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Upload and preview</button>
+                <button type="submit" @disabled(! $canImport) class="rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400">Upload and preview</button>
             </form>
         </section>
 

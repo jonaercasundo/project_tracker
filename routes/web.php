@@ -28,6 +28,7 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\LogisticsChannelController;
 use App\Http\Controllers\MIAppController;
 use App\Http\Controllers\MIApprovalController;
+use App\Http\Controllers\MmcPplManagementController;
 use App\Http\Controllers\MmcPplWorkbookImportController;
 use App\Http\Controllers\OperationsLifecycleController;
 use App\Http\Controllers\PplFormController;
@@ -385,6 +386,12 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:finance'])->group(function () {
         Route::get('/dashboard', [ProjectFinancialPlanController::class, 'dashboard'])
             ->name('finance.dashboard');
+        Route::middleware('company.context:MMC')->prefix('/finance/ppl-management')->name('finance.ppl.')->group(function (): void {
+            Route::get('/', [ProjectFinancialPlanController::class, 'dashboard'])->name('dashboard');
+            Route::get('/sources', [MmcPplManagementController::class, 'sources'])->name('sources.index');
+            Route::post('/sources/{pplForm}/confirm', [MmcPplManagementController::class, 'confirm'])->whereNumber('pplForm')->name('sources.confirm');
+            Route::get('/analytics', [MmcPplManagementController::class, 'analytics'])->name('analytics');
+        });
         Route::get('/finance/plans/monitoring/export', [ProjectFinancialPlanController::class, 'exportMonitoring'])
             ->name('finance.plans.monitoring.export');
 

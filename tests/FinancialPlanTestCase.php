@@ -14,6 +14,7 @@ class FinancialPlanTestCase extends BiddingTestCase
         $migrations[] = 'database/migrations/2026_10_16_074412_create_project_financial_plan_tables.php';
         $migrations[] = 'database/migrations/2026_10_22_015100_create_mmc_ppl_import_tables.php';
         $migrations[] = 'database/migrations/2026_10_22_020051_add_revenue_year_to_project_financial_plans_table.php';
+        $migrations[] = 'database/migrations/2026_10_22_022026_add_soft_deletes_to_project_financial_plans_table.php';
 
         return ['--path' => $migrations];
     }

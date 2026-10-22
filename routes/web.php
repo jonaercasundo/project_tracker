@@ -388,6 +388,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/finance/plans/{financialPlan}', [ProjectFinancialPlanController::class, 'show'])
             ->whereNumber('financialPlan')
             ->name('finance.plans.show');
+        Route::delete('/finance/plans/{financialPlan}', [ProjectFinancialPlanController::class, 'destroy'])
+            ->whereNumber('financialPlan')
+            ->middleware('company.context:MMC')
+            ->name('finance.plans.destroy');
 
         Route::middleware('company.context:MMC')->group(function (): void {
             Route::get('/ppl-forms', [PplFormController::class, 'index'])

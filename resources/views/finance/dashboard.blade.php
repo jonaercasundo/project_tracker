@@ -49,7 +49,8 @@
                         <a href="{{ route('finance.plans.monitoring.export', request()->query()) }}" class="rounded-lg border border-emerald-700 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">Download financial report</a>
                     </div>
                 </div>
-                <form method="GET" action="{{ route('finance.dashboard') }}" class="grid gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
+                <form method="GET" action="{{ route('finance.dashboard') }}" class="grid gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:grid-cols-2 xl:grid-cols-[minmax(14rem,2fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_auto_auto] sm:items-end">
+                    <div><label for="monitoring-search" class="mb-1 block text-xs font-semibold text-slate-600">Search projects and plans</label><input id="monitoring-search" name="search" value="{{ $filters['search'] ?? '' }}" maxlength="120" class="w-full rounded-lg border-slate-300 bg-white text-sm" placeholder="Project, lot, or plan name"></div>
                     <div>
                         <label for="monitoring-year" class="mb-1 block text-xs font-semibold text-slate-600">Revenue year</label>
                         <select id="monitoring-year" name="year" class="w-full rounded-lg border-slate-300 bg-white text-sm">
@@ -72,24 +73,24 @@
                     <a href="{{ route('finance.dashboard') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-100">Clear</a>
                 </form>
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <table class="w-full min-w-[2500px] table-fixed divide-y divide-slate-200 text-sm">
                         <thead class="bg-white text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <tr>
-                                <th class="px-4 py-3">Project / lot</th>
-                                <th class="px-4 py-3">Year</th>
-                                <th class="px-4 py-3">Status</th>
-                                <th class="px-4 py-3 text-right">ABC</th>
-                                <th class="px-4 py-3 text-right">Contract amount</th>
-                                <th class="px-4 py-3 text-right">Revenue</th>
-                                <th class="px-4 py-3 text-right">Factory cost</th>
-                                <th class="px-4 py-3 text-right">Total costs</th>
-                                <th class="px-4 py-3 text-right">Operating expenses</th>
-                                <th class="px-4 py-3 text-right">Gross profit</th>
-                                <th class="px-4 py-3 text-right">GPM</th>
-                                <th class="px-4 py-3 text-right">Projected PPL</th>
-                                <th class="px-4 py-3 text-right">Net profit after tax</th>
-                                <th class="px-4 py-3 text-right">NPM</th>
-                                <th class="px-4 py-3">Version / sources</th>
+                                <th class="w-[320px] px-4 py-3">Project / lot</th>
+                                <th class="w-[90px] px-3 py-3">Year</th>
+                                <th class="w-[110px] px-3 py-3">Status</th>
+                                <th class="w-[145px] px-3 py-3 text-right">ABC</th>
+                                <th class="w-[155px] px-3 py-3 text-right">Contract amount</th>
+                                <th class="w-[145px] px-3 py-3 text-right">Revenue</th>
+                                <th class="w-[145px] px-3 py-3 text-right">Factory cost</th>
+                                <th class="w-[145px] px-3 py-3 text-right">Total costs</th>
+                                <th class="w-[155px] px-3 py-3 text-right">Operating expenses</th>
+                                <th class="w-[145px] px-3 py-3 text-right">Gross profit</th>
+                                <th class="w-[90px] px-3 py-3 text-right">GPM</th>
+                                <th class="w-[145px] px-3 py-3 text-right">Projected PPL</th>
+                                <th class="w-[160px] px-3 py-3 text-right">Net profit after tax</th>
+                                <th class="w-[90px] px-3 py-3 text-right">NPM</th>
+                                <th class="w-[210px] px-3 py-3">Version / sources</th><th class="w-[180px] px-3 py-3">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -103,30 +104,46 @@
                                     $inputs = $version?->input_data['inputs'] ?? [];
                                 @endphp
                                 <tr>
-                                    <td class="px-4 py-3">
-                                        <a href="{{ route('finance.plans.show', $plan) }}" class="font-semibold text-emerald-800 hover:underline">{{ $projectName }}</a>
+                                    <td class="px-4 py-2.5">
+                                        <a href="{{ route('finance.plans.show', $plan) }}" title="{{ $projectName }}" class="line-clamp-2 font-semibold leading-5 text-emerald-800 hover:underline">{{ $projectName }}</a>
                                         <p class="mt-1 text-xs text-slate-500">{{ $plan->name }}@if($lotNumber) · Lot {{ $lotNumber }}@endif</p>
                                     </td>
                                     <td class="px-4 py-3 text-slate-700">{{ $plan->revenue_year ?? $plan->pplForm?->year_of_revenue_recognition ?? data_get($plan->latestVersion?->input_data, 'workbook_import.revenue_year') ?? 'Not set' }}</td>
                                     <td class="px-4 py-3 text-slate-700">{{ $monitoringStatus }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['abc'] ?? $inputs['abc'] ?? 0), 2) }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['contract_amount'] ?? $inputs['contract_amount'] ?? 0), 2) }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['net_sales'] ?? 0), 2) }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['factory_cost'] ?? 0), 2) }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['total_cost_of_sales'] ?? 0), 2) }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['opex'] ?? 0), 2) }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['gross_profit'] ?? 0), 2) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[13px] tabular-nums text-slate-700">₱{{ number_format((float) ($results['abc'] ?? $inputs['abc'] ?? 0), 2) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[13px] tabular-nums text-slate-700">₱{{ number_format((float) ($results['contract_amount'] ?? $inputs['contract_amount'] ?? 0), 2) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[13px] tabular-nums text-slate-700">₱{{ number_format((float) ($results['net_sales'] ?? 0), 2) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[13px] tabular-nums text-slate-700">₱{{ number_format((float) ($results['factory_cost'] ?? 0), 2) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[13px] tabular-nums text-slate-700">₱{{ number_format((float) ($results['total_cost_of_sales'] ?? 0), 2) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[13px] tabular-nums text-slate-700">₱{{ number_format((float) ($results['opex'] ?? 0), 2) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[13px] tabular-nums {{ (float) ($results['gross_profit'] ?? 0) < 0 ? 'font-semibold text-rose-700' : 'text-slate-700' }}">{{ (float) ($results['gross_profit'] ?? 0) < 0 ? '−' : '' }}₱{{ number_format(abs((float) ($results['gross_profit'] ?? 0)), 2) }}</td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700">{{ isset($results['gpm']) ? number_format((float) $results['gpm'] * 100, 2).'%' : '—' }}</td>
-                                    <td class="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">₱{{ number_format((float) ($results['ppl'] ?? 0), 2) }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['net_profit_after_tax'] ?? 0), 2) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[13px] font-semibold tabular-nums {{ (float) ($results['ppl'] ?? 0) < 0 ? 'text-rose-700' : 'text-slate-900' }}">{{ (float) ($results['ppl'] ?? 0) < 0 ? '−' : '' }}₱{{ number_format(abs((float) ($results['ppl'] ?? 0)), 2) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[13px] tabular-nums {{ (float) ($results['net_profit_after_tax'] ?? 0) < 0 ? 'font-semibold text-rose-700' : 'text-slate-700' }}">{{ (float) ($results['net_profit_after_tax'] ?? 0) < 0 ? '−' : '' }}₱{{ number_format(abs((float) ($results['net_profit_after_tax'] ?? 0)), 2) }}</td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700">{{ isset($results['npm']) ? number_format((float) $results['npm'] * 100, 2).'%' : '—' }}</td>
                                     <td class="px-4 py-3 text-xs text-slate-600">
                                         <span class="font-semibold">v{{ $version?->version_number ?? '—' }}</span>
                                         <p class="mt-1">Project #{{ $plan->project_id ?? '—' }} · Bid #{{ $plan->project_information_id ?? '—' }} · PPL #{{ $plan->ppl_form_id ?? '—' }}@if($plan->lot_id) · Lot ID {{ $plan->lot_id }}@endif</p>
                                     </td>
+                                    <td class="whitespace-nowrap px-3 py-2.5">
+                                        <div class="flex items-center gap-2 text-xs font-semibold">
+                                            <a href="{{ route('finance.plans.show', $plan) }}" class="text-emerald-800 hover:underline">View</a>
+                                            <a href="{{ route('finance.plans.edit', $plan) }}" class="text-slate-700 hover:underline">Edit</a>
+                                            @if ($plan->status === 'draft')
+                                                <button type="button" onclick="document.getElementById('delete-plan-{{ $plan->id }}').showModal()" class="text-rose-700 hover:underline">Delete</button>
+                                            @else
+                                                <span class="text-slate-400" title="Only draft plans can be deleted">Delete</span>
+                                            @endif
+                                        </div>
+                                        @if ($plan->status === 'draft')
+                                            <dialog id="delete-plan-{{ $plan->id }}" class="w-[min(32rem,calc(100%-2rem))] rounded-xl p-0 shadow-xl backdrop:bg-slate-950/40">
+                                                <div class="p-6"><h3 class="text-lg font-semibold text-slate-950">Delete financial plan?</h3><p class="mt-2 text-sm text-slate-600">This removes the plan from active monitoring. Its version history and linked PPL source will be retained.</p><p class="mt-4 rounded-lg bg-slate-50 p-3 text-sm font-semibold text-slate-800">{{ $projectName }}@if($lotNumber) · Lot {{ $lotNumber }}@endif</p><div class="mt-6 flex justify-end gap-3"><form method="dialog"><button class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cancel</button></form><form method="POST" action="{{ route('finance.plans.destroy', $plan) }}">@csrf @method('DELETE')<button class="rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800">Delete plan</button></form></div></div>
+                                            </dialog>
+                                        @endif
+                                    </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="15" class="px-5 py-10 text-center text-sm text-slate-500">No financial plans match these monitoring filters.</td></tr>
+                                <tr><td colspan="16" class="px-5 py-10 text-center text-sm text-slate-500">No financial plans match these monitoring filters.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

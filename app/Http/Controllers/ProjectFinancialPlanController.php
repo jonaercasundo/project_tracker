@@ -38,7 +38,7 @@ class ProjectFinancialPlanController extends Controller
         $monitoringPlans = null;
         $monitoringYears = collect();
         $monitoringStatuses = collect();
-        $filters = ['year' => null, 'status' => null];
+        $filters = ['year' => null, 'status' => null, 'search' => null];
 
         if ($isMmcPplWorkspace) {
             $filters = $this->monitoringFilters($request);
@@ -178,6 +178,26 @@ class ProjectFinancialPlanController extends Controller
         return redirect()->route('finance.plans.show', $updated)->with('success', 'A new financial draft version was saved.');
     }
 
+    public function destroy(Request $request, ProjectFinancialPlan $financialPlan): RedirectResponse
+    {
+        abort_unless($request->user()?->currentCompany()?->code === 'MMC', 403, 'MMC company context is required.');
+
+        DB::transaction(function () use ($request, $financialPlan): void {
+            $plan = ProjectFinancialPlan::query()
+                ->forCompany($this->currentCompanyId())
+                ->whereKey($financialPlan->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless($plan->status === 'draft', 409, 'Only draft financial plans can be deleted.');
+            $plan->deleted_by = $request->user()->getAuthIdentifier();
+            $plan->save();
+            $plan->delete();
+        });
+
+        return redirect()->route('finance.dashboard')->with('success', 'Financial plan removed from active monitoring.');
+    }
+
     /** @return array<string, mixed> */
     private function formData(): array
     {
@@ -223,12 +243,13 @@ class ProjectFinancialPlanController extends Controller
         return (int) $company->company_id;
     }
 
-    /** @return array{year?: string, status?: string} */
+    /** @return array{year?: string, status?: string, search?: string} */
     private function monitoringFilters(Request $request): array
     {
         return $request->validate([
             'year' => ['nullable', 'digits:4'],
             'status' => ['nullable', 'string', 'max:50'],
+            'search' => ['nullable', 'string', 'max:120'],
         ]);
     }
 
@@ -259,6 +280,18 @@ class ProjectFinancialPlanController extends Controller
                 $planQuery->where('status', $status)
                     ->orWhereHas('project', fn (Builder $projectQuery) => $projectQuery->where('status', $status))
                     ->orWhereHas('bidding', fn (Builder $biddingQuery) => $biddingQuery->where('status', $status));
+            });
+        }
+
+        if (! empty($filters['search'])) {
+            $search = trim($filters['search']);
+            $query->where(function (Builder $planQuery) use ($search): void {
+                $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+                $planQuery->where('name', 'like', $like)
+                    ->orWhereHas('project', fn (Builder $sourceQuery) => $sourceQuery->where('project_name', 'like', $like)->orWhere('project_code', 'like', $like))
+                    ->orWhereHas('bidding', fn (Builder $sourceQuery) => $sourceQuery->where('project_name', 'like', $like)->orWhere('project_id', 'like', $like))
+                    ->orWhereHas('pplForm', fn (Builder $sourceQuery) => $sourceQuery->where('project_title', 'like', $like)->orWhere('project_code', 'like', $like)->orWhere('lot_number', 'like', $like))
+                    ->orWhereHas('lot', fn (Builder $sourceQuery) => $sourceQuery->where('lot_no', 'like', $like));
             });
         }
 

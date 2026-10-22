@@ -632,6 +632,99 @@ it('filters MMC PPL monitoring by historical revenue year and linked project sta
         ->assertViewHas('isMmcPplWorkspace', true);
 });
 
+it('soft deletes eligible MMC financial plans while retaining source forms and versions', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $pplForm = PplForm::query()->create(['project_code' => 'PPL-KEEP', 'lot_number' => '2', 'project_title' => 'Retained source']);
+    $payload = financialPlanPayload(['ppl_form_id' => $pplForm->id]);
+    $this->post(route('finance.plans.store'), $payload)->assertRedirect();
+    $plan = ProjectFinancialPlan::query()->with('versions')->sole();
+    $versionCount = $plan->versions->count();
+
+    $this->get(route('finance.plans.show', $plan))->assertOk();
+    $this->get(route('finance.plans.edit', $plan))->assertOk();
+    $this->delete(route('finance.plans.destroy', $plan))->assertRedirect(route('finance.dashboard'));
+
+    expect(ProjectFinancialPlan::query()->find($plan->id))->toBeNull()
+        ->and(ProjectFinancialPlan::withTrashed()->findOrFail($plan->id)->deleted_by)->toBe(auth()->id())
+        ->and(ProjectFinancialPlan::withTrashed()->findOrFail($plan->id)->versions()->count())->toBe($versionCount)
+        ->and(PplForm::query()->find($pplForm->id))->not->toBeNull();
+
+    $this->get(route('finance.dashboard'))->assertOk()->assertDontSee('Pre-award profitability estimate');
+});
+
+it('rejects MMC plan deletion from unauthorized and MI company contexts', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $this->post(route('finance.plans.store'), financialPlanPayload())->assertRedirect();
+    $plan = ProjectFinancialPlan::query()->sole();
+
+    $this->signInBiddingUser('user', 'MMC');
+    $this->delete(route('finance.plans.destroy', $plan))->assertForbidden();
+
+    $this->signInBiddingUser('finance', 'MI');
+    $this->delete(route('finance.plans.destroy', $plan))->assertForbidden();
+    expect(ProjectFinancialPlan::query()->find($plan->id))->not->toBeNull();
+});
+
+it('rejects cross-company and non-draft plan deletion', function () {
+    $this->signInBiddingUser('finance', 'MI');
+    $this->post(route('finance.plans.store'), financialPlanPayload())->assertRedirect();
+    $miPlan = ProjectFinancialPlan::query()->sole();
+
+    $this->signInBiddingUser('finance', 'MMC');
+    $this->delete(route('finance.plans.destroy', $miPlan))->assertNotFound();
+    $this->post(route('finance.plans.store'), financialPlanPayload(['name' => 'Not eligible']))->assertRedirect();
+    $draft = ProjectFinancialPlan::query()->where('name', 'Not eligible')->firstOrFail();
+    $draft->update(['status' => 'approved']);
+    $this->delete(route('finance.plans.destroy', $draft))->assertStatus(409);
+    expect(ProjectFinancialPlan::query()->find($miPlan->id))->not->toBeNull()
+        ->and(ProjectFinancialPlan::query()->find($draft->id))->not->toBeNull();
+});
+
+it('searches monitoring by plan name and renders long project names with compact actions', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $projectName = str_repeat('A very long MMC project name ', 8);
+    $project = makeLegacyProject(['project_name' => $projectName]);
+    $this->post(route('finance.plans.store'), financialPlanPayload([
+        'name' => 'Searchable monitoring plan',
+        'project_id' => $project->project_id,
+    ]))->assertRedirect();
+
+    $this->get(route('finance.dashboard', ['search' => 'Searchable monitoring']))
+        ->assertOk()
+        ->assertSee('Searchable monitoring plan')
+        ->assertSee('line-clamp-2')
+        ->assertSee('title="'.$projectName.'"', false)
+        ->assertSee('Actions')
+        ->assertSee('Delete financial plan?');
+
+    $this->get(route('finance.dashboard', ['search' => 'no matching plan']))
+        ->assertOk()
+        ->assertSee('No financial plans match these monitoring filters.');
+});
+
+it('paginates monitoring results while keeping search and filters in the query string', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $userId = auth()->id();
+    $companyId = auth()->user()->currentCompany()->company_id;
+    foreach (range(1, 26) as $number) {
+        ProjectFinancialPlan::query()->create([
+            'company_id' => $companyId,
+            'name' => 'Pageable plan '.$number,
+            'status' => 'draft',
+            'created_by' => $userId,
+            'updated_by' => $userId,
+        ]);
+    }
+
+    $this->get(route('finance.dashboard', ['search' => 'Pageable plan', 'status' => 'draft', 'page' => 2]))
+        ->assertOk()
+        ->assertViewHas('monitoringPlans', fn ($plans): bool => $plans->count() === 1
+            && $plans->currentPage() === 2
+            && $plans->total() === 26
+            && str_contains($plans->url(1), 'search=Pageable%20plan')
+            && str_contains($plans->url(1), 'status=draft'));
+});
+
 it('exports the MMC monitoring report with saved calculations version and source references', function () {
     $this->signInBiddingUser('finance', 'MMC');
     $project = makeLegacyProject(['project_name' => 'Report source project']);

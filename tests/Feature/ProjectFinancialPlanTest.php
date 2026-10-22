@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Lot as LegacyLot;
 use App\Models\MI_Product;
 use App\Models\PplForm;
 use App\Models\Project;
@@ -509,6 +510,114 @@ it('validates and persists PPL form fields using the actual database column name
         'abc' => '-1', 'delivery_days_after_production' => '-2',
     ])->assertSessionHasErrors(['abc', 'delivery_days_after_production']);
     expect(PplForm::query()->count())->toBe(1);
+});
+
+it('prefills verified PPL project and lot fields from the existing MMC Operations Bidding Form', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $bidding = ProjectInformation::query()->create([
+        'project_id' => 'PHILGEPS-501',
+        'project_name' => 'SME 2025 2, 9, 11',
+        'procuring_entity' => 'Fixture Agency',
+        'approved_budget_contract_abc' => '500000.00',
+        'region' => 'Region IV-A',
+        'date_of_bid_opening' => '2026-09-10',
+        'status' => 'Draft',
+    ]);
+    $lot = ProjectLot::query()->create([
+        'project_id' => $bidding->id,
+        'lot_no' => 'Lot 2',
+        'region' => 'Region V',
+    ]);
+
+    $this->get(route('ppl_forms.source', [$bidding, $lot]))
+        ->assertOk()
+        ->assertExactJson([
+            'project_title' => 'SME 2025 2, 9, 11',
+            'lot_number' => 'Lot 2',
+            'region' => 'Region V',
+            'bid_opening' => '2026-09-10',
+        ]);
+
+    $this->get(route('ppl_forms.create'))
+        ->assertOk()
+        ->assertSee('bidding_source')
+        ->assertSee('ABC, and financial assumptions stay Finance-controlled');
+
+    expect($bidding->fresh()->status)->toBe('Draft')
+        ->and(PplForm::query()->count())->toBe(0);
+});
+
+it('rejects a lot that belongs to another bidding project when prefilling PPL fields', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $bidding = ProjectInformation::query()->create([
+        'project_id' => 'PHILGEPS-502', 'project_name' => 'Source A', 'approved_budget_contract_abc' => '100.00',
+    ]);
+    $otherBidding = ProjectInformation::query()->create([
+        'project_id' => 'PHILGEPS-503', 'project_name' => 'Source B', 'approved_budget_contract_abc' => '100.00',
+    ]);
+    $lot = ProjectLot::query()->create(['project_id' => $otherBidding->id, 'lot_no' => 'Lot 1']);
+
+    $this->get(route('ppl_forms.source', [$bidding, $lot]))->assertNotFound();
+});
+
+it('reuses a verified Project List legacy lot when the bidding record has no bidding lots', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    Schema::create('lot', function (Blueprint $table): void {
+        $table->increments('lot_id');
+        $table->string('lot_name');
+        $table->unsignedInteger('project_id');
+        $table->string('contract_no')->nullable();
+    });
+
+    $project = Project::query()->create([
+        'project_name' => 'SME 2025 2, 9, 11',
+        'project_code' => null,
+        'ref_no' => 'PROJECT-LIST-502698',
+        'agency' => 'Fixture Agency',
+        'contract_amount' => '500000.00',
+        'ABC' => '600000.00',
+        'status' => 'Implementation',
+        'keystage' => false,
+    ]);
+    $bidding = ProjectInformation::query()->create([
+        'project_id' => (string) $project->project_id,
+        'project_name' => 'SME 2025 2, 9, 11',
+        'approved_budget_contract_abc' => '600000.00',
+        'status' => 'Draft',
+    ]);
+    $legacyLot = LegacyLot::query()->create([
+        'project_id' => $project->project_id,
+        'lot_name' => '2',
+        'contract_no' => 'TENDER-LOT-2',
+    ]);
+
+    $this->get(route('ppl_forms.legacy_source', [$bidding, $project, $legacyLot]))
+        ->assertOk()
+        ->assertExactJson([
+            'project_title' => 'SME 2025 2, 9, 11',
+            'lot_number' => '2',
+            'region' => null,
+            'bid_opening' => null,
+        ]);
+
+    $this->get(route('ppl_forms.create'))
+        ->assertOk()
+        ->assertSee('Project List Lot 2');
+    expect($project->fresh()->status)->toBe('Implementation')
+        ->and($bidding->fresh()->status)->toBe('Draft');
+});
+
+it('keeps the PPL source prefill endpoint inside the MMC finance workspace', function () {
+    $bidding = ProjectInformation::query()->create([
+        'project_id' => 'PHILGEPS-504', 'project_name' => 'MMC Source', 'approved_budget_contract_abc' => '100.00',
+    ]);
+    $lot = ProjectLot::query()->create(['project_id' => $bidding->id, 'lot_no' => 'Lot 1']);
+
+    $this->signInBiddingUser('finance', 'MI');
+    $this->get(route('ppl_forms.source', [$bidding, $lot]))->assertForbidden();
+
+    $this->signInBiddingUser('user', 'MMC');
+    $this->get(route('ppl_forms.source', [$bidding, $lot]))->assertForbidden();
 });
 
 it('denies non-finance users and isolates plans between company workspaces', function () {

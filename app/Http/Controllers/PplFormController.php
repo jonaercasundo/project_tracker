@@ -4,8 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportPplFormRequest;
 use App\Http\Requests\StorePplFormRequest;
+use App\Models\Lot as LegacyLot;
 use App\Models\PplForm;
+use App\Models\Project;
+use App\Models\ProjectInformation;
+use App\Models\ProjectLot;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
@@ -63,7 +71,61 @@ class PplFormController extends Controller
 
     public function create()
     {
-        return view('finance.ppl_forms.create');
+        Gate::authorize('viewAny', ProjectInformation::class);
+
+        $biddingProjects = ProjectInformation::query()
+            ->with(['lots:id,project_id,lot_no,region'])
+            ->orderBy('project_name')
+            ->get(['id', 'project_id', 'project_code', 'project_name', 'region', 'date_of_bid_opening', 'approved_budget_contract_abc']);
+
+        $legacyProjectLots = collect();
+        if (Schema::hasTable('projects') && Schema::hasTable('lot')) {
+            $legacyProjectLots = DB::table('project_information as bidding')
+                ->join('projects as project', 'project.project_id', '=', 'bidding.project_id')
+                ->join('lot as legacy_lot', 'legacy_lot.project_id', '=', 'project.project_id')
+                ->whereNotNull('bidding.project_id')
+                ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('lots as bidding_lot')->whereColumn('bidding_lot.project_id', 'bidding.id'))
+                ->orderBy('bidding.project_name')
+                ->orderBy('legacy_lot.lot_name')
+                ->get([
+                    'bidding.id as bidding_id', 'bidding.project_id as bidding_identifier', 'bidding.project_name as bidding_name',
+                    'bidding.region as bidding_region', 'bidding.date_of_bid_opening', 'project.project_id as project_id',
+                    'project.project_name as project_name', 'legacy_lot.lot_id as lot_id', 'legacy_lot.lot_name as lot_name',
+                ]);
+        }
+
+        return view('finance.ppl_forms.create', compact('biddingProjects', 'legacyProjectLots'));
+    }
+
+    public function sourceMapping(ProjectInformation $bidding, ProjectLot $lot): JsonResponse
+    {
+        Gate::authorize('view', $bidding);
+
+        abort_unless((int) $lot->project_id === (int) $bidding->getKey(), 404);
+
+        return response()->json([
+            'project_title' => $bidding->project_name,
+            'lot_number' => $lot->lot_no,
+            'region' => $lot->region,
+            'bid_opening' => $bidding->date_of_bid_opening,
+        ]);
+    }
+
+    public function legacyLotSourceMapping(ProjectInformation $bidding, Project $project, LegacyLot $lot): JsonResponse
+    {
+        Gate::authorize('view', $bidding);
+
+        abort_unless(is_numeric($bidding->project_id)
+            && (string) $project->getKey() === trim((string) $bidding->project_id)
+            && (int) $lot->project_id === (int) $project->getKey()
+            && ! $bidding->lots()->exists(), 404);
+
+        return response()->json([
+            'project_title' => $bidding->project_name,
+            'lot_number' => $lot->lot_name,
+            'region' => null,
+            'bid_opening' => $bidding->date_of_bid_opening,
+        ]);
     }
 
     public function store(StorePplFormRequest $request)

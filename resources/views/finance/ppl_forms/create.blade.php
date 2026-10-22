@@ -16,6 +16,34 @@
     <form method="POST" action="{{ route('ppl_forms.store') }}" class="space-y-5">
         @csrf
 
+        <section class="rounded-xl border border-blue-200 bg-blue-50 p-4" aria-labelledby="bidding-source-heading">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h2 id="bidding-source-heading" class="text-sm font-semibold text-blue-900">Use existing Operations Bidding Form</h2>
+                    <p class="mt-1 text-xs text-blue-800">Choose the verified project and lot to prefill project title, lot, lot region when recorded, and bid opening date. Project Code, Project ID No., ABC, and financial assumptions stay Finance-controlled because the source fields do not provide verified lot-level equivalents.</p>
+                </div>
+            </div>
+            <label for="bidding_source" class="mt-3 block text-xs font-medium text-slate-700">Bidding project and lot</label>
+            <select id="bidding_source" class="mt-1 h-10 w-full rounded-lg border-slate-300 bg-white px-3 text-sm text-slate-800 focus:border-blue-500 focus:ring-blue-200">
+                <option value="">Select a project and lot</option>
+                @foreach ($biddingProjects as $biddingProject)
+                    @foreach ($biddingProject->lots as $biddingLot)
+                        <option value="bidding:{{ $biddingProject->id }}:{{ $biddingLot->id }}">
+                            {{ $biddingProject->project_name }} — {{ $biddingProject->project_id }} — Lot {{ $biddingLot->lot_no }}
+                        </option>
+                    @endforeach
+                @endforeach
+                @foreach ($legacyProjectLots as $legacyProjectLot)
+                    <option value="legacy:{{ $legacyProjectLot->bidding_id }}:{{ $legacyProjectLot->project_id }}:{{ $legacyProjectLot->lot_id }}">
+                        {{ $legacyProjectLot->bidding_name }} — {{ $legacyProjectLot->bidding_identifier }} — Project List Lot {{ $legacyProjectLot->lot_name }}
+                    </option>
+                @endforeach
+            </select>
+            <p id="bidding_source_status" class="mt-2 text-xs text-slate-600" role="status" aria-live="polite">
+                Project Code, Project ID No., ABC, costs, rates, and other financial assumptions remain Finance-controlled because matching lot-level source fields are unavailable.
+            </p>
+        </section>
+
         {{-- TWO COLUMN DISPOSITION TO REDUCE VERTICAL SCROLL --}}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
             
@@ -307,5 +335,46 @@
 
     </form>
 </div>
+
+<script>
+    (() => {
+        const selector = document.getElementById('bidding_source');
+        const status = document.getElementById('bidding_source_status');
+        const sourceUrl = @js(route('ppl_forms.source', ['bidding' => 987654321, 'lot' => 987654322]));
+        const legacySourceUrl = @js(route('ppl_forms.legacy_source', ['bidding' => 987654321, 'project' => 987654323, 'lot' => 987654322]));
+        const fields = ['project_title', 'lot_number', 'region', 'bid_opening'];
+
+        selector.addEventListener('change', async () => {
+            if (!selector.value) {
+                status.textContent = 'No Operations source selected. Project Code, Project ID No., ABC, costs, rates, and other financial assumptions remain Finance-controlled because matching lot-level source fields are unavailable.';
+                return;
+            }
+
+            const [sourceType, biddingId, projectOrLotId, legacyLotId] = selector.value.split(':');
+            const url = sourceType === 'legacy'
+                ? legacySourceUrl.replace('987654321', biddingId).replace('987654323', projectOrLotId).replace('987654322', legacyLotId)
+                : sourceUrl.replace('987654321', biddingId).replace('987654322', projectOrLotId);
+            status.textContent = 'Loading verified Operations project and lot…';
+
+            try {
+                const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                if (!response.ok) {
+                    throw new Error('The selected lot is unavailable for this project.');
+                }
+
+                const source = await response.json();
+                fields.forEach((field) => {
+                    const input = document.getElementById(field);
+                    if (input && source[field] !== null && source[field] !== undefined) {
+                        input.value = source[field];
+                    }
+                });
+                status.textContent = 'Prefilled from the selected Operations Bidding Form and its related lot. Values remain editable for Finance review.';
+            } catch (error) {
+                status.textContent = error.message;
+            }
+        });
+    })();
+</script>
 
 </x-finance_app-layout>

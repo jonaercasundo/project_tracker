@@ -402,6 +402,12 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/ppl-forms/create', [PplFormController::class, 'create'])
                 ->name('ppl_forms.create');
 
+            Route::get('/ppl-forms/source/{bidding}/{lot}', [PplFormController::class, 'sourceMapping'])
+                ->whereNumber('bidding')->whereNumber('lot')->name('ppl_forms.source');
+
+            Route::get('/ppl-forms/source/legacy/{bidding}/{project}/{lot}', [PplFormController::class, 'legacyLotSourceMapping'])
+                ->whereNumber('bidding')->whereNumber('project')->whereNumber('lot')->name('ppl_forms.legacy_source');
+
             Route::post('/ppl-forms/store', [PplFormController::class, 'store'])
                 ->name('ppl_forms.store');
 

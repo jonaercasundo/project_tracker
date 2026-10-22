@@ -29,6 +29,7 @@ use App\Http\Controllers\LogisticsChannelController;
 use App\Http\Controllers\MIAppController;
 use App\Http\Controllers\MIApprovalController;
 use App\Http\Controllers\MmcPplWorkbookImportController;
+use App\Http\Controllers\OperationsLifecycleController;
 use App\Http\Controllers\PplFormController;
 use App\Http\Controllers\ProductScanController;
 use App\Http\Controllers\ProfileController;
@@ -178,6 +179,19 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/projects/dashboard', [ProjectDashboardController::class, 'index'])
             ->name('projects.dashboard');
+
+        Route::get('/operations/lifecycle', [OperationsLifecycleController::class, 'index'])
+            ->name('operations.lifecycle.index');
+        Route::post('/operations/lifecycle', [OperationsLifecycleController::class, 'store'])
+            ->name('operations.lifecycle.store');
+        Route::get('/operations/lifecycle/{track}', [OperationsLifecycleController::class, 'show'])
+            ->whereNumber('track')->name('operations.lifecycle.show');
+        Route::patch('/operations/lifecycle/{track}', [OperationsLifecycleController::class, 'update'])
+            ->whereNumber('track')->name('operations.lifecycle.update');
+        Route::post('/operations/lifecycle/{track}/tasks', [OperationsLifecycleController::class, 'storeTask'])
+            ->whereNumber('track')->name('operations.lifecycle.tasks.store');
+        Route::patch('/operations/lifecycle/{track}/tasks/{task}', [OperationsLifecycleController::class, 'updateTask'])
+            ->whereNumber('track')->whereNumber('task')->name('operations.lifecycle.tasks.update');
 
         Route::get('/projects/{project}/deliveries', [DeliveryController::class, 'index'])
             ->name('deliveries.index');
@@ -396,6 +410,12 @@ Route::middleware(['auth'])->group(function () {
             ->name('finance.plans.destroy');
 
         Route::middleware('company.context:MMC')->group(function (): void {
+            Route::prefix('/finance/operations/lifecycle')->name('finance.operations.lifecycle.')->group(function (): void {
+                Route::get('/', [OperationsLifecycleController::class, 'index'])->name('index');
+                Route::get('/{track}', [OperationsLifecycleController::class, 'show'])
+                    ->whereNumber('track')->name('show');
+            });
+
             Route::get('/ppl-forms', [PplFormController::class, 'index'])
                 ->name('ppl_forms.index');
 

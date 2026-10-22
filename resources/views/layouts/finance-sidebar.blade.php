@@ -125,6 +125,21 @@
             </a>
         @endif
 
+        @if (auth()->user()?->currentCompany()?->code === 'MMC')
+            <a href="{{ route('finance.operations.lifecycle.index') }}"
+               class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden
+               {{ request()->routeIs('finance.operations.lifecycle.*') ? 'bg-emerald-50/80 text-emerald-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
+                @if(request()->routeIs('finance.operations.lifecycle.*'))
+                    <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-emerald-600 rounded-r-md"></div>
+                @endif
+                <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('finance.operations.lifecycle.*') ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-600' }}"
+                     fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 19V5m0 14h16M8 15l3-4 3 2 5-7"/>
+                </svg>
+                <span>Bidding &amp; Project Monitoring</span>
+            </a>
+        @endif
+
         {{-- BIDDING DOCUMENT --}}
         <a href="{{ route('bidding.index') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden

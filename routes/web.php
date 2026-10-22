@@ -368,6 +368,8 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/', [MmcPplWorkbookImportController::class, 'index'])->name('index');
             Route::post('/', [MmcPplWorkbookImportController::class, 'store'])->name('store');
             Route::get('/{batch}', [MmcPplWorkbookImportController::class, 'show'])->whereNumber('batch')->name('show');
+            Route::patch('/{batch}/rows/{row}/mapping', [MmcPplWorkbookImportController::class, 'updateMapping'])
+                ->whereNumber('batch')->whereNumber('row')->name('rows.mapping');
             Route::post('/{batch}/confirm', [MmcPplWorkbookImportController::class, 'confirm'])->whereNumber('batch')->name('confirm');
             Route::post('/{batch}/cancel', [MmcPplWorkbookImportController::class, 'cancel'])->whereNumber('batch')->name('cancel');
             Route::get('/{batch}/download', [MmcPplWorkbookImportController::class, 'download'])->whereNumber('batch')->name('download');

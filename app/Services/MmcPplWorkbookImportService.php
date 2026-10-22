@@ -238,6 +238,7 @@ class MmcPplWorkbookImportService
                         'source_row' => $row->source_row,
                         'source_fingerprint' => $row->source_fingerprint,
                         'source_cells' => $row->source_data['source_cells'],
+                        'manual_mapping' => $row->normalized_data['manual_mapping'] ?? null,
                         'revenue_year' => $data['revenue_year'],
                     ];
                     $version->input_data = $inputData;
@@ -322,6 +323,105 @@ class MmcPplWorkbookImportService
 
             return $lockedBatch;
         });
+    }
+
+    public function mapRow(
+        MmcPplImportBatch $batch,
+        MmcPplImportRow $row,
+        User $user,
+        int $companyId,
+        ?int $projectId,
+        ?int $biddingId,
+        ?int $lotId,
+    ): MmcPplImportRow {
+        return DB::transaction(function () use ($batch, $row, $user, $companyId, $projectId, $biddingId, $lotId): MmcPplImportRow {
+            $lockedBatch = MmcPplImportBatch::query()
+                ->where('company_id', $companyId)
+                ->whereKey($batch->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! in_array($lockedBatch->status, ['previewed', 'failed'], true)) {
+                throw ValidationException::withMessages(['mapping' => 'Source mappings can only be changed before an import is confirmed.']);
+            }
+
+            $lockedRow = $lockedBatch->rows()->whereKey($row->getKey())->lockForUpdate()->firstOrFail();
+            if ($lockedRow->status === 'imported') {
+                throw ValidationException::withMessages(['mapping' => 'An imported row cannot be remapped.']);
+            }
+
+            $project = null;
+            if ($projectId !== null) {
+                if (! Schema::hasTable('projects') || ! Schema::hasColumn('projects', 'project_id') || ! Schema::hasColumn('projects', 'project_name')) {
+                    throw ValidationException::withMessages(['project_id' => 'MMC project selection is unavailable because the project schema is incomplete.']);
+                }
+                $project = Project::query()->find($projectId);
+                if ($project === null) {
+                    throw ValidationException::withMessages(['project_id' => 'Select an existing MMC project.']);
+                }
+            }
+
+            $bidding = null;
+            if ($biddingId !== null) {
+                if (! Schema::hasTable('project_information') || ! Schema::hasColumn('project_information', 'id') || ! Schema::hasColumn('project_information', 'project_name')) {
+                    throw ValidationException::withMessages(['project_information_id' => 'Bidding-record selection is unavailable because the bidding schema is incomplete.']);
+                }
+                $bidding = ProjectInformation::query()->find($biddingId);
+                if ($bidding === null) {
+                    throw ValidationException::withMessages(['project_information_id' => 'Select an existing bidding record.']);
+                }
+            }
+
+            $lot = null;
+            if ($lotId !== null) {
+                if ($bidding === null) {
+                    throw ValidationException::withMessages(['lot_id' => 'Select a bidding record before linking one of its lots.']);
+                }
+                if (! Schema::hasTable('lots') || ! Schema::hasColumn('lots', 'id') || ! Schema::hasColumn('lots', 'project_id') || ! Schema::hasColumn('lots', 'lot_no')) {
+                    throw ValidationException::withMessages(['lot_id' => 'Lot selection is unavailable because the lot schema is incomplete.']);
+                }
+                $lot = ProjectLot::query()->where('project_id', $bidding->getKey())->whereKey($lotId)->first();
+                if ($lot === null) {
+                    throw ValidationException::withMessages(['lot_id' => 'Select a lot that belongs to the chosen bidding record.']);
+                }
+            }
+
+            if ($project !== null && $bidding !== null && Schema::hasColumn('projects', 'project_information_id')
+                && $project->project_information_id !== null && (int) $project->project_information_id !== (int) $bidding->getKey()) {
+                throw ValidationException::withMessages(['project_information_id' => 'The selected bidding record does not belong to the selected MMC project.']);
+            }
+
+            $normalizedData = $lockedRow->normalized_data ?? [];
+            $normalizedData['plan'] = array_replace($normalizedData['plan'] ?? [], [
+                'project_id' => $project?->getKey(),
+                'project_information_id' => $bidding?->getKey(),
+                'lot_id' => $lot?->getKey(),
+            ]);
+            $manualMapping = [
+                'project' => $project === null ? null : ['id' => $project->getKey(), 'name' => $project->project_name, 'identifier' => $project->project_code ?? null],
+                'bidding' => $bidding === null ? null : ['id' => $bidding->getKey(), 'name' => $bidding->project_name, 'identifier' => $bidding->project_id_no ?? null],
+                'lot' => $lot === null ? null : ['id' => $lot->getKey(), 'number' => $lot->lot_no],
+                'selected_by' => $user->getAuthIdentifier(),
+                'selected_at' => now()->toIso8601String(),
+            ];
+            $normalizedData['manual_mapping'] = $manualMapping;
+            $sourceData = $lockedRow->source_data ?? [];
+            $sourceData['manual_mapping'] = $manualMapping;
+
+            $warnings = array_values(array_filter($lockedRow->warnings ?? [], fn (string $warning): bool => ! str_starts_with($warning, 'No exact project-code match exists.')
+                && ! str_starts_with($warning, 'No exact bidding identifier match exists.')
+                && ! str_starts_with($warning, 'No exact database lot match exists.')));
+            $warnings[] = 'An authorized user reviewed and saved the source-link selections shown above. Workbook financial inputs were not changed.';
+
+            $lockedRow->forceFill([
+                'normalized_data' => $normalizedData,
+                'source_data' => $sourceData,
+                'warnings' => array_values(array_unique($warnings)),
+                'status' => ($lockedRow->errors ?? []) !== [] ? 'blocked' : 'warning',
+            ])->save();
+
+            return $lockedRow->fresh();
+        }, 3);
     }
 
     /** @param list<array<string, mixed>> $formRows
@@ -498,6 +598,13 @@ class MmcPplWorkbookImportService
         ];
         foreach (self::INPUT_CELL_MAP as $inputKey => $column) {
             $value = $formRow['values'][$inputKey] ?? null;
+            if ($inputKey === 'pf3_rate' && ($value === null || trim((string) $value) === '')) {
+                // Excel's SUMIFS over a blank PF3 input contributes zero to PPL!M.
+                $inputs[$inputKey] = '0';
+
+                continue;
+            }
+
             if (! is_numeric($value)) {
                 $errors[] = 'Required financial input '.$inputKey.' is blank or non-numeric at 1. FORM!'.$column.$formRow['source_row'].'.';
                 $inputs[$inputKey] = '';
@@ -936,7 +1043,7 @@ class MmcPplWorkbookImportService
             return '';
         }
 
-        return number_format((float) $value, 8, '.', '');
+        return rtrim(rtrim(number_format((float) $value, 16, '.', ''), '0'), '.');
     }
 
     private function amountDiffers(mixed $first, mixed $second): bool

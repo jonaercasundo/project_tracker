@@ -4,10 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\MmcPplWorkbookUploadRequest;
 use App\Models\MmcPplImportBatch;
+use App\Models\MmcPplImportRow;
+use App\Models\Project;
+use App\Models\ProjectInformation;
+use App\Models\ProjectLot;
 use App\Services\MmcPplWorkbookImportService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -42,9 +47,60 @@ class MmcPplWorkbookImportController extends Controller
     {
         $this->authorizeBatch($request, $batch);
 
+        $projects = collect();
+        if (Schema::hasTable('projects') && Schema::hasColumn('projects', 'project_id') && Schema::hasColumn('projects', 'project_name')) {
+            $columns = ['project_id', 'project_name'];
+            foreach (['project_code', 'project_information_id'] as $column) {
+                if (Schema::hasColumn('projects', $column)) {
+                    $columns[] = $column;
+                }
+            }
+            $projects = Project::query()->orderBy('project_name')->get($columns);
+        }
+
+        $biddings = collect();
+        if (Schema::hasTable('project_information') && Schema::hasColumn('project_information', 'id') && Schema::hasColumn('project_information', 'project_name')) {
+            $columns = ['id', 'project_name'];
+            foreach (['project_id_no', 'lot_no'] as $column) {
+                if (Schema::hasColumn('project_information', $column)) {
+                    $columns[] = $column;
+                }
+            }
+            $biddings = ProjectInformation::query()->orderBy('project_name')->get($columns);
+        }
+
+        $lots = Schema::hasTable('lots') && Schema::hasColumn('lots', 'id') && Schema::hasColumn('lots', 'project_id') && Schema::hasColumn('lots', 'lot_no')
+            ? ProjectLot::query()->with('project:id,project_name')->orderBy('lot_no')->get(['id', 'project_id', 'lot_no'])
+            : collect();
+
         return view('finance.ppl-import.show', [
             'batch' => $batch->load(['rows' => fn ($query) => $query->orderBy('source_row')]),
+            'mappingProjects' => $projects,
+            'mappingBiddings' => $biddings,
+            'mappingLots' => $lots,
         ]);
+    }
+
+    public function updateMapping(Request $request, MmcPplImportBatch $batch, MmcPplImportRow $row, MmcPplWorkbookImportService $service): RedirectResponse
+    {
+        $this->authorizeBatch($request, $batch);
+        $validated = $request->validate([
+            'project_id' => ['nullable', 'integer', 'min:1'],
+            'project_information_id' => ['nullable', 'integer', 'min:1'],
+            'lot_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $service->mapRow(
+            $batch,
+            $row,
+            $request->user(),
+            (int) $request->user()->currentCompany()->company_id,
+            isset($validated['project_id']) ? (int) $validated['project_id'] : null,
+            isset($validated['project_information_id']) ? (int) $validated['project_information_id'] : null,
+            isset($validated['lot_id']) ? (int) $validated['lot_id'] : null,
+        );
+
+        return redirect()->route('finance.ppl-import.show', $batch)->with('status', 'Source links saved for this preview row. Financial inputs and historical PPL data were not changed.');
     }
 
     public function confirm(Request $request, MmcPplImportBatch $batch, MmcPplWorkbookImportService $service): RedirectResponse

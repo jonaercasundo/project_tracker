@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportPplFormRequest;
 use App\Http\Requests\StorePplFormRequest;
+use App\Http\Requests\UpdatePplFormRequest;
 use App\Models\Lot as LegacyLot;
 use App\Models\MmcPplSourceLink;
 use App\Models\PplForm;
@@ -471,5 +472,38 @@ class PplFormController extends Controller
         $data = $query->firstOrFail();
 
         return view('finance.ppl_forms.show', compact('data'));
+    }
+
+    public function edit(Request $request, DashboardService $dashboards, int $id): View
+    {
+        $company = $dashboards->currentCompany($request->user(), $request->session());
+        abort_unless($company?->code === 'MMC', 403);
+        Gate::authorize('viewAny', ProjectInformation::class);
+
+        $query = PplForm::query()->whereKey($id);
+        if (Schema::hasColumn('ppl_forms', 'company_id')) {
+            $query->where(fn ($ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $company->company_id));
+        }
+
+        return view('finance.ppl_forms.create', ['data' => $query->firstOrFail()]);
+    }
+
+    public function update(UpdatePplFormRequest $request, DashboardService $dashboards, int $id)
+    {
+        $company = $dashboards->currentCompany($request->user(), $request->session());
+        abort_unless($company?->code === 'MMC', 403);
+        Gate::authorize('viewAny', ProjectInformation::class);
+
+        DB::transaction(function () use ($request, $company, $id): void {
+            $query = PplForm::query()->whereKey($id);
+            if (Schema::hasColumn('ppl_forms', 'company_id')) {
+                $query->where(fn ($ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $company->company_id));
+            }
+
+            $query->lockForUpdate()->firstOrFail()->update($request->validated());
+        });
+
+        return redirect()->route('ppl_forms.show', ['id' => $id] + $request->query())
+            ->with('success', 'PPL Form updated. Saved financial-plan versions were not recalculated.');
     }
 }

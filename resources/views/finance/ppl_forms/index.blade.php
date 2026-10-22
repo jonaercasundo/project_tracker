@@ -156,7 +156,7 @@
                                         @if ($value === null) &mdash; @elseif (in_array($key, ['gpm', 'npm'], true)) {{ number_format((float) $value * 100, 2) }}% @else &#8369;{{ number_format((float) $value, 2) }} @endif
                                     </td>
                                 @endforeach
-                                <td class="px-3 py-3 text-right"><div class="flex justify-end gap-1"><a href="{{ route('ppl_forms.show', ['id' => $row->id] + $returnParams) }}" class="rounded border border-slate-200 px-2 py-1 font-semibold hover:bg-slate-100">View</a><a href="{{ url('/ppl-forms/'.$row->id.'/edit') }}" class="rounded border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100">Edit</a></div></td>
+                                <td class="px-3 py-3 text-right"><div class="flex justify-end gap-1"><a href="{{ route('ppl_forms.show', ['id' => $row->id] + $returnParams) }}" class="rounded border border-slate-200 px-2 py-1 font-semibold hover:bg-slate-100">View</a><a href="{{ route('ppl_forms.edit', ['id' => $row->id] + $returnParams) }}" class="rounded border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100">Edit</a></div></td>
                             </tr>
                         @empty
                             <tr><td colspan="{{ 6 + count($financialColumns) }}" class="px-6 py-16 text-center"><p class="font-semibold text-slate-800">No PPL Forms match these search and filter settings.</p><p class="mt-1 text-xs text-slate-500">Clear one or more filters, or try another project name, code, reference, or lot number.</p></td></tr>

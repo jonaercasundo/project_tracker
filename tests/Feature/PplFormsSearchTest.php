@@ -181,6 +181,99 @@ it('keeps foreign company forms and source statuses out of the MMC listing', fun
         ->not->toContain($miForm->getKey());
 });
 
+it('opens the existing PPL Form edit page with saved values', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($user, ['project_title' => 'Editable historical form', 'abc' => '74316257.20']);
+
+    $this->get(route('ppl_forms.edit', ['id' => $fixture['form']->id, 'search' => 'Editable']))
+        ->assertOk()
+        ->assertSee('Edit PPL Form #'.$fixture['form']->id)
+        ->assertSee('Editable historical form')
+        ->assertSee('74316257.20')
+        ->assertSee(route('ppl_forms.update', ['id' => $fixture['form']->id, 'search' => 'Editable']))
+        ->assertDontSee('Use existing Operations Bidding Form');
+
+    $this->get(route('ppl_forms.edit', ['id' => 999999]))->assertNotFound();
+});
+
+it('updates only validated historical form fields and retains source links and saved plan versions', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($user, ['project_title' => 'Original PPL title', 'abc' => '500.00'], 'Implementation');
+    $plan = ProjectFinancialPlan::query()->create([
+        'company_id' => $user->currentCompany()->company_id,
+        'ppl_form_id' => $fixture['form']->id,
+        'name' => 'Saved historical plan',
+        'status' => 'draft',
+        'created_by' => $user->user_id,
+        'updated_by' => $user->user_id,
+    ]);
+    $version = $plan->versions()->create([
+        'version_number' => 1,
+        'status' => 'draft',
+        'input_data' => ['inputs' => ['abc' => '500.00']],
+        'calculation_results' => ['abc' => '500.00'],
+        'assumptions_snapshot' => [],
+        'factory_cost_snapshot' => [],
+        'created_by' => $user->user_id,
+    ]);
+
+    $this->put(route('ppl_forms.update', ['id' => $fixture['form']->id]), [
+        'project_code' => $fixture['form']->project_code,
+        'lot_number' => $fixture['form']->lot_number,
+        'project_title' => 'Corrected PPL title',
+        'abc' => '500.00',
+        'source_project_id' => 999999,
+        'company_id' => 999999,
+    ])->assertRedirect(route('ppl_forms.show', $fixture['form']->id));
+
+    expect($fixture['form']->fresh()->project_title)->toBe('Corrected PPL title')
+        ->and($fixture['form']->fresh()->company_id)->toBe($user->currentCompany()->company_id)
+        ->and($fixture['form']->fresh()->sourceLink->project_id)->toBe($fixture['project']->project_id)
+        ->and($version->fresh()->calculation_results['abc'])->toBe('500.00');
+    $this->assertDatabaseCount('ppl_forms', 1);
+});
+
+it('rejects invalid or cross-company PPL Form edits', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($user, ['project_title' => 'Protected MMC form']);
+    $foreignCompany = Company::query()->create(['code' => 'MI', 'name' => 'MI', 'is_active' => true]);
+    $foreignForm = PplForm::query()->create([
+        'company_id' => $foreignCompany->company_id,
+        'project_code' => 'FOREIGN', 'lot_number' => '1', 'project_title' => 'Foreign form', 'abc' => '100.00',
+    ]);
+
+    $this->put(route('ppl_forms.update', $fixture['form']->id), [
+        'project_code' => $fixture['form']->project_code,
+        'lot_number' => $fixture['form']->lot_number,
+        'project_title' => '',
+        'abc' => '500.00',
+    ])->assertSessionHasErrors('project_title');
+    $this->get(route('ppl_forms.edit', $foreignForm->id))->assertNotFound();
+    $this->put(route('ppl_forms.update', $foreignForm->id), [
+        'project_code' => 'FOREIGN', 'lot_number' => '1', 'project_title' => 'Tampered', 'abc' => '100.00',
+    ])->assertNotFound();
+    expect($fixture['form']->fresh()->project_title)->toBe('Protected MMC form')
+        ->and($foreignForm->fresh()->project_title)->toBe('Foreign form');
+
+    $this->signInBiddingUser('finance', 'MI');
+    $this->get(route('ppl_forms.edit', $fixture['form']->id))->assertForbidden();
+    $this->put(route('ppl_forms.update', $fixture['form']->id), [
+        'project_code' => 'PPL-EDIT', 'lot_number' => '2', 'project_title' => 'Tampered', 'abc' => '500.00',
+    ])->assertForbidden();
+});
+
+it('requires MMC Finance access to edit a PPL Form', function () {
+    $financeUser = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($financeUser, ['project_title' => 'Finance-only PPL form']);
+
+    $this->signInBiddingUser('user', 'MMC');
+    $this->get(route('ppl_forms.edit', $fixture['form']->id))->assertForbidden();
+    $this->put(route('ppl_forms.update', $fixture['form']->id), [
+        'project_code' => 'TAMPER', 'lot_number' => '2', 'project_title' => 'Tampered', 'abc' => '500.00',
+    ])->assertForbidden();
+    expect($fixture['form']->fresh()->project_title)->toBe('Finance-only PPL form');
+});
+
 it('sorts by permitted columns and preserves filters in pagination and form links', function () {
     $user = $this->signInBiddingUser('finance', 'MMC');
     $low = makePplListingFixture($user, ['project_title' => 'Low ABC form', 'abc' => '100.00']);

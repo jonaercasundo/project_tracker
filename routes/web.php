@@ -441,6 +441,11 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/ppl-forms/store', [PplFormController::class, 'store'])
                 ->name('ppl_forms.store');
 
+            Route::get('/ppl-forms/{id}/edit', [PplFormController::class, 'edit'])
+                ->whereNumber('id')->name('ppl_forms.edit');
+            Route::put('/ppl-forms/{id}', [PplFormController::class, 'update'])
+                ->whereNumber('id')->name('ppl_forms.update');
+
             // ✅ FIXED HERE
             Route::get('/ppl-forms/{id}', [PplFormController::class, 'show'])
                 ->name('ppl_forms.show');

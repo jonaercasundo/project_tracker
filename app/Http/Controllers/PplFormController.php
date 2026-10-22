@@ -5,75 +5,213 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ImportPplFormRequest;
 use App\Http\Requests\StorePplFormRequest;
 use App\Models\Lot as LegacyLot;
+use App\Models\MmcPplSourceLink;
 use App\Models\PplForm;
 use App\Models\Project;
+use App\Models\ProjectFinancialPlan;
 use App\Models\ProjectInformation;
 use App\Models\ProjectLot;
 use App\Services\DashboardService;
 use App\Services\MmcPplSourceLinkService;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class PplFormController extends Controller
 {
-    public function index(Request $request, DashboardService $dashboards)
+    public function index(Request $request, DashboardService $dashboards): View
     {
-        $query = PplForm::query();
         $company = $dashboards->currentCompany($request->user(), $request->session());
         abort_unless($company?->code === 'MMC', 403);
+        Gate::authorize('viewAny', ProjectInformation::class);
+
+        $hasSourceLinks = Schema::hasTable('mmc_ppl_source_links');
+        $hasFinancialPlans = Schema::hasTable('project_financial_plans')
+            && Schema::hasColumn('project_financial_plans', 'ppl_form_id')
+            && Schema::hasColumn('project_financial_plans', 'company_id');
+        $query = PplForm::query();
         if (Schema::hasColumn('ppl_forms', 'company_id')) {
             $query->where(fn ($ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $company->company_id));
         }
+        $optionQuery = clone $query;
 
-        // ===============================
-        // SEARCH
-        // ===============================
-        if ($request->filled('search')) {
-            $search = $request->search;
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'status' => ['nullable', Rule::in([...array_keys(config('project_lifecycle.project_status_mapping')), 'Unlinked'])],
+            'year' => ['nullable', 'integer', 'between:1901,2155'],
+            'lot' => ['nullable', 'string', 'max:255'],
+            'linkage' => ['nullable', Rule::in(['linked', 'unlinked'])],
+            'bidding_id' => ['nullable', 'integer', Rule::when($hasSourceLinks, ['exists:project_information,id'])],
+            'financial_plan' => ['nullable', Rule::in(['linked', 'unlinked'])],
+            'created_from' => ['nullable', 'date'],
+            'created_to' => ['nullable', 'date', 'after_or_equal:created_from'],
+            'sort_by' => ['nullable', Rule::in(['project_title', 'project_code', 'project_id_no', 'lot_number', 'created_at', 'abc', 'id'])],
+            'sort_order' => ['nullable', Rule::in(['asc', 'desc'])],
+            'per_page' => ['nullable', Rule::in(['10', '25', '50'])],
+        ]);
 
-            $query->where(function ($q) use ($search) {
+        $verifiedLink = function ($links) use ($company): void {
+            $links->where('match_status', 'verified');
+            if (Schema::hasColumn('mmc_ppl_source_links', 'company_id')) {
+                $links->where('company_id', $company->company_id);
+            }
+            if (Schema::hasColumn('projects', 'company_id')) {
+                $links->whereHas('project', fn ($projects) => $projects->whereNull('company_id')->orWhere('company_id', $company->company_id));
+            }
+            if (Schema::hasColumn('project_information', 'company_id')) {
+                $links->whereHas('bidding', fn ($biddings) => $biddings->whereNull('company_id')->orWhere('company_id', $company->company_id));
+            }
+        };
+
+        if (($search = trim((string) ($filters['search'] ?? ''))) !== '') {
+            $query->where(function ($q) use ($search, $hasSourceLinks, $verifiedLink): void {
                 $q->where('project_code', 'like', "%{$search}%")
                     ->orWhere('project_title', 'like', "%{$search}%")
                     ->orWhere('project_id_no', 'like', "%{$search}%")
+                    ->orWhere('lot_number', 'like', "%{$search}%")
                     ->orWhere('region', 'like', "%{$search}%")
                     ->orWhere('bidder', 'like', "%{$search}%");
+
+                if (is_numeric($search)) {
+                    $q->orWhere('id', (int) $search);
+                }
+                if ($hasSourceLinks) {
+                    $q->orWhereHas('sourceLink', function ($links) use ($verifiedLink, $search): void {
+                        $verifiedLink($links);
+                        $links->where(function ($sourceQuery) use ($search): void {
+                            $sourceQuery->whereHas('project', fn ($projects) => $projects->where('project_name', 'like', "%{$search}%")
+                                ->orWhere('project_code', 'like', "%{$search}%")
+                                ->orWhere('ref_no', 'like', "%{$search}%")
+                                ->orWhere('agency', 'like', "%{$search}%"))
+                                ->orWhereHas('bidding', fn ($biddings) => $biddings->where('project_name', 'like', "%{$search}%")
+                                    ->orWhere('project_code', 'like', "%{$search}%")
+                                    ->orWhere('project_id', 'like', "%{$search}%")
+                                    ->orWhere('procuring_entity', 'like', "%{$search}%"));
+                        });
+                    });
+                }
             });
         }
 
-        // ===============================
-        // SORTING (SAFE)
-        // ===============================
-        $allowedSorts = [
-            'id',
-            'project_code',
-            'lot_number',
-            'project_title',
-            'project_id_no',
-            'region',
-            'bid_opening',
-            'abc',
-            'bidder',
-        ];
+        if (isset($filters['year']) && Schema::hasColumn('ppl_forms', 'year_of_revenue_recognition')) {
+            $query->where('year_of_revenue_recognition', $filters['year']);
+        }
+        if (isset($filters['lot'])) {
+            $query->where('lot_number', $filters['lot']);
+        }
+        if (isset($filters['linkage']) && $hasSourceLinks) {
+            $linkQuery = function ($links) use ($verifiedLink): void {
+                $verifiedLink($links);
+                $links->whereNotNull('project_id');
+            };
+            if ($filters['linkage'] === 'linked') {
+                $query->whereHas('sourceLink', $linkQuery);
+            } else {
+                $query->whereDoesntHave('sourceLink', $linkQuery);
+            }
+        } elseif (($filters['linkage'] ?? null) === 'linked') {
+            $query->whereRaw('1 = 0');
+        } elseif (($filters['linkage'] ?? null) === 'unlinked' && ! $hasSourceLinks) {
+            // Without durable source links, the existing forms are unlinked.
+        }
+        if (isset($filters['bidding_id']) && $hasSourceLinks) {
+            $query->whereHas('sourceLink', function ($links) use ($verifiedLink, $filters): void {
+                $verifiedLink($links);
+                $links->where('project_information_id', $filters['bidding_id']);
+            });
+        }
+        if (isset($filters['status'])) {
+            if ($hasSourceLinks && Schema::hasTable('projects') && Schema::hasColumn('projects', 'status')) {
+                if ($filters['status'] === 'Unlinked') {
+                    $query->whereDoesntHave('sourceLink', function ($links) use ($verifiedLink): void {
+                        $verifiedLink($links);
+                        $links->whereNotNull('project_id');
+                    });
+                } else {
+                    $query->whereHas('sourceLink', function ($links) use ($verifiedLink, $filters): void {
+                        $verifiedLink($links);
+                        $links->whereNotNull('project_id')->whereHas('project', fn ($projects) => $projects->where('status', $filters['status']));
+                    });
+                }
+            } elseif ($filters['status'] !== 'Unlinked') {
+                $query->whereRaw('1 = 0');
+            }
+        }
+        if (isset($filters['financial_plan']) && $hasFinancialPlans) {
+            $planFormIds = ProjectFinancialPlan::query()->where('company_id', $company->company_id)->whereNotNull('ppl_form_id');
+            if (Schema::hasColumn('project_financial_plans', 'deleted_at')) {
+                $planFormIds->whereNull('deleted_at');
+            }
+            if ($filters['financial_plan'] === 'linked') {
+                $query->whereIn('ppl_forms.id', $planFormIds->select('ppl_form_id'));
+            } else {
+                $query->whereNotIn('ppl_forms.id', $planFormIds->select('ppl_form_id'));
+            }
+        }
+        if (isset($filters['created_from'])) {
+            $query->whereDate('created_at', '>=', $filters['created_from']);
+        }
+        if (isset($filters['created_to'])) {
+            $query->whereDate('created_at', '<=', $filters['created_to']);
+        }
 
-        $sortBy = $request->get('sort_by', 'id');
-        $sortOrder = $request->get('sort_order', 'desc');
+        $sortBy = $filters['sort_by'] ?? 'id';
+        $sortOrder = $filters['sort_order'] ?? 'desc';
+        $query->orderBy($sortBy, $sortOrder)->orderBy('id', 'desc');
+        if ($hasFinancialPlans) {
+            $query->withCount(['financialPlans as has_financial_plan' => function ($plans) use ($company): void {
+                $plans->where('company_id', $company->company_id);
+                if (Schema::hasColumn('project_financial_plans', 'deleted_at')) {
+                    $plans->whereNull('deleted_at');
+                }
+            }]);
+        }
+        $data = $query->with($hasSourceLinks ? [
+            'sourceLink' => fn ($links) => $verifiedLink($links),
+            'sourceLink.project',
+            'sourceLink.bidding',
+        ] : [])
+            ->paginate((int) ($filters['per_page'] ?? 10))->withQueryString();
 
-        $sortBy = in_array($sortBy, $allowedSorts) ? $sortBy : 'id';
-        $sortOrder = $sortOrder === 'asc' ? 'asc' : 'desc';
+        $projectStatuses = collect();
+        $biddingRecords = collect();
+        $years = Schema::hasColumn('ppl_forms', 'year_of_revenue_recognition')
+            ? (clone $optionQuery)->reorder()->whereNotNull('year_of_revenue_recognition')->distinct()->orderBy('year_of_revenue_recognition')->pluck('year_of_revenue_recognition')
+            : collect();
+        $lots = (clone $optionQuery)->reorder()->whereNotNull('lot_number')->distinct()->orderBy('lot_number')->pluck('lot_number');
+        if ($hasSourceLinks) {
+            $links = MmcPplSourceLink::query();
+            $verifiedLink($links);
+            if (Schema::hasTable('projects') && Schema::hasColumn('projects', 'status')) {
+                $projectStatuses = Project::query()->whereIn('project_id', (clone $links)->whereNotNull('project_id')->select('project_id'))
+                    ->whereNotNull('status')->distinct()->orderBy('status')->pluck('status');
+            }
+            if (Schema::hasTable('project_information')) {
+                $biddingQuery = ProjectInformation::query()->whereIn('id', (clone $links)->whereNotNull('project_information_id')->select('project_information_id'));
+                if (Schema::hasColumn('project_information', 'company_id')) {
+                    $biddingQuery->where(fn ($ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $company->company_id));
+                }
+                $biddingRecords = $biddingQuery->orderBy('project_name')->get(['id', 'project_name', 'project_code']);
+            }
+        }
 
-        $query->orderBy($sortBy, $sortOrder);
-
-        // ===============================
-        // PAGINATION
-        // ===============================
-        $data = $query->paginate(10)->withQueryString();
-
-        return view('finance.ppl_forms.index', compact('data'));
+        return view('finance.ppl_forms.index', [
+            'data' => $data,
+            'filters' => $filters,
+            'projectStatuses' => $projectStatuses,
+            'years' => $years,
+            'lots' => $lots,
+            'biddingRecords' => $biddingRecords,
+            'hasSourceLinks' => $hasSourceLinks,
+            'hasFinancialPlans' => $hasFinancialPlans,
+            'activeFilterCount' => count(array_filter($filters, fn ($value, $key): bool => ! in_array($key, ['sort_by', 'sort_order', 'per_page'], true) && $value !== null && $value !== '', ARRAY_FILTER_USE_BOTH)),
+        ]);
     }
 
     public function create(Request $request, DashboardService $dashboards)

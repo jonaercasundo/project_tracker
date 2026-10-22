@@ -20,7 +20,7 @@
         </div>
 
         <div class="flex gap-2">
-            <a href="/ppl-forms"
+            <a href="{{ route('ppl_forms.index', request()->query()) }}"
                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition-colors">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                 Back

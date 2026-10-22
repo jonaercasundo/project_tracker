@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PplForm extends Model
@@ -68,6 +69,11 @@ class PplForm extends Model
     public function sourceLink(): HasOne
     {
         return $this->hasOne(MmcPplSourceLink::class, 'ppl_form_id');
+    }
+
+    public function financialPlans(): HasMany
+    {
+        return $this->hasMany(ProjectFinancialPlan::class, 'ppl_form_id');
     }
 
     protected $casts = [

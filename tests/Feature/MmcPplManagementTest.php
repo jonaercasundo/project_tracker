@@ -43,8 +43,26 @@ function pplManagementFixture(): array
 it('shows the dedicated PPL sidebar and preserves existing form routes', function () {
     $this->signInBiddingUser('finance', 'MMC');
     $this->get(route('finance.dashboard'))->assertOk()->assertSee('PPL Management')->assertDontSee('Project Source Mapping');
-    $this->get(route('finance.ppl.dashboard'))->assertOk()->assertSee('Project Source Mapping')->assertSee('AI Analytics & Chart Studio');
-    $this->get(route('ppl_forms.index'))->assertOk()->assertSee('PPL Forms')->assertSee('PPL Management');
+    $this->get(route('finance.ppl.dashboard'))->assertOk()
+        ->assertSee('Overview')->assertSee('Financial Planning')->assertSee('Monitoring & Intelligence')
+        ->assertSee(route('finance.ppl-import.index'), false)
+        ->assertSee(route('finance.ppl.sources.index'), false)
+        ->assertSee(route('finance.plans.index'), false)
+        ->assertSee(route('finance.ppl.analytics', ['view' => 'history']).'#history', false)
+        ->assertSee(route('finance.ppl.dashboard', ['view' => 'monitoring']).'#monitoring', false)
+        ->assertSee(route('finance.ppl.analytics', ['view' => 'variance']).'#variance', false)
+        ->assertSee(route('finance.ppl.analytics', ['view' => 'reports']).'#reports', false)
+        ->assertSee(route('finance.ppl.analytics'), false)
+        ->assertSee('AI Analytics & Chart Studio')
+        ->assertSee('Back to Finance Dashboard')
+        ->assertSee(route('company.switch'), false)
+        ->assertSee('name="company_id"', false)
+        ->assertSee('overflow-y-auto')
+        ->assertSee('lg:hidden');
+    $this->get(route('ppl_forms.index'))->assertOk()
+        ->assertSee('PPL Forms')->assertSee('PPL Management')
+        ->assertSee('aria-current="page"', false)
+        ->assertSee('bg-emerald-50/80 text-emerald-600');
     $this->get(route('finance.ppl-import.index'))->assertOk();
 });
 

@@ -6,6 +6,8 @@ use App\Models\Project;
 use App\Services\ProjectAwardSynchronizationService;
 use App\Services\ProjectBiddingEvidenceService;
 use App\Services\ProjectDetailsService;
+use App\Services\ProjectLifecycleService;
+use App\Services\ProjectLifecycleSourceMatcher;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -57,7 +59,7 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, ProjectLifecycleSourceMatcher $sourceMatcher, ProjectLifecycleService $lifecycle): RedirectResponse
     {
         $validated = $request->validate([
             'ref_no' => ['required', 'string', 'max:50', Rule::unique('projects', 'ref_no')],
@@ -84,13 +86,25 @@ class ProjectController extends Controller
 
         $validated['project_code'] = $validated['contract_number'] ?? null;
         unset($validated['contract_number']);
+        $company = $request->user()->currentCompany();
+        if ($company?->code === 'MMC' && Schema::hasColumn('projects', 'company_id')) {
+            $validated['company_id'] = $company->company_id;
+        }
 
         try {
-            Project::create($validated);
+            DB::transaction(function () use ($validated, $company, $sourceMatcher, $lifecycle, $request): void {
+                $project = Project::create($validated);
+                if ($company?->code === 'MMC' && $sourceMatcher->supportsDurableLinks()) {
+                    $biddings = $sourceMatcher->biddingsForProject($project, $company);
+                    if ($biddings->count() === 1) {
+                        $sourceMatcher->autoLink($biddings->first(), $company, $request->user()->user_id, $lifecycle);
+                    }
+                }
+            }, 3);
         } catch (QueryException $e) {
             // Fallback in case two submissions race each other and both
             // pass the validation check above before either one inserts.
-            if ($e->errorInfo[1] == 1062) {
+            if (($e->errorInfo[1] ?? null) == 1062 && Project::query()->where('ref_no', $validated['ref_no'])->exists()) {
                 return back()->withInput()->withErrors([
                     'ref_no' => 'A project with this Reference No. already exists.',
                 ]);

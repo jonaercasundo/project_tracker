@@ -16,6 +16,7 @@ use App\Models\ProjectLifecycleTrack;
 use App\Models\ProjectLot;
 use App\Models\User;
 use App\Services\ProjectLifecycleService;
+use App\Services\ProjectLifecycleSourceMatcher;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -30,7 +31,40 @@ use Illuminate\Validation\ValidationException;
 
 class OperationsLifecycleController extends Controller
 {
-    public function index(Request $request): View
+    public function reconcile(Request $request, ProjectLifecycleSourceMatcher $matcher): View
+    {
+        Gate::authorize('verifyLifecycleEvidence', ProjectInformation::class);
+        $company = $this->requireMmcCompany($request->user());
+        abort_unless($matcher->supportsDurableLinks(), 409);
+        $biddings = ProjectInformation::query()->with('lots')->where('company_id', $company->company_id)
+            ->whereDoesntHave('implementationProject')->latest('id')->paginate(20)->withQueryString();
+        $candidates = $biddings->getCollection()->mapWithKeys(fn (ProjectInformation $bidding): array => [
+            $bidding->getKey() => $matcher->candidates($bidding, $company),
+        ]);
+
+        return view('operation.lifecycle.reconcile', compact('biddings', 'candidates'));
+    }
+
+    public function confirmSourceLink(Request $request, ProjectLifecycleSourceMatcher $matcher, ProjectLifecycleService $lifecycle): RedirectResponse
+    {
+        Gate::authorize('verifyLifecycleEvidence', ProjectInformation::class);
+        $company = $this->requireMmcCompany($request->user());
+        abort_unless($matcher->supportsDurableLinks(), 409);
+        $validated = $request->validate([
+            'bidding_id' => ['required', 'integer', 'exists:project_information,id'],
+            'project_id' => ['required', 'integer', 'exists:projects,project_id'],
+        ]);
+
+        $matcher->link(
+            ProjectInformation::query()->findOrFail($validated['bidding_id']),
+            Project::query()->findOrFail($validated['project_id']),
+            $company, $request->user()->user_id, $lifecycle, 'source_link_confirmed',
+        );
+
+        return back()->with('success', 'Existing Bidding and Project List records linked. Their statuses were not changed.');
+    }
+
+    public function index(Request $request, ProjectLifecycleService $lifecycle, ProjectLifecycleSourceMatcher $matcher): View
     {
         Gate::authorize('viewAny', ProjectInformation::class);
         $company = $this->requireMmcCompany($request->user());
@@ -49,18 +83,31 @@ class OperationsLifecycleController extends Controller
             'to' => ['nullable', 'date', 'after_or_equal:from'],
             'overdue' => ['nullable', Rule::in(['1'])],
             'lot' => ['nullable', 'string', 'max:50'],
+            'year' => ['nullable', 'integer', 'between:2000,2100'],
+            'bidding_status' => ['nullable', Rule::in(array_keys(config('project_lifecycle.bidding_status_mapping')))],
+            'operational_status' => ['nullable', Rule::in(array_keys(config('project_lifecycle.project_status_mapping')))],
+            'link' => ['nullable', Rule::in(['linked', 'unlinked'])],
         ]);
 
         $tracksQuery = ProjectLifecycleTrack::query()
             ->where('company_id', $company->company_id)
             ->with(['project', 'bidding', 'legacyLot', 'biddingLot', 'owner']);
+        if (Schema::hasColumn('projects', 'company_id')) {
+            $tracksQuery->where(fn ($query) => $query->whereNull('project_id')
+                ->orWhereHas('project', fn ($projects) => $this->scopeCompanyOwned($projects, 'projects', $company)));
+        }
+        if (Schema::hasColumn('project_information', 'company_id')) {
+            $tracksQuery->where(fn ($query) => $query->whereNull('project_information_id')
+                ->orWhereHas('bidding', fn ($biddings) => $this->scopeCompanyOwned($biddings, 'project_information', $company)));
+        }
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
             $tracksQuery->where(function ($query) use ($search): void {
                 $query->whereHas('project', fn ($projects) => $projects->where('project_name', 'like', '%'.$search.'%')
                     ->orWhere('project_code', 'like', '%'.$search.'%')->orWhere('ref_no', 'like', '%'.$search.'%'))
                     ->orWhereHas('bidding', fn ($biddings) => $biddings->where('project_name', 'like', '%'.$search.'%')
-                        ->orWhere('project_id', 'like', '%'.$search.'%')->orWhere('project_code', 'like', '%'.$search.'%'))
+                        ->orWhere('project_id', 'like', '%'.$search.'%')->orWhere('project_code', 'like', '%'.$search.'%')
+                        ->orWhere('reference_no', 'like', '%'.$search.'%'))
                     ->orWhereHas('legacyLot', fn ($lots) => $lots->where('lot_name', 'like', '%'.$search.'%'))
                     ->orWhereHas('biddingLot', fn ($lots) => $lots->where('lot_no', 'like', '%'.$search.'%'));
             });
@@ -71,7 +118,23 @@ class OperationsLifecycleController extends Controller
                 ->orWhereHas('bidding', fn ($biddings) => $biddings->where('procuring_entity', $agency)));
         }
         if (! empty($filters['stage'])) {
-            $tracksQuery->where('current_stage', $filters['stage']);
+            $projectStatuses = collect(config('project_lifecycle.project_status_mapping'))->filter(fn (array $mapping): bool => $mapping['stage'] === $filters['stage'])->keys();
+            $biddingStatuses = collect(config('project_lifecycle.bidding_status_mapping'))->filter(fn (array $mapping): bool => $mapping['stage'] === $filters['stage'])->keys();
+            $tracksQuery->where(fn ($query) => $query->whereHas('project', fn ($projects) => $projects->whereIn('status', $projectStatuses))
+                ->orWhere(fn ($unlinked) => $unlinked->whereNull('project_id')->whereHas('bidding', fn ($biddings) => $biddings->whereIn('status', $biddingStatuses))));
+        }
+        if (! empty($filters['bidding_status'])) {
+            $tracksQuery->whereHas('bidding', fn ($biddings) => $biddings->where('status', $filters['bidding_status']));
+        }
+        if (! empty($filters['operational_status'])) {
+            $tracksQuery->whereHas('project', fn ($projects) => $projects->where('status', $filters['operational_status']));
+        }
+        if (! empty($filters['link'])) {
+            $tracksQuery->{$filters['link'] === 'linked' ? 'whereNotNull' : 'whereNull'}('project_id');
+        }
+        if (! empty($filters['year'])) {
+            $tracksQuery->where(fn ($query) => $query->whereHas('project', fn ($projects) => $projects->whereYear('start_date', $filters['year']))
+                ->orWhereHas('bidding', fn ($biddings) => $biddings->whereYear('created_at', $filters['year'])));
         }
         if (array_key_exists('status', $filters) && $filters['status'] !== '') {
             $isOutcome = in_array($filters['status'], config('project_lifecycle.outcomes'), true);
@@ -114,19 +177,20 @@ class OperationsLifecycleController extends Controller
         }
 
         $tracks = $tracksQuery->latest('updated_at')->paginate(20)->withQueryString();
+        $tracks->getCollection()->each(function (ProjectLifecycleTrack $track) use ($lifecycle): void {
+            $track->setAttribute('display_state', $lifecycle->displayState($track->project, $track->bidding));
+        });
         $owners = User::query()->whereHas('companies', fn ($users) => $users->where('companies.company_id', $company->company_id))
             ->orderBy('name')->get(['user_id', 'name']);
         $biddingAgencyQuery = $this->scopeCompanyOwned(ProjectInformation::query(), 'project_information', $company);
         $projectAgencyQuery = $this->scopeCompanyOwned(Project::query(), 'projects', $company);
         $agencies = $biddingAgencyQuery->whereNotNull('procuring_entity')->distinct()->orderBy('procuring_entity')->pluck('procuring_entity')
             ->merge($projectAgencyQuery->whereNotNull('agency')->distinct()->orderBy('agency')->pluck('agency'))->unique()->sort()->values();
-        $biddingsQuery = $this->scopeCompanyOwned(ProjectInformation::query()->with([
-            'lots',
-            'implementationProject' => fn ($projects) => $projects->where(fn ($query) => $this->scopeCompanyOwned($query, 'projects', $company)),
-        ]), 'project_information', $company);
+        $biddingsQuery = $this->scopeCompanyOwned(ProjectInformation::query()->with('lots'), 'project_information', $company);
         if ($search !== '') {
             $biddingsQuery->where(fn ($query) => $query->where('project_name', 'like', '%'.$search.'%')
                 ->orWhere('project_id', 'like', '%'.$search.'%')->orWhere('project_code', 'like', '%'.$search.'%')
+                ->orWhere('reference_no', 'like', '%'.$search.'%')
                 ->orWhere('procuring_entity', 'like', '%'.$search.'%')
                 ->orWhereHas('lots', fn ($lots) => $lots->where('lot_no', 'like', '%'.$search.'%')));
         }
@@ -134,9 +198,23 @@ class OperationsLifecycleController extends Controller
             $biddingsQuery->where('procuring_entity', $filters['agency']);
         }
         if (! empty($filters['stage'])) {
-            $stageStatuses = collect(config('project_lifecycle.bidding_status_mapping'))
-                ->filter(fn (array $mapping): bool => $mapping['stage'] === $filters['stage'])->keys();
-            $biddingsQuery->whereIn('status', $stageStatuses);
+            $projectStatuses = collect(config('project_lifecycle.project_status_mapping'))->filter(fn (array $mapping): bool => $mapping['stage'] === $filters['stage'])->keys();
+            $biddingStatuses = collect(config('project_lifecycle.bidding_status_mapping'))->filter(fn (array $mapping): bool => $mapping['stage'] === $filters['stage'])->keys();
+            $biddingsQuery->where(fn ($query) => $query->whereHas('implementationProject', fn ($projects) => $this->scopeCompanyOwned($projects->whereIn('status', $projectStatuses), 'projects', $company))
+                ->orWhere(fn ($unlinked) => $unlinked->whereDoesntHave('implementationProject', fn ($projects) => $this->scopeCompanyOwned($projects, 'projects', $company))->whereIn('status', $biddingStatuses)));
+        }
+        if (! empty($filters['bidding_status'])) {
+            $biddingsQuery->where('status', $filters['bidding_status']);
+        }
+        if (! empty($filters['operational_status'])) {
+            $biddingsQuery->whereHas('implementationProject', fn ($projects) => $this->scopeCompanyOwned($projects->where('status', $filters['operational_status']), 'projects', $company));
+        }
+        if (! empty($filters['link'])) {
+            $biddingsQuery->{$filters['link'] === 'linked' ? 'whereHas' : 'whereDoesntHave'}('implementationProject',
+                fn ($projects) => $this->scopeCompanyOwned($projects, 'projects', $company));
+        }
+        if (! empty($filters['year'])) {
+            $biddingsQuery->whereYear('created_at', $filters['year']);
         }
         if (! empty($filters['status'])) {
             if (array_key_exists($filters['status'], config('project_lifecycle.bidding_status_mapping'))) {
@@ -161,6 +239,30 @@ class OperationsLifecycleController extends Controller
                 ->whereNotIn('status', ['Awarded', 'Cancelled', 'Completed']);
         }
         $existingBiddings = $biddingsQuery->latest('id')->paginate(12, ['*'], 'bids_page')->withQueryString();
+        $pageBiddings = $existingBiddings->getCollection();
+        if (Schema::hasColumn('projects', 'project_information_id')) {
+            $projectMatches = $this->scopeCompanyOwned(Project::query(), 'projects', $company)
+                ->whereIn('project_information_id', $pageBiddings->modelKeys())->get()->groupBy('project_information_id');
+            $verifiedProjects = $pageBiddings->mapWithKeys(fn (ProjectInformation $bidding): array => [
+                $bidding->getKey() => $projectMatches->get($bidding->getKey(), collect())->count() === 1
+                    ? $projectMatches->get($bidding->getKey())->first() : null,
+            ]);
+        } else {
+            $legacyIds = $pageBiddings->pluck('project_id')->filter(fn ($id): bool => ctype_digit((string) $id))->unique();
+            $legacyCounts = ProjectInformation::query()->whereIn('project_id', $legacyIds)
+                ->selectRaw('project_id, COUNT(*) as total')->groupBy('project_id')->pluck('total', 'project_id');
+            $legacyProjects = $this->scopeCompanyOwned(Project::query(), 'projects', $company)
+                ->whereIn('project_id', $legacyIds)->get()->keyBy('project_id');
+            $verifiedProjects = $pageBiddings->mapWithKeys(fn (ProjectInformation $bidding): array => [
+                $bidding->getKey() => (int) $legacyCounts->get($bidding->project_id) === 1
+                    ? $legacyProjects->get((int) $bidding->project_id) : null,
+            ]);
+        }
+        $pageBiddings->each(function (ProjectInformation $bidding) use ($lifecycle, $verifiedProjects): void {
+            $project = $verifiedProjects->get($bidding->getKey());
+            $bidding->setRelation('verifiedLifecycleProject', $project);
+            $bidding->setAttribute('display_state', $lifecycle->displayState($project, $bidding));
+        });
         $availableBiddings = $this->scopeCompanyOwned(ProjectInformation::query()->with('lots'), 'project_information', $company)->latest('id')->limit(100)->get();
         $availableProjects = $this->scopeCompanyOwned(Project::query(), 'projects', $company)->orderByDesc('project_id')->limit(100)->get();
         $availableLegacyLots = Lot::query()->with('project')->whereHas('project', fn ($projects) => $this->scopeCompanyOwned($projects, 'projects', $company))
@@ -187,6 +289,7 @@ class OperationsLifecycleController extends Controller
             'availableBiddingLots' => $availableBiddingLots,
             'metrics' => $this->dashboardMetrics($company),
             'readOnly' => request()->routeIs('finance.operations.lifecycle.*'),
+            'canReconcile' => $matcher->supportsDurableLinks(),
         ]);
     }
 
@@ -214,7 +317,7 @@ class OperationsLifecycleController extends Controller
         $biddingLot = isset($validated['bidding_lot_id']) ? ProjectLot::query()->findOrFail($validated['bidding_lot_id']) : null;
 
         if (! $project && $bidding) {
-            $project = $bidding->implementationProject()->first();
+            $project = $lifecycle->verifiedProjectForBidding($bidding);
         }
 
         if ($bidding) {
@@ -298,7 +401,8 @@ class OperationsLifecycleController extends Controller
                 ->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status')
             : collect();
         $pplLink = $this->verifiedPplLink($track);
-        $currentStatus = $track->project?->status ?? $track->bidding?->status;
+        $displayState = $lifecycle->displayState($track->project, $track->bidding);
+        $currentStatus = $displayState['project_status'];
         $currentValue = $track->project?->contract_amount ?? $track->bidding?->contract_amount;
         $currentAbc = $track->project?->ABC ?? $track->bidding?->approved_budget_contract_abc;
 
@@ -315,6 +419,7 @@ class OperationsLifecycleController extends Controller
             'billingCounts' => $billingCounts,
             'pplLink' => $pplLink,
             'operationalStatus' => $currentStatus,
+            'displayState' => $displayState,
             'contractAmount' => $currentValue,
             'abc' => $currentAbc,
             'readOnly' => request()->routeIs('finance.operations.lifecycle.*'),

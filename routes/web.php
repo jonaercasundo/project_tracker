@@ -182,6 +182,10 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/operations/lifecycle', [OperationsLifecycleController::class, 'index'])
             ->name('operations.lifecycle.index');
+        Route::get('/operations/lifecycle/reconcile', [OperationsLifecycleController::class, 'reconcile'])
+            ->name('operations.lifecycle.reconcile');
+        Route::post('/operations/lifecycle/reconcile', [OperationsLifecycleController::class, 'confirmSourceLink'])
+            ->name('operations.lifecycle.reconcile.confirm');
         Route::post('/operations/lifecycle', [OperationsLifecycleController::class, 'store'])
             ->name('operations.lifecycle.store');
         Route::get('/operations/lifecycle/{track}', [OperationsLifecycleController::class, 'show'])

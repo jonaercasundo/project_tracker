@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -28,20 +29,30 @@ class BiddingService
         private BiddingDocumentService $documentService,
         private BiddingSchoolService $schools,
         private ProjectAwardSynchronizationService $projectSync,
+        private ProjectLifecycleSourceMatcher $sourceMatcher,
+        private ProjectLifecycleService $lifecycle,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function store(array $data): ProjectInformation
     {
         return $this->saveTransaction(function () use ($data): ProjectInformation {
-            $project = ProjectInformation::create(array_merge([
+            $attributes = array_merge([
                 'procuring_entity' => '', 'approved_budget_contract_abc' => '0.00', 'status' => 'Draft',
-            ], $this->parentAttributes($data)));
+            ], $this->parentAttributes($data));
+            $company = auth()->user()?->currentCompany();
+            if ($company?->code === 'MMC' && Schema::hasColumn('project_information', 'company_id')) {
+                $attributes['company_id'] = $company->company_id;
+            }
+            $project = ProjectInformation::create($attributes);
             $this->syncLots($project, $data['lots']);
             $this->schools->sync($project, $data, true);
             $this->refreshTotal($project);
             if ($project->status === 'Awarded') {
                 $this->projectSync->syncFromBidding($project, true, true, 'Draft', auth()->id());
+            }
+            if ($company?->code === 'MMC') {
+                $this->sourceMatcher->autoLink($project, $company, auth()->id(), $this->lifecycle);
             }
 
             return $project;

@@ -25,10 +25,12 @@ function lifecycleRecords(string $legacyLotName = '2', string $biddingLotNumber 
     $owner->assignRole(Role::findOrCreate('user', 'web'));
     $owner->companies()->attach($company);
     $project = Project::query()->create([
+        'company_id' => $company->company_id,
         'project_name' => 'SME Lifecycle Package', 'project_code' => 'SME-2026', 'ref_no' => 'LC-'.fake()->unique()->numerify('####'),
         'agency' => 'Department of Education', 'contract_amount' => '500.00', 'ABC' => '600.00', 'status' => 'Implementation',
     ]);
     $bidding = ProjectInformation::query()->create([
+        'company_id' => $company->company_id,
         'project_id' => (string) $project->project_id, 'project_code' => 'SME-2026', 'project_name' => 'SME Lifecycle Package',
         'procuring_entity' => 'Department of Education', 'approved_budget_contract_abc' => '700.00', 'status' => 'Awarded',
         'contract_amount' => '500.00',
@@ -83,6 +85,278 @@ it('renders existing operations totals without creating a duplicate project mast
 
     expect(Project::query()->count())->toBe(1)
         ->and(ProjectLifecycleTrack::query()->count())->toBe(0);
+});
+
+it('shows the current Project List stage when bidding is still Draft', function (string $projectStatus, string $expectedStage) {
+    $records = lifecycleRecords();
+    $records['project']->update(['status' => $projectStatus]);
+    $records['bidding']->update(['status' => 'Draft']);
+    $this->signInBiddingUser();
+    startLifecycleTracking($records)->assertRedirect();
+    $track = ProjectLifecycleTrack::query()->sole();
+    $track->update(['current_stage' => 'Preparation']);
+
+    $this->get(route('operations.lifecycle.index'))
+        ->assertOk()
+        ->assertSee($expectedStage)
+        ->assertSee($projectStatus)
+        ->assertSee('Status discrepancy')
+        ->assertSee('Bidding: Draft')
+        ->assertSee('Project #'.$records['project']->project_id);
+    $this->get(route('operations.lifecycle.show', $track))
+        ->assertOk()
+        ->assertSee('Effective stage follows Project List status.')
+        ->assertSee('Status discrepancy');
+
+    expect($track->fresh()->current_stage)->toBe('Preparation')
+        ->and($records['project']->fresh()->status)->toBe($projectStatus)
+        ->and($records['bidding']->fresh()->status)->toBe('Draft');
+})->with([
+    ['Implementation', 'Implementation'],
+    ['Delivered', 'Delivery'],
+    ['Completed', 'Completed'],
+]);
+
+it('labels an unlinked bidding stage as provisional without selecting an ambiguous project', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['project_information_id' => null]);
+    Project::query()->create([
+        'project_name' => 'Another project', 'project_code' => 'OTHER', 'ref_no' => 'OTHER-2026',
+        'agency' => 'Department of Education', 'contract_amount' => '100.00', 'ABC' => '100.00', 'status' => 'Completed',
+    ]);
+    $records['bidding']->update(['status' => 'Draft']);
+    $this->signInBiddingUser();
+
+    $this->get(route('operations.lifecycle.index'))
+        ->assertOk()
+        ->assertSee('Unlinked · provisional')
+        ->assertSee('Preparation')
+        ->assertSee('Not linked');
+
+    expect(ProjectLifecycleTrack::query()->count())->toBe(0)
+        ->and($records['project']->fresh()->project_information_id)->toBeNull();
+});
+
+it('filters by the displayed operational stage and keeps bidding status separate', function () {
+    $records = lifecycleRecords();
+    $records['bidding']->update(['status' => 'Draft']);
+    $this->signInBiddingUser();
+    startLifecycleTracking($records)->assertRedirect();
+
+    $this->get(route('operations.lifecycle.index', [
+        'stage' => 'Implementation', 'bidding_status' => 'Draft', 'operational_status' => 'Implementation', 'link' => 'linked',
+    ]))->assertOk()->assertSee('SME Lifecycle Package')->assertSee('Status discrepancy');
+
+    $this->get(route('operations.lifecycle.index', ['stage' => 'Preparation']))
+        ->assertOk()->assertSee('No lifecycle records match these filters.')
+        ->assertSee('No existing Bidding records match these filters.');
+});
+
+it('searches exact bidding and Project List references without changing statuses', function () {
+    $records = lifecycleRecords();
+    $records['bidding']->update(['reference_no' => 'BID-REF-2026']);
+    $this->signInBiddingUser();
+    startLifecycleTracking($records)->assertRedirect();
+
+    $this->get(route('operations.lifecycle.index', ['search' => 'BID-REF-2026']))
+        ->assertOk()->assertSee('SME Lifecycle Package')
+        ->assertSee('BID-REF-2026');
+    $this->get(route('operations.lifecycle.index', ['search' => $records['project']->ref_no]))
+        ->assertOk()->assertSee('SME Lifecycle Package');
+});
+
+it('requires Operations confirmation of exact historical identifiers and audits the durable link', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['project_information_id' => null]);
+    $this->signInBiddingUser();
+
+    $this->get(route('operations.lifecycle.reconcile'))
+        ->assertOk()->assertSee('One exact candidate')->assertSee('SME Lifecycle Package');
+    $this->post(route('operations.lifecycle.reconcile.confirm'), [
+        'bidding_id' => $records['bidding']->getKey(), 'project_id' => $records['project']->project_id,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect((int) $records['project']->fresh()->project_information_id)->toBe((int) $records['bidding']->getKey())
+        ->and($records['project']->fresh()->status)->toBe('Implementation');
+    $this->assertDatabaseHas('project_award_events', [
+        'project_information_id' => $records['bidding']->getKey(),
+        'project_id' => $records['project']->project_id, 'event_type' => 'source_link_confirmed',
+    ]);
+    $this->post(route('operations.lifecycle.reconcile.confirm'), [
+        'bidding_id' => $records['bidding']->getKey(), 'project_id' => $records['project']->project_id,
+    ])->assertRedirect();
+    expect(DB::table('project_award_events')->where('event_type', 'source_link_confirmed')->count())->toBe(1);
+});
+
+it('reconciles an existing bidding-only lot track without losing its lot or stage history', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['project_information_id' => null]);
+    $this->signInBiddingUser();
+    $this->post(route('operations.lifecycle.store'), [
+        'bidding_id' => $records['bidding']->getKey(), 'bidding_lot_id' => $records['biddingLot']->getKey(),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    $track = ProjectLifecycleTrack::query()->sole();
+    $originalStage = $track->current_stage;
+
+    $this->post(route('operations.lifecycle.reconcile.confirm'), [
+        'bidding_id' => $records['bidding']->getKey(), 'project_id' => $records['project']->project_id,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($track->fresh()->project_id)->toBe($records['project']->project_id)
+        ->and($track->fresh()->bidding_lot_id)->toBe($records['biddingLot']->getKey())
+        ->and($track->fresh()->current_stage)->toBe($originalStage)
+        ->and($track->fresh()->scope_key)->toContain('project:'.$records['project']->project_id);
+    $this->assertDatabaseHas('project_lifecycle_events', [
+        'project_lifecycle_track_id' => $track->getKey(), 'event_type' => 'source_link_confirmed',
+    ]);
+});
+
+it('rejects guessed historical links and keeps ambiguous candidates for manual review', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['project_information_id' => null]);
+    $second = Project::query()->create([
+        'company_id' => $records['company']->company_id,
+        'project_name' => 'Another project', 'project_code' => 'SME-2026', 'ref_no' => 'ANOTHER-2026',
+        'agency' => 'Department of Education', 'contract_amount' => '100.00', 'ABC' => '100.00', 'status' => 'Pending',
+    ]);
+    $unrelated = Project::query()->create([
+        'company_id' => $records['company']->company_id,
+        'project_name' => 'Unrelated project', 'project_code' => 'UNRELATED', 'ref_no' => 'UNRELATED-2026',
+        'agency' => 'Department of Education', 'contract_amount' => '100.00', 'ABC' => '100.00', 'status' => 'Pending',
+    ]);
+    $this->signInBiddingUser();
+
+    $this->get(route('operations.lifecycle.reconcile'))->assertOk()->assertSee('Needs review — multiple candidates');
+    $this->post(route('operations.lifecycle.reconcile.confirm'), [
+        'bidding_id' => $records['bidding']->getKey(), 'project_id' => $unrelated->project_id,
+    ])->assertSessionHasErrors('project_id');
+    expect($records['project']->fresh()->project_information_id)->toBeNull()
+        ->and($second->fresh()->project_information_id)->toBeNull()
+        ->and(DB::table('project_award_events')->where('event_type', 'source_link_confirmed')->count())->toBe(0);
+});
+
+it('finds an exact reference number and ignores a similar project title', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['project_information_id' => null]);
+    $records['bidding']->update([
+        'project_id' => 'BID-UNRELATED', 'project_code' => null, 'reference_no' => $records['project']->ref_no,
+    ]);
+    Project::query()->create([
+        'company_id' => $records['company']->company_id,
+        'project_name' => 'SME Lifecycle Package', 'project_code' => 'OTHER', 'ref_no' => 'OTHER-REF',
+        'agency' => 'Department of Education', 'contract_amount' => '100.00', 'ABC' => '100.00', 'status' => 'Pending',
+    ]);
+    $this->signInBiddingUser();
+
+    $this->get(route('operations.lifecycle.reconcile'))
+        ->assertOk()->assertSee('One exact candidate')
+        ->assertSee('reference_no');
+});
+
+it('automatically links a uniquely identified MMC project during bidding registration without advancing status', function () {
+    $company = Company::query()->firstOrCreate(['code' => 'MMC'], ['name' => 'Metro-Mobilia', 'is_active' => true]);
+    $project = Project::query()->create([
+        'company_id' => $company->company_id, 'project_name' => 'Existing Implementation',
+        'project_code' => 'OPS-UNIQUE', 'ref_no' => 'OPS-REF', 'agency' => 'Local Agency',
+        'contract_amount' => '500.00', 'ABC' => '600.00', 'status' => 'Implementation',
+    ]);
+    $this->signInBiddingUser();
+    $payload = $this->validBiddingPayload();
+    $payload['project_id'] = 'OPS-UNIQUE';
+    $payload['status'] = 'Draft';
+
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+
+    $bidding = ProjectInformation::query()->sole();
+    expect((int) $project->fresh()->project_information_id)->toBe((int) $bidding->getKey())
+        ->and($project->fresh()->status)->toBe('Implementation')
+        ->and($bidding->status)->toBe('Draft')
+        ->and(Project::query()->count())->toBe(1);
+    $this->assertDatabaseHas('project_award_events', ['project_id' => $project->project_id,
+        'project_information_id' => $bidding->getKey(), 'event_type' => 'source_link_auto']);
+});
+
+it('automatically links a uniquely identified bidding record during MMC project creation', function () {
+    $company = Company::query()->firstOrCreate(['code' => 'MMC'], ['name' => 'Metro-Mobilia', 'is_active' => true]);
+    $bidding = ProjectInformation::query()->create([
+        'company_id' => $company->company_id, 'project_id' => 'OPS-NEW',
+        'project_name' => 'Existing Bidding', 'procuring_entity' => 'Local Agency',
+        'approved_budget_contract_abc' => '600.00', 'status' => 'Draft',
+    ]);
+    $this->signInBiddingUser();
+
+    $this->post(route('projects.store'), [
+        'ref_no' => 'NEW-REF', 'contract_number' => 'OPS-NEW', 'project_name' => 'New Project List record',
+        'agency' => '__other__', 'other_agency' => 'Local Agency', 'contract_amount' => '500.00', 'ABC' => '600.00',
+        'start_date' => '2026-11-01', 'end_date' => '2027-01-01', 'status' => 'Pending',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $project = Project::query()->sole();
+    expect((int) $project->project_information_id)->toBe((int) $bidding->getKey())
+        ->and($project->status)->toBe('Pending')
+        ->and($bidding->fresh()->status)->toBe('Draft');
+    $this->assertDatabaseHas('project_award_events', ['project_id' => $project->project_id,
+        'project_information_id' => $bidding->getKey(), 'event_type' => 'source_link_auto']);
+});
+
+it('leaves ambiguous registration matches unlinked for Operations review', function () {
+    $company = Company::query()->firstOrCreate(['code' => 'MMC'], ['name' => 'Metro-Mobilia', 'is_active' => true]);
+    foreach (['A', 'B'] as $suffix) {
+        Project::query()->create([
+            'company_id' => $company->company_id, 'project_name' => 'Candidate '.$suffix,
+            'project_code' => 'OPS-DUPLICATE', 'ref_no' => 'REF-'.$suffix, 'agency' => 'Local Agency',
+            'contract_amount' => '500.00', 'ABC' => '600.00', 'status' => 'Implementation',
+        ]);
+    }
+    $this->signInBiddingUser();
+    $payload = $this->validBiddingPayload();
+    $payload['project_id'] = 'OPS-DUPLICATE';
+
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(Project::query()->whereNotNull('project_information_id')->count())->toBe(0)
+        ->and(Project::query()->count())->toBe(2)
+        ->and(ProjectInformation::query()->count())->toBe(1)
+        ->and(DB::table('project_award_events')->where('event_type', 'source_link_auto')->count())->toBe(0);
+    $this->get(route('operations.lifecycle.reconcile'))->assertOk()->assertSee('Needs review — multiple candidates');
+});
+
+it('never automatically links an MI owned project to an MMC bidding registration', function () {
+    $mi = Company::query()->firstOrCreate(['code' => 'MI'], ['name' => 'MI', 'is_active' => true]);
+    $project = Project::query()->create([
+        'company_id' => $mi->company_id, 'project_name' => 'MI owned project',
+        'project_code' => 'CROSS-COMPANY', 'ref_no' => 'MI-REF', 'agency' => 'Local Agency',
+        'contract_amount' => '500.00', 'ABC' => '600.00', 'status' => 'Implementation',
+    ]);
+    $this->signInBiddingUser();
+    $payload = $this->validBiddingPayload();
+    $payload['project_id'] = 'CROSS-COMPANY';
+
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($project->fresh()->project_information_id)->toBeNull()
+        ->and(ProjectInformation::query()->sole()->company_id)->not->toBe($mi->company_id)
+        ->and(DB::table('project_award_events')->where('event_type', 'source_link_auto')->count())->toBe(0);
+});
+
+it('denies historical source confirmation to Finance and to another company’s project', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['project_information_id' => null]);
+    $records['project']->forceFill(['company_id' => Company::query()->firstOrCreate(['code' => 'MI'], ['name' => 'MI', 'is_active' => true])->company_id])->save();
+    $this->signInBiddingUser();
+
+    $this->get(route('operations.lifecycle.reconcile'))->assertOk()->assertDontSee('One exact candidate');
+    $this->post(route('operations.lifecycle.reconcile.confirm'), [
+        'bidding_id' => $records['bidding']->getKey(), 'project_id' => $records['project']->project_id,
+    ])->assertNotFound();
+
+    auth()->logout();
+    $this->signInBiddingUser('finance');
+    $this->get(route('operations.lifecycle.reconcile'))->assertForbidden();
+    $this->post(route('operations.lifecycle.reconcile.confirm'), [
+        'bidding_id' => $records['bidding']->getKey(), 'project_id' => $records['project']->project_id,
+    ])->assertForbidden();
+    expect($records['project']->fresh()->project_information_id)->toBeNull();
 });
 
 it('starts a lifecycle record from the verified existing project and lot records without changing operational statuses', function () {
@@ -143,6 +417,9 @@ it('tracks separate lots at separate lifecycle stages while sharing the same pro
         ->and($implementationTrack->fresh()->current_stage)->toBe('Implementation')
         ->and(Project::query()->count())->toBe(1)
         ->and(ProjectInformation::query()->count())->toBe(1);
+    $this->get(route('operations.lifecycle.index'))->assertOk()
+        ->assertSee('Tracked lot stage: Delivery (separate)')
+        ->assertSee('Implementation');
 });
 
 it('advances an eligible project only after an authorized user verifies an archived NOA', function () {

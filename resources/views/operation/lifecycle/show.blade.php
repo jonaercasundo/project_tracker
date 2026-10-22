@@ -11,16 +11,16 @@
         @if ($errors->any())<div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><ul class="list-inside list-disc">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
 
         @php
-            $stageIndex = array_search($track->current_stage, $stages, true);
+            $stageIndex = array_search($displayState['effective_stage'], $stages, true);
             $progress = count($stages) > 1 ? round(($stageIndex / (count($stages) - 1)) * 100) : 0;
         @endphp
         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div class="flex flex-wrap items-start justify-between gap-4">
-                <div><div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800">{{ $track->current_stage }}</span>@if($track->outcome)<span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-950">{{ $track->outcome }}</span>@endif</div><p class="mt-2 text-xs text-slate-600">Lifecycle stage is tracked independently and does not update Project List status.</p></div>
+                <div><div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800">{{ $displayState['effective_stage'] }}</span>@if($track->outcome)<span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-950">{{ $track->outcome }}</span>@endif</div><p class="mt-2 text-xs text-slate-600">{{ $displayState['linked'] ? 'Effective stage follows Project List status.' : 'Unlinked: bidding stage is provisional.' }} Bidding status: {{ $displayState['bidding_status'] ?? 'Not linked' }}.</p>@if($displayState['discrepancy'])<p class="mt-2 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-950">Status discrepancy: Bidding and Project List are at different stages.</p>@endif</div>
                 <div class="text-right"><p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Operational status</p><p class="mt-1 text-sm font-semibold text-slate-900">{{ $operationalStatus ?? 'Not linked' }}</p></div>
             </div>
             <div class="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-600" style="width: {{ $progress }}%"></div></div>
-            <div class="mt-2 grid grid-cols-2 gap-2 text-[10px] font-medium text-slate-500 sm:grid-cols-5 lg:grid-cols-10">@foreach($stages as $stage)<span class="{{ $stage === $track->current_stage ? 'font-bold text-blue-800' : '' }}">{{ $stage }}</span>@endforeach</div>
+            <div class="mt-2 grid grid-cols-2 gap-2 text-[10px] font-medium text-slate-500 sm:grid-cols-5 lg:grid-cols-10">@foreach($stages as $stage)<span class="{{ $stage === $displayState['effective_stage'] ? 'font-bold text-blue-800' : '' }}">{{ $stage }}</span>@endforeach</div>
         </section>
 
         <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -167,7 +167,7 @@
 
                 <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <h2 class="text-sm font-bold text-slate-900">Delivery & billing progress</h2>
-                    <p class="mt-3 text-xs text-slate-600">Delivered or accepted packages: <strong class="text-slate-900">{{ $deliveredCount }} / {{ $deliveryCount }}</strong></p>
+                    <p class="mt-3 text-xs text-slate-600">DR rows reported delivered or accepted: <strong class="text-slate-900">{{ $deliveredCount }} / {{ $deliveryCount }}</strong></p>
                     @if($billingCounts->isNotEmpty())<dl class="mt-3 space-y-2 text-xs">@foreach($billingCounts as $status => $count)<div class="flex justify-between gap-2"><dt class="text-slate-500">{{ str_replace('_', ' ', ucfirst($status)) }}</dt><dd class="font-semibold text-slate-900">{{ $count }}</dd></div>@endforeach</dl>@else<p class="mt-2 text-xs text-slate-500">No delivery billing records are linked yet.</p>@endif
                 </section>
 

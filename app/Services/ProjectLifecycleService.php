@@ -26,6 +26,39 @@ class ProjectLifecycleService
         ];
     }
 
+    /** @return array{bidding_status: ?string, project_status: ?string, effective_stage: string, linked: bool, discrepancy: bool} */
+    public function displayState(?Project $project, ?ProjectInformation $bidding): array
+    {
+        $projectStatus = $project?->status;
+        $biddingStatus = $bidding?->status;
+        $projectStage = $projectStatus === null ? null : config('project_lifecycle.project_status_mapping.'.$projectStatus.'.stage');
+        $biddingStage = $biddingStatus === null ? null : config('project_lifecycle.bidding_status_mapping.'.$biddingStatus.'.stage');
+
+        return [
+            'bidding_status' => $biddingStatus,
+            'project_status' => $projectStatus,
+            'effective_stage' => $projectStage ?? $projectStatus ?? $biddingStage ?? 'Entry',
+            'linked' => $project !== null,
+            'discrepancy' => $projectStatus !== null && $biddingStatus !== null && $projectStage !== $biddingStage,
+        ];
+    }
+
+    public function verifiedProjectForBidding(ProjectInformation $bidding): ?Project
+    {
+        if (Schema::hasColumn('projects', 'project_information_id')) {
+            $projects = Project::query()->where('project_information_id', $bidding->getKey())->limit(2)->get();
+
+            return $projects->count() === 1 ? $projects->first() : null;
+        }
+
+        if (! ctype_digit((string) $bidding->project_id)
+            || ProjectInformation::query()->where('project_id', $bidding->project_id)->limit(2)->count() !== 1) {
+            return null;
+        }
+
+        return Project::query()->find((int) $bidding->project_id);
+    }
+
     public function scopeKey(?Project $project, ?ProjectInformation $bidding, ?string $lotNumber): string
     {
         $root = $project ? 'project:'.$project->project_id : 'bidding:'.$bidding->getKey();

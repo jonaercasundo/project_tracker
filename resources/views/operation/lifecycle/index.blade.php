@@ -27,7 +27,7 @@
                 ['Awarded projects', $metrics['awarded_projects'], 'text-emerald-700'],
                 ['Awarded bidding lots', $metrics['awarded_lots'], 'text-emerald-700'],
                 ['Implementation', $metrics['implementation'], 'text-cyan-700'],
-                ['Deliveries accepted', $metrics['delivered'].' / '.$metrics['deliveries'], 'text-cyan-700'],
+                ['DRs reported delivered / accepted', $metrics['delivered'].' / '.$metrics['deliveries'], 'text-cyan-700'],
                 ['For billing / billed', $metrics['for_billing'].' / '.$metrics['billed'], 'text-violet-700'],
                 ['Overdue actions', $metrics['overdue'], $metrics['overdue'] > 0 ? 'text-rose-700' : 'text-emerald-700'],
                 ];
@@ -81,6 +81,10 @@
                     <select name="agency" class="rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"><option value="">All agencies</option>@foreach ($agencies as $agency)<option value="{{ $agency }}" @selected(($filters['agency'] ?? '') === $agency)>{{ $agency }}</option>@endforeach</select>
                     <select name="stage" class="rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"><option value="">All lifecycle stages</option>@foreach ($stages as $stage)<option value="{{ $stage }}" @selected(($filters['stage'] ?? '') === $stage)>{{ $stage }}</option>@endforeach</select>
                     <select name="status" class="rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"><option value="">All statuses</option><option value="open" @selected(($filters['status'] ?? '') === 'open')>Open lifecycle</option>@foreach ($statuses as $status)<option value="{{ $status }}" @selected(($filters['status'] ?? '') === $status)>{{ $status }}</option>@endforeach</select>
+                    <select name="bidding_status" aria-label="Bidding status" class="rounded-lg border-slate-300 text-sm"><option value="">All bidding statuses</option>@foreach(array_keys(config('project_lifecycle.bidding_status_mapping')) as $status)<option value="{{ $status }}" @selected(($filters['bidding_status'] ?? '') === $status)>{{ $status }}</option>@endforeach</select>
+                    <select name="operational_status" aria-label="Project List status" class="rounded-lg border-slate-300 text-sm"><option value="">All Project List statuses</option>@foreach(array_keys(config('project_lifecycle.project_status_mapping')) as $status)<option value="{{ $status }}" @selected(($filters['operational_status'] ?? '') === $status)>{{ $status }}</option>@endforeach</select>
+                    <select name="link" aria-label="Project link" class="rounded-lg border-slate-300 text-sm"><option value="">All links</option><option value="linked" @selected(($filters['link'] ?? '') === 'linked')>Linked</option><option value="unlinked" @selected(($filters['link'] ?? '') === 'unlinked')>Unlinked</option></select>
+                    <input name="year" type="number" min="2000" max="2100" value="{{ $filters['year'] ?? '' }}" placeholder="Year" aria-label="Year" class="rounded-lg border-slate-300 text-sm">
                     <select name="owner" class="rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"><option value="">All owners</option>@foreach ($owners as $owner)<option value="{{ $owner->user_id }}" @selected((string) ($filters['owner'] ?? '') === (string) $owner->user_id)>{{ $owner->name }}</option>@endforeach</select>
                     <input name="lot" value="{{ $filters['lot'] ?? '' }}" placeholder="Lot number" class="rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
                     <input type="date" name="from" value="{{ $filters['from'] ?? '' }}" aria-label="Due date from" class="rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
@@ -92,23 +96,23 @@
             <div class="overflow-x-auto">
                 <table class="min-w-[1100px] w-full text-left text-xs">
                     <thead class="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
-                        <tr><th class="px-4 py-3">Project / Lot</th><th class="px-4 py-3">Agency</th><th class="px-4 py-3">Lifecycle</th><th class="px-4 py-3">Project List status</th><th class="px-4 py-3">Next action / deadline</th><th class="px-4 py-3">Owner</th><th class="px-4 py-3">Values</th><th class="px-4 py-3">Open</th></tr>
+                        <tr><th class="px-4 py-3">Project / Lot</th><th class="px-4 py-3">Agency</th><th class="px-4 py-3">Effective lifecycle stage</th><th class="px-4 py-3">Project List / Bidding status</th><th class="px-4 py-3">Next action / deadline</th><th class="px-4 py-3">Owner</th><th class="px-4 py-3">Values</th><th class="px-4 py-3">Open</th></tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         @forelse ($tracks as $track)
                             @php
                                 $title = $track->project?->project_name ?? $track->bidding?->project_name ?? 'Existing record';
                                 $lotName = $track->legacyLot?->lot_name ?? $track->biddingLot?->lot_no;
-                                $current = $track->project?->status ?? $track->bidding?->status;
-                                $stageIndex = array_search($track->current_stage, $stages, true);
+                                $display = $track->display_state;
+                                $stageIndex = array_search($display['effective_stage'], $stages, true);
                                 $stagePercent = count($stages) > 1 ? round(($stageIndex / (count($stages) - 1)) * 100) : 0;
                                 $isOverdue = $track->outcome === null && $track->next_action_due_at?->isPast();
                             @endphp
                             <tr class="align-top hover:bg-slate-50/70">
-                                <td class="max-w-[280px] px-4 py-4"><a href="{{ route($readOnly ? 'finance.operations.lifecycle.show' : 'operations.lifecycle.show', $track) }}" class="line-clamp-2 font-semibold text-slate-900 hover:text-blue-700" title="{{ $title }}">{{ $title }}</a><p class="mt-1 text-[10px] text-slate-500">{{ $lotName ? 'Lot '.$lotName : 'Project level' }} · {{ $track->bidding?->project_code ?? $track->project?->project_code ?? $track->project?->ref_no }}</p></td>
+                                <td class="max-w-[280px] px-4 py-4"><a href="{{ route($readOnly ? 'finance.operations.lifecycle.show' : 'operations.lifecycle.show', $track) }}" class="line-clamp-2 font-semibold text-slate-900 hover:text-blue-700" title="{{ $title }}">{{ $title }}</a><p class="mt-1 text-[10px] text-slate-500">{{ $lotName ? 'Lot '.$lotName : 'Project level' }} · Project #{{ $track->project_id ?? 'Unlinked' }} · Bidding #{{ $track->project_information_id ?? 'Unlinked' }}</p><p class="mt-1 text-[10px] text-slate-500">Project ref {{ $track->project?->ref_no ?? '—' }} · Bidding ref {{ $track->bidding?->reference_no ?? '—' }}</p></td>
                                 <td class="px-4 py-4 text-slate-600">{{ $track->project?->agency ?? $track->bidding?->procuring_entity ?? '—' }}</td>
-                                <td class="min-w-40 px-4 py-4"><div class="flex items-center gap-2"><span class="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-800">{{ $track->current_stage }}</span>@if($track->outcome)<span class="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-900">{{ $track->outcome }}</span>@endif</div><div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-600" style="width: {{ $stagePercent }}%"></div></div><span class="sr-only">{{ $stagePercent }} percent through the configured lifecycle</span></td>
-                                <td class="px-4 py-4"><span class="rounded-md bg-slate-100 px-2 py-1 text-slate-700">{{ $current ?? '—' }}</span></td>
+                                <td class="min-w-40 px-4 py-4"><div class="flex items-center gap-2"><span class="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-800">{{ $display['effective_stage'] }}</span>@if($track->outcome)<span class="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-900">{{ $track->outcome }}</span>@endif</div>@if($lotName)<p class="mt-1 text-[10px] text-slate-600">Tracked lot stage: {{ $track->current_stage }} (separate)</p>@endif<div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-600" style="width: {{ $stagePercent }}%"></div></div><span class="sr-only">{{ $stagePercent }} percent through the configured lifecycle</span></td>
+                                <td class="px-4 py-4"><span class="rounded-md bg-slate-100 px-2 py-1 text-slate-700">{{ $display['project_status'] ?? 'Unlinked' }}</span>@if($display['discrepancy'])<span class="mt-2 block rounded-md bg-amber-100 px-2 py-1 font-semibold text-amber-950">Status discrepancy</span>@endif<p class="mt-2 text-[10px] text-slate-500">Bidding: {{ $display['bidding_status'] ?? '—' }}</p></td>
                                 <td class="max-w-48 px-4 py-4"><p class="line-clamp-2 text-slate-800">{{ $track->next_action ?: 'No action recorded' }}</p><p class="mt-1 font-medium {{ $isOverdue ? 'text-rose-700' : 'text-slate-500' }}">{{ $track->next_action_due_at?->format('M j, Y') ?? 'No deadline' }}{{ $isOverdue ? ' · Overdue' : '' }}</p></td>
                                 <td class="px-4 py-4 text-slate-600">{{ $track->owner?->name ?? 'Unassigned' }}</td>
                                 <td class="px-4 py-4 text-right tabular-nums text-slate-700">{{ $track->project?->contract_amount ? '₱'.number_format((float) $track->project->contract_amount, 2) : '—' }}</td>
@@ -128,6 +132,7 @@
             <div class="mb-4">
                 <h2 class="text-sm font-bold text-slate-900">Start lifecycle tracking</h2>
                 <p class="mt-1 text-xs text-slate-500">Select existing records only. Project and bidding links, and any paired lot numbers, are validated before a lifecycle record is added.</p>
+                @if($canReconcile)<a href="{{ route('operations.lifecycle.reconcile') }}" class="mt-2 inline-block text-xs font-semibold text-blue-700 hover:underline">Review missing Project List links</a>@endif
             </div>
             <form method="POST" action="{{ route('operations.lifecycle.store') }}" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 @csrf
@@ -152,20 +157,23 @@
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-[1000px] w-full text-left text-xs">
-                    <thead class="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">Opportunity</th><th class="px-4 py-3">Agency</th><th class="px-4 py-3">Lots</th><th class="px-4 py-3">Bidding status</th><th class="px-4 py-3">Mapped stage</th><th class="px-4 py-3">Project List status</th><th class="px-4 py-3 text-right">ABC / contract</th><th class="px-4 py-3">Submission deadline</th><th class="px-4 py-3">Actions</th></tr></thead>
+                    <thead class="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">Opportunity</th><th class="px-4 py-3">Agency</th><th class="px-4 py-3">Lots</th><th class="px-4 py-3">Bidding status</th><th class="px-4 py-3">Effective lifecycle stage</th><th class="px-4 py-3">Project List status</th><th class="px-4 py-3 text-right">ABC / contract</th><th class="px-4 py-3">Submission deadline</th><th class="px-4 py-3">Actions</th></tr></thead>
                     <tbody class="divide-y divide-slate-100">
                         @forelse($existingBiddings as $bidding)
                             @php
-                                $mapping = config('project_lifecycle.bidding_status_mapping.'.$bidding->status, ['stage' => 'Entry']);
+                                $display = $bidding->display_state;
                                 $deadlineOverdue = $bidding->bid_submission_deadline && \Illuminate\Support\Carbon::parse($bidding->bid_submission_deadline)->isPast() && !in_array($bidding->status, ['Awarded', 'Cancelled', 'Completed'], true);
                             @endphp
                             <tr class="align-top hover:bg-slate-50/70">
-                                <td class="max-w-[300px] px-4 py-4">@unless($readOnly)<a href="{{ route('project.bidding.show', $bidding) }}" class="line-clamp-2 font-semibold text-slate-900 hover:text-blue-700" title="{{ $bidding->project_name }}">{{ $bidding->project_name }}</a>@else<p class="line-clamp-2 font-semibold text-slate-900" title="{{ $bidding->project_name }}">{{ $bidding->project_name }}</p>@endunless<p class="mt-1 text-[10px] text-slate-500">Bidding #{{ $bidding->id }} · {{ $bidding->project_code ?: $bidding->project_id }}</p></td>
+                                <td class="max-w-[300px] px-4 py-4">@unless($readOnly)<a href="{{ route('project.bidding.show', $bidding) }}" class="line-clamp-2 font-semibold text-slate-900 hover:text-blue-700" title="{{ $bidding->project_name }}">{{ $bidding->project_name }}</a>@else<p class="line-clamp-2 font-semibold text-slate-900" title="{{ $bidding->project_name }}">{{ $bidding->project_name }}</p>@endunless<p class="mt-1 text-[10px] text-slate-500">Bidding #{{ $bidding->id }} · Code {{ $bidding->project_code ?: $bidding->project_id }} · Ref {{ $bidding->reference_no ?: '—' }}</p></td>
                                 <td class="px-4 py-4 text-slate-600">{{ $bidding->procuring_entity ?: '—' }}</td>
                                 <td class="px-4 py-4 text-slate-700">@if($bidding->lots->isNotEmpty()){{ $bidding->lots->pluck('lot_no')->join(', ') }}@else{{ $bidding->lot_no ?: '—' }}@endif</td>
                                 <td class="px-4 py-4"><span class="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-700">{{ $bidding->status }}</span></td>
-                                <td class="px-4 py-4"><span class="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-800">{{ $mapping['stage'] }}</span></td>
-                                <td class="px-4 py-4 text-slate-700">{{ $bidding->implementationProject?->status ?? 'Not linked' }}</td>
+                                <td class="px-4 py-4"><span class="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-800">{{ $display['effective_stage'] }}</span>
+                                    @unless($display['linked'])<span class="mt-2 block text-amber-800">Unlinked · provisional</span>@endunless
+                                    @if($display['discrepancy'])<span class="mt-2 block rounded-md bg-amber-100 px-2 py-1 font-semibold text-amber-950">Status discrepancy</span>@endif
+                                </td>
+                                <td class="px-4 py-4 text-slate-700">{{ $display['project_status'] ?? 'Not linked' }}@if($display['linked'])<span class="mt-1 block text-[10px] text-slate-500">Project #{{ $bidding->verifiedLifecycleProject->project_id }} · {{ $bidding->verifiedLifecycleProject->ref_no }}</span>@endif</td>
                                 <td class="px-4 py-4 text-right tabular-nums text-slate-700"><div>₱{{ number_format((float) $bidding->approved_budget_contract_abc, 2) }}</div><div class="mt-1 text-[10px] text-slate-500">Contract ₱{{ number_format((float) $bidding->contract_amount, 2) }}</div></td>
                                 <td class="px-4 py-4 font-medium {{ $deadlineOverdue ? 'text-rose-700' : 'text-slate-600' }}">{{ $bidding->bid_submission_deadline ? \Illuminate\Support\Carbon::parse($bidding->bid_submission_deadline)->format('M j, Y') : 'No deadline' }}{{ $deadlineOverdue ? ' · Overdue' : '' }}</td>
                                 <td class="px-4 py-4">@unless($readOnly)<div class="flex items-center gap-2"><a href="{{ route('project.bidding.show', $bidding) }}" class="font-semibold text-blue-700 hover:underline">View</a><form method="POST" action="{{ route('operations.lifecycle.store') }}">@csrf<input type="hidden" name="bidding_id" value="{{ $bidding->id }}"><button class="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50">Track</button></form></div>@else<span class="text-slate-500">Read only</span>@endunless</td>

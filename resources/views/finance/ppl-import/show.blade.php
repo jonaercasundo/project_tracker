@@ -16,8 +16,8 @@
         @if ($errors->any())<div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"><ul class="list-disc space-y-1 pl-5">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
         @if ($batch->error_message)<div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{{ $batch->error_message }}</div>@endif
 
-        <section class="grid gap-3 sm:grid-cols-4">
-            @foreach ([['Workbook rows', $batch->summary['form_rows'] ?? 0], ['Ready', $batch->summary['ready'] ?? 0], ['Warnings', $batch->summary['warnings'] ?? 0], ['Blocked', $batch->summary['blocked'] ?? 0]] as [$label, $value])
+        <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
+            @foreach ([['Workbook rows', $batch->summary['form_rows'] ?? 0], ['Ready', $batch->summary['ready'] ?? 0], ['Warnings', $batch->summary['warnings'] ?? 0], ['Blocked', $batch->summary['blocked'] ?? 0], ['Auto-matched', $batch->summary['auto_matched'] ?? 0], ['Needs Review', $batch->summary['needs_review'] ?? 0], ['Unmatched', $batch->summary['unmatched'] ?? 0]] as [$label, $value])
                 <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $label }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-slate-900">{{ $value }}</p></div>
             @endforeach
         </section>
@@ -32,7 +32,9 @@
                             @php($normalized = $row->normalized_data ?? [])
                             @php($inputs = data_get($normalized, 'plan.inputs', []))
                             @php($planLinks = data_get($normalized, 'plan', []))
-                            @php($manualMapping = data_get($normalized, 'manual_mapping', []))
+                            @php($sourceMapping = data_get($normalized, 'source_mapping', []))
+                            @php($mappingUserId = data_get($sourceMapping, 'confirmed_by') ?? data_get($sourceMapping, 'import_confirmed_by'))
+                            @php($mappingUser = $mappingUserId ? ($mappingUsers[$mappingUserId] ?? null) : null)
                             <tr class="align-top">
                                 <td class="px-4 py-4 font-mono text-xs text-slate-600">{{ $row->source_sheet }}!{{ $row->source_row }}</td>
                                 <td class="px-4 py-4"><p class="font-semibold text-slate-900">{{ $row->project_code }} · Lot {{ $row->lot_number }}</p><p class="mt-1 text-xs text-slate-500">{{ data_get($normalized, 'project_title') }}</p><p class="mt-1 text-xs text-slate-500">PPL Form #{{ data_get($normalized, 'plan.ppl_form_id') ?? 'not matched' }}</p></td>
@@ -40,17 +42,72 @@
                                 <td class="px-4 py-4 text-right tabular-nums">{{ is_numeric($inputs['abc'] ?? null) ? '₱'.number_format((float) $inputs['abc'], 2) : '—' }}</td>
                                 <td class="px-4 py-4 text-right tabular-nums">{{ is_numeric($inputs['contract_amount'] ?? null) ? '₱'.number_format((float) $inputs['contract_amount'], 2) : '—' }}</td>
                                 <td class="px-4 py-4 text-right tabular-nums">{{ is_numeric($inputs['factory_cost'] ?? null) ? '₱'.number_format((float) $inputs['factory_cost'], 2) : '—' }}</td>
-                                <td class="px-4 py-4"><ul class="space-y-2">@foreach(($row->errors ?? []) as $message)<li class="text-xs text-rose-800">• {{ $message }}</li>@endforeach @foreach(($row->warnings ?? []) as $message)<li class="text-xs text-amber-900">• {{ $message }}</li>@endforeach @foreach(data_get($normalized, 'reconciliation.differences', []) as $metric => $difference)<li class="text-xs text-amber-900">{{ str($metric)->replace('_', ' ')->title() }} differs: workbook ₱{{ number_format((float) $difference['workbook'], 2) }}, calculated ₱{{ number_format((float) $difference['calculated'], 2) }} ({{ $difference['cell'] }})</li>@endforeach @if(empty($row->errors) && empty($row->warnings) && empty(data_get($normalized, 'reconciliation.differences', [])))<li class="text-xs text-emerald-800">No blocking issues or reconciliation differences.</li>@endif</ul><p class="mt-2 text-xs text-slate-500">Linked PPL #{{ data_get($normalized, 'plan.ppl_form_id') ?? '—' }} · bidding #{{ data_get($normalized, 'plan.project_information_id') ?? '—' }} · lot #{{ data_get($normalized, 'plan.lot_id') ?? '—' }}</p></td>
                                 <td class="px-4 py-4">
+                                    @if (($sourceMapping['warnings'] ?? []) !== [])
+                                        <p class="mb-1 text-xs font-semibold text-amber-900">Source mapping</p>
+                                        <ul class="mb-3 list-disc space-y-1 pl-4">
+                                            @foreach ($sourceMapping['warnings'] as $message)
+                                                <li class="text-xs text-amber-900">{{ $message }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
+                                    @if (($row->errors ?? []) !== [])
+                                        <p class="mb-1 text-xs font-semibold text-rose-900">Financial validation errors</p>
+                                        <ul class="mb-3 list-disc space-y-1 pl-4">
+                                            @foreach ($row->errors as $message)
+                                                <li class="text-xs text-rose-800">{{ $message }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
+                                    @if (($row->warnings ?? []) !== [])
+                                        <p class="mb-1 text-xs font-semibold text-amber-900">Financial review warnings</p>
+                                        <ul class="list-disc space-y-1 pl-4">
+                                            @foreach ($row->warnings as $message)
+                                                <li class="text-xs text-amber-900">{{ $message }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
+                                    @foreach (data_get($normalized, 'reconciliation.differences', []) as $metric => $difference)
+                                        <p class="mt-2 text-xs text-amber-900">{{ str($metric)->replace('_', ' ')->title() }} differs: workbook {{ number_format((float) $difference['workbook'], 2) }}, calculated {{ number_format((float) $difference['calculated'], 2) }} ({{ $difference['cell'] }})</p>
+                                    @endforeach
+                                    <p class="mt-2 text-xs text-slate-500">Linked PPL #{{ data_get($normalized, 'plan.ppl_form_id') ?? '-' }} / bidding #{{ data_get($normalized, 'plan.project_information_id') ?? '-' }} / lot #{{ data_get($normalized, 'plan.lot_id') ?? '-' }}</p>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span class="mb-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ ($sourceMapping['status'] ?? 'unmatched') === 'auto_matched' ? 'bg-emerald-100 text-emerald-800' : (($sourceMapping['status'] ?? 'unmatched') === 'unmatched' ? 'bg-slate-100 text-slate-700' : 'bg-amber-100 text-amber-900') }}">{{ ($sourceMapping['status'] ?? 'unmatched') === 'auto_matched' ? 'Auto-matched' : (($sourceMapping['status'] ?? 'unmatched') === 'unmatched' ? 'Unmatched' : 'Needs Review') }}</span>
+                                    <p class="mb-2 text-xs text-slate-500">
+                                        {{ ($sourceMapping['origin'] ?? 'automatic') === 'manual' ? 'Manually selected' : (($sourceMapping['origin'] ?? 'automatic') === 'previous_import' ? 'Reused from prior import' : 'Automatic match') }}
+                                        @if ($mappingUser)
+                                            by {{ $mappingUser->name }}
+                                        @elseif (($sourceMapping['matched_by'] ?? null) === 'system')
+                                            by system
+                                        @endif
+                                    </p>
+                                    <p class="mb-2 break-words text-xs text-slate-500">Identifiers: {{ collect($sourceMapping['matched_identifiers'] ?? [])->filter()->values()->implode(' / ') }}</p>
+                                    @if (collect(data_get($sourceMapping, 'candidates.projects', []))->count() > 1 || collect(data_get($sourceMapping, 'candidates.biddings', []))->count() > 1 || collect(data_get($sourceMapping, 'candidates.lots', []))->count() > 1)
+                                        <details class="mb-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950">
+                                            <summary class="cursor-pointer font-semibold">Review matching candidates</summary>
+                                            @foreach (['projects' => 'Projects', 'biddings' => 'Bidding records', 'lots' => 'Lots'] as $candidateKey => $candidateLabel)
+                                                @if (count(data_get($sourceMapping, 'candidates.'.$candidateKey, [])) > 1)
+                                                    <p class="mt-2 font-semibold">{{ $candidateLabel }}</p>
+                                                    <ul class="list-disc pl-4">
+                                                        @foreach (data_get($sourceMapping, 'candidates.'.$candidateKey, []) as $candidate)
+                                                            <li>{{ $candidate['name'] ?? 'Lot '.$candidate['number'] ?? 'Record' }} / {{ $candidate['identifier'] ?? 'Lot '.$candidate['number'] ?? 'No identifier' }} / #{{ $candidate['id'] }}</li>
+                                                        @endforeach
+                                                    </ul>
+                                                @endif
+                                            @endforeach
+                                        </details>
+                                    @endif
+                                    <p class="mb-2 text-xs text-slate-500">Linked IDs — Project {{ data_get($sourceMapping, 'linked_record_ids.project_id') ?? '—' }} / Bidding {{ data_get($sourceMapping, 'linked_record_ids.bidding_id') ?? '—' }} / Lot {{ data_get($sourceMapping, 'linked_record_ids.lot_id') ?? '—' }} / PPL {{ data_get($sourceMapping, 'linked_record_ids.ppl_form_id') ?? '—' }}</p>
                                     @if (in_array($batch->status, ['previewed', 'failed'], true) && $row->status !== 'imported')
                                         <form method="POST" action="{{ route('finance.ppl-import.rows.mapping', [$batch, $row]) }}" class="space-y-2">@csrf @method('PATCH')
-                                            <div><label for="project-{{ $row->id }}" class="mb-1 block text-xs font-semibold text-slate-600">MMC project (name / project code)</label><select id="project-{{ $row->id }}" name="project_id" class="w-full rounded-md border-slate-300 text-xs"><option value="">No project link</option>@foreach($mappingProjects as $project)<option value="{{ $project->project_id }}" @selected((string) old('project_id', $planLinks['project_id'] ?? '') === (string) $project->project_id)>{{ $project->project_name }} / {{ $project->project_code ?? 'No code' }} ? #{{ $project->project_id }}</option>@endforeach</select></div>
-                                            <div><label for="bidding-{{ $row->id }}" class="mb-1 block text-xs font-semibold text-slate-600">Bidding record (name / identifier)</label><select id="bidding-{{ $row->id }}" name="project_information_id" class="w-full rounded-md border-slate-300 text-xs"><option value="">No bidding link (PPL Form can remain the source)</option>@foreach($mappingBiddings as $bidding)<option value="{{ $bidding->id }}" @selected((string) old('project_information_id', $planLinks['project_information_id'] ?? '') === (string) $bidding->id)>{{ $bidding->project_name }} / {{ $bidding->project_id_no ?? 'No identifier' }} ? #{{ $bidding->id }}</option>@endforeach</select></div>
-                                            <div><label for="lot-{{ $row->id }}" class="mb-1 block text-xs font-semibold text-slate-600">Lot (must belong to selected bidding record)</label><select id="lot-{{ $row->id }}" name="lot_id" class="w-full rounded-md border-slate-300 text-xs"><option value="">No lot link</option>@foreach($mappingLots as $lot)<option value="{{ $lot->id }}" @selected((string) old('lot_id', $planLinks['lot_id'] ?? '') === (string) $lot->id)>{{ $lot->project?->project_name ?? 'Bidding record #'.$lot->project_id }} ? Lot {{ $lot->lot_no }} ? #{{ $lot->id }}</option>@endforeach</select></div>
+                                            <div><label for="project-{{ $row->id }}" class="mb-1 block text-xs font-semibold text-slate-600">MMC project (name / identifier)</label><select id="project-{{ $row->id }}" name="project_id" class="w-full rounded-md border-slate-300 text-xs"><option value="">No project link</option>@foreach($mappingProjects as $project)<option value="{{ $project->project_id }}" @selected((string) old("project_id", $planLinks["project_id"] ?? "") === (string) $project->project_id)>{{ $project->project_name }} / {{ $project->project_code ?? $project->ref_no ?? "No identifier" }} / #{{ $project->project_id }}</option>@endforeach</select></div>
+                                            <div><label for="bidding-{{ $row->id }}" class="mb-1 block text-xs font-semibold text-slate-600">Bidding record (name / identifier)</label><select id="bidding-{{ $row->id }}" name="project_information_id" class="w-full rounded-md border-slate-300 text-xs"><option value="">No bidding link (PPL Form can remain the source)</option>@foreach($mappingBiddings as $bidding)<option value="{{ $bidding->id }}" @selected((string) old("project_information_id", $planLinks["project_information_id"] ?? "") === (string) $bidding->id)>{{ $bidding->project_name }} / {{ $bidding->project_id_no ?? $bidding->project_id ?? $bidding->project_code ?? $bidding->reference_no ?? "No identifier" }} / #{{ $bidding->id }}</option>@endforeach</select></div>
+                                            <div><label for="lot-{{ $row->id }}" class="mb-1 block text-xs font-semibold text-slate-600">Lot (must belong to selected bidding record)</label><select id="lot-{{ $row->id }}" name="lot_id" class="w-full rounded-md border-slate-300 text-xs"><option value="">No lot link</option>@foreach($mappingLots as $lot)<option value="{{ $lot->id }}" @selected((string) old("lot_id", $planLinks["lot_id"] ?? "") === (string) $lot->id)>{{ $lot->project?->project_name ?? "Bidding record #".$lot->project_id }} / Lot {{ $lot->lot_no }} / #{{ $lot->id }}</option>@endforeach</select></div>
                                             <button type="submit" class="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800">Save source links</button>
                                         </form>
                                     @else
-                                        <p class="text-xs text-slate-600">{{ data_get($manualMapping, 'project.name', 'No project selected') }} / {{ data_get($manualMapping, 'bidding.identifier', 'No bidding identifier') }} ? Lot {{ data_get($manualMapping, 'lot.number', 'not linked') }}</p>
+                                        <p class="text-xs text-slate-600">{{ data_get($sourceMapping, 'origin', 'No mapping') }} / Project {{ data_get($sourceMapping, 'linked_record_ids.project_id', '—') }} / Bidding {{ data_get($sourceMapping, 'linked_record_ids.bidding_id', '—') }} / Lot {{ data_get($sourceMapping, 'linked_record_ids.lot_id', '—') }}</p>
                                     @endif
                                 </td>
                             </tr>

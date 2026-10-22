@@ -13,7 +13,9 @@ use App\Models\ProjectLot;
 use App\Models\User;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -229,6 +231,9 @@ class MmcPplWorkbookImportService
                     }
                     $version = $plan->latestVersion;
                     $inputData = $version->input_data ?? [];
+                    $sourceMapping = $row->normalized_data['source_mapping'] ?? [];
+                    $sourceMapping['import_confirmed_by'] = $user->getAuthIdentifier();
+                    $sourceMapping['import_confirmed_at'] = now()->toIso8601String();
                     $inputData['workbook_import'] = [
                         'batch_id' => $lockedBatch->getKey(),
                         'import_row_id' => $row->getKey(),
@@ -239,6 +244,7 @@ class MmcPplWorkbookImportService
                         'source_fingerprint' => $row->source_fingerprint,
                         'source_cells' => $row->source_data['source_cells'],
                         'manual_mapping' => $row->normalized_data['manual_mapping'] ?? null,
+                        'source_mapping' => $sourceMapping,
                         'revenue_year' => $data['revenue_year'],
                     ];
                     $version->input_data = $inputData;
@@ -268,7 +274,16 @@ class MmcPplWorkbookImportService
                         'mmc_ppl_import_row_id' => $row->getKey(),
                         'financial_plan_id' => $plan->getKey(),
                     ]);
-                    $row->forceFill(['status' => 'imported', 'financial_plan_id' => $plan->getKey()])->save();
+                    $normalizedData = $row->normalized_data ?? [];
+                    $normalizedData['source_mapping'] = $sourceMapping;
+                    $sourceData = $row->source_data ?? [];
+                    $sourceData['source_mapping'] = $sourceMapping;
+                    $row->forceFill([
+                        'status' => 'imported',
+                        'financial_plan_id' => $plan->getKey(),
+                        'normalized_data' => $normalizedData,
+                        'source_data' => $sourceData,
+                    ])->save();
                     $importedCount++;
                 }
 
@@ -386,12 +401,40 @@ class MmcPplWorkbookImportService
                 }
             }
 
-            if ($project !== null && $bidding !== null && Schema::hasColumn('projects', 'project_information_id')
-                && $project->project_information_id !== null && (int) $project->project_information_id !== (int) $bidding->getKey()) {
-                throw ValidationException::withMessages(['project_information_id' => 'The selected bidding record does not belong to the selected MMC project.']);
+            if ($project !== null && $bidding !== null) {
+                $hasExplicitBiddingLink = Schema::hasColumn('projects', 'project_information_id')
+                    && (int) $project->project_information_id === (int) $bidding->getKey();
+                $hasVerifiedLegacyLink = is_numeric($bidding->project_id)
+                    && (string) $project->getKey() === trim((string) $bidding->project_id);
+                if (! $hasExplicitBiddingLink && ! $hasVerifiedLegacyLink) {
+                    throw ValidationException::withMessages(['project_information_id' => 'The selected bidding record does not belong to the selected MMC project.']);
+                }
             }
 
             $normalizedData = $lockedRow->normalized_data ?? [];
+            $planLinks = $normalizedData['plan'] ?? [];
+            $sourceMapping = $normalizedData['source_mapping'] ?? [];
+            $sourceMapping['status'] = $project !== null && $bidding !== null && $lot !== null
+                ? 'auto_matched'
+                : ($project !== null || $bidding !== null || $lot !== null ? 'needs_review' : 'unmatched');
+            $sourceMapping['origin'] = 'manual';
+            $sourceMapping['matched_identifiers'] = array_replace($sourceMapping['matched_identifiers'] ?? [], [
+                'selected_project_identifier' => $project?->project_code ?? $project?->ref_no,
+                'selected_bidding_identifier' => $bidding?->project_id_no ?? $bidding?->project_id ?? $bidding?->project_code,
+                'selected_lot_number' => $lot?->lot_no,
+            ]);
+            $sourceMapping['linked_record_ids'] = [
+                'project_id' => $project?->getKey(),
+                'bidding_id' => $bidding?->getKey(),
+                'lot_id' => $lot?->getKey(),
+                'ppl_form_id' => data_get($planLinks, 'ppl_form_id'),
+            ];
+            $sourceMapping['confirmed_by'] = $user->getAuthIdentifier();
+            $sourceMapping['confirmed_at'] = now()->toIso8601String();
+            $sourceMapping['warnings'] = $sourceMapping['status'] === 'unmatched'
+                ? ['No MMC project, bidding, or lot link was selected.']
+                : [];
+            $sourceMapping['warnings'][] = 'An authorized Finance user explicitly confirmed these source links.';
             $normalizedData['plan'] = array_replace($normalizedData['plan'] ?? [], [
                 'project_id' => $project?->getKey(),
                 'project_information_id' => $bidding?->getKey(),
@@ -405,13 +448,14 @@ class MmcPplWorkbookImportService
                 'selected_at' => now()->toIso8601String(),
             ];
             $normalizedData['manual_mapping'] = $manualMapping;
+            $normalizedData['source_mapping'] = $sourceMapping;
             $sourceData = $lockedRow->source_data ?? [];
             $sourceData['manual_mapping'] = $manualMapping;
+            $sourceData['source_mapping'] = $sourceMapping;
 
             $warnings = array_values(array_filter($lockedRow->warnings ?? [], fn (string $warning): bool => ! str_starts_with($warning, 'No exact project-code match exists.')
                 && ! str_starts_with($warning, 'No exact bidding identifier match exists.')
                 && ! str_starts_with($warning, 'No exact database lot match exists.')));
-            $warnings[] = 'An authorized user reviewed and saved the source-link selections shown above. Workbook financial inputs were not changed.';
 
             $lockedRow->forceFill([
                 'normalized_data' => $normalizedData,
@@ -419,6 +463,19 @@ class MmcPplWorkbookImportService
                 'warnings' => array_values(array_unique($warnings)),
                 'status' => ($lockedRow->errors ?? []) !== [] ? 'blocked' : 'warning',
             ])->save();
+
+            $rowStatuses = $lockedBatch->rows()->get(['status', 'normalized_data']);
+            $summary = $lockedBatch->summary ?? [];
+            $summary = array_replace($summary, [
+                'ready' => $rowStatuses->where('status', 'ready')->count(),
+                'warnings' => $rowStatuses->where('status', 'warning')->count(),
+                'blocked' => $rowStatuses->where('status', 'blocked')->count(),
+                'imported' => $rowStatuses->where('status', 'imported')->count(),
+                'auto_matched' => $rowStatuses->filter(fn (MmcPplImportRow $batchRow): bool => data_get($batchRow->normalized_data, 'source_mapping.status') === 'auto_matched')->count(),
+                'needs_review' => $rowStatuses->filter(fn (MmcPplImportRow $batchRow): bool => data_get($batchRow->normalized_data, 'source_mapping.status') === 'needs_review')->count(),
+                'unmatched' => $rowStatuses->filter(fn (MmcPplImportRow $batchRow): bool => data_get($batchRow->normalized_data, 'source_mapping.status') === 'unmatched')->count(),
+            ]);
+            $lockedBatch->forceFill(['summary' => $summary])->save();
 
             return $lockedRow->fresh();
         }, 3);
@@ -429,54 +486,351 @@ class MmcPplWorkbookImportService
      */
     private function loadReferences(int $companyId, array $formRows): array
     {
-        $projectCodes = collect($formRows)->pluck('project_code')->filter()->unique()->values();
-        $projectIdentifiers = collect($formRows)->pluck('project_identifier')->filter()->unique()->values();
-        $sourceKeys = collect($formRows)->map(fn (array $row): string => $this->sourceKey($row['project_code'], $row['lot_number']))->flip();
+        $pplColumns = ['id', 'project_code', 'lot_number', 'project_title', 'abc'];
+        if (Schema::hasColumn('ppl_forms', 'project_id_no')) {
+            $pplColumns[] = 'project_id_no';
+        }
+        $pplForms = PplForm::query()->get($pplColumns);
 
-        $pplForms = PplForm::query()->whereIn('project_code', $projectCodes)->get(['id', 'project_code', 'lot_number', 'project_title', 'abc'])
-            ->filter(fn (PplForm $form): bool => $sourceKeys->has($this->sourceKey((string) $form->project_code, (string) $form->lot_number)));
         $projects = collect();
-        if (Schema::hasTable('projects') && Schema::hasColumn('projects', 'project_code') && Schema::hasColumn('projects', 'project_id')) {
-            $projects = Project::query()->whereIn('project_code', $projectCodes)->get(['project_id', 'project_code'])
-                ->filter(fn (Project $project): bool => $projectCodes->containsStrict($project->project_code));
+        if (Schema::hasTable('projects') && Schema::hasColumn('projects', 'project_name') && Schema::hasColumn('projects', 'project_id')) {
+            $projectColumns = ['project_id', 'project_name'];
+            foreach (['project_code', 'ref_no', 'project_information_id'] as $column) {
+                if (Schema::hasColumn('projects', $column)) {
+                    $projectColumns[] = $column;
+                }
+            }
+            $projects = Project::query()->get($projectColumns);
         }
 
         $biddings = collect();
-        if (Schema::hasTable('project_information') && Schema::hasColumn('project_information', 'project_id_no')) {
-            $biddingColumns = ['id', 'project_id_no'];
-            foreach (['approved_budget_contract_abc', 'contract_amount', 'lot_no'] as $optionalColumn) {
-                if (Schema::hasColumn('project_information', $optionalColumn)) {
-                    $biddingColumns[] = $optionalColumn;
+        if (Schema::hasTable('project_information') && Schema::hasColumn('project_information', 'id') && Schema::hasColumn('project_information', 'project_name')) {
+            $biddingColumns = ['id', 'project_name'];
+            foreach (['project_id', 'project_code', 'project_id_no', 'reference_no', 'approved_budget_contract_abc', 'contract_amount', 'lot_no', 'status'] as $column) {
+                if (Schema::hasColumn('project_information', $column)) {
+                    $biddingColumns[] = $column;
                 }
             }
-            $biddings = ProjectInformation::query()->whereIn('project_id_no', $projectIdentifiers)->get($biddingColumns)
-                ->filter(fn (ProjectInformation $bidding): bool => $projectIdentifiers->containsStrict($bidding->project_id_no));
+            $biddings = ProjectInformation::query()->get(array_values(array_unique($biddingColumns)));
         }
 
         $lots = collect();
-        if (Schema::hasTable('lots') && Schema::hasColumn('lots', 'id') && Schema::hasColumn('lots', 'project_id')
-            && Schema::hasColumn('lots', 'lot_no') && $biddings->isNotEmpty()) {
-            $lots = ProjectLot::query()
-                ->whereIn('project_id', $biddings->pluck('id'))
-                ->get(['id', 'project_id', 'lot_no']);
+        if (Schema::hasTable('lots') && Schema::hasColumn('lots', 'id') && Schema::hasColumn('lots', 'project_id') && Schema::hasColumn('lots', 'lot_no')) {
+            $lots = ProjectLot::query()->get(['id', 'project_id', 'lot_no']);
         }
 
         $companyPlans = ProjectFinancialPlan::query()->forCompany($companyId)
             ->get(['id', 'ppl_form_id', 'project_information_id', 'lot_id']);
-        $fingerprints = collect($formRows)->map(fn (array $row): string => $this->sourceFingerprint($row['project_code'], $row['lot_number']))->unique();
+        $fingerprints = collect($formRows)->flatMap(fn (array $row): array => [
+            $this->sourceFingerprint($row['project_code'], $row['lot_number']),
+            $this->legacySourceFingerprint($row['project_code'], $row['lot_number']),
+        ])->unique();
         $existingMappings = MmcPplImportSourceMapping::query()
             ->where('company_id', $companyId)
             ->whereIn('source_fingerprint', $fingerprints)
+            ->with(['financialPlan.latestVersion'])
             ->get(['source_fingerprint', 'financial_plan_id']);
 
         return [
-            'ppl_forms' => $pplForms->groupBy(fn (PplForm $form): string => $this->sourceKey($form->project_code, $form->lot_number)),
-            'projects' => $projects->groupBy('project_code'),
-            'biddings' => $biddings->groupBy('project_id_no'),
-            'lots' => $lots->groupBy(fn (ProjectLot $lot): string => $lot->project_id.'|'.$lot->lot_no),
+            'ppl_forms' => $pplForms,
+            'projects' => $projects,
+            'biddings' => $biddings,
+            'lots' => $lots,
             'plans' => $companyPlans,
             'mappings' => $existingMappings->keyBy('source_fingerprint'),
         ];
+    }
+
+    /** @param array<string, mixed> $formRow
+     * @param  array<string, mixed>  $references
+     * @return array{project: ?Project, bidding: ?ProjectInformation, lot: ?ProjectLot, mapping: array<string, mixed>}
+     */
+    private function resolveSourceMapping(array $formRow, ?PplForm $pplForm, array $references, ?MmcPplImportSourceMapping $priorMapping): array
+    {
+        $identifiers = array_values(array_filter([
+            $formRow['project_identifier'] ?? null,
+            $pplForm?->project_id_no,
+        ], fn (mixed $identifier): bool => is_string($identifier) && trim($identifier) !== ''));
+        $projectCodes = array_values(array_filter([$formRow['project_code'] ?? null], fn (mixed $code): bool => is_string($code) && trim($code) !== ''));
+        $projectNames = array_values(array_filter([
+            $formRow['project_title'] ?? null,
+            $pplForm?->project_title,
+        ], fn (mixed $name): bool => is_string($name) && trim($name) !== ''));
+
+        $biddingCandidates = $this->identifierMatches($references['biddings'], ['project_id_no', 'reference_no', 'project_id'], $identifiers);
+        if ($biddingCandidates->isEmpty()) {
+            $biddingCandidates = $this->codeMatches($references['biddings'], ['project_code'], $projectCodes);
+        }
+        if ($biddingCandidates->isEmpty()) {
+            $biddingCandidates = $this->nameMatches($references['biddings'], $projectNames);
+        }
+
+        $projectCandidates = $this->identifierMatches($references['projects'], ['project_code', 'ref_no'], $identifiers);
+        if ($projectCandidates->isEmpty()) {
+            $projectCandidates = $this->codeMatches($references['projects'], ['project_code'], $projectCodes);
+        }
+        if ($projectCandidates->isEmpty()) {
+            $projectCandidates = $this->nameMatches($references['projects'], $projectNames);
+        }
+
+        if ($biddingCandidates->count() === 1) {
+            $relatedProjects = $this->projectsRelatedToBidding($biddingCandidates->first(), $references['projects']);
+            if ($relatedProjects->count() === 1) {
+                $projectCandidates = $relatedProjects;
+            }
+        }
+
+        if ($projectCandidates->count() === 1) {
+            $relatedBiddings = $this->biddingsRelatedToProject($projectCandidates->first(), $references['biddings']);
+            if ($relatedBiddings->count() === 1) {
+                $biddingCandidates = $relatedBiddings;
+            }
+        }
+
+        $sourcePlans = $pplForm === null
+            ? collect()
+            : $references['plans']->where('ppl_form_id', $pplForm->getKey())->values();
+        $matchedPlan = $sourcePlans->count() === 1 ? $sourcePlans->first() : null;
+        if ($matchedPlan !== null) {
+            $projectCandidates = $references['projects']->where('project_id', $matchedPlan->project_id)->values();
+            $biddingCandidates = $references['biddings']->where('id', $matchedPlan->project_information_id)->values();
+            $lotCandidates = $references['lots']->where('id', $matchedPlan->lot_id)->values();
+        }
+
+        $project = $projectCandidates->count() === 1 ? $projectCandidates->first() : null;
+        $bidding = $biddingCandidates->count() === 1 ? $biddingCandidates->first() : null;
+        $unverifiedProjectBiddingPair = $matchedPlan === null && $project !== null && $bidding !== null
+            && ! $this->projectsRelatedToBidding($bidding, $references['projects'])->contains(fn (Project $relatedProject): bool => (int) $relatedProject->getKey() === (int) $project->getKey());
+        if ($unverifiedProjectBiddingPair) {
+            $project = null;
+            $bidding = null;
+        }
+        if ($matchedPlan === null) {
+            $lotCandidates = $bidding === null || $unverifiedProjectBiddingPair
+                ? collect()
+                : $references['lots']->filter(fn (ProjectLot $lot): bool => (int) $lot->project_id === (int) $bidding->getKey()
+                    && $this->normalizeLot((string) $lot->lot_no) === $this->normalizeLot((string) $formRow['lot_number']))->values();
+        }
+        $lot = $lotCandidates->count() === 1 ? $lotCandidates->first() : null;
+
+        $matchedIdentifiers = [
+            'workbook_project_code' => $formRow['project_code'],
+            'workbook_project_identifier' => $formRow['project_identifier'],
+            'ppl_form_project_identifier' => $pplForm?->project_id_no,
+            'normalized_project_name' => $this->normalizeProjectName((string) ($formRow['project_title'] ?? '')),
+            'workbook_lot' => $formRow['lot_number'],
+        ];
+        $candidateSummary = [
+            'projects' => $projectCandidates->map(fn (Project $candidate): array => [
+                'id' => $candidate->getKey(),
+                'name' => $candidate->project_name,
+                'identifier' => $candidate->project_code ?? $candidate->ref_no ?? null,
+            ])->values()->all(),
+            'biddings' => $biddingCandidates->map(fn (ProjectInformation $candidate): array => [
+                'id' => $candidate->getKey(),
+                'name' => $candidate->project_name,
+                'identifier' => $candidate->project_id_no ?? $candidate->project_id ?? $candidate->project_code ?? null,
+            ])->values()->all(),
+            'lots' => $lotCandidates->map(fn (ProjectLot $candidate): array => [
+                'id' => $candidate->getKey(),
+                'number' => $candidate->lot_no,
+                'bidding_id' => $candidate->project_id,
+            ])->values()->all(),
+            'financial_plans' => $sourcePlans->map(fn (ProjectFinancialPlan $candidate): array => [
+                'id' => $candidate->getKey(),
+                'project_id' => $candidate->project_id,
+                'bidding_id' => $candidate->project_information_id,
+                'lot_id' => $candidate->lot_id,
+            ])->values()->all(),
+        ];
+
+        $warnings = [];
+        if ($projectCandidates->count() > 1) {
+            $warnings[] = 'Multiple MMC projects match this workbook source; select the correct project.';
+        } elseif ($project === null) {
+            $warnings[] = $unverifiedProjectBiddingPair
+                ? 'The matched project and bidding records are not linked by a verified relationship; select the correct source records.'
+                : 'No verified MMC Project List match was found.';
+        }
+        if ($biddingCandidates->count() > 1) {
+            $warnings[] = 'Multiple bidding records match this workbook source; select the correct bidding record.';
+        } elseif ($bidding === null) {
+            $warnings[] = 'No verified bidding record match was found.';
+        }
+        if ($bidding !== null && $lotCandidates->count() > 1) {
+            $warnings[] = 'Multiple lots on the matched bidding record have this lot number; select the correct lot.';
+        } elseif ($bidding !== null && $lot === null) {
+            $warnings[] = 'The matched bidding record has no corresponding lot master record. The workbook and PPL lot remain visible without a lot link.';
+        }
+
+        $mapping = [
+            'status' => $project !== null && $bidding !== null && $lot !== null && $warnings === [] ? 'auto_matched'
+                : ($projectCandidates->isNotEmpty() || $biddingCandidates->isNotEmpty() || $lotCandidates->isNotEmpty() ? 'needs_review' : 'unmatched'),
+            'origin' => 'automatic',
+            'matched_identifiers' => $matchedIdentifiers,
+            'linked_record_ids' => [
+                'project_id' => $project?->getKey(),
+                'bidding_id' => $bidding?->getKey(),
+                'lot_id' => $lot?->getKey(),
+                'ppl_form_id' => $pplForm?->getKey(),
+                'financial_plan_id' => $matchedPlan?->getKey(),
+            ],
+            'candidates' => $candidateSummary,
+            'warnings' => $warnings,
+            'matched_at' => now()->toIso8601String(),
+            'matched_by' => 'system',
+        ];
+
+        $priorPlan = $priorMapping?->financialPlan;
+        if ($priorPlan !== null && ! $references['plans']->contains(fn (ProjectFinancialPlan $plan): bool => (int) $plan->getKey() === (int) $priorPlan->getKey())) {
+            $priorPlan = null;
+        }
+        if ($priorPlan !== null) {
+            $project = $references['projects']->first(fn (Project $candidate): bool => (int) $candidate->getKey() === (int) $priorPlan->project_id);
+            $bidding = $references['biddings']->first(fn (ProjectInformation $candidate): bool => (int) $candidate->getKey() === (int) $priorPlan->project_information_id);
+            $lot = $references['lots']->first(fn (ProjectLot $candidate): bool => (int) $candidate->getKey() === (int) $priorPlan->lot_id);
+            $priorSourceMapping = data_get($priorPlan->latestVersion?->input_data, 'workbook_import.source_mapping', []);
+            $mapping['status'] = $project !== null && $bidding !== null && $lot !== null ? 'auto_matched' : 'needs_review';
+            $mapping['origin'] = data_get($priorSourceMapping, 'origin', 'previous_import');
+            $mapping['reused_from_plan_id'] = $priorPlan->getKey();
+            $mapping['confirmed_by'] = data_get($priorSourceMapping, 'confirmed_by') ?? data_get($priorSourceMapping, 'import_confirmed_by');
+            $mapping['confirmed_at'] = data_get($priorSourceMapping, 'confirmed_at') ?? data_get($priorSourceMapping, 'import_confirmed_at');
+            $mapping['linked_record_ids'] = [
+                'project_id' => $project?->getKey(),
+                'bidding_id' => $bidding?->getKey(),
+                'lot_id' => $lot?->getKey(),
+                'ppl_form_id' => $priorPlan->ppl_form_id,
+            ];
+            $mapping['warnings'][] = 'Reused verified source links from prior MMC financial plan #'.$priorPlan->getKey().'.';
+            if ($project === null && $priorPlan->project_id !== null) {
+                $mapping['warnings'][] = 'The previously linked project is no longer available; review the project selection.';
+            }
+            if ($bidding === null && $priorPlan->project_information_id !== null) {
+                $mapping['warnings'][] = 'The previously linked bidding record is no longer available; review the bidding selection.';
+            }
+            if ($lot === null && $priorPlan->lot_id !== null) {
+                $mapping['warnings'][] = 'The previously linked lot is no longer available; review the lot selection.';
+            }
+        }
+
+        return ['project' => $project, 'bidding' => $bidding, 'lot' => $lot, 'mapping' => $mapping];
+    }
+
+    /** @param Collection<int, Model> $records
+     * @param  list<string>  $fields
+     * @param  list<string>  $identifiers
+     * @return Collection<int, Model>
+     */
+    private function identifierMatches($records, array $fields, array $identifiers)
+    {
+        $normalizedIdentifiers = collect($identifiers)->map(fn (string $identifier): string => $this->normalizeIdentifier($identifier))->filter()->all();
+
+        return $records->filter(function (Model $record) use ($fields, $normalizedIdentifiers): bool {
+            foreach ($fields as $field) {
+                $value = $record->getAttribute($field);
+                if (is_string($value) && in_array($this->normalizeIdentifier($value), $normalizedIdentifiers, true)) {
+                    return true;
+                }
+            }
+
+            return false;
+        })->values();
+    }
+
+    /** @param Collection<int, Model> $records
+     * @param  list<string>  $fields
+     * @param  list<string>  $sourceCodes
+     * @return Collection<int, Model>
+     */
+    private function codeMatches($records, array $fields, array $sourceCodes)
+    {
+        $sourceTokens = collect($sourceCodes)->flatMap(fn (string $code): array => $this->projectCodeTokens($code))->unique()->values()->all();
+        if ($sourceTokens === []) {
+            return collect();
+        }
+
+        return $records->filter(function (Model $record) use ($fields, $sourceCodes, $sourceTokens): bool {
+            foreach ($fields as $field) {
+                $value = $record->getAttribute($field);
+                if (! is_string($value) || trim($value) === '') {
+                    continue;
+                }
+                if ($this->normalizeIdentifier($value) === $this->normalizeIdentifier($sourceCodes[0])) {
+                    return true;
+                }
+                $candidateTokens = $this->projectCodeTokens($value);
+                if (count($candidateTokens) >= 2 && array_intersect($candidateTokens, $sourceTokens) === $candidateTokens) {
+                    return true;
+                }
+            }
+
+            return false;
+        })->values();
+    }
+
+    /** @param Collection<int, Model> $records
+     * @param  list<string>  $sourceNames
+     * @return Collection<int, Model>
+     */
+    private function nameMatches($records, array $sourceNames)
+    {
+        $normalizedNames = collect($sourceNames)->map(fn (string $name): string => $this->normalizeProjectName($name))->filter()->unique()->all();
+
+        return $records->filter(fn (Model $record): bool => is_string($record->getAttribute('project_name'))
+            && in_array($this->normalizeProjectName($record->project_name), $normalizedNames, true))->values();
+    }
+
+    /** @param Collection<int, Project> $projects
+     * @return Collection<int, Project>
+     */
+    private function projectsRelatedToBidding(ProjectInformation $bidding, $projects)
+    {
+        return $projects->filter(function (Project $project) use ($bidding): bool {
+            $hasExplicitBiddingLink = Schema::hasColumn('projects', 'project_information_id')
+                && (int) $project->project_information_id === (int) $bidding->getKey();
+            $hasVerifiedLegacyLink = is_numeric($bidding->project_id)
+                && (string) $project->getKey() === trim((string) $bidding->project_id);
+
+            return $hasExplicitBiddingLink || $hasVerifiedLegacyLink;
+        })->values();
+    }
+
+    /** @param Collection<int, ProjectInformation> $biddings
+     * @return Collection<int, ProjectInformation>
+     */
+    private function biddingsRelatedToProject(Project $project, $biddings)
+    {
+        return $biddings->filter(function (ProjectInformation $bidding) use ($project): bool {
+            $hasExplicitBiddingLink = Schema::hasColumn('projects', 'project_information_id')
+                && (int) $project->project_information_id === (int) $bidding->getKey();
+            $hasVerifiedLegacyLink = is_numeric($bidding->project_id)
+                && (string) $project->getKey() === trim((string) $bidding->project_id);
+
+            return $hasExplicitBiddingLink || $hasVerifiedLegacyLink;
+        })->values();
+    }
+
+    /** @return list<string> */
+    private function projectCodeTokens(string $code): array
+    {
+        preg_match_all('/[\pL]+|[0-9]+/u', mb_strtolower($code), $matches);
+
+        return array_values(array_unique(array_filter($matches[0] ?? [], fn (string $token): bool => ! preg_match('/^20[0-9]{2}$/', $token))));
+    }
+
+    private function normalizeIdentifier(string $identifier): string
+    {
+        return preg_replace('/[^\pL0-9]/u', '', mb_strtolower(trim($identifier))) ?? '';
+    }
+
+    private function normalizeProjectName(string $name): string
+    {
+        return $this->normalizeIdentifier($name);
+    }
+
+    private function normalizeLot(string $lot): string
+    {
+        return preg_replace('/^lot/i', '', $this->normalizeIdentifier($lot)) ?? '';
     }
 
     /** @param array<string, mixed> $workbookData
@@ -491,6 +845,7 @@ class MmcPplWorkbookImportService
         $fingerprint = $this->sourceFingerprint($projectCode, $lotNumber);
         $errors = [];
         $warnings = [];
+        $mappingWarnings = [];
         $sourceCells = $formRow['source_cells'];
         $factoryItems = $workbookData['factory_costs'][$key] ?? [];
         $pplSource = $workbookData['ppl_rows'][$key] ?? null;
@@ -505,37 +860,28 @@ class MmcPplWorkbookImportService
             $errors[] = 'More than one PPL summary row uses this project-code and lot key. Resolve the duplicate source rows before import.';
         }
 
-        $pplMatches = $references['ppl_forms'][$key] ?? collect();
+        $pplMatches = $references['ppl_forms']->filter(fn (PplForm $form): bool => $this->sameSourceIdentity($form->project_code, $form->lot_number, $projectCode, $lotNumber))->values();
         $pplForm = $pplMatches->count() === 1 ? $pplMatches->first() : null;
         if ($pplMatches->count() > 1) {
-            $errors[] = 'More than one existing PPL Form matches this project code and lot.';
+            $mappingWarnings[] = 'More than one existing PPL Form matches this project code and lot.';
         } elseif ($pplForm === null) {
-            $warnings[] = 'No existing PPL Form matches exactly. The import will retain workbook provenance without creating or changing a PPL Form.';
-        }
-
-        $projectMatches = $references['projects'][$projectCode] ?? collect();
-        $project = $projectMatches->count() === 1 ? $projectMatches->first() : null;
-        if ($projectMatches->count() > 1) {
-            $errors[] = 'More than one MMC project matches this project code.';
-        } elseif ($project === null) {
-            $warnings[] = 'No exact project-code match exists. The plan will remain linked only to verified bidding or PPL records.';
+            $mappingWarnings[] = 'No existing PPL Form matches exactly. The import will retain workbook provenance without creating or changing a PPL Form.';
         }
 
         $identifier = $formRow['project_identifier'];
-        $biddingMatches = $identifier === null ? collect() : ($references['biddings'][$identifier] ?? collect());
-        $bidding = $biddingMatches->count() === 1 ? $biddingMatches->first() : null;
-        if ($biddingMatches->count() > 1) {
-            $errors[] = 'The workbook project identifier matches more than one bidding record.';
-        } elseif ($identifier !== null && $bidding === null) {
-            $warnings[] = 'No exact bidding identifier match exists. No bidding record will be linked.';
-        }
-
-        $lotMatches = $bidding === null ? collect() : ($references['lots'][$bidding->id.'|'.$lotNumber] ?? collect());
-        $lot = $lotMatches->count() === 1 ? $lotMatches->first() : null;
-        if ($lotMatches->count() > 1) {
-            $errors[] = 'More than one database lot matches this bidding record and lot number.';
-        } elseif ($bidding !== null && $lot === null) {
-            $warnings[] = 'No exact database lot match exists. The bidding project may be linked, but no lot is linked.';
+        $priorMapping = $references['mappings'][$fingerprint]
+            ?? $references['mappings'][$this->legacySourceFingerprint($projectCode, $lotNumber)]
+            ?? null;
+        $resolvedMapping = $this->resolveSourceMapping($formRow, $pplForm, $references, $priorMapping);
+        $project = $resolvedMapping['project'];
+        $bidding = $resolvedMapping['bidding'];
+        $lot = $resolvedMapping['lot'];
+        $sourceMapping = $resolvedMapping['mapping'];
+        $mappingWarnings = [...$mappingWarnings, ...$sourceMapping['warnings']];
+        if ($pplMatches->count() > 1) {
+            $sourceMapping['linked_record_ids']['ppl_form_id'] = null;
+        } else {
+            $sourceMapping['linked_record_ids']['ppl_form_id'] = $pplForm?->getKey();
         }
 
         $formAbc = $formRow['values']['abc'];
@@ -664,24 +1010,29 @@ class MmcPplWorkbookImportService
         $sourceCells['factory_cost_items'] = array_column($factoryItems, 'source_cells');
         $sourceCells['municipal_assumptions'] = $workbookData['assumptions'];
         $warnings = array_values(array_unique($warnings));
+        $mappingWarnings = array_values(array_unique($mappingWarnings));
+        $sourceMapping['warnings'] = array_values(array_unique([...($sourceMapping['warnings'] ?? []), ...$mappingWarnings]));
         $errors = array_values(array_unique($errors));
-        $status = $errors !== [] ? 'blocked' : ($warnings !== [] ? 'warning' : 'ready');
+        $status = $errors !== [] ? 'blocked' : ($warnings !== [] || $sourceMapping['status'] !== 'auto_matched' ? 'warning' : 'ready');
         $planName = Str::limit(($formRow['project_title'] ?: $projectCode).' - Lot '.$lotNumber, 255, '');
 
-        $duplicatePlan = $pplForm !== null && $references['plans']->contains(fn (ProjectFinancialPlan $plan): bool => (int) $plan->ppl_form_id === (int) $pplForm->id);
+        $previousPlan = $priorMapping?->financialPlan;
+        $duplicatePlan = $pplForm !== null && $references['plans']->contains(fn (ProjectFinancialPlan $plan): bool => (int) $plan->ppl_form_id === (int) $pplForm->id
+            && (int) $plan->getKey() !== (int) $previousPlan?->getKey());
         if ($duplicatePlan) {
             $errors[] = 'A financial plan is already linked to this PPL Form. Existing plans are not overwritten.';
             $status = 'blocked';
         }
-        if (isset($references['mappings'][$fingerprint])) {
-            $warnings[] = 'This project-code and lot source was imported in an earlier batch and will be skipped to prevent a duplicate plan.';
+        if ($previousPlan !== null) {
+            $sourceMapping['warnings'][] = 'This project-code and lot source was imported earlier. The existing mapping will be reused and the row skipped.';
             $status = $status === 'ready' ? 'warning' : $status;
         }
 
         $projectInformationId = $bidding?->getKey();
         $lotId = $lot?->getKey();
         if ($projectInformationId !== null && $lotId !== null
-            && $references['plans']->contains(fn (ProjectFinancialPlan $plan): bool => (int) $plan->project_information_id === (int) $projectInformationId && (int) $plan->lot_id === (int) $lotId)) {
+            && $references['plans']->contains(fn (ProjectFinancialPlan $plan): bool => (int) $plan->project_information_id === (int) $projectInformationId
+                && (int) $plan->lot_id === (int) $lotId && (int) $plan->getKey() !== (int) $previousPlan?->getKey())) {
             $errors[] = 'A financial plan already exists for this bidding record and lot. Existing plans are not overwritten.';
             $status = 'blocked';
         }
@@ -700,6 +1051,7 @@ class MmcPplWorkbookImportService
             ],
             'factory_cost_items' => $factoryItems,
             'reconciliation' => $reconciliation,
+            'source_mapping' => $sourceMapping,
             'project_title' => $formRow['project_title'],
             'project_identifier' => $identifier,
             'revenue_year' => $formRow['values']['revenue_year'] ?? null,
@@ -718,6 +1070,7 @@ class MmcPplWorkbookImportService
                 'lot_number' => $lotNumber,
                 'project_title' => $formRow['project_title'],
                 'project_identifier' => $identifier,
+                'source_mapping' => $sourceMapping,
             ],
             'normalized_data' => $normalizedData,
             'errors' => $errors,
@@ -1020,7 +1373,18 @@ class MmcPplWorkbookImportService
 
     private function sourceFingerprint(string $projectCode, string $lotNumber): string
     {
+        return hash('sha256', $this->normalizeIdentifier($projectCode)."\x1f".$this->normalizeLot($lotNumber));
+    }
+
+    private function legacySourceFingerprint(string $projectCode, string $lotNumber): string
+    {
         return hash('sha256', mb_strtolower(trim($projectCode))."\x1f".trim($lotNumber));
+    }
+
+    private function sameSourceIdentity(string $firstProjectCode, string $firstLot, string $secondProjectCode, string $secondLot): bool
+    {
+        return $this->normalizeIdentifier($firstProjectCode) === $this->normalizeIdentifier($secondProjectCode)
+            && $this->normalizeLot($firstLot) === $this->normalizeLot($secondLot);
     }
 
     /** @param list<mixed> $values */
@@ -1058,6 +1422,7 @@ class MmcPplWorkbookImportService
     private function summarize(array $rows, array $sheetNames): array
     {
         $counts = collect($rows)->countBy('status');
+        $mappingCounts = collect($rows)->countBy(fn (array $row): string => data_get($row, 'normalized_data.source_mapping.status', 'unmatched'));
 
         return [
             'worksheet_count' => count($sheetNames),
@@ -1066,6 +1431,9 @@ class MmcPplWorkbookImportService
             'ready' => $counts->get('ready', 0),
             'warnings' => $counts->get('warning', 0),
             'blocked' => $counts->get('blocked', 0),
+            'auto_matched' => $mappingCounts->get('auto_matched', 0),
+            'needs_review' => $mappingCounts->get('needs_review', 0),
+            'unmatched' => $mappingCounts->get('unmatched', 0),
         ];
     }
 }

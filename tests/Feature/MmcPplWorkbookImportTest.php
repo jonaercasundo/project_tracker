@@ -189,7 +189,9 @@ it('previews and confirms a workbook into a new versioned plan without changing 
             ->and($plan->revenue_year)->toBe(2026)
             ->and($plan->versions)->toHaveCount(1)
             ->and($plan->latestVersion->calculation_results['costs']['tax_lawyer_allowance'])->toBe('20.00')
-            ->and($plan->latestVersion->input_data['workbook_import']['source_sheet'])->toBe('1. FORM');
+            ->and($plan->latestVersion->input_data['workbook_import']['source_sheet'])->toBe('1. FORM')
+            ->and($plan->latestVersion->input_data['workbook_import']['source_mapping']['import_confirmed_by'])->toBe($user->getAuthIdentifier())
+            ->and($batch->rows()->firstOrFail()->normalized_data['source_mapping']['import_confirmed_by'])->toBe($user->getAuthIdentifier());
         $this->assertDatabaseHas('project_financial_plan_cost_items', [
             'project_financial_plan_version_id' => $plan->latestVersion->id,
             'category' => 'factory_cost_detail',
@@ -245,7 +247,7 @@ it('allows authorized users to explicitly map an unmatched workbook row to verif
     $user = $this->signInBiddingUser('finance', 'MMC');
     $pplForm = PplForm::query()->create(['project_code' => 'UNMATCHED-CODE', 'lot_number' => '2', 'project_title' => 'Existing PPL source', 'abc' => 200]);
     $project = Project::query()->create(['ref_no' => 'REF-MAP-1', 'project_name' => 'Verified project choice', 'project_code' => 'OTHER-CODE', 'agency' => 'MMC', 'contract_amount' => 100, 'status' => 'Ongoing', 'ABC' => 200]);
-    $bidding = ProjectInformation::query()->create(['project_id' => 'BID-OTHER', 'project_name' => 'Verified bidding choice', 'procuring_entity' => 'MMC', 'approved_budget_contract_abc' => 200, 'status' => 'Draft']);
+    $bidding = ProjectInformation::query()->create(['project_id' => (string) $project->project_id, 'project_name' => 'Verified bidding choice', 'procuring_entity' => 'MMC', 'approved_budget_contract_abc' => 200, 'status' => 'Draft']);
     $bidding->forceFill(['project_id_no' => 'OTHER-IDENTIFIER'])->save();
     $lot = ProjectLot::query()->create(['project_id' => $bidding->id, 'lot_no' => '2']);
     $path = mmcPplImportWorkbook(['A3' => 'UNMATCHED-CODE', 'B3' => '2', 'C3' => 'Workbook project title', 'D3' => 'NO-IDENTIFIER']);
@@ -273,6 +275,8 @@ it('allows authorized users to explicitly map an unmatched workbook row to verif
             ->and($row->normalized_data['plan']['lot_id'])->toBe($lot->id)
             ->and($row->normalized_data['plan']['ppl_form_id'])->toBe($pplForm->id)
             ->and($row->normalized_data['plan']['inputs']['abc'])->toBe('200')
+            ->and($row->normalized_data['source_mapping']['origin'])->toBe('manual')
+            ->and($row->normalized_data['source_mapping']['confirmed_by'])->toBe($user->getAuthIdentifier())
             ->and($row->normalized_data['manual_mapping']['selected_by'])->toBe($user->getAuthIdentifier());
 
         $this->post(route('finance.ppl-import.confirm', $batch), ['acknowledge_warnings' => '1'])->assertRedirect();
@@ -284,6 +288,147 @@ it('allows authorized users to explicitly map an unmatched workbook row to verif
             ->and($plan->latestVersion->input_data['workbook_import']['manual_mapping']['selected_by'])->toBe($user->getAuthIdentifier());
     } finally {
         @unlink($path);
+    }
+});
+
+it('auto-matches exact project identifiers and the lot belonging to the linked bidding record', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $project = Project::query()->create(['ref_no' => 'SME-2025-2-9-11', 'project_name' => 'SME 2025 2, 9, 11', 'project_code' => 'SME 2025 2, 9, 11', 'agency' => 'MMC', 'contract_amount' => 100, 'status' => 'Draft', 'ABC' => 200]);
+    $bidding = ProjectInformation::query()->create(['project_id' => (string) $project->project_id, 'project_name' => 'SME 2025 2, 9, 11', 'procuring_entity' => 'MMC', 'approved_budget_contract_abc' => 200, 'status' => 'Draft']);
+    $bidding->forceFill(['project_id_no' => 'BID-SME-2025-002'])->save();
+    $lot = ProjectLot::query()->create(['project_id' => $bidding->id, 'lot_no' => 'Lot 2']);
+    $pplForm = PplForm::query()->create(['project_code' => 'SME 2025 2, 9, 11', 'lot_number' => '2', 'project_title' => 'SME 2025 2, 9, 11', 'project_id_no' => 'BID-SME-2025-002', 'abc' => 200]);
+    $path = mmcPplImportWorkbook(['A3' => 'SME 2025 2, 9, 11', 'B3' => 'Lot 2', 'C3' => 'SME 2025 2, 9, 11', 'D3' => 'BID-SME-2025-002']);
+
+    try {
+        $this->post(route('finance.ppl-import.store'), ['file' => mmcPplImportUpload($path)])->assertRedirect();
+        $row = MmcPplImportBatch::query()->firstOrFail()->rows()->firstOrFail();
+
+        expect($row->normalized_data['source_mapping']['status'])->toBe('auto_matched')
+            ->and($row->normalized_data['source_mapping']['origin'])->toBe('automatic')
+            ->and($row->normalized_data['source_mapping']['linked_record_ids'])->toBe([
+                'project_id' => $project->project_id,
+                'bidding_id' => $bidding->id,
+                'lot_id' => $lot->id,
+                'ppl_form_id' => $pplForm->id,
+                'financial_plan_id' => null,
+            ])
+            ->and($row->normalized_data['plan']['project_id'])->toBe($project->project_id)
+            ->and($row->normalized_data['plan']['project_information_id'])->toBe($bidding->id)
+            ->and($row->normalized_data['plan']['lot_id'])->toBe($lot->id)
+            ->and($row->normalized_data['plan']['ppl_form_id'])->toBe($pplForm->id);
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('normalizes project-name punctuation and capitalization while retaining a verified project relationship', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $project = Project::query()->create(['ref_no' => 'NORMALIZED-REF', 'project_name' => '(SME 2)  Mass-Production: FY2025', 'project_code' => 'UNRELATED-CODE', 'agency' => 'MMC', 'contract_amount' => 100, 'status' => 'Draft', 'ABC' => 200]);
+    $bidding = ProjectInformation::query()->create(['project_id' => (string) $project->project_id, 'project_name' => 'sme 2 mass production fy2025', 'procuring_entity' => 'MMC', 'approved_budget_contract_abc' => 200, 'status' => 'Draft']);
+    $lot = ProjectLot::query()->create(['project_id' => $bidding->id, 'lot_no' => '2']);
+    $path = mmcPplImportWorkbook(['A3' => 'OTHER-CODE', 'B3' => 'Lot #2', 'C3' => 'SME 2 Mass Production FY2025', 'D3' => 'NO-BID-ID']);
+
+    try {
+        $this->post(route('finance.ppl-import.store'), ['file' => mmcPplImportUpload($path)])->assertRedirect();
+        $row = MmcPplImportBatch::query()->firstOrFail()->rows()->firstOrFail();
+
+        expect($row->normalized_data['source_mapping']['status'])->toBe('auto_matched')
+            ->and($row->normalized_data['source_mapping']['linked_record_ids']['project_id'])->toBe($project->project_id)
+            ->and($row->normalized_data['source_mapping']['linked_record_ids']['bidding_id'])->toBe($bidding->id)
+            ->and($row->normalized_data['source_mapping']['linked_record_ids']['lot_id'])->toBe($lot->id);
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('marks ambiguous project and bidding matches for review without preselecting a candidate', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    foreach ([1, 2] as $index) {
+        $project = Project::query()->create(['ref_no' => 'AMBIGUOUS-'.$index, 'project_name' => 'Ambiguous SME Project', 'project_code' => 'AMBIGUOUS-CODE', 'agency' => 'MMC', 'contract_amount' => 100, 'status' => 'Draft', 'ABC' => 200]);
+        ProjectInformation::query()->create(['project_id' => (string) $project->project_id, 'project_name' => 'Ambiguous SME Project', 'project_code' => 'AMBIGUOUS-CODE', 'procuring_entity' => 'MMC', 'approved_budget_contract_abc' => 200, 'status' => 'Draft']);
+    }
+    $path = mmcPplImportWorkbook(['A3' => 'AMBIGUOUS-CODE', 'B3' => '2', 'C3' => 'Ambiguous SME Project', 'D3' => 'NO-IDENTIFIER']);
+
+    try {
+        $this->post(route('finance.ppl-import.store'), ['file' => mmcPplImportUpload($path)])->assertRedirect();
+        $row = MmcPplImportBatch::query()->firstOrFail()->rows()->firstOrFail();
+        $this->get(route('finance.ppl-import.show', $row->batch))->assertSee('Review matching candidates');
+
+        expect($row->normalized_data['source_mapping']['status'])->toBe('needs_review')
+            ->and($row->normalized_data['source_mapping']['linked_record_ids']['project_id'])->toBeNull()
+            ->and($row->normalized_data['source_mapping']['linked_record_ids']['bidding_id'])->toBeNull()
+            ->and($row->normalized_data['source_mapping']['candidates']['projects'])->toHaveCount(2)
+            ->and($row->normalized_data['source_mapping']['candidates']['biddings'])->toHaveCount(2);
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('does not auto-select or allow manual links between unrelated project and bidding records', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $project = Project::query()->create(['ref_no' => 'UNRELATED-PAIR-PROJECT', 'project_name' => 'Unrelated pair project', 'project_code' => 'PAIR-CODE', 'agency' => 'MMC', 'contract_amount' => 100, 'status' => 'Draft', 'ABC' => 200]);
+    $bidding = ProjectInformation::query()->create(['project_id' => 'NOT-'.$project->project_id, 'project_name' => 'Unrelated pair project', 'project_code' => 'PAIR-CODE', 'procuring_entity' => 'MMC', 'approved_budget_contract_abc' => 200, 'status' => 'Draft']);
+    $lot = ProjectLot::query()->create(['project_id' => $bidding->id, 'lot_no' => '2']);
+    $path = mmcPplImportWorkbook(['A3' => 'PAIR-CODE', 'B3' => '2', 'C3' => 'Unrelated pair project', 'D3' => 'NO-BID-ID']);
+
+    try {
+        $this->post(route('finance.ppl-import.store'), ['file' => mmcPplImportUpload($path)])->assertRedirect();
+        $batch = MmcPplImportBatch::query()->firstOrFail();
+        $row = $batch->rows()->firstOrFail();
+
+        expect($row->normalized_data['source_mapping']['status'])->toBe('needs_review')
+            ->and($row->normalized_data['source_mapping']['linked_record_ids']['project_id'])->toBeNull()
+            ->and($row->normalized_data['source_mapping']['linked_record_ids']['bidding_id'])->toBeNull()
+            ->and($row->normalized_data['source_mapping']['candidates']['projects'])->toHaveCount(1)
+            ->and($row->normalized_data['source_mapping']['candidates']['biddings'])->toHaveCount(1);
+
+        $this->patch(route('finance.ppl-import.rows.mapping', [$batch, $row]), [
+            'project_id' => $project->project_id,
+            'project_information_id' => $bidding->id,
+            'lot_id' => $lot->id,
+        ])->assertSessionHasErrors('project_information_id');
+
+        expect($row->fresh()->normalized_data['plan']['project_id'])->toBeNull()
+            ->and($row->fresh()->normalized_data['plan']['project_information_id'])->toBeNull()
+            ->and($row->fresh()->normalized_data['plan']['lot_id'])->toBeNull();
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('reuses a previously confirmed MMC mapping for a later upload of the same source identity', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $project = Project::query()->create(['ref_no' => 'REPEAT-REF', 'project_name' => 'Repeat project', 'project_code' => 'REPEAT-CODE', 'agency' => 'MMC', 'contract_amount' => 100, 'status' => 'Draft', 'ABC' => 200]);
+    $bidding = ProjectInformation::query()->create(['project_id' => (string) $project->project_id, 'project_name' => 'Repeat project', 'project_code' => 'REPEAT-CODE', 'procuring_entity' => 'MMC', 'approved_budget_contract_abc' => 200, 'status' => 'Draft']);
+    $lot = ProjectLot::query()->create(['project_id' => $bidding->id, 'lot_no' => '2']);
+    $pplForm = PplForm::query()->create(['project_code' => 'REPEAT-CODE', 'lot_number' => '2', 'project_title' => 'Repeat project', 'abc' => 200]);
+    $firstPath = mmcPplImportWorkbook(['A3' => 'REPEAT-CODE', 'B3' => '2', 'C3' => 'Repeat project', 'D3' => 'NO-BID-ID']);
+    $secondPath = mmcPplImportWorkbook(['A3' => 'REPEAT-CODE', 'B3' => '2', 'C3' => 'Repeat project', 'D3' => 'NO-BID-ID'], 113);
+
+    try {
+        $this->post(route('finance.ppl-import.store'), ['file' => mmcPplImportUpload($firstPath)])->assertRedirect();
+        $firstBatch = MmcPplImportBatch::query()->firstOrFail();
+        $firstRow = $firstBatch->rows()->firstOrFail();
+        $this->patch(route('finance.ppl-import.rows.mapping', [$firstBatch, $firstRow]), [
+            'project_id' => $project->project_id,
+            'project_information_id' => $bidding->id,
+            'lot_id' => $lot->id,
+        ])->assertRedirect();
+        $this->post(route('finance.ppl-import.confirm', $firstBatch), ['acknowledge_warnings' => '1'])->assertRedirect();
+
+        $this->post(route('finance.ppl-import.store'), ['file' => mmcPplImportUpload($secondPath)])->assertRedirect();
+        $secondRow = MmcPplImportBatch::query()->whereKeyNot($firstBatch->id)->firstOrFail()->rows()->firstOrFail();
+
+        expect($secondRow->normalized_data['source_mapping']['origin'])->toBe('manual')
+            ->and($secondRow->normalized_data['source_mapping']['reused_from_plan_id'])->not->toBeNull()
+            ->and($secondRow->normalized_data['plan']['project_id'])->toBe($project->project_id)
+            ->and($secondRow->normalized_data['plan']['project_information_id'])->toBe($bidding->id)
+            ->and($secondRow->normalized_data['plan']['lot_id'])->toBe($lot->id)
+            ->and($secondRow->normalized_data['plan']['ppl_form_id'])->toBe($pplForm->id);
+    } finally {
+        @unlink($firstPath);
+        @unlink($secondPath);
     }
 });
 

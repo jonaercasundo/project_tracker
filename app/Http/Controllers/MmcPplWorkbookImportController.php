@@ -8,6 +8,7 @@ use App\Models\MmcPplImportRow;
 use App\Models\Project;
 use App\Models\ProjectInformation;
 use App\Models\ProjectLot;
+use App\Models\User;
 use App\Services\MmcPplWorkbookImportService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -50,7 +51,7 @@ class MmcPplWorkbookImportController extends Controller
         $projects = collect();
         if (Schema::hasTable('projects') && Schema::hasColumn('projects', 'project_id') && Schema::hasColumn('projects', 'project_name')) {
             $columns = ['project_id', 'project_name'];
-            foreach (['project_code', 'project_information_id'] as $column) {
+            foreach (['project_code', 'ref_no', 'project_information_id'] as $column) {
                 if (Schema::hasColumn('projects', $column)) {
                     $columns[] = $column;
                 }
@@ -61,7 +62,7 @@ class MmcPplWorkbookImportController extends Controller
         $biddings = collect();
         if (Schema::hasTable('project_information') && Schema::hasColumn('project_information', 'id') && Schema::hasColumn('project_information', 'project_name')) {
             $columns = ['id', 'project_name'];
-            foreach (['project_id_no', 'lot_no'] as $column) {
+            foreach (['project_id', 'project_code', 'project_id_no', 'reference_no', 'lot_no'] as $column) {
                 if (Schema::hasColumn('project_information', $column)) {
                     $columns[] = $column;
                 }
@@ -73,11 +74,21 @@ class MmcPplWorkbookImportController extends Controller
             ? ProjectLot::query()->with('project:id,project_name')->orderBy('lot_no')->get(['id', 'project_id', 'lot_no'])
             : collect();
 
+        $mappingUserIds = $batch->rows->flatMap(function (MmcPplImportRow $row): array {
+            return array_filter([
+                data_get($row->normalized_data, 'source_mapping.confirmed_by'),
+                data_get($row->normalized_data, 'source_mapping.import_confirmed_by'),
+                data_get($row->normalized_data, 'manual_mapping.selected_by'),
+            ], fn (mixed $userId): bool => is_numeric($userId));
+        })->unique()->values();
+        $mappingUsers = User::query()->whereIn('user_id', $mappingUserIds)->get(['user_id', 'name'])->keyBy('user_id');
+
         return view('finance.ppl-import.show', [
             'batch' => $batch->load(['rows' => fn ($query) => $query->orderBy('source_row')]),
             'mappingProjects' => $projects,
             'mappingBiddings' => $biddings,
             'mappingLots' => $lots,
+            'mappingUsers' => $mappingUsers,
         ]);
     }
 

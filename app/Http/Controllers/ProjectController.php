@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Services\ProjectAwardSynchronizationService;
+use App\Services\ProjectBiddingEvidenceService;
 use App\Services\ProjectDetailsService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\QueryException;
@@ -19,7 +20,14 @@ class ProjectController extends Controller
 {
     public function index(): View
     {
-        $projects = Project::with('bidding')->orderBy('project_id')->paginate(10);
+        $projectsQuery = Project::query()->orderBy('project_id');
+        if (Schema::hasTable('project_information')) {
+            $projectsQuery->with('bidding');
+        }
+        $projects = $projectsQuery->paginate(10);
+        if (! Schema::hasTable('project_information')) {
+            $projects->getCollection()->each(fn (Project $project) => $project->setRelation('bidding', null));
+        }
 
         $yearExpression = DB::connection()->getDriverName() === 'sqlite'
             ? "strftime('%Y', created_at)"
@@ -207,9 +215,14 @@ class ProjectController extends Controller
         );
     }
 
-    public function show(Project $project, ProjectDetailsService $details): View
+    public function show(Project $project, ProjectDetailsService $details, ProjectBiddingEvidenceService $biddingEvidenceService): View
     {
-        $project->load('bidding.awardEvents');
+        if (Schema::hasTable('project_information')) {
+            $project->load('bidding');
+            if ($project->bidding && Schema::hasTable('project_award_events')) {
+                $project->bidding->load('awardEvents');
+            }
+        }
         /*
         |--------------------------------------------------------------------------
         | AR SETTINGS
@@ -353,6 +366,7 @@ class ProjectController extends Controller
         */
 
         $summary = $details->summary($project);
+        $biddingEvidence = $biddingEvidenceService->forProject($project, auth()->user()?->currentCompany());
         $structureIsSmall = $summary['lotCount'] <= 100 && $summary['keystageCount'] <= 100;
         $lots = $structureIsSmall ? $details->lotRecords($project)->limit(100)->get() : collect();
         $keystages = $structureIsSmall ? $details->keystageRecords($project)->limit(100)->get() : collect();
@@ -371,6 +385,7 @@ class ProjectController extends Controller
             'keystages' => $keystages,
             'arSettings' => $arSettings,
             'logoFiles' => $logoFiles,
+            'biddingEvidence' => $biddingEvidence,
         ] + $summary);
     }
 

@@ -117,6 +117,164 @@ function projectDetailsFixtures(): void
     ]);
 }
 
+function projectBiddingEvidenceFixtures(bool $withEvidence = true): void
+{
+    Schema::create('project_information', function (Blueprint $table): void {
+        $table->id();
+        $table->string('project_id')->nullable();
+        $table->string('project_code')->nullable();
+        $table->text('project_name')->nullable();
+        $table->string('status')->nullable();
+        $table->date('notice_of_award_date')->nullable();
+    });
+    $projectInformationId = DB::table('project_information')->insertGetId([
+        'project_id' => '1',
+        'project_code' => 'SME-2025',
+        'project_name' => 'Science procurement',
+        'status' => 'Awarded',
+        'notice_of_award_date' => '2026-09-01',
+    ]);
+    Schema::create('lots', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('project_id');
+        $table->string('lot_no')->nullable();
+        $table->timestamps();
+    });
+    $lotTwoId = DB::table('lots')->insertGetId(['project_id' => $projectInformationId, 'lot_no' => 'Lot 2']);
+    $lotThreeId = DB::table('lots')->insertGetId(['project_id' => $projectInformationId, 'lot_no' => 'Lot 3']);
+    Schema::create('bidding_documents', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('project_information_id');
+        $table->unsignedBigInteger('folder_id')->nullable();
+        $table->string('display_name');
+        $table->string('original_name');
+        $table->string('stored_name');
+        $table->string('storage_disk');
+        $table->string('storage_path');
+        $table->string('mime_type');
+        $table->string('extension');
+        $table->unsignedBigInteger('file_size');
+        $table->text('description')->nullable();
+        $table->integer('uploaded_by')->nullable();
+        $table->unsignedInteger('version')->default(1);
+        $table->timestamp('uploaded_at')->nullable();
+        $table->timestamps();
+    });
+    $noaDocumentId = DB::table('bidding_documents')->insertGetId([
+        'project_information_id' => $projectInformationId,
+        'display_name' => 'Signed NOA',
+        'original_name' => 'noa.pdf',
+        'stored_name' => 'private-noa.pdf',
+        'storage_disk' => 'local',
+        'storage_path' => 'private/noa.pdf',
+        'mime_type' => 'application/pdf',
+        'extension' => 'pdf',
+        'file_size' => 100,
+        'version' => 1,
+        'uploaded_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $ntpDocumentId = DB::table('bidding_documents')->insertGetId([
+        'project_information_id' => $projectInformationId,
+        'display_name' => 'Signed NTP',
+        'original_name' => 'ntp.pdf',
+        'stored_name' => 'private-ntp.pdf',
+        'storage_disk' => 'local',
+        'storage_path' => 'private/ntp.pdf',
+        'mime_type' => 'application/pdf',
+        'extension' => 'pdf',
+        'file_size' => 100,
+        'version' => 1,
+        'uploaded_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('bidding_documents')->insert([
+        'project_information_id' => $projectInformationId,
+        'display_name' => 'Contract attachment',
+        'original_name' => 'contract.pdf',
+        'stored_name' => 'private-contract.pdf',
+        'storage_disk' => 'local',
+        'storage_path' => 'private/contract.pdf',
+        'mime_type' => 'application/pdf',
+        'extension' => 'pdf',
+        'file_size' => 100,
+        'description' => 'Contract processing document',
+        'version' => 1,
+        'uploaded_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    Schema::create('project_lifecycle_tracks', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('company_id');
+        $table->integer('project_id');
+        $table->unsignedBigInteger('project_information_id');
+        $table->integer('legacy_lot_id')->nullable();
+        $table->unsignedBigInteger('bidding_lot_id')->nullable();
+        $table->timestamps();
+    });
+    Schema::create('project_lifecycle_events', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('project_lifecycle_track_id');
+        $table->integer('actor_user_id')->nullable();
+        $table->string('event_type');
+        $table->string('from_stage')->nullable();
+        $table->string('to_stage')->nullable();
+        $table->string('outcome')->nullable();
+        $table->text('note')->nullable();
+        $table->json('metadata')->nullable();
+        $table->timestamp('created_at')->nullable();
+    });
+
+    if (! $withEvidence) {
+        return;
+    }
+
+    $companyId = DB::table('companies')->where('code', 'MMC')->value('company_id');
+    $actorId = auth()->id();
+    $lotTwoTrackId = DB::table('project_lifecycle_tracks')->insertGetId([
+        'company_id' => $companyId,
+        'project_id' => 1,
+        'project_information_id' => $projectInformationId,
+        'bidding_lot_id' => $lotTwoId,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('project_lifecycle_tracks')->insert([
+        'company_id' => $companyId,
+        'project_id' => 1,
+        'project_information_id' => $projectInformationId,
+        'bidding_lot_id' => $lotThreeId,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('project_lifecycle_events')->insert([
+        [
+            'project_lifecycle_track_id' => $lotTwoTrackId,
+            'actor_user_id' => $actorId,
+            'event_type' => 'noa_verified',
+            'from_stage' => 'Evaluation',
+            'to_stage' => 'Awarded',
+            'note' => 'NOA reviewed and verified',
+            'metadata' => json_encode(['reference' => 'NOA-778', 'document_id' => $noaDocumentId, 'verified_by' => $actorId, 'event_date' => '2026-09-01', 'award_amount' => '100.12']),
+            'created_at' => now()->subDay(),
+        ],
+        [
+            'project_lifecycle_track_id' => $lotTwoTrackId,
+            'actor_user_id' => $actorId,
+            'event_type' => 'ntp_verified',
+            'from_stage' => 'Awarded',
+            'to_stage' => 'Implementation',
+            'note' => 'NTP reviewed and verified',
+            'metadata' => json_encode(['reference' => 'NTP-445', 'document_id' => $ntpDocumentId, 'verified_by' => $actorId, 'event_date' => '2026-09-05', 'effectivity_date' => '2026-09-10']),
+            'created_at' => now(),
+        ],
+    ]);
+}
+
 it('renders SQL summaries without querying or rendering large detail collections', function () {
     projectDetailsUser();
     projectDetailsFixtures();
@@ -129,6 +287,87 @@ it('renders SQL summaries without querying or rendering large detail collections
         ->assertSee('Lot A')->assertSee('Intermediate')->assertDontSee('Microscope')->assertDontSee('data-school-id=', false);
     $queries = collect(DB::getQueryLog())->pluck('query');
     expect($queries->filter(fn (string $sql): bool => preg_match('/select \* from "(school|item|package|deliveries)"/i', $sql))->all())->toBe([]);
+});
+
+it('shows verified NOA and NTP references with per-lot evidence and protected document actions', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    projectBiddingEvidenceFixtures();
+
+    $response = $this->get('/projects/1');
+
+    $response->assertOk()
+        ->assertSee('Bidding Documents &amp; Award References', false)
+        ->assertSee('Bidding record #1')
+        ->assertSee('Lot 2')
+        ->assertSee('Lot 3')
+        ->assertSee('NOA-778')
+        ->assertSee('NTP-445')
+        ->assertSee('2026-09-10')
+        ->assertSee('Signed NOA')
+        ->assertSee('Contract attachment')
+        ->assertSee(route('project.bidding.documents.preview', [1, 1]), false)
+        ->assertSee(route('project.bidding.documents.download', [1, 1]), false)
+        ->assertSee('No verified delivery acceptance linked')
+        ->assertDontSee('private/noa.pdf');
+
+    projectDetailsUser('MI');
+    $this->get('/project/bidding/1/documents/1/download')->assertForbidden();
+});
+
+it('explains when no bidding document or verified lifecycle evidence is linked', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    projectBiddingEvidenceFixtures(false);
+    DB::table('bidding_documents')->delete();
+
+    $this->get('/projects/1')
+        ->assertOk()
+        ->assertSee('No verified NOA recorded')
+        ->assertSee('No verified NTP recorded')
+        ->assertSee('Not yet uploaded.')
+        ->assertSee('No verified NOA, NTP, or delivery acceptance evidence recorded for this scope.');
+});
+
+it('allows authorized MMC Finance users to read Project Details and gives them read-only document links', function () {
+    projectDetailsUser('MMC', 'finance');
+    projectDetailsFixtures();
+    projectBiddingEvidenceFixtures();
+
+    $this->get('/projects/1')
+        ->assertOk()
+        ->assertSee(route('bidding.documents.download', [1, 1]), false)
+        ->assertDontSee(route('project.bidding.documents.download', [1, 1]), false)
+        ->assertDontSee('Open Bidding record')
+        ->assertDontSee('Project Setting');
+});
+
+it('keeps Project Details unavailable to users whose active company is not MMC', function () {
+    projectDetailsFixtures();
+    $this->get('/projects/1')->assertRedirect(route('login'));
+
+    projectDetailsUser('MI');
+
+    $this->get('/projects/1')->assertForbidden();
+});
+
+it('does not expose bidding evidence when the legacy project identifier matches multiple records', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    projectBiddingEvidenceFixtures();
+    DB::table('project_information')->insert([
+        'project_id' => '1',
+        'project_code' => 'SME-2025-DUPLICATE',
+        'project_name' => 'Ambiguous second bidding record',
+        'status' => 'Awarded',
+    ]);
+
+    $this->get('/projects/1')
+        ->assertOk()
+        ->assertSee('No verified Bidding record is linked to this project.')
+        ->assertDontSee('NOA-778')
+        ->assertDontSee('Signed NOA')
+        ->assertDontSee('private/noa.pdf');
 });
 
 it('includes direct and delivered schools once and applies SQL search and location filters', function () {

@@ -224,8 +224,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/projects/{project:project_id}/lots-data', [ProjectController::class, 'lotsData'])->name('projects.lots-data');
         Route::get('/projects/{project:project_id}/keystages-data', [ProjectController::class, 'keystagesData'])->name('projects.keystages-data');
         Route::get('/projects/{project:project_id}/detail-options', [ProjectController::class, 'detailOptions'])->name('projects.detail-options');
-        Route::get('/projects/{project:project_id}', [ProjectController::class, 'show'])
-            ->name('projects.show');
         /*
             |--------------------------------------------------------------------------
             | Allocation List Import
@@ -376,6 +374,10 @@ Route::middleware(['auth'])->group(function () {
         | ADMIN ROUTES
         |--------------------------------------------------------------------------
     */
+    Route::get('/projects/{project:project_id}', [ProjectController::class, 'show'])
+        ->middleware(['company.context:MMC', 'role:user,finance'])
+        ->name('projects.show');
+
     Route::middleware(['role:finance'])->group(function () {
         Route::get('/dashboard', [ProjectFinancialPlanController::class, 'dashboard'])
             ->name('finance.dashboard');
@@ -477,7 +479,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/bidding/{bidding}', [BiddingController::class, 'destroy'])
             ->name('bidding.destroy');
 
-        Route::prefix('bidding/{bidding}')->name('bidding.')->group(function (): void {
+        Route::prefix('bidding/{bidding}')->middleware('company.context:MMC')->name('bidding.')->group(function (): void {
             Route::post('folders', [BiddingFolderController::class, 'store'])->name('folders.store');
             Route::put('folders/{folder}', [BiddingFolderController::class, 'update'])->name('folders.update');
             Route::delete('folders/{folder}', [BiddingFolderController::class, 'destroy'])->name('folders.destroy');

@@ -45,6 +45,16 @@ class ProjectInformationPolicy
         return $user->hasRole('finance');
     }
 
+    public function verifyLifecycleEvidence(User $user): bool
+    {
+        $company = $user->currentCompany();
+
+        return $user->hasRole('user')
+            && $company?->code === 'MMC'
+            && $company->is_active
+            && $user->belongsToCompany($company->company_id);
+    }
+
     public function uploadDocument(User $user, ProjectInformation $bidding): bool
     {
         return $this->update($user, $bidding);

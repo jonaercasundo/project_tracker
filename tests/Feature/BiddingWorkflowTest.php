@@ -871,7 +871,7 @@ function completeAwardPayload(BiddingTestCase $test): array
     ]);
 }
 
-it('creates a pending implementation project once a bidding document is awarded', function () {
+it('does not advance the linked Project List record from an unverified bidding status alone', function () {
     $this->signInBiddingUser();
     $payload = completeAwardPayload($this);
 
@@ -887,15 +887,44 @@ it('creates a pending implementation project once a bidding document is awarded'
         ->and($project->status)->toBe('Pending');
     $this->assertDatabaseHas('project_award_events', [
         'project_information_id' => $bidding->id,
-        'event_type' => 'awarded',
+        'event_type' => 'bidding_status_awarded',
         'event_date' => '2026-10-15',
         'status_before' => 'Draft',
     ]);
+    $awardEvent = DB::table('project_award_events')->where('project_information_id', $bidding->id)->sole();
+    $snapshot = json_decode($awardEvent->project_snapshot, true, flags: JSON_THROW_ON_ERROR);
+    expect($snapshot['bidding_status_before'])->toBe('Draft')
+        ->and($snapshot['bidding_status_after'])->toBe('Awarded')
+        ->and($snapshot['project_status_before'])->toBeNull()
+        ->and($snapshot['project_status_after'])->toBe('Pending')
+        ->and($awardEvent->actor_user_id)->toBe(auth()->id());
     $this->get(route('projects.index'))
         ->assertOk()
         ->assertSee($payload['project_name'])
         ->assertSee('Procurement: Awarded');
 });
+
+it('does not downgrade Project List statuses already at or beyond the award stage', function (string $status) {
+    $this->signInBiddingUser();
+    $payload = completeAwardPayload($this);
+    $project = Project::create([
+        'ref_no' => $payload['reference_no'],
+        'project_code' => $payload['project_id'],
+        'project_name' => $payload['project_name'],
+        'agency' => $payload['procuring_entity'],
+        'contract_amount' => $payload['contract_amount'],
+        'ABC' => $payload['approved_budget_contract_abc'],
+        'status' => $status,
+        'start_date' => $payload['start_date'],
+        'end_date' => $payload['end_date'],
+    ]);
+
+    $this->post(route('project.bidding.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(Project::query()->count())->toBe(1)
+        ->and($project->fresh()->status)->toBe($status)
+        ->and($project->fresh()->project_information_id)->toBe(ProjectInformation::query()->sole()->id);
+})->with(['For NOA', 'For RTA', 'Implementation', 'Delivered', 'For Billing', 'Completed']);
 
 it('requires complete project information before an award can be saved', function () {
     $this->signInBiddingUser();

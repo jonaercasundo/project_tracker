@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\BiddingDocument;
 use App\Models\Company;
 use App\Models\Lot;
 use App\Models\MmcPplSourceLink;
@@ -9,6 +10,7 @@ use App\Models\ProjectInformation;
 use App\Models\ProjectLifecycleTrack;
 use App\Models\ProjectLot;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Spatie\Permission\Models\Role;
 use Tests\FinancialPlanTestCase;
@@ -49,6 +51,22 @@ function startLifecycleTracking(array $records, array $overrides = []): TestResp
         'next_action' => 'Confirm delivery schedule',
         'next_action_due_at' => now()->addDays(3)->format('Y-m-d H:i:s'),
     ], $overrides));
+}
+
+function lifecycleEvidenceDocument(ProjectInformation $bidding, string $name): BiddingDocument
+{
+    return BiddingDocument::query()->create([
+        'project_information_id' => $bidding->getKey(),
+        'display_name' => $name,
+        'original_name' => $name.'.pdf',
+        'stored_name' => fake()->uuid().'.pdf',
+        'storage_disk' => 'local',
+        'storage_path' => 'lifecycle/'.fake()->uuid().'.pdf',
+        'mime_type' => 'application/pdf',
+        'extension' => 'pdf',
+        'file_size' => 1024,
+        'uploaded_at' => now(),
+    ]);
 }
 
 it('renders existing operations totals without creating a duplicate project master', function () {
@@ -125,6 +143,156 @@ it('tracks separate lots at separate lifecycle stages while sharing the same pro
         ->and($implementationTrack->fresh()->current_stage)->toBe('Implementation')
         ->and(Project::query()->count())->toBe(1)
         ->and(ProjectInformation::query()->count())->toBe(1);
+});
+
+it('advances an eligible project only after an authorized user verifies an archived NOA', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['status' => 'Pending']);
+    $records['bidding']->update(['notice_of_award_date' => '2026-10-15']);
+    $this->signInBiddingUser();
+    startLifecycleTracking($records)->assertRedirect();
+    $track = ProjectLifecycleTrack::query()->sole();
+    $document = lifecycleEvidenceDocument($records['bidding'], 'Official NOA');
+
+    $this->post(route('operations.lifecycle.verify-noa', $track), [
+        'reference' => 'NOA-2026-001', 'document_id' => $document->getKey(),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($records['project']->fresh()->status)->toBe('Awarded')
+        ->and($track->fresh()->current_stage)->toBe('Awarded');
+    $event = $track->fresh()->events()->where('event_type', 'noa_verified')->sole();
+    expect($event->metadata)->toMatchArray([
+        'reference' => 'NOA-2026-001', 'document_id' => $document->getKey(),
+        'event_date' => '2026-10-15', 'verified_by' => auth()->id(),
+    ]);
+
+    $this->post(route('operations.lifecycle.verify-noa', $track), [
+        'reference' => 'NOA-2026-001', 'document_id' => $document->getKey(),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    expect($track->fresh()->events()->where('event_type', 'noa_verified')->count())->toBe(1);
+    expect($track->fresh()->events()->where('event_type', 'noa_verified')->sole()->metadata)
+        ->toMatchArray(['project_status_before' => 'Pending', 'project_status_after' => 'Awarded']);
+});
+
+it('does not advance a project when NOA evidence is missing or belongs to another bidding record', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['status' => 'Pending']);
+    $records['bidding']->update(['notice_of_award_date' => '2026-10-15']);
+    $otherBidding = ProjectInformation::query()->create([
+        'project_id' => 'BID-'.fake()->unique()->numerify('####'), 'project_name' => 'Other bid',
+        'procuring_entity' => 'Test Agency', 'approved_budget_contract_abc' => '900.00', 'status' => 'Awarded',
+    ]);
+    $this->signInBiddingUser();
+    startLifecycleTracking($records)->assertRedirect();
+    $track = ProjectLifecycleTrack::query()->sole();
+    $foreignDocument = lifecycleEvidenceDocument($otherBidding, 'Unrelated document');
+
+    $this->post(route('operations.lifecycle.verify-noa', $track), ['reference' => 'NOA-001'])
+        ->assertSessionHasErrors(['document_id']);
+    $this->post(route('operations.lifecycle.verify-noa', $track), [
+        'reference' => 'NOA-001', 'document_id' => $foreignDocument->getKey(),
+    ])->assertUnprocessable();
+
+    expect($records['project']->fresh()->status)->toBe('Pending')
+        ->and($track->fresh()->events()->where('event_type', 'noa_verified')->count())->toBe(0);
+});
+
+it('advances to implementation only after verified NOA and NTP evidence and creates no delivery receipt', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['status' => 'Pending']);
+    $records['bidding']->update(['notice_of_award_date' => '2026-10-15']);
+    $this->signInBiddingUser();
+    startLifecycleTracking($records)->assertRedirect();
+    $track = ProjectLifecycleTrack::query()->sole();
+    $noa = lifecycleEvidenceDocument($records['bidding'], 'Official NOA');
+    $ntp = lifecycleEvidenceDocument($records['bidding'], 'Official NTP');
+
+    $this->post(route('operations.lifecycle.verify-ntp', $track), [
+        'reference' => 'NTP-001', 'notice_date' => '2026-10-20', 'effectivity_date' => '2026-11-01', 'document_id' => $ntp->getKey(),
+    ])->assertSessionHasErrors('reference');
+    expect($records['project']->fresh()->status)->toBe('Pending');
+
+    $this->post(route('operations.lifecycle.verify-noa', $track), [
+        'reference' => 'NOA-001', 'document_id' => $noa->getKey(),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    $this->post(route('operations.lifecycle.verify-ntp', $track), [
+        'reference' => 'NTP-001', 'notice_date' => '2026-10-20', 'effectivity_date' => '2026-11-01', 'document_id' => $ntp->getKey(),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($records['project']->fresh()->status)->toBe('Implementation')
+        ->and($track->fresh()->current_stage)->toBe('Implementation')
+        ->and(DB::table('deliveries')->count())->toBe(0);
+    $event = $track->fresh()->events()->where('event_type', 'ntp_verified')->sole();
+    expect($event->metadata)->toMatchArray([
+        'reference' => 'NTP-001', 'document_id' => $ntp->getKey(),
+        'event_date' => '2026-10-20', 'effectivity_date' => '2026-11-01', 'verified_by' => auth()->id(),
+    ]);
+});
+
+it('keeps a partial NOA award at lot level until every existing bidding lot has verified evidence', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['status' => 'Pending']);
+    $records['bidding']->update(['notice_of_award_date' => '2026-10-15']);
+    $secondBiddingLot = ProjectLot::query()->create(['project_id' => $records['bidding']->getKey(), 'lot_no' => 'Lot 9']);
+    $secondLegacyLot = Lot::query()->create([
+        'project_id' => $records['project']->project_id, 'lot_name' => '9', 'contract_no' => 'LC-LOT-9',
+    ]);
+    $this->signInBiddingUser();
+    startLifecycleTracking($records)->assertRedirect();
+    startLifecycleTracking($records, [
+        'legacy_lot_id' => $secondLegacyLot->getKey(), 'bidding_lot_id' => $secondBiddingLot->getKey(),
+    ])->assertRedirect();
+    $tracks = ProjectLifecycleTrack::query()->orderBy('id')->get();
+    $documents = [
+        lifecycleEvidenceDocument($records['bidding'], 'Lot 2 NOA'),
+        lifecycleEvidenceDocument($records['bidding'], 'Lot 9 NOA'),
+    ];
+
+    $this->post(route('operations.lifecycle.verify-noa', $tracks[0]), [
+        'reference' => 'NOA-LOT-2', 'document_id' => $documents[0]->getKey(),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    expect($records['project']->fresh()->status)->toBe('Pending');
+
+    $this->post(route('operations.lifecycle.verify-noa', $tracks[1]), [
+        'reference' => 'NOA-LOT-9', 'document_id' => $documents[1]->getKey(),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    expect($records['project']->fresh()->status)->toBe('Awarded');
+});
+
+it('preserves an advanced Project List status when a late NOA is verified', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['status' => 'Delivered']);
+    $records['bidding']->update(['notice_of_award_date' => '2026-10-15']);
+    $this->signInBiddingUser();
+    startLifecycleTracking($records)->assertRedirect();
+    $track = ProjectLifecycleTrack::query()->sole();
+    $document = lifecycleEvidenceDocument($records['bidding'], 'Late NOA');
+
+    $this->post(route('operations.lifecycle.verify-noa', $track), [
+        'reference' => 'NOA-LATE', 'document_id' => $document->getKey(),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($records['project']->fresh()->status)->toBe('Delivered')
+        ->and($track->fresh()->current_stage)->toBe('Delivery');
+});
+
+it('restricts official trigger verification to the authenticated MMC operations role', function () {
+    $records = lifecycleRecords();
+    $records['project']->update(['status' => 'Pending']);
+    $records['bidding']->update(['notice_of_award_date' => '2026-10-15']);
+    $operationsUser = $this->signInBiddingUser();
+    startLifecycleTracking($records)->assertRedirect();
+    $track = ProjectLifecycleTrack::query()->sole();
+    $document = lifecycleEvidenceDocument($records['bidding'], 'Official NOA');
+    auth()->logout();
+    $this->signInBiddingUser('finance');
+
+    $this->post(route('operations.lifecycle.verify-noa', $track), [
+        'reference' => 'NOA-001', 'document_id' => $document->getKey(),
+    ])->assertForbidden();
+
+    expect($operationsUser->exists)->toBeTrue()
+        ->and($records['project']->fresh()->status)->toBe('Pending');
 });
 
 it('maps an existing published bidding record to Submitted without advancing its stored status', function () {

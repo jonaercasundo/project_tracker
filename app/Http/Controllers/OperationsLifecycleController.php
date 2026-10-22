@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BiddingDocument;
 use App\Models\Company;
 use App\Models\Delivery;
 use App\Models\DeliveryBillingRecord;
@@ -352,6 +353,47 @@ class OperationsLifecycleController extends Controller
         return back()->with('success', 'Lifecycle tracking updated. The underlying operational status was not changed.');
     }
 
+    public function verifyNoa(Request $request, ProjectLifecycleTrack $track, ProjectLifecycleService $lifecycle): RedirectResponse
+    {
+        Gate::authorize('verifyLifecycleEvidence', ProjectInformation::class);
+        $company = $this->requireMmcCompany($request->user());
+        abort_unless((int) $track->company_id === (int) $company->company_id, 404);
+        $validated = $request->validate([
+            'reference' => ['required', 'string', 'max:120'],
+            'document_id' => ['required', 'integer', 'exists:bidding_documents,id'],
+        ]);
+        $this->assertEvidenceDocumentBelongsToBidding($track, (int) $validated['document_id']);
+
+        $lifecycle->verifyNoticeOfAward($track, $validated['reference'], (int) $validated['document_id'], $request->user()->user_id);
+
+        return back()->with('success', 'NOA verification recorded. Project status advances only when its award scope is complete.');
+    }
+
+    public function verifyNtp(Request $request, ProjectLifecycleTrack $track, ProjectLifecycleService $lifecycle): RedirectResponse
+    {
+        Gate::authorize('verifyLifecycleEvidence', ProjectInformation::class);
+        $company = $this->requireMmcCompany($request->user());
+        abort_unless((int) $track->company_id === (int) $company->company_id, 404);
+        $validated = $request->validate([
+            'reference' => ['required', 'string', 'max:120'],
+            'notice_date' => ['required', 'date'],
+            'effectivity_date' => ['required', 'date', 'after_or_equal:notice_date'],
+            'document_id' => ['required', 'integer', 'exists:bidding_documents,id'],
+        ]);
+        $this->assertEvidenceDocumentBelongsToBidding($track, (int) $validated['document_id']);
+
+        $lifecycle->verifyNoticeToProceed(
+            $track,
+            $validated['reference'],
+            $validated['notice_date'],
+            $validated['effectivity_date'],
+            (int) $validated['document_id'],
+            $request->user()->user_id,
+        );
+
+        return back()->with('success', 'NTP verification recorded. Implementation status and delivery planning are enabled.');
+    }
+
     public function storeTask(Request $request, ProjectLifecycleTrack $track, ProjectLifecycleService $lifecycle): RedirectResponse
     {
         Gate::authorize('create', ProjectInformation::class);
@@ -410,6 +452,13 @@ class OperationsLifecycleController extends Controller
         if ($userId !== null && ! User::query()->whereKey($userId)->whereHas('companies', fn ($companies) => $companies->where('companies.company_id', $company->company_id))->exists()) {
             throw ValidationException::withMessages(['owner_user_id' => 'The assigned person must belong to the active MMC company.']);
         }
+    }
+
+    private function assertEvidenceDocumentBelongsToBidding(ProjectLifecycleTrack $track, int $documentId): void
+    {
+        abort_unless($track->project_information_id !== null, 422, 'Link the lifecycle record to its Bidding Docs record before verifying official documents.');
+        $document = BiddingDocument::query()->findOrFail($documentId);
+        abort_unless((int) $document->project_information_id === (int) $track->project_information_id, 422, 'The supporting document must belong to the linked Bidding record.');
     }
 
     private function assertVerifiedSources(?Project $project, ?ProjectInformation $bidding, ?Lot $legacyLot, ?ProjectLot $biddingLot, ProjectLifecycleService $lifecycle): void

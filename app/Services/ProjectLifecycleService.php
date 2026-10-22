@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\BiddingDocument;
 use App\Models\Project;
 use App\Models\ProjectInformation;
 use App\Models\ProjectLifecycleEvent;
 use App\Models\ProjectLifecycleTrack;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ProjectLifecycleService
@@ -102,6 +104,212 @@ class ProjectLifecycleService
             'metadata' => $metadata,
             'created_at' => now(),
         ]);
+    }
+
+    public function verifyNoticeOfAward(
+        ProjectLifecycleTrack $track,
+        string $reference,
+        int $documentId,
+        int $actorId,
+    ): void {
+        DB::transaction(function () use ($track, $reference, $documentId, $actorId): void {
+            $track = ProjectLifecycleTrack::query()->lockForUpdate()->with(['project', 'bidding'])->findOrFail($track->getKey());
+            $bidding = ProjectInformation::query()->lockForUpdate()->findOrFail($track->project_information_id);
+            $project = Project::query()->lockForUpdate()->findOrFail($track->project_id);
+            $track->setRelation('bidding', $bidding);
+            $track->setRelation('project', $project);
+            if (! $bidding || $bidding->status !== 'Awarded' || ! $bidding->notice_of_award_date) {
+                throw ValidationException::withMessages(['reference' => 'The Bidding record must be awarded and have an NOA date before verifying its Notice of Award.']);
+            }
+            $this->assertVerifiedProjectBiddingLink($track);
+            if (in_array($track->outcome, ['Lost', 'Disqualified', 'Cancelled'], true)) {
+                throw ValidationException::withMessages(['reference' => 'A closed lifecycle outcome cannot receive a Notice of Award.']);
+            }
+
+            $stageBefore = $track->current_stage;
+            $projectStatusBefore = $track->project?->status;
+            $existingEventId = $track->events()->where('event_type', 'noa_verified')->value('id');
+            $event = $this->recordVerifiedEvidence($track, 'noa_verified', $reference, $documentId, $actorId, [
+                'event_date' => $bidding->notice_of_award_date->toDateString(),
+            ], 'Notice of Award verified.');
+            if ($track->current_stage !== 'Awarded' && $this->isBeforeStage($track->current_stage, 'Awarded')) {
+                $track->current_stage = 'Awarded';
+                $track->save();
+            }
+
+            if ($track->project && $this->isProjectTriggerComplete($track, 'noa_verified')) {
+                $this->advanceProjectStatus($track->project, 'Awarded');
+            }
+            if ($existingEventId === null) {
+                $event->from_stage = $stageBefore;
+                $event->to_stage = $track->current_stage;
+                $event->metadata = [...($event->metadata ?? []), 'project_status_before' => $projectStatusBefore, 'project_status_after' => $track->project?->fresh()->status];
+                $event->save();
+            }
+        }, 3);
+    }
+
+    public function verifyNoticeToProceed(
+        ProjectLifecycleTrack $track,
+        string $reference,
+        string $noticeDate,
+        string $effectivityDate,
+        int $documentId,
+        int $actorId,
+    ): void {
+        DB::transaction(function () use ($track, $reference, $noticeDate, $effectivityDate, $documentId, $actorId): void {
+            $track = ProjectLifecycleTrack::query()->lockForUpdate()->with(['project', 'bidding'])->findOrFail($track->getKey());
+            $bidding = ProjectInformation::query()->lockForUpdate()->findOrFail($track->project_information_id);
+            $project = Project::query()->lockForUpdate()->findOrFail($track->project_id);
+            $track->setRelation('bidding', $bidding);
+            $track->setRelation('project', $project);
+            if ($bidding->status !== 'Awarded') {
+                throw ValidationException::withMessages(['reference' => 'A verified NOA and linked Bidding and Project List records are required before verifying an NTP.']);
+            }
+            $this->assertVerifiedProjectBiddingLink($track);
+            if (in_array($track->outcome, ['Lost', 'Disqualified', 'Cancelled'], true)) {
+                throw ValidationException::withMessages(['reference' => 'A closed lifecycle outcome cannot receive a Notice to Proceed.']);
+            }
+            if (! in_array($track->current_stage, ['Awarded', 'Contract Processing', 'Implementation'], true)) {
+                throw ValidationException::withMessages(['reference' => 'NTP can only be verified after the Awarded stage and before delivery.']);
+            }
+            $hasVerifiedNoa = $track->events()->where('event_type', 'noa_verified')->exists();
+            if (! $hasVerifiedNoa) {
+                throw ValidationException::withMessages(['reference' => 'Verify the Notice of Award before verifying the Notice to Proceed.']);
+            }
+
+            $stageBefore = $track->current_stage;
+            $projectStatusBefore = $project->status;
+            $existingEventId = $track->events()->where('event_type', 'ntp_verified')->value('id');
+            $event = $this->recordVerifiedEvidence($track, 'ntp_verified', $reference, $documentId, $actorId, [
+                'event_date' => $noticeDate,
+                'effectivity_date' => $effectivityDate,
+            ], 'Notice to Proceed verified. Delivery planning is enabled. No delivery receipt was created.');
+
+            if ($this->isBeforeStage($track->current_stage, 'Implementation')) {
+                $track->current_stage = 'Implementation';
+                $track->save();
+            }
+            if ($this->isProjectTriggerComplete($track, 'ntp_verified')) {
+                $this->advanceProjectStatus($project, 'Implementation');
+            }
+            if ($existingEventId === null) {
+                $event->from_stage = $stageBefore;
+                $event->to_stage = $track->current_stage;
+                $event->metadata = [...($event->metadata ?? []), 'project_status_before' => $projectStatusBefore, 'project_status_after' => $project->fresh()->status];
+                $event->save();
+            }
+        }, 3);
+    }
+
+    /** @param array<string, string> $details */
+    private function recordVerifiedEvidence(
+        ProjectLifecycleTrack $track,
+        string $eventType,
+        string $reference,
+        int $documentId,
+        int $actorId,
+        array $details,
+        string $note,
+    ): ProjectLifecycleEvent {
+        $document = BiddingDocument::query()->lockForUpdate()->findOrFail($documentId);
+        $existing = $track->events()->where('event_type', $eventType)->latest('id')->first();
+        if ($existing) {
+            if (($existing->metadata['reference'] ?? null) === $reference
+                && (int) ($existing->metadata['document_id'] ?? 0) === $documentId
+                && (int) ($existing->metadata['document_version'] ?? 0) === (int) $document->version
+                && collect($details)->every(fn (string $value, string $key): bool => ($existing->metadata[$key] ?? null) === $value)) {
+                return $existing;
+            }
+
+            throw ValidationException::withMessages(['reference' => 'Verified evidence is already recorded for this lifecycle record. Contact an administrator to correct it.']);
+        }
+
+        return $track->events()->create([
+            'actor_user_id' => $actorId,
+            'event_type' => $eventType,
+            'from_stage' => $track->current_stage,
+            'to_stage' => $track->current_stage,
+            'outcome' => $track->outcome,
+            'note' => $note,
+            'metadata' => [
+                'reference' => $reference,
+                'document_id' => $documentId,
+                'document_name' => $document->display_name,
+                'document_version' => $document->version,
+                'verified_by' => $actorId,
+                'verified_at' => now()->toISOString(),
+                ...$details,
+            ],
+            'created_at' => now(),
+        ]);
+    }
+
+    private function isProjectTriggerComplete(ProjectLifecycleTrack $track, string $eventType): bool
+    {
+        if ($track->bidding_lot_id === null) {
+            return $track->legacy_lot_id === null;
+        }
+
+        $bidding = $track->bidding;
+        if (! $bidding) {
+            return false;
+        }
+        $lots = $bidding->lots()->get(['id']);
+        if ($lots->isEmpty()) {
+            return false;
+        }
+
+        foreach ($lots as $lot) {
+            $lotTrack = ProjectLifecycleTrack::query()
+                ->where('company_id', $track->company_id)
+                ->where('project_information_id', $bidding->getKey())
+                ->where('bidding_lot_id', $lot->id)
+                ->first();
+            if (! $lotTrack || ! $lotTrack->events()->where('event_type', $eventType)->exists()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function assertVerifiedProjectBiddingLink(ProjectLifecycleTrack $track): void
+    {
+        if (! $track->project || ! $track->bidding) {
+            throw ValidationException::withMessages(['reference' => 'Verified Project List and Bidding relationships are required for official triggers.']);
+        }
+        if (! Schema::hasColumn('projects', 'project_information_id')) {
+            throw ValidationException::withMessages(['reference' => 'The reviewed Project List to Bidding relationship schema is required before official triggers can run.']);
+        }
+        if ((int) $track->project->project_information_id !== (int) $track->bidding->getKey()) {
+            throw ValidationException::withMessages(['reference' => 'The Project List and Bidding records no longer have a verified relationship.']);
+        }
+        if (Schema::hasColumn('projects', 'company_id') && Schema::hasColumn('project_information', 'company_id')
+            && $track->project->company_id !== null && $track->bidding->company_id !== null
+            && (int) $track->project->company_id !== (int) $track->bidding->company_id) {
+            throw ValidationException::withMessages(['reference' => 'The Project List and Bidding records belong to different companies.']);
+        }
+    }
+
+    private function advanceProjectStatus(Project $project, string $targetStage): void
+    {
+        $mapping = config('project_lifecycle.project_status_mapping.'.(string) $project->status);
+        if (! $mapping || ! $this->isBeforeStage((string) ($mapping['stage'] ?? ''), $targetStage)) {
+            return;
+        }
+
+        $project->status = $targetStage;
+        $project->saveQuietly();
+    }
+
+    private function isBeforeStage(string $currentStage, string $targetStage): bool
+    {
+        $stages = array_keys(config('project_lifecycle.stages', []));
+        $currentIndex = array_search($currentStage, $stages, true);
+        $targetIndex = array_search($targetStage, $stages, true);
+
+        return $currentIndex !== false && $targetIndex !== false && $currentIndex < $targetIndex;
     }
 
     /** @return list<string> */

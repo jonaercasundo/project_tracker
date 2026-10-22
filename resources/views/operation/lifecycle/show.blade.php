@@ -23,6 +23,58 @@
             <div class="mt-2 grid grid-cols-2 gap-2 text-[10px] font-medium text-slate-500 sm:grid-cols-5 lg:grid-cols-10">@foreach($stages as $stage)<span class="{{ $stage === $track->current_stage ? 'font-bold text-blue-800' : '' }}">{{ $stage }}</span>@endforeach</div>
         </section>
 
+        <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                <h2 class="text-sm font-bold text-emerald-950">Verify Notice of Award</h2>
+                <p class="mt-1 text-xs text-emerald-900">A Bidding status alone does not advance Project List. Verify the official NOA and select its archived supporting document.</p>
+                @if(!$readOnly && $track->bidding?->status === 'Awarded' && $documents->isNotEmpty())
+                    <form method="POST" action="{{ route('operations.lifecycle.verify-noa', $track) }}" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        @csrf
+                        <label class="text-xs font-semibold text-slate-700">NOA number / reference <input name="reference" required maxlength="120" class="mt-1 block w-full rounded-lg border-slate-300 text-sm"></label>
+                        <label class="text-xs font-semibold text-slate-700">NOA date <input value="{{ $track->bidding->notice_of_award_date?->format('Y-m-d') }}" readonly class="mt-1 block w-full rounded-lg border-slate-300 bg-slate-100 text-sm"></label>
+                        <label class="text-xs font-semibold text-slate-700 sm:col-span-2">Supporting archived document <select name="document_id" required class="mt-1 block w-full rounded-lg border-slate-300 text-sm"><option value="">Select NOA document</option>@foreach($documents as $document)<option value="{{ $document->id }}">{{ $document->display_name }} · v{{ $document->version }}</option>@endforeach</select></label>
+                        <button class="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800 sm:col-span-2">Verify NOA</button>
+                    </form>
+                @elseif($readOnly)
+                    <p class="mt-3 text-xs font-medium text-emerald-900">Finance view is read only. Operations verifies NOA evidence.</p>
+                @else
+                    <p class="mt-3 text-xs font-medium text-amber-800">Set the Bidding record to Awarded, link it here, and archive its NOA document before verification.</p>
+                @endif
+            </div>
+            <div class="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                <h2 class="text-sm font-bold text-blue-950">Verify Notice to Proceed</h2>
+                <p class="mt-1 text-xs text-blue-900">A verified NTP advances the eligible record to Implementation and permits delivery planning. It does not create a delivery receipt.</p>
+                @if(!$readOnly && $track->bidding?->status === 'Awarded' && $documents->isNotEmpty() && $track->events->contains(fn ($event) => $event->event_type === 'noa_verified'))
+                    <form method="POST" action="{{ route('operations.lifecycle.verify-ntp', $track) }}" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        @csrf
+                        <label class="text-xs font-semibold text-slate-700">NTP number / reference <input name="reference" required maxlength="120" class="mt-1 block w-full rounded-lg border-slate-300 text-sm"></label>
+                        <label class="text-xs font-semibold text-slate-700">NTP date <input type="date" name="notice_date" required class="mt-1 block w-full rounded-lg border-slate-300 text-sm"></label>
+                        <label class="text-xs font-semibold text-slate-700">Effectivity date <input type="date" name="effectivity_date" required class="mt-1 block w-full rounded-lg border-slate-300 text-sm"></label>
+                        <label class="text-xs font-semibold text-slate-700">Supporting archived document <select name="document_id" required class="mt-1 block w-full rounded-lg border-slate-300 text-sm"><option value="">Select NTP document</option>@foreach($documents as $document)<option value="{{ $document->id }}">{{ $document->display_name }} · v{{ $document->version }}</option>@endforeach</select></label>
+                        <button class="rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800 sm:col-span-2">Verify NTP</button>
+                    </form>
+                @elseif($readOnly)
+                    <p class="mt-3 text-xs font-medium text-blue-900">Finance view is read only. Operations verifies NTP evidence.</p>
+                @else
+                    <p class="mt-3 text-xs font-medium text-amber-800">Verify the NOA first, then archive the NTP document before verification.</p>
+                @endif
+            </div>
+        </section>
+
+        @php
+            $hasVerifiedNoa = $track->events->contains(fn ($event) => $event->event_type === 'noa_verified');
+            $hasVerifiedNtp = $track->events->contains(fn ($event) => $event->event_type === 'ntp_verified');
+        @endphp
+        <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <h2 class="text-sm font-bold text-amber-950">Pending requirements</h2>
+            <ul class="mt-2 list-inside list-disc space-y-1 text-xs text-amber-900">
+                @unless($hasVerifiedNoa)<li>Official NOA verification is pending.</li>@endunless
+                @if($hasVerifiedNoa && !$hasVerifiedNtp)<li>Official NTP verification is pending.</li>@endif
+                @if($hasVerifiedNtp)<li>Implementation is enabled. Customer acceptance for all required deliveries still needs verification before the Project List can show Delivered.</li>@endif
+                @if($track->owner)<li>Responsible user: {{ $track->owner->name }}.</li>@else<li>Assign a responsible user and next action.</li>@endif
+            </ul>
+        </section>
+
         <section class="grid grid-cols-1 gap-4 xl:grid-cols-3">
             <div class="space-y-4 xl:col-span-2">
                 @unless($readOnly)
@@ -77,7 +129,7 @@
                     <h2 class="text-sm font-bold text-slate-900">Stage history</h2>
                     <ol class="mt-4 space-y-4 border-l-2 border-slate-100 pl-4">
                         @forelse($track->events as $event)
-                            <li class="relative"><span class="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-blue-600 ring-4 ring-white"></span><p class="text-xs font-semibold text-slate-900">{{ str_replace('_', ' ', ucfirst($event->event_type)) }}@if($event->to_stage) · {{ $event->to_stage }}@endif @if($event->outcome) · {{ $event->outcome }}@endif</p><p class="mt-1 text-[11px] text-slate-500">{{ $event->actor?->name ?? 'System' }} · {{ $event->created_at?->format('M j, Y g:i A') }}</p>@if($event->note)<p class="mt-1 text-xs text-slate-700">{{ $event->note }}</p>@endif</li>
+                            <li class="relative"><span class="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-blue-600 ring-4 ring-white"></span><p class="text-xs font-semibold text-slate-900">{{ str_replace('_', ' ', ucfirst($event->event_type)) }}@if($event->to_stage) · {{ $event->to_stage }}@endif @if($event->outcome) · {{ $event->outcome }}@endif</p><p class="mt-1 text-[11px] text-slate-500">{{ $event->actor?->name ?? 'System' }} · {{ $event->created_at?->format('M j, Y g:i A') }}</p>@if($event->note)<p class="mt-1 text-xs text-slate-700">{{ $event->note }}</p>@endif @if(in_array($event->event_type, ['noa_verified', 'ntp_verified'], true))<p class="mt-1 text-[11px] text-slate-600">Reference {{ $event->metadata['reference'] ?? '—' }} · Document #{{ $event->metadata['document_id'] ?? '—' }} v{{ $event->metadata['document_version'] ?? '—' }} · {{ $event->metadata['event_date'] ?? $event->metadata['notice_date'] ?? '—' }}@if($event->metadata['effectivity_date'] ?? null) · Effective {{ $event->metadata['effectivity_date'] }}@endif</p>@endif</li>
                         @empty
                             <li class="text-xs text-slate-500">No history has been recorded.</li>
                         @endforelse

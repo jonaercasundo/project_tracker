@@ -124,7 +124,7 @@ class BiddingService
 
             $awardEvent = DB::table('project_award_events')
                 ->where('project_information_id', $project->getKey())
-                ->where('event_type', 'awarded')
+                ->whereIn('event_type', ['bidding_status_awarded', 'awarded'])
                 ->latest('id')
                 ->first();
             $previousStatus = $awardEvent?->status_before;

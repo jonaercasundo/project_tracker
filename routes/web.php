@@ -188,6 +188,10 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('track')->name('operations.lifecycle.show');
         Route::patch('/operations/lifecycle/{track}', [OperationsLifecycleController::class, 'update'])
             ->whereNumber('track')->name('operations.lifecycle.update');
+        Route::post('/operations/lifecycle/{track}/verify-noa', [OperationsLifecycleController::class, 'verifyNoa'])
+            ->whereNumber('track')->name('operations.lifecycle.verify-noa');
+        Route::post('/operations/lifecycle/{track}/verify-ntp', [OperationsLifecycleController::class, 'verifyNtp'])
+            ->whereNumber('track')->name('operations.lifecycle.verify-ntp');
         Route::post('/operations/lifecycle/{track}/tasks', [OperationsLifecycleController::class, 'storeTask'])
             ->whereNumber('track')->name('operations.lifecycle.tasks.store');
         Route::patch('/operations/lifecycle/{track}/tasks/{task}', [OperationsLifecycleController::class, 'updateTask'])

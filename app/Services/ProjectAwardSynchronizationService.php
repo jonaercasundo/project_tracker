@@ -45,6 +45,8 @@ class ProjectAwardSynchronizationService
             return null;
         }
 
+        $projectStatusBefore = $project?->status;
+
         if ($project !== null && $project->project_information_id !== null && (int) $project->project_information_id !== (int) $bidding->getKey()) {
             throw ValidationException::withMessages([
                 'reference_no' => 'This project is already linked to another bidding document.',
@@ -61,7 +63,7 @@ class ProjectAwardSynchronizationService
             }
             $project->saveQuietly();
             if ($recordAwardEvent) {
-                $this->recordAwardEvent($bidding, $project, $statusBefore, $actorUserId);
+                $this->recordAwardEvent($bidding, $project, $statusBefore, $actorUserId, $projectStatusBefore);
             }
 
             return $project;
@@ -94,7 +96,7 @@ class ProjectAwardSynchronizationService
         $project->saveQuietly();
 
         if ($recordAwardEvent) {
-            $this->recordAwardEvent($bidding, $project, $statusBefore, $actorUserId);
+            $this->recordAwardEvent($bidding, $project, $statusBefore, $actorUserId, $projectStatusBefore);
         }
 
         return $project;
@@ -233,19 +235,25 @@ class ProjectAwardSynchronizationService
         }
     }
 
-    private function recordAwardEvent(ProjectInformation $bidding, Project $project, ?string $statusBefore, ?int $actorUserId): void
+    private function recordAwardEvent(ProjectInformation $bidding, Project $project, ?string $statusBefore, ?int $actorUserId, ?string $projectStatusBefore): void
     {
         DB::table('project_award_events')->insert([
             'project_information_id' => $bidding->getKey(),
             'project_id' => $project->getKey(),
-            'event_type' => 'awarded',
+            'event_type' => 'bidding_status_awarded',
             'actor_user_id' => $actorUserId,
             'event_date' => $bidding->notice_of_award_date?->toDateString(),
             'status_before' => $statusBefore,
-            'project_snapshot' => json_encode(Arr::only($project->getAttributes(), [
-                'project_id', 'project_information_id', 'ref_no', 'project_code', 'project_name',
-                'agency', 'contract_amount', 'ABC', 'start_date', 'end_date', 'status',
-            ]), JSON_THROW_ON_ERROR),
+            'project_snapshot' => json_encode([
+                ...Arr::only($project->getAttributes(), [
+                    'project_id', 'project_information_id', 'ref_no', 'project_code', 'project_name',
+                    'agency', 'contract_amount', 'ABC', 'start_date', 'end_date', 'status',
+                ]),
+                'bidding_status_before' => $statusBefore,
+                'bidding_status_after' => $bidding->status,
+                'project_status_before' => $projectStatusBefore,
+                'project_status_after' => $project->status,
+            ], JSON_THROW_ON_ERROR),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

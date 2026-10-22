@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\New\Item;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
 
 class Project extends Model
 {
@@ -42,7 +43,11 @@ class Project extends Model
 
     public function bidding(): BelongsTo
     {
-        return $this->belongsTo(ProjectInformation::class, 'project_information_id');
+        if (Schema::hasColumn($this->getTable(), 'project_information_id')) {
+            return $this->belongsTo(ProjectInformation::class, 'project_information_id');
+        }
+
+        return $this->belongsTo(ProjectInformation::class, 'project_id', 'project_id');
     }
 
     public function arSetting()

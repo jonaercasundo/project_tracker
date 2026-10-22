@@ -105,10 +105,10 @@ class ProjectFinancialPlanController extends Controller
                     $fputCsv = fn (mixed $value): mixed => is_string($value) ? $this->safeCsvValue($value) : $value;
 
                     fputcsv($output, [
-                        $fputCsv($plan->project?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? $plan->name),
+                        $fputCsv($plan->project?->project_name ?? $plan->bidding?->implementationProject?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? $plan->name),
                         $plan->lot?->lot_no ?? $plan->pplForm?->lot_number,
                         $plan->revenue_year ?? $plan->pplForm?->year_of_revenue_recognition ?? data_get($version?->input_data, 'workbook_import.revenue_year'),
-                        $fputCsv($plan->project?->status ?? $plan->bidding?->status ?? $plan->status),
+                        $fputCsv($plan->project?->status ?? $plan->bidding?->implementationProject?->status ?? $plan->bidding?->status ?? $plan->status),
                         $results['abc'] ?? '', $results['contract_amount'] ?? '', $results['net_sales'] ?? '',
                         $results['factory_cost'] ?? '', $results['total_cost_of_sales'] ?? '', $results['opex'] ?? '',
                         $results['gross_profit'] ?? '', $results['gpm'] ?? '',
@@ -258,7 +258,7 @@ class ProjectFinancialPlanController extends Controller
     {
         $query = ProjectFinancialPlan::query()
             ->forCompany($companyId)
-            ->with(['latestVersion', 'project', 'bidding', 'lot', 'pplForm'])
+            ->with(['latestVersion', 'project', 'bidding.implementationProject', 'lot', 'pplForm'])
             ->latest('updated_at');
 
         if (! empty($filters['year'])) {
@@ -279,6 +279,7 @@ class ProjectFinancialPlanController extends Controller
             $query->where(function (Builder $planQuery) use ($status): void {
                 $planQuery->where('status', $status)
                     ->orWhereHas('project', fn (Builder $projectQuery) => $projectQuery->where('status', $status))
+                    ->orWhereHas('bidding.implementationProject', fn (Builder $projectQuery) => $projectQuery->where('status', $status))
                     ->orWhereHas('bidding', fn (Builder $biddingQuery) => $biddingQuery->where('status', $status));
             });
         }

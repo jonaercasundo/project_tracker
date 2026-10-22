@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\ProjectInformation;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ProjectAwardSynchronizationService
@@ -26,12 +27,17 @@ class ProjectAwardSynchronizationService
             $this->assertAwardReady($bidding);
         }
 
-        $project = Project::query()
-            ->where('project_information_id', $bidding->getKey())
-            ->lockForUpdate()
-            ->first();
+        $project = $bidding->implementationProject()->lockForUpdate()->first();
+
+        $supportsBiddingForeignKey = Schema::hasColumn((new Project)->getTable(), 'project_information_id');
 
         if ($project === null && $createForAward) {
+            if (! $supportsBiddingForeignKey) {
+                throw ValidationException::withMessages([
+                    'status' => 'The project-to-bidding relationship column is not available. Apply the reviewed project synchronization schema before awarding this bidding record.',
+                ]);
+            }
+
             $project = $this->findExistingProject($bidding);
         }
 
@@ -45,7 +51,7 @@ class ProjectAwardSynchronizationService
             ]);
         }
 
-        if ($preserveExistingData && $project !== null && ! $project->project_information_id) {
+        if ($preserveExistingData && $project !== null && $supportsBiddingForeignKey && ! $project->project_information_id) {
             $this->assertExistingProjectMatchesAward($project, $bidding);
             $project->project_information_id = $bidding->getKey();
             $project->saveQuietly();
@@ -57,8 +63,7 @@ class ProjectAwardSynchronizationService
         }
 
         $project ??= new Project;
-        $project->fill([
-            'project_information_id' => $bidding->getKey(),
+        $projectAttributes = [
             'ref_no' => $bidding->reference_no,
             'project_code' => $bidding->project_id,
             'project_name' => $bidding->project_name,
@@ -67,7 +72,11 @@ class ProjectAwardSynchronizationService
             'ABC' => $bidding->approved_budget_contract_abc,
             'start_date' => $bidding->start_date,
             'end_date' => $bidding->end_date,
-        ]);
+        ];
+        if ($supportsBiddingForeignKey) {
+            $projectAttributes['project_information_id'] = $bidding->getKey();
+        }
+        $project->fill($projectAttributes);
 
         if (! $project->exists) {
             $project->status = 'Pending';
@@ -90,25 +99,29 @@ class ProjectAwardSynchronizationService
      */
     public function syncFromProject(Project $project, array $attributes): void
     {
-        $bidding = ProjectInformation::query()
-            ->whereKey($project->project_information_id)
-            ->lockForUpdate()
-            ->first();
+        $bidding = $project->bidding()->lockForUpdate()->first();
 
         if ($bidding === null) {
             return;
         }
 
-        $bidding->fill([
+        $biddingAttributes = [
             'reference_no' => $attributes['ref_no'] ?? $project->ref_no,
-            'project_id' => $attributes['project_code'] ?? $project->project_code,
+            'project_code' => $attributes['project_code'] ?? $project->project_code,
             'project_name' => $attributes['project_name'] ?? $project->project_name,
             'procuring_entity' => $attributes['agency'] ?? $project->agency,
             'contract_amount' => $attributes['contract_amount'] ?? $project->contract_amount,
             'approved_budget_contract_abc' => $attributes['ABC'] ?? $project->ABC,
             'start_date' => $attributes['start_date'] ?? $project->start_date,
             'end_date' => $attributes['end_date'] ?? $project->end_date,
-        ])->saveQuietly();
+        ];
+
+        if (Schema::hasColumn((new Project)->getTable(), 'project_information_id')) {
+            $biddingAttributes['project_id'] = $attributes['project_code'] ?? $project->project_code;
+        }
+
+        $bidding->fill(Arr::where($biddingAttributes, fn (mixed $value, string $column): bool => Schema::hasColumn($bidding->getTable(), $column)))
+            ->saveQuietly();
     }
 
     public function assertAwardReady(ProjectInformation $bidding): void

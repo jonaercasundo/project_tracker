@@ -98,9 +98,10 @@
                                 @php
                                     $version = $plan->latestVersion;
                                     $results = $version?->calculation_results ?? [];
-                                    $projectName = $plan->project?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? 'Standalone pre-award';
+                                    $implementationProject = $plan->project ?? $plan->bidding?->implementationProject;
+                                    $projectName = $implementationProject?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? 'Standalone pre-award';
                                     $lotNumber = $plan->lot?->lot_no ?? $plan->pplForm?->lot_number;
-                                    $monitoringStatus = $plan->project?->status ?? $plan->bidding?->status ?? ucfirst($plan->status);
+                                    $monitoringStatus = $implementationProject?->status ?? $plan->bidding?->status ?? ucfirst($plan->status);
                                     $inputs = $version?->input_data['inputs'] ?? [];
                                 @endphp
                                 <tr>
@@ -123,7 +124,8 @@
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700">{{ isset($results['npm']) ? number_format((float) $results['npm'] * 100, 2).'%' : '—' }}</td>
                                     <td class="px-4 py-3 text-xs text-slate-600">
                                         <span class="font-semibold">v{{ $version?->version_number ?? '—' }}</span>
-                                        <p class="mt-1">Project #{{ $plan->project_id ?? '—' }} · Bid #{{ $plan->project_information_id ?? '—' }} · PPL #{{ $plan->ppl_form_id ?? '—' }}@if($plan->lot_id) · Lot ID {{ $plan->lot_id }}@endif</p>
+                                        <p class="mt-1">Project #{{ $plan->project_id ?? '—' }}@if($plan->bidding) · Bid: {{ $plan->bidding->project_name }} (#{{ $plan->bidding->id }})@else · Bid #{{ $plan->project_information_id ?? '—' }}@endif</p>
+                                        <p class="mt-1">PPL: {{ $plan->pplForm?->project_code ?? '—' }} / Lot {{ $plan->pplForm?->lot_number ?? '—' }} (#{{ $plan->ppl_form_id ?? '—' }})@if($plan->lot) · Bidding lot {{ $plan->lot->lot_no }} (#{{ $plan->lot_id }})@endif</p>
                                     </td>
                                     <td class="whitespace-nowrap px-3 py-2.5">
                                         <div class="flex items-center gap-2 text-xs font-semibold">

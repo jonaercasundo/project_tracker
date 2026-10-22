@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Schema;
 
 class ProjectInformation extends Model
 {
@@ -64,7 +65,11 @@ class ProjectInformation extends Model
 
     public function implementationProject(): HasOne
     {
-        return $this->hasOne(Project::class, 'project_information_id');
+        if (Schema::hasColumn((new Project)->getTable(), 'project_information_id')) {
+            return $this->hasOne(Project::class, 'project_information_id');
+        }
+
+        return $this->hasOne(Project::class, 'project_id', 'project_id');
     }
 
     public function awardEvents(): HasMany

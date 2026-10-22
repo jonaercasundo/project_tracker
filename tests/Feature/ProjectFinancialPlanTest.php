@@ -326,6 +326,81 @@ it('supports existing project links and optional bidding lots without changing p
         ->and($plan->bidding->status)->toBe('Awarded');
 });
 
+it('shows linked implementation status and all bidding PPL and lot sources in MMC monitoring', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $bidding = ProjectInformation::query()->create([
+        'project_id' => 'SME-2025-2-9-11',
+        'project_code' => 'SME 2',
+        'project_name' => 'SME 2025 2, 9, 11',
+        'procuring_entity' => 'Department of Education',
+        'approved_budget_contract_abc' => '157751301.52',
+        'status' => 'Draft',
+    ]);
+    $project = Project::query()->create([
+        'project_information_id' => $bidding->id,
+        'ref_no' => 'SME-MONITORING-001',
+        'project_code' => 'SME 2',
+        'project_name' => 'SME 2025 2, 9, 11',
+        'agency' => 'Department of Education',
+        'contract_amount' => '150000000.00',
+        'ABC' => '157751301.52',
+        'status' => 'Implementation',
+    ]);
+    $lot = ProjectLot::query()->create(['project_id' => $bidding->id, 'lot_no' => '2']);
+    $pplForm = PplForm::query()->create([
+        'project_code' => 'SME 2025 2, 9, 11',
+        'lot_number' => '2',
+        'project_title' => 'SME 2025 2, 9, 11',
+        'abc' => '157751301.52',
+    ]);
+
+    $this->post(route('finance.plans.store'), financialPlanPayload([
+        'project_id' => $project->project_id,
+        'project_information_id' => $bidding->id,
+        'lot_id' => $lot->id,
+        'ppl_form_id' => $pplForm->id,
+    ]))->assertRedirect();
+
+    $this->get(route('finance.dashboard'))
+        ->assertOk()
+        ->assertSee('Implementation')
+        ->assertSee('Bid: SME 2025 2, 9, 11')
+        ->assertSee('PPL: SME 2025 2, 9, 11 / Lot 2')
+        ->assertSee('Bidding lot 2');
+
+    $plan = ProjectFinancialPlan::query()->sole();
+
+    expect($bidding->fresh()->status)->toBe('Draft')
+        ->and($project->fresh()->status)->toBe('Implementation')
+        ->and((float) $pplForm->fresh()->abc)->toBe(157751301.52)
+        ->and($plan->project_id)->toBe($project->project_id)
+        ->and($plan->project_information_id)->toBe($bidding->id)
+        ->and($plan->lot_id)->toBe($lot->id)
+        ->and($plan->ppl_form_id)->toBe($pplForm->id);
+});
+
+it('resolves the legacy bidding link by the shared project identifier when the foreign key column is absent', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $project = makeLegacyProject();
+    $project->forceFill(['project_id' => 502682])->save();
+    $bidding = ProjectInformation::query()->create([
+        'project_id' => '502682',
+        'project_name' => 'SME 2025 2, 9, 11',
+        'procuring_entity' => 'Department of Education',
+        'approved_budget_contract_abc' => '157751301.52',
+        'status' => 'Draft',
+    ]);
+
+    Schema::table('projects', function (Blueprint $table): void {
+        $table->dropForeign(['project_information_id']);
+        $table->dropUnique('projects_bidding_link_unique');
+        $table->dropColumn('project_information_id');
+    });
+
+    expect($project->fresh()->bidding?->id)->toBe($bidding->id)
+        ->and($bidding->fresh()->implementationProject?->project_id)->toBe(502682);
+});
+
 it('fills blank ABC and contract inputs from selected MMC sources and preserves entered values', function () {
     $this->signInBiddingUser('finance', 'MMC');
     $bidding = ProjectInformation::query()->create([

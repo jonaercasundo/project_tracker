@@ -35,7 +35,7 @@ class StorePplFormRequest extends FormRequest
             'forex' => ['nullable', 'numeric', 'gt:0', 'max:999999999.999999'],
             'factory_downpayment' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
             'factory_payment_terms' => ['nullable', 'string', 'max:255'],
-            'full_payment_after_delivery' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
+            'full_payment_after_delivery' => ['nullable', 'integer', 'min:0', 'max:36500'],
             'pf1_contract_amt' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
             'pf2_contract_amt' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
             'pf3_contract_amt' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
@@ -73,7 +73,7 @@ class StorePplFormRequest extends FormRequest
         ];
 
         foreach ([
-            'lcb_abc', 'factory_downpayment', 'full_payment_after_delivery',
+            'lcb_abc', 'factory_downpayment',
             'pf1_contract_amt', 'pf2_contract_amt', 'pf3_contract_amt',
             'll_comm_factory_cost', 'logistics_abc', 'other_expenses',
             'manpower_others', 'assembly_service_center', 'rd_expenses',

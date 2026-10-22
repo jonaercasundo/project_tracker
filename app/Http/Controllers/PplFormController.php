@@ -461,7 +461,7 @@ class PplFormController extends Controller
         return null;
     }
 
-    public function show(Request $request, DashboardService $dashboards, int $id)
+    public function show(Request $request, DashboardService $dashboards, int $id): View
     {
         $company = $dashboards->currentCompany($request->user(), $request->session());
         abort_unless($company?->code === 'MMC', 403);
@@ -471,7 +471,42 @@ class PplFormController extends Controller
         }
         $data = $query->firstOrFail();
 
-        return view('finance.ppl_forms.show', compact('data'));
+        $source = null;
+        if (Schema::hasTable('mmc_ppl_source_links')
+            && Schema::hasColumn('mmc_ppl_source_links', 'company_id')
+            && Schema::hasColumn('mmc_ppl_source_links', 'ppl_form_id')
+            && Schema::hasColumn('mmc_ppl_source_links', 'match_status')) {
+            $sourceQuery = MmcPplSourceLink::query()
+                ->where('ppl_form_id', $data->getKey())
+                ->where('company_id', $company->company_id)
+                ->where('match_status', 'verified');
+            if (Schema::hasColumn('projects', 'company_id')) {
+                $sourceQuery->where(fn ($links) => $links->whereNull('project_id')
+                    ->orWhereHas('project', fn ($projects) => $projects->whereNull('company_id')->orWhere('company_id', $company->company_id)));
+            }
+            if (Schema::hasColumn('project_information', 'company_id')) {
+                $sourceQuery->where(fn ($links) => $links->whereNull('project_information_id')
+                    ->orWhereHas('bidding', fn ($biddings) => $biddings->whereNull('company_id')->orWhere('company_id', $company->company_id)));
+            }
+            $source = $sourceQuery->with(['project', 'bidding', 'biddingLot', 'legacyLot'])->first();
+            if ($source !== null && (
+                ($source->biddingLot !== null && (int) $source->biddingLot->project_id !== (int) $source->project_information_id)
+                || ($source->legacyLot !== null && (int) $source->legacyLot->project_id !== (int) $source->project_id)
+            )) {
+                $source = null;
+            }
+        }
+
+        $plans = collect();
+        if (Schema::hasTable('project_financial_plans')
+            && Schema::hasTable('project_financial_plan_versions')
+            && Schema::hasColumn('project_financial_plans', 'company_id')
+            && Schema::hasColumn('project_financial_plans', 'ppl_form_id')) {
+            $plans = ProjectFinancialPlan::query()->forCompany((int) $company->company_id)
+                ->where('ppl_form_id', $data->getKey())->with('latestVersion')->orderBy('id')->get();
+        }
+
+        return view('finance.ppl_forms.show', compact('data', 'source', 'plans'));
     }
 
     public function edit(Request $request, DashboardService $dashboards, int $id): View

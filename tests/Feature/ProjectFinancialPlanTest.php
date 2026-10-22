@@ -497,18 +497,19 @@ it('validates and persists PPL form fields using the actual database column name
         'project_code' => 'PPL-NEW', 'lot_number' => '1', 'project_title' => 'PPL validation case',
         'project_id_no' => 'ID-8', 'region' => 'Region VII', 'bid_opening' => '2026-10-01',
         'abc' => '200000.00', 'lcb_abc' => '190000.00', 'delivery_days_after_production' => '20',
-        'pf1_contract_amt' => '1.50', 'year_of_revenue_recognition' => '2026',
+        'pf1_contract_amt' => '1.50', 'full_payment_after_delivery' => '150', 'year_of_revenue_recognition' => '2026',
     ])->assertRedirect(route('ppl_forms.index'));
 
     $pplForm = PplForm::query()->sole();
     expect((float) $pplForm->lcb_abc)->toBe(190000.0)
         ->and($pplForm->delivery_days_after_production)->toBe(20)
+        ->and((int) $pplForm->full_payment_after_delivery)->toBe(150)
         ->and((float) $pplForm->pf1_contract_amt)->toBe(1.5);
 
     $this->post(route('ppl_forms.store'), [
         'project_code' => 'PPL-INVALID', 'lot_number' => '2', 'project_title' => 'Invalid',
-        'abc' => '-1', 'delivery_days_after_production' => '-2',
-    ])->assertSessionHasErrors(['abc', 'delivery_days_after_production']);
+        'abc' => '-1', 'delivery_days_after_production' => '-2', 'full_payment_after_delivery' => '0.5',
+    ])->assertSessionHasErrors(['abc', 'delivery_days_after_production', 'full_payment_after_delivery']);
     expect(PplForm::query()->count())->toBe(1);
 });
 

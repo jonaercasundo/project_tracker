@@ -6,6 +6,7 @@ use App\Models\PplForm;
 use App\Models\Project;
 use App\Models\ProjectFinancialPlan;
 use App\Models\ProjectInformation;
+use App\Models\ProjectLot;
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 use Tests\FinancialPlanTestCase;
@@ -144,6 +145,117 @@ it('shows unlinked forms without assigning an operational status', function () {
         ->assertSee('Unlinked');
 
     expect((float) $fixture['form']->fresh()->abc)->toBe(500.0);
+});
+
+it('shows historical PPL inputs without inventing missing workbook rates or calculations', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($user, [
+        'project_code' => 'TXTBOOK GRADE 11',
+        'lot_number' => '18',
+        'project_title' => 'Senior High School textbooks',
+        'project_id_no' => null,
+        'abc' => '74316257.20',
+        'lcb_abc' => null,
+        'pf3_contract_amt' => null,
+    ]);
+
+    $this->get(route('ppl_forms.show', $fixture['form']->id))
+        ->assertOk()
+        ->assertSee('PPL Form #'.$fixture['form']->id)
+        ->assertSee('Senior High School textbooks')
+        ->assertSee('₱74,316,257.20')
+        ->assertSee('LCB discount rate')
+        ->assertSee('PF3 / contract amount rate')
+        ->assertSee('Not recorded')
+        ->assertSee('No verified Project List link')
+        ->assertSee('No saved financial-plan calculation is linked')
+        ->assertDontSee('₱0.00');
+
+    expect($fixture['form']->fresh()->lcb_abc)->toBeNull();
+});
+
+it('shows only the latest saved MMC plan results and verified Project List status', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($user, ['abc' => '100.00', 'lcb_abc' => '0.25'], 'Implementation');
+    $plan = ProjectFinancialPlan::query()->create([
+        'company_id' => $user->currentCompany()->company_id,
+        'ppl_form_id' => $fixture['form']->id,
+        'name' => 'Verified lot plan',
+        'status' => 'draft',
+        'created_by' => $user->user_id,
+        'updated_by' => $user->user_id,
+    ]);
+    foreach ([1 => '99.00', 2 => '-50.00'] as $versionNumber => $ppl) {
+        $plan->versions()->create([
+            'version_number' => $versionNumber,
+            'status' => 'draft',
+            'input_data' => [],
+            'calculation_results' => ['abc' => '100.00', 'gross_profit' => $ppl, 'ppl' => $ppl],
+            'assumptions_snapshot' => [],
+            'factory_cost_snapshot' => [],
+            'created_by' => $user->user_id,
+        ]);
+    }
+
+    $this->get(route('ppl_forms.show', $fixture['form']->id))
+        ->assertOk()
+        ->assertSee('Implementation')
+        ->assertSee('Verified lot plan')
+        ->assertSee('Version 2')
+        ->assertSee('₱-50.00')
+        ->assertSee('0.25 (25.00%)')
+        ->assertSee(route('finance.plans.show', $plan))
+        ->assertDontSee('₱99.00');
+
+    expect($fixture['project']->fresh()->status)->toBe('Implementation')
+        ->and($plan->versions()->count())->toBe(2);
+});
+
+it('hides foreign company source status and plans on the PPL details page', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($user, ['project_title' => 'MMC historical source'], 'Implementation');
+    $miCompany = Company::query()->create(['code' => 'MI', 'name' => 'MI', 'is_active' => true]);
+    $fixture['project']->forceFill([
+        'company_id' => $miCompany->company_id,
+        'project_name' => 'MI confidential project',
+        'status' => 'Completed',
+    ])->save();
+    ProjectFinancialPlan::query()->create([
+        'company_id' => $miCompany->company_id,
+        'ppl_form_id' => $fixture['form']->id,
+        'name' => 'MI confidential plan',
+        'status' => 'draft',
+        'created_by' => $user->user_id,
+        'updated_by' => $user->user_id,
+    ]);
+
+    $this->get(route('ppl_forms.show', $fixture['form']->id))
+        ->assertOk()
+        ->assertSee('MMC historical source')
+        ->assertSee('No verified Project List link')
+        ->assertSee('No saved financial-plan calculation is linked')
+        ->assertDontSee('MI confidential project')
+        ->assertDontSee('MI confidential plan')
+        ->assertDontSee('Completed');
+});
+
+it('does not display a mismatched bidding lot as a verified PPL source', function () {
+    $user = $this->signInBiddingUser('finance', 'MMC');
+    $fixture = makePplListingFixture($user, ['project_title' => 'Lot integrity case'], 'Implementation');
+    $otherBidding = ProjectInformation::query()->create([
+        'project_id' => 'OTHER-BIDDING',
+        'project_name' => 'Unrelated bidding project',
+        'approved_budget_contract_abc' => '100.00',
+        'status' => 'Draft',
+    ]);
+    $otherLot = ProjectLot::query()->create(['project_id' => $otherBidding->getKey(), 'lot_no' => 'Lot 99']);
+    $fixture['form']->sourceLink->forceFill(['bidding_lot_id' => $otherLot->getKey()])->save();
+
+    $this->get(route('ppl_forms.show', $fixture['form']->id))
+        ->assertOk()
+        ->assertSee('No verified Project List link')
+        ->assertDontSee('Unrelated bidding project')
+        ->assertDontSee('Lot 99');
 });
 
 it('keeps foreign company forms and source statuses out of the MMC listing', function () {

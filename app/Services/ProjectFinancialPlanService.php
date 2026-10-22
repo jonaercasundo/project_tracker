@@ -13,6 +13,7 @@ use App\Models\ProjectLot;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ProjectFinancialPlanService
@@ -88,6 +89,7 @@ class ProjectFinancialPlanService
             $this->resolveLotProjectInformation($data);
             $plan = ProjectFinancialPlan::query()->create([
                 ...Arr::only($data, ['project_id', 'project_information_id', 'lot_id', 'ppl_form_id']),
+                'mmc_ppl_source_link_id' => $this->verifiedPplSourceLinkId($data, $companyId),
                 'company_id' => $companyId,
                 'name' => $data['name'],
                 'status' => 'draft',
@@ -115,6 +117,7 @@ class ProjectFinancialPlanService
             $this->resolveLotProjectInformation($data);
             $lockedPlan->fill([
                 ...Arr::only($data, ['project_id', 'project_information_id', 'lot_id', 'ppl_form_id']),
+                'mmc_ppl_source_link_id' => $this->verifiedPplSourceLinkId($data, $companyId),
                 'name' => $data['name'],
                 'updated_by' => $user->getKey(),
             ])->save();
@@ -301,9 +304,52 @@ class ProjectFinancialPlanService
             throw ValidationException::withMessages(['project_id' => 'Project, bidding, and legacy PPL records are currently owned by the MMC workspace.']);
         }
 
+        if ($companyCode === 'MMC') {
+            foreach ([
+                ['projects', Project::class, $data['project_id'] ?? null],
+                ['project_information', ProjectInformation::class, $data['project_information_id'] ?? null],
+                ['ppl_forms', PplForm::class, $data['ppl_form_id'] ?? null],
+            ] as [$table, $model, $recordId]) {
+                if ($recordId === null || ! Schema::hasColumn($table, 'company_id')) {
+                    continue;
+                }
+
+                $owner = $model::query()->whereKey($recordId)->value('company_id');
+                if ($owner !== null && (int) $owner !== $companyId) {
+                    throw ValidationException::withMessages(['project_id' => 'A linked project, bidding record, or PPL Form belongs to a different company.']);
+                }
+            }
+
+            if (! empty($data['project_id']) && ! empty($data['project_information_id'])) {
+                $project = Project::query()->findOrFail($data['project_id']);
+                $bidding = ProjectInformation::query()->findOrFail($data['project_information_id']);
+                $isRelated = Schema::hasColumn('projects', 'project_information_id') && $project->project_information_id !== null
+                    ? (int) $project->project_information_id === (int) $bidding->getKey()
+                    : is_numeric($bidding->project_id) && (string) $project->getKey() === trim((string) $bidding->project_id);
+                if (! $isRelated) {
+                    throw ValidationException::withMessages(['project_information_id' => 'The selected bidding record does not have a verified relationship to the selected Project List record.']);
+                }
+            }
+        }
+
         if (! empty($data['inputs']['factory_cost_id']) && $companyCode !== 'MI') {
             throw ValidationException::withMessages(['inputs.factory_cost_id' => 'MI factory-cost snapshots are available only in the MI company workspace.']);
         }
+    }
+
+    /** @param array<string, mixed> $data */
+    private function verifiedPplSourceLinkId(array $data, int $companyId): ?int
+    {
+        if (empty($data['ppl_form_id']) || ! Schema::hasTable('mmc_ppl_source_links')
+            || ! Schema::hasColumn('project_financial_plans', 'mmc_ppl_source_link_id')) {
+            return null;
+        }
+
+        return DB::table('mmc_ppl_source_links')
+            ->where('company_id', $companyId)
+            ->where('ppl_form_id', $data['ppl_form_id'])
+            ->where('match_status', 'verified')
+            ->value('id');
     }
 
     /** @param array<string, mixed> $data

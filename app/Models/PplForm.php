@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PplForm extends Model
 {
     protected $table = 'ppl_forms';
 
     protected $fillable = [
+        'company_id',
         'project_code',
         'lot_number',
         'project_title',
@@ -62,6 +64,11 @@ class PplForm extends Model
         'bidder',
         'authorized_signatory',
     ];
+
+    public function sourceLink(): HasOne
+    {
+        return $this->hasOne(MmcPplSourceLink::class, 'ppl_form_id');
+    }
 
     protected $casts = [
         'bid_opening' => 'date',

@@ -23,10 +23,19 @@ return new class extends Migration
             $table->boolean('keystage')->default(false);
             $table->float('ABC');
         });
+
+        Schema::create('lot', function (Blueprint $table): void {
+            $table->increments('lot_id');
+            $table->string('lot_name', 100);
+            $table->integer('project_id');
+            $table->string('contract_no', 255);
+            $table->foreign('project_id')->references('project_id')->on('projects')->restrictOnDelete();
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('lot');
         Schema::dropIfExists('projects');
     }
 };

@@ -101,7 +101,7 @@
                                     $implementationProject = $plan->project ?? $plan->bidding?->implementationProject;
                                     $projectName = $implementationProject?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? 'Standalone pre-award';
                                     $lotNumber = $plan->lot?->lot_no ?? $plan->pplForm?->lot_number;
-                                    $monitoringStatus = $implementationProject?->status ?? $plan->bidding?->status ?? ucfirst($plan->status);
+                                    $monitoringStatus = $implementationProject?->status ?? 'Not linked';
                                     $inputs = $version?->input_data['inputs'] ?? [];
                                 @endphp
                                 <tr>

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\MmcPplImportBatch;
 use App\Models\MmcPplImportRow;
 use App\Models\MmcPplImportSourceMapping;
+use App\Models\MmcPplSourceLink;
 use App\Models\PplForm;
 use App\Models\Project;
 use App\Models\ProjectFinancialPlan;
@@ -226,6 +227,7 @@ class MmcPplWorkbookImportService
                         $user,
                         $companyId,
                     );
+                    $this->persistVerifiedSourceLink($plan, $row, $user, $companyId);
                     if (Schema::hasColumn('project_financial_plans', 'revenue_year') && is_numeric($data['revenue_year'] ?? null)) {
                         $plan->forceFill(['revenue_year' => (int) $data['revenue_year']])->save();
                     }
@@ -321,6 +323,86 @@ class MmcPplWorkbookImportService
         ];
     }
 
+    private function persistVerifiedSourceLink(ProjectFinancialPlan $plan, MmcPplImportRow $row, User $user, int $companyId): void
+    {
+        if (! Schema::hasTable('mmc_ppl_source_links') || ! Schema::hasColumn('project_financial_plans', 'mmc_ppl_source_link_id')) {
+            return;
+        }
+
+        $mapping = data_get($row->normalized_data, 'source_mapping', []);
+        $ids = $mapping['linked_record_ids'] ?? [];
+        if (($mapping['status'] ?? null) !== 'auto_matched'
+            || empty($ids['project_id']) || empty($ids['bidding_id']) || empty($ids['lot_id']) || empty($plan->ppl_form_id)) {
+            return;
+        }
+
+        $pplForm = PplForm::query()->whereKey($plan->ppl_form_id)->first();
+        $project = Project::query()->whereKey($ids['project_id'])->first();
+        $bidding = ProjectInformation::query()->whereKey($ids['bidding_id'])->first();
+        $lot = ProjectLot::query()->where('project_id', $ids['bidding_id'])->whereKey($ids['lot_id'])->first();
+        if ($pplForm === null || $project === null || $bidding === null || $lot === null
+            || ! $this->projectsAreLinked($project, $bidding)
+            || $this->normalizeLot((string) $lot->lot_no) !== $this->normalizeLot((string) $pplForm->lot_number)) {
+            throw ValidationException::withMessages(['source_mapping' => 'The selected project, bidding, lot, and PPL records no longer form a verified source relationship. Review the mapping and retry.']);
+        }
+
+        foreach ([[$pplForm, 'ppl_forms'], [$project, 'projects'], [$bidding, 'project_information']] as [$record, $table]) {
+            if (Schema::hasColumn($table, 'company_id') && $record->company_id !== null && (int) $record->company_id !== $companyId) {
+                throw ValidationException::withMessages(['source_mapping' => 'The selected source record belongs to a different company.']);
+            }
+        }
+
+        foreach ([[$pplForm, 'ppl_forms'], [$project, 'projects'], [$bidding, 'project_information']] as [$record, $table]) {
+            if (Schema::hasColumn($table, 'company_id') && $record->company_id === null) {
+                $record->forceFill(['company_id' => $companyId])->save();
+            }
+        }
+
+        if (Schema::hasColumn('projects', 'project_information_id')) {
+            if ($project->project_information_id !== null && (int) $project->project_information_id !== (int) $bidding->getKey()) {
+                throw ValidationException::withMessages(['source_mapping' => 'The project is already linked to a different bidding record.']);
+            }
+            if (Project::query()->where('project_information_id', $bidding->getKey())->where('project_id', '<>', $project->getKey())->exists()) {
+                throw ValidationException::withMessages(['source_mapping' => 'The bidding record is already linked to another project.']);
+            }
+            if ($project->project_information_id === null) {
+                $project->forceFill(['project_information_id' => $bidding->getKey()])->save();
+            }
+        }
+
+        $link = MmcPplSourceLink::query()->updateOrCreate(
+            ['ppl_form_id' => $pplForm->getKey()],
+            [
+                'company_id' => $companyId,
+                'project_id' => $project->getKey(),
+                'project_information_id' => $bidding->getKey(),
+                'bidding_lot_id' => $lot->getKey(),
+                'legacy_lot_id' => null,
+                'match_status' => 'verified',
+                'match_origin' => ($mapping['origin'] ?? 'automatic') === 'manual' ? 'manual' : 'automatic',
+                'matching_identifiers' => [
+                    'workbook_project_code' => $row->normalized_data['project_code'] ?? null,
+                    'workbook_lot_number' => $row->normalized_data['lot_number'] ?? null,
+                    'project_identifier' => $row->normalized_data['project_identifier'] ?? null,
+                    'linked_record_ids' => $ids,
+                    'mapping_origin' => $mapping['origin'] ?? 'automatic',
+                ],
+                'confirmed_by' => $user->getAuthIdentifier(),
+                'confirmed_at' => now(),
+            ],
+        );
+        $plan->forceFill(['mmc_ppl_source_link_id' => $link->getKey()])->save();
+    }
+
+    private function projectsAreLinked(Project $project, ProjectInformation $bidding): bool
+    {
+        if (Schema::hasColumn('projects', 'project_information_id') && $project->project_information_id !== null) {
+            return (int) $project->project_information_id === (int) $bidding->getKey();
+        }
+
+        return is_numeric($bidding->project_id) && (string) $project->getKey() === trim((string) $bidding->project_id);
+    }
+
     public function cancel(MmcPplImportBatch $batch, int $companyId): MmcPplImportBatch
     {
         return DB::transaction(function () use ($batch, $companyId): MmcPplImportBatch {
@@ -370,7 +452,11 @@ class MmcPplWorkbookImportService
                 if (! Schema::hasTable('projects') || ! Schema::hasColumn('projects', 'project_id') || ! Schema::hasColumn('projects', 'project_name')) {
                     throw ValidationException::withMessages(['project_id' => 'MMC project selection is unavailable because the project schema is incomplete.']);
                 }
-                $project = Project::query()->find($projectId);
+                $projectQuery = Project::query()->whereKey($projectId);
+                if (Schema::hasColumn('projects', 'company_id')) {
+                    $projectQuery->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $companyId));
+                }
+                $project = $projectQuery->first();
                 if ($project === null) {
                     throw ValidationException::withMessages(['project_id' => 'Select an existing MMC project.']);
                 }
@@ -381,7 +467,11 @@ class MmcPplWorkbookImportService
                 if (! Schema::hasTable('project_information') || ! Schema::hasColumn('project_information', 'id') || ! Schema::hasColumn('project_information', 'project_name')) {
                     throw ValidationException::withMessages(['project_information_id' => 'Bidding-record selection is unavailable because the bidding schema is incomplete.']);
                 }
-                $bidding = ProjectInformation::query()->find($biddingId);
+                $biddingQuery = ProjectInformation::query()->whereKey($biddingId);
+                if (Schema::hasColumn('project_information', 'company_id')) {
+                    $biddingQuery->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $companyId));
+                }
+                $bidding = $biddingQuery->first();
                 if ($bidding === null) {
                     throw ValidationException::withMessages(['project_information_id' => 'Select an existing bidding record.']);
                 }
@@ -402,11 +492,7 @@ class MmcPplWorkbookImportService
             }
 
             if ($project !== null && $bidding !== null) {
-                $hasExplicitBiddingLink = Schema::hasColumn('projects', 'project_information_id')
-                    && (int) $project->project_information_id === (int) $bidding->getKey();
-                $hasVerifiedLegacyLink = is_numeric($bidding->project_id)
-                    && (string) $project->getKey() === trim((string) $bidding->project_id);
-                if (! $hasExplicitBiddingLink && ! $hasVerifiedLegacyLink) {
+                if (! $this->projectsAreLinked($project, $bidding)) {
                     throw ValidationException::withMessages(['project_information_id' => 'The selected bidding record does not belong to the selected MMC project.']);
                 }
             }
@@ -490,7 +576,11 @@ class MmcPplWorkbookImportService
         if (Schema::hasColumn('ppl_forms', 'project_id_no')) {
             $pplColumns[] = 'project_id_no';
         }
-        $pplForms = PplForm::query()->get($pplColumns);
+        $pplQuery = PplForm::query();
+        if (Schema::hasColumn('ppl_forms', 'company_id')) {
+            $pplQuery->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $companyId));
+        }
+        $pplForms = $pplQuery->get($pplColumns);
 
         $projects = collect();
         if (Schema::hasTable('projects') && Schema::hasColumn('projects', 'project_name') && Schema::hasColumn('projects', 'project_id')) {
@@ -500,7 +590,12 @@ class MmcPplWorkbookImportService
                     $projectColumns[] = $column;
                 }
             }
-            $projects = Project::query()->get($projectColumns);
+            $projectQuery = Project::query();
+            if (Schema::hasColumn('projects', 'company_id')) {
+                $projectQuery->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $companyId));
+                $projectColumns[] = 'company_id';
+            }
+            $projects = $projectQuery->get($projectColumns);
         }
 
         $biddings = collect();
@@ -511,7 +606,12 @@ class MmcPplWorkbookImportService
                     $biddingColumns[] = $column;
                 }
             }
-            $biddings = ProjectInformation::query()->get(array_values(array_unique($biddingColumns)));
+            $biddingQuery = ProjectInformation::query();
+            if (Schema::hasColumn('project_information', 'company_id')) {
+                $biddingQuery->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $companyId));
+                $biddingColumns[] = 'company_id';
+            }
+            $biddings = $biddingQuery->get(array_values(array_unique($biddingColumns)));
         }
 
         $lots = collect();
@@ -786,12 +886,7 @@ class MmcPplWorkbookImportService
     private function projectsRelatedToBidding(ProjectInformation $bidding, $projects)
     {
         return $projects->filter(function (Project $project) use ($bidding): bool {
-            $hasExplicitBiddingLink = Schema::hasColumn('projects', 'project_information_id')
-                && (int) $project->project_information_id === (int) $bidding->getKey();
-            $hasVerifiedLegacyLink = is_numeric($bidding->project_id)
-                && (string) $project->getKey() === trim((string) $bidding->project_id);
-
-            return $hasExplicitBiddingLink || $hasVerifiedLegacyLink;
+            return $this->projectsAreLinked($project, $bidding);
         })->values();
     }
 
@@ -801,12 +896,7 @@ class MmcPplWorkbookImportService
     private function biddingsRelatedToProject(Project $project, $biddings)
     {
         return $biddings->filter(function (ProjectInformation $bidding) use ($project): bool {
-            $hasExplicitBiddingLink = Schema::hasColumn('projects', 'project_information_id')
-                && (int) $project->project_information_id === (int) $bidding->getKey();
-            $hasVerifiedLegacyLink = is_numeric($bidding->project_id)
-                && (string) $project->getKey() === trim((string) $bidding->project_id);
-
-            return $hasExplicitBiddingLink || $hasVerifiedLegacyLink;
+            return $this->projectsAreLinked($project, $bidding);
         })->values();
     }
 

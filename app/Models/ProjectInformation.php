@@ -13,6 +13,7 @@ class ProjectInformation extends Model
     protected $table = 'project_information';
 
     protected $fillable = [
+        'company_id',
         'project_id',
         'project_code',
         'reference_no',

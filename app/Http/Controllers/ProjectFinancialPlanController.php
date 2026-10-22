@@ -56,12 +56,11 @@ class ProjectFinancialPlanController extends Controller
                 ? ProjectFinancialPlan::query()->forCompany($companyId)->whereNotNull('revenue_year')->distinct()->orderBy('revenue_year')->pluck('revenue_year')
                 : collect();
             $monitoringYears = $linkedFormYears->merge($importedPlanYears)->unique()->sort()->values();
-            $monitoringStatuses = collect(['draft'])
-                ->merge(Project::query()->whereNotNull('status')->distinct()->orderBy('status')->pluck('status'))
-                ->merge(ProjectInformation::query()->whereNotNull('status')->distinct()->orderBy('status')->pluck('status'))
-                ->unique()
-                ->sort()
-                ->values();
+            $statusQuery = Project::query()->whereNotNull('status');
+            if (Schema::hasColumn('projects', 'company_id')) {
+                $statusQuery->where(fn (Builder $projectQuery) => $projectQuery->whereNull('company_id')->orWhere('company_id', $companyId));
+            }
+            $monitoringStatuses = $statusQuery->distinct()->orderBy('status')->pluck('status');
         }
 
         return view('finance.dashboard', [
@@ -108,7 +107,7 @@ class ProjectFinancialPlanController extends Controller
                         $fputCsv($plan->project?->project_name ?? $plan->bidding?->implementationProject?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? $plan->name),
                         $plan->lot?->lot_no ?? $plan->pplForm?->lot_number,
                         $plan->revenue_year ?? $plan->pplForm?->year_of_revenue_recognition ?? data_get($version?->input_data, 'workbook_import.revenue_year'),
-                        $fputCsv($plan->project?->status ?? $plan->bidding?->implementationProject?->status ?? $plan->bidding?->status ?? $plan->status),
+                        $fputCsv($plan->project?->status ?? $plan->bidding?->implementationProject?->status ?? 'Not linked'),
                         $results['abc'] ?? '', $results['contract_amount'] ?? '', $results['net_sales'] ?? '',
                         $results['factory_cost'] ?? '', $results['total_cost_of_sales'] ?? '', $results['opex'] ?? '',
                         $results['gross_profit'] ?? '', $results['gpm'] ?? '',
@@ -256,9 +255,32 @@ class ProjectFinancialPlanController extends Controller
     /** @param array{year?: string, status?: string} $filters */
     private function monitoringQuery(int $companyId, array $filters): Builder
     {
+        $projectOwnerScope = function ($projectQuery) use ($companyId): void {
+            if (Schema::hasColumn('projects', 'company_id')) {
+                $projectQuery->where(fn (Builder $ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $companyId));
+            }
+        };
+        $biddingOwnerScope = function ($biddingQuery) use ($companyId): void {
+            if (Schema::hasColumn('project_information', 'company_id')) {
+                $biddingQuery->where(fn (Builder $ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $companyId));
+            }
+        };
         $query = ProjectFinancialPlan::query()
             ->forCompany($companyId)
-            ->with(['latestVersion', 'project', 'bidding.implementationProject', 'lot', 'pplForm'])
+            ->with([
+                'latestVersion',
+                'project' => $projectOwnerScope,
+                'bidding' => function ($biddingQuery) use ($biddingOwnerScope, $projectOwnerScope): void {
+                    $biddingOwnerScope($biddingQuery);
+                    $biddingQuery->with(['implementationProject' => $projectOwnerScope]);
+                },
+                'lot',
+                'pplForm' => function ($pplQuery) use ($companyId): void {
+                    if (Schema::hasColumn('ppl_forms', 'company_id')) {
+                        $pplQuery->where(fn (Builder $ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $companyId));
+                    }
+                },
+            ])
             ->latest('updated_at');
 
         if (! empty($filters['year'])) {
@@ -277,10 +299,22 @@ class ProjectFinancialPlanController extends Controller
         if (! empty($filters['status'])) {
             $status = $filters['status'];
             $query->where(function (Builder $planQuery) use ($status): void {
-                $planQuery->where('status', $status)
-                    ->orWhereHas('project', fn (Builder $projectQuery) => $projectQuery->where('status', $status))
-                    ->orWhereHas('bidding.implementationProject', fn (Builder $projectQuery) => $projectQuery->where('status', $status))
-                    ->orWhereHas('bidding', fn (Builder $biddingQuery) => $biddingQuery->where('status', $status));
+                $planQuery->whereHas('project', function (Builder $projectQuery) use ($status): void {
+                    $projectQuery->where('status', $status);
+                    if (Schema::hasColumn('projects', 'company_id')) {
+                        $projectQuery->where(fn (Builder $ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $this->currentCompanyId()));
+                    }
+                })->orWhereHas('bidding', function (Builder $biddingQuery) use ($status): void {
+                    if (Schema::hasColumn('project_information', 'company_id')) {
+                        $biddingQuery->where(fn (Builder $ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $this->currentCompanyId()));
+                    }
+                    $biddingQuery->whereHas('implementationProject', function (Builder $projectQuery) use ($status): void {
+                        $projectQuery->where('status', $status);
+                        if (Schema::hasColumn('projects', 'company_id')) {
+                            $projectQuery->where(fn (Builder $ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $this->currentCompanyId()));
+                        }
+                    });
+                });
             });
         }
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\MmcPplImportBatch;
+use App\Models\MmcPplSourceLink;
 use App\Models\PplForm;
 use App\Models\Project;
 use App\Models\ProjectFinancialPlan;
@@ -285,7 +286,11 @@ it('allows authorized users to explicitly map an unmatched workbook row to verif
             ->and($plan->project_information_id)->toBe($bidding->id)
             ->and($plan->lot_id)->toBe($lot->id)
             ->and($plan->ppl_form_id)->toBe($pplForm->id)
-            ->and($plan->latestVersion->input_data['workbook_import']['manual_mapping']['selected_by'])->toBe($user->getAuthIdentifier());
+            ->and($plan->latestVersion->input_data['workbook_import']['manual_mapping']['selected_by'])->toBe($user->getAuthIdentifier())
+            ->and($plan->mmc_ppl_source_link_id)->toBe(MmcPplSourceLink::query()->sole()->getKey())
+            ->and(MmcPplSourceLink::query()->sole()->match_origin)->toBe('manual')
+            ->and(MmcPplSourceLink::query()->sole()->ppl_form_id)->toBe($pplForm->getKey())
+            ->and((int) $project->fresh()->project_information_id)->toBe((int) $bidding->getKey());
     } finally {
         @unlink($path);
     }

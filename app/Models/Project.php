@@ -20,6 +20,7 @@ class Project extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
+        'company_id',
         'project_name',
         'project_code',
         'ref_no',

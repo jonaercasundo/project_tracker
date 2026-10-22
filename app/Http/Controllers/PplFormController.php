@@ -9,6 +9,8 @@ use App\Models\PplForm;
 use App\Models\Project;
 use App\Models\ProjectInformation;
 use App\Models\ProjectLot;
+use App\Services\DashboardService;
+use App\Services\MmcPplSourceLinkService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,9 +21,14 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class PplFormController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, DashboardService $dashboards)
     {
         $query = PplForm::query();
+        $company = $dashboards->currentCompany($request->user(), $request->session());
+        abort_unless($company?->code === 'MMC', 403);
+        if (Schema::hasColumn('ppl_forms', 'company_id')) {
+            $query->where(fn ($ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $company->company_id));
+        }
 
         // ===============================
         // SEARCH
@@ -69,14 +76,19 @@ class PplFormController extends Controller
         return view('finance.ppl_forms.index', compact('data'));
     }
 
-    public function create()
+    public function create(Request $request, DashboardService $dashboards)
     {
         Gate::authorize('viewAny', ProjectInformation::class);
+        $company = $dashboards->currentCompany($request->user(), $request->session());
+        abort_unless($company?->code === 'MMC', 403);
 
-        $biddingProjects = ProjectInformation::query()
+        $biddingQuery = ProjectInformation::query()
             ->with(['lots:id,project_id,lot_no,region'])
-            ->orderBy('project_name')
-            ->get(['id', 'project_id', 'project_code', 'project_name', 'region', 'date_of_bid_opening', 'approved_budget_contract_abc']);
+            ->orderBy('project_name');
+        if (Schema::hasColumn('project_information', 'company_id')) {
+            $biddingQuery->where(fn ($ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $company->company_id));
+        }
+        $biddingProjects = $biddingQuery->get(['id', 'project_id', 'project_code', 'project_name', 'region', 'date_of_bid_opening', 'approved_budget_contract_abc']);
 
         $legacyProjectLots = collect();
         if (Schema::hasTable('projects') && Schema::hasTable('lot')) {
@@ -87,6 +99,8 @@ class PplFormController extends Controller
                 ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('lots as bidding_lot')->whereColumn('bidding_lot.project_id', 'bidding.id'))
                 ->orderBy('bidding.project_name')
                 ->orderBy('legacy_lot.lot_name')
+                ->when(Schema::hasColumn('project_information', 'company_id'), fn ($query) => $query->where(fn ($ownerQuery) => $ownerQuery->whereNull('bidding.company_id')->orWhere('bidding.company_id', $company->company_id)))
+                ->when(Schema::hasColumn('projects', 'company_id'), fn ($query) => $query->where(fn ($ownerQuery) => $ownerQuery->whereNull('project.company_id')->orWhere('project.company_id', $company->company_id)))
                 ->get([
                     'bidding.id as bidding_id', 'bidding.project_id as bidding_identifier', 'bidding.project_name as bidding_name',
                     'bidding.region as bidding_region', 'bidding.date_of_bid_opening', 'project.project_id as project_id',
@@ -97,9 +111,12 @@ class PplFormController extends Controller
         return view('finance.ppl_forms.create', compact('biddingProjects', 'legacyProjectLots'));
     }
 
-    public function sourceMapping(ProjectInformation $bidding, ProjectLot $lot): JsonResponse
+    public function sourceMapping(ProjectInformation $bidding, ProjectLot $lot, Request $request, DashboardService $dashboards): JsonResponse
     {
         Gate::authorize('view', $bidding);
+        $company = $dashboards->currentCompany($request->user(), $request->session());
+        abort_unless($company?->code === 'MMC', 403);
+        abort_if(Schema::hasColumn('project_information', 'company_id') && $bidding->company_id !== null && (int) $bidding->company_id !== (int) $company->company_id, 404);
 
         abort_unless((int) $lot->project_id === (int) $bidding->getKey(), 404);
 
@@ -111,9 +128,13 @@ class PplFormController extends Controller
         ]);
     }
 
-    public function legacyLotSourceMapping(ProjectInformation $bidding, Project $project, LegacyLot $lot): JsonResponse
+    public function legacyLotSourceMapping(ProjectInformation $bidding, Project $project, LegacyLot $lot, Request $request, DashboardService $dashboards): JsonResponse
     {
         Gate::authorize('view', $bidding);
+        $company = $dashboards->currentCompany($request->user(), $request->session());
+        abort_unless($company?->code === 'MMC', 403);
+        abort_if((Schema::hasColumn('project_information', 'company_id') && $bidding->company_id !== null && (int) $bidding->company_id !== (int) $company->company_id)
+            || (Schema::hasColumn('projects', 'company_id') && $project->company_id !== null && (int) $project->company_id !== (int) $company->company_id), 404);
 
         abort_unless(is_numeric($bidding->project_id)
             && (string) $project->getKey() === trim((string) $bidding->project_id)
@@ -128,16 +149,35 @@ class PplFormController extends Controller
         ]);
     }
 
-    public function store(StorePplFormRequest $request)
+    public function store(StorePplFormRequest $request, DashboardService $dashboards, MmcPplSourceLinkService $sourceLinks)
     {
-        PplForm::create($request->validated());
+        $company = $dashboards->currentCompany($request->user(), $request->session());
+        abort_unless($company?->code === 'MMC', 403);
+        $validated = $request->validated();
+        $sourceIds = [
+            'project_id' => $validated['source_project_id'] ?? null,
+            'project_information_id' => $validated['source_project_information_id'] ?? null,
+            'bidding_lot_id' => $validated['source_bidding_lot_id'] ?? null,
+            'legacy_lot_id' => $validated['source_legacy_lot_id'] ?? null,
+        ];
+        unset($validated['source_project_id'], $validated['source_project_information_id'], $validated['source_bidding_lot_id'], $validated['source_legacy_lot_id']);
+        if (Schema::hasColumn('ppl_forms', 'company_id')) {
+            $validated['company_id'] = $company->company_id;
+        }
+
+        DB::transaction(function () use ($validated, $sourceIds, $request, $company, $sourceLinks): void {
+            $pplForm = PplForm::query()->create($validated);
+            $sourceLinks->recordManualPplLink($pplForm, $sourceIds, $request->user(), (int) $company->company_id);
+        });
 
         return redirect()->route('ppl_forms.index')->with('success', 'Saved successfully');
     }
 
-    public function import(ImportPplFormRequest $request)
+    public function import(ImportPplFormRequest $request, DashboardService $dashboards)
     {
         $request->validated();
+        $company = $dashboards->currentCompany($request->user(), $request->session());
+        abort_unless($company?->code === 'MMC', 403);
 
         $file = $request->file('file');
         $spreadsheet = IOFactory::load($file->getPathname());
@@ -162,7 +202,7 @@ class PplFormController extends Controller
             }
 
             try {
-                PplForm::create([
+                $attributes = [
                     'project_code' => $projectCode,
                     'lot_number' => $lotNumber,
                     'project_title' => $projectTitle,
@@ -172,7 +212,11 @@ class PplFormController extends Controller
                     'abc' => $this->cleanNumber($row[$columns['abc']] ?? null),
                     'bidder' => $this->clean($row[$columns['bidder']] ?? null),
                     'authorized_signatory' => $this->clean($row[$columns['authorized_signatory']] ?? null),
-                ]);
+                ];
+                if (Schema::hasColumn('ppl_forms', 'company_id')) {
+                    $attributes['company_id'] = $company->company_id;
+                }
+                PplForm::create($attributes);
                 $inserted++;
             } catch (\Throwable $exception) {
                 report($exception);
@@ -273,9 +317,15 @@ class PplFormController extends Controller
         return null;
     }
 
-    public function show($id)
+    public function show(Request $request, DashboardService $dashboards, int $id)
     {
-        $data = PplForm::findOrFail($id);
+        $company = $dashboards->currentCompany($request->user(), $request->session());
+        abort_unless($company?->code === 'MMC', 403);
+        $query = PplForm::query()->whereKey($id);
+        if (Schema::hasColumn('ppl_forms', 'company_id')) {
+            $query->where(fn ($ownerQuery) => $ownerQuery->whereNull('company_id')->orWhere('company_id', $company->company_id));
+        }
+        $data = $query->firstOrFail();
 
         return view('finance.ppl_forms.show', compact('data'));
     }

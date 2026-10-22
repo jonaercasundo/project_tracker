@@ -15,6 +15,10 @@
 
     <form method="POST" action="{{ route('ppl_forms.store') }}" class="space-y-5">
         @csrf
+        <input type="hidden" id="source_project_id" name="source_project_id" value="{{ old('source_project_id') }}">
+        <input type="hidden" id="source_project_information_id" name="source_project_information_id" value="{{ old('source_project_information_id') }}">
+        <input type="hidden" id="source_bidding_lot_id" name="source_bidding_lot_id" value="{{ old('source_bidding_lot_id') }}">
+        <input type="hidden" id="source_legacy_lot_id" name="source_legacy_lot_id" value="{{ old('source_legacy_lot_id') }}">
 
         <section class="rounded-xl border border-blue-200 bg-blue-50 p-4" aria-labelledby="bidding-source-heading">
             <div class="flex items-start justify-between gap-4">
@@ -343,9 +347,11 @@
         const sourceUrl = @js(route('ppl_forms.source', ['bidding' => 987654321, 'lot' => 987654322]));
         const legacySourceUrl = @js(route('ppl_forms.legacy_source', ['bidding' => 987654321, 'project' => 987654323, 'lot' => 987654322]));
         const fields = ['project_title', 'lot_number', 'region', 'bid_opening'];
+        const sourceFields = ['source_project_id', 'source_project_information_id', 'source_bidding_lot_id', 'source_legacy_lot_id'];
 
         selector.addEventListener('change', async () => {
             if (!selector.value) {
+                sourceFields.forEach((field) => { document.getElementById(field).value = ''; });
                 status.textContent = 'No Operations source selected. Project Code, Project ID No., ABC, costs, rates, and other financial assumptions remain Finance-controlled because matching lot-level source fields are unavailable.';
                 return;
             }
@@ -363,6 +369,10 @@
                 }
 
                 const source = await response.json();
+                document.getElementById('source_project_information_id').value = biddingId;
+                document.getElementById('source_project_id').value = source.project_id ?? (sourceType === 'legacy' ? projectOrLotId : '');
+                document.getElementById('source_bidding_lot_id').value = sourceType === 'bidding' ? projectOrLotId : '';
+                document.getElementById('source_legacy_lot_id').value = sourceType === 'legacy' ? legacyLotId : '';
                 fields.forEach((field) => {
                     const input = document.getElementById(field);
                     if (input && source[field] !== null && source[field] !== undefined) {

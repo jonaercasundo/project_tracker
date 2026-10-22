@@ -50,10 +50,15 @@ class ProjectAwardSynchronizationService
                 'reference_no' => 'This project is already linked to another bidding document.',
             ]);
         }
+        $this->assertCompanyOwnershipCompatible($project, $bidding);
 
         if ($preserveExistingData && $project !== null && $supportsBiddingForeignKey && ! $project->project_information_id) {
             $this->assertExistingProjectMatchesAward($project, $bidding);
             $project->project_information_id = $bidding->getKey();
+            if (Schema::hasColumn('projects', 'company_id') && Schema::hasColumn('project_information', 'company_id')
+                && $project->company_id === null && $bidding->company_id !== null) {
+                $project->company_id = $bidding->company_id;
+            }
             $project->saveQuietly();
             if ($recordAwardEvent) {
                 $this->recordAwardEvent($bidding, $project, $statusBefore, $actorUserId);
@@ -75,6 +80,10 @@ class ProjectAwardSynchronizationService
         ];
         if ($supportsBiddingForeignKey) {
             $projectAttributes['project_information_id'] = $bidding->getKey();
+        }
+        if (Schema::hasColumn('projects', 'company_id') && Schema::hasColumn('project_information', 'company_id')
+            && $bidding->company_id !== null && $project->company_id === null) {
+            $projectAttributes['company_id'] = $bidding->company_id;
         }
         $project->fill($projectAttributes);
 
@@ -104,6 +113,7 @@ class ProjectAwardSynchronizationService
         if ($bidding === null) {
             return;
         }
+        $this->assertCompanyOwnershipCompatible($project, $bidding);
 
         $biddingAttributes = [
             'reference_no' => $attributes['ref_no'] ?? $project->ref_no,
@@ -115,6 +125,10 @@ class ProjectAwardSynchronizationService
             'start_date' => $attributes['start_date'] ?? $project->start_date,
             'end_date' => $attributes['end_date'] ?? $project->end_date,
         ];
+        if (Schema::hasColumn('projects', 'company_id') && Schema::hasColumn('project_information', 'company_id')
+            && $bidding->company_id === null && $project->company_id !== null) {
+            $biddingAttributes['company_id'] = $project->company_id;
+        }
 
         if (Schema::hasColumn((new Project)->getTable(), 'project_information_id')) {
             $biddingAttributes['project_id'] = $attributes['project_code'] ?? $project->project_code;
@@ -122,6 +136,19 @@ class ProjectAwardSynchronizationService
 
         $bidding->fill(Arr::where($biddingAttributes, fn (mixed $value, string $column): bool => Schema::hasColumn($bidding->getTable(), $column)))
             ->saveQuietly();
+    }
+
+    private function assertCompanyOwnershipCompatible(?Project $project, ProjectInformation $bidding): void
+    {
+        if ($project === null || ! Schema::hasColumn('projects', 'company_id') || ! Schema::hasColumn('project_information', 'company_id')) {
+            return;
+        }
+
+        if ($project->company_id !== null && $bidding->company_id !== null && (int) $project->company_id !== (int) $bidding->company_id) {
+            throw ValidationException::withMessages([
+                'project_id' => 'The Project List record and bidding record belong to different companies.',
+            ]);
+        }
     }
 
     public function assertAwardReady(ProjectInformation $bidding): void

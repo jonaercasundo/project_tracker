@@ -304,7 +304,7 @@ it('supports existing project links and optional bidding lots without changing p
     $this->signInBiddingUser('finance', 'MMC');
     $project = makeLegacyProject();
     $bidding = ProjectInformation::query()->create([
-        'project_id' => 'BID-'.fake()->unique()->numerify('####'),
+        'project_id' => (string) $project->project_id,
         'project_name' => 'Procurement lot group',
         'procuring_entity' => 'Test agency',
         'approved_budget_contract_abc' => 100000,
@@ -562,13 +562,6 @@ it('rejects a lot that belongs to another bidding project when prefilling PPL fi
 
 it('reuses a verified Project List legacy lot when the bidding record has no bidding lots', function () {
     $this->signInBiddingUser('finance', 'MMC');
-    Schema::create('lot', function (Blueprint $table): void {
-        $table->increments('lot_id');
-        $table->string('lot_name');
-        $table->unsignedInteger('project_id');
-        $table->string('contract_no')->nullable();
-    });
-
     $project = Project::query()->create([
         'project_name' => 'SME 2025 2, 9, 11',
         'project_code' => null,
@@ -679,7 +672,7 @@ it('handles missing optional bidding and project source columns without database
     $this->signInBiddingUser('finance', 'MMC');
     $project = makeLegacyProject();
     $bidding = ProjectInformation::query()->create([
-        'project_id' => 'BID-'.fake()->unique()->numerify('####'),
+        'project_id' => (string) $project->project_id,
         'project_name' => 'Optional fields unavailable',
         'procuring_entity' => 'Test agency',
         'approved_budget_contract_abc' => '250000.00',
@@ -891,8 +884,10 @@ it('paginates monitoring results while keeping search and filters in the query s
     $userId = auth()->id();
     $companyId = auth()->user()->currentCompany()->company_id;
     foreach (range(1, 26) as $number) {
+        $project = makeLegacyProject(['status' => 'Implementation']);
         ProjectFinancialPlan::query()->create([
             'company_id' => $companyId,
+            'project_id' => $project->project_id,
             'name' => 'Pageable plan '.$number,
             'status' => 'draft',
             'created_by' => $userId,
@@ -900,13 +895,35 @@ it('paginates monitoring results while keeping search and filters in the query s
         ]);
     }
 
-    $this->get(route('finance.dashboard', ['search' => 'Pageable plan', 'status' => 'draft', 'page' => 2]))
+    $this->get(route('finance.dashboard', ['search' => 'Pageable plan', 'status' => 'Implementation', 'page' => 2]))
         ->assertOk()
         ->assertViewHas('monitoringPlans', fn ($plans): bool => $plans->count() === 1
             && $plans->currentPage() === 2
             && $plans->total() === 26
             && str_contains($plans->url(1), 'search=Pageable%20plan')
-            && str_contains($plans->url(1), 'status=draft'));
+            && str_contains($plans->url(1), 'status=Implementation'));
+});
+
+it('filters PPL monitoring by Project List status and keeps financial status independent', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $userId = auth()->id();
+    $companyId = auth()->user()->currentCompany()->company_id;
+    $project = makeLegacyProject(['status' => 'Implementation']);
+    ProjectFinancialPlan::query()->create([
+        'company_id' => $companyId,
+        'project_id' => $project->project_id,
+        'name' => 'Status source plan',
+        'status' => 'draft',
+        'created_by' => $userId,
+        'updated_by' => $userId,
+    ]);
+
+    $this->get(route('finance.dashboard', ['status' => 'Implementation']))
+        ->assertOk()
+        ->assertViewHas('monitoringPlans', fn ($plans): bool => $plans->total() === 1);
+    $this->get(route('finance.dashboard', ['status' => 'draft']))
+        ->assertOk()
+        ->assertViewHas('monitoringPlans', fn ($plans): bool => $plans->total() === 0);
 });
 
 it('exports the MMC monitoring report with saved calculations version and source references', function () {

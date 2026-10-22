@@ -19,6 +19,7 @@ class ProjectFinancialPlan extends Model
         'project_information_id',
         'lot_id',
         'ppl_form_id',
+        'mmc_ppl_source_link_id',
         'revenue_year',
         'name',
         'status',
@@ -54,6 +55,11 @@ class ProjectFinancialPlan extends Model
     public function pplForm(): BelongsTo
     {
         return $this->belongsTo(PplForm::class, 'ppl_form_id');
+    }
+
+    public function mmcPplSourceLink(): BelongsTo
+    {
+        return $this->belongsTo(MmcPplSourceLink::class, 'mmc_ppl_source_link_id');
     }
 
     public function versions(): HasMany

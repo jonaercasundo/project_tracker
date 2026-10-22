@@ -360,6 +360,8 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:finance'])->group(function () {
         Route::get('/dashboard', [ProjectFinancialPlanController::class, 'dashboard'])
             ->name('finance.dashboard');
+        Route::get('/finance/plans/monitoring/export', [ProjectFinancialPlanController::class, 'exportMonitoring'])
+            ->name('finance.plans.monitoring.export');
 
         Route::get('/finance/plans', [ProjectFinancialPlanController::class, 'index'])
             ->name('finance.plans.index');
@@ -585,7 +587,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/liquidation/{liquidation}/pdf', [LiquidationController::class, 'downloadPdf'])->name('liquidation.pdf');
 
         // --- Budget Request (employee submits, approver/accounting/release workflow) ---
-        Route::get('/budget-requests', [BudgetRequestController::class, 'index'])->name('budget_requests.index');
+        Route::get('/budget-requests', [BudgetRequestController::class, 'index'])->middleware('role:user')->name('budget_requests.index');
         Route::get('/budget-requests/create', [BudgetRequestController::class, 'create'])->name('budget_requests.create');
         Route::post('/budget-requests', [BudgetRequestController::class, 'store'])->name('budget_requests.store');
         Route::get('/budget-requests/{budgetRequest}', [BudgetRequestController::class, 'show'])->name('budget_requests.show');

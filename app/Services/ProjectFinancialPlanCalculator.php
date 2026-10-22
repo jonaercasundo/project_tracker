@@ -37,8 +37,10 @@ class ProjectFinancialPlanCalculator
     }
 
     /** @return array<string, string> */
-    public function formulaManifest(): array
+    public function formulaManifest(string $companyCode): array
     {
+        $taxLawyerBase = $this->taxLawyerBase($companyCode);
+
         return [
             'net_sales' => 'contract_amount / (1 + sales_vat_rate)',
             'factory_cost' => 'sum of project lot item factory costs, sourced from the entered value or an MI factory-cost snapshot',
@@ -55,7 +57,7 @@ class ProjectFinancialPlanCalculator
             'assembly_service_center' => 'assembly_rate * ABC',
             'research_and_development' => 'rd_rate * ABC',
             'facilitation' => 'facilitation_rate * ABC',
-            'tax_lawyer_allowance' => 'tax_lawyer_rate * ABC',
+            'tax_lawyer_allowance' => 'tax_lawyer_rate * '.$taxLawyerBase,
             'municipal_tax' => '((min(net_sales, 400000) * first_tier_rate) + (max(net_sales - 400000, 0) * excess_rate)) * (1 + RRDM_rate)',
             'performance_bond' => '(contract_amount * bondable_rate * premium_rate * (1 + DST_rate + LGT_rate)) + notarial_fee + service_fee',
             'goods_insurance' => 'factory_cost * (marine_rate + fire_rate + inland_marine_rate)',
@@ -83,8 +85,9 @@ class ProjectFinancialPlanCalculator
      * @param  list<array{label: string, amount: string|int|float}>  $additionalCosts
      * @return array<string, string|null>
      */
-    public function calculate(array $inputs, array $assumptions = [], array $additionalCosts = []): array
+    public function calculate(string $companyCode, array $inputs, array $assumptions = [], array $additionalCosts = []): array
     {
+        $taxLawyerBase = $this->taxLawyerBase($companyCode);
         $rates = array_replace(self::WORKBOOK_ASSUMPTIONS, $assumptions);
         $contractAmount = $this->decimal($inputs['contract_amount'] ?? 0);
         $abc = $this->decimal($inputs['abc'] ?? 0);
@@ -108,7 +111,7 @@ class ProjectFinancialPlanCalculator
             'assembly_service_center' => $this->multiply($abc, $inputs['assembly_rate'] ?? 0),
             'research_and_development' => $this->multiply($abc, $inputs['rd_rate'] ?? 0),
             'facilitation' => $this->multiply($abc, $inputs['facilitation_rate'] ?? 0),
-            'tax_lawyer_allowance' => $this->multiply($abc, $inputs['tax_lawyer_rate'] ?? 0),
+            'tax_lawyer_allowance' => $this->multiply($taxLawyerBase === 'ABC' ? $abc : $netSales, $inputs['tax_lawyer_rate'] ?? 0),
             'municipal_tax' => $this->municipalTax($netSales, $rates),
             'performance_bond' => $this->performanceBond($contractAmount, $rates),
             'goods_insurance' => $this->goodsInsurance($factoryCost, $rates),
@@ -203,6 +206,15 @@ class ProjectFinancialPlanCalculator
     private function decimal(string|int|float|null $value): BigDecimal
     {
         return BigDecimal::of($value === null || $value === '' ? '0' : (string) $value);
+    }
+
+    private function taxLawyerBase(string $companyCode): string
+    {
+        return match ($companyCode) {
+            'MMC' => 'ABC',
+            'MI' => 'net_sales',
+            default => throw new \InvalidArgumentException('A supported company context is required for financial calculations.'),
+        };
     }
 
     private function money(BigDecimal $value): string

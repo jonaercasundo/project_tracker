@@ -38,8 +38,13 @@
         @if ($isMmcPplWorkspace)
             <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-5 py-4">
-                    <h2 class="font-semibold text-slate-950">MMC PPL monitoring</h2>
-                    <p class="mt-1 text-xs text-slate-500">Revenue uses net sales; costs, profit, and margins come from each plan's latest saved version. Year comes from the linked historical PPL revenue-recognition year.</p>
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 class="font-semibold text-slate-950">MMC PPL monitoring</h2>
+                            <p class="mt-1 text-xs text-slate-500">Financial values and version come from each plan's latest saved snapshot. Revenue year and source IDs come from linked historical records.</p>
+                        </div>
+                        <a href="{{ route('finance.plans.monitoring.export', request()->query()) }}" class="rounded-lg border border-emerald-700 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">Download financial report</a>
+                    </div>
                 </div>
                 <form method="GET" action="{{ route('finance.dashboard') }}" class="grid gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
                     <div>
@@ -70,12 +75,18 @@
                                 <th class="px-4 py-3">Project / lot</th>
                                 <th class="px-4 py-3">Year</th>
                                 <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3 text-right">ABC</th>
+                                <th class="px-4 py-3 text-right">Contract amount</th>
                                 <th class="px-4 py-3 text-right">Revenue</th>
+                                <th class="px-4 py-3 text-right">Factory cost</th>
                                 <th class="px-4 py-3 text-right">Total costs</th>
+                                <th class="px-4 py-3 text-right">Operating expenses</th>
                                 <th class="px-4 py-3 text-right">Gross profit</th>
                                 <th class="px-4 py-3 text-right">GPM</th>
                                 <th class="px-4 py-3 text-right">Projected PPL</th>
+                                <th class="px-4 py-3 text-right">Net profit after tax</th>
                                 <th class="px-4 py-3 text-right">NPM</th>
+                                <th class="px-4 py-3">Version / sources</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -86,6 +97,7 @@
                                     $projectName = $plan->project?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? 'Standalone pre-award';
                                     $lotNumber = $plan->lot?->lot_no ?? $plan->pplForm?->lot_number;
                                     $monitoringStatus = $plan->project?->status ?? $plan->bidding?->status ?? ucfirst($plan->status);
+                                    $inputs = $version?->input_data['inputs'] ?? [];
                                 @endphp
                                 <tr>
                                     <td class="px-4 py-3">
@@ -94,15 +106,24 @@
                                     </td>
                                     <td class="px-4 py-3 text-slate-700">{{ $plan->pplForm?->year_of_revenue_recognition ?? 'Not set' }}</td>
                                     <td class="px-4 py-3 text-slate-700">{{ $monitoringStatus }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['abc'] ?? $inputs['abc'] ?? 0), 2) }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['contract_amount'] ?? $inputs['contract_amount'] ?? 0), 2) }}</td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['net_sales'] ?? 0), 2) }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['factory_cost'] ?? 0), 2) }}</td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['total_cost_of_sales'] ?? 0), 2) }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['opex'] ?? 0), 2) }}</td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['gross_profit'] ?? 0), 2) }}</td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700">{{ isset($results['gpm']) ? number_format((float) $results['gpm'] * 100, 2).'%' : '—' }}</td>
                                     <td class="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">₱{{ number_format((float) ($results['ppl'] ?? 0), 2) }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums text-slate-700">₱{{ number_format((float) ($results['net_profit_after_tax'] ?? 0), 2) }}</td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700">{{ isset($results['npm']) ? number_format((float) $results['npm'] * 100, 2).'%' : '—' }}</td>
+                                    <td class="px-4 py-3 text-xs text-slate-600">
+                                        <span class="font-semibold">v{{ $version?->version_number ?? '—' }}</span>
+                                        <p class="mt-1">Project #{{ $plan->project_id ?? '—' }} · Bid #{{ $plan->project_information_id ?? '—' }} · PPL #{{ $plan->ppl_form_id ?? '—' }}@if($plan->lot_id) · Lot ID {{ $plan->lot_id }}@endif</p>
+                                    </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="9" class="px-5 py-10 text-center text-sm text-slate-500">No financial plans match these monitoring filters.</td></tr>
+                                <tr><td colspan="15" class="px-5 py-10 text-center text-sm text-slate-500">No financial plans match these monitoring filters.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

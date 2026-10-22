@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProjectFinancialPlanController extends Controller
 {
@@ -40,31 +41,13 @@ class ProjectFinancialPlanController extends Controller
         $filters = ['year' => null, 'status' => null];
 
         if ($isMmcPplWorkspace) {
-            $filters = $request->validate([
-                'year' => ['nullable', 'digits:4'],
-                'status' => ['nullable', 'string', 'max:50'],
-            ]);
-
-            $monitoringQuery = ProjectFinancialPlan::query()
-                ->forCompany($companyId)
-                ->with(['latestVersion', 'project', 'bidding', 'lot', 'pplForm'])
-                ->latest('updated_at');
-
-            if (! empty($filters['year'])) {
-                $monitoringQuery->whereHas('pplForm', fn (Builder $query) => $query->where('year_of_revenue_recognition', $filters['year']));
-            }
-
-            if (! empty($filters['status'])) {
-                $status = $filters['status'];
-                $monitoringQuery->where(function (Builder $query) use ($status): void {
-                    $query->where('status', $status)
-                        ->orWhereHas('project', fn (Builder $projectQuery) => $projectQuery->where('status', $status))
-                        ->orWhereHas('bidding', fn (Builder $biddingQuery) => $biddingQuery->where('status', $status));
-                });
-            }
-
-            $monitoringPlans = $monitoringQuery->paginate(25)->withQueryString();
+            $filters = $this->monitoringFilters($request);
+            $monitoringPlans = $this->monitoringQuery($companyId, $filters)->paginate(25)->withQueryString();
             $monitoringYears = PplForm::query()
+                ->whereIn('id', ProjectFinancialPlan::query()
+                    ->forCompany($companyId)
+                    ->whereNotNull('ppl_form_id')
+                    ->select('ppl_form_id'))
                 ->whereNotNull('year_of_revenue_recognition')
                 ->distinct()
                 ->orderBy('year_of_revenue_recognition')
@@ -89,6 +72,50 @@ class ProjectFinancialPlanController extends Controller
             'monitoringStatuses' => $monitoringStatuses,
             'filters' => $filters,
         ]);
+    }
+
+    public function exportMonitoring(Request $request): StreamedResponse
+    {
+        abort_unless(request()->user()?->currentCompany()?->code === 'MMC', 403, 'MMC company context is required for PPL monitoring reports.');
+
+        $filters = $this->monitoringFilters($request);
+        $plans = $this->monitoringQuery($this->currentCompanyId(), $filters);
+
+        return response()->streamDownload(function () use ($plans): void {
+            $output = fopen('php://output', 'wb');
+            if ($output === false) {
+                throw new \RuntimeException('Unable to open the MMC PPL monitoring report stream.');
+            }
+
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, [
+                'Project', 'Lot', 'Revenue year', 'Status', 'ABC', 'Contract amount', 'Net sales',
+                'Factory cost', 'Total cost of sales', 'Operating expenses', 'Gross profit', 'Gross margin', 'Net profit after tax', 'Projected PPL',
+                'Net margin', 'Version', 'Project ID', 'Bidding ID', 'PPL Form ID',
+            ]);
+
+            $plans->chunk(500, function ($rows) use ($output): void {
+                foreach ($rows as $plan) {
+                    $version = $plan->latestVersion;
+                    $results = $version?->calculation_results ?? [];
+                    $fputCsv = fn (mixed $value): mixed => is_string($value) ? $this->safeCsvValue($value) : $value;
+
+                    fputcsv($output, [
+                        $fputCsv($plan->project?->project_name ?? $plan->bidding?->project_name ?? $plan->pplForm?->project_title ?? $plan->name),
+                        $plan->lot?->lot_no ?? $plan->pplForm?->lot_number,
+                        $plan->pplForm?->year_of_revenue_recognition,
+                        $fputCsv($plan->project?->status ?? $plan->bidding?->status ?? $plan->status),
+                        $results['abc'] ?? '', $results['contract_amount'] ?? '', $results['net_sales'] ?? '',
+                        $results['factory_cost'] ?? '', $results['total_cost_of_sales'] ?? '', $results['opex'] ?? '',
+                        $results['gross_profit'] ?? '', $results['gpm'] ?? '',
+                        $results['net_profit_after_tax'] ?? '', $results['ppl'] ?? '', $results['npm'] ?? '',
+                        $version?->version_number, $plan->project_id, $plan->project_information_id, $plan->ppl_form_id,
+                    ]);
+                }
+            });
+
+            fclose($output);
+        }, 'mmc-ppl-monitoring.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function index(): View
@@ -190,6 +217,44 @@ class ProjectFinancialPlanController extends Controller
         abort_unless($company !== null && $company->is_active, 403, 'Select an active company to access financial plans.');
 
         return (int) $company->company_id;
+    }
+
+    /** @return array{year?: string, status?: string} */
+    private function monitoringFilters(Request $request): array
+    {
+        return $request->validate([
+            'year' => ['nullable', 'digits:4'],
+            'status' => ['nullable', 'string', 'max:50'],
+        ]);
+    }
+
+    /** @param array{year?: string, status?: string} $filters */
+    private function monitoringQuery(int $companyId, array $filters): Builder
+    {
+        $query = ProjectFinancialPlan::query()
+            ->forCompany($companyId)
+            ->with(['latestVersion', 'project', 'bidding', 'lot', 'pplForm'])
+            ->latest('updated_at');
+
+        if (! empty($filters['year'])) {
+            $query->whereHas('pplForm', fn (Builder $pplQuery) => $pplQuery->where('year_of_revenue_recognition', $filters['year']));
+        }
+
+        if (! empty($filters['status'])) {
+            $status = $filters['status'];
+            $query->where(function (Builder $planQuery) use ($status): void {
+                $planQuery->where('status', $status)
+                    ->orWhereHas('project', fn (Builder $projectQuery) => $projectQuery->where('status', $status))
+                    ->orWhereHas('bidding', fn (Builder $biddingQuery) => $biddingQuery->where('status', $status));
+            });
+        }
+
+        return $query;
+    }
+
+    private function safeCsvValue(string $value): string
+    {
+        return preg_match('/^[\s]*[=+\-@]/', $value) === 1 ? "'".$value : $value;
     }
 
     private function scopedPlan(ProjectFinancialPlan $plan): ProjectFinancialPlan

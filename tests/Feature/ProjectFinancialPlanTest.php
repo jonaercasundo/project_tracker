@@ -73,7 +73,7 @@ function makeLegacyProject(array $attributes = []): Project
 }
 
 it('calculates workbook PPL outputs with safe zero-sales margins and the corrected progressive municipal tax', function () {
-    $results = app(ProjectFinancialPlanCalculator::class)->calculate([
+    $results = app(ProjectFinancialPlanCalculator::class)->calculate('MMC', [
         'contract_amount' => '112000.00',
         'abc' => '100000.00',
         'factory_cost' => '50000.00',
@@ -87,7 +87,7 @@ it('calculates workbook PPL outputs with safe zero-sales margins and the correct
         ->and($results['costs']['goods_insurance'])->toBe('200.84')
         ->and($results['importation_vat'])->toBe('6500.00');
 
-    $zeroSales = app(ProjectFinancialPlanCalculator::class)->calculate([
+    $zeroSales = app(ProjectFinancialPlanCalculator::class)->calculate('MMC', [
         'contract_amount' => '0', 'abc' => '0', 'factory_cost' => '0',
     ]);
 
@@ -95,7 +95,7 @@ it('calculates workbook PPL outputs with safe zero-sales margins and the correct
 });
 
 it('calculates the tax lawyer allowance from ABC when ABC differs from net sales', function () {
-    $results = app(ProjectFinancialPlanCalculator::class)->calculate([
+    $results = app(ProjectFinancialPlanCalculator::class)->calculate('MMC', [
         'contract_amount' => '1120000.00',
         'abc' => '750000.00',
         'factory_cost' => '0.00',
@@ -104,6 +104,19 @@ it('calculates the tax lawyer allowance from ABC when ABC differs from net sales
 
     expect($results['net_sales'])->toBe('1000000.00')
         ->and($results['costs']['tax_lawyer_allowance'])->toBe('37500.00');
+
+    $miResults = app(ProjectFinancialPlanCalculator::class)->calculate('MI', [
+        'contract_amount' => '1120000.00',
+        'abc' => '750000.00',
+        'factory_cost' => '0.00',
+        'tax_lawyer_rate' => '0.05',
+    ]);
+
+    expect($miResults['net_sales'])->toBe('1000000.00')
+        ->and($miResults['costs']['tax_lawyer_allowance'])->toBe('50000.00');
+
+    expect(fn () => app(ProjectFinancialPlanCalculator::class)->calculate('UNKNOWN', []))
+        ->toThrow(InvalidArgumentException::class);
 });
 
 it('uses the workbook bases for every PPL expense and profitability measure', function () {
@@ -118,7 +131,7 @@ it('uses the workbook bases for every PPL expense and profitability measure', fu
         'opex_rate' => '0.05', 'income_tax_rate' => '0.02', 'incentive_rate' => '0.15',
         'importation_vat_rate' => '0.13', 'sales_vat_rate' => '0.12',
     ];
-    $results = app(ProjectFinancialPlanCalculator::class)->calculate($inputs);
+    $results = app(ProjectFinancialPlanCalculator::class)->calculate('MMC', $inputs);
 
     expect($results['costs']['pf1'])->toBe('11200.00')
         ->and($results['costs']['pf2'])->toBe('22400.00')
@@ -453,6 +466,72 @@ it('restricts legacy PPL forms to the MMC company context while keeping MI stand
         ->toBe(auth()->user()->currentCompany()->company_id);
 });
 
+it('uses the persisted company policy instead of a submitted company identifier', function (string $companyCode, string $expectedAllowance, string $expectedBase) {
+    $this->signInBiddingUser('finance', $companyCode);
+    $payload = financialPlanPayload([
+        'name' => 'MI tax lawyer calculation policy',
+        'inputs' => [
+            'contract_amount' => '1120000.00',
+            'abc' => '750000.00',
+            'tax_lawyer_rate' => '0.05',
+        ],
+    ]);
+    $payload['company_code'] = $companyCode === 'MMC' ? 'MI' : 'MMC';
+
+    $this->post(route('finance.plans.store'), $payload)->assertRedirect();
+
+    $plan = ProjectFinancialPlan::query()->sole();
+    $version = $plan->latestVersion;
+    expect($plan->company_id)->toBe(auth()->user()->currentCompany()->company_id)
+        ->and($version->calculation_results['net_sales'])->toBe('1000000.00')
+        ->and($version->calculation_results['costs']['tax_lawyer_allowance'])->toBe($expectedAllowance)
+        ->and($version->assumptions_snapshot['formula_manifest']['tax_lawyer_allowance'])->toBe('tax_lawyer_rate * '.$expectedBase);
+})->with([
+    ['MMC', '37500.00', 'ABC'],
+    ['MI', '50000.00', 'net_sales'],
+]);
+
+it('handles missing optional bidding and project source columns without database errors', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $project = makeLegacyProject();
+    $bidding = ProjectInformation::query()->create([
+        'project_id' => 'BID-'.fake()->unique()->numerify('####'),
+        'project_name' => 'Optional fields unavailable',
+        'procuring_entity' => 'Test agency',
+        'approved_budget_contract_abc' => '250000.00',
+        'contract_amount' => '224000.00',
+        'status' => 'Awarded',
+    ]);
+    $pplForm = PplForm::query()->create([
+        'project_code' => 'HIST-OPTIONAL',
+        'lot_number' => '1',
+        'project_title' => 'Historical PPL fallback',
+        'abc' => '200000.00',
+    ]);
+
+    Schema::table('projects', function (Blueprint $table): void {
+        $table->dropColumn(['ABC', 'contract_amount']);
+    });
+    Schema::table('project_information', function (Blueprint $table): void {
+        $table->dropColumn('contract_amount');
+    });
+
+    $this->get(route('finance.plans.create'))->assertOk();
+    $payload = financialPlanPayload([
+        'project_id' => $project->project_id,
+        'project_information_id' => $bidding->id,
+        'ppl_form_id' => $pplForm->id,
+    ]);
+    unset($payload['inputs']['abc'], $payload['inputs']['contract_amount']);
+
+    $this->from(route('finance.plans.create'))
+        ->post(route('finance.plans.store'), $payload)
+        ->assertRedirect(route('finance.plans.create'))
+        ->assertSessionHasErrors('inputs.contract_amount');
+
+    expect(ProjectFinancialPlan::query()->count())->toBe(0);
+});
+
 it('ignores client supplied status changes so a financial draft cannot alter project lifecycle status', function () {
     $this->signInBiddingUser('finance', 'MMC');
     $project = makeLegacyProject(['status' => 'Ongoing']);
@@ -544,6 +623,55 @@ it('filters MMC PPL monitoring by historical revenue year and linked project sta
 
     $this->get(route('finance.dashboard', ['year' => '2026', 'status' => 'Ongoing']))
         ->assertOk()
+        ->assertSee('ABC')
+        ->assertSee('Factory cost')
+        ->assertSee('Operating expenses')
+        ->assertSee('Net profit after tax')
+        ->assertSee('Version / sources')
         ->assertViewHas('monitoringPlans', fn ($plans): bool => $plans->count() === 1 && $plans->first()->is($plan))
         ->assertViewHas('isMmcPplWorkspace', true);
+});
+
+it('exports the MMC monitoring report with saved calculations version and source references', function () {
+    $this->signInBiddingUser('finance', 'MMC');
+    $project = makeLegacyProject(['project_name' => 'Report source project']);
+    $pplForm = PplForm::query()->create([
+        'project_code' => 'PPL-REPORT',
+        'lot_number' => '4',
+        'project_title' => 'Report source project',
+        'abc' => '100000.00',
+        'year_of_revenue_recognition' => '2026',
+    ]);
+    $payload = financialPlanPayload([
+        'project_id' => $project->project_id,
+        'ppl_form_id' => $pplForm->id,
+    ]);
+    unset($payload['inputs']['abc']);
+    $this->post(route('finance.plans.store'), $payload)->assertRedirect();
+
+    $response = $this->get(route('finance.plans.monitoring.export', ['year' => '2026', 'status' => 'Ongoing']))
+        ->assertOk()
+        ->assertDownload('mmc-ppl-monitoring.csv');
+
+    ob_start();
+    $response->sendContent();
+    $csv = ob_get_clean();
+    $csvRows = array_map('str_getcsv', array_filter(explode("\n", str_replace("\r", '', $csv))));
+    $headers = array_map(fn (string $header): string => ltrim($header, "\xEF\xBB\xBF"), $csvRows[0]);
+    $row = array_combine($headers, $csvRows[1]);
+
+    expect($row['Project'])->toBe('Report source project')
+        ->and($row['Lot'])->toBe('4')
+        ->and($row['Revenue year'])->toBe('2026')
+        ->and($row['ABC'])->toBe('120000.00')
+        ->and($row['Contract amount'])->toBe('112000.00')
+        ->and($row['Net sales'])->toBe('100000.00')
+        ->and($row['Factory cost'])->toBe('50000.00')
+        ->and($row['Operating expenses'])->toBe('0.00')
+        ->and($row['Version'])->toBe('1')
+        ->and($row['Project ID'])->toBe((string) $project->project_id)
+        ->and($row['PPL Form ID'])->toBe((string) $pplForm->id);
+
+    $this->signInBiddingUser('finance', 'MI');
+    $this->get(route('finance.plans.monitoring.export'))->assertForbidden();
 });

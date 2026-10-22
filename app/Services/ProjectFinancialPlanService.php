@@ -148,9 +148,11 @@ class ProjectFinancialPlanService
 
             throw ValidationException::withMessages($errors);
         }
+        $companyCode = $this->calculationCompanyCode($plan);
         $assumptions = array_replace($this->calculator->defaultAssumptions(), $data['assumptions'] ?? []);
         $additionalCosts = $data['cost_items'] ?? [];
-        $results = $this->calculator->calculate($inputs, $assumptions, $additionalCosts);
+        $formulaManifest = $this->calculator->formulaManifest($companyCode);
+        $results = $this->calculator->calculate($companyCode, $inputs, $assumptions, $additionalCosts);
         $factoryCostSnapshot = $this->factoryCostSnapshot($inputs, $data);
 
         $version = $plan->versions()->create([
@@ -168,9 +170,11 @@ class ProjectFinancialPlanService
                 'workbook' => 'PPL MONITORING_24 (Autosaved).xlsx',
                 'worksheet' => 'PPL / 1. FORM / 2. FACTORY COST / 3. MUNICIPAL TAX & INSURANCE',
                 'rates' => $assumptions,
-                'formula_manifest' => $this->calculator->formulaManifest(),
+                'formula_manifest' => $formulaManifest,
                 'corrections' => [
-                    'Tax lawyer allowance uses ABC per workbook PPL column X.',
+                    $companyCode === 'MMC'
+                        ? 'Tax lawyer allowance uses ABC per MMC workbook PPL column X.'
+                        : 'Tax lawyer allowance uses net sales under the existing MI calculation policy.',
                     'Municipal tax uses first-tier and excess rates only on their corresponding portions of net sales.',
                     'Zero net sales returns a null margin instead of a spreadsheet division error.',
                 ],
@@ -193,7 +197,7 @@ class ProjectFinancialPlanService
                 'rate' => $rateInput ? ($inputs[$rateInput] ?? null) : null,
                 'source_type' => 'workbook_formula',
                 'source_reference' => self::WORKBOOK_REFERENCES[$category] ?? 'PPL worksheet financial summary',
-                'source_snapshot' => ['formula' => $this->calculator->formulaManifest()[$category] ?? null],
+                'source_snapshot' => ['formula' => $formulaManifest[$category] ?? null],
             ]);
         }
 
@@ -262,6 +266,18 @@ class ProjectFinancialPlanService
         }
 
         return [$inputs, $pplForm, $sourceMapping];
+    }
+
+    private function calculationCompanyCode(ProjectFinancialPlan $plan): string
+    {
+        $companyCode = Company::query()->whereKey($plan->company_id)->value('code');
+        if (! in_array($companyCode, ['MMC', 'MI'], true)) {
+            throw ValidationException::withMessages([
+                'company_id' => 'Financial calculations require a supported MMC or MI company context.',
+            ]);
+        }
+
+        return $companyCode;
     }
 
     /** @param array<string, mixed> $data */

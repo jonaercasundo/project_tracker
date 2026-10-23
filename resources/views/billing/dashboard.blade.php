@@ -1,14 +1,10 @@
 <x-project_app-layout>
     <x-slot name="header">
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
             <div>
                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Metro Mobilia · Billing</p>
                 <h1 class="mt-1 text-xl font-extrabold tracking-tight text-slate-900">Delivery billing desk</h1>
             </div>
-            <nav aria-label="Billing navigation" class="flex flex-wrap gap-2 text-sm font-semibold">
-                <a href="{{ route('billing.scanner') }}" class="rounded-lg bg-slate-900 px-3 py-2 text-white hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Open scanner</a>
-                <a href="{{ route('billing.records.index') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:border-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Billing records</a>
-            </nav>
         </div>
     </x-slot>
 

@@ -526,9 +526,11 @@ it('shows the billing sidebar links to MMC users with billing permissions', func
 
     expect($sidebar)
         ->toContain('Billing')
+        ->toContain('href="'.route('billing.dashboard').'"')
         ->toContain('href="'.route('billing.prepare').'"')
         ->toContain('href="'.route('billing.batches.index').'"')
         ->toContain('href="'.route('billing.records.index').'"')
+        ->toContain('Billing Dashboard')
         ->toContain('Prepare for Billing')
         ->toContain('Billing Batches')
         ->toContain('Billing History');
@@ -543,7 +545,9 @@ it('shows the billing sidebar to the user role with its seeded billing permissio
         ->toContain('Billing')
         ->toContain('href="'.route('billing.prepare').'"')
         ->toContain('href="'.route('billing.batches.index').'"')
-        ->toContain('href="'.route('billing.records.index').'"');
+        ->toContain('href="'.route('billing.records.index').'"')
+        ->toContain('href="'.route('billing.scanner').'"')
+        ->toContain('Billing Dashboard');
 });
 
 it('hides the billing sidebar from MMC users without billing permissions', function (): void {
@@ -554,6 +558,7 @@ it('hides the billing sidebar from MMC users without billing permissions', funct
     $sidebar = view('layouts.project-sidebar')->render();
 
     expect($sidebar)
+        ->not->toContain('Billing Dashboard')
         ->not->toContain('Prepare for Billing')
         ->not->toContain('Billing Batches')
         ->not->toContain('Billing History')
@@ -568,6 +573,7 @@ it('shows only billing history links to MMC users with read-only billing access'
     $sidebar = view('layouts.project-sidebar')->render();
 
     expect($sidebar)
+        ->toContain('Billing Dashboard')
         ->toContain('Billing Batches')
         ->toContain('Billing History')
         ->not->toContain('Prepare for Billing')
@@ -583,6 +589,53 @@ it('hides the billing sidebar when the selected company is not MMC', function ()
         ->not->toContain('Prepare for Billing')
         ->not->toContain('Billing Batches')
         ->not->toContain('Billing History');
+});
+
+it('expands the Billing sidebar and highlights the current page link', function (): void {
+    signInBillingUser('finance');
+
+    foreach ([
+        'billing.dashboard' => route('billing.dashboard'),
+        'billing.prepare' => route('billing.prepare'),
+        'billing.batches.index' => route('billing.batches.index'),
+        'billing.records.index' => route('billing.records.index'),
+        'billing.scanner' => route('billing.scanner'),
+    ] as $routeName => $url) {
+        $response = $this->get($url)
+            ->assertOk()
+            ->assertSee('x-data="{ open: true }"', false);
+
+        expect(preg_match('/<a href="'.preg_quote($url, '/').'"[^>]*aria-current="page"[^>]*>/s', $response->getContent()))
+            ->toBe(1, "The {$routeName} sidebar link should be marked active.");
+    }
+});
+
+it('keeps generic Billing navigation links out of Billing page headers', function (): void {
+    signInBillingUser('finance');
+
+    foreach ([
+        ['billing.dashboard', 'Delivery billing desk'],
+        ['billing.prepare', 'Prepare for Billing'],
+        ['billing.batches.index', 'Billing batches'],
+        ['billing.records.index', 'Delivery records'],
+        ['billing.scanner', 'Delivery QR scanner'],
+    ] as [$routeName, $title]) {
+        $response = $this->get(route($routeName))->assertOk()->assertSee($title);
+        preg_match('/<header\\b[^>]*>(.*?)<\\/header>/s', $response->getContent(), $matches);
+        $header = $matches[1] ?? '';
+
+        expect($header)->not->toContain('aria-label="Billing navigation"');
+
+        foreach ([
+            'billing.dashboard',
+            'billing.prepare',
+            'billing.batches.index',
+            'billing.records.index',
+            'billing.scanner',
+        ] as $navigationRoute) {
+            expect($header)->not->toContain('href="'.route($navigationRoute).'"');
+        }
+    }
 });
 
 it('resolves signed QR values through the Operations preparation lookup', function (): void {
@@ -608,6 +661,7 @@ it('allows read-only preparation access without allowing billing confirmation', 
 
     $this->get(route('billing.prepare'))
         ->assertOk()
+        ->assertDontSee('Billing Dashboard')
         ->assertSee('data-can-confirm="false"', false);
     $this->postJson(route('billing.prepare.confirm'), [
         'mode' => 'scan',

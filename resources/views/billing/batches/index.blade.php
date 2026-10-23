@@ -1,15 +1,10 @@
 <x-project_app-layout>
     <x-slot name="header">
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
             <div>
                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Billing queue integration</p>
                 <h1 class="mt-1 text-xl font-extrabold tracking-tight text-slate-900">Billing batches</h1>
             </div>
-            <nav class="flex flex-wrap gap-2 text-sm font-semibold" aria-label="Billing navigation">
-                <a href="{{ route('billing.prepare') }}" class="rounded-lg bg-blue-700 px-3 py-2 text-white hover:bg-blue-800">Prepare for Billing</a>
-                <a href="{{ route('billing.records.index') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:border-blue-500">Billing queue</a>
-                <a href="{{ route('billing.dashboard') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:border-blue-500">Dashboard</a>
-            </nav>
         </div>
     </x-slot>
 

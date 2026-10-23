@@ -162,7 +162,7 @@
         @endif
 
         @if($currentCompany?->code === 'MMC' && $currentCompany?->is_active && ($currentUser?->can('billing.qr.scan') || $currentUser?->can('billing.records.view')))
-            @php($billingMenuActive = request()->routeIs('billing.prepare*', 'billing.batches.*', 'billing.records.*', 'billing.scanner*'))
+            @php($billingMenuActive = request()->routeIs('billing.dashboard', 'billing.prepare*', 'billing.batches.*', 'billing.records.*', 'billing.scanner*'))
             <div x-data="{ open: {{ $billingMenuActive ? 'true' : 'false' }} }" class="block">
                 <button type="button" @click="open = !open" :aria-expanded="open"
                         class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none {{ $billingMenuActive ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
@@ -178,6 +178,15 @@
                 </button>
 
                 <ul x-show="open" x-collapse class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
+                    @can('billing.records.view')
+                        <li>
+                            <a href="{{ route('billing.dashboard') }}" @if(request()->routeIs('billing.dashboard')) aria-current="page" @endif
+                               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors {{ request()->routeIs('billing.dashboard') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                                <svg class="w-3.5 h-3.5 shrink-0 {{ request()->routeIs('billing.dashboard') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M7 14l4-4 4 3 5-7" /></svg>
+                                <span>Billing Dashboard</span>
+                            </a>
+                        </li>
+                    @endcan
                     @can('billing.qr.scan')
                         <li>
                             <a href="{{ route('billing.prepare') }}" @if(request()->routeIs('billing.prepare*')) aria-current="page" @endif

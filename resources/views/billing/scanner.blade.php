@@ -1,16 +1,10 @@
 <x-project_app-layout>
     <x-slot name="header">
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
             <div>
                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-cyan-700">MMC billing station</p>
                 <h1 class="mt-1 text-xl font-extrabold tracking-tight text-slate-900">Delivery QR scanner</h1>
             </div>
-            <nav aria-label="Billing navigation" class="flex flex-wrap gap-2 text-sm font-semibold">
-                <a href="{{ route('billing.prepare') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:border-blue-500">Prepare for Billing</a>
-                <a href="{{ route('billing.dashboard') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:border-blue-500">Dashboard</a>
-                <a href="{{ route('billing.records.index') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:border-blue-500">Billing records</a>
-                <a href="{{ route('billing.batches.index') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:border-blue-500">Batches</a>
-            </nav>
         </div>
     </x-slot>
 

@@ -1,15 +1,9 @@
 <x-project_app-layout>
     <x-slot name="header">
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
             <div>
                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Billing ledger</p>
                 <h1 class="mt-1 text-xl font-extrabold tracking-tight text-slate-900">Delivery records</h1>
-            </div>
-            <div class="flex gap-2">
-                <a href="{{ route('billing.dashboard') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-500">Dashboard</a>
-                <a href="{{ route('billing.prepare') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-500">Prepare for Billing</a>
-                <a href="{{ route('billing.batches.index') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-500">Batches</a>
-                <a href="{{ route('billing.scanner') }}" class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700">Open scanner</a>
             </div>
         </div>
     </x-slot>

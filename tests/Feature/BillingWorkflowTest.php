@@ -381,12 +381,42 @@ it('does not advance an already billed record and includes accurate project dash
 
     $this->postJson(route('billing.for-billing', $forBillingDelivery))->assertOk();
     $this->postJson(route('billing.for-billing', $billedDelivery))->assertOk();
+    $batchId = DB::table('billing_batches')->insertGetId([
+        'batch_ref' => 'BILL-DASHBOARD-TEST',
+        'status' => 'for_billing',
+        'selection_method' => 'manual',
+        'selection_hash' => str_repeat('a', 64),
+        'idempotency_key' => (string) Str::uuid(),
+        'created_by' => auth()->id(),
+        'created_by_name' => 'Billing Tester',
+        'confirmed_by' => auth()->id(),
+        'confirmed_by_name' => 'Billing Tester',
+        'confirmed_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('delivery_billing_records')->where('delivery_id', $forBillingDelivery)->update(['billing_batch_id' => $batchId]);
     $this->postJson(route('billing.billed', $billedDelivery), [
         'invoice_no' => 'INV-2003',
         'invoice_date' => '2026-09-20',
         'amount' => '300.00',
     ])->assertOk();
     $this->postJson(route('billing.hold', $onHoldDelivery), ['remarks' => 'Delivery documents missing.'])->assertOk();
+    $returnedBatchId = DB::table('billing_batches')->insertGetId([
+        'batch_ref' => 'BILL-RETURNED-TEST',
+        'status' => 'returned_for_correction',
+        'selection_method' => 'manual',
+        'selection_hash' => str_repeat('b', 64),
+        'idempotency_key' => (string) Str::uuid(),
+        'created_by' => auth()->id(),
+        'created_by_name' => 'Billing Tester',
+        'confirmed_by' => auth()->id(),
+        'confirmed_by_name' => 'Billing Tester',
+        'confirmed_at' => now(),
+        'created_at' => now()->subDay(),
+        'updated_at' => now(),
+    ]);
+    DB::table('delivery_billing_records')->where('delivery_id', $onHoldDelivery)->update(['billing_batch_id' => $returnedBatchId]);
 
     $this->postJson(route('billing.for-billing', $billedDelivery))->assertStatus(409);
     $this->postJson(route('billing.billed', $billedDelivery), [
@@ -401,12 +431,69 @@ it('does not advance an already billed record and includes accurate project dash
         ->assertOk()
         ->assertViewHas('totals', fn (array $totals): bool => $totals === [
             'total' => 4,
-            'pending_billing' => 1,
+            'ready' => 1,
             'for_billing' => 1,
             'billed' => 1,
-            'on_hold' => 1,
+            'blocked' => 1,
+            'active_batches' => 2,
             'completion_percentage' => 25.0,
-        ]);
+        ])
+        ->assertViewHas('recentBatches', fn ($batches): bool => $batches->count() === 2
+            && $batches->contains('batch_ref', 'BILL-DASHBOARD-TEST'))
+        ->assertViewHas('returnedBatchCount', 1)
+        ->assertViewHas('returnedBatches', fn ($batches): bool => $batches->count() === 1
+            && $batches->first()->batch_ref === 'BILL-RETURNED-TEST')
+        ->assertViewHas('activityTrend', fn (array $trend): bool => count($trend) === 1
+            && $trend[0]['submitted'] === 2
+            && $trend[0]['billed'] === 1);
+});
+
+it('applies project and delivery date filters consistently to billing dashboard metrics', function (): void {
+    signInBillingUser();
+    $matchingDelivery = createBillingDelivery('DR-MATCHING');
+    $matchingProjectId = (int) DB::table('deliveries')->where('delivery_id', $matchingDelivery)->value('project_id');
+    DB::table('projects')->where('project_id', $matchingProjectId)->update([
+        'project_name' => '2026 Northern District Furniture and Learning Materials Distribution Program',
+        'project_code' => 'MMC-2026-001',
+    ]);
+    createDeliveryForBillingProject($matchingProjectId, 'DR-OTHER-DATE', 'accepted', '2026-08-10');
+    $otherProjectDelivery = createBillingDelivery('DR-OTHER-PROJECT');
+    DB::table('delivery_billing_records')->insert([
+        'delivery_id' => $otherProjectDelivery,
+        'status' => 'billed',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->get(route('billing.dashboard', [
+        'project_id' => $matchingProjectId,
+        'date_from' => '2026-09-01',
+        'date_to' => '2026-09-30',
+    ]))
+        ->assertOk()
+        ->assertSee('Operations menu')
+        ->assertSee('2026 Northern District Furniture and Learning Materials Distribution Program')
+        ->assertViewHas('filters', [
+            'project_id' => (string) $matchingProjectId,
+            'date_from' => '2026-09-01',
+            'date_to' => '2026-09-30',
+        ])
+        ->assertViewHas('totals', fn (array $totals): bool => $totals['total'] === 1
+            && $totals['ready'] === 1
+            && $totals['billed'] === 0)
+        ->assertViewHas('projectPerformance', fn ($projects): bool => $projects->count() === 1
+            && (int) $projects->first()->project_id === $matchingProjectId);
+});
+
+it('shows clear empty states when dashboard filters have no matching deliveries', function (): void {
+    signInBillingUser();
+
+    $this->get(route('billing.dashboard', ['date_from' => '2099-01-01', 'date_to' => '2099-01-31']))
+        ->assertOk()
+        ->assertSee('No delivered records match these filters')
+        ->assertSee('No billing activity in this date range')
+        ->assertViewHas('totals', fn (array $totals): bool => $totals['total'] === 0
+            && $totals['completion_percentage'] === 0.0);
 });
 
 it('filters billing records, shows their audit history and exports CSV', function () {
@@ -614,7 +701,7 @@ it('keeps generic Billing navigation links out of Billing page headers', functio
     signInBillingUser('finance');
 
     foreach ([
-        ['billing.dashboard', 'Delivery billing desk'],
+        ['billing.dashboard', 'Billing Dashboard'],
         ['billing.prepare', 'Prepare for Billing'],
         ['billing.batches.index', 'Billing batches'],
         ['billing.records.index', 'Delivery records'],

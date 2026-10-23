@@ -6,6 +6,7 @@ import './deliveries.js';
 import './delivery-monitoring.js';
 import './billing-scanner.js';
 import './billing-preparation.js';
+import './searchable-project-dropdown.js';
 import './project-details.js';
 import './mi-product-edit.js';
 import Alpine from 'alpinejs';

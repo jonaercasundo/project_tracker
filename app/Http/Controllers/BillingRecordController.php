@@ -23,7 +23,7 @@ class BillingRecordController extends Controller
         return view('billing.records.index', [
             'records' => $records,
             'filters' => $filters,
-            'projects' => DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']),
+            'projects' => DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name', 'project_code', 'ref_no']),
             'schools' => DB::table('school')->orderBy('school_name')->get(['school_id', 'school_name']),
             'statuses' => [
                 DeliveryBillingRecord::PENDING_BILLING => 'Pending Billing',
@@ -118,6 +118,7 @@ class BillingRecordController extends Controller
     {
         return DB::table('deliveries as d')
             ->leftJoin('projects as p', 'p.project_id', '=', 'd.project_id')
+            ->leftJoin('lot as l', 'l.lot_id', '=', 'd.lot_id')
             ->leftJoin('school as s', 's.school_id', '=', 'd.school_id')
             ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
             ->leftJoin('invoices as invoice', 'invoice.invoice_id', '=', 'billing.invoice_id')
@@ -127,6 +128,7 @@ class BillingRecordController extends Controller
                 'd.dr_no',
                 'd.project_id',
                 'p.project_name',
+                'l.lot_name',
                 'd.school_id',
                 's.school_name',
                 'd.delivery_date',

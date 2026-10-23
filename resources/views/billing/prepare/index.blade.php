@@ -39,12 +39,12 @@
             <div class="min-w-0 space-y-1 text-xs font-semibold text-slate-600">
                 <label for="billing-project-trigger">Project</label>
                 <div x-data="{
-                    options: @js($projects->map(fn ($project) => ['id' => (string) $project->project_id, 'name' => (string) $project->project_name])->values()),
+                    options: @js($projects->map(fn ($project) => ['id' => (string) $project->project_id, 'name' => (string) $project->project_name, 'code' => (string) ($project->project_code ?: $project->ref_no ?: '')])->values()),
                     yearId: @js((string) ($filters['year'] ?? '')),
                     selectedId: @js((string) ($filters['project_id'] ?? '')),
                     search: '', open: false, activeIndex: 0, dropdownStyle: {},
                     get availableOptions() { return this.yearId ? [{ id: '', name: 'All Projects' }, ...this.options] : []; },
-                    get filteredOptions() { const term = this.search.trim().toLocaleLowerCase(); return this.availableOptions.filter(option => option.name.toLocaleLowerCase().includes(term)); },
+                    get filteredOptions() { const term = this.search.trim().toLocaleLowerCase(); return this.availableOptions.filter(option => `${option.name} ${option.code ?? ''}`.toLocaleLowerCase().includes(term)); },
                     get selectedName() { return this.availableOptions.find(option => option.id === this.selectedId)?.name ?? (this.yearId ? 'All Projects' : 'Select Year First'); },
                     positionDropdown() {
                         const trigger = this.$refs.trigger.getBoundingClientRect(); const margin = 8;
@@ -90,7 +90,7 @@
                         <ul id="billing-project-options" x-ref="options" role="listbox" aria-label="Projects" class="min-h-0 flex-1 overflow-y-auto p-1.5" :style="{ maxHeight: `${Math.max(0, parseInt(dropdownStyle.maxHeight ?? '350', 10) - 64)}px` }">
                             <template x-for="(option, index) in filteredOptions" :key="option.id || 'all-projects'">
                                 <li :id="`billing-project-option-${option.id || 'all'}`" :data-option-index="index" role="option" :aria-selected="(option.id === selectedId).toString()" @click="selectOption(option)" @mouseenter="activeIndex = index" class="flex cursor-pointer items-start justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-normal leading-5 transition" :class="option.id === selectedId ? 'bg-blue-50 font-semibold text-blue-800' : (index === activeIndex ? 'bg-slate-100 text-slate-900' : 'text-slate-700 hover:bg-slate-50')">
-                                    <span class="min-w-0 whitespace-normal break-words" x-text="option.name"></span>
+                                    <span class="min-w-0 whitespace-normal break-words"><span class="block" x-text="option.name"></span><span x-show="option.code" class="mt-0.5 block text-xs font-normal text-slate-500" x-text="option.code"></span></span>
                                     <span x-show="option.id === selectedId" class="shrink-0 text-blue-700" aria-hidden="true">✓</span>
                                 </li>
                             </template>

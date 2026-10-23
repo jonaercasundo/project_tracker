@@ -61,6 +61,7 @@ abstract class BillingWorkflowTestCase extends TestCase
         Schema::create('projects', function (Blueprint $table): void {
             $table->increments('project_id');
             $table->string('project_name');
+            $table->string('project_code')->nullable();
             $table->string('ref_no')->nullable();
             $table->string('status')->nullable();
         });

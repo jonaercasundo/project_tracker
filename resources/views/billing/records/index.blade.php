@@ -16,14 +16,13 @@
 
     <div class="mx-auto max-w-7xl space-y-5">
         <form method="GET" action="{{ route('billing.records.index') }}" class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
-            <label class="space-y-1 text-xs font-semibold text-slate-600">Project
-                <select name="project_id" class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                    <option value="">All projects</option>
-                    @foreach ($projects as $project)
-                        <option value="{{ $project->project_id }}" @selected(($filters['project_id'] ?? '') == $project->project_id)>{{ $project->project_name }}</option>
-                    @endforeach
-                </select>
-            </label>
+            <x-searchable-project-filter
+                :projects="$projects"
+                name="project_id"
+                :selected="$filters['project_id'] ?? ''"
+                all-label="All Projects"
+                id="billing-record-project"
+            />
             <label class="space-y-1 text-xs font-semibold text-slate-600">DR number
                 <input name="dr_no" value="{{ $filters['dr_no'] ?? '' }}" maxlength="100" class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Search DR number">
             </label>
@@ -89,7 +88,7 @@
                                 <td class="whitespace-nowrap px-4 py-3 font-mono font-semibold text-slate-900">{{ $record->dr_no }}</td>
                                 <td class="min-w-64 px-4 py-3">
                                     <p class="font-medium text-slate-800">{{ $record->project_name }}</p>
-                                    <p class="mt-1 text-xs text-slate-500">{{ $record->school_name }} · {{ $record->school_id }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ $record->lot_name ?? 'All lots' }} · {{ $record->school_name }} · {{ $record->school_id }}</p>
                                 </td>
                                 <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ $record->delivery_date }}</td>
                                 <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">{{ $record->delivery_status }}</span></td>

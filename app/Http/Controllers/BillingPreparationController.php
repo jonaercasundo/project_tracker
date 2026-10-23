@@ -53,7 +53,7 @@ class BillingPreparationController extends Controller
                         ->whereYear('d.delivery_date', $filters['year']);
                 })
                 ->orderBy('p.project_name')
-                ->get(['p.project_id', 'p.project_name'])
+                ->get(['p.project_id', 'p.project_name', 'p.project_code', 'p.ref_no'])
             : collect();
         $lots = DB::table('lot')
             ->when(isset($filters['project_id']), fn (Builder $query) => $query->where('project_id', $filters['project_id']))

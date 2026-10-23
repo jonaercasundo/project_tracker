@@ -49,6 +49,7 @@ function createBillingDelivery(string $drNumber = 'DR-1001', string $status = 'a
 {
     $projectId = DB::table('projects')->insertGetId([
         'project_name' => 'School Furniture Contract',
+        'project_code' => 'PRJ-1001',
         'ref_no' => 'PROJ-1001',
         'status' => 'Ongoing',
     ], 'project_id');
@@ -434,6 +435,67 @@ it('filters billing records, shows their audit history and exports CSV', functio
         ->assertDownload('billing-records.csv');
 });
 
+it('filters billing records by project while preserving the remaining ledger filters', function (): void {
+    signInBillingUser();
+    $firstDeliveryId = createBillingDelivery('1001');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstDeliveryId)->value('project_id');
+    $projectName = '2026 Northern Division School Furniture, Learning Materials, and Nutrition Distribution Program';
+    DB::table('projects')->where('project_id', $projectId)->update([
+        'project_name' => $projectName,
+        'project_code' => 'MMC-PRJ-2026-001',
+    ]);
+    $sameProjectDeliveryId = createDeliveryForBillingProject($projectId, '1003');
+    $secondLotId = DB::table('lot')->insertGetId([
+        'lot_name' => 'Lot B',
+        'project_id' => $projectId,
+        'contract_no' => 'CONTRACT-'.$projectId.'-B',
+    ], 'lot_id');
+    DB::table('deliveries')->where('delivery_id', $sameProjectDeliveryId)->update(['lot_id' => $secondLotId]);
+    $otherProjectDeliveryId = createBillingDelivery('1002');
+    $otherProjectId = (int) DB::table('deliveries')->where('delivery_id', $otherProjectDeliveryId)->value('project_id');
+    DB::table('projects')->where('project_id', $otherProjectId)->update([
+        'project_name' => $projectName,
+        'project_code' => 'MMC-PRJ-2026-002',
+    ]);
+
+    foreach ([$firstDeliveryId, $sameProjectDeliveryId, $otherProjectDeliveryId] as $deliveryId) {
+        confirmDeliveryForBilling($deliveryId);
+    }
+    $this->postJson(route('billing.billed', $firstDeliveryId), [
+        'invoice_no' => 'INV-PROJECT-FILTER',
+        'invoice_date' => '2026-09-20',
+        'amount' => '300.00',
+    ])->assertOk();
+
+    $this->get(route('billing.records.index', [
+        'project_id' => $projectId,
+        'dr_no' => '1001',
+        'school_id' => 'SCH-0001',
+        'billing_status' => 'billed',
+        'date_from' => '2026-09-01',
+        'date_to' => '2026-09-30',
+        'invoice_no' => 'INV-PROJECT-FILTER',
+    ]))
+        ->assertOk()
+        ->assertSee($projectName)
+        ->assertSee('MMC-PRJ-2026-001')
+        ->assertSee('Search projects by name or code...', false)
+        ->assertSee('role="listbox"', false)
+        ->assertSee('whitespace-normal break-words', false)
+        ->assertSee('name="project_id" value="'.$projectId.'"', false)
+        ->assertSee('name="dr_no" value="1001"', false)
+        ->assertSee('name="school_id"', false)
+        ->assertSee('INV-PROJECT-FILTER')
+        ->assertDontSee('1002');
+
+    $this->get(route('billing.records.index', ['project_id' => $projectId]))
+        ->assertOk()
+        ->assertSee('Lot A')
+        ->assertSee('Lot B')
+        ->assertSee('MMC-PRJ-2026-001')
+        ->assertSee('MMC-PRJ-2026-002');
+});
+
 it('blocks users outside the MMC company context from billing routes', function () {
     signInBillingUser('finance', 'MI');
 
@@ -444,7 +506,7 @@ it('renders the Operations preparation page with the dependent project filter an
     signInBillingUser();
     createBillingDelivery('1001');
 
-    $this->get(route('billing.prepare'))
+    $this->get(route('billing.prepare', ['year' => 2026]))
         ->assertOk()
         ->assertSee('Prepare for Billing')
         ->assertSee('All Years')
@@ -453,7 +515,8 @@ it('renders the Operations preparation page with the dependent project filter an
         ->assertSee('Search DR')
         ->assertSee('DR From')
         ->assertSee('All Delivered')
-        ->assertSee('Search projects...', false);
+        ->assertSee('Search projects...', false)
+        ->assertSee('PRJ-1001');
 });
 
 it('shows the billing sidebar links to MMC users with billing permissions', function (): void {

@@ -13,7 +13,7 @@
         const region       = container.querySelector('#region');
         const division     = container.querySelector('#division');
         const municipality = container.querySelector('#municipality');
-        const year         = container.querySelector('#year');
+        let previousProjectValue = project?.value || '';
         
         // This checkbox is OUTSIDE #filter-container
         const selectAll = document.getElementById('select-all-drs');
@@ -42,15 +42,26 @@
         // PROJECT CHANGE
         // =========================
         project?.addEventListener('change', async () => {
+            const selectedProject = project.value;
+
+            if (!selectedProject) {
+                previousProjectValue = '';
+
+                return;
+            }
+
+            if (selectedProject === previousProjectValue) return;
+
+            previousProjectValue = selectedProject;
             fillSelect(lot, [], '', '', 'Loading...');
             fillSelect(region, [], '', '', 'All Regions');
             fillSelect(division, [], '', '', 'All Divisions');
             fillSelect(municipality, [], '', '', 'All Municipalities');
 
-            if (!project.value) return;
-
             const lots = await fetchData(`/filter/lots?project=${encodeURIComponent(project.value)}`);
-            fillSelect(lot, lots, 'lot_id', 'lot_name', 'All Lots');
+            if (project.value === selectedProject) {
+                fillSelect(lot, lots, 'lot_id', 'lot_name', 'All Lots');
+            }
         });
 
         // =========================
@@ -109,17 +120,6 @@
         });
 
         // =========================
-        // YEAR RESET
-        // =========================
-        year?.addEventListener('change', () => {
-            project.value = '';
-            fillSelect(lot, [], '', '', 'All Lots');
-            fillSelect(region, [], '', '', 'All Regions');
-            fillSelect(division, [], '', '', 'All Divisions');
-            fillSelect(municipality, [], '', '', 'All Municipalities');
-        });
-
-        // =========================
         // SELECT ALL DRs
         // =========================
         selectAll?.addEventListener('change', function () {
@@ -164,11 +164,15 @@
     if (project) project.value = projectVal;
     if (lot) lot.value = lotVal;
 
-    if (!projectVal || !lotVal) return;
+    if (!lotVal) return;
+
+    const filterParams = new URLSearchParams();
+    if (projectVal) filterParams.set('project', projectVal);
+    filterParams.set('lot', lotVal);
 
     // Restore regions
     const regions = await fetchData(
-        `/filter/regions?project=${encodeURIComponent(projectVal)}&lot=${encodeURIComponent(lotVal)}`
+        `/filter/regions?${filterParams.toString()}`
     );
     fillSelect(region, regions, 'region', 'region', 'All Regions');
     region.value = regionVal;
@@ -176,25 +180,16 @@
     if (!regionVal) return;
 
     // Restore divisions
-    const divisions = await fetchData(
-        `/filter/divisions`
-        + `?project=${encodeURIComponent(projectVal)}`
-        + `&lot=${encodeURIComponent(lotVal)}`
-        + `&region=${encodeURIComponent(regionVal)}`
-    );
+    filterParams.set('region', regionVal);
+    const divisions = await fetchData(`/filter/divisions?${filterParams.toString()}`);
     fillSelect(division, divisions, 'division', 'division', 'All Divisions');
     division.value = divisionVal;
 
     if (!divisionVal) return;
 
     // Restore municipalities
-    const municipalities = await fetchData(
-        `/filter/municipalities`
-        + `?project=${encodeURIComponent(projectVal)}`
-        + `&lot=${encodeURIComponent(lotVal)}`
-        + `&region=${encodeURIComponent(regionVal)}`
-        + `&division=${encodeURIComponent(divisionVal)}`
-    );
+    filterParams.set('division', divisionVal);
+    const municipalities = await fetchData(`/filter/municipalities?${filterParams.toString()}`);
     fillSelect(municipality, municipalities, 'municipality', 'municipality', 'All Municipalities');
     municipality.value = municipalityVal;
 }

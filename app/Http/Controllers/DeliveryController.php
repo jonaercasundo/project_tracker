@@ -511,9 +511,12 @@ class DeliveryController extends Controller
 
         $projects = DB::table('projects')->get();
 
-        $lots = $request->filled('project')
-            ? DB::table('lot')->where('project_id', $request->project)->orderBy('lot_name')->get()
-            : collect();
+        $lots = DB::table('lot')
+            ->when($request->filled('project'), fn ($query) => $query->where('project_id', $request->project))
+            ->when(! $request->filled('project') && $request->filled('lot'), fn ($query) => $query->where('lot_id', $request->lot))
+            ->when(! $request->filled('project') && ! $request->filled('lot'), fn ($query) => $query->whereRaw('1 = 0'))
+            ->orderBy('lot_name')
+            ->get();
 
         return view('deliveries.index', [
             'grouped_deliveries' => $grouped,

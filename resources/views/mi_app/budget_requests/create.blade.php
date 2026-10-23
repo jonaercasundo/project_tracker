@@ -149,12 +149,35 @@
                         >
                             <option value="">Select country</option>
 
-                            @foreach (['Philippines', 'United States', 'Canada', 'United Kingdom', 'Japan', 'China', 'South Korea', 'Singapore', 'Australia', 'Other'] as $country)
+                            @foreach (['Philippines', 'United States', 'Canada', 'United Kingdom', 'Japan', 'China', 'South Korea', 'Singapore', 'Australia', 'Vietnam'] as $country)
                                 <option value="{{ $country }}" {{ old('country') == $country ? 'selected' : '' }}>
                                     {{ $country }}
                                 </option>
                             @endforeach
+                            <option value="Other" @selected(old('country') === 'Other')>Others — Specify Country</option>
                         </select>
+                        @error('country')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+
+                        <div id="custom-country-wrap" class="mt-3" @if(old('country') !== 'Other') hidden @endif>
+                            <label for="custom_country" class="mb-1.5 block text-xs font-semibold text-slate-600">
+                                Specify Country <span class="text-red-500" aria-hidden="true">*</span>
+                            </label>
+                            <input
+                                id="custom_country"
+                                name="custom_country"
+                                type="text"
+                                maxlength="100"
+                                value="{{ old('country') === 'Other' ? old('custom_country') : '' }}"
+                                @if(old('country') === 'Other') required @else disabled @endif
+                                aria-describedby="custom-country-error"
+                                class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            >
+                            <p id="custom-country-error" class="mt-1 text-xs text-red-600" @if(!$errors->has('custom_country')) hidden @endif>
+                                {{ $errors->first('custom_country') ?: 'Please specify a country.' }}
+                            </p>
+                        </div>
 
                     </div>
 
@@ -732,12 +755,29 @@
             "China": ["Shanghai", "Beijing", "Guangzhou", "Shenzhen", "Hong Kong", "Other"],
             "South Korea": ["Seoul", "Busan", "Incheon", "Daegu", "Daejeon", "Other"],
             "Singapore": ["Singapore", "Other"],
-            "Australia": ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Other"]
+            "Australia": ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Other"],
+            "Vietnam": ["Hanoi", "Ho Chi Minh City", "Da Nang", "Other"]
         };
 
         const countrySelect = document.getElementById('country');
         const placeSelect = document.getElementById('place');
+        const customCountryWrap = document.getElementById('custom-country-wrap');
+        const customCountryInput = document.getElementById('custom_country');
+        const customCountryError = document.getElementById('custom-country-error');
         const oldPlace = @json(old('place'));
+
+        function syncCustomCountry() {
+            const isOther = countrySelect.value === 'Other';
+            customCountryWrap.hidden = !isOther;
+            customCountryInput.required = isOther;
+            customCountryInput.disabled = !isOther;
+
+            if (!isOther) {
+                customCountryInput.value = '';
+                customCountryInput.setCustomValidity('');
+                customCountryError.hidden = true;
+            }
+        }
 
         function updateCities() {
 
@@ -769,8 +809,16 @@
         }
 
         countrySelect.addEventListener('change', updateCities);
+        countrySelect.addEventListener('change', syncCustomCountry);
+        customCountryInput.addEventListener('input', () => {
+            customCountryInput.setCustomValidity('');
+            if (customCountryInput.value.trim() !== '') {
+                customCountryError.hidden = true;
+            }
+        });
 
         updateCities();
+        syncCustomCountry();
 
 
         /* =========================================================
@@ -1176,6 +1224,18 @@
         const form = document.getElementById('budget-form');
 
         form.addEventListener('submit', function (e) {
+
+            if (countrySelect.value === 'Other') {
+                customCountryInput.value = customCountryInput.value.trim();
+                if (customCountryInput.value === '') {
+                    customCountryInput.setCustomValidity('Please specify a country.');
+                    customCountryError.hidden = false;
+                    e.preventDefault();
+                    customCountryInput.focus();
+                    return;
+                }
+                customCountryError.hidden = true;
+            }
 
             if (!validateDateRange()) {
 

@@ -119,6 +119,7 @@
                         <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500">Control ID</th>
                         <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500">Employee</th>
                         <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500">Department</th>
+                        <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500">Place / Country</th>
                         <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500">Requested</th>
                         <th scope="col" class="px-4 py-3 text-right text-[11px] font-bold text-slate-500">Budget total</th>
                         <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500">Status</th>
@@ -158,6 +159,10 @@
 
                             <td class="px-4 py-3.5 text-slate-600">{{ $br->department }}</td>
 
+                            <td class="px-4 py-3.5 text-slate-600">
+                                {{ collect([$br->place, $br->country])->filter()->implode(', ') ?: '—' }}
+                            </td>
+
                             <td class="px-4 py-3.5 text-slate-500 text-xs whitespace-nowrap">
                                 {{ $br->created_at->format('M d, Y') }}
                             </td>
@@ -189,7 +194,7 @@
                     @empty
 
                         <tr>
-                            <td colspan="7" class="px-4 py-14 text-center">
+                            <td colspan="8" class="px-4 py-14 text-center">
                                 <div class="flex flex-col items-center">
                                     <span class="flex items-center justify-center w-11 h-11 rounded-2xl bg-slate-100 text-slate-400 mb-3">
                                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -249,6 +254,10 @@
                     <p class="text-xs text-slate-500">
                         {{ $br->department }} · {{ $br->created_at->format('M d, Y') }}
                     </p>
+
+                    @if($br->place || $br->country)
+                        <p class="mt-1 break-words text-xs text-slate-500">{{ collect([$br->place, $br->country])->filter()->implode(', ') }}</p>
+                    @endif
 
                     <p class="mt-3 pt-3 border-t border-dashed border-slate-200 text-right text-base font-bold text-slate-900 tabular-nums">
                         ₱{{ number_format($br->budget_total, 2) }}

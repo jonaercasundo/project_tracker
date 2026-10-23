@@ -33,7 +33,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-sm">
             <div><span class="text-gray-500">Employee:</span> {{ $budgetRequest->employee->name }}</div>
             <div><span class="text-gray-500">Department:</span> {{ $budgetRequest->department }}</div>
-            <div><span class="text-gray-500">Place:</span> {{ $budgetRequest->place }}, {{ $budgetRequest->country }}</div>
+            <div><span class="text-gray-500">Place / Country:</span> {{ collect([$budgetRequest->place, $budgetRequest->country])->filter()->implode(', ') ?: 'Not recorded' }}</div>
             <div><span class="text-gray-500">Travel Dates:</span> {{ optional($budgetRequest->travel_date_from)->format('M d, Y') }} - {{ optional($budgetRequest->travel_date_to)->format('M d, Y') }}</div>
         </div>
 

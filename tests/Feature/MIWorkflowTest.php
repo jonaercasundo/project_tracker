@@ -34,6 +34,89 @@ it('creates a budget with the authenticated primary key and exact server totals'
     $this->get(route('budget_requests.index'))->assertViewHas('budgetRequests', fn ($requests): bool => $requests->total() === 1);
 });
 
+it('persists Vietnam as the selected predefined country across budget views and approvals', function () {
+    $owner = $this->miUser();
+    $this->signInMI($owner);
+    $this->get(route('budget_requests.create'))
+        ->assertSee('option value="Vietnam"', false)
+        ->assertSee('Others — Specify Country');
+    $payload = $this->budgetPayload();
+    $payload['country'] = 'Vietnam';
+    $payload['custom_country'] = 'Stale value';
+
+    $this->post(route('budget_requests.store'), $payload)->assertRedirect();
+    $budget = BudgetRequest::sole();
+
+    expect($budget->country)->toBe('Vietnam');
+    $this->get(route('budget_requests.show', $budget))->assertSee('Vietnam');
+    $this->get(route('budget_requests.index'))->assertSee('Vietnam');
+
+    $this->signInMI($this->miUser('Executive'));
+    $this->get(route('mi.approvals'))->assertSee('Vietnam');
+
+    $this->signInMI($this->miUser('accounting'));
+    $this->get(route('accounting.mi.budgets.show', $budget))->assertSee('Vietnam');
+});
+
+it('trims and persists a specified country and retains it when editing a legacy custom value', function () {
+    $owner = $this->miUser();
+    $this->signInMI($owner);
+    $payload = $this->budgetPayload();
+    $payload['country'] = 'Other';
+    $payload['custom_country'] = '  Taiwan  ';
+    $this->post(route('budget_requests.store'), $payload)->assertRedirect();
+    $budget = BudgetRequest::sole();
+
+    expect($budget->country)->toBe('Taiwan');
+    $this->get(route('budget_requests.edit', $budget))
+        ->assertSee('Others — Specify Country')
+        ->assertSee('value="Taiwan"', false);
+
+    $this->put(route('budget_requests.update', $budget), [
+        'department' => 'Trading',
+        'country' => 'Other',
+        'custom_country' => '  Taiwan updated  ',
+    ])->assertRedirect(route('budget_requests.show', $budget));
+
+    expect($budget->fresh()->country)->toBe('Taiwan updated');
+    expect($budget->fresh()->status)->toBe('budget_requested');
+    $this->get(route('budget_requests.show', $budget))->assertSee('Taiwan updated');
+
+    $this->from(route('budget_requests.edit', $budget))->put(route('budget_requests.update', $budget), [
+        'department' => 'Trading',
+        'country' => 'Other',
+        'custom_country' => '   ',
+    ])->assertRedirect(route('budget_requests.edit', $budget))->assertSessionHasErrors('custom_country');
+    $this->get(route('budget_requests.edit', $budget))
+        ->assertSee('value="Other" selected', false)
+        ->assertSee('The custom country field is required.');
+    expect($budget->fresh()->country)->toBe('Taiwan updated');
+});
+
+it('requires a specified country for Others and preserves the selection and text after validation fails', function () {
+    $this->signInMI($this->miUser());
+    $payload = $this->budgetPayload();
+    $payload['department'] = '';
+    $payload['country'] = 'Other';
+    $payload['custom_country'] = '   ';
+
+    $this->from(route('budget_requests.create'))->post(route('budget_requests.store'), $payload)
+        ->assertRedirect(route('budget_requests.create'))
+        ->assertSessionHasErrors(['department', 'custom_country']);
+
+    $this->get(route('budget_requests.create'))
+        ->assertSee('value="Other" selected', false)
+        ->assertSee('name="custom_country"', false)
+        ->assertSee('The custom country field is required.');
+
+    $payload['custom_country'] = '  Taiwan  ';
+    $this->from(route('budget_requests.create'))->post(route('budget_requests.store'), $payload)
+        ->assertRedirect(route('budget_requests.create'))
+        ->assertSessionHasErrors('department');
+    $this->get(route('budget_requests.create'))->assertSee('value="Taiwan"', false);
+    $this->assertDatabaseCount('budget_requests', 0);
+});
+
 it('denies access and mutation of another employees budget', function (string $method, string $action) {
     $owner = $this->miUser();
     $budget = MIBudgetFixtureFactory::new()->create(['employee_id' => $owner->getKey()]);

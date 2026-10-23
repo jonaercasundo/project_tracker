@@ -10,10 +10,16 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class BudgetRequestController extends Controller
 {
+    private const COUNTRIES = [
+        'Philippines', 'United States', 'Canada', 'United Kingdom', 'Japan', 'China', 'South Korea',
+        'Singapore', 'Australia', 'Vietnam', 'Other',
+    ];
+
     public function index(Request $request): View
     {
         $budgetRequests = BudgetRequest::with('employee')
@@ -36,13 +42,15 @@ class BudgetRequestController extends Controller
     public function store(Request $request): RedirectResponse
     {
         Gate::authorize('create', BudgetRequest::class);
+        $this->normalizeCountryInput($request);
         $data = $request->validate([
             'department' => 'required|string|max:100',
             'objectives' => 'nullable|string',
             'travel_date_from' => 'nullable|date',
             'travel_date_to' => 'nullable|date|after_or_equal:travel_date_from',
             'place' => 'nullable|string|max:150',
-            'country' => 'nullable|string|max:100',
+            'country' => ['nullable', Rule::in(self::COUNTRIES)],
+            'custom_country' => ['exclude_unless:country,Other', 'required', 'string', 'max:100'],
             'remarks' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*' => 'required|array',
@@ -62,7 +70,7 @@ class BudgetRequestController extends Controller
                 'travel_date_from' => $data['travel_date_from'] ?? null,
                 'travel_date_to' => $data['travel_date_to'] ?? null,
                 'place' => $data['place'] ?? null,
-                'country' => $data['country'] ?? null,
+                'country' => ($data['country'] ?? null) === 'Other' ? $data['custom_country'] : ($data['country'] ?? null),
                 'remarks' => $data['remarks'] ?? null,
                 'status' => 'budget_requested',
             ]);
@@ -112,15 +120,19 @@ class BudgetRequestController extends Controller
     {
         Gate::authorize('update', $budgetRequest);
 
+        $this->normalizeCountryInput($request);
         $data = $request->validate([
             'department' => 'required|string|max:100',
             'objectives' => 'nullable|string',
             'travel_date_from' => 'nullable|date',
             'travel_date_to' => 'nullable|date|after_or_equal:travel_date_from',
             'place' => 'nullable|string|max:150',
-            'country' => 'nullable|string|max:100',
+            'country' => ['nullable', Rule::in(self::COUNTRIES)],
+            'custom_country' => ['exclude_unless:country,Other', 'required', 'string', 'max:100'],
             'remarks' => 'nullable|string',
         ]);
+        $data['country'] = ($data['country'] ?? null) === 'Other' ? $data['custom_country'] : ($data['country'] ?? null);
+        unset($data['custom_country']);
 
         DB::transaction(function () use ($budgetRequest, $data): void {
             $budgetRequest = BudgetRequest::query()->whereKey($budgetRequest->getKey())->lockForUpdate()->firstOrFail();
@@ -191,5 +203,24 @@ class BudgetRequestController extends Controller
         $budgetRequest->load('items', 'employee', 'company', 'activities', 'releases', 'liquidation.items');
 
         return view('mi_app.budget_requests.show', compact('budgetRequest'));
+    }
+
+    private function normalizeCountryInput(Request $request): void
+    {
+        $country = $request->input('country');
+        $customCountry = $request->input('custom_country');
+
+        if (is_string($country)) {
+            $country = trim($country);
+        }
+
+        if (is_string($customCountry)) {
+            $customCountry = trim($customCountry);
+        }
+
+        $request->merge([
+            'country' => $country === '' ? null : $country,
+            'custom_country' => $customCountry,
+        ]);
     }
 }

@@ -471,6 +471,18 @@ it('shows the billing sidebar links to MMC users with billing permissions', func
         ->toContain('Billing History');
 });
 
+it('shows the billing sidebar to the user role with its seeded billing permissions', function (): void {
+    signInBillingUser('user');
+
+    $sidebar = view('layouts.project-sidebar')->render();
+
+    expect($sidebar)
+        ->toContain('Billing')
+        ->toContain('href="'.route('billing.prepare').'"')
+        ->toContain('href="'.route('billing.batches.index').'"')
+        ->toContain('href="'.route('billing.records.index').'"');
+});
+
 it('hides the billing sidebar from MMC users without billing permissions', function (): void {
     Role::findOrCreate('billing-viewer-without-access', 'web');
     [$user] = signInBillingUser('billing-viewer-without-access');

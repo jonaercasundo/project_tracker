@@ -4,6 +4,28 @@ export function resetProjectForYearChange(project, submitForm) {
     submitForm();
 }
 
+export function classifyScanRecords(records, selectedIds) {
+    const seenIds = new Set(selectedIds);
+
+    return records.map((record) => {
+        if (!record.eligible) {
+            return { record, status: 'rejected' };
+        }
+
+        if (seenIds.has(record.delivery_id)) {
+            return { record, status: 'duplicate' };
+        }
+
+        seenIds.add(record.delivery_id);
+
+        return { record, status: 'eligible' };
+    });
+}
+
+export function getUnambiguousScanRecord(records) {
+    return records.length === 1 ? records[0] : null;
+}
+
 export function buildConfirmationPayload({
     selectionMode,
     selectedIds,

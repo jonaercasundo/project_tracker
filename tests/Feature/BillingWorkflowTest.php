@@ -738,6 +738,40 @@ it('resolves signed QR values through the Operations preparation lookup', functi
         ->assertUnprocessable();
 });
 
+it('returns all candidates for a shared label QR without choosing or queueing a delivery', function (): void {
+    signInBillingUser();
+    $firstDeliveryId = createBillingDelivery('DR-SHARED-LABEL');
+    $secondDeliveryId = createBillingDelivery('DR-SHARED-LABEL');
+    $payload = app(DeliveryBillingQrCodeService::class)->makeDrNumberPayload('DR-SHARED-LABEL');
+
+    $this->getJson(route('billing.prepare.scan', ['q' => $payload]))
+        ->assertOk()
+        ->assertJsonCount(2, 'records')
+        ->assertJsonPath('records.0.delivery_id', $firstDeliveryId)
+        ->assertJsonPath('records.1.delivery_id', $secondDeliveryId)
+        ->assertJsonPath('records.0.dr_no', 'DR-SHARED-LABEL')
+        ->assertJsonPath('records.1.dr_no', 'DR-SHARED-LABEL');
+
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $firstDeliveryId, 'status' => 'accepted']);
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $secondDeliveryId, 'status' => 'accepted']);
+    $this->assertDatabaseCount('delivery_billing_records', 0);
+});
+
+it('renders continuous scan feedback and preserves the other preparation methods', function (): void {
+    signInBillingUser();
+
+    $this->get(route('billing.prepare'))
+        ->assertOk()
+        ->assertSee('Start camera')
+        ->assertSee('Stop camera')
+        ->assertSee('Total scanned')
+        ->assertSee('Eligible added')
+        ->assertSee('Duplicates')
+        ->assertSee('Recent scans')
+        ->assertSee('Search DR')
+        ->assertSee('DR From');
+});
+
 it('allows read-only preparation access without allowing billing confirmation', function (): void {
     [$user] = signInBillingUser('user');
     $user->removeRole('user');

@@ -166,9 +166,28 @@
                             <label for="billing-preparation-scan-input" class="text-sm font-bold text-slate-900">USB scanner / manual QR entry</label>
                             <p class="mt-1 text-xs leading-5 text-slate-500">Most handheld scanners enter the decoded QR value and press Enter.</p>
                         </div>
-                        <textarea id="billing-preparation-scan-input" rows="3" maxlength="2048" class="w-full rounded-lg border-slate-300 font-mono text-xs focus:border-blue-500 focus:ring-blue-500" placeholder="Scan or paste a signed delivery QR" required></textarea>
+                        <input id="billing-preparation-scan-input" type="text" autocomplete="off" maxlength="2048" class="w-full min-w-0 rounded-lg border-slate-300 font-mono text-xs focus:border-blue-500 focus:ring-blue-500" placeholder="Scan or paste a delivery label QR" required>
                         <button class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">Add scanned DR</button>
                     </form>
+                </section>
+
+                <section data-billing-panel="scan" aria-label="QR scan results" class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold text-slate-500">Total scanned</p><p id="billing-preparation-scan-total" class="mt-1 text-2xl font-extrabold text-slate-900" aria-live="polite">0</p></div>
+                        <div class="rounded-lg border border-emerald-100 bg-emerald-50 p-3"><p class="text-xs font-semibold text-emerald-800">Eligible added</p><p id="billing-preparation-scan-eligible" class="mt-1 text-2xl font-extrabold text-emerald-800" aria-live="polite">0</p></div>
+                        <div class="rounded-lg border border-amber-100 bg-amber-50 p-3"><p class="text-xs font-semibold text-amber-800">Duplicates</p><p id="billing-preparation-scan-duplicate" class="mt-1 text-2xl font-extrabold text-amber-800" aria-live="polite">0</p></div>
+                        <div class="rounded-lg border border-rose-100 bg-rose-50 p-3"><p class="text-xs font-semibold text-rose-800">Rejected</p><p id="billing-preparation-scan-rejected" class="mt-1 text-2xl font-extrabold text-rose-800" aria-live="polite">0</p></div>
+                    </div>
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+                        <div class="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Last scanned DR</p>
+                            <p id="billing-preparation-scan-last" class="mt-2 break-words font-bold text-slate-900" aria-live="polite">Waiting for a scan</p>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Recent scans</p>
+                            <ul id="billing-preparation-scan-recent" class="grid gap-2 sm:grid-cols-2" aria-live="polite" aria-relevant="additions"></ul>
+                        </div>
+                    </div>
                 </section>
 
                 <section data-billing-panel="search" role="tabpanel" class="hidden space-y-3">

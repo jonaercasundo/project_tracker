@@ -1,4 +1,4 @@
-import { buildConfirmationPayload, resetProjectForYearChange } from './billing-preparation-state.js';
+import { buildConfirmationPayload, classifyScanRecords, getUnambiguousScanRecord, resetProjectForYearChange } from './billing-preparation-state.js';
 
 const root = document.getElementById('billing-preparation');
 
@@ -21,6 +21,14 @@ if (root) {
     const cameraSupport = document.getElementById('billing-preparation-camera-support');
     const cameraStart = document.getElementById('billing-preparation-camera-start');
     const cameraStop = document.getElementById('billing-preparation-camera-stop');
+    const scanCounters = {
+        total: document.getElementById('billing-preparation-scan-total'),
+        eligible: document.getElementById('billing-preparation-scan-eligible'),
+        duplicate: document.getElementById('billing-preparation-scan-duplicate'),
+        rejected: document.getElementById('billing-preparation-scan-rejected'),
+    };
+    const scanLast = document.getElementById('billing-preparation-scan-last');
+    const scanRecent = document.getElementById('billing-preparation-scan-recent');
     const maxBatchSize = Number(root.dataset.maxBatchSize || 500);
     const canConfirm = root.dataset.canConfirm === 'true';
     const selected = new Map();
@@ -35,9 +43,12 @@ if (root) {
     let cameraStream = null;
     let barcodeDetector = null;
     let lastCameraPayload = '';
+    let lastCameraSeenAt = 0;
     let scanBuffer = '';
     let lastScanKeyAt = 0;
     let scanBufferTimer = null;
+    const scanStats = { total: 0, eligible: 0, duplicate: 0, rejected: 0 };
+    let recentScans = [];
 
     function showFeedback(message, tone = 'info') {
         feedback.textContent = message;
@@ -49,6 +60,53 @@ if (root) {
             error: ['border-rose-200', 'bg-rose-50', 'text-rose-900'],
         }[tone] || ['border-slate-200', 'bg-slate-50', 'text-slate-800']));
         feedback.classList.remove('hidden');
+    }
+
+    function recordScan(status, record = null, message = '', displayLabel = null) {
+        scanStats.total += 1;
+        if (status in scanStats && status !== 'total') scanStats[status] += 1;
+        Object.entries(scanStats).forEach(([key, value]) => {
+            scanCounters[key].textContent = String(value);
+        });
+
+        const displayRecord = record || { dr_no: 'Unrecognized QR', project_name: '', school_name: '' };
+        scanLast.textContent = displayLabel || (record
+            ? `${record.dr_no} · ${record.project_name} · ${record.school_name}`
+            : 'No delivery record identified');
+        recentScans.unshift({
+            dr_no: displayRecord.dr_no,
+            details: [displayRecord.project_name, displayRecord.school_name].filter(Boolean).join(' · '),
+            status,
+            message,
+        });
+        recentScans = recentScans.slice(0, 8);
+        scanRecent.replaceChildren();
+        recentScans.forEach((scan) => {
+            const item = document.createElement('li');
+            item.className = 'flex flex-wrap items-start justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2';
+            const detail = document.createElement('span');
+            detail.className = 'min-w-0';
+            const dr = document.createElement('span');
+            dr.className = 'block font-semibold text-slate-800';
+            dr.textContent = scan.dr_no;
+            detail.append(dr);
+            if (scan.details) {
+                const context = document.createElement('span');
+                context.className = 'block break-words text-xs text-slate-500';
+                context.textContent = scan.details;
+                detail.append(context);
+            }
+            const result = document.createElement('span');
+            result.className = scan.status === 'eligible'
+                ? 'shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800'
+                : (scan.status === 'duplicate'
+                    ? 'shrink-0 rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800'
+                    : 'shrink-0 rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-800');
+            result.textContent = scan.status === 'eligible' ? 'Added' : (scan.status === 'duplicate' ? 'Duplicate' : 'Rejected');
+            result.title = scan.message;
+            item.append(detail, result);
+            scanRecent.append(item);
+        });
     }
 
     async function readResponse(response) {
@@ -69,13 +127,16 @@ if (root) {
     }
 
     function appendSelected(record, source) {
-        if (!record.eligible) return;
+        if (!record.eligible) return false;
         if (!selected.has(record.delivery_id) && selected.size >= maxBatchSize) {
             showFeedback(`A batch can contain at most ${maxBatchSize} deliveries. Remove a delivery or confirm the current review first.`, 'warning');
-            return;
+            return false;
         }
+        const isNewSelection = !selected.has(record.delivery_id);
         selected.set(record.delivery_id, record);
         selectionMethods.add(source);
+
+        return isNewSelection;
     }
 
     function setRecords(records, source, { selectEligible = false, paginationData = null, filters = null } = {}) {
@@ -207,6 +268,7 @@ if (root) {
         const excludedVisible = visibleRecords.length - eligibleVisible;
         const selectedProjects = new Set([...selected.values()].map((record) => record.project_name));
         summary.textContent = `${selected.size} selected · ${selected.size} eligible · ${excludedVisible} excluded in this review${currentPage ? ` · ${currentPage.total} matching results` : ''}${selectedProjects.size ? ` · ${selectedProjects.size} project(s)` : ''}`;
+        confirmButton.textContent = selected.size ? `Confirm for Billing (${selected.size})` : 'Confirm for Billing';
         confirmButton.disabled = selected.size === 0 || !canConfirm;
         renderPagination();
     }
@@ -258,17 +320,51 @@ if (root) {
     }
 
     async function scan(value) {
-        const response = await fetch(`${root.dataset.scanUrl}?${queryString({ q: value })}`, { headers: { Accept: 'application/json' } });
-        const payload = await readResponse(response);
-        const currentIds = new Set(visibleRecords.map((record) => record.delivery_id));
-        payload.records.forEach((record) => {
-            if (!currentIds.has(record.delivery_id)) visibleRecords.unshift(record);
-            appendSelected(record, 'scan');
-        });
-        currentPage = null;
-        review.classList.remove('hidden');
-        render();
-        showFeedback(payload.message, payload.records.some((record) => !record.eligible) ? 'warning' : 'success');
+        try {
+            const response = await fetch(`${root.dataset.scanUrl}?${queryString({ q: value })}`, { headers: { Accept: 'application/json' } });
+            const payload = await readResponse(response);
+            const unambiguousRecord = getUnambiguousScanRecord(payload.records);
+            if (payload.records.length === 0) {
+                throw new Error('This QR code did not identify exactly one delivery. Use Search DR to choose the correct record.');
+            }
+
+            const currentIds = new Set(visibleRecords.map((item) => item.delivery_id));
+            payload.records.slice().reverse().forEach((record) => {
+                if (!currentIds.has(record.delivery_id)) visibleRecords.unshift(record);
+            });
+            currentPage = null;
+            review.classList.remove('hidden');
+            render();
+            if (!unambiguousRecord) {
+                const drNumber = payload.records[0].dr_no;
+                const message = `${payload.records.length} deliveries share DR ${drNumber}. Review project, lot, and school, then select the correct delivery.`;
+                recordScan('rejected', {
+                    dr_no: drNumber,
+                    project_name: `${payload.records.length} matching deliveries`,
+                    school_name: '',
+                }, message, `${drNumber} · ${payload.records.length} matching deliveries need selection`);
+                showFeedback(message, 'warning');
+                return;
+            }
+
+            const record = unambiguousRecord;
+            const [result] = classifyScanRecords([record], selected.keys());
+            const wasAdded = result.status === 'eligible' && appendSelected(record, 'scan');
+            const scanStatus = result.status === 'eligible' && !wasAdded ? 'rejected' : result.status;
+            render();
+            const scanMessage = scanStatus === 'rejected'
+                ? `The batch limit of ${maxBatchSize} deliveries has been reached.`
+                : (scanStatus === 'duplicate' ? 'This delivery is already in the review.' : payload.message);
+            recordScan(scanStatus, record, scanMessage);
+            showFeedback(
+                scanStatus === 'duplicate' ? `${record.dr_no} is already in this review.` : (scanStatus === 'rejected' ? `${record.dr_no}: ${scanMessage}` : payload.message),
+                scanStatus === 'eligible' ? 'success' : 'warning',
+            );
+        } catch (error) {
+            recordScan('rejected', null, error.message);
+            showFeedback(error.message, 'error');
+            throw error;
+        }
     }
 
     function setBusy(button, busy, busyText) {
@@ -357,6 +453,13 @@ if (root) {
         allExcluded = new Set();
         allExpected = [];
         currentPage = null;
+        Object.keys(scanStats).forEach((key) => {
+            scanStats[key] = 0;
+            scanCounters[key].textContent = '0';
+        });
+        recentScans = [];
+        scanRecent.replaceChildren();
+        scanLast.textContent = 'Waiting for a scan';
         render();
         showFeedback('Review cleared. No billing records were changed.', 'info');
     });
@@ -422,6 +525,8 @@ if (root) {
         cameraStream?.getTracks().forEach((track) => track.stop());
         cameraStream = null;
         barcodeDetector = null;
+        lastCameraPayload = '';
+        lastCameraSeenAt = 0;
         camera.srcObject = null;
         camera.classList.add('hidden');
         cameraPlaceholder.classList.remove('hidden');
@@ -434,12 +539,14 @@ if (root) {
         try {
             const codes = await barcodeDetector.detect(camera);
             const payload = codes[0]?.rawValue;
-            if (payload && payload !== lastCameraPayload) {
-                lastCameraPayload = payload;
-                scan(payload).catch((error) => showFeedback(error.message, 'error'));
-                window.setTimeout(() => {
-                    if (lastCameraPayload === payload) lastCameraPayload = '';
-                }, 1800);
+            if (payload) {
+                lastCameraSeenAt = Date.now();
+                if (payload !== lastCameraPayload) {
+                    lastCameraPayload = payload;
+                    scan(payload).catch(() => {});
+                }
+            } else if (Date.now() - lastCameraSeenAt > 1200) {
+                lastCameraPayload = '';
             }
         } catch (error) {
             cameraSupport.textContent = 'Camera could not read this frame. Keep the QR steady or use the manual entry fallback.';

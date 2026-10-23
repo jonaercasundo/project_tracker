@@ -1,7 +1,30 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildConfirmationPayload, resetProjectForYearChange } from '../../resources/js/billing-preparation-state.js';
+import { buildConfirmationPayload, classifyScanRecords, getUnambiguousScanRecord, resetProjectForYearChange } from '../../resources/js/billing-preparation-state.js';
+
+test('only automatically selects a label QR result when it resolves to one delivery', () => {
+    const first = { delivery_id: 11, dr_no: 'DR-SHARED' };
+    const second = { delivery_id: 12, dr_no: 'DR-SHARED' };
+
+    assert.equal(getUnambiguousScanRecord([first]), first);
+    assert.equal(getUnambiguousScanRecord([first, second]), null);
+    assert.equal(getUnambiguousScanRecord([]), null);
+});
+
+test('classifies repeated delivery IDs as duplicates while preserving distinct deliveries with the same DR number', () => {
+    const results = classifyScanRecords([
+        { delivery_id: 11, dr_no: 'DR-SHARED', eligible: true },
+        { delivery_id: 12, dr_no: 'DR-SHARED', eligible: true },
+        { delivery_id: 13, dr_no: 'DR-HELD', eligible: false },
+    ], [11]);
+
+    assert.deepEqual(results.map(({ record, status }) => [record.delivery_id, status]), [
+        [11, 'duplicate'],
+        [12, 'eligible'],
+        [13, 'rejected'],
+    ]);
+});
 
 test('clears Project and submits the unchanged Year filter form when Year changes', () => {
     const project = {

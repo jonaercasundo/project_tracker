@@ -161,31 +161,57 @@
             </a>
         @endif
 
-        @if($currentCompany?->code === 'MMC' && $currentCompany?->is_active && $currentUser?->can('billing.qr.scan'))
-            @if($currentUser?->can('billing.for-billing.mark'))
-                <a href="{{ route('billing.prepare') }}"
-                   @if(request()->routeIs('billing.prepare*')) aria-current="page" @endif
-                   class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('billing.prepare*') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
-                    @if(request()->routeIs('billing.prepare*'))
-                        <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
-                    @endif
-                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5h6m-6 4h6m-6 4h6m-9 6h12a2 2 0 002-2V5a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        @if($currentCompany?->code === 'MMC' && $currentCompany?->is_active && ($currentUser?->can('billing.qr.scan') || $currentUser?->can('billing.records.view')))
+            @php($billingMenuActive = request()->routeIs('billing.prepare*', 'billing.batches.*', 'billing.records.*', 'billing.scanner*'))
+            <div x-data="{ open: {{ $billingMenuActive ? 'true' : 'false' }} }" class="block">
+                <button type="button" @click="open = !open" :aria-expanded="open"
+                        class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none {{ $billingMenuActive ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                    <span class="flex items-center gap-3">
+                        <svg class="w-4 h-4 shrink-0 {{ $billingMenuActive ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75h6v6h-6zm10.5 0h6v6h-6zm-10.5 10.5h6v6h-6zm10.5 1.5h1.5m3-1.5v1.5m-4.5 3h1.5m3-1.5v1.5m-4.5-4.5h4.5v4.5h-4.5z" />
+                        </svg>
+                        <span>Billing</span>
+                    </span>
+                    <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0" :class="open ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
-                    <span>Prepare for Billing</span>
-                </a>
-            @endif
-            <a href="{{ route('billing.scanner') }}"
-               @if(request()->routeIs('billing.scanner*')) aria-current="page" @endif
-               class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('billing.scanner*') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
-                @if(request()->routeIs('billing.scanner*'))
-                    <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
-                @endif
-                <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('billing.scanner*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75h6v6h-6zm10.5 0h6v6h-6zm-10.5 10.5h6v6h-6zm10.5 1.5h1.5m3-1.5v1.5m-4.5 3h1.5m3-1.5v1.5m-4.5-4.5h4.5v4.5h-4.5z" />
-                </svg>
-                <span>Billing QR Scanner</span>
-            </a>
+                </button>
+
+                <ul x-show="open" x-collapse class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
+                    @can('billing.qr.scan')
+                        <li>
+                            <a href="{{ route('billing.prepare') }}" @if(request()->routeIs('billing.prepare*')) aria-current="page" @endif
+                               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors {{ request()->routeIs('billing.prepare*') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                                <svg class="w-3.5 h-3.5 shrink-0 {{ request()->routeIs('billing.prepare*') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5h6m-6 4h6m-6 4h6m-9 6h12a2 2 0 002-2V5a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                <span>Prepare for Billing</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('billing.scanner') }}" @if(request()->routeIs('billing.scanner*')) aria-current="page" @endif
+                               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors {{ request()->routeIs('billing.scanner*') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                                <svg class="w-3.5 h-3.5 shrink-0 {{ request()->routeIs('billing.scanner*') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75h6v6h-6zm10.5 0h6v6h-6zm-10.5 10.5h6v6h-6zm10.5 1.5h1.5m3-1.5v1.5m-4.5 3h1.5m3-1.5v1.5m-4.5-4.5h4.5v4.5h-4.5z" /></svg>
+                                <span>Billing QR Scanner</span>
+                            </a>
+                        </li>
+                    @endcan
+                    @can('billing.records.view')
+                        <li>
+                            <a href="{{ route('billing.batches.index') }}" @if(request()->routeIs('billing.batches.*')) aria-current="page" @endif
+                               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors {{ request()->routeIs('billing.batches.*') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                                <svg class="w-3.5 h-3.5 shrink-0 {{ request()->routeIs('billing.batches.*') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                                <span>Billing Batches</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('billing.records.index') }}" @if(request()->routeIs('billing.records.*')) aria-current="page" @endif
+                               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors {{ request()->routeIs('billing.records.*') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                                <svg class="w-3.5 h-3.5 shrink-0 {{ request()->routeIs('billing.records.*') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 4h8l4 4v12H4V4h4zm0 0v5h8V4m-8 9h8m-8 4h8" /></svg>
+                                <span>Billing History</span>
+                            </a>
+                        </li>
+                    @endcan
+                </ul>
+            </div>
         @endif
 
         <a href="{{ route('catalog-items.index') }}"

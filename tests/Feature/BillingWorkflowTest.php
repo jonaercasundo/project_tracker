@@ -456,6 +456,60 @@ it('renders the Operations preparation page with the dependent project filter an
         ->assertSee('Search projects...', false);
 });
 
+it('shows the billing sidebar links to MMC users with billing permissions', function (): void {
+    signInBillingUser('finance');
+
+    $sidebar = view('layouts.project-sidebar')->render();
+
+    expect($sidebar)
+        ->toContain('Billing')
+        ->toContain('href="'.route('billing.prepare').'"')
+        ->toContain('href="'.route('billing.batches.index').'"')
+        ->toContain('href="'.route('billing.records.index').'"')
+        ->toContain('Prepare for Billing')
+        ->toContain('Billing Batches')
+        ->toContain('Billing History');
+});
+
+it('hides the billing sidebar from MMC users without billing permissions', function (): void {
+    Role::findOrCreate('billing-viewer-without-access', 'web');
+    [$user] = signInBillingUser('billing-viewer-without-access');
+    $user->refresh();
+
+    $sidebar = view('layouts.project-sidebar')->render();
+
+    expect($sidebar)
+        ->not->toContain('Prepare for Billing')
+        ->not->toContain('Billing Batches')
+        ->not->toContain('Billing History')
+        ->not->toContain('Billing QR Scanner');
+});
+
+it('shows only billing history links to MMC users with read-only billing access', function (): void {
+    Role::findOrCreate('billing-records-viewer', 'web')->givePermissionTo('billing.records.view');
+    [$user] = signInBillingUser('billing-records-viewer');
+    $user->refresh();
+
+    $sidebar = view('layouts.project-sidebar')->render();
+
+    expect($sidebar)
+        ->toContain('Billing Batches')
+        ->toContain('Billing History')
+        ->not->toContain('Prepare for Billing')
+        ->not->toContain('Billing QR Scanner');
+});
+
+it('hides the billing sidebar when the selected company is not MMC', function (): void {
+    signInBillingUser('finance', 'MI');
+
+    $sidebar = view('layouts.project-sidebar')->render();
+
+    expect($sidebar)
+        ->not->toContain('Prepare for Billing')
+        ->not->toContain('Billing Batches')
+        ->not->toContain('Billing History');
+});
+
 it('resolves signed QR values through the Operations preparation lookup', function (): void {
     signInBillingUser();
     $deliveryId = createBillingDelivery('1001');

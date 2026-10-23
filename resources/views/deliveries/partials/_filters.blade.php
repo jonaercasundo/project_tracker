@@ -54,7 +54,7 @@
     <hr class="border-slate-200">
 
     {{-- FILTERS --}}
-    <div id="filter-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div id="filter-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
 
         {{-- Year --}}
         <div>
@@ -79,7 +79,7 @@
         </div>
 
         {{-- Project --}}
-        <div>
+        <div class="xl:col-span-2 min-w-0">
             <label class="block text-xs font-semibold text-slate-600 mb-1">
                 Project
             </label>
@@ -92,6 +92,7 @@
 
                 @foreach($projects as $project)
                     <option value="{{ $project->project_id }}"
+                        title="{{ $project->project_name }}"
                         @selected(request('project')==$project->project_id)>
                         {{ $project->project_name }}
                     </option>

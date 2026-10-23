@@ -147,6 +147,36 @@ class DeliveryController extends Controller
 
     public function index(Request $request)
     {
+        $yearValue = $request->input('year');
+        $year = $request->filled('year') && is_scalar($yearValue)
+            ? filter_var($yearValue, FILTER_VALIDATE_INT)
+            : null;
+
+        if ($request->filled('year') && (! is_scalar($yearValue) || $year === false || ! DB::table('deliveries')->whereYear('delivery_date', $year)->exists())) {
+            $query = $request->query();
+            unset($query['year'], $query['project']);
+
+            return redirect()->route('deliveries.tracking', $query);
+        }
+
+        if ($request->filled('project')) {
+            $projectValue = $request->input('project');
+            $projectId = is_scalar($projectValue) ? filter_var($projectValue, FILTER_VALIDATE_INT) : false;
+
+            $projectMatchesYear = $projectId !== false && $year !== null
+                && DB::table('deliveries')
+                    ->where('project_id', $projectId)
+                    ->whereYear('delivery_date', $year)
+                    ->exists();
+
+            if (! $projectMatchesYear) {
+                $query = $request->query();
+                unset($query['project']);
+
+                return redirect()->route('deliveries.tracking', $query);
+            }
+        }
+
         $limit = (int) $request->input('per_page', 10);
         if (! in_array($limit, [10, 20, 30, 50, 100])) {
             $limit = 10;
@@ -509,7 +539,17 @@ class DeliveryController extends Controller
             ->orderBy('year', 'desc')
             ->pluck('year');
 
-        $projects = DB::table('projects')->get();
+        $projects = $request->filled('year')
+            ? DB::table('projects as p')
+                ->whereExists(function (Builder $projectDeliveries) use ($request): void {
+                    $projectDeliveries->selectRaw('1')
+                        ->from('deliveries as project_delivery')
+                        ->whereColumn('project_delivery.project_id', 'p.project_id')
+                        ->whereYear('project_delivery.delivery_date', $request->input('year'));
+                })
+                ->orderBy('p.project_name')
+                ->get(['p.project_id', 'p.project_name'])
+            : collect();
 
         $lots = DB::table('lot')
             ->when($request->filled('project'), fn ($query) => $query->where('project_id', $request->project))

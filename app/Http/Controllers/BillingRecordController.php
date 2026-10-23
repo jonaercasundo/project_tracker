@@ -121,6 +121,7 @@ class BillingRecordController extends Controller
             ->leftJoin('school as s', 's.school_id', '=', 'd.school_id')
             ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
             ->leftJoin('invoices as invoice', 'invoice.invoice_id', '=', 'billing.invoice_id')
+            ->leftJoin('billing_batches as batch', 'batch.id', '=', 'billing.billing_batch_id')
             ->select([
                 'd.delivery_id',
                 'd.dr_no',
@@ -133,6 +134,8 @@ class BillingRecordController extends Controller
                 'invoice.invoice_no',
                 'invoice.invoice_date',
                 'invoice.amount as invoice_amount',
+                'batch.id as billing_batch_id',
+                'batch.batch_ref',
                 'invoice.status as invoice_status',
                 'billing.billing_amount',
                 'billing.billing_reference',

@@ -7,6 +7,9 @@
             </div>
             <div class="flex gap-2">
                 <a href="{{ route('billing.records.index') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-500">Back to records</a>
+                @if ($record->billing_batch_id)
+                    <a href="{{ route('billing.batches.show', $record->billing_batch_id) }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-500">Batch {{ $record->batch_ref }}</a>
+                @endif
                 <a href="{{ route('billing.scanner') }}" class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700">Open scanner</a>
             </div>
         </div>

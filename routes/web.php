@@ -8,7 +8,9 @@ use App\Http\Controllers\BiddingController;
 use App\Http\Controllers\BiddingDocumentController;
 use App\Http\Controllers\BiddingFolderController;
 use App\Http\Controllers\BiddingSchoolController;
+use App\Http\Controllers\BillingBatchController;
 use App\Http\Controllers\BillingDashboardController;
+use App\Http\Controllers\BillingPreparationController;
 use App\Http\Controllers\BillingRecordController;
 use App\Http\Controllers\BillingScannerController;
 use App\Http\Controllers\BudgetRequestController;
@@ -720,6 +722,31 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/scanner/lookup', [BillingScannerController::class, 'lookup'])
                 ->middleware('can:billing.qr.scan')
                 ->name('scanner.lookup');
+            Route::get('/prepare', [BillingPreparationController::class, 'index'])
+                ->middleware('can:billing.qr.scan')
+                ->name('prepare');
+            Route::get('/prepare/scan', [BillingPreparationController::class, 'scanLookup'])
+                ->middleware('can:billing.qr.scan')
+                ->name('prepare.scan');
+            Route::get('/prepare/search', [BillingPreparationController::class, 'search'])
+                ->middleware('can:billing.qr.scan')
+                ->name('prepare.search');
+            Route::get('/prepare/range', [BillingPreparationController::class, 'range'])
+                ->middleware('can:billing.qr.scan')
+                ->name('prepare.range');
+            Route::get('/prepare/all-delivered', [BillingPreparationController::class, 'allDelivered'])
+                ->middleware('can:billing.qr.scan')
+                ->name('prepare.all');
+            Route::post('/prepare/confirm', [BillingPreparationController::class, 'confirm'])
+                ->middleware('can:billing.for-billing.mark')
+                ->name('prepare.confirm');
+            Route::get('/batches', [BillingBatchController::class, 'index'])
+                ->middleware('can:billing.records.view')
+                ->name('batches.index');
+            Route::get('/batches/{batch}', [BillingBatchController::class, 'show'])
+                ->whereNumber('batch')
+                ->middleware('can:billing.records.view')
+                ->name('batches.show');
             Route::post('/records/{delivery}/for-billing', [BillingScannerController::class, 'markForBilling'])
                 ->whereNumber('delivery')
                 ->middleware('can:billing.for-billing.mark')

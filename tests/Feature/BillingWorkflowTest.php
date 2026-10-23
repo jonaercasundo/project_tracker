@@ -5,6 +5,8 @@ use App\Services\DeliveryBillingQrCodeService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 use Tests\BillingWorkflowTestCase;
 
 pest()->extend(BillingWorkflowTestCase::class)->in(__FILE__);
@@ -50,14 +52,40 @@ function createBillingDelivery(string $drNumber = 'DR-1001', string $status = 'a
         'ref_no' => 'PROJ-1001',
         'status' => 'Ongoing',
     ], 'project_id');
+    $lotId = DB::table('lot')->insertGetId([
+        'lot_name' => 'Lot A',
+        'project_id' => $projectId,
+        'contract_no' => 'CONTRACT-'.$projectId,
+    ], 'lot_id');
     $schoolId = 'SCH-'.str_pad((string) $projectId, 4, '0', STR_PAD_LEFT);
-    DB::table('school')->insert(['school_id' => $schoolId, 'school_name' => 'North District School']);
+    DB::table('school')->insert(['school_id' => $schoolId, 'school_name' => 'North District School', 'division' => 'North Division']);
 
     return (int) DB::table('deliveries')->insertGetId([
         'project_id' => $projectId,
         'school_id' => $schoolId,
+        'lot_id' => $lotId,
         'dr_no' => $drNumber,
         'delivery_date' => '2026-09-15',
+        'status' => $status,
+    ], 'delivery_id');
+}
+
+function createDeliveryForBillingProject(int $projectId, string $drNumber, string $status = 'accepted', string $deliveryDate = '2026-09-15'): int
+{
+    $lotId = (int) DB::table('lot')->where('project_id', $projectId)->value('lot_id');
+    $schoolId = 'SCH-'.$projectId.'-'.preg_replace('/[^A-Za-z0-9]/', '', $drNumber);
+    DB::table('school')->insertOrIgnore([
+        'school_id' => $schoolId,
+        'school_name' => 'North District School '.$drNumber,
+        'division' => 'North Division',
+    ]);
+
+    return (int) DB::table('deliveries')->insertGetId([
+        'project_id' => $projectId,
+        'school_id' => $schoolId,
+        'lot_id' => $lotId,
+        'dr_no' => $drNumber,
+        'delivery_date' => $deliveryDate,
         'status' => $status,
     ], 'delivery_id');
 }
@@ -410,4 +438,226 @@ it('blocks users outside the MMC company context from billing routes', function 
     signInBillingUser('finance', 'MI');
 
     $this->get(route('billing.scanner'))->assertForbidden();
+});
+
+it('renders the Operations preparation page with the dependent project filter and four selection methods', function (): void {
+    signInBillingUser();
+    createBillingDelivery('1001');
+
+    $this->get(route('billing.prepare'))
+        ->assertOk()
+        ->assertSee('Prepare for Billing')
+        ->assertSee('All Years')
+        ->assertSee('Select Year First')
+        ->assertSee('Scan QR')
+        ->assertSee('Search DR')
+        ->assertSee('DR From')
+        ->assertSee('All Delivered')
+        ->assertSee('Search projects...', false);
+});
+
+it('resolves signed QR values through the Operations preparation lookup', function (): void {
+    signInBillingUser();
+    $deliveryId = createBillingDelivery('1001');
+    $payload = app(DeliveryBillingQrCodeService::class)->makePayload($deliveryId);
+
+    $this->getJson(route('billing.prepare.scan', ['q' => $payload]))
+        ->assertOk()
+        ->assertJsonPath('records.0.delivery_id', $deliveryId)
+        ->assertJsonPath('records.0.eligible', true);
+    $this->getJson(route('billing.prepare.scan', ['q' => 'unsigned-delivery-id']))
+        ->assertUnprocessable();
+});
+
+it('allows read-only preparation access without allowing billing confirmation', function (): void {
+    [$user] = signInBillingUser('user');
+    $user->removeRole('user');
+    $readOnlyRole = Role::findOrCreate('billing-viewer', 'web');
+    $readOnlyRole->givePermissionTo('billing.qr.scan');
+    $user->assignRole($readOnlyRole);
+    $deliveryId = createBillingDelivery('1001');
+
+    $this->get(route('billing.prepare'))
+        ->assertOk()
+        ->assertSee('data-can-confirm="false"', false);
+    $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'scan',
+        'delivery_ids' => [$deliveryId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertForbidden();
+
+    $this->assertDatabaseCount('billing_batches', 0);
+});
+
+it('searches duplicate DR numbers by exact delivery records and shows eligibility and POD state', function (): void {
+    signInBillingUser();
+    $firstId = createBillingDelivery('1001');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('project_id');
+    $secondId = createDeliveryForBillingProject($projectId, '1001');
+    $packageStatusId = (int) DB::table('package_status')->insertGetId([
+        'delivery_id' => $secondId,
+        'package_id' => 1,
+        'status' => 'accepted',
+    ], 'package_status_id');
+    DB::table('delivery_proofs')->insert(['package_status_id' => $packageStatusId, 'photo' => 'proof.jpg']);
+
+    $response = $this->getJson(route('billing.prepare.search', ['q' => '1001']))
+        ->assertOk()
+        ->assertJsonCount(2, 'records')
+        ->assertJsonPath('records.0.eligible', true);
+
+    expect(collect($response->json('records'))->contains(fn (array $record): bool => $record['pod_available']))->toBeTrue();
+
+    expect($firstId)->not->toBe($secondId);
+});
+
+it('previews a numeric DR range without casting nonnumeric receipt identifiers', function (): void {
+    signInBillingUser();
+    $firstId = createBillingDelivery('1001');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('project_id');
+    createDeliveryForBillingProject($projectId, '1003');
+    createDeliveryForBillingProject($projectId, 'DR-1002');
+
+    $this->getJson(route('billing.prepare.range', [
+        'project_id' => $projectId,
+        'year' => 2026,
+        'dr_from' => '1001',
+        'dr_to' => '1002',
+    ]))
+        ->assertOk()
+        ->assertJsonCount(1, 'records')
+        ->assertJsonPath('records.0.dr_no', '1001');
+});
+
+it('paginates server-side DR search results while retaining filters in page links', function (): void {
+    signInBillingUser();
+    $firstId = createBillingDelivery('1000');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('project_id');
+    foreach (range(1001, 1011) as $number) {
+        createDeliveryForBillingProject($projectId, (string) $number);
+    }
+
+    $this->getJson(route('billing.prepare.search', [
+        'q' => 'North District School',
+        'year' => 2026,
+        'project_id' => $projectId,
+        'per_page' => 10,
+        'page' => 2,
+    ]))
+        ->assertOk()
+        ->assertJsonPath('pagination.current_page', 2)
+        ->assertJsonPath('pagination.last_page', 2)
+        ->assertJsonPath('pagination.total', 12);
+});
+
+it('previews only scoped deliveries and explains excluded statuses for Select All', function (): void {
+    signInBillingUser();
+    $eligibleId = createBillingDelivery('1001');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $eligibleId)->value('project_id');
+    $forBillingId = createDeliveryForBillingProject($projectId, '1002');
+    $pendingId = createDeliveryForBillingProject($projectId, '1003', 'pending');
+    confirmDeliveryForBilling($forBillingId);
+
+    $this->getJson(route('billing.prepare.all', ['year' => 2026, 'project_id' => $projectId]))
+        ->assertOk()
+        ->assertJsonPath('summary.total', 3)
+        ->assertJsonPath('summary.eligible', 1)
+        ->assertJsonPath('summary.excluded', 2);
+
+    $this->getJson(route('billing.prepare.all'))->assertUnprocessable();
+    $this->assertDatabaseCount('delivery_billing_records', 1);
+    $this->assertDatabaseMissing('delivery_billing_records', ['delivery_id' => $pendingId]);
+});
+
+it('confirms a batch into the existing Billing queue idempotently without creating invoices', function (): void {
+    signInBillingUser();
+    $deliveryId = createBillingDelivery('1001');
+    $key = (string) Str::uuid();
+    $payload = ['mode' => 'scan', 'delivery_ids' => [$deliveryId], 'idempotency_key' => $key];
+
+    $created = $this->postJson(route('billing.prepare.confirm'), $payload)
+        ->assertCreated()
+        ->assertJsonPath('batch.delivery_count', 1)
+        ->assertJsonPath('batch.status', 'for_billing');
+    $batchId = $created->json('batch.id');
+    $batchRef = $created->json('batch.batch_ref');
+
+    $this->postJson(route('billing.prepare.confirm'), $payload)
+        ->assertOk()
+        ->assertJsonPath('batch.id', $batchId);
+
+    $this->assertDatabaseHas('delivery_billing_records', [
+        'delivery_id' => $deliveryId,
+        'billing_batch_id' => $batchId,
+        'status' => 'for_billing',
+    ]);
+    $this->assertDatabaseHas('billing_batches', [
+        'id' => $batchId,
+        'batch_ref' => $batchRef,
+        'created_by' => auth()->id(),
+        'confirmed_by' => auth()->id(),
+    ]);
+    $this->assertDatabaseCount('delivery_billing_histories', 1);
+    $this->assertDatabaseCount('invoices', 0);
+
+    $this->get(route('billing.records.index', ['billing_status' => 'for_billing']))
+        ->assertOk()
+        ->assertSee($batchRef);
+    $this->get(route('billing.batches.show', $batchId))
+        ->assertOk()
+        ->assertSee($batchRef)
+        ->assertSee('1001');
+
+    $this->postJson(route('billing.billed', $deliveryId), [
+        'invoice_no' => 'INV-BATCH-1001',
+        'invoice_date' => '2026-09-20',
+        'amount' => '100.00',
+    ])->assertOk()->assertJsonPath('record.billing_status', 'billed');
+    $this->assertDatabaseHas('billing_batches', ['id' => $batchId, 'status' => 'billed']);
+    $this->assertDatabaseCount('invoices', 1);
+});
+
+it('rejects a mixed eligible and ineligible confirmation atomically', function (): void {
+    signInBillingUser();
+    $eligibleId = createBillingDelivery('1001');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $eligibleId)->value('project_id');
+    $pendingId = createDeliveryForBillingProject($projectId, '1002', 'pending');
+
+    $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'mixed',
+        'delivery_ids' => [$eligibleId, $pendingId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertStatus(409)
+        ->assertJsonPath('rejected.0.delivery_id', $pendingId)
+        ->assertJsonPath('rejected.0.reason', 'Not Yet Delivered');
+
+    $this->assertDatabaseCount('billing_batches', 0);
+    $this->assertDatabaseCount('delivery_billing_records', 0);
+    $this->assertDatabaseCount('delivery_billing_histories', 0);
+});
+
+it('confirms Select All from server-side criteria and rejects stale previews', function (): void {
+    signInBillingUser();
+    $firstId = createBillingDelivery('1001');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('project_id');
+    $secondId = createDeliveryForBillingProject($projectId, '1002');
+    $criteria = ['year' => 2026, 'project_id' => $projectId];
+    $preview = $this->getJson(route('billing.prepare.all', $criteria))->assertOk();
+    $expected = collect($preview->json('records'))->where('eligible', true)->pluck('delivery_id')->all();
+
+    $this->postJson(route('billing.prepare.confirm'), $criteria + [
+        'mode' => 'all',
+        'expected_delivery_ids' => $expected,
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated()->assertJsonPath('batch.delivery_count', 2);
+
+    $staleKey = (string) Str::uuid();
+    $stalePreview = $this->getJson(route('billing.prepare.all', ['year' => 2026, 'project_id' => (int) DB::table('deliveries')->where('delivery_id', $secondId)->value('project_id')]))->assertOk();
+    $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'all',
+        'year' => 2026,
+        'project_id' => $projectId,
+        'expected_delivery_ids' => collect($stalePreview->json('records'))->pluck('delivery_id')->all(),
+        'idempotency_key' => $staleKey,
+    ])->assertStatus(409);
 });

@@ -7,6 +7,8 @@
             </div>
             <div class="flex gap-2">
                 <a href="{{ route('billing.dashboard') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-500">Dashboard</a>
+                <a href="{{ route('billing.prepare') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-500">Prepare for Billing</a>
+                <a href="{{ route('billing.batches.index') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-500">Batches</a>
                 <a href="{{ route('billing.scanner') }}" class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700">Open scanner</a>
             </div>
         </div>
@@ -76,6 +78,7 @@
                             <th class="px-4 py-3">Delivery date</th>
                             <th class="px-4 py-3">Delivery status</th>
                             <th class="px-4 py-3">Billing status</th>
+                            <th class="px-4 py-3">Batch</th>
                             <th class="px-4 py-3">Invoice</th>
                             <th class="px-4 py-3"><span class="sr-only">Details</span></th>
                         </tr>
@@ -101,13 +104,20 @@
                                     @endphp
                                     <span class="rounded-full px-2.5 py-1 text-xs font-bold {{ $billingTone }}">{{ $statuses[$record->billing_status] ?? $record->billing_status }}</span>
                                 </td>
+                                <td class="whitespace-nowrap px-4 py-3 text-xs font-semibold text-blue-700">
+                                    @if ($record->billing_batch_id)
+                                        <a href="{{ route('billing.batches.show', $record->billing_batch_id) }}" class="hover:underline">{{ $record->batch_ref }}</a>
+                                    @else
+                                        <span class="text-slate-400">Legacy / individual</span>
+                                    @endif
+                                </td>
                                 <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ $record->invoice_no ?? '—' }}</td>
                                 <td class="whitespace-nowrap px-4 py-3 text-right">
                                     <a href="{{ route('billing.records.show', $record->delivery_id) }}" class="font-semibold text-blue-700 hover:text-blue-900">Details <span aria-hidden="true">→</span></a>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="px-5 py-12 text-center text-slate-500">No delivery records match these filters.</td></tr>
+                            <tr><td colspan="8" class="px-5 py-12 text-center text-slate-500">No delivery records match these filters.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

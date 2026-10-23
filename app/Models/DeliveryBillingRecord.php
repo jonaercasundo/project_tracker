@@ -39,6 +39,11 @@ class DeliveryBillingRecord extends Model
         return $this->belongsTo(Invoice::class, 'invoice_id', 'invoice_id');
     }
 
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(BillingBatch::class, 'billing_batch_id');
+    }
+
     public function histories(): HasMany
     {
         return $this->hasMany(DeliveryBillingHistory::class, 'delivery_billing_record_id');

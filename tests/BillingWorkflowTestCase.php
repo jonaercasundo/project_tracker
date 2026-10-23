@@ -65,15 +65,24 @@ abstract class BillingWorkflowTestCase extends TestCase
             $table->string('status')->nullable();
         });
 
+        Schema::create('lot', function (Blueprint $table): void {
+            $table->increments('lot_id');
+            $table->string('lot_name', 100);
+            $table->integer('project_id');
+            $table->string('contract_no');
+        });
+
         Schema::create('school', function (Blueprint $table): void {
             $table->string('school_id')->primary();
             $table->string('school_name');
+            $table->string('division')->default('North Division');
         });
 
         Schema::create('deliveries', function (Blueprint $table): void {
             $table->increments('delivery_id');
             $table->integer('project_id');
             $table->string('school_id');
+            $table->integer('lot_id')->nullable();
             $table->string('dr_no');
             $table->date('delivery_date');
             $table->string('status');
@@ -96,6 +105,13 @@ abstract class BillingWorkflowTestCase extends TestCase
             $table->integer('delivery_id');
             $table->integer('package_id');
             $table->string('status');
+        });
+
+        Schema::create('delivery_proofs', function (Blueprint $table): void {
+            $table->increments('id');
+            $table->integer('package_status_id');
+            $table->string('photo');
+            $table->timestamps();
         });
 
         Schema::create('permissions', function (Blueprint $table): void {
@@ -136,5 +152,6 @@ abstract class BillingWorkflowTestCase extends TestCase
 
         (require database_path('migrations/2026_10_13_030108_add_project_invoice_number_unique_index.php'))->up();
         (require database_path('migrations/2026_10_13_030107_create_delivery_billing_tables.php'))->up();
+        (require database_path('migrations/2026_10_23_061316_create_billing_batches_table.php'))->up();
     }
 }

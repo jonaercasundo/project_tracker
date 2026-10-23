@@ -11,9 +11,9 @@ use Illuminate\Support\Facades\DB;
 
 class DeliveryBillingService
 {
-    public function markForBilling(int $deliveryId, User $actor): DeliveryBillingRecord
+    public function markForBilling(int $deliveryId, User $actor, ?int $billingBatchId = null): DeliveryBillingRecord
     {
-        return DB::transaction(function () use ($deliveryId, $actor): DeliveryBillingRecord {
+        return DB::transaction(function () use ($deliveryId, $actor, $billingBatchId): DeliveryBillingRecord {
             $delivery = $this->lockEligibleDelivery($deliveryId);
             $billingRecord = $this->lockBillingRecord($deliveryId);
             $currentStatus = $billingRecord?->status ?? DeliveryBillingRecord::PENDING_BILLING;
@@ -27,6 +27,7 @@ class DeliveryBillingService
             $billingRecord->status_before_hold = null;
             $billingRecord->submitted_for_billing_by = $actor->getKey();
             $billingRecord->submitted_for_billing_at = now();
+            $billingRecord->billing_batch_id = $billingBatchId;
             $billingRecord->save();
 
             $this->recordTransition($billingRecord, $currentStatus, DeliveryBillingRecord::FOR_BILLING, $actor);
@@ -101,6 +102,7 @@ class DeliveryBillingService
                 $invoice->invoice_id,
                 $billingRecord->billing_remarks
             );
+            $this->syncBatchStatus($billingRecord->billing_batch_id);
 
             return $billingRecord->refresh();
         }, 3);
@@ -124,6 +126,7 @@ class DeliveryBillingService
             $billingRecord->save();
 
             $this->recordTransition($billingRecord, $currentStatus, DeliveryBillingRecord::ON_HOLD, $actor, null, $remarks);
+            $this->syncBatchStatus($billingRecord->billing_batch_id);
 
             return $billingRecord->refresh();
         }, 3);
@@ -146,6 +149,7 @@ class DeliveryBillingService
             $billingRecord->save();
 
             $this->recordTransition($billingRecord, $previousStatus, $nextStatus, $actor);
+            $this->syncBatchStatus($billingRecord->billing_batch_id);
 
             return $billingRecord->refresh();
         }, 3);
@@ -186,6 +190,33 @@ class DeliveryBillingService
             'changed_by_name' => $actor->name,
             'remarks' => $remarks,
             'created_at' => now(),
+        ]);
+    }
+
+    private function syncBatchStatus(?int $batchId): void
+    {
+        if ($batchId === null) {
+            return;
+        }
+
+        DB::table('billing_batches')->where('id', $batchId)->lockForUpdate()->first();
+        $counts = DB::table('delivery_billing_records')
+            ->where('billing_batch_id', $batchId)
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw("SUM(CASE WHEN status = 'billed' THEN 1 ELSE 0 END) as billed")
+            ->selectRaw("SUM(CASE WHEN status = 'on_hold' THEN 1 ELSE 0 END) as on_hold")
+            ->first();
+
+        $status = match (true) {
+            (int) $counts->total > 0 && (int) $counts->billed === (int) $counts->total => 'billed',
+            (int) $counts->on_hold > 0 => 'returned_for_correction',
+            (int) $counts->billed > 0 => 'under_billing_review',
+            default => 'for_billing',
+        };
+
+        DB::table('billing_batches')->where('id', $batchId)->update([
+            'status' => $status,
+            'updated_at' => now(),
         ]);
     }
 }

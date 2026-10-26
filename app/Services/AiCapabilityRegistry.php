@@ -12,6 +12,7 @@ class AiCapabilityRegistry
     public function categories(): array
     {
         return [
+            ['id' => 'page_help', 'label' => 'Page Help', 'subtitle' => 'Explain the current authorized page and its available actions', 'icon' => 'help'],
             ['id' => 'view_search', 'label' => 'View & Search', 'subtitle' => 'Find records across authorized modules', 'icon' => 'search'],
             ['id' => 'create_records', 'label' => 'Create Records', 'subtitle' => 'Prepare records and drafts with explicit confirmation', 'icon' => 'create'],
             ['id' => 'edit_update', 'label' => 'Edit & Update', 'subtitle' => 'Review changes and validate existing records', 'icon' => 'edit'],
@@ -29,6 +30,7 @@ class AiCapabilityRegistry
     public function definitions(): array
     {
         return [
+            $this->capability('ai.page_help', 'page_help', 'Page-aware help', '*', 'READ', 'Explain page purpose, visible workflow guidance, and links using route metadata only.', [], [], 'page_help', 'AiModuleRegistry', [], 'low', 'none', 'AI activity log'),
             $this->capability('mi.catalog.search', 'view_search', 'MI Product Catalog Search', 'MI', 'READ', 'Search MI product names, SKU, category, materials and colors without exposing selling prices.', ['mi.product-catalog.view'], [], 'mi_catalog', 'AiReadOnlyToolGateway', ['search_mi_products', 'mi_product_catalog_summary', 'mi_products_needing_cop'], 'low', 'none', 'AI activity log'),
             $this->capability('mi.product_prices.lookup', 'view_search', 'MI Selling Price Lookup', 'MI', 'READ', 'Retrieve catalog selling prices only for accounts with the separate price permission.', ['mi.product-catalog.view', 'mi.product-prices.view'], [], 'mi_prices', 'AiReadOnlyToolGateway', ['lookup_mi_product_prices'], 'sensitive_read', 'none', 'AI activity log'),
             $this->capability('mmc.projects_deliveries.read', 'view_search', 'MMC Projects & Deliveries', 'MMC', 'READ', 'Search authorized MMC projects and inspect delivery counts for resolved project references.', [], ['user', 'Administrator'], 'mmc_operations', 'AiReadOnlyToolGateway', ['search_mmc_projects', 'get_mmc_project_delivery_summary', 'mmc_operations_snapshot', 'search_mmc_deliveries'], 'low', 'none', 'AI activity log'),
@@ -55,7 +57,8 @@ class AiCapabilityRegistry
     public function groupedFor(User $user, ?Company $company, bool $enabled, bool $configured): array
     {
         $capabilities = collect($this->definitions())->map(function (array $capability) use ($user, $company, $enabled, $configured): array {
-            $capability['permission_label'] = $capability['business_permissions'] === [] ? 'AI use + module access' : implode(', ', $capability['business_permissions']);
+            $capability['permission_label'] = 'AI: '.implode(', ', $capability['ai_permissions'])
+                .($capability['business_permissions'] === [] ? '' : ' · Business: '.implode(', ', $capability['business_permissions']));
             $capability['status'] = $this->status($capability, $user, $company, $enabled, $configured);
 
             return $capability;
@@ -82,11 +85,13 @@ class AiCapabilityRegistry
         }
         $businessPermissionsAreSatisfied = $capability['authorization_rule'] === 'mi_approvals'
             || $this->hasBusinessPermissions($user, $capability['business_permissions']);
-        if (! $businessPermissionsAreSatisfied || ! $this->hasAnyRole($user, $capability['roles'])) {
+        $aiPermissionsAreSatisfied = $this->hasBusinessPermissions($user, $capability['ai_permissions']);
+        if (! $businessPermissionsAreSatisfied || ! $aiPermissionsAreSatisfied || ! $this->hasAnyRole($user, $capability['roles'])) {
             return false;
         }
 
         return match ($capability['authorization_rule']) {
+            'page_help' => $user->can('ai.page-help.use'),
             'mi_catalog' => $company->code === 'MI' && $user->can('mi.product-catalog.view'),
             'mi_prices' => $company->code === 'MI' && $user->can('mi.product-catalog.view') && $user->can('mi.product-prices.view'),
             'mi_quotation' => $company->code === 'MI' && $user->can('mi.quotation.create') && $user->can('mi.product-prices.view'),
@@ -178,6 +183,11 @@ class AiCapabilityRegistry
     {
         $implemented = $handler !== null;
         $partial = in_array($category, ['charts_analytics', 'workflow_assistant', 'proactive_assistance'], true);
+        $aiPermissions = match ($authorizationRule) {
+            'page_help' => ['ai.page-help.use'],
+            'mi_catalog', 'mi_prices', 'mmc_operations', 'mmc_inventory', 'mi_own_budget', 'mi_liquidations', 'mi_accounting', 'mi_approvals' => ['ai.business-search.use'],
+            default => ['ai.assistant.use'],
+        };
 
         return [
             'id' => $id,
@@ -187,6 +197,7 @@ class AiCapabilityRegistry
             'operation' => $operation,
             'description' => $description,
             'business_permissions' => $businessPermissions,
+            'ai_permissions' => $aiPermissions,
             'roles' => $roles,
             'authorization_rule' => $authorizationRule,
             'handler' => $handler,
@@ -224,8 +235,8 @@ class AiCapabilityRegistry
             }
 
             $schemas[$toolName] = match ($toolName) {
-                'search_mi_products' => ['type' => 'array', 'items' => ['id' => 'integer', 'name' => 'string', 'sku' => 'string|null', 'category' => 'string|null', 'materials' => 'string|null', 'colors' => 'string|null']],
-                'lookup_mi_product_prices' => ['type' => 'array', 'items' => ['id' => 'integer', 'name' => 'string', 'sku' => 'string|null', 'selling_price' => 'number|null', 'currency' => 'string']],
+                'search_mi_products' => ['type' => 'array', 'items' => ['id' => 'integer', 'name' => 'string', 'sku' => 'string|null', 'category' => 'string|null', 'sub_category' => 'string|null', 'collection' => 'string|null', 'materials' => 'array', 'colors' => 'array', 'specifications' => 'verified product details and dimensions', 'url' => 'authorized MI product page URL']],
+                'lookup_mi_product_prices' => ['type' => 'array', 'items' => ['id' => 'integer', 'name' => 'string', 'sku' => 'string|null', 'specifications' => 'verified product details and dimensions', 'selling_price' => 'number|null', 'currency' => 'string', 'url' => 'authorized MI product page URL']],
                 'mi_product_catalog_summary' => ['type' => 'object', 'properties' => ['product_count' => 'integer', 'products_missing_cop' => 'integer|null']],
                 'mi_products_needing_cop' => ['type' => 'array', 'items' => ['id' => 'integer', 'name' => 'string', 'sku' => 'string|null']],
                 'get_mmc_project_delivery_summary' => ['type' => 'object', 'properties' => ['projects' => 'array of verified project delivery summaries']],

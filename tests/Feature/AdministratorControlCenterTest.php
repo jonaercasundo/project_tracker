@@ -44,6 +44,9 @@ it('shows the control center and protects management routes from non-administrat
         ->assertSee('md:w-[72px]')->assertSee('md:w-[260px]')->assertSee('md:sticky')
         ->assertSee(route('roles.index'))->assertSee(route('admin.ai-management.index'))->assertSee(route('roleaccess.index'));
     $this->get(route('admin.access.permissions.index'))->assertOk()->assertSee('Role permission matrix')->assertSee('Administrator navigation');
+    $this->get(route('admin.access.permissions.ai'))->assertOk()->assertSee('AI capability permissions')
+        ->assertSee('ai.page-help.use')->assertSee('ai.business-search.use')->assertSee('Capability details')
+        ->assertSee('Filter by implementation status')->assertSee('Select visible')->assertSee('Reset changes');
     $this->get(route('admin.access.review'))->assertOk()->assertSee('User access review')->assertSee('All users &amp; access', false);
     $this->get(route('admin.audit.index'))->assertOk()->assertSee('Activity and access log')->assertSee('Roles &amp; permissions', false);
     $this->get(route('admin.ai-management.index'))->assertOk()->assertSee('Assistant capabilities and usage')->assertSee('AI Assistant');

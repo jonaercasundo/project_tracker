@@ -8,6 +8,7 @@ use App\Models\AiMessage;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\AiAssistantService;
+use App\Services\AiCapabilityRegistry;
 use App\Services\AiModuleRegistry;
 use App\Services\AiPageContextService;
 use App\Services\AiProviderConfiguration;
@@ -31,9 +32,10 @@ class AssistantController extends Controller
         return view('ai.workspace');
     }
 
-    public function capabilities(Request $request, AiModuleRegistry $registry): JsonResponse
+    public function capabilities(Request $request, AiModuleRegistry $registry, AiCapabilityRegistry $capabilities): JsonResponse
     {
         [$user, $company] = $this->identity($request);
+        abort_unless($capabilities->allows('ai.page_help', $user, $company), 403, 'You do not have permission to use page-aware AI help.');
 
         return response()->json(['context' => $registry->pageContext($user, $company, $request->string('page_route')->toString() ?: $request->route()?->getName())]);
     }

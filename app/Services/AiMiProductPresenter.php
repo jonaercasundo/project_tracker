@@ -30,9 +30,25 @@ class AiMiProductPresenter
             'category_id' => $product->category_id,
             'category' => $product->category?->name,
             'sub_category_id' => $product->sub_category_id,
+            'sub_category' => $product->subCategory?->name,
             'collection' => $product->collection?->name,
             'materials' => $product->materials,
             'colors' => $product->color,
+            'specifications' => [
+                'description' => $product->description,
+                'type' => $product->type,
+                'product_type' => $product->productType?->name,
+                'classification' => $product->classification,
+                'designer' => $product->designed_by,
+                'country_of_production' => $product->country_of_production,
+                'dimensions' => [
+                    'height' => $product->product_height,
+                    'width' => $product->product_width,
+                    'length' => $product->product_length,
+                    'depth' => $product->product_depth,
+                ],
+            ],
+            'url' => route('mi_app.show', $product->getKey()),
         ];
 
         if ($includeSellingPrice) {

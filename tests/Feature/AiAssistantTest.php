@@ -3,6 +3,7 @@
 use App\Models\AiConversation;
 use App\Models\BudgetRequest;
 use App\Models\MI_Liquidation;
+use App\Models\MI_Product;
 use App\Services\AiAssistantService;
 use App\Services\AiCapabilityRegistry;
 use App\Services\AiReadOnlyToolGateway;
@@ -22,6 +23,17 @@ class AiAssistantTestCase extends MIWorkflowTestCase
     protected function migrateFreshUsing(): array
     {
         $migrationPaths = parent::migrateFreshUsing();
+        $migrationPaths['--path'][] = 'database/migrations/2026_07_27_073520_create_m_i__products_table.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_07_29_075636_create_categories_table.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_07_29_075711_create_sub_categories_table.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_07_29_075746_create_product_types_table.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_07_29_075829_create_collections_table.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_07_31_015928_update_mi_products_table_for_new_product_system.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_08_17_000000_add_price_to_products_table.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_07_31_020944_change_materials_and_color_to_json_in_mi_products_table.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_10_06_040342_create_mi_product_images_table.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_10_06_085134_add_unique_item_code_to_mi_products_table.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_10_20_082229_add_country_of_production_to_mi_products_table.php';
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_083437_create_ai_assistant_tables.php';
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_085724_create_ai_provider_settings_tables.php';
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_095438_create_ai_quotation_workflow_tables.php';
@@ -324,6 +336,48 @@ it('returns page metadata from the authorized registry and denies cross-company 
     expect($ownRequests)->toHaveCount(1)->and($ownRequests[0]['department'])->toBe('Design');
 });
 
+it('requires page-help and business-search AI permissions in addition to module access', function () {
+    $user = $this->miUser('user');
+    $this->signInMI($user);
+    $company = $user->currentCompany();
+    $registry = app(AiCapabilityRegistry::class);
+    $gateway = app(AiReadOnlyToolGateway::class);
+
+    expect($registry->allows('ai.page_help', $user, $company))->toBeTrue()
+        ->and($registry->allows('mi.catalog.search', $user, $company))->toBeTrue();
+
+    Role::findByName('user', 'web')->revokePermissionTo('ai.page-help.use');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $this->getJson(route('assistant.capabilities'))->assertForbidden();
+    expect($registry->allows('ai.page_help', $user->fresh(), $company))->toBeFalse();
+
+    Role::findByName('user', 'web')->revokePermissionTo('ai.business-search.use');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    expect(collect($gateway->tools($user->fresh(), $company, []))->pluck('name'))->not->toContain('search_mi_products');
+});
+
+it('returns verified product specifications and links without leaking purchase costs', function () {
+    $user = $this->miUser('user');
+    $this->signInMI($user);
+    $product = MI_Product::factory()->create([
+        'item_name' => 'Spec Search Chair',
+        'description' => 'Solid timber chair with a low back.',
+        'product_height' => '82.00',
+        'product_width' => '48.00',
+        'product_length' => '52.00',
+        'product_depth' => '49.00',
+        'purchase_cost' => '999.00',
+        'price' => '1999.00',
+    ]);
+    $result = app(AiReadOnlyToolGateway::class)->call('search_mi_products', ['query' => 'Spec Search Chair'], $user, $user->currentCompany());
+
+    expect($result)->toHaveCount(1)
+        ->and($result[0]['specifications']['description'])->toBe('Solid timber chair with a low back.')
+        ->and($result[0]['specifications']['dimensions']['height'])->toBe('82.00')
+        ->and($result[0]['url'])->toBe(route('mi_app.show', $product->getKey()))
+        ->and(array_keys($result[0]))->not->toContain('price', 'purchase_cost');
+});
+
 it('keeps advertised callable capabilities aligned with the authorized tool gateway', function () {
     $user = $this->miUser('user');
     $this->signInMI($user);
@@ -384,7 +438,7 @@ it('keeps MI catalog and price reads separate from quotation creation permission
     expect($toolNames)->toContain('lookup_mi_product_prices')->and($user->can('mi.quotation.create'))->toBeFalse();
 
     $readOnlyRole = Role::findOrCreate('MI_Catalog_Read_Only', 'web');
-    $readOnlyRole->givePermissionTo(['ai.assistant.use', 'mi.product-catalog.view']);
+    $readOnlyRole->givePermissionTo(['ai.assistant.use', 'ai.business-search.use', 'mi.product-catalog.view']);
     $readOnlyUser = $this->miUser('MI_Catalog_Read_Only');
     $this->actingAs($readOnlyUser)->withSession(['company_id' => $readOnlyUser->companies()->sole()->getKey()]);
     $readOnlyCompany = $readOnlyUser->currentCompany();

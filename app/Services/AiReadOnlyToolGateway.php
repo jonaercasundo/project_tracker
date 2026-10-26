@@ -31,7 +31,7 @@ class AiReadOnlyToolGateway
         }
 
         if ($this->capabilities->allows('mi.catalog.search', $user, $company)) {
-            $tools[] = $this->productSearchTool('search_mi_products', 'Search MI product names, SKU or item code, category, collection, materials, and colors. Does not return selling prices.');
+            $tools[] = $this->productSearchTool('search_mi_products', 'Search MI product names, SKU or item code, category, collection, materials, colors and verified product specifications. Does not return selling prices.');
             $tools[] = ['type' => 'function', 'name' => 'mi_product_catalog_summary', 'description' => 'Return the MI product count and, when available, the count of products missing country of production (COP).', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
             $tools[] = ['type' => 'function', 'name' => 'mi_products_needing_cop', 'description' => 'List up to 25 MI products whose country of production (COP) is missing.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
         }
@@ -275,10 +275,19 @@ class AiReadOnlyToolGateway
     {
         $terms = array_values(array_unique(preg_split('/[\s\W_]+/u', $query, -1, PREG_SPLIT_NO_EMPTY) ?: []));
         $columns = ['product_id', 'item_name', 'sku', 'item_code', 'category_id', 'sub_category_id', 'collection_id', 'materials', 'color'];
+        foreach (['description', 'type', 'product_type_id', 'classification', 'designed_by', 'country_of_production', 'product_height', 'product_width', 'product_length', 'product_depth'] as $specificationColumn) {
+            if (Schema::hasColumn('mi_products', $specificationColumn)) {
+                $columns[] = $specificationColumn;
+            }
+        }
         if ($includePrice) {
             $columns[] = 'price';
         }
-        $products = MI_Product::query()->with(['images', 'category', 'collection'])->where(function ($builder) use ($query, $terms): void {
+        $relations = ['images', 'category', 'subCategory', 'collection'];
+        if (Schema::hasColumn('mi_products', 'product_type_id')) {
+            $relations[] = 'productType';
+        }
+        $products = MI_Product::query()->with($relations)->where(function ($builder) use ($query, $terms): void {
             $builder->where('item_name', 'like', '%'.$query.'%')
                 ->orWhere('sku', 'like', '%'.$query.'%')
                 ->orWhere('item_code', 'like', '%'.$query.'%')

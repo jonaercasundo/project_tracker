@@ -72,7 +72,7 @@ class AdminControlCenterController extends Controller
         ]);
     }
 
-    public function permissionMatrix(Request $request): View
+    public function permissionMatrix(Request $request, AiCapabilityRegistry $capabilities): View
     {
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
@@ -95,6 +95,30 @@ class AdminControlCenterController extends Controller
             ->orderBy('name')->get();
         $roles = Role::query()->where('guard_name', 'web')->with(['permissions' => fn ($query) => $query->where('guard_name', 'web')])
             ->withCount('users')->orderBy('name')->get();
+        $definitions = $capabilities->definitions();
+        $permissionDetails = $permissions->mapWithKeys(function (Permission $permission) use ($definitions): array {
+            $definition = collect($definitions)->first(function (array $definition) use ($permission): bool {
+                if (in_array($permission->name, $definition['ai_permissions'] ?? [], true)) {
+                    return true;
+                }
+
+                return collect($definition['business_permissions'] ?? [])->contains(
+                    fn (string $requiredPermission): bool => in_array($permission->name, explode(' or ', $requiredPermission), true),
+                );
+            });
+            if ($permission->name === 'ai.settings.manage') {
+                return [$permission->getKey() => ['module' => 'AI', 'operation' => 'ADMIN', 'implementation' => 'implemented', 'handler' => 'AiConfigurationController', 'ai_permissions' => ['ai.settings.manage'], 'business_permissions' => []]];
+            }
+
+            return [$permission->getKey() => [
+                'module' => str_starts_with($permission->name, 'mi.') ? 'MI' : (str_starts_with($permission->name, 'mmc.') ? 'MMC' : 'AI'),
+                'operation' => $definition['operation'] ?? (str_starts_with($permission->name, 'ai.') ? 'CORE' : 'PERMISSION'),
+                'implementation' => $definition['implementation'] ?? (str_starts_with($permission->name, 'ai.') ? 'implemented' : 'permission_only'),
+                'handler' => $definition['handler'] ?? (str_starts_with($permission->name, 'ai.') ? 'AssistantController / AiAssistantService' : 'Existing module authorization'),
+                'ai_permissions' => $definition['ai_permissions'] ?? [],
+                'business_permissions' => $definition['business_permissions'] ?? [],
+            ]];
+        });
 
         return view('admin.access.permission-matrix', [
             'permissions' => $permissions,
@@ -103,15 +127,16 @@ class AdminControlCenterController extends Controller
             'companyScope' => $company,
             'search' => $validated['search'] ?? '',
             'permissionGroups' => $permissions->groupBy(fn (Permission $permission): string => $this->permissionGroup($permission->name)),
+            'permissionDetails' => $permissionDetails,
             'companyLabels' => ['all' => 'All scopes', 'MI' => 'MI', 'MMC' => 'MMC'],
         ]);
     }
 
-    public function aiPermissionMatrix(Request $request): View
+    public function aiPermissionMatrix(Request $request, AiCapabilityRegistry $capabilities): View
     {
         $request->merge(['scope' => 'ai']);
 
-        return $this->permissionMatrix($request);
+        return $this->permissionMatrix($request, $capabilities);
     }
 
     public function updatePermissionMatrix(Request $request, AdminAuditLogger $audit): RedirectResponse
@@ -285,7 +310,12 @@ class AdminControlCenterController extends Controller
         $prefix = explode('.', $permission)[0];
 
         return match ($prefix) {
-            'ai' => 'AI Assistant',
+            'ai' => match (explode('.', $permission)[1] ?? '') {
+                'assistant', 'settings' => 'AI Core',
+                'page-help' => 'AI Page Help',
+                'business-search' => 'AI Business Search',
+                default => 'AI '.ucfirst(str_replace(['-', '_'], ' ', explode('.', $permission)[1] ?? 'Assistant')),
+            },
             'mi' => 'MI',
             'mmc' => 'MMC',
             default => ucfirst(str_replace(['-', '_'], ' ', $prefix)),

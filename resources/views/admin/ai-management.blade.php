@@ -51,6 +51,7 @@
                                     @case('analytics')<path d="M4 20V11m5 9V5m5 15v-7m5 7V3M2 20h20"/>@break
                                     @case('forecast')<path d="M4 18 9 12l4 3 7-9M15 6h5v5M5 5h.01M5 9h.01M5 13h.01"/>@break
                                     @case('document')<path d="M6 3h8l5 5v13H6zM14 3v5h5m-9 5h4m-4 4h6"/><circle cx="9" cy="13" r="3"/>@break
+                                    @case('help')<path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3m.1 4h.01"/><circle cx="12" cy="12" r="9"/>@break
                                     @case('workflow')<rect x="3" y="4" width="7" height="6" rx="1"/><rect x="14" y="14" width="7" height="6" rx="1"/><path d="M10 7h3a2 2 0 0 1 2 2v5M12 14l3 3 3-3"/>@break
                                     @default<path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.6 8.6 0 0 1-3.5-.7L4 20l1.4-3.4A7.3 7.3 0 0 1 4 12c0-4.1 3.6-7.5 8-7.5s8 3.1 8 7zM8 12h.01M12 12h.01M16 12h.01"/>
                                 @endswitch

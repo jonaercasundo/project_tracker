@@ -19,12 +19,18 @@ class AiAssistantPermissionSeeder extends Seeder
 
         Permission::findOrCreate('ai.assistant.use', 'web');
         Permission::findOrCreate('ai.settings.manage', 'web');
+        $pageHelpPermission = Permission::findOrCreate('ai.page-help.use', 'web');
+        $businessSearchPermission = Permission::findOrCreate('ai.business-search.use', 'web');
 
         $administrator = Role::findOrCreate('Administrator', 'web');
         $administrator->givePermissionTo(['ai.assistant.use', 'ai.settings.manage']);
 
         foreach (['user', 'finance', 'accounting', 'Accounting', 'Executive', 'executive', 'IT', 'Warehouse_officer'] as $roleName) {
             Role::findOrCreate($roleName, 'web')->givePermissionTo('ai.assistant.use');
+        }
+
+        foreach (Role::query()->where('guard_name', 'web')->whereHas('permissions', fn ($query) => $query->where('name', 'ai.assistant.use')->where('guard_name', 'web'))->get() as $role) {
+            $role->givePermissionTo([$pageHelpPermission, $businessSearchPermission]);
         }
 
         foreach (Role::query()->where('name', '!=', 'Administrator')->get() as $role) {

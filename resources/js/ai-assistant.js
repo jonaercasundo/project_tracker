@@ -21,6 +21,7 @@ window.aiAssistant = (settings) => ({
     quoteSearching: false,
     mobileSidebarOpen: false,
     contextPanelOpen: false,
+    contextOpen: false,
 
     async init() {
         this.open = Boolean(this.workspace);
@@ -89,7 +90,7 @@ window.aiAssistant = (settings) => ({
         if (this.context?.key === 'mi_designer') {
             const actions = [
                 { title: 'Search products', subtitle: 'Find an item by name or SKU', prompt: 'Find a product in the MI catalog', icon: 'search' },
-                { title: 'Check a price', subtitle: 'Look up an approved selling price', prompt: 'How much is item XXX?', icon: 'tag' },
+                { title: 'Check a price', subtitle: 'Look up an approved selling price', prompt: 'How much is ROUND SIDE TABLE (M)?', icon: 'tag' },
                 { title: 'Explain this page', subtitle: 'Get a guided walkthrough', prompt: 'Explain this page and what I can do here', icon: 'help' },
             ];
             if (this.quoteAllowed) actions.splice(2, 0, { title: 'Create a quotation', subtitle: 'Build and review a quote from catalog prices', prompt: 'Help me create a quotation', icon: 'document' });

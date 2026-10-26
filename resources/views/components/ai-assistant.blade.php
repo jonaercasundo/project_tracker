@@ -42,7 +42,7 @@
                 }
             })"
             x-init="init()"
-            @keydown.escape.window="if (contextPanelOpen) contextPanelOpen = false; else if (mobileSidebarOpen) mobileSidebarOpen = false; else if (open && workspace) exitWorkspace(); else if (open) close()"
+            @keydown.escape.window="if (contextPanelOpen) contextPanelOpen = false; else if (mobileSidebarOpen) mobileSidebarOpen = false; else if (contextOpen) contextOpen = false; else if (open && workspace) exitWorkspace(); else if (open) close()"
             class="fixed z-[110] bottom-5 right-5 sm:bottom-6 sm:right-6"
             data-ai-assistant
         >
@@ -215,24 +215,30 @@
                 </section>
             @else
             <section x-cloak x-show="open" x-transition.opacity class="fixed inset-0 z-[111] bg-slate-950/30 sm:bg-transparent" @click.self="if (!workspace) close()" :class="workspace ? 'sm:inset-0' : ''">
-                <div class="fixed inset-x-0 bottom-0 flex h-[min(88vh,760px)] flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(720px,calc(100vh-3rem))] sm:w-[min(440px,calc(100vw-3rem))] sm:rounded-2xl" :class="workspace ? 'sm:!inset-6 sm:!h-auto sm:!w-auto sm:rounded-2xl' : ''" role="dialog" aria-modal="true" aria-label="Project Tracker Assistant">
+                <div class="fixed inset-x-0 bottom-0 flex h-[min(92vh,820px)] flex-col overflow-hidden rounded-t-[26px] border border-slate-200/70 bg-white shadow-[0_18px_60px_rgba(18,34,61,0.15)] sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(780px,calc(100vh-3rem))] sm:w-[min(760px,calc(100vw-3rem))] sm:rounded-[26px]" :class="workspace ? 'sm:!inset-6 sm:!h-auto sm:!w-auto sm:rounded-2xl' : ''" role="dialog" aria-modal="true" aria-label="Project Tracker Assistant">
                     <header class="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
-                        <div class="flex min-w-0 items-center gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#203d83] text-white"><x-ai-icon name="sparkles" size="19" /></span><div class="min-w-0"><div class="flex items-center gap-2"><h2 class="truncate text-base font-bold tracking-tight text-slate-900">AI Assistant</h2><span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700" x-text="context?.label || company || 'Workspace'"></span></div><p class="mt-1 truncate text-xs text-slate-500" x-text="context?.page?.title || 'Context-aware workspace help'"></p></div></div>
+                        <div class="flex min-w-0 items-center gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#203d83] text-white"><x-ai-icon name="sparkles" size="19" /></span><div class="min-w-0"><div class="flex items-center gap-2"><h2 class="truncate text-base font-bold tracking-tight text-slate-900">AI Assistant</h2><span class="rounded-full bg-blue-50/80 px-2.5 py-1 text-[10px] font-semibold text-blue-800" x-text="context?.label || company || 'Workspace'"></span></div><p class="mt-1 truncate text-xs text-slate-500" x-text="context?.page?.title || 'Context-aware workspace help'"></p></div></div>
                         <div class="flex shrink-0 items-center gap-2">
                             <button x-show="conversationId" type="button" @click="deleteConversation()" class="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-rose-50 hover:text-rose-700" aria-label="Delete chat"><x-ai-icon name="trash" size="17" /></button>
                             <a x-show="!workspace" :href="routes.full" class="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-blue-700" aria-label="Open fullscreen assistant"><x-ai-icon name="expand" size="17" /></a>
+                            <button x-show="!workspace" type="button" @click="contextOpen = !contextOpen" class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-800" :aria-expanded="contextOpen" aria-label="Toggle page context"><x-ai-icon name="compass" size="16" /><span class="hidden sm:inline">Page help</span></button>
                             <button x-show="!workspace" type="button" @click="close()" class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100" aria-label="Close assistant"><x-ai-icon name="close" size="17" /></button>
                         </div>
                     </header>
 
                     <div x-show="status !== 'ready'" role="status" aria-live="polite" class="flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800"><x-ai-icon name="sparkles" size="17" /></span><span class="min-w-0"><strong class="block font-semibold" x-text="statusTitle()"></strong><span class="mt-0.5 block text-xs leading-5 text-amber-900/80" x-text="statusDetails()"></span><a x-show="status === 'not_configured' && routes.aiSettings" :href="routes.aiSettings" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold underline"><x-ai-icon name="external" size="13" /> Open configuration</a></span></div>
 
-                    <div class="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[190px_minmax(0,1fr)]">
-                        <aside class="hidden border-r border-slate-200 bg-slate-50 p-3 md:flex md:flex-col">
+                    <div x-cloak x-show="contextOpen" x-transition class="border-b border-slate-200/70 bg-[#f8faff] px-5 py-4 sm:px-6">
+                        <div class="flex items-start justify-between gap-4"><div class="flex items-start gap-3"><span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm"><x-ai-icon name="compass" size="16" /></span><div class="min-w-0"><p class="text-xs font-semibold text-slate-800" x-text="pageTitle()"></p><p class="mt-1 max-w-2xl text-xs leading-5 text-slate-500" x-text="pageDescription()"></p><div class="mt-3 flex flex-wrap gap-2"><template x-for="action in quickActions()" :key="`drawer-help-${action.title}`"><button type="button" @click="send(action.prompt); contextOpen = false" :disabled="status !== 'ready'" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-800 disabled:opacity-50" x-text="action.title"></button></template></div></div></div><button type="button" @click="contextOpen = false" class="rounded-md p-1 text-slate-400 hover:bg-white hover:text-slate-700" aria-label="Close page help"><x-ai-icon name="close" size="16" /></button></div>
+                    </div>
+
+                    <div class="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[208px_minmax(0,1fr)]">
+                        <aside class="hidden border-r border-slate-200/70 bg-[#f9fafc] p-4 md:flex md:flex-col">
                             <button type="button" @click="newConversation()" :disabled="status !== 'ready'" class="mb-3 inline-flex items-center justify-center gap-2 rounded-xl bg-[#203d83] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#172f6e] disabled:cursor-not-allowed disabled:opacity-50"><x-ai-icon name="plus" size="16" /> New conversation</button>
                             <label class="mb-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-slate-400 focus-within:border-blue-300"><x-ai-icon name="search" size="15" /><span class="sr-only">Search conversations</span><input x-model="conversationSearch" type="search" placeholder="Search chats" class="w-full border-0 bg-transparent p-0 text-xs text-slate-700 placeholder:text-slate-400 focus:ring-0"></label>
                             <p class="mb-2 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><x-ai-icon name="clock" size="13" /> Recent chats</p>
-                            <div class="min-h-0 space-y-1 overflow-y-auto">
+                            <div class="min-h-0 flex-1 space-y-1 overflow-y-auto">
+                                <template x-if="loadingConversations"><div class="space-y-2 px-2 py-2"><div class="h-8 animate-pulse rounded-lg bg-slate-200/60"></div><div class="h-8 animate-pulse rounded-lg bg-slate-200/60"></div><div class="h-8 animate-pulse rounded-lg bg-slate-200/60"></div></div></template>
                                 <template x-for="item in filteredConversations()" :key="item.id">
                                     <button type="button" @click="load(item.id)" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-white" :class="Number(conversationId) === Number(item.id) ? 'bg-white font-semibold text-slate-900 shadow-sm' : 'text-slate-600'"><x-ai-icon name="message" size="14" class="shrink-0 text-slate-400" /><span class="min-w-0 flex-1 truncate" x-text="item.title"></span><span class="shrink-0 text-[10px] text-slate-400" x-text="formatTime(item.last_message_at)"></span></button>
                                 </template>
@@ -242,29 +248,31 @@
                         <div class="flex min-h-0 min-w-0 flex-col">
                             <div class="border-b border-slate-100 px-4 py-3 md:hidden">
                                 <div class="flex items-center gap-2">
-                                    <button type="button" @click="newConversation()" :disabled="status !== 'ready'" class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50">New conversation</button>
+                                    <button type="button" @click="newConversation()" :disabled="status !== 'ready'" class="inline-flex items-center gap-1.5 rounded-lg bg-[#203d83] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><x-ai-icon name="plus" size="14" /> New chat</button>
                                     <select aria-label="Recent conversations" @change="if ($event.target.value) load($event.target.value)" class="min-w-0 flex-1 rounded-lg border-slate-200 py-2 text-xs text-slate-700">
                                         <option value="">Recent conversations</option>
                                         <template x-for="item in conversations" :key="item.id"><option :value="item.id" x-text="item.title"></option></template>
                                     </select>
                                 </div>
                             </div>
-                            <div x-ref="scrollArea" class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                            <div x-ref="scrollArea" class="min-h-0 flex-1 space-y-5 overflow-y-auto bg-white px-5 py-5 sm:px-7 sm:py-7">
                                 <template x-if="messages.length === 0">
-                                    <div class="rounded-2xl border border-blue-100 bg-gradient-to-br from-[#f4f7ff] to-white p-4 text-sm leading-6 text-slate-700 shadow-sm">
-                                        <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#203d83] text-white"><x-ai-icon name="sparkles" size="18" /></span><div><p class="font-semibold text-slate-900" x-text="welcomeTitle()"></p><p class="mt-0.5 text-xs text-slate-500" x-text="pageTitle()"></p></div></div><p class="mt-3" x-text="pageDescription()"></p>
-                                        <div class="mt-3 flex flex-wrap gap-2">
-                                            <template x-for="suggestion in context.suggestions || []" :key="suggestion"><button type="button" @click="send(suggestion)" class="rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs text-blue-800 hover:bg-blue-100" x-text="suggestion"></button></template>
-                                        </div>
-                                        <div x-show="context.links?.length" class="mt-3 flex flex-wrap gap-2 border-t border-blue-100 pt-3">
-                                            <template x-for="link in context.links || []" :key="link.url"><a :href="link.url" class="text-xs font-medium text-blue-700 underline" x-text="link.label"></a></template>
+                                    <div class="flex min-h-full flex-col justify-center px-1 py-7 sm:px-5 sm:py-10">
+                                        <div class="mx-auto w-full max-w-[570px]">
+                                            <div class="mb-7 flex items-center gap-4"><span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#3150a4]"><x-ai-icon name="sparkles" size="27" /></span><div><p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-700" x-text="context?.label || 'Workspace assistant'"></p><h3 class="mt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl" x-text="welcomeTitle()"></h3></div></div>
+                                            <p class="max-w-xl text-sm leading-6 text-slate-600" x-text="pageDescription()"></p>
+                                            <div class="mt-8 flex items-center justify-between gap-3"><p class="text-xs font-semibold text-slate-700">Try one of these</p><button type="button" @click="contextOpen = !contextOpen" class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" :aria-expanded="contextOpen"><x-ai-icon name="compass" size="14" /> Page context <x-ai-icon name="plus" size="13" /></button></div>
+                                            <div class="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                                                <template x-for="(action, index) in quickActions()" :key="`drawer-action-${action.title}`"><button type="button" @click="send(action.prompt)" :disabled="status !== 'ready'" class="group flex min-h-[76px] items-start gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 text-left transition hover:border-blue-200 hover:bg-blue-50/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"><span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-500 transition group-hover:bg-blue-100 group-hover:text-blue-800"><x-ai-icon name="search" size="16" x-show="action.icon === 'search'" /><x-ai-icon name="tag" size="16" x-show="action.icon === 'tag'" /><x-ai-icon name="document" size="16" x-show="action.icon === 'document'" /><x-ai-icon name="chart" size="16" x-show="action.icon === 'chart'" /><x-ai-icon name="activity" size="16" x-show="action.icon === 'activity'" /><x-ai-icon name="help" size="16" x-show="action.icon === 'help'" /></span><span class="min-w-0"><span class="block text-xs font-semibold text-slate-800" x-text="action.title"></span><span class="mt-1 block text-[11px] leading-4 text-slate-500" x-text="action.subtitle"></span></span></button></template>
+                                            </div>
+                                            <p class="mt-6 text-center text-[11px] text-slate-400">Your page context helps focus the answer. Form values stay private.</p>
                                         </div>
                                     </div>
                                 </template>
                                 <template x-for="(message, index) in messages" :key="index">
                                     <div class="flex items-start gap-2.5" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
                                         <span x-show="message.role !== 'user'" class="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#203d83] text-white"><x-ai-icon name="sparkles" size="14" /></span>
-                                        <div class="max-w-[92%] min-w-0 rounded-2xl px-3.5 py-2.5 text-sm leading-6 whitespace-pre-wrap" :class="message.role === 'user' ? 'bg-blue-50 text-slate-900' : 'border border-slate-200 bg-white text-slate-800'">
+                                        <div class="max-w-[92%] min-w-0 rounded-2xl px-4 py-3 text-sm leading-6 whitespace-pre-wrap" :class="message.role === 'user' ? 'bg-[#edf2ff] text-slate-900' : 'bg-[#f7f8fa] text-slate-800'">
                                             <div class="mb-1 text-[10px] font-semibold text-slate-500" x-text="`${message.role === 'user' ? 'You' : 'Assistant'} · ${formatTime(message.created_at)}`"></div>
                                             <p x-text="message.content"></p>
                                             <template x-for="product in message.products || message.metadata?.products || []" :key="product.id">
@@ -322,11 +330,11 @@
                                     <button x-show="lastPrompt" type="button" @click="send(lastPrompt)" class="mt-2 text-xs font-semibold underline">Retry</button>
                                 </div>
                             </div>
-                            <form @submit.prevent="submit()" class="border-t border-slate-200 bg-white p-3">
+                            <form @submit.prevent="submit()" class="border-t border-slate-200/70 bg-white px-4 py-4 sm:px-6 sm:py-5">
                                 <label class="sr-only" for="assistant-message">Message the assistant</label>
-                                <div class="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white p-2 shadow-sm transition focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100/70">
-                                    <textarea id="assistant-message" x-model="draft" @keydown.enter.prevent="if (!$event.shiftKey) submit()" rows="2" maxlength="4000" :disabled="loading || status !== 'ready'" :placeholder="status === 'ready' ? 'Ask about this page or your workspace…' : statusMessage()" class="max-h-32 min-h-[48px] flex-1 resize-y border-0 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:ring-0 disabled:opacity-60"></textarea>
-                                    <button type="submit" :disabled="loading || status !== 'ready' || !draft.trim()" class="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#203d83] text-white transition hover:-translate-y-0.5 hover:bg-[#172f6e] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transform-none" aria-label="Send message"><x-ai-icon name="send" size="17" /></button>
+                                <div class="flex items-end gap-3 rounded-2xl border border-slate-300/80 bg-white px-3 py-2.5 shadow-[0_2px_8px_rgba(25,42,75,0.04)] transition focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100/70 sm:px-4">
+                                    <textarea id="assistant-message" x-model="draft" @keydown.enter.prevent="if (!$event.shiftKey) submit()" rows="2" maxlength="4000" :disabled="loading || status !== 'ready'" :placeholder="status === 'ready' ? 'Ask about this page or your workspace…' : statusMessage()" class="max-h-36 min-h-[64px] flex-1 resize-y border-0 bg-transparent py-2 text-sm leading-6 text-slate-800 placeholder:text-slate-400 focus:ring-0 disabled:opacity-60"></textarea>
+                                    <button type="submit" :disabled="loading || status !== 'ready' || !draft.trim()" class="mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#203d83] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#172f6e] focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transform-none" aria-label="Send message"><x-ai-icon name="send" size="17" /></button>
                                 </div>
                                 <p class="mt-2 flex items-center justify-between gap-2 px-1 text-[10px] text-slate-400"><span>Enter to send <span class="px-1">·</span> Shift + Enter for a new line</span><span class="hidden sm:inline">Page form values are not shared automatically.</span></p>
                             </form>

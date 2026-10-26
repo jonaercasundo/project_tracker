@@ -82,7 +82,11 @@ it('renders the assistant on an authenticated self-contained trend page', functi
     $this->get(route('tiktok.trends'))
         ->assertOk()
         ->assertSee('AI Assistant')
-        ->assertSee('data-ai-assistant', false);
+        ->assertSee('data-ai-assistant', false)
+        ->assertSee('sm:w-[min(760px,calc(100vw-3rem))]', false)
+        ->assertSee('h-[min(92vh,820px)]', false)
+        ->assertSee('md:grid-cols-[208px_minmax(0,1fr)]', false)
+        ->assertSee('contextOpen', false);
 });
 
 it('shows an actionable workspace status when an authorized user has no active company selected', function () {
@@ -121,7 +125,7 @@ it('adapts the launcher guidance and commerce actions to the MI designer page', 
         ->assertJsonPath('context.key', 'mi_designer')
         ->assertJsonPath('context.page.title', 'Create Product')
         ->assertJsonPath('context.suggestions.0', 'How do I create a product?');
-    expect(file_get_contents(resource_path('js/ai-assistant.js')))->toContain('Search products', 'Check a price', 'Create a quotation', 'Explain this page');
+    expect(file_get_contents(resource_path('js/ai-assistant.js')))->toContain('Search products', 'Check a price', 'How much is ROUND SIDE TABLE (M)?', 'Create a quotation', 'Explain this page');
 });
 
 it('can resume the assistant migration after its conversation table was left behind', function () {

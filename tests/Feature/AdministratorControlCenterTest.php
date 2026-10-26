@@ -54,7 +54,8 @@ it('shows the control center and protects management routes from non-administrat
         ->assertSee('ai.mmc.projects.view')->assertSee('Filter by implementation status')->assertSee('Select visible')->assertSee('Reset changes')
         ->assertSee('Effective access diagnostics')->assertSee('MMC Intelligence')
         ->assertSee('Required AI permissions')->assertSee('Business-policy requirements')
-        ->assertSee('Implementation status / risk')->assertSee('Company scope');
+        ->assertSee('Implementation status / risk')->assertSee('Company scope')
+        ->assertSee('Diagnose Access')->assertSee('Configure access for')->assertSee('Save &amp; Verify Access', false);
     $this->get(route('admin.access.review'))->assertOk()->assertSee('User access review')->assertSee('All users &amp; access', false);
     $this->get(route('admin.audit.index'))->assertOk()->assertSee('Activity and access log')->assertSee('Roles &amp; permissions', false);
     $this->get(route('admin.ai-management.index'))->assertOk()->assertSee('Assistant capabilities and usage')->assertSee('AI Assistant');
@@ -143,6 +144,74 @@ it('lets administrators grant and revoke MMC AI capability permissions without r
         ->and($role->fresh()->hasPermissionTo('ai.assistant.use'))->toBeTrue();
 });
 
+it('allows administrators to grant and revoke AI permissions for one user without granting business permissions', function () {
+    controlCenterAdmin();
+    $target = $this->miUser('user', 'MMC');
+    $permission = Permission::findByName('ai.mmc.projects.view', 'web');
+
+    $this->patch(route('admin.access.permissions.ai.configure'), [
+        'subject_type' => 'user',
+        'user_subject_id' => $target->getKey(),
+        'permission_id' => $permission->getKey(),
+        'action' => 'grant',
+        'diagnostic_user_id' => $target->getKey(),
+        'company_id' => $target->companies()->sole()->getKey(),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($target->fresh()->can('ai.mmc.projects.view'))->toBeTrue()
+        ->and($target->fresh()->can('mmc.projects.view'))->toBeFalse()
+        ->and(DB::table('admin_activity_logs')->where('event', 'ai.permission_granted')->exists())->toBeTrue();
+
+    $this->patch(route('admin.access.permissions.ai.configure'), [
+        'subject_type' => 'user',
+        'user_subject_id' => $target->getKey(),
+        'permission_id' => $permission->getKey(),
+        'action' => 'revoke',
+        'diagnostic_user_id' => $target->getKey(),
+        'company_id' => $target->companies()->sole()->getKey(),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($target->fresh()->can('ai.mmc.projects.view'))->toBeFalse()
+        ->and(DB::table('admin_activity_logs')->where('event', 'ai.permission_revoked')->exists())->toBeTrue();
+});
+
+it('requires confirmation for shared role AI permission changes and protects self grants', function () {
+    $admin = controlCenterAdmin();
+    $role = Role::findByName('user', 'web');
+    $permission = Permission::findByName('ai.mmc.projects.view', 'web');
+
+    $this->patch(route('admin.access.permissions.ai.configure'), [
+        'subject_type' => 'role',
+        'role_subject_id' => $role->getKey(),
+        'permission_id' => $permission->getKey(),
+        'action' => 'grant',
+    ])->assertSessionHasErrors('confirm_shared_role');
+
+    $this->patch(route('admin.access.permissions.ai.configure'), [
+        'subject_type' => 'role',
+        'role_subject_id' => $role->getKey(),
+        'permission_id' => $permission->getKey(),
+        'action' => 'grant',
+        'confirm_shared_role' => '1',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $this->patch(route('admin.access.permissions.ai.configure'), [
+        'subject_type' => 'user',
+        'user_subject_id' => $admin->getKey(),
+        'permission_id' => $permission->getKey(),
+        'action' => 'grant',
+    ])->assertStatus(422);
+
+    $ordinaryUser = $this->miUser('user', 'MMC');
+    $this->actingAs($ordinaryUser)->withSession(['company_id' => $ordinaryUser->companies()->sole()->getKey()])
+        ->patch(route('admin.access.permissions.ai.configure'), [
+            'subject_type' => 'user',
+            'user_subject_id' => $ordinaryUser->getKey(),
+            'permission_id' => $permission->getKey(),
+            'action' => 'grant',
+        ])->assertForbidden();
+});
+
 it('authorizes global AI configuration by permission without an AI company', function () {
     $admin = controlCenterAdmin();
     $registry = app(AiCapabilityRegistry::class);
@@ -201,7 +270,10 @@ it('reports exact missing AI permissions and MMC business-policy failures', func
         ->and($missingPermissions['granted_ai_permissions'])->toContain('ai.assistant.use', 'ai.business-search.use')
         ->and($missingPermissions['missing_ai_permissions'])->toContain('ai.mmc.projects.view', 'ai.mmc.deliveries.view', 'ai.mmc.deliveries.analyze')
         ->and($missingPermissions['business_policy_requirements'])->toContain('ProjectInformation viewAny policy', 'viewMmcDeliveryMonitoring Gate')
-        ->and($missingPermissions['reason'])->toContain('ai.mmc.deliveries.analyze');
+        ->and($missingPermissions['reason'])->toContain('ai.mmc.deliveries.analyze')
+        ->and(collect($missingPermissions['checks'])->firstWhere('name', 'ai.assistant.use')['granted'])->toBeTrue()
+        ->and(collect($missingPermissions['checks'])->firstWhere('name', 'ai.mmc.deliveries.analyze')['granted'])->toBeFalse()
+        ->and(collect($missingPermissions['checks'])->firstWhere('name', 'viewMmcDeliveryMonitoring Gate'))->not->toBeNull();
 
     $itRole = Role::findByName('IT', 'web');
     $itRole->givePermissionTo(Permission::findOrCreate('ai.mmc.projects.view', 'web'));

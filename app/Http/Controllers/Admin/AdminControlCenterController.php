@@ -81,6 +81,7 @@ class AdminControlCenterController extends Controller
             'module' => ['nullable', Rule::in(['all', 'AI', 'MI', 'MMC'])],
             'company_id' => ['nullable', 'integer', Rule::exists('companies', 'company_id')],
             'diagnostic_user_id' => ['nullable', 'integer', Rule::exists('users', 'user_id')],
+            'diagnostic_capability_id' => ['nullable', 'string', 'max:120'],
         ]);
         $scope = $validated['scope'] ?? 'all';
         $company = $validated['company'] ?? 'all';
@@ -120,6 +121,10 @@ class AdminControlCenterController extends Controller
         $aiEnabled = $aiConfiguration->isEnabled();
         $aiConfigured = $aiConfiguration->credentialSource() !== 'none';
         $definitions = $capabilities->definitions();
+        $selectedCapability = collect($definitions)->firstWhere('id', $validated['diagnostic_capability_id'] ?? null);
+        $selectedCapabilityDiagnostic = $selectedCapability !== null
+            ? $capabilities->diagnostic($selectedCapability['id'], $diagnosticUser, $diagnosticCompany, $aiEnabled, $aiConfigured)
+            : null;
         $permissionDetails = $permissions->mapWithKeys(function (Permission $permission) use ($definitions, $capabilities, $diagnosticUser, $diagnosticCompany, $aiEnabled, $aiConfigured): array {
             $definition = collect($definitions)->first(function (array $definition) use ($permission): bool {
                 if (in_array($permission->name, $definition['ai_permissions'] ?? [], true)) {
@@ -173,6 +178,11 @@ class AdminControlCenterController extends Controller
             'capabilityGroups' => $capabilities->groupedFor($diagnosticUser, $diagnosticCompany, $aiEnabled, $aiConfigured),
             'aiEnabled' => $aiEnabled,
             'aiConfigured' => $aiConfigured,
+            'aiPermissions' => Permission::query()->where('guard_name', 'web')->where('name', 'like', 'ai.%')->where('name', '!=', 'ai.settings.manage')->orderBy('name')->get(),
+            'diagnosticCapabilityId' => $validated['diagnostic_capability_id'] ?? '',
+            'selectedCapability' => $selectedCapability,
+            'selectedCapabilityDiagnostic' => $selectedCapabilityDiagnostic,
+            'diagnosticCapabilities' => collect($definitions)->map(fn (array $definition): array => ['id' => $definition['id'], 'label' => $definition['label'], 'company' => $definition['company']])->all(),
         ]);
     }
 
@@ -181,6 +191,68 @@ class AdminControlCenterController extends Controller
         $request->merge(['scope' => 'ai']);
 
         return $this->permissionMatrix($request, $capabilities);
+    }
+
+    public function configureAiPermission(Request $request, AdminAuditLogger $audit): RedirectResponse
+    {
+        $validated = $request->validate([
+            'subject_type' => ['required', Rule::in(['user', 'role'])],
+            'user_subject_id' => ['nullable', 'required_if:subject_type,user', 'integer', Rule::exists('users', 'user_id')],
+            'role_subject_id' => ['nullable', 'required_if:subject_type,role', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],
+            'permission_id' => ['required', 'integer', Rule::exists('permissions', 'id')->where('guard_name', 'web')],
+            'action' => ['required', Rule::in(['grant', 'revoke'])],
+            'confirm_shared_role' => ['nullable', 'boolean'],
+            'company_id' => ['nullable', 'integer', Rule::exists('companies', 'company_id')],
+            'diagnostic_user_id' => ['nullable', 'integer', Rule::exists('users', 'user_id')],
+            'diagnostic_capability_id' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $permission = Permission::query()->where('guard_name', 'web')->whereKey($validated['permission_id'])->firstOrFail();
+        abort_unless(str_starts_with($permission->name, 'ai.') && $permission->name !== 'ai.settings.manage', 422, 'Only non-configuration AI-specific permissions can be changed here.');
+        $actor = $request->user();
+        if ($validated['subject_type'] === 'user') {
+            $subject = User::query()->findOrFail($validated['user_subject_id'] ?? null);
+            abort_if($subject->is($actor), 422, 'Administrators cannot grant or revoke AI permissions on their own account.');
+            $subjectLabel = $subject->name.' ('.$subject->email.')';
+            $relation = $subject;
+            $verificationUser = $subject;
+        } else {
+            $relation = Role::query()->where('guard_name', 'web')->findOrFail($validated['role_subject_id'] ?? null);
+            abort_if($relation->name === 'Administrator', 422, 'The protected Administrator role must be managed through the role matrix.');
+            abort_if($validated['action'] === 'grant' && $actor->hasRole($relation), 422, 'Administrators cannot grant AI permissions to themselves through a shared role.');
+            if (! $request->boolean('confirm_shared_role')) {
+                return back()->withErrors(['confirm_shared_role' => 'Confirm this change to a shared role before saving.'])->withInput();
+            }
+            $subjectLabel = $relation->name.' role ('.$relation->users()->count().' users)';
+            $verificationUser = $relation->users()->orderBy('name')->first();
+        }
+
+        DB::transaction(function () use ($relation, $permission, $validated, $audit, $actor, $subjectLabel): void {
+            if ($validated['action'] === 'grant') {
+                $relation->givePermissionTo($permission);
+            } else {
+                $relation->revokePermissionTo($permission);
+            }
+            $event = $validated['action'] === 'grant' ? 'ai.permission_granted' : 'ai.permission_revoked';
+            $audit->record($actor, $event, $validated['subject_type'], $relation->getKey(), ucfirst($validated['action']).' '.$permission->name.' for '.$subjectLabel.'.', null, [
+                'permission' => $permission->name,
+                'subject_type' => $validated['subject_type'],
+                'action' => $validated['action'],
+                'preview_company_id' => $validated['company_id'] ?? null,
+            ]);
+        });
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $verificationCompanyId = isset($validated['company_id']) && $verificationUser?->belongsToCompany($validated['company_id'])
+            ? (int) $validated['company_id']
+            : $verificationUser?->companies()->where('companies.is_active', true)->orderBy('companies.company_id')->value('companies.company_id');
+
+        return redirect()->route('admin.access.permissions.ai', array_filter([
+            'company_id' => $verificationCompanyId,
+            'diagnostic_user_id' => $verificationUser?->getKey() ?? $validated['diagnostic_user_id'] ?? null,
+            'diagnostic_capability_id' => $validated['diagnostic_capability_id'] ?? null,
+        ]))->with('success', 'AI permission change saved. Effective access has been refreshed; review the updated diagnostics below.');
     }
 
     public function updatePermissionMatrix(Request $request, AdminAuditLogger $audit): RedirectResponse

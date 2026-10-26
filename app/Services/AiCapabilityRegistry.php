@@ -127,34 +127,43 @@ class AiCapabilityRegistry
     {
         $capability = collect($this->definitions())->firstWhere('id', $id);
         if ($capability === null) {
-            return $this->formatDiagnostic(null, 'Not Implemented', 'This capability is not registered.', [], [], []);
+            return [...$this->formatDiagnostic(null, 'Not Implemented', 'This capability is not registered.', [], [], []), 'checks' => []];
         }
 
         $decision = $this->authorizationDecision($id, $user, $company, false);
+        $withChecks = function (array $diagnostic) use ($decision, $id, $enabled, $configured): array {
+            $checks = $decision['checks'];
+            if ($id !== 'ai.configuration') {
+                $checks[] = ['type' => 'system_setting', 'name' => 'ai_assistant.enabled', 'granted' => $enabled];
+                $checks[] = ['type' => 'configuration', 'name' => 'openai.credential_available', 'granted' => $configured];
+            }
+
+            return [...$diagnostic, 'checks' => $checks];
+        };
         $implementationStatus = $this->implementationStatus($capability);
         if ($implementationStatus === 'Not Implemented') {
-            return $this->formatDiagnostic($capability, $implementationStatus, 'No executable service action or registered route is available for this capability.', $decision['missing_ai_permissions'], $decision['failed_business_checks'], $decision['required_ai_permissions'], $decision['granted_ai_permissions']);
+            return $withChecks($this->formatDiagnostic($capability, $implementationStatus, 'No executable service action or registered route is available for this capability.', $decision['missing_ai_permissions'], $decision['failed_business_checks'], $decision['required_ai_permissions'], $decision['granted_ai_permissions']));
         }
 
         if (! $decision['allowed']) {
-            return $this->formatDiagnostic($capability, $decision['status'], $decision['reason'], $decision['missing_ai_permissions'], $decision['failed_business_checks'], $decision['required_ai_permissions'], $decision['granted_ai_permissions']);
+            return $withChecks($this->formatDiagnostic($capability, $decision['status'], $decision['reason'], $decision['missing_ai_permissions'], $decision['failed_business_checks'], $decision['required_ai_permissions'], $decision['granted_ai_permissions']));
         }
 
         if ($id !== 'ai.configuration' && ! $enabled) {
-            return $this->formatDiagnostic($capability, 'Disabled', 'The AI Assistant is disabled globally.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions']);
+            return $withChecks($this->formatDiagnostic($capability, 'Disabled', 'The AI Assistant is disabled globally.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions']));
         }
         if ($id !== 'ai.configuration' && ! $configured) {
-            return $this->formatDiagnostic($capability, 'Configuration Required', 'No OpenAI credential is available.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions']);
+            return $withChecks($this->formatDiagnostic($capability, 'Configuration Required', 'No OpenAI credential is available.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions']));
         }
         if (in_array($id, ['mi.quotation.draft', 'business.proactive_suggestions'], true)
             && (! Schema::hasTable('ai_quotation_workflows') || ! Schema::hasTable('ai_quotations'))) {
-            return $this->formatDiagnostic($capability, 'Configuration Required', 'The quotation workflow database tables are not installed.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions']);
+            return $withChecks($this->formatDiagnostic($capability, 'Configuration Required', 'The quotation workflow database tables are not installed.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions']));
         }
 
-        return $this->formatDiagnostic($capability, $implementationStatus, 'All required AI permissions, company membership, and business-policy checks passed.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions'], true);
+        return $withChecks($this->formatDiagnostic($capability, $implementationStatus, 'All required AI permissions, company membership, and business-policy checks passed.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions'], true));
     }
 
-    /** @return array{allowed: bool, status: string, reason: string, required_ai_permissions: array<int, string>, granted_ai_permissions: array<int, string>, missing_ai_permissions: array<int, string>, failed_business_checks: array<int, string>} */
+    /** @return array{allowed: bool, status: string, reason: string, required_ai_permissions: array<int, string>, granted_ai_permissions: array<int, string>, missing_ai_permissions: array<int, string>, failed_business_checks: array<int, string>, checks: array<int, array{type: string, name: string, granted: bool}>} */
     private function authorizationDecision(string $id, User $user, ?Company $company, bool $requireCurrentCompany): array
     {
         $capability = collect($this->definitions())->firstWhere('id', $id);
@@ -163,34 +172,54 @@ class AiCapabilityRegistry
             : array_values(array_unique(['ai.assistant.use', ...($capability['ai_permissions'] ?? [])]));
         $grantedAiPermissions = array_values(array_filter($requiredAiPermissions, fn (string $permission): bool => $user->can($permission)));
         $missingAiPermissions = array_values(array_diff($requiredAiPermissions, $grantedAiPermissions));
-        if ($capability === null || $this->implementationStatus($capability) === 'Not Implemented') {
-            return ['allowed' => false, 'status' => 'Not Implemented', 'reason' => 'The requested capability has no executable implementation.', 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => $missingAiPermissions, 'failed_business_checks' => []];
-        }
-        if ($missingAiPermissions !== []) {
-            return ['allowed' => false, 'status' => 'Permission Restricted', 'reason' => 'Missing AI permission(s): '.implode(', ', $missingAiPermissions).'.', 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => $missingAiPermissions, 'failed_business_checks' => []];
-        }
-        if ($id === 'ai.configuration') {
-            return ['allowed' => true, 'status' => 'Implemented', 'reason' => 'ai.settings.manage is granted. System-wide configuration does not require company membership.', 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => [], 'failed_business_checks' => []];
-        }
-        if ($company === null || ! $this->hasActiveCompany($user, $company, $requireCurrentCompany)) {
-            $companyName = $company?->code ?? '(none selected)';
-
-            return ['allowed' => false, 'status' => 'Company Restricted', 'reason' => "Company membership check failed for {$companyName}: the company must be active and assigned to the inspected user.", 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => [], 'failed_business_checks' => []];
-        }
-        if ($capability['company'] !== '*' && $capability['company'] !== $company->code) {
-            return ['allowed' => false, 'status' => 'Company Restricted', 'reason' => "Company scope check failed: this capability requires {$capability['company']} and {$company->code} is selected.", 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => [], 'failed_business_checks' => []];
+        $isGlobal = $capability !== null && $id === 'ai.configuration';
+        $membershipGranted = $isGlobal || ($company !== null
+            && (bool) $company->is_active
+            && $user->belongsToCompany($company->getKey())
+            && (! $requireCurrentCompany || $user->currentCompany()?->getKey() === $company->getKey()));
+        $companyScopeGranted = $isGlobal || ($company !== null && ($capability['company'] === '*' || $capability['company'] === $company->code));
+        $businessChecks = $capability !== null && $company !== null && ! $isGlobal ? $this->businessChecks($capability, $user, $company) : [];
+        $failedBusinessChecks = array_map(fn (string $name): string => $name.' check failed', array_keys(array_filter($businessChecks, fn (bool $passed): bool => ! $passed)));
+        $checks = array_map(fn (string $permission): array => ['type' => 'ai_permission', 'name' => $permission, 'granted' => $user->can($permission)], $requiredAiPermissions);
+        $checks[] = ['type' => 'company_membership', 'name' => $isGlobal ? 'global scope; membership not required' : 'active membership in selected company', 'granted' => $membershipGranted];
+        $checks[] = ['type' => 'company_scope', 'name' => $isGlobal ? 'global' : ($capability['company'] ?? 'unknown'), 'granted' => $companyScopeGranted];
+        foreach ($businessChecks as $name => $passed) {
+            $checks[] = ['type' => 'business_policy', 'name' => $name, 'granted' => $passed];
         }
 
-        $failedBusinessChecks = $this->failedBusinessChecks($capability, $user, $company);
-        if ($failedBusinessChecks !== []) {
-            return ['allowed' => false, 'status' => 'Business Access Restricted', 'reason' => 'Failed business access check(s): '.implode('; ', $failedBusinessChecks), 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => [], 'failed_business_checks' => $failedBusinessChecks];
+        $implemented = $capability !== null && $this->implementationStatus($capability) !== 'Not Implemented';
+        $checks[] = ['type' => 'implementation', 'name' => $capability['handler'] ?? 'executable handler', 'granted' => $implemented];
+
+        if (! $implemented) {
+            $status = 'Not Implemented';
+            $reason = 'The requested capability has no executable implementation.';
+        } elseif ($missingAiPermissions !== []) {
+            $status = 'Permission Restricted';
+            $reason = 'Missing AI permission(s): '.implode(', ', $missingAiPermissions).'.';
+        } elseif (! $membershipGranted || ! $companyScopeGranted) {
+            $status = 'Company Restricted';
+            $reason = ! $membershipGranted
+                ? 'Company membership check failed: the company must be active, assigned to the inspected user, and selected for runtime access.'
+                : "Company scope check failed: this capability requires {$capability['company']} and {$company?->code} is selected.";
+        } elseif ($failedBusinessChecks !== []) {
+            $status = 'Business Access Restricted';
+            $reason = 'Failed business access check(s): '.implode('; ', $failedBusinessChecks);
+        } else {
+            $status = $isGlobal ? 'Implemented' : $this->implementationStatus($capability);
+            $reason = $isGlobal ? 'ai.settings.manage is granted. System-wide configuration does not require company membership.' : 'Authorized.';
         }
 
-        return ['allowed' => true, 'status' => $this->implementationStatus($capability), 'reason' => 'Authorized.', 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => [], 'failed_business_checks' => []];
+        return ['allowed' => $status === 'Implemented' || $status === 'Partially Implemented', 'status' => $status, 'reason' => $reason, 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => $missingAiPermissions, 'failed_business_checks' => $failedBusinessChecks, 'checks' => $checks];
     }
 
     /** @return array<int, string> */
     private function failedBusinessChecks(array $capability, User $user, Company $company): array
+    {
+        return array_map(fn (string $name): string => $name.' check failed', array_keys(array_filter($this->businessChecks($capability, $user, $company), fn (bool $passed): bool => ! $passed)));
+    }
+
+    /** @return array<string, bool> */
+    private function businessChecks(array $capability, User $user, Company $company): array
     {
         $checks = [];
         foreach ($capability['business_permissions'] as $permission) {
@@ -200,9 +229,7 @@ class AiCapabilityRegistry
             $passed = str_contains($permission, ' or ')
                 ? $user->hasAnyPermission(explode(' or ', $permission))
                 : $user->can($permission);
-            if (! $passed) {
-                $checks[] = "Business permission {$permission} is missing";
-            }
+            $checks["Business permission {$permission}"] = $passed;
         }
 
         $ruleChecks = match ($capability['authorization_rule']) {
@@ -242,13 +269,7 @@ class AiCapabilityRegistry
             default => [],
         };
 
-        foreach ($ruleChecks as $name => $passed) {
-            if (! $passed) {
-                $checks[] = "{$name} check failed";
-            }
-        }
-
-        return array_values(array_unique($checks));
+        return array_merge($checks, $ruleChecks);
     }
 
     public function allowsTool(string $toolName, User $user, Company $company): bool

@@ -43,7 +43,42 @@
                         @foreach ($diagnosticUsers as $diagnosticUserOption)<option value="{{ $diagnosticUserOption->getKey() }}" @selected($diagnosticUser?->getKey() === $diagnosticUserOption->getKey())>{{ $diagnosticUserOption->name }} · {{ $diagnosticUserOption->email }}</option>@endforeach
                     </select>
                 </label>
-                <button class="rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800">Check Effective Access</button>
+                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">AI capability
+                    <select name="diagnostic_capability_id" class="rounded-lg border-slate-200 bg-white text-xs">
+                        <option value="">All capabilities</option>
+                        @foreach ($diagnosticCapabilities as $capabilityOption)<option value="{{ $capabilityOption['id'] }}" @selected($diagnosticCapabilityId === $capabilityOption['id'])>{{ $capabilityOption['label'] }} · {{ $capabilityOption['company'] === '*' ? 'Global' : $capabilityOption['company'] }}</option>@endforeach
+                    </select>
+                </label>
+                <button class="rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800">Diagnose Access</button>
+            </form>
+            @if ($selectedCapability && $selectedCapabilityDiagnostic)
+                <div class="mt-3 rounded-xl border {{ $selectedCapabilityDiagnostic['allowed'] ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50' }} p-3 text-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-2"><strong>{{ $selectedCapability['label'] }} · {{ $selectedCapabilityDiagnostic['status'] }}</strong><span>{{ $selectedCapabilityDiagnostic['reason'] }}</span></div>
+                    <p class="mt-2 text-slate-600">Missing AI permissions: <span class="font-semibold text-rose-700">{{ implode(', ', $selectedCapabilityDiagnostic['missing_ai_permissions']) ?: 'None' }}</span></p>
+                    <p class="mt-1 text-slate-600">Failed business checks: <span class="font-semibold text-rose-700">{{ implode('; ', $selectedCapabilityDiagnostic['failed_business_checks']) ?: 'None' }}</span></p>
+                    <ul class="mt-2 grid gap-1 sm:grid-cols-2">@foreach ($selectedCapabilityDiagnostic['checks'] as $check)<li class="flex items-center justify-between gap-2 rounded-lg bg-white/70 px-2 py-1"><span class="text-slate-600">{{ $check['type'] }} · {{ $check['name'] }}</span><strong class="{{ $check['granted'] ? 'text-emerald-700' : 'text-rose-700' }}">{{ $check['granted'] ? 'Passed' : 'Failed' }}</strong></li>@endforeach</ul>
+                </div>
+            @endif
+            <form method="POST" action="{{ route('admin.access.permissions.ai.configure') }}" class="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4" x-data="{ targetType: 'user' }" @submit="if (targetType === 'role' && !window.confirm('This changes a shared role and may affect every assigned user. Continue?')) $event.preventDefault()">
+                @csrf @method('PATCH')
+                @if ($diagnosticCompany)<input type="hidden" name="company_id" value="{{ $diagnosticCompany->getKey() }}">@endif
+                @if ($diagnosticUser)<input type="hidden" name="diagnostic_user_id" value="{{ $diagnosticUser->getKey() }}">@endif
+                <input type="hidden" name="diagnostic_capability_id" value="{{ $diagnosticCapabilityId }}">
+                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Configure access for
+                    <select name="subject_type" x-model="targetType" class="rounded-lg border-slate-200 text-xs"><option value="user">One user</option><option value="role">Shared role</option></select>
+                </label>
+                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">User
+                    <select name="user_subject_id" x-show="targetType === 'user'" x-bind:disabled="targetType !== 'user'" class="rounded-lg border-slate-200 text-xs"><option value="">Select user</option>@foreach ($diagnosticUsers as $userOption)<option value="{{ $userOption->getKey() }}">{{ $userOption->name }} · {{ $userOption->email }}</option>@endforeach</select>
+                    <select name="role_subject_id" x-show="targetType === 'role'" x-bind:disabled="targetType !== 'role'" class="rounded-lg border-slate-200 text-xs"><option value="">Select role</option>@foreach ($roles as $roleOption)<option value="{{ $roleOption->getKey() }}" @disabled($roleOption->name === 'Administrator')>{{ $roleOption->name }} · {{ $roleOption->users_count }} users</option>@endforeach</select>
+                </label>
+                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">AI permission
+                    <select name="permission_id" required class="rounded-lg border-slate-200 text-xs"><option value="">Select AI permission</option>@foreach ($aiPermissions as $aiPermission)<option value="{{ $aiPermission->getKey() }}">{{ $aiPermission->name }}</option>@endforeach</select>
+                </label>
+                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Action
+                    <select name="action" required class="rounded-lg border-slate-200 text-xs"><option value="grant">Grant</option><option value="revoke">Revoke</option></select>
+                </label>
+                <label class="flex items-start gap-2 text-[10px] leading-relaxed text-amber-800 sm:col-span-2 lg:col-span-3"><input type="checkbox" name="confirm_shared_role" value="1" x-bind:required="targetType === 'role'" class="mt-0.5 rounded border-amber-300"><span>Confirm shared-role impact when configuring a role. This only changes AI-specific permissions; business permissions and company policies remain independently enforced.</span></label>
+                <button class="rounded-lg bg-[#174b8a] px-4 py-2 text-xs font-bold text-white hover:bg-[#123b72]">Save &amp; Verify Access</button>
             </form>
             <div class="mt-3 flex flex-wrap items-center gap-3 text-[10px]">
                 <a href="{{ route('admin.access.review', array_filter(['company' => $diagnosticCompany?->getKey()])) }}" class="font-semibold text-blue-700 hover:underline">Review user access</a>

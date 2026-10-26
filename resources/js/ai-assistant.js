@@ -1,4 +1,5 @@
 import { renderAiMarkdown } from './ai-markdown.js';
+import { AiSseParser } from './ai-sse.js';
 
 window.aiAssistant = (settings) => ({
     ...settings,
@@ -24,6 +25,7 @@ window.aiAssistant = (settings) => ({
     mobileSidebarOpen: false,
     contextPanelOpen: false,
     contextOpen: false,
+    thinkingLabel: 'Thinking…',
 
     renderMarkdown(content) { return renderAiMarkdown(content || ''); },
 
@@ -198,24 +200,33 @@ window.aiAssistant = (settings) => ({
         return updated;
     },
 
-    async send(message) {
+    async send(message, retry = false) {
         if (this.loading || this.status !== 'ready') return;
         this.error = '';
         if (!this.conversationId) await this.newConversation();
         if (!this.conversationId) return;
         this.lastPrompt = message;
         this.draft = '';
-        this.messages.push({ role: 'user', content: message, created_at: new Date().toISOString() });
-        const assistantMessage = { role: 'assistant', content: '', created_at: new Date().toISOString() };
-        this.messages.push(assistantMessage);
+        this.$nextTick(() => { if (this.$refs.composer) this.resizeComposer(this.$refs.composer); });
+        const lastUserMessage = [...this.messages].reverse().find((item) => item.role === 'user');
+        const lastAssistantMessage = this.messages[this.messages.length - 1];
+        const isRetry = retry && lastUserMessage?.content === message && lastAssistantMessage?.role === 'assistant' && lastAssistantMessage.failed;
+        if (isRetry) this.messages.pop();
+        else this.messages.push({ role: 'user', content: message, created_at: new Date().toISOString() });
+        this.messages.push({ role: 'assistant', content: '', created_at: new Date().toISOString(), failed: false, complete: false, error: '' });
+        const assistantMessage = this.messages[this.messages.length - 1];
         this.loading = true;
-        this.scrollToBottom();
+        this.thinkingLabel = 'Connecting…';
+        this.scrollToBottom(true);
+        const requestController = new AbortController();
+        const requestTimeout = setTimeout(() => requestController.abort(), 100_000);
 
         try {
             const response = await fetch(this.endpoint(this.routes.stream, this.conversationId), {
                 method: 'POST',
                 headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrf() },
-                body: JSON.stringify({ message, page_route: this.context?.route || null }),
+                body: JSON.stringify({ message, retry: isRetry, page_route: this.context?.route || null }),
+                signal: requestController.signal,
             });
             if (!response.ok) {
                 const payload = await response.json().catch(() => ({}));
@@ -225,32 +236,42 @@ window.aiAssistant = (settings) => ({
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let buffer = '';
+            const parser = new AiSseParser();
+            const processEvents = (events) => {
+                for (const { event, data } of events) {
+                    const payload = JSON.parse(data);
+                    if (event === 'status') this.thinkingLabel = payload.label || 'Thinking…';
+                    if (event === 'delta') {
+                        const shouldStick = this.isNearBottom();
+                        assistantMessage.content += payload.text || '';
+                        assistantMessage.failed = false;
+                        this.scrollToBottom(shouldStick);
+                    }
+                    if (event === 'products') assistantMessage.products = payload.items || [];
+                    if (event === 'done') assistantMessage.complete = true;
+                    if (event === 'error') throw new Error(payload.message || 'I’m having trouble retrieving that right now. Your message is still here; would you like to try again?');
+                }
+            };
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const events = buffer.split('\n\n');
-                buffer = events.pop() || '';
-                for (const raw of events) {
-                    const event = raw.match(/^event:\s*(.+)$/m)?.[1]?.trim();
-                    const data = raw.match(/^data:\s*(.+)$/m)?.[1];
-                    if (!data) continue;
-                    const payload = JSON.parse(data);
-                    if (event === 'delta') assistantMessage.content += payload.text || '';
-                    if (event === 'products') assistantMessage.products = payload.items || [];
-                    if (event === 'error') throw new Error(payload.message || 'I’m having trouble retrieving that right now. Your message is still here; would you like to try again?');
-                    this.scrollToBottom();
-                }
+                processEvents(parser.push(decoder.decode(value, { stream: true })));
             }
-            await this.refreshConversations();
+            processEvents(parser.push(decoder.decode()));
+            processEvents(parser.finish());
+            if (!assistantMessage.complete) throw new Error('The connection ended before the response was complete. Please try again.');
         } catch (error) {
-            assistantMessage.content = assistantMessage.content || (error.message || 'I’m having trouble retrieving that right now. Your message is still here; would you like to try again?');
+            const transportFailed = ['AbortError', 'TypeError', 'SyntaxError'].includes(error.name) || ['Failed to fetch', 'NetworkError', 'Load failed'].includes(error.message);
+            assistantMessage.error = transportFailed
+                ? (error.name === 'AbortError' ? 'The response took too long to arrive. Your question is still here; please try again.' : 'The connection was interrupted before the response finished. Your question is still here; please try again.')
+                : (error.message || 'I’m having trouble retrieving that right now. Your message is still here; would you like to try again?');
+            assistantMessage.failed = true;
             this.error = '';
-            this.draft = message;
         } finally {
+            clearTimeout(requestTimeout);
             this.loading = false;
             this.scrollToBottom();
+            await this.refreshConversations();
         }
     },
 
@@ -336,7 +357,20 @@ window.aiAssistant = (settings) => ({
         } catch (error) { this.quoteError = error.message; }
     },
 
-    scrollToBottom() {
-        this.$nextTick(() => { if (this.$refs.scrollArea) this.$refs.scrollArea.scrollTop = this.$refs.scrollArea.scrollHeight; });
+    resizeComposer(event) {
+        const textarea = event.target || event;
+        textarea.style.height = 'auto';
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 144)}px`;
+        textarea.style.overflowY = textarea.scrollHeight > 144 ? 'auto' : 'hidden';
+    },
+
+    isNearBottom() {
+        const area = this.$refs.scrollArea;
+        return !area || area.scrollHeight - area.scrollTop - area.clientHeight < 120;
+    },
+
+    scrollToBottom(force = false) {
+        const shouldScroll = force || this.isNearBottom();
+        if (shouldScroll) this.$nextTick(() => { if (this.$refs.scrollArea) this.$refs.scrollArea.scrollTop = this.$refs.scrollArea.scrollHeight; });
     },
 });

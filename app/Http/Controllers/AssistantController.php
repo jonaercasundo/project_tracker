@@ -80,11 +80,22 @@ class AssistantController extends Controller
         $this->authorizePriceHistory($user, $company, $conversation);
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:'.(int) config('ai_assistant.max_message_characters', 4000)],
+            'retry' => ['nullable', 'boolean'],
             'page_route' => ['nullable', 'string', 'max:160'],
         ]);
         $text = trim($validated['message']);
         if ($text === '') {
             throw ValidationException::withMessages(['message' => 'Please enter a message.']);
+        }
+        $isRetry = (bool) ($validated['retry'] ?? false);
+        if ($isRetry) {
+            $latestMessage = $conversation->messages()->latest('id')->first();
+            $previousMessage = $latestMessage?->role === 'assistant'
+                ? $conversation->messages()->where('id', '<', $latestMessage->getKey())->latest('id')->first()
+                : null;
+            if ($latestMessage instanceof AiMessage && $previousMessage?->role === 'user' && hash_equals($previousMessage->content, $text)) {
+                return $this->streamStoredRetry($latestMessage);
+            }
         }
         abort_if($configuration->apiKey() === null, 503, 'OpenAI configuration is required before using the assistant.');
         abort_if($configuration->monthlyLimitReached(), 429, 'The system monthly AI token limit has been reached.');
@@ -95,13 +106,17 @@ class AssistantController extends Controller
                 ->latest('id')->limit(4)->get(['metadata'])->flatMap(fn (AiMessage $message): array => $message->metadata['products'] ?? [])->filter(fn (mixed $product): bool => is_array($product))
                 ->take(8)->map(fn (array $product): array => array_intersect_key($product, array_flip(['id', 'name', 'sku', 'price', 'currency', 'pricing_basis'])))->values()->all();
         }
-        $history = DB::transaction(function () use ($conversation, $text): array {
-            $conversation->messages()->create(['role' => 'user', 'content' => $text]);
-            if ($conversation->title === 'New conversation') {
-                $conversation->title = Str::limit($text, 100);
+        $history = DB::transaction(function () use ($conversation, $text, $isRetry): array {
+            $latestMessage = $conversation->messages()->latest('id')->first();
+            $retryingSavedQuestion = $isRetry && $latestMessage?->role === 'user' && hash_equals($latestMessage->content, $text);
+            if (! $retryingSavedQuestion) {
+                $conversation->messages()->create(['role' => 'user', 'content' => $text]);
+                if ($conversation->title === 'New conversation') {
+                    $conversation->title = Str::limit($text, 100);
+                }
+                $conversation->last_message_at = now();
+                $conversation->save();
             }
-            $conversation->last_message_at = now();
-            $conversation->save();
 
             return $conversation->messages()->latest('id')->limit((int) config('ai_assistant.message_limit', 20))->get()->reverse()
                 ->map(fn (AiMessage $message): array => ['role' => $message->role, 'content' => $message->content])->values()->all();
@@ -119,6 +134,7 @@ class AssistantController extends Controller
             };
 
             try {
+                $emit('status', ['label' => 'Connecting…']);
                 $usage = $assistant->respond($user, $company, $context, $history, function (string $delta) use (&$answer, $emit): void {
                     $answer .= $delta;
                     $emit('delta', ['text' => $delta]);
@@ -133,6 +149,8 @@ class AssistantController extends Controller
                         ]);
                     }
                     $emit('products', ['items' => $products]);
+                }, function (string $label) use ($emit): void {
+                    $emit('status', ['label' => $label]);
                 });
                 DB::transaction(function () use ($conversation, $answer, $usage, $user, $company, &$productCards): void {
                     $assistantMessage = ['role' => 'assistant', 'content' => $answer, 'model' => $usage['model'], 'input_tokens' => $usage['input_tokens'], 'output_tokens' => $usage['output_tokens']];
@@ -194,5 +212,23 @@ class AssistantController extends Controller
     {
         $cutoff = now()->subDays(max(1, (int) config('ai_assistant.retention_days', 90)));
         AiConversation::query()->where('user_id', $user->getKey())->where('company_id', $company->getKey())->where('updated_at', '<', $cutoff)->delete();
+    }
+
+    private function streamStoredRetry(AiMessage $message): StreamedResponse
+    {
+        return response()->stream(function () use ($message): void {
+            $emit = static function (string $event, array $data): void {
+                echo 'event: '.$event."\n".'data: '.json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n\n";
+                if (ob_get_level() > 0) {
+                    ob_flush();
+                }
+                flush();
+            };
+            $emit('delta', ['text' => $message->content]);
+            if (is_array($message->metadata['products'] ?? null)) {
+                $emit('products', ['items' => $message->metadata['products']]);
+            }
+            $emit('done', ['ok' => true]);
+        }, 200, ['Content-Type' => 'text/event-stream', 'Cache-Control' => 'no-cache, no-transform', 'X-Accel-Buffering' => 'no', 'Connection' => 'keep-alive']);
     }
 }

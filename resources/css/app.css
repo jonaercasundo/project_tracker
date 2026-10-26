@@ -19,4 +19,7 @@
 .ai-typing-dot:nth-child(2) { animation-delay: 120ms; }
 .ai-typing-dot:nth-child(3) { animation-delay: 240ms; }
 @keyframes ai-typing { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+.ai-thinking-spinner { height: 0.9rem; width: 0.9rem; flex: none; border: 2px solid #dbe4f6; border-top-color: #3150a4; border-radius: 9999px; animation: ai-spin 0.8s linear infinite; }
+@keyframes ai-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ai-typing-dot { animation: none; opacity: 0.7; } }
+@media (prefers-reduced-motion: reduce) { .ai-thinking-spinner { animation-duration: 2s; } }

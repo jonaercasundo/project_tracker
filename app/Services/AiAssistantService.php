@@ -16,7 +16,7 @@ class AiAssistantService
      * @param  callable(string): void  $onDelta
      * @return array{model: string, request_id: ?string, input_tokens: ?int, output_tokens: ?int}
      */
-    public function respond(User $user, Company $company, array $context, array $history, callable $onDelta, ?callable $onProductMatches = null): array
+    public function respond(User $user, Company $company, array $context, array $history, callable $onDelta, ?callable $onProductMatches = null, ?callable $onStatus = null): array
     {
         if (! $this->configuration->isEnabled()) {
             throw new RuntimeException('The AI assistant is currently disabled.');
@@ -39,6 +39,9 @@ class AiAssistantService
         $emitted = '';
 
         for ($round = 0; $round < 3; $round++) {
+            if ($onStatus !== null) {
+                $onStatus($round === 0 ? 'Thinking…' : 'Preparing your answer…');
+            }
             $requestBody = [
                 'model' => $model,
                 'instructions' => $this->instructions(
@@ -74,6 +77,23 @@ class AiAssistantService
             $toolCalls = [];
             $responseOutput = [];
             $completed = false;
+            $handleEvent = function (array $event) use (&$toolCalls, &$responseOutput, &$completed, &$usage, &$emitted, $onDelta): void {
+                $type = $event['type'] ?? '';
+                if ($type === 'response.output_text.delta' && isset($event['delta'])) {
+                    $delta = (string) $event['delta'];
+                    $emitted .= $delta;
+                    $onDelta($delta);
+                } elseif ($type === 'response.output_item.done' && ($event['item']['type'] ?? null) === 'function_call') {
+                    $toolCalls[] = $event['item'];
+                } elseif ($type === 'response.completed') {
+                    $completed = true;
+                    $responseOutput = $event['response']['output'] ?? [];
+                    $usage['input_tokens'] = $event['response']['usage']['input_tokens'] ?? null;
+                    $usage['output_tokens'] = $event['response']['usage']['output_tokens'] ?? null;
+                } elseif ($type === 'error') {
+                    throw new RuntimeException('The AI provider reported an error.');
+                }
+            };
             while (! $body->eof()) {
                 $buffer .= $body->read(2048);
                 while (($lineEnd = strpos($buffer, "\n")) !== false) {
@@ -88,21 +108,14 @@ class AiAssistantService
                         continue;
                     }
 
-                    $type = $event['type'] ?? '';
-                    if ($type === 'response.output_text.delta' && isset($event['delta'])) {
-                        $delta = (string) $event['delta'];
-                        $emitted .= $delta;
-                        $onDelta($delta);
-                    } elseif ($type === 'response.output_item.done' && ($event['item']['type'] ?? null) === 'function_call') {
-                        $toolCalls[] = $event['item'];
-                    } elseif ($type === 'response.completed') {
-                        $completed = true;
-                        $responseOutput = $event['response']['output'] ?? [];
-                        $usage['input_tokens'] = $event['response']['usage']['input_tokens'] ?? null;
-                        $usage['output_tokens'] = $event['response']['usage']['output_tokens'] ?? null;
-                    } elseif ($type === 'error') {
-                        throw new RuntimeException('The AI provider reported an error.');
-                    }
+                    $handleEvent($event);
+                }
+            }
+            $remainingLine = trim($buffer);
+            if (str_starts_with($remainingLine, 'data:')) {
+                $event = json_decode(trim(substr($remainingLine, 5)), true);
+                if (is_array($event)) {
+                    $handleEvent($event);
                 }
             }
 
@@ -127,6 +140,13 @@ class AiAssistantService
 
             $input = [...$input, ...$responseOutput];
             foreach ($toolCalls as $call) {
+                if ($onStatus !== null) {
+                    $onStatus(match ($call['name'] ?? '') {
+                        'lookup_mi_product_prices', 'search_mi_products' => 'Searching the MI product catalog…',
+                        'my_mi_budget_requests', 'my_mi_liquidations', 'mi_pending_approval_summary', 'mi_accounting_queue_summary' => 'Retrieving your authorized records…',
+                        default => 'Retrieving authorized workspace data…',
+                    });
+                }
                 $arguments = json_decode((string) ($call['arguments'] ?? '{}'), true);
                 $result = $gateway->call((string) $call['name'], is_array($arguments) ? $arguments : [], $user, $company);
                 if ($call['name'] === 'lookup_mi_product_prices' && $onProductMatches !== null && $result !== []) {

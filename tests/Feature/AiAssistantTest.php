@@ -155,6 +155,7 @@ it('can resume the assistant migration after its conversation table was left beh
 });
 
 it('stores conversation messages and streams provider deltas without saving provider errors', function () {
+    expect(Schema::hasColumn('ai_messages', 'metadata'))->toBeTrue();
     $user = $this->miUser('user');
     $this->signInMI($user);
     config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
@@ -168,7 +169,7 @@ it('stores conversation messages and streams provider deltas without saving prov
     $conversation = $this->postJson(route('assistant.conversations.store'))->assertCreated()->json('conversation');
     $response = $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'How do I create a product?', 'page_route' => 'mi_app.create']);
     $response->assertOk();
-    expect($response->streamedContent())->toContain('event: delta', 'Hello from AI', 'event: done');
+    expect($response->streamedContent())->toContain('event: status', 'Connecting…', 'Thinking…', 'event: delta', 'Hello from AI', 'event: done');
 
     $this->getJson(route('assistant.conversations.show', $conversation['id']))
         ->assertOk()->assertJsonPath('conversation.messages.0.role', 'user')
@@ -178,6 +179,48 @@ it('stores conversation messages and streams provider deltas without saving prov
         && $request['store'] === false && $request['stream'] === true
         && str_contains($request['instructions'], 'MI Product Designer'));
     expect(Http::recorded()->first()[0]['instructions'])->toContain('Materials and colors support searching');
+});
+
+it('reuses the saved user message when retrying a failed assistant stream', function () {
+    $user = $this->miUser('user');
+    $this->signInMI($user);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fakeSequence('https://api.openai.com/v1/responses')
+        ->push("data: {\"type\":\"error\",\"error\":{\"message\":\"temporary\"}}\n\n", 200, ['Content-Type' => 'text/event-stream'])
+        ->push("data: {\"type\":\"response.output_text.delta\",\"delta\":\"Recovered\"}\n\n".
+            "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{},\"output\":[]}}\n\n", 200, ['Content-Type' => 'text/event-stream']);
+    $conversation = $this->postJson(route('assistant.conversations.store'))->assertCreated()->json('conversation');
+
+    $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'Please help'])
+        ->assertOk()->streamedContent();
+    $this->assertDatabaseCount('ai_messages', 1);
+    $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'Please help', 'retry' => true])
+        ->assertOk()->streamedContent();
+
+    $this->assertDatabaseCount('ai_messages', 2);
+    $this->assertDatabaseHas('ai_messages', ['conversation_id' => $conversation['id'], 'role' => 'assistant', 'content' => 'Recovered']);
+});
+
+it('replays a completed answer on retry without calling OpenAI or duplicating messages', function () {
+    $user = $this->miUser('user');
+    $this->signInMI($user);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fake(['https://api.openai.com/v1/responses' => Http::response(
+        "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Saved answer\"}\n\n".
+        "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{},\"output\":[]}}\n\n",
+        200,
+        ['Content-Type' => 'text/event-stream'],
+    )]);
+    $conversation = $this->postJson(route('assistant.conversations.store'))->assertCreated()->json('conversation');
+
+    $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'Please help'])
+        ->assertOk()->streamedContent();
+    $retry = $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'Please help', 'retry' => true])
+        ->assertOk();
+
+    expect($retry->streamedContent())->toContain('event: delta', 'Saved answer', 'event: done');
+    expect(Http::recorded())->toHaveCount(1);
+    $this->assertDatabaseCount('ai_messages', 2);
 });
 
 it('routes a Filipino product price question to the authorized catalog tool', function () {

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\AdminAuditLogger;
+use App\Services\AiCapabilityRegistry;
 use App\Services\AiProviderConfiguration;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -214,26 +215,16 @@ class AdminControlCenterController extends Controller
         ]);
     }
 
-    public function aiOverview(AiProviderConfiguration $configuration): View
+    public function aiOverview(AiProviderConfiguration $configuration, AiCapabilityRegistry $capabilities): View
     {
         $user = auth()->user();
         $company = $user->currentCompany();
-        $globalReady = $configuration->isEnabled() && $configuration->credentialSource() !== 'none';
-        $tools = [
-            ['name' => 'MI product search', 'module' => 'MI', 'permission' => 'mi.product-catalog.view', 'role' => null, 'url' => null],
-            ['name' => 'MI selling price lookup', 'module' => 'MI', 'permission' => 'mi.product-prices.view', 'role' => null, 'url' => null],
-            ['name' => 'MI quotation workflow', 'module' => 'MI', 'permission' => 'mi.quotation.create', 'role' => null, 'url' => null],
-            ['name' => 'MMC project lookup and delivery analytics', 'module' => 'MMC', 'permission' => null, 'role' => ['user', 'Administrator'], 'url' => null],
-            ['name' => 'MMC inventory search', 'module' => 'MMC', 'permission' => null, 'role' => ['user', 'Administrator', 'Warehouse_officer'], 'url' => null],
-        ];
-        foreach ($tools as &$tool) {
-            $moduleActive = $company?->code === $tool['module'];
-            $hasPermission = $tool['permission'] === null || $user->can($tool['permission']);
-            $hasRole = $tool['role'] === null || $user->hasAnyRole($tool['role']);
-            $tool['access'] = ! $globalReady ? 'Blocked by AI configuration' : (! $moduleActive ? 'Select '.$tool['module'].' company to use' : (! $hasPermission || ! $hasRole ? 'Permission blocked' : 'Available in current company'));
-            $tool['permission_label'] = $tool['permission'] ?? 'AI access + module role';
-        }
-        unset($tool);
+        $capabilityGroups = $capabilities->groupedFor(
+            $user,
+            $company,
+            $configuration->isEnabled(),
+            $configuration->credentialSource() !== 'none',
+        );
 
         $usage = Schema::hasTable('ai_activity_logs')
             ? DB::table('ai_activity_logs')->where('status', 'completed')->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
@@ -251,9 +242,9 @@ class AdminControlCenterController extends Controller
             'credentialSource' => $configuration->credentialSource(),
             'model' => $configuration->model(),
             'company' => $company,
+            'capabilityGroups' => $capabilityGroups,
             'usage' => $usage,
             'failures' => $failures,
-            'tools' => $tools,
         ]);
     }
 

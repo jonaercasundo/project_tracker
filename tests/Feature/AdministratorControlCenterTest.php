@@ -56,6 +56,26 @@ it('shows the control center and protects management routes from non-administrat
     $this->patch(route('admin.access.permissions.update'), [])->assertForbidden();
 });
 
+it('shows the AI capability registry with implemented and unavailable functions clearly identified', function () {
+    controlCenterAdmin();
+
+    $this->get(route('admin.ai-management.index'))
+        ->assertOk()
+        ->assertSee('AI capability registry')
+        ->assertSee('View &amp; Search', false)
+        ->assertSee('Create Records')
+        ->assertSee('Generate PDF')
+        ->assertSee('Excel Tools')
+        ->assertSee('Charts &amp; Analytics', false)
+        ->assertSee('Forecasting')
+        ->assertSee('Document Intelligence')
+        ->assertSee('Workflow Assistant')
+        ->assertSee('Proactive Assistance')
+        ->assertSee('MI Product Catalog Search')
+        ->assertSee('Not yet implemented')
+        ->assertSee('Manage role permissions');
+});
+
 it('updates a permission matrix and records an audit without affecting other permission grants', function () {
     $admin = controlCenterAdmin();
     $role = Role::findByName('user', 'web');

@@ -4,6 +4,7 @@ use App\Models\AiConversation;
 use App\Models\BudgetRequest;
 use App\Models\MI_Liquidation;
 use App\Services\AiAssistantService;
+use App\Services\AiCapabilityRegistry;
 use App\Services\AiReadOnlyToolGateway;
 use Database\Seeders\AiAssistantPermissionSeeder;
 use Database\Seeders\AiBusinessDataPermissionSeeder;
@@ -321,6 +322,25 @@ it('returns page metadata from the authorized registry and denies cross-company 
     BudgetRequest::create(['employee_id' => $other->getKey(), 'company_id' => $other->companies()->sole()->getKey(), 'department' => 'Finance', 'budget_total' => 500]);
     $ownRequests = $gateway->call('my_mi_budget_requests', [], $user, $user->currentCompany());
     expect($ownRequests)->toHaveCount(1)->and($ownRequests[0]['department'])->toBe('Design');
+});
+
+it('keeps advertised callable capabilities aligned with the authorized tool gateway', function () {
+    $user = $this->miUser('user');
+    $this->signInMI($user);
+    $company = $user->currentCompany();
+    $registry = app(AiCapabilityRegistry::class);
+    $gateway = app(AiReadOnlyToolGateway::class);
+    $registeredToolNames = collect($registry->definitions())
+        ->filter(fn (array $capability): bool => $registry->allows($capability['id'], $user, $company))
+        ->flatMap(fn (array $capability): array => $capability['tool_names'])->unique()->values();
+    $gatewayToolNames = collect($gateway->tools($user, $company, []))->pluck('name')->values();
+
+    expect($registeredToolNames->diff($gatewayToolNames)->all())->toBeEmpty()
+        ->and($gatewayToolNames->diff($registeredToolNames)->all())->toBeEmpty()
+        ->and($registry->allowsTool('search_mi_products', $user, $company))->toBeTrue()
+        ->and($registry->allowsTool('lookup_mi_product_prices', $user, $company))->toBeTrue()
+        ->and($registry->allowsTool('search_mmc_projects', $user, $company))->toBeFalse()
+        ->and($registry->allows('business.records.delete', $user, $company))->toBeFalse();
 });
 
 it('registers MMC project analytics only within an authorized active MMC workspace', function () {

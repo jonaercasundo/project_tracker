@@ -18,6 +18,7 @@ class AiReadOnlyToolGateway
         private JarvisReadService $jarvisReadService,
         private AccountingWorkspace $accountingWorkspace,
         private MIApprovalQueue $approvalQueue,
+        private AiCapabilityRegistry $capabilities,
     ) {}
 
     /** @return array<int, array<string, mixed>> */
@@ -29,40 +30,40 @@ class AiReadOnlyToolGateway
             return $tools;
         }
 
-        if ($this->canReadMiCatalog($user, $company)) {
+        if ($this->capabilities->allows('mi.catalog.search', $user, $company)) {
             $tools[] = $this->productSearchTool('search_mi_products', 'Search MI product names, SKU or item code, category, collection, materials, and colors. Does not return selling prices.');
             $tools[] = ['type' => 'function', 'name' => 'mi_product_catalog_summary', 'description' => 'Return the MI product count and, when available, the count of products missing country of production (COP).', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
             $tools[] = ['type' => 'function', 'name' => 'mi_products_needing_cop', 'description' => 'List up to 25 MI products whose country of production (COP) is missing.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
         }
 
-        if ($this->canViewMiPrices($user, $company)) {
+        if ($this->capabilities->allows('mi.product_prices.lookup', $user, $company)) {
             $tools[] = $this->productSearchTool('lookup_mi_product_prices', 'Search MI products and return their authorized selling price, if one is set. Use the MI product selling price field only; never use factory or purchase costs as selling prices.');
         }
 
-        if ($company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator'])) {
+        if ($this->capabilities->allows('mmc.projects_deliveries.read', $user, $company)) {
             $tools[] = $this->searchTool('search_mmc_projects', 'Search MMC project records visible in the active MMC company.', 'Project name, code, or procuring entity');
             $tools[] = ['type' => 'function', 'name' => 'get_mmc_project_delivery_summary', 'description' => 'Resolve one or more project codes or aliases and return verified delivery receipt counts using the operational dashboard definition. Use null dates for all time.', 'parameters' => ['type' => 'object', 'properties' => ['project_references' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1, 'maxItems' => 5], 'date_from' => ['type' => ['string', 'null']], 'date_to' => ['type' => ['string', 'null']]], 'required' => ['project_references', 'date_from', 'date_to'], 'additionalProperties' => false], 'strict' => true];
             $tools[] = ['type' => 'function', 'name' => 'mmc_operations_snapshot', 'description' => 'Get calculated MMC project, delivery, package, and inventory totals for the active company workspace.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
             $tools[] = $this->searchTool('search_mmc_deliveries', 'Search read-only MMC delivery records, receipt statuses, and package counts.', 'Project, receipt number, or school to search');
         }
 
-        if ($company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator', 'Warehouse_officer'])) {
+        if ($this->capabilities->allows('mmc.inventory.search', $user, $company)) {
             $tools[] = $this->searchTool('search_mmc_inventory', 'Search read-only MMC warehouse inventory by item, warehouse, or project.', 'Item, warehouse, or project to search');
         }
 
-        if ($company->code === 'MI' && $user->hasMIUserAccess()) {
+        if ($this->capabilities->allows('mi.budget_requests.own_status', $user, $company)) {
             $tools[] = ['type' => 'function', 'name' => 'my_mi_budget_requests', 'description' => 'List only the authenticated MI employee’s own budget requests and their status.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
         }
 
-        if ($company->code === 'MI' && $user->can('mi.liquidation.view')) {
+        if ($this->capabilities->allows('mi.liquidations.own_status', $user, $company)) {
             $tools[] = ['type' => 'function', 'name' => 'my_mi_liquidations', 'description' => 'List the authenticated employee’s own MI liquidation titles, preparation dates, and statuses. Does not return financial amounts.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
         }
 
-        if ($company->code === 'MI' && $user->hasAccountingRole() && $user->can('mi.accounting.dashboard.view')) {
+        if ($this->capabilities->allows('mi.accounting.queue_summary', $user, $company)) {
             $tools[] = ['type' => 'function', 'name' => 'mi_accounting_queue_summary', 'description' => 'Return counts for MI accounting queues. Each count is filtered by the employee’s accounting permissions.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
         }
 
-        if ($company->code === 'MI' && ($user->canApproveMI('mi.budget.approve') || $user->canApproveMI('mi.travel.approve'))) {
+        if ($this->capabilities->allows('mi.approvals.pending_summary', $user, $company)) {
             $tools[] = ['type' => 'function', 'name' => 'mi_pending_approval_summary', 'description' => 'Return counts of pending MI budget and travel liquidation approvals accessible to this approver.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
         }
 
@@ -88,6 +89,10 @@ class AiReadOnlyToolGateway
 
         if (! $this->isActiveCompany($user, $company)) {
             Log::warning('AI assistant tool denied', ['tool' => $name, 'user_id' => $user->getKey(), 'company_id' => $company->getKey()]);
+            abort(403, 'This assistant data tool is not available for your account.');
+        }
+        if (! $this->capabilities->allowsTool($name, $user, $company)) {
+            Log::warning('AI assistant capability denied', ['tool' => $name, 'user_id' => $user->getKey(), 'company_id' => $company->getKey()]);
             abort(403, 'This assistant data tool is not available for your account.');
         }
 
@@ -304,12 +309,12 @@ class AiReadOnlyToolGateway
 
     private function canReadMiCatalog(User $user, Company $company): bool
     {
-        return $company->code === 'MI' && $user->can('ai.assistant.use') && $user->can('mi.product-catalog.view') && $this->isActiveCompany($user, $company);
+        return $this->capabilities->allows('mi.catalog.search', $user, $company);
     }
 
     private function canViewMiPrices(User $user, Company $company): bool
     {
-        return $this->canReadMiCatalog($user, $company) && $user->can('mi.product-prices.view');
+        return $this->capabilities->allows('mi.product_prices.lookup', $user, $company);
     }
 
     private function logToolExecuted(string $name, User $user, Company $company, int $recordCount): void

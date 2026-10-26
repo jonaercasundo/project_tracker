@@ -5,6 +5,7 @@ use App\Models\BudgetRequest;
 use App\Services\AiReadOnlyToolGateway;
 use Database\Seeders\AiAssistantPermissionSeeder;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\MIWorkflowTestCase;
 
@@ -39,6 +40,26 @@ it('requires authentication and an authorized company module', function () {
     $unsupported->syncRoles([]);
     $this->actingAs($unsupported)->withSession(['company_id' => $unsupported->companies()->sole()->getKey()])
         ->get(route('assistant.workspace'))->assertForbidden();
+});
+
+it('can resume the assistant migration after its conversation table was left behind', function () {
+    $migration = require database_path('migrations/2026_10_26_083437_create_ai_assistant_tables.php');
+    $migration->down();
+    Schema::create('ai_conversations', function ($table): void {
+        $table->id();
+        $table->unsignedBigInteger('user_id');
+        $table->unsignedBigInteger('company_id');
+        $table->string('title', 120)->default('New conversation');
+        $table->timestamp('last_message_at')->nullable();
+        $table->timestamps();
+        $table->index(['user_id', 'company_id', 'updated_at']);
+    });
+
+    $migration->up();
+
+    expect(Schema::hasTable('ai_conversations'))->toBeTrue()
+        ->and(Schema::hasTable('ai_messages'))->toBeTrue()
+        ->and(Schema::hasTable('ai_activity_logs'))->toBeTrue();
 });
 
 it('stores conversation messages and streams provider deltas without saving provider errors', function () {

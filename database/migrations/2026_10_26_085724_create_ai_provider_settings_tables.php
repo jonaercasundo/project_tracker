@@ -19,13 +19,13 @@ return new class extends Migration
             $table->boolean('enabled')->default(true);
             $table->unsignedSmallInteger('per_user_requests_per_minute')->default(12);
             $table->unsignedBigInteger('monthly_token_limit')->nullable();
-            $table->foreignId('configured_by')->nullable()->constrained('users', 'user_id')->nullOnDelete();
+            $table->unsignedBigInteger('configured_by')->nullable();
             $table->timestamps();
         });
 
         Schema::create('ai_provider_setting_audits', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('performed_by')->nullable()->constrained('users', 'user_id')->nullOnDelete();
+            $table->unsignedBigInteger('performed_by')->nullable();
             $table->string('action', 40);
             $table->json('metadata')->nullable();
             $table->timestamps();

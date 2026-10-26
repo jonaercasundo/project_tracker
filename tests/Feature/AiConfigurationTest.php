@@ -54,10 +54,15 @@ it('limits settings management to administrators with the explicit permission', 
     $admin = aiAdmin();
     expect($admin->can('ai.settings.manage'))->toBeTrue();
     $this->get(route('admin.ai-configuration.index'))->assertOk()->assertSee('AI Configuration');
+    $this->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSee('AI Configuration')
+        ->assertSee(route('admin.ai-configuration.index'));
 
     Role::findByName('Administrator', 'web')->revokePermissionTo('ai.settings.manage');
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     $this->get(route('admin.ai-configuration.index'))->assertForbidden();
+    $this->get(route('admin.dashboard'))->assertOk()->assertDontSee(route('admin.ai-configuration.index'));
 
     $regularUser = $this->miUser('user');
     expect($regularUser->can('ai.assistant.use'))->toBeTrue()

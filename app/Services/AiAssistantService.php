@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\AiRequiredToolUnavailable;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
@@ -34,11 +35,17 @@ class AiAssistantService
         $gateway = app(AiReadOnlyToolGateway::class);
         $tools = $gateway->tools($user, $company, $context);
         $input = array_map(fn (array $message): array => ['role' => $message['role'], 'content' => $message['content']], $history);
-        $requiredTool = $this->requiredReadTool($history, $tools, $context);
+        $requiredReadCalls = $this->requiredMmcReadCalls($user, $company, $history, $tools, $gateway);
+        if ($requiredReadCalls === []) {
+            $requiredTool = $this->requiredReadTool($history, $tools, $context);
+            if ($requiredTool !== null) {
+                $requiredReadCalls[] = ['name' => $requiredTool, 'arguments' => []];
+            }
+        }
         $usage = ['model' => $model, 'request_id' => null, 'input_tokens' => null, 'output_tokens' => null];
         $emitted = '';
 
-        for ($round = 0; $round < 3; $round++) {
+        for ($round = 0, $roundLimit = max(3, count($requiredReadCalls) + 2); $round < $roundLimit; $round++) {
             if ($onStatus !== null) {
                 $onStatus($round === 0 ? 'Thinking…' : 'Preparing your answer…');
             }
@@ -56,10 +63,11 @@ class AiAssistantService
                 'store' => false,
                 'max_output_tokens' => (int) config('ai_assistant.max_output_tokens', 1200),
             ];
-            if ($round === 0 && $requiredTool !== null) {
-                $requestBody['tool_choice'] = ['type' => 'function', 'name' => $requiredTool];
+            $requiredCall = $requiredReadCalls[$round] ?? null;
+            if ($requiredCall !== null) {
+                $requestBody['tool_choice'] = ['type' => 'function', 'name' => $requiredCall['name']];
                 Log::info('AI assistant required tool selected by intent', [
-                    'tool' => $requiredTool,
+                    'tool' => $requiredCall['name'],
                     'user_id' => $user->getKey(),
                     'company_id' => $company->getKey(),
                 ]);
@@ -77,12 +85,14 @@ class AiAssistantService
             $toolCalls = [];
             $responseOutput = [];
             $completed = false;
-            $handleEvent = function (array $event) use (&$toolCalls, &$responseOutput, &$completed, &$usage, &$emitted, $onDelta): void {
+            $handleEvent = function (array $event) use (&$toolCalls, &$responseOutput, &$completed, &$usage, &$emitted, $onDelta, $round, $requiredReadCalls): void {
                 $type = $event['type'] ?? '';
                 if ($type === 'response.output_text.delta' && isset($event['delta'])) {
                     $delta = (string) $event['delta'];
-                    $emitted .= $delta;
-                    $onDelta($delta);
+                    if ($round >= count($requiredReadCalls)) {
+                        $emitted .= $delta;
+                        $onDelta($delta);
+                    }
                 } elseif ($type === 'response.output_item.done' && ($event['item']['type'] ?? null) === 'function_call') {
                     $toolCalls[] = $event['item'];
                 } elseif ($type === 'response.completed') {
@@ -123,6 +133,10 @@ class AiAssistantService
                 throw new RuntimeException('The AI provider response ended unexpectedly.');
             }
 
+            if ($requiredCall !== null && ! collect($toolCalls)->contains(fn (array $call): bool => ($call['name'] ?? null) === $requiredCall['name'])) {
+                throw new RuntimeException('The required project data lookup could not be completed.');
+            }
+
             if ($toolCalls === []) {
                 if ($round > 0 && $emitted === '') {
                     foreach ($responseOutput as $item) {
@@ -147,7 +161,12 @@ class AiAssistantService
                         default => 'Retrieving authorized workspace data…',
                     });
                 }
-                $arguments = json_decode((string) ($call['arguments'] ?? '{}'), true);
+                $isRequiredMmcCall = $requiredCall !== null
+                    && ($call['name'] ?? null) === $requiredCall['name']
+                    && in_array($requiredCall['name'], ['search_mmc_projects', 'get_mmc_project_delivery_summary'], true);
+                $arguments = $isRequiredMmcCall
+                    ? $requiredCall['arguments']
+                    : json_decode((string) ($call['arguments'] ?? '{}'), true);
                 $result = $gateway->call((string) $call['name'], is_array($arguments) ? $arguments : [], $user, $company);
                 if ($call['name'] === 'lookup_mi_product_prices' && $onProductMatches !== null && $result !== []) {
                     $onProductMatches($result);
@@ -190,12 +209,6 @@ class AiAssistantService
             return 'my_mi_liquidations';
         }
 
-        $asksMmcDeliveryAnalytics = preg_match('/\b(deliver(?:ed|y|ies)?|pending|delayed|completion|completed|schools?)\b|\b(ilan|ilang)\b.*\b(deliver|paaralan|school)/iu', $lastUserMessage) === 1;
-        if ($asksMmcDeliveryAnalytics && in_array('get_mmc_project_delivery_summary', $availableTools, true)
-            && preg_match('/\b(?:in|sa|for|of)\s+[\(\[]?[\pL]{2,}(?:[\s-]*\d+)?[\)\]]?|\b[\pL]{2,}[\s-]*\d+\b/iu', $lastUserMessage)) {
-            return 'get_mmc_project_delivery_summary';
-        }
-
         if (preg_match('/\b(budget|expense|forecast|project|delivery|inventory|liquidation|spend|spent|last\s+month)\b/i', $lastUserMessage)) {
             return null;
         }
@@ -210,6 +223,68 @@ class AiAssistantService
         return $priceToolAvailable && (($asksForPrice && $specificProductTerms !== '') || $priceFollowUp)
             ? 'lookup_mi_product_prices'
             : null;
+    }
+
+    /**
+     * @param  array<int, array{role: string, content: string}>  $history
+     * @param  array<int, array<string, mixed>>  $tools
+     * @return list<array{name: string, arguments: array<string, mixed>}>
+     */
+    private function requiredMmcReadCalls(User $user, Company $company, array $history, array $tools, AiReadOnlyToolGateway $gateway): array
+    {
+        $question = collect($history)->last(fn (array $message): bool => $message['role'] === 'user')['content'] ?? '';
+        if (! is_string($question) || $company->code !== 'MMC') {
+            return [];
+        }
+
+        $hasProjectReference = preg_match('/\b(?:[\pL]{2,10}[\s-]*\d{1,4}|BPC)\b/iu', $question) === 1;
+        if (! $hasProjectReference) {
+            return [];
+        }
+
+        $asksComparison = preg_match('/\b(compare|comparison|versus|vs\.?|kumpara)\b/iu', $question) === 1;
+        $asksDeliveryPerformance = preg_match('/\b(deliver(?:ed|y|ies)?|pending|delayed|remaining|completion|completed|progress|receipts?|schools?)\b|\b(ilan|ilang)\b.*\b(deliver|paaralan|school)/iu', $question) === 1;
+        $lifecycleQuestion = preg_replace('/\b(?:(?:delivery|completion)\s+status|status\s+of\s+deliver(?:y|ies))\b/iu', ' ', $question);
+        $asksProjectLifecycle = preg_match('/\b(?:project\s+(?:status|stage)|(?:what(?:\s+is|\'s)?|show|tell\s+me|current)\s+(?:the\s+)?status\s+(?:of|for)|status\s+(?:of|for)|lifecycle)\b/iu', (string) $lifecycleQuestion) === 1;
+
+        if (! $asksComparison && ! $asksDeliveryPerformance && ! $asksProjectLifecycle) {
+            return [];
+        }
+
+        $availableTools = collect($tools)->pluck('name')->all();
+        $references = $gateway->projectReferencesInQuestion($question, $user, $company);
+        if ($references === []) {
+            return [];
+        }
+        $references = array_slice($references, 0, 5);
+
+        $mustSearchProjects = $asksProjectLifecycle || $asksComparison;
+        $mustReadDeliveries = $asksDeliveryPerformance || $asksComparison;
+        $requiredNames = array_values(array_filter([
+            $mustSearchProjects ? 'search_mmc_projects' : null,
+            $mustReadDeliveries ? 'get_mmc_project_delivery_summary' : null,
+        ]));
+        foreach ($requiredNames as $name) {
+            if (! in_array($name, $availableTools, true)) {
+                throw new AiRequiredToolUnavailable('A required MMC project data lookup is not enabled in this application version.');
+            }
+        }
+
+        $calls = [];
+        if ($mustSearchProjects) {
+            foreach ($references as $reference) {
+                $calls[] = ['name' => 'search_mmc_projects', 'arguments' => ['query' => $reference]];
+            }
+        }
+        if ($mustReadDeliveries) {
+            $calls[] = ['name' => 'get_mmc_project_delivery_summary', 'arguments' => [
+                'project_references' => $references,
+                'date_from' => null,
+                'date_to' => null,
+            ]];
+        }
+
+        return $calls;
     }
 
     /** @param array<string, mixed> $context */
@@ -236,6 +311,7 @@ class AiAssistantService
             $conversation['safety'] ?? 'Never invent business facts or claim a tool succeeded when it failed. Respect server-enforced permissions and company isolation.',
             $moduleVoice,
             'The active company is '.$company->code.'. Use the page context to explain the current page, but use any supplied tool the user is authorized to access even if it belongs to another module in this company. Never claim access to another company. Use only supplied read-only tools for saved records. Page context contains route metadata only, never form values. Never create, edit, delete, submit, release, or approve records.',
+            'For MMC project questions that name a project code or alias, retrieve project lifecycle status using the project search tool before answering. For delivery counts, pending or remaining deliveries, completion, or delivery progress, retrieve the delivery summary before answering. For comparisons or questions covering both lifecycle and delivery performance, retrieve both kinds of data. Do not answer these database questions from memory or conversation context; if the lookup returns no results, ambiguity, or an execution failure, report that exact state clearly.',
             'For MI product price questions, call lookup_mi_product_prices when available; price access is independent from quotation creation. Use search_mi_products for product details without prices. When the result contains specifications, summarize the relevant verified details and include its authorized product page URL when useful. '.$priceGuidance.' Report a price and SKU only when returned by the price tool. State PHP currency and MI product selling price basis. Never treat factory or purchase cost as selling price. If multiple similar products are returned, present distinct options; do not assume Round Table and Round Side Table are the same product.',
             'For MMC project delivery questions, use get_mmc_project_delivery_summary when available, including for Filipino or Taglish questions and regardless of the current page. It resolves project aliases against actual project codes, names, references, and linked bidding records; always use the returned project_id identity and never treat bidding_id as a project ID. If ambiguous, ask the user to choose from the candidates. Distinguish not found from a found project with no delivery rows and from zero completed receipts. Delivered means completed valid DR receipts (all expected packages delivered or accepted, or all receipt rows delivered/accepted when no package definitions exist). State the period and counting unit. Unique schools counts schools with at least one delivered/accepted delivery row. Never treat delivery rows and DR receipts as interchangeable.',
             $quotationGuidance,

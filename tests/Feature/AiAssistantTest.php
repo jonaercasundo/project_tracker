@@ -7,9 +7,11 @@ use App\Models\MI_Product;
 use App\Services\AiAssistantService;
 use App\Services\AiCapabilityRegistry;
 use App\Services\AiReadOnlyToolGateway;
+use App\Services\ProjectDeliveryProgressService;
 use Database\Seeders\AiAssistantPermissionSeeder;
 use Database\Seeders\AiBusinessDataPermissionSeeder;
 use Database\Seeders\AiQuotationPermissionSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
@@ -44,6 +46,7 @@ class AiAssistantTestCase extends MIWorkflowTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        require __DIR__.'/../Fixtures/jarvis_schema.php';
         $this->seed(AiAssistantPermissionSeeder::class);
         $this->seed(AiBusinessDataPermissionSeeder::class);
         $this->seed(AiQuotationPermissionSeeder::class);
@@ -51,6 +54,22 @@ class AiAssistantTestCase extends MIWorkflowTestCase
 }
 
 pest()->extend(AiAssistantTestCase::class)->in('AiAssistantTest.php');
+
+function aiAssistantToolSse(string $name): string
+{
+    static $call = 0;
+    $call++;
+    $item = ['id' => 'fc_'.$call, 'type' => 'function_call', 'call_id' => 'call_'.$call, 'name' => $name, 'arguments' => '{}'];
+
+    return 'data: '.json_encode(['type' => 'response.output_item.done', 'item' => $item], JSON_THROW_ON_ERROR)."\n\n"
+        .'data: '.json_encode(['type' => 'response.completed', 'response' => ['id' => 'resp_'.$call, 'usage' => [], 'output' => [$item]]], JSON_THROW_ON_ERROR)."\n\n";
+}
+
+function aiAssistantTextSse(string $text): string
+{
+    return 'data: '.json_encode(['type' => 'response.output_text.delta', 'delta' => $text], JSON_THROW_ON_ERROR)."\n\n"
+        .'data: '.json_encode(['type' => 'response.completed', 'response' => ['id' => 'resp_final', 'usage' => [], 'output' => []]], JSON_THROW_ON_ERROR)."\n\n";
+}
 
 it('requires authentication and an authorized company module', function () {
     $this->get(route('assistant.workspace'))->assertRedirect(route('login'));
@@ -403,7 +422,9 @@ it('registers MMC project analytics only within an authorized active MMC workspa
     $gateway = app(AiReadOnlyToolGateway::class);
     $tools = collect($gateway->tools($authorized, $authorized->currentCompany(), []))->pluck('name');
 
-    expect($tools)->toContain('get_mmc_project_delivery_summary');
+    expect($tools)->toContain('search_mmc_projects', 'get_mmc_project_delivery_summary');
+    expect(app(AiCapabilityRegistry::class)->allowsTool('search_mmc_projects', $authorized, $authorized->currentCompany()))->toBeTrue()
+        ->and(app(AiCapabilityRegistry::class)->allowsTool('get_mmc_project_delivery_summary', $authorized, $authorized->currentCompany()))->toBeTrue();
 
     $wrongModuleUser = $this->miUser('user', 'MI');
     $this->actingAs($wrongModuleUser)->withSession(['company_id' => $wrongModuleUser->companies()->sole()->getKey()]);
@@ -413,18 +434,157 @@ it('registers MMC project analytics only within an authorized active MMC workspa
         ->toThrow(HttpException::class);
 });
 
-it('routes English and Filipino MMC delivery questions through project analytics', function (string $question) {
-    $assistant = app(AiAssistantService::class);
-    $method = new ReflectionMethod($assistant, 'requiredReadTool');
+it('forces project lifecycle status through authorized project search and returns database status', function () {
+    DB::table('projects')->insert(['project_id' => 21, 'project_code' => 'SME2', 'project_name' => 'SME2 School Expansion', 'status' => 'Ongoing']);
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fakeSequence('https://api.openai.com/v1/responses')
+        ->push(aiAssistantToolSse('search_mmc_projects'), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(aiAssistantTextSse('SME2 is ongoing.'), 200, ['Content-Type' => 'text/event-stream']);
 
-    expect($method->invoke($assistant, [['role' => 'user', 'content' => $question]], [['name' => 'get_mmc_project_delivery_summary']], []))
-        ->toBe('get_mmc_project_delivery_summary');
+    app(AiAssistantService::class)->respond($user, $company, [], [['role' => 'user', 'content' => 'What is the status of SME2?']], fn (string $delta) => null);
+
+    $requests = Http::recorded()->map(fn (array $pair) => $pair[0]);
+    $toolOutput = collect($requests[1]['input'])->first(fn (array $item): bool => ($item['type'] ?? null) === 'function_call_output');
+    $projectResult = json_decode($toolOutput['output'], true, flags: JSON_THROW_ON_ERROR);
+    expect($requests)->toHaveCount(2)
+        ->and($requests[0]['tool_choice'])->toBe(['type' => 'function', 'name' => 'search_mmc_projects'])
+        ->and($projectResult['status'])->toBe('found')
+        ->and($projectResult['projects'][0])->toMatchArray(['project_code' => 'SME2', 'status' => 'Ongoing']);
+});
+
+it('forces delivery questions in English and Taglish through the dashboard metrics gateway', function (string $question) {
+    DB::table('projects')->insert([
+        ['project_id' => 22, 'project_code' => 'SME2', 'project_name' => 'SME2 School Expansion', 'status' => 'Ongoing'],
+        ['project_id' => 23, 'project_code' => 'SME1', 'project_name' => 'SME1 School Expansion', 'status' => 'Ongoing'],
+    ]);
+    DB::table('deliveries')->insert([
+        ['delivery_id' => 21, 'project_id' => 22, 'school_id' => 'SCH-1', 'dr_no' => 'DR-21', 'status' => 'delivered', 'delivery_date' => '2026-10-01'],
+        ['delivery_id' => 22, 'project_id' => 22, 'school_id' => 'SCH-2', 'dr_no' => 'DR-22', 'status' => 'pending', 'delivery_date' => '2026-10-02'],
+        ['delivery_id' => 23, 'project_id' => 23, 'school_id' => 'SCH-3', 'dr_no' => 'DR-23', 'status' => 'delivered', 'delivery_date' => '2026-10-03'],
+        ['delivery_id' => 24, 'project_id' => 23, 'school_id' => 'SCH-4', 'dr_no' => 'DR-24', 'status' => 'pending', 'delivery_date' => '2026-10-04'],
+    ]);
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fakeSequence('https://api.openai.com/v1/responses')
+        ->push(aiAssistantToolSse('get_mmc_project_delivery_summary'), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(aiAssistantTextSse('Verified from the dashboard metrics.'), 200, ['Content-Type' => 'text/event-stream']);
+
+    app(AiAssistantService::class)->respond($user, $company, [], [['role' => 'user', 'content' => $question]], fn (string $delta) => null);
+
+    $requests = Http::recorded()->map(fn (array $pair) => $pair[0]);
+    $toolOutput = collect($requests[1]['input'])->first(fn (array $item): bool => ($item['type'] ?? null) === 'function_call_output');
+    $summary = json_decode($toolOutput['output'], true, flags: JSON_THROW_ON_ERROR)['projects'][0];
+    $expectedCode = str_contains($question, 'SME1') ? 'SME1' : 'SME2';
+    $dashboardProject = app(ProjectDeliveryProgressService::class)->report(['project_id' => $expectedCode === 'SME1' ? 23 : 22])['projects']->first();
+    expect($requests)->toHaveCount(2)
+        ->and($requests[0]['tool_choice'])->toBe(['type' => 'function', 'name' => 'get_mmc_project_delivery_summary'])
+        ->and($summary['status'])->toBe('found')
+        ->and($summary['project']['project_code'])->toBe($expectedCode)
+        ->and($summary['delivered_receipts_count'])->toBe(1)
+        ->and($summary['pending_receipts_count'])->toBe(1)
+        ->and($summary['delivered_receipts_count'])->toBe($dashboardProject['operational_pipeline']['delivered']['completed'])
+        ->and($summary['total_receipts_count'])->toBe($dashboardProject['operational_pipeline']['delivered']['total']);
 })->with([
     'How many delivered in SME 2?',
-    'Ilan na delivered sa SME2?',
-    'Compare SME1 and SME2 deliveries.',
-    'How many schools were delivered in SME-2?',
+    'Ilan na ang delivered sa SME2?',
+    'Show pending deliveries in SME1.',
+    'What is the delivery status of SME2?',
+    'How is delivery progress for SME2?',
+    'How many deliveries remain for SME2?',
+    'What is the completion status of SME2?',
 ]);
+
+it('retrieves both lifecycle and delivery data when comparing project aliases', function () {
+    DB::table('projects')->insert([
+        ['project_id' => 31, 'project_code' => 'SME1', 'project_name' => 'SME1 School Program', 'status' => 'Ongoing'],
+        ['project_id' => 32, 'project_code' => 'SME2', 'project_name' => 'SME2 School Program', 'status' => 'Completed'],
+    ]);
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fakeSequence('https://api.openai.com/v1/responses')
+        ->push(aiAssistantToolSse('search_mmc_projects'), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(aiAssistantToolSse('search_mmc_projects'), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(aiAssistantToolSse('get_mmc_project_delivery_summary'), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(aiAssistantTextSse('Comparison based on verified project and delivery records.'), 200, ['Content-Type' => 'text/event-stream']);
+
+    app(AiAssistantService::class)->respond($user, $company, [], [['role' => 'user', 'content' => 'Compare SME1 and SME2.']], fn (string $delta) => null);
+
+    $requests = Http::recorded()->map(fn (array $pair) => $pair[0]);
+    $outputs = collect($requests[3]['input'])->filter(fn (array $item): bool => ($item['type'] ?? null) === 'function_call_output')->values();
+    $comparisonSummary = json_decode($outputs->last()['output'], true, flags: JSON_THROW_ON_ERROR)['projects'];
+    expect($requests)->toHaveCount(4)
+        ->and($requests[0]['tool_choice']['name'])->toBe('search_mmc_projects')
+        ->and($requests[1]['tool_choice']['name'])->toBe('search_mmc_projects')
+        ->and($requests[2]['tool_choice'])->toBe(['type' => 'function', 'name' => 'get_mmc_project_delivery_summary'])
+        ->and($outputs)->toHaveCount(3)
+        ->and(collect($comparisonSummary)->pluck('project.project_code')->all())->toBe(['SME1', 'SME2']);
+});
+
+it('resolves only known project aliases, preserves ambiguity, and blocks users without project access', function () {
+    DB::table('projects')->insert([
+        ['project_id' => 41, 'project_code' => 'SME1', 'project_name' => 'SME1 School Program', 'status' => 'Ongoing'],
+        ['project_id' => 42, 'project_code' => 'SME2', 'project_name' => 'SME2 School Program', 'status' => 'Ongoing'],
+        ['project_id' => 43, 'project_code' => 'BPC', 'project_name' => 'BPC Learning Program', 'status' => 'Ongoing'],
+        ['project_id' => 44, 'project_code' => 'SME2', 'project_name' => 'Second SME2 Program', 'status' => 'Ongoing'],
+    ]);
+    $authorized = $this->miUser('user', 'MMC');
+    $company = $authorized->companies()->sole();
+    $this->actingAs($authorized)->withSession(['company_id' => $company->getKey()]);
+    $gateway = app(AiReadOnlyToolGateway::class);
+
+    expect($gateway->projectReferencesInQuestion('Compare SME1 and SME 2 with BPC.', $authorized, $company))
+        ->toBe(['SME1', 'SME 2', 'BPC']);
+    expect($gateway->call('get_mmc_project_delivery_summary', ['project_references' => ['SME-2'], 'date_from' => null, 'date_to' => null], $authorized, $company)['projects'][0]['status'])
+        ->toBe('ambiguous');
+
+    $denied = $this->miUser('finance', 'MMC');
+    $deniedCompany = $denied->companies()->sole();
+    $this->actingAs($denied)->withSession(['company_id' => $deniedCompany->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fake();
+    expect(fn () => app(AiAssistantService::class)->respond($denied, $deniedCompany, [], [['role' => 'user', 'content' => 'What is the status of SME2?']], fn (string $delta) => null))
+        ->toThrow(HttpException::class);
+    expect(Http::recorded())->toBeEmpty();
+});
+
+it('reports a recognized project lookup with zero matches as no results', function () {
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fakeSequence('https://api.openai.com/v1/responses')
+        ->push(aiAssistantToolSse('search_mmc_projects'), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(aiAssistantTextSse('No matching project was found.'), 200, ['Content-Type' => 'text/event-stream']);
+
+    app(AiAssistantService::class)->respond($user, $company, [], [['role' => 'user', 'content' => 'What is the status of SME99?']], fn (string $delta) => null);
+
+    $requests = Http::recorded()->map(fn (array $pair) => $pair[0]);
+    $toolOutput = collect($requests[1]['input'])->first(fn (array $item): bool => ($item['type'] ?? null) === 'function_call_output');
+    expect($requests[0]['tool_choice']['name'])->toBe('search_mmc_projects')
+        ->and(json_decode($toolOutput['output'], true, flags: JSON_THROW_ON_ERROR))->toBe(['status' => 'no_results', 'projects' => []]);
+});
+
+it('does not stream an answer when OpenAI omits a required MMC project lookup', function () {
+    DB::table('projects')->insert(['project_id' => 51, 'project_code' => 'SME2', 'project_name' => 'SME2 School Program', 'status' => 'Ongoing']);
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fake(['https://api.openai.com/v1/responses' => Http::response(aiAssistantTextSse('SME2 is completed.'), 200, ['Content-Type' => 'text/event-stream'])]);
+    $deltas = '';
+
+    expect(fn () => app(AiAssistantService::class)->respond($user, $company, [], [['role' => 'user', 'content' => 'What is the status of SME2?']], function (string $delta) use (&$deltas): void {
+        $deltas .= $delta;
+    }))->toThrow(RuntimeException::class, 'required project data lookup could not be completed');
+    expect($deltas)->toBeEmpty()->and(Http::recorded())->toHaveCount(1);
+});
 
 it('keeps MI catalog and price reads separate from quotation creation permission', function () {
     $user = $this->miUser('user');

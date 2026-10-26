@@ -19,6 +19,7 @@ class AiReadOnlyToolGateway
         private AccountingWorkspace $accountingWorkspace,
         private MIApprovalQueue $approvalQueue,
         private AiCapabilityRegistry $capabilities,
+        private MmcProjectIntelligence $mmcProjectIntelligence,
     ) {}
 
     /** @return array<int, array<string, mixed>> */
@@ -74,6 +75,18 @@ class AiReadOnlyToolGateway
         ]);
 
         return $tools;
+    }
+
+    /** @return list<string> */
+    public function projectReferencesInQuestion(string $question, User $user, Company $company): array
+    {
+        if (! $this->isActiveCompany($user, $company)
+            || $company->code !== 'MMC'
+            || ! $this->capabilities->allows('mmc.projects_deliveries.read', $user, $company)) {
+            abort(403, 'You do not have access to MMC project data in this company.');
+        }
+
+        return $this->mmcProjectIntelligence->referencesInQuestion($question, $company->getKey());
     }
 
     /** @param array<string, mixed> $arguments
@@ -227,15 +240,23 @@ class AiReadOnlyToolGateway
         }
 
         if ($name === 'search_mmc_projects' && $company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator'])) {
-            $result = $this->jarvisReadService->projectRecords(['search' => $query])
+            $projects = $this->jarvisReadService->projectRecords(['search' => $query]);
+            if (Schema::hasColumn('projects', 'company_id')) {
+                $projects->where('p.company_id', $company->getKey());
+            }
+            $result = $projects
                 ->orderBy('p.project_id')->limit(8)->get()->map(fn (object $project): array => (array) $project)->all();
             $this->logToolExecuted($name, $user, $company, count($result));
 
-            return $result;
+            return $result === [] ? ['status' => 'no_results', 'projects' => []] : ['status' => 'found', 'projects' => $result];
         }
 
         if ($name === 'search_mmc_deliveries' && $company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator'])) {
-            $result = $this->jarvisReadService->deliveryRecords(['search' => $query])
+            $deliveries = $this->jarvisReadService->deliveryRecords(['search' => $query]);
+            if (Schema::hasColumn('projects', 'company_id')) {
+                $deliveries->where('p.company_id', $company->getKey());
+            }
+            $result = $deliveries
                 ->orderBy('d.delivery_id')->limit(8)->get()->map(fn (object $delivery): array => (array) $delivery)->all();
             $this->logToolExecuted($name, $user, $company, count($result));
 

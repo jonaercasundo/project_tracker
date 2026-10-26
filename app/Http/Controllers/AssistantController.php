@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AiRequiredToolUnavailable;
 use App\Models\AiActivity;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
@@ -169,9 +170,15 @@ class AssistantController extends Controller
                 AiActivity::create(['user_id' => $user->getKey(), 'company_id' => $company->getKey(), 'conversation_id' => $conversation->getKey(), 'status' => 'failed']);
                 $latestUserMessage = collect($history)->last(fn (array $message): bool => $message['role'] === 'user')['content'] ?? '';
                 $isFilipino = preg_match('/\b(?:magkano|itong|ito|akin|ko|mo|paki|salamat|sige|hindi|paano|ano|pwede|po|naman)\b/i', $latestUserMessage) === 1;
-                $message = $exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 403
+                if ($exception instanceof AiRequiredToolUnavailable) {
+                    $message = $isFilipino
+                        ? 'Hindi naka-enable ang kinakailangang project data lookup. Makipag-ugnayan sa administrator.'
+                        : 'A required project data lookup is not enabled in this application. Contact your administrator.';
+                } else {
+                    $message = $exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 403
                     ? ($isFilipino ? 'Wala kang pahintulot para makita ang impormasyong iyon. Makipag-ugnayan sa administrator kung kailangan mo ng access.' : 'You do not have access to that information. Contact your administrator if you think you need access.')
                     : ($isFilipino ? 'Hindi ko makuha ang impormasyong iyon sa ngayon. Nandito pa rin ang mensahe mo; subukan natin ulit mamaya.' : 'I’m having trouble retrieving that right now. Your message is still here; would you like to try again?');
+                }
                 $emit('error', ['message' => $message]);
             }
         }, 200, ['Content-Type' => 'text/event-stream', 'Cache-Control' => 'no-cache, no-transform', 'X-Accel-Buffering' => 'no', 'Connection' => 'keep-alive']);

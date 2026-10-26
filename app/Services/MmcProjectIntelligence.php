@@ -116,6 +116,47 @@ class MmcProjectIntelligence
         return ['status' => 'found', 'reference' => $reference, 'project' => $candidateView($topMatches[0])];
     }
 
+    /** @return list<string> */
+    public function referencesInQuestion(string $question, int|string|null $companyId = null): array
+    {
+        preg_match_all('/\b[\pL]{2,10}[\s-]*\d{1,4}\b|\bBPC\b/iu', $question, $aliases);
+        preg_match_all('/\b[A-Z]{2,10}\b/u', $question, $codes);
+        $aliasCandidates = array_values(array_unique(array_map('trim', $aliases[0])));
+        $codeCandidates = array_filter($codes[0], function (string $code) use ($aliasCandidates): bool {
+            $normalizedCode = self::normalizeReference($code);
+
+            foreach ($aliasCandidates as $alias) {
+                $normalizedAlias = self::normalizeReference($alias);
+                if (str_starts_with($normalizedAlias, $normalizedCode) && $normalizedAlias !== $normalizedCode) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+        $candidates = array_values(array_unique(array_map('trim', [...$aliasCandidates, ...$codeCandidates])));
+        $references = [];
+        $seen = [];
+
+        foreach ($candidates as $candidate) {
+            $normalized = self::normalizeReference($candidate);
+            if ($normalized === '' || isset($seen[$normalized])) {
+                continue;
+            }
+
+            $resolved = $this->resolve($candidate, $companyId);
+            $isExplicitAlias = preg_match('/^(?:[\pL]{2,10}[\s-]*\d{1,4}|BPC|[A-Z]{2,10})$/u', $candidate) === 1;
+            if (! in_array($resolved['status'] ?? null, ['found', 'ambiguous'], true) && ! $isExplicitAlias) {
+                continue;
+            }
+
+            $seen[$normalized] = true;
+            $references[] = $candidate;
+        }
+
+        return $references;
+    }
+
     /** @return array<string, mixed> */
     public function deliverySummary(string $reference, int|string|null $companyId = null, array $filters = []): array
     {

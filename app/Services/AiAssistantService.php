@@ -275,7 +275,10 @@ class AiAssistantService
                 if (in_array($diagnostic['status'] ?? null, ['Permission Restricted', 'Business Access Restricted', 'Company Restricted'], true)) {
                     abort(403, $diagnostic['reason']);
                 }
-                throw new AiRequiredToolUnavailable('A required MMC project data lookup is not enabled in this application version.');
+                $unavailableReason = ($diagnostic['status'] ?? null) === 'Not Implemented'
+                    ? 'The required MMC lookup has no executable implementation.'
+                    : 'The authorized MMC lookup is missing from the active assistant tool registry.';
+                throw new AiRequiredToolUnavailable($unavailableReason);
             }
         }
 

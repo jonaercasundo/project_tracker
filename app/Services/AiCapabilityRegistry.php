@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\Admin\AiConfigurationController;
+use App\Http\Controllers\AssistantController;
 use App\Models\Company;
-use App\Models\ProjectInformation;
 use App\Models\User;
+use App\Policies\ProjectInformationPolicy;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
 class AiCapabilityRegistry
@@ -37,7 +40,7 @@ class AiCapabilityRegistry
             $this->capability('mi.budget_requests.own_status', 'mi_intelligence', 'My MI Budget Requests', 'MI', 'READ', 'List only the authenticated MI employee’s own budget requests and their status.', [], [], 'mi_own_budget', 'AiReadOnlyToolGateway', ['my_mi_budget_requests'], 'sensitive_read', 'none', 'AI activity log'),
             $this->capability('mi.liquidations.own_status', 'view_search', 'My MI Liquidations', 'MI', 'READ', 'List the authenticated employee’s own liquidation titles and statuses without financial amounts.', ['mi.liquidation.view'], [], 'mi_liquidations', 'AiReadOnlyToolGateway', ['my_mi_liquidations'], 'sensitive_read', 'none', 'AI activity log'),
             $this->capability('mi.accounting.queue_summary', 'mi_intelligence', 'MI Accounting Queue Summary', 'MI', 'READ', 'Return accounting queue counts filtered by the user’s accounting permissions.', ['mi.accounting.dashboard.view'], [], 'mi_accounting', 'AiReadOnlyToolGateway', ['mi_accounting_queue_summary'], 'sensitive_read', 'none', 'AI activity log'),
-            $this->capability('mi.approvals.pending_summary', 'mi_intelligence', 'MI Pending Approval Summary', 'MI', 'READ', 'Summarize only budget and travel approval queues the user may review.', ['mi.budget.approve or mi.travel.approve'], [], 'mi_approvals', 'AiReadOnlyToolGateway', ['mi_pending_approval_summary'], 'sensitive_read', 'none', 'AI activity log'),
+            $this->capability('mi.approvals.pending_summary', 'mi_intelligence', 'MI Pending Approval Summary', 'MI', 'READ', 'Summarize only budget and travel approval queues the user may review.', [], [], 'mi_approvals', 'AiReadOnlyToolGateway', ['mi_pending_approval_summary'], 'sensitive_read', 'none', 'AI activity log'),
             $this->capability('mi.quotation.draft', 'create_records', 'MI Quotation Draft', 'MI', 'CREATE', 'Prepare and confirm an idempotent quotation draft using current authorized selling prices.', ['mi.quotation.create', 'mi.product-prices.view'], [], 'mi_quotation', 'AiQuotationWorkflowService', [], 'high', 'explicit_confirmation', 'Quotation workflow audit'),
             $this->capability('business.records.create', 'create_records', 'Create other business records', '*', 'CREATE', 'General conversational creation is not connected to existing application form services.', [], [], 'unavailable', null, [], 'high', 'explicit_confirmation', 'Not available'),
             $this->capability('business.records.update', 'edit_update', 'Edit existing business records', '*', 'UPDATE', 'No generic AI edit tool is implemented; edits must use each module’s existing form and validation.', [], [], 'unavailable', null, [], 'high', 'explicit_confirmation', 'Not available'),
@@ -47,9 +50,9 @@ class AiCapabilityRegistry
             $this->capability('business.charts', 'charts_analytics', 'Render charts and reports', '*', 'CHARTS / REPORTING', 'Some read tools return verified counts, but chart rendering and AI report generation are not implemented.', [], [], 'unavailable', 'AiReadOnlyToolGateway (verified metrics only)', [], 'moderate', 'none', 'Existing read-tool activity'),
             $this->capability('business.forecasts', 'forecasting', 'Statistical business forecasting', '*', 'FORECASTING / ANALYSIS', 'No deterministic forecasting service is connected to the assistant.', [], [], 'unavailable', null, [], 'moderate', 'none', 'Not available'),
             $this->capability('business.document_intelligence', 'document_intelligence', 'Uploaded document intelligence', '*', 'DOCUMENT PROCESSING', 'The assistant does not ingest uploaded files or read their contents.', [], [], 'unavailable', null, [], 'sensitive_read', 'none', 'Not available'),
-            $this->capability('business.workflow_guidance', 'workflow_assistant', 'Workflow guidance', '*', 'WORKFLOW EXECUTION', 'The assistant explains page context and can show authorized status summaries; it never submits or approves workflow items.', [], [], 'unavailable', 'AiModuleRegistry (page guidance only)', [], 'moderate', 'explicit_confirmation', 'AI activity log'),
-            $this->capability('business.proactive_suggestions', 'proactive_assistance', 'Context-aware next steps', '*', 'WORKFLOW EXECUTION', 'Page context and the MI quotation prompt can suggest a relevant next step; general proactive workflows are not implemented.', [], [], 'unavailable', 'AiAssistantService (quotation suggestion only)', [], 'low', 'explicit_confirmation', 'AI activity log'),
-            $this->capability('ai.configuration', 'core_ai', 'AI Configuration', 'AI', 'ADMIN', 'Manage system-wide AI provider settings.', [], [], 'ai_settings', 'AiConfigurationController', [], 'high', 'explicit_confirmation', 'Administrator audit log', ['ai.settings.manage']),
+            $this->capability('business.workflow_guidance', 'workflow_assistant', 'Workflow guidance', '*', 'READ', 'Explain page context and safe next steps. Business workflow execution continues through existing authorized forms and actions.', [], [], 'workflow_guidance', 'AiModuleRegistry (page guidance only)', [], 'moderate', 'none', 'AI activity log'),
+            $this->capability('business.proactive_suggestions', 'proactive_assistance', 'Context-aware next steps', '*', 'READ', 'Offer the existing MI quotation next step only when the user can access its underlying product and quotation actions.', [], [], 'proactive_suggestions', 'AiAssistantService (quotation suggestion only)', [], 'low', 'none', 'AI activity log'),
+            $this->capability('ai.configuration', 'core_ai', 'AI Configuration', '*', 'ADMIN', 'Manage system-wide AI provider settings.', [], [], 'ai_settings', 'AiConfigurationController', [], 'high', 'explicit_confirmation', 'Administrator audit log', ['ai.settings.manage']),
             $this->capability('ai.conversations', 'core_ai', 'Conversation History', '*', 'READ / DELETE OWN', 'Read and delete only the authenticated user’s own conversations.', [], [], 'conversation_history', 'AssistantController', [], 'low', 'none', 'AI activity log', ['ai.assistant.use']),
             $this->capability('mmc.reports.generate', 'mmc_intelligence', 'Generate MMC Reports', 'MMC', 'REPORT', 'AI-generated MMC reports are not connected.', [], [], 'unavailable', null, [], 'high', 'none', 'Not available', ['ai.mmc.reports.generate']),
             $this->capability('mmc.charts.generate', 'mmc_intelligence', 'Generate MMC Charts', 'MMC', 'CHART', 'AI chart generation is not connected.', [], [], 'unavailable', null, [], 'moderate', 'none', 'Not available', ['ai.mmc.charts.generate']),
@@ -92,6 +95,14 @@ class AiCapabilityRegistry
             $diagnostic = $this->diagnostic($capability['id'], $user, $company, $enabled, $configured);
             $capability['status'] = $diagnostic['status'];
             $capability['diagnostic_reason'] = $diagnostic['reason'];
+            $capability['diagnostic_details'] = $diagnostic;
+            $capability['implementation_status'] = $diagnostic['implementation_status'];
+            $capability['company_scope'] = $diagnostic['company_scope'];
+            $capability['required_ai_permissions'] = $diagnostic['required_ai_permissions'];
+            $capability['granted_ai_permissions'] = $diagnostic['granted_ai_permissions'];
+            $capability['missing_ai_permissions'] = $diagnostic['missing_ai_permissions'];
+            $capability['business_policy_requirements'] = $diagnostic['business_policy_requirements'];
+            $capability['failed_business_checks'] = $diagnostic['failed_business_checks'];
 
             return $capability;
         })->groupBy('category');
@@ -100,101 +111,144 @@ class AiCapabilityRegistry
             $items = $capabilities->get($category['id'], collect())->values();
             $category['capabilities'] = $items->all();
             $category['implemented_count'] = $items->whereIn('implementation', ['implemented', 'partial'])->count();
-            $category['available_count'] = $items->whereIn('status', ['Available', 'Partially available'])->count();
+            $category['available_count'] = $items->whereIn('status', ['Implemented', 'Partially Implemented'])->count();
 
             return $category;
         })->all();
     }
 
-    public function allows(string $id, User $user, Company $company): bool
+    public function allows(string $id, User $user, ?Company $company): bool
     {
-        return $this->authorizationDecision($id, $user, $company)['allowed'];
+        return $this->authorizationDecision($id, $user, $company, true)['allowed'];
     }
 
-    /** @return array{status: string, reason: string, allowed: bool} */
+    /** @return array{status: string, reason: string, allowed: bool, implementation_status: string, company_scope: string, required_ai_permissions: array<int, string>, granted_ai_permissions: array<int, string>, missing_ai_permissions: array<int, string>, business_policy_requirements: array<int, string>, failed_business_checks: array<int, string>} */
     public function diagnostic(string $id, User $user, ?Company $company, bool $enabled, bool $configured): array
     {
         $capability = collect($this->definitions())->firstWhere('id', $id);
-        if ($capability === null || $capability['implementation'] === 'unavailable') {
-            return ['status' => 'Not Implemented', 'reason' => 'No AI tool or service is connected. Assigning the permission will not enable it.', 'allowed' => false];
-        }
-        if (! $enabled || ! $configured) {
-            return ['status' => 'Configuration Required', 'reason' => $enabled ? 'The AI provider is not configured.' : 'The AI Assistant is disabled globally.', 'allowed' => false];
-        }
-        if (! $user->can('ai.assistant.use')) {
-            return ['status' => 'Permission Restricted', 'reason' => 'The user lacks ai.assistant.use.', 'allowed' => false];
-        }
-        if ($company === null || ! $this->hasActiveCompany($user, $company)
-            || ($capability['company'] !== '*' && $capability['company'] !== $company->code)) {
-            return ['status' => 'Company Restricted', 'reason' => $company === null ? 'Select an active company and verify the user belongs to it.' : 'The selected user does not have an active membership in the required company.', 'allowed' => false];
-        }
-        if ($capability['authorization_rule'] === 'mi_quotation'
-            && (! Schema::hasTable('ai_quotation_workflows') || ! Schema::hasTable('ai_quotations'))) {
-            return ['status' => 'Configuration Required', 'reason' => 'The quotation workflow database tables are not installed.', 'allowed' => false];
-        }
-        $decision = $this->authorizationDecision($id, $user, $company);
-        if (! $decision['allowed']) {
-            return [
-                'status' => $decision['kind'] === 'permission' ? 'Permission Restricted' : 'Business Access Restricted',
-                'reason' => $decision['reason'],
-                'allowed' => false,
-            ];
+        if ($capability === null) {
+            return $this->formatDiagnostic(null, 'Not Implemented', 'This capability is not registered.', [], [], []);
         }
 
-        return ['status' => 'Available', 'reason' => 'All required AI permissions, business access checks, and company membership are satisfied.', 'allowed' => true];
+        $decision = $this->authorizationDecision($id, $user, $company, false);
+        $implementationStatus = $this->implementationStatus($capability);
+        if ($implementationStatus === 'Not Implemented') {
+            return $this->formatDiagnostic($capability, $implementationStatus, 'No executable service action or registered route is available for this capability.', $decision['missing_ai_permissions'], $decision['failed_business_checks'], $decision['required_ai_permissions'], $decision['granted_ai_permissions']);
+        }
+
+        if (! $decision['allowed']) {
+            return $this->formatDiagnostic($capability, $decision['status'], $decision['reason'], $decision['missing_ai_permissions'], $decision['failed_business_checks'], $decision['required_ai_permissions'], $decision['granted_ai_permissions']);
+        }
+
+        if ($id !== 'ai.configuration' && ! $enabled) {
+            return $this->formatDiagnostic($capability, 'Disabled', 'The AI Assistant is disabled globally.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions']);
+        }
+        if ($id !== 'ai.configuration' && ! $configured) {
+            return $this->formatDiagnostic($capability, 'Configuration Required', 'No OpenAI credential is available.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions']);
+        }
+        if (in_array($id, ['mi.quotation.draft', 'business.proactive_suggestions'], true)
+            && (! Schema::hasTable('ai_quotation_workflows') || ! Schema::hasTable('ai_quotations'))) {
+            return $this->formatDiagnostic($capability, 'Configuration Required', 'The quotation workflow database tables are not installed.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions']);
+        }
+
+        return $this->formatDiagnostic($capability, $implementationStatus, 'All required AI permissions, company membership, and business-policy checks passed.', [], [], $decision['required_ai_permissions'], $decision['granted_ai_permissions'], true);
     }
 
-    /** @return array{allowed: bool, kind: string, reason: string} */
-    private function authorizationDecision(string $id, User $user, Company $company): array
+    /** @return array{allowed: bool, status: string, reason: string, required_ai_permissions: array<int, string>, granted_ai_permissions: array<int, string>, missing_ai_permissions: array<int, string>, failed_business_checks: array<int, string>} */
+    private function authorizationDecision(string $id, User $user, ?Company $company, bool $requireCurrentCompany): array
     {
         $capability = collect($this->definitions())->firstWhere('id', $id);
-        if ($capability === null || $capability['implementation'] === 'unavailable') {
-            return ['allowed' => false, 'kind' => 'permission', 'reason' => 'The requested capability is not implemented.'];
+        $requiredAiPermissions = $id === 'ai.configuration'
+            ? ['ai.settings.manage']
+            : array_values(array_unique(['ai.assistant.use', ...($capability['ai_permissions'] ?? [])]));
+        $grantedAiPermissions = array_values(array_filter($requiredAiPermissions, fn (string $permission): bool => $user->can($permission)));
+        $missingAiPermissions = array_values(array_diff($requiredAiPermissions, $grantedAiPermissions));
+        if ($capability === null || $this->implementationStatus($capability) === 'Not Implemented') {
+            return ['allowed' => false, 'status' => 'Not Implemented', 'reason' => 'The requested capability has no executable implementation.', 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => $missingAiPermissions, 'failed_business_checks' => []];
         }
-        if (! $user->can('ai.assistant.use')) {
-            return ['allowed' => false, 'kind' => 'permission', 'reason' => 'The user lacks ai.assistant.use.'];
+        if ($missingAiPermissions !== []) {
+            return ['allowed' => false, 'status' => 'Permission Restricted', 'reason' => 'Missing AI permission(s): '.implode(', ', $missingAiPermissions).'.', 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => $missingAiPermissions, 'failed_business_checks' => []];
         }
-        if (! $this->hasActiveCompany($user, $company)) {
-            return ['allowed' => false, 'kind' => 'company', 'reason' => 'The user lacks active membership in the selected company.'];
+        if ($id === 'ai.configuration') {
+            return ['allowed' => true, 'status' => 'Implemented', 'reason' => 'ai.settings.manage is granted. System-wide configuration does not require company membership.', 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => [], 'failed_business_checks' => []];
+        }
+        if ($company === null || ! $this->hasActiveCompany($user, $company, $requireCurrentCompany)) {
+            $companyName = $company?->code ?? '(none selected)';
+
+            return ['allowed' => false, 'status' => 'Company Restricted', 'reason' => "Company membership check failed for {$companyName}: the company must be active and assigned to the inspected user.", 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => [], 'failed_business_checks' => []];
         }
         if ($capability['company'] !== '*' && $capability['company'] !== $company->code) {
-            return ['allowed' => false, 'kind' => 'company', 'reason' => 'This capability belongs to a different company module.'];
-        }
-        if (! $this->hasBusinessPermissions($user, $capability['ai_permissions'])) {
-            return ['allowed' => false, 'kind' => 'permission', 'reason' => 'One or more required AI capability permissions are missing: '.implode(', ', array_filter($capability['ai_permissions'], fn (string $permission): bool => ! $user->can($permission))).'.'];
-        }
-        if (($capability['authorization_rule'] !== 'mi_approvals' && ! $this->hasBusinessPermissions($user, $capability['business_permissions']))
-            || ! $this->businessPolicyAllows($capability['authorization_rule'], $user, $company)) {
-            return ['allowed' => false, 'kind' => 'business', 'reason' => 'The user does not satisfy the existing business-module permission or policy.'];
+            return ['allowed' => false, 'status' => 'Company Restricted', 'reason' => "Company scope check failed: this capability requires {$capability['company']} and {$company->code} is selected.", 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => [], 'failed_business_checks' => []];
         }
 
-        return ['allowed' => true, 'kind' => 'available', 'reason' => 'Authorized.'];
+        $failedBusinessChecks = $this->failedBusinessChecks($capability, $user, $company);
+        if ($failedBusinessChecks !== []) {
+            return ['allowed' => false, 'status' => 'Business Access Restricted', 'reason' => 'Failed business access check(s): '.implode('; ', $failedBusinessChecks), 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => [], 'failed_business_checks' => $failedBusinessChecks];
+        }
+
+        return ['allowed' => true, 'status' => $this->implementationStatus($capability), 'reason' => 'Authorized.', 'required_ai_permissions' => $requiredAiPermissions, 'granted_ai_permissions' => $grantedAiPermissions, 'missing_ai_permissions' => [], 'failed_business_checks' => []];
     }
 
-    private function businessPolicyAllows(string $rule, User $user, Company $company): bool
+    /** @return array<int, string> */
+    private function failedBusinessChecks(array $capability, User $user, Company $company): array
     {
-        return match ($rule) {
-            'page_help' => $user->can('ai.page-help.use'),
-            'mi_catalog' => $company->code === 'MI' && $user->can('mi.product-catalog.view'),
-            'mi_prices' => $company->code === 'MI' && $user->can('mi.product-catalog.view') && $user->can('mi.product-prices.view'),
-            'mi_quotation' => $company->code === 'MI' && $user->can('mi.quotation.create') && $user->can('mi.product-prices.view'),
-            'mi_own_budget' => $company->code === 'MI' && $user->hasMIUserAccess(),
-            'mi_liquidations' => $company->code === 'MI' && $user->can('mi.liquidation.view'),
-            'mi_accounting' => $company->code === 'MI' && $user->hasAccountingRole() && $user->can('mi.accounting.dashboard.view'),
-            'mi_approvals' => $company->code === 'MI' && ($user->canApproveMI('mi.budget.approve') || $user->canApproveMI('mi.travel.approve')),
-            'mmc_projects' => $company->code === 'MMC' && Gate::forUser($user)->allows('viewAny', ProjectInformation::class),
-            'mmc_delivery_analysis', 'mmc_delivery_search' => $company->code === 'MMC'
-                && Gate::forUser($user)->allows('viewAny', ProjectInformation::class)
-                && Gate::forUser($user)->allows('viewMmcDeliveryMonitoring'),
-            'mmc_operations_snapshot' => $company->code === 'MMC'
-                && Gate::forUser($user)->allows('viewAny', ProjectInformation::class)
-                && Gate::forUser($user)->allows('viewMmcDeliveryMonitoring')
-                && Gate::forUser($user)->allows('viewMmcInventory'),
-            'mmc_inventory' => $company->code === 'MMC' && Gate::forUser($user)->allows('viewMmcInventory'),
-            'ai_settings' => $user->can('ai.settings.manage'),
-            'conversation_history' => $user->can('ai.assistant.use'),
-            default => false,
+        $checks = [];
+        foreach ($capability['business_permissions'] as $permission) {
+            if ($capability['authorization_rule'] === 'mi_approvals') {
+                break;
+            }
+            $passed = str_contains($permission, ' or ')
+                ? $user->hasAnyPermission(explode(' or ', $permission))
+                : $user->can($permission);
+            if (! $passed) {
+                $checks[] = "Business permission {$permission} is missing";
+            }
+        }
+
+        $ruleChecks = match ($capability['authorization_rule']) {
+            'page_help', 'workflow_guidance' => [
+                'ai.page-help.use' => $user->can('ai.page-help.use'),
+                'AiModuleRegistry::pageContext action' => class_exists(AiModuleRegistry::class) && method_exists(AiModuleRegistry::class, 'pageContext'),
+            ],
+            'mi_catalog' => ['mi.product-catalog.view' => $company->code === 'MI' && $user->can('mi.product-catalog.view')],
+            'mi_prices' => ['mi.product-prices.view' => $company->code === 'MI' && $user->can('mi.product-prices.view')],
+            'mi_quotation', 'proactive_suggestions' => [
+                'MI company scope' => $company->code === 'MI',
+                'mi.quotation.create' => $user->can('mi.quotation.create'),
+                'mi.product-prices.view' => $user->can('mi.product-prices.view'),
+                'AiQuotationWorkflowService start/preview/confirm actions' => class_exists(AiQuotationWorkflowService::class)
+                    && method_exists(AiQuotationWorkflowService::class, 'start')
+                    && method_exists(AiQuotationWorkflowService::class, 'preview')
+                    && method_exists(AiQuotationWorkflowService::class, 'confirm'),
+            ],
+            'mi_own_budget' => ['MI employee role' => $company->code === 'MI' && $user->hasAnyRole(['user', 'Executive', 'executive'])],
+            'mi_liquidations' => ['mi.liquidation.view' => $company->code === 'MI' && $user->can('mi.liquidation.view')],
+            'mi_accounting' => ['MI accounting role and mi.accounting.dashboard.view' => $company->code === 'MI' && $user->hasAccountingRole() && $user->can('mi.accounting.dashboard.view')],
+            'mi_approvals' => ['MI approval role or approval permission' => $company->code === 'MI'
+                && ($user->hasAnyRole(['Executive', 'executive', 'Administrator']) || $user->can('mi.budget.approve') || $user->can('mi.travel.approve'))],
+            'mmc_projects' => ['ProjectInformation viewAny policy' => $company->code === 'MMC' && app(ProjectInformationPolicy::class)->viewAnyForCompany($user, $company)],
+            'mmc_delivery_analysis', 'mmc_delivery_search' => [
+                'ProjectInformation viewAny policy' => $company->code === 'MMC' && app(ProjectInformationPolicy::class)->viewAnyForCompany($user, $company),
+                'viewMmcDeliveryMonitoring Gate' => Gate::forUser($user)->allows('viewMmcDeliveryMonitoring', $company),
+            ],
+            'mmc_operations_snapshot' => [
+                'ProjectInformation viewAny policy' => $company->code === 'MMC' && app(ProjectInformationPolicy::class)->viewAnyForCompany($user, $company),
+                'viewMmcDeliveryMonitoring Gate' => Gate::forUser($user)->allows('viewMmcDeliveryMonitoring', $company),
+                'viewMmcInventory Gate' => Gate::forUser($user)->allows('viewMmcInventory', $company),
+            ],
+            'mmc_inventory' => ['viewMmcInventory Gate' => Gate::forUser($user)->allows('viewMmcInventory', $company)],
+            'ai_settings' => ['ai.settings.manage' => $user->can('ai.settings.manage')],
+            'conversation_history' => ['AssistantController conversation routes' => Route::has('assistant.conversations.index') && Route::has('assistant.conversations.store') && Route::has('assistant.conversations.show') && Route::has('assistant.conversations.destroy')],
+            default => [],
         };
+
+        foreach ($ruleChecks as $name => $passed) {
+            if (! $passed) {
+                $checks[] = "{$name} check failed";
+            }
+        }
+
+        return array_values(array_unique($checks));
     }
 
     public function allowsTool(string $toolName, User $user, Company $company): bool
@@ -204,28 +258,117 @@ class AiCapabilityRegistry
         return $capability !== null && $this->allows($capability['id'], $user, $company);
     }
 
-    /** @param array<int, string> $permissions */
-    private function hasBusinessPermissions(User $user, array $permissions): bool
-    {
-        foreach ($permissions as $permission) {
-            if (str_contains($permission, ' or ')) {
-                if (! $user->hasAnyPermission(explode(' or ', $permission))) {
-                    return false;
-                }
-            } elseif (! $user->can($permission)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function hasActiveCompany(User $user, Company $company): bool
+    private function hasActiveCompany(User $user, Company $company, bool $requireCurrentCompany): bool
     {
         return $user->can('ai.assistant.use')
             && (bool) $company->is_active
-            && $user->currentCompany()?->getKey() === $company->getKey()
+            && (! $requireCurrentCompany || $user->currentCompany()?->getKey() === $company->getKey())
             && $user->belongsToCompany($company->getKey());
+    }
+
+    /** @param array<string, mixed>|null $capability
+     * @param  array<int, string>  $missingAiPermissions
+     * @param  array<int, string>  $failedBusinessChecks
+     * @param  array<int, string>  $requiredAiPermissions
+     * @param  array<int, string>  $grantedAiPermissions
+     * @return array{status: string, reason: string, allowed: bool, implementation_status: string, company_scope: string, required_ai_permissions: array<int, string>, granted_ai_permissions: array<int, string>, missing_ai_permissions: array<int, string>, business_policy_requirements: array<int, string>, failed_business_checks: array<int, string>}
+     */
+    private function formatDiagnostic(?array $capability, string $status, string $reason, array $missingAiPermissions, array $failedBusinessChecks, array $requiredAiPermissions, array $grantedAiPermissions = [], bool $allowed = false): array
+    {
+        $ruleRequirements = match ($capability['authorization_rule'] ?? null) {
+            'page_help' => ['ai.page-help.use', 'AiModuleRegistry pageContext action'],
+            'mi_catalog' => ['MI company scope', 'mi.product-catalog.view'],
+            'mi_prices' => ['MI company scope', 'mi.product-catalog.view', 'mi.product-prices.view'],
+            'mi_quotation' => ['MI company scope', 'mi.quotation.create', 'mi.product-prices.view', 'quotation workflow actions'],
+            'proactive_suggestions' => ['MI quotation permissions and executable quote workflow', 'MI company scope', 'mi.quotation.create', 'mi.product-prices.view'],
+            'mi_own_budget' => ['MI company scope', 'MI employee role'],
+            'mi_liquidations' => ['MI company scope', 'mi.liquidation.view'],
+            'mi_accounting' => ['MI company scope', 'accounting role', 'mi.accounting.dashboard.view'],
+            'mi_approvals' => ['MI company scope', 'Executive/Administrator role or an approval permission'],
+            'mmc_delivery_analysis', 'mmc_delivery_search' => ['ProjectInformation viewAny policy', 'viewMmcDeliveryMonitoring Gate'],
+            'mmc_operations_snapshot' => ['ProjectInformation viewAny policy', 'viewMmcDeliveryMonitoring Gate', 'viewMmcInventory Gate'],
+            'mmc_inventory' => ['viewMmcInventory Gate'],
+            'mmc_projects' => ['ProjectInformation viewAny policy'],
+            'ai_settings' => ['Global scope; ai.settings.manage'],
+            'workflow_guidance' => ['AiModuleRegistry pageContext action; no workflow execution authority'],
+            default => [],
+        };
+        $businessRequirements = array_values(array_unique([
+            ...($capability['business_permissions'] ?? []),
+            ...$ruleRequirements,
+        ]));
+
+        return [
+            'status' => $status,
+            'reason' => $reason,
+            'allowed' => $allowed,
+            'implementation_status' => $capability['implementation_status'] ?? $status,
+            'company_scope' => $capability['company'] ?? '*',
+            'required_ai_permissions' => $requiredAiPermissions,
+            'granted_ai_permissions' => $grantedAiPermissions,
+            'missing_ai_permissions' => $missingAiPermissions,
+            'business_policy_requirements' => $businessRequirements,
+            'failed_business_checks' => $failedBusinessChecks,
+        ];
+    }
+
+    /** @param array<string, mixed> $capability */
+    private function implementationStatus(array $capability): string
+    {
+        if (($capability['authorization_rule'] ?? 'unavailable') === 'unavailable' || ! $this->registeredActionsAreUsable($capability)) {
+            return 'Not Implemented';
+        }
+
+        return in_array($capability['authorization_rule'], ['workflow_guidance', 'proactive_suggestions'], true)
+            ? 'Partially Implemented'
+            : 'Implemented';
+    }
+
+    /** @param array<string, mixed> $capability */
+    private function registeredActionsAreUsable(array $capability): bool
+    {
+        return match ($capability['authorization_rule']) {
+            'page_help', 'workflow_guidance' => class_exists(AiModuleRegistry::class) && method_exists(AiModuleRegistry::class, 'pageContext'),
+            'mi_catalog', 'mi_prices', 'mi_own_budget', 'mi_liquidations', 'mi_accounting', 'mi_approvals', 'mmc_projects', 'mmc_delivery_analysis', 'mmc_delivery_search', 'mmc_operations_snapshot', 'mmc_inventory' => $this->readToolActionsAreUsable($capability),
+            'mi_quotation' => class_exists(AiQuotationWorkflowService::class)
+                && method_exists(AiQuotationWorkflowService::class, 'start')
+                && method_exists(AiQuotationWorkflowService::class, 'preview')
+                && method_exists(AiQuotationWorkflowService::class, 'confirm'),
+            'proactive_suggestions' => class_exists(AiAssistantService::class)
+                && method_exists(AiAssistantService::class, 'respond')
+                && class_exists(AiQuotationWorkflowService::class)
+                && method_exists(AiQuotationWorkflowService::class, 'start')
+                && method_exists(AiQuotationWorkflowService::class, 'preview')
+                && method_exists(AiQuotationWorkflowService::class, 'confirm'),
+            'ai_settings' => class_exists(AiConfigurationController::class)
+                && method_exists(AiConfigurationController::class, 'index')
+                && Route::has('admin.ai-configuration.index'),
+            'conversation_history' => class_exists(AssistantController::class)
+                && method_exists(AssistantController::class, 'conversations')
+                && Route::has('assistant.conversations.index')
+                && Route::has('assistant.conversations.store')
+                && Route::has('assistant.conversations.show')
+                && Route::has('assistant.conversations.destroy'),
+            default => false,
+        };
+    }
+
+    /** @param array<string, mixed> $capability */
+    private function readToolActionsAreUsable(array $capability): bool
+    {
+        if (! class_exists(AiReadOnlyToolGateway::class) || ! method_exists(AiReadOnlyToolGateway::class, 'call')
+            || ! collect($capability['tool_names'])->every(fn (string $toolName): bool => AiReadOnlyToolGateway::supportsTool($toolName))) {
+            return false;
+        }
+
+        return match ($capability['authorization_rule']) {
+            'mmc_projects' => class_exists(JarvisReadService::class) && method_exists(JarvisReadService::class, 'projectRecords') && Route::has('projects.dashboard'),
+            'mmc_delivery_analysis' => class_exists(MmcProjectIntelligence::class) && method_exists(MmcProjectIntelligence::class, 'deliverySummary') && Route::has('deliveries.monitoring'),
+            'mmc_delivery_search' => class_exists(JarvisReadService::class) && method_exists(JarvisReadService::class, 'deliveryRecords') && Route::has('deliveries.monitoring'),
+            'mmc_operations_snapshot' => class_exists(JarvisReadService::class) && method_exists(JarvisReadService::class, 'dashboard') && class_exists(MmcProjectIntelligence::class) && method_exists(MmcProjectIntelligence::class, 'deliverySummary'),
+            'mmc_inventory' => class_exists(JarvisReadService::class) && method_exists(JarvisReadService::class, 'inventoryRecords') && Route::has('warehouse.inventory.index'),
+            default => true,
+        };
     }
 
     /** @param array<int, string> $businessPermissions
@@ -235,8 +378,7 @@ class AiCapabilityRegistry
      */
     private function capability(string $id, string $category, string $label, string $company, string $operation, string $description, array $businessPermissions, array $roles, string $authorizationRule, ?string $handler, array $toolNames, string $risk, string $confirmation, string $audit, array $declaredAiPermissions = []): array
     {
-        $implemented = $handler !== null;
-        $partial = in_array($category, ['charts_analytics', 'workflow_assistant', 'proactive_assistance'], true);
+        $implemented = $handler !== null && $authorizationRule !== 'unavailable';
         $aiPermissions = $declaredAiPermissions !== [] ? $declaredAiPermissions : match ($authorizationRule) {
             'page_help' => ['ai.page-help.use'],
             'mi_catalog' => ['ai.business-search.use', 'ai.mi.products.search', 'ai.mi.products.specifications'],
@@ -244,6 +386,8 @@ class AiCapabilityRegistry
             'mi_quotation' => ['ai.business-search.use', 'ai.mi.quotation.create'],
             'mi_own_budget', 'mi_liquidations' => ['ai.business-search.use', 'ai.mi.budget-liquidation.assist'],
             'mi_accounting', 'mi_approvals' => ['ai.business-search.use', 'ai.mi.accounting.reports'],
+            'workflow_guidance' => ['ai.page-help.use'],
+            'proactive_suggestions' => ['ai.business-search.use', 'ai.mi.quotation.create'],
             'mmc_projects' => ['ai.business-search.use', 'ai.mmc.projects.view'],
             'mmc_delivery_analysis' => ['ai.business-search.use', 'ai.mmc.projects.view', 'ai.mmc.deliveries.view', 'ai.mmc.deliveries.analyze'],
             'mmc_delivery_search' => ['ai.business-search.use', 'ai.mmc.projects.view', 'ai.mmc.deliveries.view'],
@@ -252,7 +396,7 @@ class AiCapabilityRegistry
             default => ['ai.assistant.use'],
         };
 
-        return [
+        $capability = [
             'id' => $id,
             'category' => $category,
             'label' => $label,
@@ -270,8 +414,17 @@ class AiCapabilityRegistry
             'risk' => $risk,
             'confirmation' => $confirmation,
             'audit' => $audit,
-            'implementation' => $implemented ? ($partial ? 'partial' : 'implemented') : 'unavailable',
+            'implementation' => 'unavailable',
         ];
+        $implementationStatus = $this->implementationStatus($capability);
+        $capability['implementation_status'] = $implementationStatus;
+        $capability['implementation'] = match ($implementationStatus) {
+            'Implemented' => 'implemented',
+            'Partially Implemented' => 'partial',
+            default => 'unavailable',
+        };
+
+        return $capability;
     }
 
     /** @param array<int, string> $toolNames

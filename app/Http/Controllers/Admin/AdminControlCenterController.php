@@ -115,7 +115,7 @@ class AdminControlCenterController extends Controller
             : auth()->user();
         $diagnosticCompany = isset($validated['company_id'])
             ? Company::query()->findOrFail($validated['company_id'])
-            : $diagnosticUser->currentCompany();
+            : $diagnosticUser->companies()->where('companies.is_active', true)->orderBy('companies.company_id')->first();
         $aiConfiguration = app(AiProviderConfiguration::class);
         $aiEnabled = $aiConfiguration->isEnabled();
         $aiConfigured = $aiConfiguration->credentialSource() !== 'none';
@@ -130,6 +130,9 @@ class AdminControlCenterController extends Controller
                     fn (string $requiredPermission): bool => in_array($permission->name, explode(' or ', $requiredPermission), true),
                 );
             });
+            $diagnostic = $definition !== null
+                ? $capabilities->diagnostic($definition['id'], $diagnosticUser, $diagnosticCompany, $aiEnabled, $aiConfigured)
+                : ['status' => 'Permission only', 'reason' => 'This existing business permission is enforced by its module; it does not enable an AI tool by itself.', 'allowed' => false, 'required_ai_permissions' => [], 'granted_ai_permissions' => [], 'missing_ai_permissions' => [], 'business_policy_requirements' => []];
 
             return [$permission->getKey() => [
                 'module' => $definition !== null && in_array($definition['company'], ['MI', 'MMC'], true)
@@ -137,14 +140,19 @@ class AdminControlCenterController extends Controller
                     : (str_starts_with($permission->name, 'mi.') ? 'MI' : (str_starts_with($permission->name, 'mmc.') ? 'MMC' : 'AI')),
                 'operation' => $definition['operation'] ?? (str_starts_with($permission->name, 'ai.') ? 'CORE' : 'PERMISSION'),
                 'implementation' => $definition['implementation'] ?? (str_starts_with($permission->name, 'ai.') ? 'implemented' : 'permission_only'),
+                'implementation_status' => $definition['implementation_status'] ?? (str_starts_with($permission->name, 'ai.') ? 'Implemented' : 'Permission only'),
+                'company_scope' => $definition['company'] ?? (str_starts_with($permission->name, 'mi.') ? 'MI' : (str_starts_with($permission->name, 'mmc.') ? 'MMC' : '*')),
                 'handler' => $definition['handler'] ?? (str_starts_with($permission->name, 'ai.') ? 'AssistantController / AiAssistantService' : 'Existing module authorization'),
                 'ai_permissions' => $definition['ai_permissions'] ?? [],
                 'business_permissions' => $definition['business_permissions'] ?? [],
+                'required_ai_permissions' => $diagnostic['required_ai_permissions'],
+                'granted_ai_permissions' => $diagnostic['granted_ai_permissions'],
+                'missing_ai_permissions' => $diagnostic['missing_ai_permissions'],
+                'business_policy_requirements' => $diagnostic['business_policy_requirements'],
+                'failed_business_checks' => $diagnostic['failed_business_checks'] ?? [],
                 'capability' => $definition['label'] ?? null,
                 'risk' => $definition['risk'] ?? 'business permission',
-                'status' => $definition !== null
-                    ? $capabilities->diagnostic($definition['id'], $diagnosticUser, $diagnosticCompany, $aiEnabled, $aiConfigured)
-                    : ['status' => 'Permission only', 'reason' => 'This existing business permission is enforced by its module; it does not enable an AI tool by itself.', 'allowed' => false],
+                'status' => $diagnostic,
             ]];
         });
 

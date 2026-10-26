@@ -172,8 +172,8 @@ class AssistantController extends Controller
                 $isFilipino = preg_match('/\b(?:magkano|itong|ito|akin|ko|mo|paki|salamat|sige|hindi|paano|ano|pwede|po|naman)\b/i', $latestUserMessage) === 1;
                 if ($exception instanceof AiRequiredToolUnavailable) {
                     $message = $isFilipino
-                        ? 'Hindi naka-enable ang kinakailangang project data lookup. Makipag-ugnayan sa administrator.'
-                        : 'A required project data lookup is not enabled in this application. Contact your administrator.';
+                        ? 'Hindi available ang kinakailangang project data lookup sa assistant tool registry. Makipag-ugnayan sa administrator.'
+                        : 'A required project data lookup is missing from the active assistant tool registry. Contact your administrator.';
                 } else {
                     $message = $exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 403
                     ? ($isFilipino ? 'Wala kang pahintulot para makita ang impormasyong iyon. Makipag-ugnayan sa administrator kung kailangan mo ng access.' : 'You do not have access to that information. Contact your administrator if you think you need access.')

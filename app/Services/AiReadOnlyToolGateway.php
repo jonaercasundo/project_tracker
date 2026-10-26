@@ -13,6 +13,25 @@ use Illuminate\Support\Facades\Schema;
 
 class AiReadOnlyToolGateway
 {
+    public static function supportsTool(string $toolName): bool
+    {
+        return in_array($toolName, [
+            'search_mi_products',
+            'lookup_mi_product_prices',
+            'mi_product_catalog_summary',
+            'mi_products_needing_cop',
+            'search_mmc_projects',
+            'get_mmc_project_delivery_summary',
+            'mmc_operations_snapshot',
+            'search_mmc_deliveries',
+            'search_mmc_inventory',
+            'my_mi_budget_requests',
+            'my_mi_liquidations',
+            'mi_accounting_queue_summary',
+            'mi_pending_approval_summary',
+        ], true);
+    }
+
     public function __construct(
         private AiMiProductPresenter $productPresenter,
         private JarvisReadService $jarvisReadService,
@@ -86,10 +105,13 @@ class AiReadOnlyToolGateway
     /** @return list<string> */
     public function projectReferencesInQuestion(string $question, User $user, Company $company): array
     {
-        if (! $this->isActiveCompany($user, $company)
-            || $company->code !== 'MMC'
-            || ! $this->capabilities->allows('mmc.projects.view', $user, $company)) {
-            abort(403, 'You do not have access to MMC project data in this company.');
+        if (! $this->isActiveCompany($user, $company) || $company->code !== 'MMC') {
+            abort(403, 'Company membership check failed for MMC project data.');
+        }
+
+        $diagnostic = $this->capabilities->diagnostic('mmc.projects.view', $user, $company, true, true);
+        if (! $diagnostic['allowed']) {
+            abort(403, $diagnostic['reason']);
         }
 
         return $this->mmcProjectIntelligence->referencesInQuestion($question, $company->getKey());
@@ -112,7 +134,9 @@ class AiReadOnlyToolGateway
         }
         if (! $this->capabilities->allowsTool($name, $user, $company)) {
             Log::warning('AI assistant capability denied', ['tool' => $name, 'user_id' => $user->getKey(), 'company_id' => $company->getKey()]);
-            abort(403, 'This assistant data tool is not available for your account.');
+            $capability = collect($this->capabilities->definitions())->first(fn (array $item): bool => in_array($name, $item['tool_names'], true));
+            $diagnostic = $capability === null ? null : $this->capabilities->diagnostic($capability['id'], $user, $company, true, true);
+            abort(403, $diagnostic['reason'] ?? 'This assistant data tool is not registered.');
         }
 
         if ($name === 'mi_product_catalog_summary' && $this->canReadMiCatalog($user, $company)) {

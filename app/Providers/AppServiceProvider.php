@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Listeners\LogSuccessfulLogin;
 use App\Models\BudgetRequest;
+use App\Models\Company;
 use App\Models\Liquidation;
 use App\Models\LogisticsIntegration;
 use App\Models\MI_Liquidation;
@@ -51,8 +52,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(MI_Liquidation::class, MILiquidationPolicy::class);
         Gate::policy(MI_Product::class, MIProductPolicy::class);
         Gate::policy(ProjectInformation::class, ProjectInformationPolicy::class);
-        Gate::define('viewMmcDeliveryMonitoring', fn (User $user): bool => $user->hasAnyRole(['user', 'Administrator']));
-        Gate::define('viewMmcInventory', fn (User $user): bool => $user->hasRole('Warehouse_officer'));
+        Gate::define('viewMmcDeliveryMonitoring', fn (User $user, Company $company): bool => $company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator']));
+        Gate::define('viewMmcInventory', fn (User $user, Company $company): bool => $company->code === 'MMC' && $user->hasRole('Warehouse_officer'));
         Gate::policy(LogisticsIntegration::class, LogisticsIntegrationPolicy::class);
         View::composer('components.accounting-sidebar', function ($view): void {
             $user = auth()->user();

@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Company;
 use App\Models\ProjectInformation;
 use App\Models\User;
 
@@ -13,11 +14,20 @@ class ProjectInformationPolicy
             return true;
         }
 
-        return $user->hasRole('user') && $user->companies()
-            ->where('companies.code', 'MMC')
-            ->where('companies.is_active', true)
-            ->where('companies.company_id', session('company_id'))
-            ->exists();
+        return $this->viewAnyForCompany($user, Company::query()->find(session('company_id')));
+    }
+
+    public function viewAnyForCompany(User $user, ?Company $company): bool
+    {
+        if ($user->hasRole('finance')) {
+            return true;
+        }
+
+        if ($company === null || $company->code !== 'MMC' || ! $company->is_active || ! $user->belongsToCompany($company->getKey())) {
+            return false;
+        }
+
+        return $user->hasRole('user');
     }
 
     public function create(User $user): bool

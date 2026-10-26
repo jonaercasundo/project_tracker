@@ -465,6 +465,37 @@ it('forces project lifecycle status through authorized project search and return
         ->and($projectResult['projects'][0])->toMatchArray(['project_code' => 'SME2', 'status' => 'Ongoing']);
 });
 
+it('retrieves SME2 project status and delivery statistics for a combined natural-language question', function () {
+    DB::table('projects')->insert(['project_id' => 24, 'project_code' => 'SME2', 'project_name' => 'SME2 School Expansion', 'status' => 'Ongoing']);
+    DB::table('deliveries')->insert([
+        ['delivery_id' => 25, 'project_id' => 24, 'school_id' => 'SCH-25', 'dr_no' => 'DR-25', 'status' => 'delivered', 'delivery_date' => '2026-10-10'],
+        ['delivery_id' => 26, 'project_id' => 24, 'school_id' => 'SCH-26', 'dr_no' => 'DR-26', 'status' => 'pending', 'delivery_date' => '2026-10-11'],
+    ]);
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fakeSequence('https://api.openai.com/v1/responses')
+        ->push(aiAssistantToolSse('search_mmc_projects'), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(aiAssistantToolSse('get_mmc_project_delivery_summary'), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(aiAssistantTextSse('SME2 is ongoing, with one delivered and one pending receipt.'), 200, ['Content-Type' => 'text/event-stream']);
+
+    app(AiAssistantService::class)->respond($user, $company, [], [['role' => 'user', 'content' => 'What is the status of SME2 and how many deliveries are complete?']], fn (string $delta) => null);
+
+    $requests = Http::recorded()->map(fn (array $pair) => $pair[0]);
+    $toolOutputs = collect($requests[2]['input'])->filter(fn (array $item): bool => ($item['type'] ?? null) === 'function_call_output')->values();
+    $projectFacts = json_decode($toolOutputs[0]['output'], true, flags: JSON_THROW_ON_ERROR);
+    $deliveryFacts = json_decode($toolOutputs[1]['output'], true, flags: JSON_THROW_ON_ERROR)['projects'][0];
+
+    expect($requests)->toHaveCount(3)
+        ->and($requests[0]['tool_choice'])->toBe(['type' => 'function', 'name' => 'search_mmc_projects'])
+        ->and($requests[1]['tool_choice'])->toBe(['type' => 'function', 'name' => 'get_mmc_project_delivery_summary'])
+        ->and($projectFacts['projects'][0])->toMatchArray(['project_code' => 'SME2', 'status' => 'Ongoing'])
+        ->and($deliveryFacts['project']['project_code'])->toBe('SME2')
+        ->and($deliveryFacts['delivered_receipts_count'])->toBe(1)
+        ->and($deliveryFacts['pending_receipts_count'])->toBe(1);
+});
+
 it('forces delivery questions in English and Taglish through the dashboard metrics gateway', function (string $question) {
     DB::table('projects')->insert([
         ['project_id' => 22, 'project_code' => 'SME2', 'project_name' => 'SME2 School Expansion', 'status' => 'Ongoing'],
@@ -560,7 +591,21 @@ it('resolves only known project aliases, preserves ambiguity, and blocks users w
     config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
     Http::fake();
     expect(fn () => app(AiAssistantService::class)->respond($denied, $deniedCompany, [], [['role' => 'user', 'content' => 'What is the status of SME2?']], fn (string $delta) => null))
-        ->toThrow(HttpException::class);
+        ->toThrow(HttpException::class, 'Missing AI permission(s): ai.mmc.projects.view.');
+    expect(Http::recorded())->toBeEmpty();
+});
+
+it('reports the exact missing delivery permission before requesting an unavailable tool', function () {
+    Role::findByName('user', 'web')->revokePermissionTo('ai.mmc.deliveries.analyze');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fake();
+
+    expect(fn () => app(AiAssistantService::class)->respond($user, $company, [], [['role' => 'user', 'content' => 'How many delivered in SME2?']], fn (string $delta) => null))
+        ->toThrow(HttpException::class, 'Missing AI permission(s): ai.mmc.deliveries.analyze.');
     expect(Http::recorded())->toBeEmpty();
 });
 

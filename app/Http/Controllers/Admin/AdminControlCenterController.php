@@ -78,10 +78,14 @@ class AdminControlCenterController extends Controller
             'search' => ['nullable', 'string', 'max:100'],
             'scope' => ['nullable', Rule::in(['all', 'ai'])],
             'company' => ['nullable', Rule::in(['all', 'MI', 'MMC'])],
+            'module' => ['nullable', Rule::in(['all', 'AI', 'MI', 'MMC'])],
+            'company_id' => ['nullable', 'integer', Rule::exists('companies', 'company_id')],
+            'diagnostic_user_id' => ['nullable', 'integer', Rule::exists('users', 'user_id')],
         ]);
         $scope = $validated['scope'] ?? 'all';
         $company = $validated['company'] ?? 'all';
-        $permissions = Permission::query()->where('guard_name', 'web')
+        $module = $validated['module'] ?? 'all';
+        $permissionQuery = Permission::query()->where('guard_name', 'web')
             ->when($scope === 'ai', fn ($query) => $query->where(function ($query): void {
                 $query->where('name', 'like', 'ai.%')->orWhere('name', 'like', 'mi.%')->orWhere('name', 'like', 'mmc.%');
             }))
@@ -91,12 +95,32 @@ class AdminControlCenterController extends Controller
             ->when($company === 'MMC', fn ($query) => $query->where(function ($query): void {
                 $query->where('name', 'like', 'mmc.%')->orWhere('name', 'like', 'ai.%');
             }))
-            ->when($validated['search'] ?? null, fn ($query, string $search) => $query->where('name', 'like', '%'.$search.'%'))
-            ->orderBy('name')->get();
+            ->when($module !== 'all', function ($query) use ($module): void {
+                $query->where(function ($query) use ($module): void {
+                    if ($module === 'MMC') {
+                        $query->where('name', 'like', 'mmc.%')->orWhere('name', 'like', 'ai.mmc.%');
+                    } elseif ($module === 'MI') {
+                        $query->where('name', 'like', 'mi.%')->orWhere('name', 'like', 'ai.mi.%');
+                    } else {
+                        $query->where('name', 'like', 'ai.%')->where('name', 'not like', 'ai.mmc.%')->where('name', 'not like', 'ai.mi.%');
+                    }
+                });
+            })
+            ->when($validated['search'] ?? null, fn ($query, string $search) => $query->where('name', 'like', '%'.$search.'%'));
+        $permissions = $permissionQuery->orderBy('name')->get();
         $roles = Role::query()->where('guard_name', 'web')->with(['permissions' => fn ($query) => $query->where('guard_name', 'web')])
             ->withCount('users')->orderBy('name')->get();
+        $diagnosticUser = isset($validated['diagnostic_user_id'])
+            ? User::query()->with(['roles.permissions', 'permissions', 'companies'])->findOrFail($validated['diagnostic_user_id'])
+            : auth()->user();
+        $diagnosticCompany = isset($validated['company_id'])
+            ? Company::query()->findOrFail($validated['company_id'])
+            : $diagnosticUser->currentCompany();
+        $aiConfiguration = app(AiProviderConfiguration::class);
+        $aiEnabled = $aiConfiguration->isEnabled();
+        $aiConfigured = $aiConfiguration->credentialSource() !== 'none';
         $definitions = $capabilities->definitions();
-        $permissionDetails = $permissions->mapWithKeys(function (Permission $permission) use ($definitions): array {
+        $permissionDetails = $permissions->mapWithKeys(function (Permission $permission) use ($definitions, $capabilities, $diagnosticUser, $diagnosticCompany, $aiEnabled, $aiConfigured): array {
             $definition = collect($definitions)->first(function (array $definition) use ($permission): bool {
                 if (in_array($permission->name, $definition['ai_permissions'] ?? [], true)) {
                     return true;
@@ -106,17 +130,21 @@ class AdminControlCenterController extends Controller
                     fn (string $requiredPermission): bool => in_array($permission->name, explode(' or ', $requiredPermission), true),
                 );
             });
-            if ($permission->name === 'ai.settings.manage') {
-                return [$permission->getKey() => ['module' => 'AI', 'operation' => 'ADMIN', 'implementation' => 'implemented', 'handler' => 'AiConfigurationController', 'ai_permissions' => ['ai.settings.manage'], 'business_permissions' => []]];
-            }
 
             return [$permission->getKey() => [
-                'module' => str_starts_with($permission->name, 'mi.') ? 'MI' : (str_starts_with($permission->name, 'mmc.') ? 'MMC' : 'AI'),
+                'module' => $definition !== null && in_array($definition['company'], ['MI', 'MMC'], true)
+                    ? $definition['company']
+                    : (str_starts_with($permission->name, 'mi.') ? 'MI' : (str_starts_with($permission->name, 'mmc.') ? 'MMC' : 'AI')),
                 'operation' => $definition['operation'] ?? (str_starts_with($permission->name, 'ai.') ? 'CORE' : 'PERMISSION'),
                 'implementation' => $definition['implementation'] ?? (str_starts_with($permission->name, 'ai.') ? 'implemented' : 'permission_only'),
                 'handler' => $definition['handler'] ?? (str_starts_with($permission->name, 'ai.') ? 'AssistantController / AiAssistantService' : 'Existing module authorization'),
                 'ai_permissions' => $definition['ai_permissions'] ?? [],
                 'business_permissions' => $definition['business_permissions'] ?? [],
+                'capability' => $definition['label'] ?? null,
+                'risk' => $definition['risk'] ?? 'business permission',
+                'status' => $definition !== null
+                    ? $capabilities->diagnostic($definition['id'], $diagnosticUser, $diagnosticCompany, $aiEnabled, $aiConfigured)
+                    : ['status' => 'Permission only', 'reason' => 'This existing business permission is enforced by its module; it does not enable an AI tool by itself.', 'allowed' => false],
             ]];
         });
 
@@ -129,6 +157,14 @@ class AdminControlCenterController extends Controller
             'permissionGroups' => $permissions->groupBy(fn (Permission $permission): string => $this->permissionGroup($permission->name)),
             'permissionDetails' => $permissionDetails,
             'companyLabels' => ['all' => 'All scopes', 'MI' => 'MI', 'MMC' => 'MMC'],
+            'moduleFilter' => $module,
+            'companies' => Company::query()->orderBy('name')->get(),
+            'diagnosticUsers' => User::query()->orderBy('name')->limit(300)->get(['user_id', 'name', 'email']),
+            'diagnosticUser' => $diagnosticUser,
+            'diagnosticCompany' => $diagnosticCompany,
+            'capabilityGroups' => $capabilities->groupedFor($diagnosticUser, $diagnosticCompany, $aiEnabled, $aiConfigured),
+            'aiEnabled' => $aiEnabled,
+            'aiConfigured' => $aiConfigured,
         ]);
     }
 
@@ -145,6 +181,9 @@ class AdminControlCenterController extends Controller
             'scope' => ['required', Rule::in(['all', 'ai'])],
             'company' => ['required', Rule::in(['all', 'MI', 'MMC'])],
             'search' => ['nullable', 'string', 'max:100'],
+            'module' => ['nullable', Rule::in(['all', 'AI', 'MI', 'MMC'])],
+            'company_id' => ['nullable', 'integer', Rule::exists('companies', 'company_id')],
+            'diagnostic_user_id' => ['nullable', 'integer', Rule::exists('users', 'user_id')],
             'role_ids' => ['required', 'array', 'min:1'],
             'role_ids.*' => ['required', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],
             'permissions' => ['nullable', 'array'],
@@ -159,7 +198,7 @@ class AdminControlCenterController extends Controller
             abort(422, 'One or more roles are invalid for the web guard.');
         }
 
-        $editablePermissions = $this->filteredPermissions($validated['scope'], $validated['company'], $validated['search'] ?? '')->get();
+        $editablePermissions = $this->filteredPermissions($validated['scope'], $validated['company'], $validated['search'] ?? '', $validated['module'] ?? 'all')->get();
         $editableIds = $editablePermissions->modelKeys();
         $selected = $validated['permissions'] ?? [];
         $adminChanged = false;
@@ -211,6 +250,8 @@ class AdminControlCenterController extends Controller
 
         return redirect()->route('admin.access.permissions.index', array_filter([
             'scope' => $validated['scope'], 'company' => $validated['company'], 'search' => $validated['search'] ?? null,
+            'module' => $validated['module'] ?? 'all', 'company_id' => $validated['company_id'] ?? null,
+            'diagnostic_user_id' => $validated['diagnostic_user_id'] ?? null,
         ]))->with('success', 'Role permissions saved.');
     }
 
@@ -290,7 +331,7 @@ class AdminControlCenterController extends Controller
         return view('admin.audit.index', ['activities' => $activities, 'filters' => $validated]);
     }
 
-    private function filteredPermissions(string $scope, string $company, string $search): EloquentBuilder
+    private function filteredPermissions(string $scope, string $company, string $search, string $module = 'all'): EloquentBuilder
     {
         return Permission::query()->where('guard_name', 'web')
             ->when($scope === 'ai', fn ($query) => $query->where(function ($query): void {
@@ -302,6 +343,17 @@ class AdminControlCenterController extends Controller
             ->when($company === 'MMC', fn ($query) => $query->where(function ($query): void {
                 $query->where('name', 'like', 'mmc.%')->orWhere('name', 'like', 'ai.%');
             }))
+            ->when($module !== 'all', function ($query) use ($module): void {
+                $query->where(function ($query) use ($module): void {
+                    if ($module === 'MMC') {
+                        $query->where('name', 'like', 'mmc.%')->orWhere('name', 'like', 'ai.mmc.%');
+                    } elseif ($module === 'MI') {
+                        $query->where('name', 'like', 'mi.%')->orWhere('name', 'like', 'ai.mi.%');
+                    } else {
+                        $query->where('name', 'like', 'ai.%')->where('name', 'not like', 'ai.mmc.%')->where('name', 'not like', 'ai.mi.%');
+                    }
+                });
+            })
             ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'));
     }
 

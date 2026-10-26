@@ -266,6 +266,15 @@ class AiAssistantService
         ]));
         foreach ($requiredNames as $name) {
             if (! in_array($name, $availableTools, true)) {
+                $capabilityId = match ($name) {
+                    'search_mmc_projects' => 'mmc.projects.view',
+                    'get_mmc_project_delivery_summary' => 'mmc.deliveries.analyze',
+                    default => null,
+                };
+                $diagnostic = $capabilityId === null ? null : app(AiCapabilityRegistry::class)->diagnostic($capabilityId, $user, $company, true, true);
+                if (in_array($diagnostic['status'] ?? null, ['Permission Restricted', 'Business Access Restricted', 'Company Restricted'], true)) {
+                    abort(403, $diagnostic['reason']);
+                }
                 throw new AiRequiredToolUnavailable('A required MMC project data lookup is not enabled in this application version.');
             }
         }

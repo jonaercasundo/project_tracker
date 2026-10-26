@@ -71,7 +71,9 @@
                                 $statusTone = match ($capability['status']) {
                                     'Available' => 'bg-emerald-50 text-emerald-800',
                                     'Partially available' => 'bg-blue-50 text-blue-800',
-                                    'Not yet implemented' => 'bg-slate-100 text-slate-600',
+                                    'Not yet implemented', 'Not Implemented' => 'bg-slate-100 text-slate-600',
+                                    'Configuration Required' => 'bg-amber-50 text-amber-800',
+                                    'Permission Restricted', 'Company Restricted', 'Business Access Restricted' => 'bg-rose-50 text-rose-800',
                                     'Disabled', 'AI configuration required', 'Quotation workflow unavailable' => 'bg-amber-50 text-amber-800',
                                     default => 'bg-rose-50 text-rose-800',
                                 };

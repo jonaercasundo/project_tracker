@@ -10,6 +10,7 @@ use App\Services\AiReadOnlyToolGateway;
 use App\Services\ProjectDeliveryProgressService;
 use Database\Seeders\AiAssistantPermissionSeeder;
 use Database\Seeders\AiBusinessDataPermissionSeeder;
+use Database\Seeders\AiCapabilityPermissionSeeder;
 use Database\Seeders\AiQuotationPermissionSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -48,8 +49,17 @@ class AiAssistantTestCase extends MIWorkflowTestCase
         parent::setUp();
         require __DIR__.'/../Fixtures/jarvis_schema.php';
         $this->seed(AiAssistantPermissionSeeder::class);
+        $this->seed(AiCapabilityPermissionSeeder::class);
         $this->seed(AiBusinessDataPermissionSeeder::class);
         $this->seed(AiQuotationPermissionSeeder::class);
+        $capabilityPermissions = [
+            'ai.mi.products.search', 'ai.mi.products.specifications', 'ai.mi.prices.lookup', 'ai.mi.quotation.create',
+            'ai.mi.budget-liquidation.assist', 'ai.mi.accounting.reports', 'ai.mmc.projects.view',
+            'ai.mmc.deliveries.view', 'ai.mmc.deliveries.analyze', 'ai.mmc.inventory.view',
+        ];
+        foreach (['user', 'Administrator', 'Accounting', 'accounting', 'Executive', 'executive', 'Warehouse_officer'] as $roleName) {
+            Role::findByName($roleName, 'web')->givePermissionTo($capabilityPermissions);
+        }
     }
 }
 
@@ -598,7 +608,7 @@ it('keeps MI catalog and price reads separate from quotation creation permission
     expect($toolNames)->toContain('lookup_mi_product_prices')->and($user->can('mi.quotation.create'))->toBeFalse();
 
     $readOnlyRole = Role::findOrCreate('MI_Catalog_Read_Only', 'web');
-    $readOnlyRole->givePermissionTo(['ai.assistant.use', 'ai.business-search.use', 'mi.product-catalog.view']);
+    $readOnlyRole->givePermissionTo(['ai.assistant.use', 'ai.business-search.use', 'ai.mi.products.search', 'ai.mi.products.specifications', 'mi.product-catalog.view']);
     $readOnlyUser = $this->miUser('MI_Catalog_Read_Only');
     $this->actingAs($readOnlyUser)->withSession(['company_id' => $readOnlyUser->companies()->sole()->getKey()]);
     $readOnlyCompany = $readOnlyUser->currentCompany();

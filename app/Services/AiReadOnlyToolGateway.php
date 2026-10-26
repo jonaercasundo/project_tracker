@@ -41,10 +41,16 @@ class AiReadOnlyToolGateway
             $tools[] = $this->productSearchTool('lookup_mi_product_prices', 'Search MI products and return their authorized selling price, if one is set. Use the MI product selling price field only; never use factory or purchase costs as selling prices.');
         }
 
-        if ($this->capabilities->allows('mmc.projects_deliveries.read', $user, $company)) {
+        if ($this->capabilities->allows('mmc.projects.view', $user, $company)) {
             $tools[] = $this->searchTool('search_mmc_projects', 'Search MMC project records visible in the active MMC company.', 'Project name, code, or procuring entity');
+        }
+        if ($this->capabilities->allows('mmc.deliveries.analyze', $user, $company)) {
             $tools[] = ['type' => 'function', 'name' => 'get_mmc_project_delivery_summary', 'description' => 'Resolve one or more project codes or aliases and return verified delivery receipt counts using the operational dashboard definition. Use null dates for all time.', 'parameters' => ['type' => 'object', 'properties' => ['project_references' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1, 'maxItems' => 5], 'date_from' => ['type' => ['string', 'null']], 'date_to' => ['type' => ['string', 'null']]], 'required' => ['project_references', 'date_from', 'date_to'], 'additionalProperties' => false], 'strict' => true];
+        }
+        if ($this->capabilities->allows('mmc.operations.snapshot', $user, $company)) {
             $tools[] = ['type' => 'function', 'name' => 'mmc_operations_snapshot', 'description' => 'Get calculated MMC project, delivery, package, and inventory totals for the active company workspace.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
+        }
+        if ($this->capabilities->allows('mmc.deliveries.search', $user, $company)) {
             $tools[] = $this->searchTool('search_mmc_deliveries', 'Search read-only MMC delivery records, receipt statuses, and package counts.', 'Project, receipt number, or school to search');
         }
 
@@ -82,7 +88,7 @@ class AiReadOnlyToolGateway
     {
         if (! $this->isActiveCompany($user, $company)
             || $company->code !== 'MMC'
-            || ! $this->capabilities->allows('mmc.projects_deliveries.read', $user, $company)) {
+            || ! $this->capabilities->allows('mmc.projects.view', $user, $company)) {
             abort(403, 'You do not have access to MMC project data in this company.');
         }
 
@@ -142,14 +148,14 @@ class AiReadOnlyToolGateway
             return $result;
         }
 
-        if ($name === 'mmc_operations_snapshot' && $company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator'])) {
+        if ($name === 'mmc_operations_snapshot' && $company->code === 'MMC') {
             $result = $this->jarvisReadService->dashboard([]);
             $this->logToolExecuted($name, $user, $company, 1);
 
             return $result;
         }
 
-        if ($name === 'get_mmc_project_delivery_summary' && $company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator'])) {
+        if ($name === 'get_mmc_project_delivery_summary' && $company->code === 'MMC') {
             $references = $arguments['project_references'] ?? [];
             if (! is_array($references) || $references === [] || count($references) > 5) {
                 abort(422, 'Project reference is invalid.');
@@ -239,7 +245,7 @@ class AiReadOnlyToolGateway
             return $result;
         }
 
-        if ($name === 'search_mmc_projects' && $company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator'])) {
+        if ($name === 'search_mmc_projects' && $company->code === 'MMC') {
             $projects = $this->jarvisReadService->projectRecords(['search' => $query]);
             if (Schema::hasColumn('projects', 'company_id')) {
                 $projects->where('p.company_id', $company->getKey());
@@ -251,7 +257,7 @@ class AiReadOnlyToolGateway
             return $result === [] ? ['status' => 'no_results', 'projects' => []] : ['status' => 'found', 'projects' => $result];
         }
 
-        if ($name === 'search_mmc_deliveries' && $company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator'])) {
+        if ($name === 'search_mmc_deliveries' && $company->code === 'MMC') {
             $deliveries = $this->jarvisReadService->deliveryRecords(['search' => $query]);
             if (Schema::hasColumn('projects', 'company_id')) {
                 $deliveries->where('p.company_id', $company->getKey());
@@ -263,7 +269,7 @@ class AiReadOnlyToolGateway
             return $result;
         }
 
-        if ($name === 'search_mmc_inventory' && $company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator', 'Warehouse_officer'])) {
+        if ($name === 'search_mmc_inventory' && $company->code === 'MMC') {
             $result = $this->jarvisReadService->inventoryRecords(['search' => $query])
                 ->orderBy('inv.inventory_id')->limit(8)->get()->map(fn (object $inventory): array => (array) $inventory)->all();
             $this->logToolExecuted($name, $user, $company, count($result));

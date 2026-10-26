@@ -11,6 +11,7 @@
         </div>
         <form method="GET" action="{{ $scope === 'ai' ? route('admin.access.permissions.ai') : route('admin.access.permissions.index') }}" class="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(220px,1fr)_160px_auto_auto]">
             @if ($scope === 'ai')<input type="hidden" name="scope" value="ai">@endif
+            <input type="hidden" name="module" id="permission-module-submitted" value="{{ $moduleFilter }}">
             <label class="sr-only" for="permission-search">Search permissions</label>
             <input id="permission-search" name="search" value="{{ $search }}" placeholder="Search permissions by name" class="min-w-0 rounded-xl border-slate-200 bg-slate-50 text-xs placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/20">
             <label class="sr-only" for="permission-company">Company scope</label>
@@ -18,17 +19,71 @@
                 @foreach ($companyLabels as $value => $label)<option value="{{ $value }}" @selected($companyScope === $value)>{{ $label }} scope</option>@endforeach
             </select>
             <button class="rounded-xl bg-[#174b8a] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#123b72] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Apply filters</button>
-            @if ($search || $companyScope !== 'all')<a href="{{ $scope === 'ai' ? route('admin.access.permissions.ai') : route('admin.access.permissions.index') }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-center text-xs font-bold text-slate-600 hover:bg-slate-50">Reset</a>@endif
+            @if ($search || $companyScope !== 'all' || $moduleFilter !== 'all')<a href="{{ $scope === 'ai' ? route('admin.access.permissions.ai') : route('admin.access.permissions.index') }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-center text-xs font-bold text-slate-600 hover:bg-slate-50">Reset</a>@endif
         </form>
         <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <label class="sr-only" for="permission-module-filter">Filter by module</label>
-            <select id="permission-module-filter" @change="filterRows()" class="rounded-xl border-slate-200 bg-slate-50 text-xs focus:border-blue-500 focus:ring-blue-500/20"><option value="all">All modules</option><option value="AI">AI</option><option value="MI">MI</option><option value="MMC">MMC</option></select>
+            <select id="permission-module-filter" @change="document.getElementById('permission-module-submitted').value = $event.target.value; filterRows()" class="rounded-xl border-slate-200 bg-slate-50 text-xs focus:border-blue-500 focus:ring-blue-500/20"><option value="all" @selected($moduleFilter === 'all')>All modules</option><option value="AI" @selected($moduleFilter === 'AI')>Core AI</option><option value="MI" @selected($moduleFilter === 'MI')>MI</option><option value="MMC" @selected($moduleFilter === 'MMC')>MMC</option></select>
             <label class="sr-only" for="permission-type-filter">Filter by capability type</label>
             <select id="permission-type-filter" @change="filterRows()" class="rounded-xl border-slate-200 bg-slate-50 text-xs focus:border-blue-500 focus:ring-blue-500/20"><option value="all">All capability types</option><option value="CORE">Core</option><option value="READ">Read / search</option><option value="CREATE">Create</option><option value="UPDATE">Update</option><option value="DELETE / ARCHIVE">Delete / archive</option><option value="PERMISSION">Module permission</option></select>
             <label class="sr-only" for="permission-status-filter">Filter by implementation status</label>
             <select id="permission-status-filter" @change="filterRows()" class="rounded-xl border-slate-200 bg-slate-50 text-xs focus:border-blue-500 focus:ring-blue-500/20"><option value="all">All implementation statuses</option><option value="implemented">Implemented</option><option value="partial">Partially implemented</option><option value="unavailable">Not implemented</option><option value="permission_only">Permission only</option></select>
         </div>
+        @if ($scope === 'ai')
+            <form method="GET" action="{{ route('admin.access.permissions.ai') }}" class="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-blue-100 bg-blue-50/50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <input type="hidden" name="scope" value="ai"><input type="hidden" name="company" value="{{ $companyScope }}"><input type="hidden" name="search" value="{{ $search }}"><input type="hidden" name="module" value="{{ $moduleFilter }}">
+                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Diagnostic company
+                    <select name="company_id" class="rounded-lg border-slate-200 bg-white text-xs">
+                        <option value="">Select a company</option>
+                        @foreach ($companies as $companyOption)<option value="{{ $companyOption->getKey() }}" @selected($diagnosticCompany?->getKey() === $companyOption->getKey())>{{ $companyOption->name }} ({{ $companyOption->code }})</option>@endforeach
+                    </select>
+                </label>
+                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Effective access for user
+                    <select name="diagnostic_user_id" class="rounded-lg border-slate-200 bg-white text-xs">
+                        @foreach ($diagnosticUsers as $diagnosticUserOption)<option value="{{ $diagnosticUserOption->getKey() }}" @selected($diagnosticUser?->getKey() === $diagnosticUserOption->getKey())>{{ $diagnosticUserOption->name }} · {{ $diagnosticUserOption->email }}</option>@endforeach
+                    </select>
+                </label>
+                <button class="rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800">Check Effective Access</button>
+            </form>
+            <div class="mt-3 flex flex-wrap items-center gap-3 text-[10px]">
+                <a href="{{ route('admin.access.review', array_filter(['company' => $diagnosticCompany?->getKey()])) }}" class="font-semibold text-blue-700 hover:underline">Review user access</a>
+                <a href="{{ route('admin.audit.index', ['event' => 'role.permissions_updated']) }}" class="font-semibold text-blue-700 hover:underline">Permission change audit history</a>
+                <span class="text-slate-500">Role permissions are global. Company selection scopes this diagnostic; membership and business policy are checked independently.</span>
+            </div>
+        @endif
     </section>
+
+    @if ($scope === 'ai')
+        <section class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div><h3 class="text-sm font-bold text-[#172a45]">Effective access diagnostics</h3><p class="mt-1 text-[10px] text-slate-500">{{ $diagnosticUser?->name ?? 'No user selected' }} · {{ $diagnosticCompany?->name ?? 'No company selected' }} · permissions are evaluated using the same registry as the AI tool gateway.</p></div>
+                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-semibold text-slate-600">{{ $aiEnabled ? 'Assistant enabled' : 'Assistant disabled' }} · {{ $aiConfigured ? 'Provider configured' : 'Configuration required' }}</span>
+            </div>
+            <div class="mt-4 grid gap-3">
+                @foreach ($capabilityGroups as $category)
+                    <details open class="rounded-xl border border-slate-100">
+                        <summary class="cursor-pointer bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700">{{ $category['label'] }} <span class="ml-1 text-[10px] font-medium text-slate-400">{{ count($category['capabilities']) }} capabilities</span></summary>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-left text-[10px]">
+                                <thead class="bg-white text-[9px] uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2">Capability</th><th class="px-3 py-2">AI permissions</th><th class="px-3 py-2">Business access</th><th class="px-3 py-2">Implementation / risk</th><th class="px-3 py-2">Effective status / reason</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    @foreach ($category['capabilities'] as $capability)
+                                        <tr>
+                                            <td class="px-3 py-2 font-semibold text-slate-700">{{ $capability['label'] }}<span class="mt-0.5 block font-mono text-[9px] font-normal text-slate-400">{{ $capability['id'] }}</span></td>
+                                            <td class="max-w-[220px] break-words px-3 py-2 text-slate-600">{{ implode(', ', $capability['ai_permissions']) ?: 'None' }}</td>
+                                            <td class="max-w-[220px] break-words px-3 py-2 text-slate-600">{{ implode(', ', $capability['business_permissions']) ?: ($capability['company'] === 'MMC' ? 'Existing MMC policy / route authorization' : 'Company membership') }}</td>
+                                            <td class="px-3 py-2 text-slate-600">{{ ucfirst(str_replace('_', ' ', $capability['implementation'])) }}<span class="mt-0.5 block">Risk: {{ $capability['risk'] }}</span></td>
+                                            <td class="max-w-[280px] px-3 py-2"><span class="inline-flex rounded-full px-2 py-1 font-bold {{ $capability['status'] === 'Available' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800' }}">{{ $capability['status'] }}</span><p class="mt-1 leading-relaxed text-slate-500">{{ $capability['diagnostic_reason'] }}</p></td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                @endforeach
+            </div>
+        </section>
+    @endif
 
     @if (session('success'))<div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800">{{ session('success') }}</div>@endif
     @if ($errors->any())<div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{{ $errors->first() }}</div>@endif
@@ -38,6 +93,9 @@
         <input type="hidden" name="scope" value="{{ $scope }}">
         <input type="hidden" name="company" value="{{ $companyScope }}">
         <input type="hidden" name="search" value="{{ $search }}">
+        <input type="hidden" name="module" value="{{ $moduleFilter }}">
+        @if ($diagnosticCompany)<input type="hidden" name="company_id" value="{{ $diagnosticCompany->getKey() }}">@endif
+        @if ($diagnosticUser)<input type="hidden" name="diagnostic_user_id" value="{{ $diagnosticUser->getKey() }}">@endif
         @foreach ($roles as $role)<input type="hidden" name="role_ids[]" value="{{ $role->id }}">@endforeach
 
         <section class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
@@ -78,7 +136,7 @@
                                 <tr class="group hover:bg-blue-50/40" data-permission-row data-group="{{ $groupKey }}" data-module="{{ $detail['module'] }}" data-operation="{{ $detail['operation'] }}" data-implementation="{{ $detail['implementation'] }}">
                                     <th scope="row" class="sticky left-0 z-[5] border-b border-r border-slate-100 bg-white px-4 py-3 font-semibold text-slate-700 group-hover:bg-blue-50/60">
                                         <span class="block break-all font-mono text-[10px]">{{ $permission->name }}</span>
-                                        <details class="mt-1.5 text-[9px] font-normal text-slate-500"><summary class="cursor-pointer">Capability details</summary><div class="mt-1 space-y-0.5"><p>Module: {{ $detail['module'] }} · Operation: {{ $detail['operation'] }}</p><p>Status: {{ str_replace('_', ' ', $detail['implementation']) }}</p><p class="break-words">Handler: {{ $detail['handler'] }}</p><p class="break-words">AI permission: {{ implode(', ', $detail['ai_permissions']) }}</p><p class="break-words">Business permission: {{ implode(', ', $detail['business_permissions']) }}</p></div></details>
+                                        <details class="mt-1.5 text-[9px] font-normal text-slate-500"><summary class="cursor-pointer">Capability details & access diagnostic</summary><div class="mt-1 space-y-0.5"><p>Module: {{ $detail['module'] }} · Operation: {{ $detail['operation'] }}</p>@if ($detail['capability'])<p>Capability: {{ $detail['capability'] }}</p>@endif<p>Implementation: {{ str_replace('_', ' ', $detail['implementation']) }}</p><p class="break-words">Handler: {{ $detail['handler'] }}</p><p class="break-words">Required AI permission: {{ implode(', ', $detail['ai_permissions']) ?: 'None' }}</p><p class="break-words">Required business permission: {{ implode(', ', $detail['business_permissions']) ?: 'Existing business policy' }}</p><p>Risk: {{ $detail['risk'] }}</p><p>Effective access: {{ $detail['status']['status'] }}</p><p class="break-words">Why: {{ $detail['status']['reason'] }}</p></div></details>
                                         <span class="mt-1 block text-[9px] font-medium text-slate-400">{{ $permission->guard_name }} guard · {{ str_starts_with($permission->name, 'mi.') ? 'MI' : (str_starts_with($permission->name, 'mmc.') ? 'MMC' : 'Shared') }}</span>
                                     </th>
                                     @foreach ($roles as $role)
@@ -103,7 +161,7 @@
             </div>
             <div class="sticky bottom-0 z-30 flex flex-col gap-4 border-t border-slate-100 bg-white/95 px-4 py-4 pr-20 shadow-[0_-8px_18px_-18px_rgba(15,23,42,.5)] backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:pr-5">
                 <label class="flex max-w-2xl items-start gap-2.5 text-[10px] leading-relaxed text-slate-500"><input type="checkbox" name="confirm_critical" value="1" class="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-500"><span>Confirm critical Administrator role changes. <span class="font-semibold text-slate-700">ai.settings.manage</span> must remain with Administrator; the last active Administrator cannot be removed from an account.</span></label>
-                <div class="flex shrink-0 flex-wrap items-center gap-2"><a href="{{ $scope === 'ai' ? route('admin.access.permissions.ai') : route('admin.access.permissions.index') }}" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</a><button type="button" @click="resetChanges()" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Reset changes</button><button type="submit" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#174b8a] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#123b72] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Save permission changes</button></div>
+                <div class="flex shrink-0 flex-wrap items-center gap-2"><a href="{{ $scope === 'ai' ? route('admin.access.permissions.ai') : route('admin.access.permissions.index') }}" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</a><button type="button" @click="resetChanges()" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Reset changes</button><button type="submit" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#174b8a] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#123b72] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Save Permissions</button></div>
             </div>
         </section>
     </form>

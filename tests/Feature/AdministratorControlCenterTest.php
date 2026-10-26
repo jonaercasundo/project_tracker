@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\User;
+use App\Services\AiCapabilityRegistry;
 use Database\Seeders\AiAssistantPermissionSeeder;
+use Database\Seeders\AiCapabilityPermissionSeeder;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -23,6 +25,7 @@ class AdministratorControlCenterTestCase extends MIWorkflowTestCase
     {
         parent::setUp();
         $this->seed(AiAssistantPermissionSeeder::class);
+        $this->seed(AiCapabilityPermissionSeeder::class);
     }
 }
 
@@ -46,7 +49,8 @@ it('shows the control center and protects management routes from non-administrat
     $this->get(route('admin.access.permissions.index'))->assertOk()->assertSee('Role permission matrix')->assertSee('Administrator navigation');
     $this->get(route('admin.access.permissions.ai'))->assertOk()->assertSee('AI capability permissions')
         ->assertSee('ai.page-help.use')->assertSee('ai.business-search.use')->assertSee('Capability details')
-        ->assertSee('Filter by implementation status')->assertSee('Select visible')->assertSee('Reset changes');
+        ->assertSee('ai.mmc.projects.view')->assertSee('Filter by implementation status')->assertSee('Select visible')->assertSee('Reset changes')
+        ->assertSee('Effective access diagnostics')->assertSee('MMC Intelligence');
     $this->get(route('admin.access.review'))->assertOk()->assertSee('User access review')->assertSee('All users &amp; access', false);
     $this->get(route('admin.audit.index'))->assertOk()->assertSee('Activity and access log')->assertSee('Roles &amp; permissions', false);
     $this->get(route('admin.ai-management.index'))->assertOk()->assertSee('Assistant capabilities and usage')->assertSee('AI Assistant');
@@ -65,17 +69,16 @@ it('shows the AI capability registry with implemented and unavailable functions 
     $this->get(route('admin.ai-management.index'))
         ->assertOk()
         ->assertSee('AI capability registry')
-        ->assertSee('View &amp; Search', false)
-        ->assertSee('Create Records')
-        ->assertSee('Generate PDF')
-        ->assertSee('Excel Tools')
-        ->assertSee('Charts &amp; Analytics', false)
-        ->assertSee('Forecasting')
-        ->assertSee('Document Intelligence')
-        ->assertSee('Workflow Assistant')
-        ->assertSee('Proactive Assistance')
+        ->assertSee('MMC Intelligence')->assertSee('MI Intelligence')
+        ->assertSee('Create other business records')
+        ->assertSee('Generate business PDFs')
+        ->assertSee('Documents &amp; Analytics', false)
+        ->assertSee('Forecast Data')
+        ->assertSee('Process Uploaded Documents')
+        ->assertSee('Workflow guidance')
+        ->assertSee('Context-aware next steps')
         ->assertSee('MI Product Catalog Search')
-        ->assertSee('Not yet implemented')
+        ->assertSee('Not Implemented')
         ->assertSee('Manage role permissions');
 });
 
@@ -98,6 +101,42 @@ it('updates a permission matrix and records an audit without affecting other per
     expect($role->fresh()->permissions()->whereKey($permission->getKey())->exists())->toBeTrue()
         ->and($role->fresh()->permissions()->whereKey($existingPermission->getKey())->exists())->toBeTrue()
         ->and(DB::table('admin_activity_logs')->where('event', 'role.permissions_updated')->exists())->toBeTrue();
+});
+
+it('lets administrators grant and revoke MMC AI capability permissions without role allowlists', function () {
+    controlCenterAdmin();
+    $role = Role::findByName('user', 'web');
+    $projectPermission = Permission::findByName('ai.mmc.projects.view', 'web');
+
+    expect($role->hasPermissionTo($projectPermission))->toBeFalse();
+
+    $this->patch(route('admin.access.permissions.update'), [
+        'company' => 'all',
+        'module' => 'MMC',
+        'role_ids' => [$role->getKey()],
+        'permissions' => [$role->getKey() => [$projectPermission->getKey() => '1']],
+        'scope' => 'ai',
+        'confirm_critical' => '1',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($role->fresh()->hasPermissionTo($projectPermission))->toBeTrue();
+    $mmcUser = $this->miUser('user', 'MMC');
+    $mmcCompany = $mmcUser->companies()->sole();
+    $this->withSession(['company_id' => $mmcCompany->getKey()]);
+    expect(app(AiCapabilityRegistry::class)->allowsTool('search_mmc_projects', $mmcUser, $mmcCompany))->toBeTrue();
+
+    $this->patch(route('admin.access.permissions.update'), [
+        'company' => 'all',
+        'module' => 'MMC',
+        'role_ids' => [$role->getKey()],
+        'permissions' => [$role->getKey() => []],
+        'scope' => 'ai',
+        'confirm_critical' => '1',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($role->fresh()->hasPermissionTo($projectPermission))->toBeFalse()
+        ->and(app(AiCapabilityRegistry::class)->allowsTool('search_mmc_projects', $mmcUser, $mmcCompany))->toBeFalse()
+        ->and($role->fresh()->hasPermissionTo('ai.assistant.use'))->toBeTrue();
 });
 
 it('keeps the final active Administrator enabled and blocks inactive accounts from authenticated pages', function () {

@@ -9,6 +9,7 @@ use App\Models\LogisticsIntegration;
 use App\Models\MI_Liquidation;
 use App\Models\MI_Product;
 use App\Models\ProjectInformation;
+use App\Models\User;
 use App\Policies\BudgetRequestPolicy;
 use App\Policies\LogisticsIntegrationPolicy;
 use App\Policies\MILiquidationPolicy;
@@ -50,6 +51,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(MI_Liquidation::class, MILiquidationPolicy::class);
         Gate::policy(MI_Product::class, MIProductPolicy::class);
         Gate::policy(ProjectInformation::class, ProjectInformationPolicy::class);
+        Gate::define('viewMmcDeliveryMonitoring', fn (User $user): bool => $user->hasAnyRole(['user', 'Administrator']));
+        Gate::define('viewMmcInventory', fn (User $user): bool => $user->hasRole('Warehouse_officer'));
         Gate::policy(LogisticsIntegration::class, LogisticsIntegrationPolicy::class);
         View::composer('components.accounting-sidebar', function ($view): void {
             $user = auth()->user();

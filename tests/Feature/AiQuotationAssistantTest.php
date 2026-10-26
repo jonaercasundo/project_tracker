@@ -6,6 +6,7 @@ use App\Models\MI_Product;
 use App\Services\AiReadOnlyToolGateway;
 use Database\Seeders\AiAssistantPermissionSeeder;
 use Database\Seeders\AiBusinessDataPermissionSeeder;
+use Database\Seeders\AiCapabilityPermissionSeeder;
 use Database\Seeders\AiQuotationPermissionSeeder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -45,8 +46,16 @@ class AiQuotationAssistantTestCase extends MIWorkflowTestCase
     {
         parent::setUp();
         $this->seed(AiAssistantPermissionSeeder::class);
+        $this->seed(AiCapabilityPermissionSeeder::class);
         $this->seed(AiBusinessDataPermissionSeeder::class);
         $this->seed(AiQuotationPermissionSeeder::class);
+        $capabilityPermissions = [
+            'ai.mi.products.search', 'ai.mi.products.specifications', 'ai.mi.prices.lookup', 'ai.mi.quotation.create',
+            'ai.mi.budget-liquidation.assist', 'ai.mi.accounting.reports',
+        ];
+        foreach (['user', 'Administrator', 'Accounting', 'accounting', 'Executive', 'executive'] as $roleName) {
+            Role::findByName($roleName, 'web')->givePermissionTo($capabilityPermissions);
+        }
     }
 }
 

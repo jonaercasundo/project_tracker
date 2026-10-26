@@ -65,6 +65,7 @@
                 </li> 
             </ul>
         </div>
+        <x-ai-assistant-nav-link />
     </nav>
 
     <!-- Account Identity Panel Footer -->

@@ -211,6 +211,7 @@
             <span>Import Data</span>
         </a>
 
+        <x-ai-assistant-nav-link />
     </nav>
 
     {{-- USER SECTION --}}

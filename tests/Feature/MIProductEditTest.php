@@ -11,6 +11,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\Models\Permission;
 use Tests\MIWorkflowTestCase;
 
 pest()->extend(MIWorkflowTestCase::class);
@@ -54,6 +55,22 @@ it('renders product 139 with saved values custom attributes and image identities
         ->assertSee('https://example.com/original.jpg')->assertSee('data-image-id="'.$image->id.'"', false)
         ->assertSee('name="purchase_cost"', false)->assertSee('value="12.34"', false);
     expect($image->product->getKey())->toBe(139);
+});
+
+it('shows the authorized AI Assistant launcher on MI Product Masterlist and Create Product pages', function () {
+    $user = $this->miUser();
+    $user->givePermissionTo(Permission::findOrCreate('ai.assistant.use', 'web'));
+    $this->signInMI($user);
+
+    $this->get(route('mi_app.index'))
+        ->assertOk()
+        ->assertSee('AI Assistant')
+        ->assertSee('data-ai-assistant', false);
+
+    $this->get(route('mi_app.create'))
+        ->assertOk()
+        ->assertSee('AI Assistant')
+        ->assertSee('data-ai-assistant', false);
 });
 
 it('preserves omitted attributes every image identity and generated values during an ordinary save', function () {

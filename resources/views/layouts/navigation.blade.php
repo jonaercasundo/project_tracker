@@ -27,6 +27,11 @@
                     </x-slot>
 
                     <x-slot name="content">
+                        @can('ai.assistant.use')
+                            <x-dropdown-link :href="route('assistant.workspace')">
+                                {{ __('AI Assistant') }}
+                            </x-dropdown-link>
+                        @endcan
                         @role('Administrator')
                             <x-dropdown-link :href="route('integrations.jarvis.index')">
                                 {{ __('API Access / Integrations') }}
@@ -85,6 +90,11 @@
             </div>
 
             <div class="mt-3 space-y-1">
+                @can('ai.assistant.use')
+                    <x-responsive-nav-link :href="route('assistant.workspace')" :active="request()->routeIs('assistant.workspace')">
+                        {{ __('AI Assistant') }}
+                    </x-responsive-nav-link>
+                @endcan
                 @role('Administrator')
                     <x-responsive-nav-link :href="route('integrations.jarvis.index')">
                         {{ __('API Access / Integrations') }}

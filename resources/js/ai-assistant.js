@@ -11,6 +11,7 @@ window.aiAssistant = (settings) => ({
 
     async init() {
         this.open = Boolean(this.workspace);
+        if (this.status !== 'ready') return;
         await this.refreshConversations();
         const stored = sessionStorage.getItem(`assistant:${this.company}`);
         const existing = this.conversations.find((item) => String(item.id) === stored);
@@ -19,6 +20,13 @@ window.aiAssistant = (settings) => ({
 
     toggle() { this.open = !this.open; },
     close() { if (!this.workspace) this.open = false; },
+    statusMessage() {
+        return {
+            select_company: 'Select an active company to use the assistant. Your conversations stay isolated by company.',
+            disabled: 'The AI Assistant is disabled by an administrator.',
+            not_configured: 'The AI service is not configured. Contact an administrator.',
+        }[this.status] || 'The AI service is unavailable. Contact an administrator.';
+    },
     endpoint(template, id) { return template.replace('__ID__', id); },
     csrf() { return document.querySelector('meta[name="csrf-token"]')?.content || ''; },
 
@@ -31,6 +39,7 @@ window.aiAssistant = (settings) => ({
     },
 
     async newConversation() {
+        if (this.status !== 'ready') return;
         this.error = '';
         try {
             const response = await fetch(this.routes.create, { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf() } });
@@ -44,6 +53,7 @@ window.aiAssistant = (settings) => ({
     },
 
     async load(id) {
+        if (this.status !== 'ready') return;
         this.error = '';
         try {
             const response = await fetch(this.endpoint(this.routes.show, id), { headers: { Accept: 'application/json' } });
@@ -57,7 +67,7 @@ window.aiAssistant = (settings) => ({
     },
 
     async deleteConversation() {
-        if (!this.conversationId) return;
+        if (!this.conversationId || this.status !== 'ready') return;
         try {
             const response = await fetch(this.endpoint(this.routes.destroy, this.conversationId), { method: 'DELETE', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf() } });
             if (!response.ok) throw new Error('Unable to delete this conversation.');
@@ -75,7 +85,7 @@ window.aiAssistant = (settings) => ({
     },
 
     async send(message) {
-        if (this.loading) return;
+        if (this.loading || this.status !== 'ready') return;
         this.error = '';
         if (!this.conversationId) await this.newConversation();
         if (!this.conversationId) return;

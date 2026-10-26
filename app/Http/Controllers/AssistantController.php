@@ -11,6 +11,7 @@ use App\Services\AiAssistantService;
 use App\Services\AiModuleRegistry;
 use App\Services\AiPageContextService;
 use App\Services\AiProviderConfiguration;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,10 +22,9 @@ use Throwable;
 
 class AssistantController extends Controller
 {
-    public function workspace(Request $request, AiModuleRegistry $registry)
+    public function workspace(Request $request): View
     {
-        [$user, $company] = $this->identity($request);
-        abort_if($registry->available($user, $company) === [], 403);
+        abort_unless($request->user()?->can('ai.assistant.use'), 403, 'You do not have permission to use the AI assistant.');
 
         return view('ai.workspace');
     }
@@ -136,7 +136,6 @@ class AssistantController extends Controller
         $company = $user->currentCompany();
         abort_unless($company instanceof Company && $user->belongsToCompany($company->getKey()), 403, 'Select an active company before using the assistant.');
         abort_unless(app(AiProviderConfiguration::class)->isEnabled(), 503, 'The AI assistant is currently disabled.');
-        abort_if(app(AiModuleRegistry::class)->available($user, $company) === [], 403, 'The assistant is not available for your account.');
 
         return [$user, $company];
     }

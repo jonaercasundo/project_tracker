@@ -34,12 +34,62 @@ it('requires authentication and an authorized company module', function () {
 
     $user = $this->miUser('user');
     $this->signInMI($user);
-    $this->get(route('assistant.workspace'))->assertOk()->assertSee('Project Tracker Assistant');
+    $this->get(route('assistant.workspace'))->assertOk()->assertSee('AI Assistant')->assertSee('not_configured', false);
 
     $unsupported = $this->miUser('user', 'OTHER');
     $unsupported->syncRoles([]);
     $this->actingAs($unsupported)->withSession(['company_id' => $unsupported->companies()->sole()->getKey()])
         ->get(route('assistant.workspace'))->assertForbidden();
+});
+
+it('mounts the shared assistant component in each active authenticated application layout', function () {
+    foreach ([
+        'layouts/app.blade.php',
+        'layouts/finance_app.blade.php',
+        'layouts/project_app.blade.php',
+        'components/mi_app.blade.php',
+        'components/it_app.blade.php',
+        'components/accounting_app.blade.php',
+        'components/project_warehouse_app.blade.php',
+        'entry/show.blade.php',
+        'socialMediaScraper/tiktok.blade.php',
+        'socialMediaScraper/pinterest.blade.php',
+    ] as $layout) {
+        expect(file_get_contents(resource_path('views/'.$layout)))->toContain('<x-ai-assistant');
+    }
+
+    foreach ([
+        'components/mi-sidebar.blade.php',
+        'layouts/project-sidebar.blade.php',
+        'layouts/finance-sidebar.blade.php',
+        'layouts/ppl-sidebar.blade.php',
+        'components/accounting-sidebar.blade.php',
+        'components/it-sidebar.blade.php',
+        'components/project-warehouse-sidebar.blade.php',
+    ] as $sidebar) {
+        expect(file_get_contents(resource_path('views/'.$sidebar)))->toContain('<x-ai-assistant-nav-link');
+    }
+});
+
+it('renders the assistant on an authenticated self-contained trend page', function () {
+    $user = $this->miUser('user', 'MMC');
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->sole()->getKey()]);
+    config(['services.apify.token' => null]);
+
+    $this->get(route('tiktok.trends'))
+        ->assertOk()
+        ->assertSee('AI Assistant')
+        ->assertSee('data-ai-assistant', false);
+});
+
+it('shows an actionable workspace status when an authorized user has no active company selected', function () {
+    $user = $this->miUser('user');
+    $this->actingAs($user);
+
+    $this->get(route('assistant.workspace'))
+        ->assertOk()
+        ->assertSee('data-ai-assistant', false)
+        ->assertSee('select_company', false);
 });
 
 it('can resume the assistant migration after its conversation table was left behind', function () {

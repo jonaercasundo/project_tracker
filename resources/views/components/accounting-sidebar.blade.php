@@ -325,6 +325,7 @@
                 <span x-show="collapsed" x-cloak class="sr-only">Original liquidation list</span>
             </a>
         @endcan
+        <x-ai-assistant-nav-link />
     </nav>
 
     {{-- Account --}}

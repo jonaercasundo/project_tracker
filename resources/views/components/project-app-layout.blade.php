@@ -1,3 +1,3 @@
-<div>
-    <!-- He who is contented is rich. - Laozi -->
-</div>
+@props(['mobileNavigation' => false])
+
+@include('layouts.project_app', ['slot' => $slot, 'mobileNavigation' => $mobileNavigation])

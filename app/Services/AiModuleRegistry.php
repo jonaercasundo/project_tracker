@@ -11,7 +11,7 @@ class AiModuleRegistry
     /** @return array<string, array<string, mixed>> */
     public function available(User $user, Company $company): array
     {
-        if (! $user->can('ai.assistant.use') || ! app(AiProviderConfiguration::class)->isEnabled()) {
+        if (! $user->can('ai.assistant.use')) {
             return [];
         }
 

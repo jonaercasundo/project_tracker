@@ -6,6 +6,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Spatie\Permission\Models\Permission;
 use Tests\BiddingCatalogFixtureFactory;
 use Tests\BiddingProjectFixtureFactory;
 use Tests\BiddingTestCase;
@@ -90,6 +91,16 @@ describe('access and listing', function () {
             'direction' => 'desc',
             'page' => '2',
         ]);
+    });
+
+    it('renders the shared AI Assistant in the legacy Project Tracker layout pages', function () {
+        $user = $this->signInBiddingUser();
+        $user->givePermissionTo(Permission::findOrCreate('ai.assistant.use', 'web'));
+
+        $this->get(route('catalog-items.index'))
+            ->assertOk()
+            ->assertSee('AI Assistant')
+            ->assertSee('data-ai-assistant', false);
     });
 
     it('shows linked item records without displaying or changing project details', function () {

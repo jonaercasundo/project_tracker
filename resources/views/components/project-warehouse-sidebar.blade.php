@@ -209,6 +209,7 @@
 
         </a>
 
+        <x-ai-assistant-nav-link />
     </nav>
 
 

@@ -107,6 +107,7 @@
                 @endforeach
             </div>
         @endforeach
+        <x-ai-assistant-nav-link />
     </nav>
 
     <div class="shrink-0 space-y-1 border-t border-slate-100 bg-slate-50/30 p-3">

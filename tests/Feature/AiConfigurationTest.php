@@ -6,8 +6,10 @@ use App\Models\User;
 use App\Services\AiProviderConfiguration;
 use App\Services\OpenAiResponsesClient;
 use Database\Seeders\AiAssistantPermissionSeeder;
+use Database\Seeders\AiSettingsPermissionRepairSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\MIWorkflowTestCase;
@@ -70,6 +72,31 @@ it('limits settings management to administrators with the explicit permission', 
     $this->actingAs($regularUser)->withSession(['company_id' => $regularUser->companies()->sole()->getKey()]);
     $this->get(route('admin.ai-configuration.index'))->assertForbidden();
     $this->postJson(route('admin.ai-configuration.store'), aiConfigurationPayload(['openai_api_key' => 'sk-secret']))->assertForbidden();
+});
+
+it('repairs only the web Administrator AI settings permission and is safe to rerun', function () {
+    $this->miUser('Administrator');
+    $administratorRole = Role::findByName('Administrator', 'web');
+    $administratorRole->revokePermissionTo('ai.settings.manage');
+
+    $otherRole = Role::findOrCreate('Operations', 'web');
+    $otherPermission = Permission::findOrCreate('reports.view', 'web');
+    $otherRole->givePermissionTo($otherPermission);
+
+    app(AiSettingsPermissionRepairSeeder::class)->run();
+    app(AiSettingsPermissionRepairSeeder::class)->run();
+
+    expect($administratorRole->fresh()->hasPermissionTo('ai.settings.manage'))->toBeTrue()
+        ->and($otherRole->fresh()->hasPermissionTo('reports.view'))->toBeTrue()
+        ->and($otherRole->fresh()->hasPermissionTo('ai.settings.manage'))->toBeFalse();
+});
+
+it('allows the system-wide AI settings page without a selected company', function () {
+    aiAdmin();
+
+    $this->withSession(['company_id' => null])
+        ->get(route('admin.ai-configuration.index'))
+        ->assertOk();
 });
 
 it('encrypts credentials, masks them in responses, and supports replacement and removal', function () {
@@ -203,7 +230,11 @@ it('uses the database key and model for assistant requests and enforces the glob
     Http::assertSent(fn ($request): bool => $request->header('Authorization')[0] === 'Bearer sk-db-preferred' && $request['model'] === 'gpt-5.4-mini');
 
     AiProviderSetting::query()->findOrFail(1)->update(['enabled' => false]);
-    $this->get(route('assistant.workspace'))->assertStatus(503);
+    $this->get(route('assistant.workspace'))
+        ->assertOk()
+        ->assertSee('AI Assistant')
+        ->assertSee('disabled', false);
+    $this->getJson(route('assistant.conversations.index'))->assertServiceUnavailable();
     AiProviderSetting::query()->findOrFail(1)->update(['enabled' => true, 'monthly_token_limit' => 3]);
     AiActivity::create(['user_id' => $user->getKey(), 'company_id' => $user->companies()->sole()->getKey(), 'model' => 'gpt-5.4-mini', 'input_tokens' => 2, 'output_tokens' => 1, 'status' => 'completed']);
     $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'Another one'])->assertStatus(429);

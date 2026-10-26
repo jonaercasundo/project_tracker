@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Http\Controllers\Admin\AiConfigurationController;
 use App\Http\Controllers\AssistantController;
 use App\Models\Company;
+use App\Models\MI_Liquidation;
 use App\Models\User;
 use App\Policies\ProjectInformationPolicy;
 use Illuminate\Support\Facades\Gate;
@@ -65,7 +66,7 @@ class AiCapabilityRegistry
             $this->capability('ai.documents.pdf', 'documents_analytics', 'Generate PDF', '*', 'DOCUMENT', 'AI-generated business PDFs are not connected.', [], [], 'unavailable', null, [], 'high', 'explicit_confirmation', 'Not available', ['ai.documents.pdf.generate']),
             $this->capability('ai.excel.export', 'documents_analytics', 'Export Excel', '*', 'EXPORT', 'AI workbook export is not connected.', [], [], 'unavailable', null, [], 'moderate', 'explicit_confirmation', 'Not available', ['ai.excel.export']),
             $this->capability('ai.excel.import', 'documents_analytics', 'Import Excel', '*', 'IMPORT', 'AI workbook import is not connected.', [], [], 'unavailable', null, [], 'high', 'explicit_confirmation', 'Not available', ['ai.excel.import']),
-            $this->capability('ai.excel.analyze', 'documents_analytics', 'Analyze Excel', '*', 'ANALYZE', 'AI workbook analysis is not connected.', [], [], 'unavailable', null, [], 'moderate', 'none', 'Not available', ['ai.excel.analyze']),
+            $this->capability('ai.excel.analyze', 'documents_analytics', 'Prepare MI Liquidation from Excel', 'MI', 'ANALYZE / DRAFT / FORM FILL', 'Inspect a private workbook and prefill the existing ordinary MI liquidation form without saving or submitting a record.', [], [], 'mi_liquidation_draft', 'AiLiquidationExcelDraftService', [], 'sensitive_read', 'explicit_confirmation', 'AI attachment audit', ['ai.excel.analyze', 'ai.mi.budget-liquidation.assist']),
             $this->capability('ai.charts.generate', 'documents_analytics', 'Generate Charts', '*', 'CHART', 'AI chart generation is not connected.', [], [], 'unavailable', null, [], 'moderate', 'none', 'Not available', ['ai.charts.generate']),
             $this->capability('ai.data.forecast', 'documents_analytics', 'Forecast Data', '*', 'FORECAST', 'Forecasting is not connected to a validated data service.', [], [], 'unavailable', null, [], 'moderate', 'none', 'Not available', ['ai.data.forecast']),
             $this->capability('ai.documents.process', 'documents_analytics', 'Process Uploaded Documents', '*', 'DOCUMENT', 'Uploaded-document processing is not implemented.', [], [], 'unavailable', null, [], 'sensitive_read', 'none', 'Not available', ['ai.documents.process']),
@@ -264,6 +265,13 @@ class AiCapabilityRegistry
                 'viewMmcInventory Gate' => Gate::forUser($user)->allows('viewMmcInventory', $company),
             ],
             'mmc_inventory' => ['viewMmcInventory Gate' => Gate::forUser($user)->allows('viewMmcInventory', $company)],
+            'mi_liquidation_draft' => [
+                'MI company scope' => $company->code === 'MI',
+                'MI_Liquidation create policy' => $company->code === 'MI' && Gate::forUser($user)->allows('create', MI_Liquidation::class),
+                'Excel parser and draft-form actions' => class_exists(AiLiquidationExcelDraftService::class)
+                    && method_exists(AiLiquidationExcelDraftService::class, 'inspect')
+                    && Route::has('assistant.liquidation.attach') && Route::has('assistant.liquidation.fill'),
+            ],
             'ai_settings' => ['ai.settings.manage' => $user->can('ai.settings.manage')],
             'conversation_history' => ['AssistantController conversation routes' => Route::has('assistant.conversations.index') && Route::has('assistant.conversations.store') && Route::has('assistant.conversations.show') && Route::has('assistant.conversations.destroy')],
             default => [],
@@ -309,6 +317,7 @@ class AiCapabilityRegistry
             'mmc_delivery_analysis', 'mmc_delivery_search' => ['ProjectInformation viewAny policy', 'viewMmcDeliveryMonitoring Gate'],
             'mmc_operations_snapshot' => ['ProjectInformation viewAny policy', 'viewMmcDeliveryMonitoring Gate', 'viewMmcInventory Gate'],
             'mmc_inventory' => ['viewMmcInventory Gate'],
+            'mi_liquidation_draft' => ['MI company scope', 'MI_Liquidation create policy', 'Excel parser and draft-form actions'],
             'mmc_projects' => ['ProjectInformation viewAny policy'],
             'ai_settings' => ['Global scope; ai.settings.manage'],
             'workflow_guidance' => ['AiModuleRegistry pageContext action; no workflow execution authority'],
@@ -355,6 +364,9 @@ class AiCapabilityRegistry
                 && method_exists(AiQuotationWorkflowService::class, 'start')
                 && method_exists(AiQuotationWorkflowService::class, 'preview')
                 && method_exists(AiQuotationWorkflowService::class, 'confirm'),
+            'mi_liquidation_draft' => class_exists(AiLiquidationExcelDraftService::class)
+                && method_exists(AiLiquidationExcelDraftService::class, 'inspect')
+                && Route::has('assistant.liquidation.attach') && Route::has('assistant.liquidation.fill'),
             'proactive_suggestions' => class_exists(AiAssistantService::class)
                 && method_exists(AiAssistantService::class, 'respond')
                 && class_exists(AiQuotationWorkflowService::class)
@@ -406,6 +418,7 @@ class AiCapabilityRegistry
             'mi_prices' => ['ai.business-search.use', 'ai.mi.prices.lookup'],
             'mi_quotation' => ['ai.business-search.use', 'ai.mi.quotation.create'],
             'mi_own_budget', 'mi_liquidations' => ['ai.business-search.use', 'ai.mi.budget-liquidation.assist'],
+            'mi_liquidation_draft' => ['ai.excel.analyze', 'ai.mi.budget-liquidation.assist'],
             'mi_accounting', 'mi_approvals' => ['ai.business-search.use', 'ai.mi.accounting.reports'],
             'workflow_guidance' => ['ai.page-help.use'],
             'proactive_suggestions' => ['ai.business-search.use', 'ai.mi.quotation.create'],

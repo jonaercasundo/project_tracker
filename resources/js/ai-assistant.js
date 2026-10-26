@@ -22,6 +22,11 @@ window.aiAssistant = (settings) => ({
     quoteError: '',
     quoteLoading: false,
     quoteSearching: false,
+    activeAttachment: null,
+    attachmentUploading: false,
+    uploadProgress: 0,
+    attachmentError: '',
+    draggingWorkbook: false,
     mobileSidebarOpen: false,
     contextPanelOpen: false,
     contextOpen: false,
@@ -124,11 +129,12 @@ window.aiAssistant = (settings) => ({
         try {
             const response = await fetch(this.routes.create, { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf() } });
             if (!response.ok) throw new Error('Unable to start a conversation.');
-            const { conversation } = await response.json();
+            const { conversation, attachments } = await response.json();
             this.conversationId = conversation.id;
             this.messages = [];
             this.quote = null;
             this.quotePreview = null;
+            this.activeAttachment = null;
             sessionStorage.setItem(`assistant:${this.company}`, String(conversation.id));
             await this.refreshConversations();
         } catch (error) { this.error = error.message; }
@@ -141,9 +147,10 @@ window.aiAssistant = (settings) => ({
         try {
             const response = await fetch(this.endpoint(this.routes.show, id), { headers: { Accept: 'application/json' } });
             if (!response.ok) throw new Error('Unable to open this conversation.');
-            const { conversation } = await response.json();
+            const { conversation, attachments } = await response.json();
             this.conversationId = conversation.id;
             this.messages = conversation.messages || [];
+            this.activeAttachment = attachments?.[0] || null;
             this.quote = null;
             this.quotePreview = null;
             const quoteResponse = await fetch(this.endpoint(this.routes.quoteShow, id), { headers: { Accept: 'application/json' } });
@@ -172,15 +179,17 @@ window.aiAssistant = (settings) => ({
             this.quote = null;
             this.quotePreview = null;
             this.quoteDraft = { customer_name: '', items: [] };
+            this.activeAttachment = null;
             await this.refreshConversations();
         } catch (error) { this.error = error.message; }
     },
 
     async submit() {
         const message = this.draft.trim();
-        if (!message || this.loading) return;
+        if ((!message && !this.activeAttachment) || this.loading || this.attachmentUploading) return;
+        const prompt = message || 'Inspect this workbook and prepare a new MI petty cash liquidation draft. Report the extracted rows, missing information, warnings, and calculated VND total.';
         const quoteUpdated = this.quote && !this.quote.quotation ? this.applyQuoteAnswer(message) : false;
-        await this.send(message);
+        await this.send(prompt);
         if (quoteUpdated && !this.error) await this.previewQuote();
     },
 
@@ -225,7 +234,7 @@ window.aiAssistant = (settings) => ({
             const response = await fetch(this.endpoint(this.routes.stream, this.conversationId), {
                 method: 'POST',
                 headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrf() },
-                body: JSON.stringify({ message, retry: isRetry, page_route: this.context?.route || null }),
+                body: JSON.stringify({ message, retry: isRetry, page_route: this.context?.route || null, attachment_id: this.activeAttachment?.id || null }),
                 signal: requestController.signal,
             });
             if (!response.ok) {
@@ -273,6 +282,81 @@ window.aiAssistant = (settings) => ({
             this.scrollToBottom();
             await this.refreshConversations();
         }
+    },
+
+    attachmentPreviewRows() { return (this.activeAttachment?.preview?.rows || []).slice(0, 8); },
+    formatFileSize(size) { return size < 1024 * 1024 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`; },
+    uploadDropped(event) {
+        this.draggingWorkbook = false;
+        const file = event.dataTransfer?.files?.[0];
+        if (file) this.uploadWorkbook(file);
+    },
+    uploadAttachment(event) {
+        const file = event.target?.files?.[0];
+        event.target.value = '';
+        if (file) this.uploadWorkbook(file);
+    },
+    async uploadWorkbook(file) {
+        if (!this.liquidationAllowed) { this.attachmentError = 'Workbook assistance is available only to authorized MI liquidation preparers.'; return; }
+        if (!/\.(xlsx|xls|csv)$/i.test(file.name) || file.size > 10 * 1024 * 1024) {
+            this.attachmentError = 'Choose an .xlsx, .xls, or .csv file smaller than 10 MB.';
+            return;
+        }
+        if (!this.conversationId) await this.newConversation();
+        if (!this.conversationId) return;
+        this.attachmentError = '';
+        this.attachmentUploading = true;
+        this.uploadProgress = 0;
+        const form = new FormData();
+        form.append('file', file);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', this.endpoint(this.routes.liquidationAttach, this.conversationId));
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.setRequestHeader('X-CSRF-TOKEN', this.csrf());
+        xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) this.uploadProgress = Math.round((event.loaded / event.total) * 100);
+        });
+        xhr.addEventListener('load', () => {
+            let payload = {};
+            try { payload = JSON.parse(xhr.responseText || '{}'); } catch { payload = {}; }
+            if (xhr.status < 200 || xhr.status >= 300) {
+                this.attachmentError = payload.errors?.file?.[0] || payload.message || 'The workbook could not be inspected.';
+                this.attachmentUploading = false;
+                return;
+            }
+            this.activeAttachment = payload.attachment;
+            this.attachmentUploading = false;
+            this.uploadProgress = 100;
+            this.scrollToBottom();
+        });
+        xhr.addEventListener('error', () => {
+            this.attachmentError = 'The workbook upload was interrupted. Check your connection and try again.';
+            this.attachmentUploading = false;
+        });
+        xhr.send(form);
+    },
+    async removeAttachment() {
+        if (!this.activeAttachment || this.attachmentUploading) return;
+        try {
+            const response = await fetch(this.endpoint(this.routes.liquidationDestroy, this.activeAttachment.id), {
+                method: 'DELETE', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf() },
+            });
+            if (!response.ok) throw new Error('Unable to remove this workbook.');
+            this.activeAttachment = null;
+            this.attachmentError = '';
+        } catch (error) { this.attachmentError = error.message; }
+    },
+    async fillLiquidationForm() {
+        if (!this.activeAttachment || !this.liquidationAllowed) return;
+        this.attachmentError = '';
+        try {
+            const response = await fetch(this.endpoint(this.routes.liquidationFill, this.activeAttachment.id), {
+                method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf() },
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.url) throw new Error(payload.message || 'Unable to open the liquidation form.');
+            window.location.assign(payload.url);
+        } catch (error) { this.attachmentError = error.message; }
     },
 
     async quoteRequest(path, method = 'GET', body = null) {

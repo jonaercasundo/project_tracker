@@ -8,7 +8,7 @@
         |--------------------------------------------------------------------------
         */
         $currentUserName = optional(auth()->user())->name ?? 'Unknown User';
-        $defaultDatePrepared = old('date_prepared', date('Y-m-d'));
+        $defaultDatePrepared = old('date_prepared', $draftData['date_prepared'] ?? date('Y-m-d'));
         try {
             $defaultReportTitle = \Illuminate\Support\Carbon::parse($defaultDatePrepared)->format('F Y').' Report';
         } catch (\Throwable) {
@@ -20,7 +20,7 @@
         | Default Items
         |--------------------------------------------------------------------------
         */
-        $oldItems = old('items', [
+        $oldItems = old('items', $draftData['rows'] ?? [
             [
                 'item_date'      => '',
                 'payee'          => '',
@@ -934,6 +934,19 @@
 
                 @csrf
                 <input type="hidden" name="submission_key" value="{{ old('submission_key', (string) \Illuminate\Support\Str::uuid()) }}">
+
+                @if (is_array($draftData))
+                    <div class="tx-card" role="status" aria-live="polite">
+                        <div class="tx-card-body">
+                            <strong>Workbook draft loaded: {{ $draftData['filename'] ?? 'Excel attachment' }}</strong>
+                            <p class="mt-1">{{ count($oldItems) }} expense row(s), {{ count($draftData['worksheets'] ?? []) }} worksheet(s). Calculated total: VND {{ number_format((float) ($draftData['total_vnd'] ?? 0), 2) }}. Review every field and complete any highlighted information before saving.</p>
+                            @if (($draftData['warnings'] ?? []) !== [])
+                                <ul class="mt-2 list-disc pl-5 text-amber-800">@foreach (array_slice($draftData['warnings'], 0, 8) as $warning)<li>{{ $warning }}</li>@endforeach</ul>
+                            @endif
+                            <p class="mt-2 text-xs text-slate-500">No liquidation record has been saved. Your normal Save Liquidation action and server validation still apply.</p>
+                        </div>
+                    </div>
+                @endif
 
                 @if ($errors->any())
                     <div class="tx-card" role="alert" aria-live="polite">

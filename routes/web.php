@@ -6,6 +6,7 @@ use App\Http\Controllers\AccountingWorkspaceController;
 use App\Http\Controllers\ActionCrawlerController;
 use App\Http\Controllers\Admin\AdminControlCenterController;
 use App\Http\Controllers\Admin\AiConfigurationController;
+use App\Http\Controllers\AiLiquidationAttachmentController;
 use App\Http\Controllers\AiQuotationController;
 use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\BiddingController;
@@ -82,6 +83,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/assistant/conversations/{conversation}', [AssistantController::class, 'showConversation'])->middleware('throttle:ai-assistant')->name('assistant.conversations.show');
     Route::delete('/assistant/conversations/{conversation}', [AssistantController::class, 'deleteConversation'])->middleware('throttle:ai-assistant')->name('assistant.conversations.destroy');
     Route::post('/assistant/conversations/{conversation}/messages', [AssistantController::class, 'stream'])->middleware('throttle:ai-assistant')->name('assistant.messages.stream');
+    Route::post('/assistant/conversations/{conversation}/liquidation-workbook', [AiLiquidationAttachmentController::class, 'upload'])->middleware('throttle:ai-assistant')->name('assistant.liquidation.attach');
+    Route::post('/assistant/liquidation-workbooks/{attachment}/fill', [AiLiquidationAttachmentController::class, 'fill'])->whereNumber('attachment')->middleware('throttle:ai-assistant')->name('assistant.liquidation.fill');
+    Route::delete('/assistant/liquidation-workbooks/{attachment}', [AiLiquidationAttachmentController::class, 'destroy'])->whereNumber('attachment')->middleware('throttle:ai-assistant')->name('assistant.liquidation.destroy');
     Route::get('/assistant/mi-products/search', [AiQuotationController::class, 'products'])->middleware('throttle:ai-assistant')->name('assistant.quotations.products');
     Route::prefix('/assistant/conversations/{conversation}/quotation')->name('assistant.quotations.')->middleware('throttle:ai-assistant')->group(function (): void {
         Route::get('/', [AiQuotationController::class, 'show'])->name('show');

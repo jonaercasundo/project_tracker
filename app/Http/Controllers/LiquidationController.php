@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AiAssistantAttachment;
 use App\Models\MI_Liquidation;
 use App\Models\MI_LiquidationItem;
 use App\Services\MiFinancialAmount;
@@ -175,9 +176,23 @@ class LiquidationController extends Controller
     /**
      * Show create liquidation form.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
         Gate::authorize('create', MI_Liquidation::class);
+        $user = $request->user();
+        $company = $user?->currentCompany();
+        $draftData = null;
+        $draftId = $request->session()->get('ai_liquidation_draft_id');
+        if ($draftId !== null && $company !== null) {
+            $attachment = AiAssistantAttachment::query()->whereKey($draftId)
+                ->where('user_id', $user->getKey())->where('company_id', $company->getKey())
+                ->where('expires_at', '>', now())->first();
+            if ($attachment !== null && $company->code === 'MI') {
+                $draftData = $attachment->parsed_data;
+            } else {
+                $request->session()->forget('ai_liquidation_draft_id');
+            }
+        }
         /*
         |--------------------------------------------------------------------------
         | Dropdown Options
@@ -192,7 +207,8 @@ class LiquidationController extends Controller
             'mi_app.liquidation.create',
             compact(
                 'payeeOptions',
-                'accountBuyerOptions'
+                'accountBuyerOptions',
+                'draftData'
             )
         );
     }
@@ -328,6 +344,8 @@ class LiquidationController extends Controller
                 ->where('company_id', $companyId)
                 ->first();
             if ($existing) {
+                $request->session()->forget('ai_liquidation_draft_id');
+
                 return redirect()->route('liquidation.show', $existing)
                     ->with('success', 'This liquidation report was already saved.');
             }
@@ -485,6 +503,8 @@ class LiquidationController extends Controller
             | Success
             |--------------------------------------------------------------------------
             */
+
+            $request->session()->forget('ai_liquidation_draft_id');
 
             return redirect()
                 ->route(

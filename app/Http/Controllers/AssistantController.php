@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\AiRequiredToolUnavailable;
 use App\Models\AiActivity;
+use App\Models\AiAssistantAttachment;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
 use App\Models\Company;
+use App\Models\MI_Liquidation;
 use App\Models\User;
 use App\Services\AiAssistantService;
 use App\Services\AiCapabilityRegistry;
+use App\Services\AiLiquidationExcelDraftService;
 use App\Services\AiModuleRegistry;
 use App\Services\AiPageContextService;
 use App\Services\AiProviderConfiguration;
@@ -17,6 +20,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -66,12 +70,36 @@ class AssistantController extends Controller
         $conversation->load(['messages' => fn ($query) => $query->latest('id')->limit((int) config('ai_assistant.message_limit', 20))]);
         $conversation->setRelation('messages', $conversation->messages->sortBy('id')->values());
 
-        return response()->json(['conversation' => $conversation]);
+        $attachments = AiAssistantAttachment::query()->where('conversation_id', $conversation->getKey())
+            ->where('user_id', $user->getKey())->where('company_id', $company->getKey())
+            ->where('expires_at', '>', now())->latest('id')->limit(3)->get()
+            ->map(function (AiAssistantAttachment $attachment): array {
+                $preview = $attachment->parsed_data;
+                $preview['rows'] = array_slice($preview['rows'] ?? [], 0, 20);
+                $preview['warnings'] = array_slice($preview['warnings'] ?? [], 0, 20);
+
+                return [
+                    'id' => $attachment->getKey(), 'filename' => $attachment->original_name,
+                    'size_bytes' => $attachment->size_bytes, 'expires_at' => $attachment->expires_at?->toIso8601String(),
+                    'preview' => $preview,
+                ];
+            })->values();
+
+        return response()->json(['conversation' => $conversation, 'attachments' => $attachments]);
     }
 
-    public function deleteConversation(Request $request, AiConversation $conversation): JsonResponse
+    public function deleteConversation(Request $request, AiConversation $conversation, AiLiquidationExcelDraftService $drafts): JsonResponse
     {
         $this->authorizeConversation($request, $conversation);
+        foreach ($conversation->attachments as $attachment) {
+            DB::table('ai_assistant_attachment_audits')->insert([
+                'attachment_id' => $attachment->getKey(), 'actor_user_id' => $attachment->user_id,
+                'company_id' => $attachment->company_id, 'conversation_id' => $attachment->conversation_id,
+                'event' => 'conversation_deleted', 'item_count' => (int) ($attachment->parsed_data['item_count'] ?? 0),
+                'file_sha256' => $attachment->sha256, 'created_at' => now(),
+            ]);
+            $drafts->forget($attachment);
+        }
         $conversation->delete();
 
         return response()->json(['deleted' => true]);
@@ -85,6 +113,7 @@ class AssistantController extends Controller
             'message' => ['required', 'string', 'max:'.(int) config('ai_assistant.max_message_characters', 4000)],
             'retry' => ['nullable', 'boolean'],
             'page_route' => ['nullable', 'string', 'max:160'],
+            'attachment_id' => ['nullable', 'integer'],
         ]);
         $text = trim($validated['message']);
         if ($text === '') {
@@ -104,6 +133,27 @@ class AssistantController extends Controller
         abort_if($configuration->monthlyLimitReached(), 429, 'The system monthly AI token limit has been reached.');
 
         $context = $pageContext->current($request);
+        if (isset($validated['attachment_id'])) {
+            abort_unless($company->code === 'MI', 404);
+            Gate::authorize('create', MI_Liquidation::class);
+            $diagnostic = app(AiCapabilityRegistry::class)->diagnostic('ai.excel.analyze', $user, $company, true, true);
+            abort_unless($diagnostic['allowed'], 403, $diagnostic['reason']);
+            $attachment = AiAssistantAttachment::query()->whereKey($validated['attachment_id'])
+                ->where('conversation_id', $conversation->getKey())->where('user_id', $user->getKey())
+                ->where('company_id', $company->getKey())->where('expires_at', '>', now())->firstOrFail();
+            $parsedData = $attachment->parsed_data;
+            $context['uploaded_workbook'] = [
+                'filename' => $attachment->original_name,
+                'worksheets' => $parsedData['worksheets'] ?? [],
+                'item_count' => $parsedData['item_count'] ?? 0,
+                'total_vnd' => $parsedData['total_vnd'] ?? '0.00',
+                'missing_required_count' => $parsedData['missing_required_count'] ?? 0,
+                'duplicate_count' => $parsedData['duplicate_count'] ?? 0,
+                'warnings' => array_slice($parsedData['warnings'] ?? [], 0, 50),
+                'rows' => array_slice($parsedData['rows'] ?? [], 0, 100),
+                'rows_omitted_from_ai_context' => max(0, count($parsedData['rows'] ?? []) - 100),
+            ];
+        }
         if (Schema::hasColumn('ai_messages', 'metadata')) {
             $context['verified_previous_products'] = $conversation->messages()->where('role', 'assistant')->whereNotNull('metadata')
                 ->latest('id')->limit(4)->get(['metadata'])->flatMap(fn (AiMessage $message): array => $message->metadata['products'] ?? [])->filter(fn (mixed $product): bool => is_array($product))

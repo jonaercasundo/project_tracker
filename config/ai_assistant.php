@@ -95,9 +95,15 @@ return [
                 ],
                 'liquidation.create' => [
                     'title' => 'Create MI Petty Cash Liquidation',
-                    'help' => 'Prepare a petty cash liquidation with its report details and expense rows. Amounts use the report exchange rate and are validated by the MI liquidation workflow. Review the form errors shown on the page before saving.',
-                    'suggestions' => ['How do I create a liquidation?', 'How are VND and USD amounts calculated?'],
+                    'help' => 'Prepare a petty cash liquidation with its report details and expense rows. You can attach an Excel workbook in the AI Assistant to extract expense rows into this form. Review all fields and warnings; the original MI validation and save action remain authoritative.',
+                    'suggestions' => ['Fill a new liquidation using an Excel workbook', 'How do I create a liquidation?', 'How are VND and USD amounts calculated?'],
                     'links' => [['label' => 'My liquidations', 'route' => 'liquidation.index']],
+                ],
+                'liquidation.index' => [
+                    'title' => 'MI Petty Cash Liquidations',
+                    'help' => 'Review your MI petty cash liquidation reports. Start a new liquidation here, or attach an Excel workbook in the assistant to prepare its expense rows.',
+                    'suggestions' => ['Fill up a new liquidation using this Excel file', 'What information is required for a liquidation?'],
+                    'links' => [['label' => 'New liquidation', 'route' => 'liquidation.create']],
                 ],
             ],
         ],

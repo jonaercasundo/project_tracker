@@ -8,6 +8,10 @@
         $assistantAuthorized = $assistantUser?->can('ai.assistant.use') ?? false;
         $assistantQuoteAllowed = $assistantUser?->can('mi.quotation.create') ?? false;
         $assistantCanManageSettings = $assistantUser?->can('ai.settings.manage') ?? false;
+        $assistantCanPrepareLiquidation = $assistantCompany?->code === 'MI'
+            && $assistantUser?->can('ai.excel.analyze')
+            && $assistantUser?->can('ai.mi.budget-liquidation.assist')
+            && \Illuminate\Support\Facades\Gate::forUser($assistantUser)->allows('create', \App\Models\MI_Liquidation::class);
         $assistantConfiguration = app(\App\Services\AiProviderConfiguration::class);
         $assistantStatus = $assistantCompany === null
             ? 'select_company'
@@ -23,6 +27,7 @@
                 company: @js($assistantCompany?->code),
                 status: @js($assistantStatus),
                 quoteAllowed: @js($assistantQuoteAllowed),
+                liquidationAllowed: @js($assistantCanPrepareLiquidation),
                 context: @js($assistantContext),
                 routes: {
                     conversations: @js(route('assistant.conversations.index')),
@@ -30,6 +35,9 @@
                     show: @js(route('assistant.conversations.show', ['conversation' => '__ID__'])),
                     destroy: @js(route('assistant.conversations.destroy', ['conversation' => '__ID__'])),
                     stream: @js(route('assistant.messages.stream', ['conversation' => '__ID__'])),
+                    liquidationAttach: @js(route('assistant.liquidation.attach', ['conversation' => '__ID__'])),
+                    liquidationFill: @js(route('assistant.liquidation.fill', ['attachment' => '__ID__'])),
+                    liquidationDestroy: @js(route('assistant.liquidation.destroy', ['attachment' => '__ID__'])),
                     capabilities: @js(route('assistant.capabilities')),
                     quoteShow: @js(route('assistant.quotations.show', ['conversation' => '__ID__'])),
                     quoteStart: @js(route('assistant.quotations.start', ['conversation' => '__ID__'])),
@@ -43,9 +51,13 @@
             })"
             x-init="init()"
             @keydown.escape.window="if (contextPanelOpen) contextPanelOpen = false; else if (mobileSidebarOpen) mobileSidebarOpen = false; else if (contextOpen) contextOpen = false; else if (open && workspace) exitWorkspace(); else if (open) close()"
+            @dragover.prevent="if (liquidationAllowed && $event.dataTransfer?.types?.includes('Files')) draggingWorkbook = true"
+            @dragleave="if ($event.target === $el) draggingWorkbook = false"
+            @drop.prevent="if (liquidationAllowed) { draggingWorkbook = false; uploadDropped($event); }"
             class="fixed z-[110] bottom-5 right-5 sm:bottom-6 sm:right-6"
             data-ai-assistant
         >
+            <div x-show="draggingWorkbook" x-transition.opacity class="pointer-events-none fixed inset-0 z-[180] grid place-items-center bg-blue-950/30 p-6 text-center text-lg font-semibold text-white" role="status">Drop the workbook to inspect it for a new MI liquidation.</div>
             @unless ($workspace)
                 <button type="button" @click="toggle()" class="flex items-center gap-3 rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl transition hover:bg-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-300" aria-label="Open AI Assistant">
                     <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500"><x-ai-icon name="sparkles" size="16" /></span>
@@ -164,6 +176,14 @@
                                             </article>
                                         </template>
                                     </div></template>
+                                    <section x-show="activeAttachment" class="mb-5 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm" aria-label="Workbook liquidation draft preview">
+                                        <div class="flex flex-wrap items-start justify-between gap-3"><div class="min-w-0"><h3 class="text-sm font-semibold text-slate-900">Liquidation workbook preview</h3><p class="mt-1 truncate text-xs text-slate-600" x-text="activeAttachment?.filename"></p></div><button type="button" @click="removeAttachment()" :disabled="attachmentUploading" class="text-xs font-semibold text-slate-500 underline">Remove</button></div>
+                                        <div class="mt-3 flex flex-wrap gap-2 text-[11px]"><span class="rounded-full bg-white px-2.5 py-1 text-slate-600" x-text="`${activeAttachment?.preview?.item_count || 0} expense rows`"></span><span class="rounded-full bg-white px-2.5 py-1 text-slate-600" x-text="`${activeAttachment?.preview?.worksheets?.length || 0} worksheets`"></span><span class="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-800" x-text="`VND ${Number(activeAttachment?.preview?.total_vnd || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`"></span><span x-show="activeAttachment?.preview?.duplicate_count" class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-900" x-text="`${activeAttachment?.preview?.duplicate_count} possible duplicates`"></span></div>
+                                        <div class="mt-3 max-h-40 space-y-1 overflow-y-auto rounded-xl bg-white p-2"><template x-for="(row, index) in attachmentPreviewRows()" :key="`${row.source?.worksheet}-${row.source?.row}-${index}`"><div class="grid grid-cols-[1fr_auto] gap-2 border-b border-slate-100 py-1.5 text-[11px] last:border-0"><span class="min-w-0 truncate text-slate-700" x-text="`${row.item_date || 'Date needed'} · ${row.payee || 'Payee needed'} · ${row.expense_type || 'Category needed'}`"></span><span class="font-semibold text-slate-800" x-text="row.amount_vnd ? `VND ${Number(row.amount_vnd).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'Amount needed'"></span></div></template></div>
+                                        <p x-show="activeAttachment?.preview?.missing_required_count" class="mt-2 text-xs text-amber-800" x-text="`${activeAttachment?.preview?.missing_required_count} required value(s) need review in the form.`"></p><p x-show="activeAttachment?.preview?.warnings?.length" class="mt-1 text-xs text-slate-500" x-text="activeAttachment?.preview?.warnings?.slice(0, 3).join(' · ')"></p>
+                                        <p x-show="attachmentError" x-text="attachmentError" role="alert" class="mt-2 text-xs text-rose-700"></p>
+                                        <button type="button" @click="fillLiquidationForm()" :disabled="!liquidationAllowed || attachmentUploading" class="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#203d83] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#172f6e] disabled:opacity-50"><x-ai-icon name="document" size="14" /> Review and edit in New Liquidation form</button><span class="ml-2 text-[10px] text-slate-500">No record is saved by this action.</span>
+                                    </section>
                                     <section x-show="quote" class="mb-5 rounded-2xl border border-blue-200 bg-white p-4 shadow-sm" aria-label="Quotation draft workflow">
                                         <div class="flex items-center justify-between"><h3 class="font-semibold text-slate-900">Quotation draft</h3><button x-show="!quote?.quotation" type="button" @click="cancelQuote()" class="text-xs text-slate-500 underline">Cancel</button></div>
                                         <p class="mt-1 text-xs text-slate-500">Prices use current MI selling price records. No tax or discount rules are configured here.</p>
@@ -176,11 +196,16 @@
                                 </div>
                             </div>
 
-                            <form @submit.prevent="submit()" class="border-t border-slate-200/80 bg-white/95 px-4 py-3 shadow-[0_-6px_20px_rgba(27,42,74,0.035)] sm:px-7 sm:py-4">
+                            <form @submit.prevent="submit()" class="relative border-t border-slate-200/80 bg-white/95 px-4 py-3 shadow-[0_-6px_20px_rgba(27,42,74,0.035)] sm:px-7 sm:py-4">
                                 <div class="mx-auto max-w-[900px]">
+                                    <div x-show="activeAttachment" class="mb-2 flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs"><x-ai-icon name="document" size="15" class="text-blue-700" /><span class="min-w-0 flex-1 truncate text-slate-700" x-text="activeAttachment?.filename"></span><span x-show="attachmentUploading" class="text-blue-700" x-text="`Uploading ${uploadProgress}%`"></span><button type="button" @click="removeAttachment()" x-show="!attachmentUploading" class="font-semibold text-slate-500 underline">Remove</button></div>
+                                    <div x-show="attachmentError" x-text="attachmentError" role="alert" class="mb-2 text-xs text-rose-700"></div>
                                     <div class="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus-within:border-[#6e88e8] focus-within:ring-4 focus-within:ring-blue-100/70 sm:px-4">
+                                        <input x-ref="workbookFile" type="file" accept=".xlsx,.xls,.csv" class="sr-only" @change="uploadAttachment($event)">
+                                        <button x-show="liquidationAllowed" type="button" @click="$refs.workbookFile.click()" :disabled="loading || attachmentUploading" class="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:opacity-40" aria-label="Attach an Excel workbook"><x-ai-icon name="document" size="18" /></button>
+                                    <div x-show="attachmentUploading" class="absolute bottom-16 left-6 right-6 h-1 overflow-hidden rounded bg-blue-100"><div class="h-full bg-blue-600 transition-all" :style="`width: ${uploadProgress}%`"></div></div>
                                         <textarea id="assistant-message" x-ref="composer" x-model="draft" @input="resizeComposer($event)" @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); submit(); }" rows="1" maxlength="4000" :disabled="loading || status !== 'ready'" :placeholder="status === 'ready' ? 'Ask a question about this page or your work…' : statusDetails()" class="max-h-36 min-h-[40px] flex-1 resize-none overflow-hidden border-0 bg-transparent py-2 text-sm leading-6 text-slate-800 placeholder:text-slate-400 focus:ring-0 disabled:opacity-60 sm:min-h-[40px]"></textarea>
-                                        <button type="submit" :disabled="loading || status !== 'ready' || !draft.trim()" class="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#203d83] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#172f6e] focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transform-none" aria-label="Send message"><x-ai-icon name="send" size="18" /></button>
+                                        <button type="submit" :disabled="loading || status !== 'ready' || (!draft.trim() && !activeAttachment) || attachmentUploading" class="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#203d83] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#172f6e] focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transform-none" aria-label="Send message"><x-ai-icon name="send" size="18" /></button>
                                     </div>
                                     <div class="mt-2 flex items-center justify-between gap-2 px-1 text-[10px] text-slate-400"><span>Enter to send <span class="px-1">·</span> Shift + Enter for a new line</span><span class="hidden sm:inline">AI responses can be wrong. Verify important records.</span></div>
                                 </div>
@@ -257,7 +282,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div x-ref="scrollArea" class="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-5 py-5 sm:px-7 sm:py-7">
+                            <div x-ref="scrollArea" @dragover.prevent="if (liquidationAllowed) draggingWorkbook = true" @drop.prevent="uploadDropped($event)" class="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-5 py-5 sm:px-7 sm:py-7">
                                 <template x-if="messages.length === 0">
                                     <div class="flex min-h-full flex-col justify-center px-1 py-7 sm:px-5 sm:py-10">
                                         <div class="mx-auto w-full max-w-[570px]">
@@ -303,6 +328,14 @@
                                         </div>
                                     </div>
                                 </template>
+                                <section x-show="activeAttachment" class="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm" aria-label="Workbook liquidation draft preview">
+                                    <div class="flex flex-wrap items-start justify-between gap-3"><div class="min-w-0"><h3 class="text-sm font-semibold text-slate-900">Liquidation workbook preview</h3><p class="mt-1 truncate text-xs text-slate-600" x-text="activeAttachment?.filename"></p></div><button type="button" @click="removeAttachment()" :disabled="attachmentUploading" class="text-xs font-semibold text-slate-500 underline">Remove</button></div>
+                                    <div class="mt-3 flex flex-wrap gap-2 text-[11px]"><span class="rounded-full bg-white px-2.5 py-1 text-slate-600" x-text="`${activeAttachment?.preview?.item_count || 0} expense rows`"></span><span class="rounded-full bg-white px-2.5 py-1 text-slate-600" x-text="`${activeAttachment?.preview?.worksheets?.length || 0} worksheets`"></span><span class="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-800" x-text="`VND ${Number(activeAttachment?.preview?.total_vnd || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`"></span><span x-show="activeAttachment?.preview?.duplicate_count" class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-900" x-text="`${activeAttachment?.preview?.duplicate_count} possible duplicates`"></span></div>
+                                    <div class="mt-3 max-h-48 space-y-1 overflow-y-auto rounded-xl bg-white p-2"><template x-for="(row, index) in attachmentPreviewRows()" :key="`${row.source?.worksheet}-${row.source?.row}-${index}`"><div class="grid grid-cols-[1fr_auto] gap-2 border-b border-slate-100 py-1.5 text-[11px] last:border-0"><span class="min-w-0 truncate text-slate-700" x-text="`${row.item_date || 'Date needed'} · ${row.payee || 'Payee needed'} · ${row.expense_type || 'Category needed'}`"></span><span class="font-semibold text-slate-800" x-text="row.amount_vnd ? `VND ${Number(row.amount_vnd).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'Amount needed'"></span></div></template></div>
+                                    <p x-show="activeAttachment?.preview?.missing_required_count" class="mt-2 text-xs text-amber-800" x-text="`${activeAttachment?.preview?.missing_required_count} required value(s) need review in the form.`"></p><p x-show="activeAttachment?.preview?.warnings?.length" class="mt-1 text-xs text-slate-500" x-text="activeAttachment?.preview?.warnings?.slice(0, 3).join(' · ')"></p>
+                                    <p x-show="attachmentError" x-text="attachmentError" role="alert" class="mt-2 text-xs text-rose-700"></p>
+                                    <button type="button" @click="fillLiquidationForm()" :disabled="!liquidationAllowed || attachmentUploading" class="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#203d83] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#172f6e] disabled:opacity-50"><x-ai-icon name="document" size="14" /> Review and edit in New Liquidation form</button><span class="ml-2 text-[10px] text-slate-500">No record is saved by this action.</span>
+                                </section>
                                 <section x-show="quote" class="rounded-xl border border-blue-200 bg-white p-4 shadow-sm" aria-label="Quotation draft workflow">
                                     <div class="flex items-center justify-between"><h3 class="font-semibold text-slate-900">Quotation draft</h3><button x-show="!quote?.quotation" type="button" @click="cancelQuote()" class="text-xs text-slate-500 underline">Cancel</button></div>
                                     <p class="mt-1 text-xs text-slate-500">Prices use current MI selling price records. No tax or discount rules are configured here.</p>
@@ -334,11 +367,16 @@
                                     <button x-show="lastPrompt" type="button" @click="send(lastPrompt)" class="mt-2 text-xs font-semibold underline">Retry</button>
                                 </div>
                             </div>
-                            <form @submit.prevent="submit()" class="border-t border-slate-200/70 bg-white px-4 py-4 sm:px-6 sm:py-5">
+                            <form @submit.prevent="submit()" class="relative border-t border-slate-200/70 bg-white px-4 py-4 sm:px-6 sm:py-5">
                                 <label class="sr-only" for="assistant-message">Message the assistant</label>
+                                <div x-show="activeAttachment" class="mb-2 flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs"><x-ai-icon name="document" size="15" class="text-blue-700" /><span class="min-w-0 flex-1 truncate text-slate-700" x-text="activeAttachment?.filename"></span><span x-show="attachmentUploading" class="text-blue-700" x-text="`Uploading ${uploadProgress}%`"></span><button type="button" @click="removeAttachment()" x-show="!attachmentUploading" class="font-semibold text-slate-500 underline">Remove</button></div>
+                                <div x-show="attachmentError" x-text="attachmentError" role="alert" class="mb-2 text-xs text-rose-700"></div>
                                 <div class="flex items-end gap-3 rounded-2xl border border-slate-300/80 bg-white px-3 py-2.5 shadow-[0_2px_8px_rgba(25,42,75,0.04)] transition focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100/70 sm:px-4">
+                                    <input x-ref="workbookFile" type="file" accept=".xlsx,.xls,.csv" class="sr-only" @change="uploadAttachment($event)">
+                                    <button x-show="liquidationAllowed" type="button" @click="$refs.workbookFile.click()" :disabled="loading || attachmentUploading" class="mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:opacity-40" aria-label="Attach an Excel workbook"><x-ai-icon name="document" size="18" /></button>
+                                    <div x-show="attachmentUploading" class="absolute bottom-16 left-6 right-6 h-1 overflow-hidden rounded bg-blue-100"><div class="h-full bg-blue-600 transition-all" :style="`width: ${uploadProgress}%`"></div></div>
                                     <textarea id="assistant-message" x-ref="composer" x-model="draft" @input="resizeComposer($event)" @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); submit(); }" rows="1" maxlength="4000" :disabled="loading || status !== 'ready'" :placeholder="status === 'ready' ? 'Ask about this page or your workspace…' : statusMessage()" class="max-h-36 min-h-[40px] flex-1 resize-none overflow-hidden border-0 bg-transparent py-2 text-sm leading-6 text-slate-800 placeholder:text-slate-400 focus:ring-0 disabled:opacity-60"></textarea>
-                                    <button type="submit" :disabled="loading || status !== 'ready' || !draft.trim()" class="mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#203d83] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#172f6e] focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transform-none" aria-label="Send message"><x-ai-icon name="send" size="17" /></button>
+                                    <button type="submit" :disabled="loading || status !== 'ready' || (!draft.trim() && !activeAttachment) || attachmentUploading" class="mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#203d83] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#172f6e] focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transform-none" aria-label="Send message"><x-ai-icon name="send" size="17" /></button>
                                 </div>
                                 <p class="mt-2 flex items-center justify-between gap-2 px-1 text-[10px] text-slate-400"><span>Enter to send <span class="px-1">·</span> Shift + Enter for a new line</span><span class="hidden sm:inline">Page form values are not shared automatically.</span></p>
                             </form>

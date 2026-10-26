@@ -2,6 +2,9 @@ window.aiAssistant = (settings) => ({
     ...settings,
     open: Boolean(settings.workspace),
     conversations: [],
+    conversationSearch: '',
+    loadingConversations: false,
+    openingConversation: false,
     conversationId: null,
     messages: [],
     draft: '',
@@ -16,6 +19,8 @@ window.aiAssistant = (settings) => ({
     quoteError: '',
     quoteLoading: false,
     quoteSearching: false,
+    mobileSidebarOpen: false,
+    contextPanelOpen: false,
 
     async init() {
         this.open = Boolean(this.workspace);
@@ -28,6 +33,15 @@ window.aiAssistant = (settings) => ({
 
     toggle() { this.open = !this.open; },
     close() { if (!this.workspace) this.open = false; },
+    exitWorkspace() {
+        if (!this.workspace) { this.close(); return; }
+        const previous = document.referrer;
+        if (previous && new URL(previous).origin === window.location.origin && !new URL(previous).pathname.endsWith('/assistant')) {
+            window.location.assign(previous);
+            return;
+        }
+        window.location.assign(this.routes.dashboard);
+    },
     statusMessage() {
         return {
             select_company: 'Select an active company to use the assistant. Your conversations stay isolated by company.',
@@ -39,11 +53,62 @@ window.aiAssistant = (settings) => ({
     csrf() { return document.querySelector('meta[name="csrf-token"]')?.content || ''; },
 
     async refreshConversations() {
+        this.loadingConversations = true;
         try {
             const response = await fetch(this.routes.conversations, { headers: { Accept: 'application/json' } });
             if (!response.ok) return;
             this.conversations = (await response.json()).conversations || [];
         } catch { this.error = 'Unable to load saved conversations.'; }
+        finally { this.loadingConversations = false; }
+    },
+
+    filteredConversations() {
+        const query = this.conversationSearch.trim().toLowerCase();
+        return this.conversations.filter((item) => !query || item.title.toLowerCase().includes(query));
+    },
+
+    pageTitle() { return this.context?.page?.title || this.context?.label || `${this.company || 'Company'} workspace`; },
+    pageDescription() { return this.context?.page?.help || this.context?.description || 'Ask questions about the work and records available in your current workspace.'; },
+    welcomeTitle() { return this.context?.page?.title ? `Let’s make ${this.pageTitle()} easier.` : `Good to see you. What are you working on?`; },
+    statusTitle() {
+        return {
+            select_company: 'Choose your workspace',
+            disabled: 'Your assistant is paused',
+            not_configured: 'AI setup is needed',
+        }[this.status] || 'The assistant is unavailable';
+    },
+    statusDetails() {
+        return {
+            select_company: 'Choose an active company from the application menu. Your assistant history stays separated by company.',
+            disabled: 'An administrator has temporarily turned off the AI Assistant. Your conversations are still saved.',
+            not_configured: 'An administrator needs to finish connecting the AI provider before you can start a conversation.',
+        }[this.status] || 'Try again shortly or contact your application administrator.';
+    },
+    statusLabel() { return this.status === 'ready' ? 'Ready' : ({ select_company: 'Workspace needed', disabled: 'Paused', not_configured: 'Setup needed' }[this.status] || 'Unavailable'); },
+    quickActions() {
+        if (this.context?.key === 'mi_designer') {
+            const actions = [
+                { title: 'Search products', subtitle: 'Find an item by name or SKU', prompt: 'Find a product in the MI catalog', icon: 'search' },
+                { title: 'Check a price', subtitle: 'Look up an approved selling price', prompt: 'How much is item XXX?', icon: 'tag' },
+                { title: 'Explain this page', subtitle: 'Get a guided walkthrough', prompt: 'Explain this page and what I can do here', icon: 'help' },
+            ];
+            if (this.quoteAllowed) actions.splice(2, 0, { title: 'Create a quotation', subtitle: 'Build and review a quote from catalog prices', prompt: 'Help me create a quotation', icon: 'document' });
+
+            return actions;
+        }
+
+        return (this.context?.suggestions || ['Explain what I can do in this area.', 'What should I check before saving?'])
+            .slice(0, 4).map((prompt, index) => ({
+                title: prompt.replace(/^how do i /i, '').replace(/[?!.]+$/, '').replace(/^./, (letter) => letter.toUpperCase()).slice(0, 42),
+                subtitle: `A quick guide for ${this.pageTitle()}`,
+                prompt,
+                icon: /find|search|which/i.test(prompt) ? 'search' : (/dashboard|financial|report|summary|analytics|compare/i.test(prompt) ? 'chart' : (/pending|review|approval|work/i.test(prompt) ? 'activity' : 'help')),
+            }));
+    },
+    formatTime(value) {
+        if (!value) return 'Now';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date);
     },
 
     async newConversation() {
@@ -65,6 +130,7 @@ window.aiAssistant = (settings) => ({
     async load(id) {
         if (this.status !== 'ready') return;
         this.error = '';
+        this.openingConversation = true;
         try {
             const response = await fetch(this.endpoint(this.routes.show, id), { headers: { Accept: 'application/json' } });
             if (!response.ok) throw new Error('Unable to open this conversation.');
@@ -85,6 +151,7 @@ window.aiAssistant = (settings) => ({
             sessionStorage.setItem(`assistant:${this.company}`, String(conversation.id));
             this.scrollToBottom();
         } catch (error) { this.error = error.message; }
+        finally { this.openingConversation = false; }
     },
 
     async deleteConversation() {
@@ -95,6 +162,9 @@ window.aiAssistant = (settings) => ({
             sessionStorage.removeItem(`assistant:${this.company}`);
             this.conversationId = null;
             this.messages = [];
+            this.quote = null;
+            this.quotePreview = null;
+            this.quoteDraft = { customer_name: '', items: [] };
             await this.refreshConversations();
         } catch (error) { this.error = error.message; }
     },
@@ -130,8 +200,8 @@ window.aiAssistant = (settings) => ({
         if (!this.conversationId) return;
         this.lastPrompt = message;
         this.draft = '';
-        this.messages.push({ role: 'user', content: message });
-        const assistantMessage = { role: 'assistant', content: '' };
+        this.messages.push({ role: 'user', content: message, created_at: new Date().toISOString() });
+        const assistantMessage = { role: 'assistant', content: '', created_at: new Date().toISOString() };
         this.messages.push(assistantMessage);
         this.loading = true;
         this.scrollToBottom();

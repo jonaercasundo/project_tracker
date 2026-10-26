@@ -95,6 +95,35 @@ it('shows an actionable workspace status when an authorized user has no active c
         ->assertSee('select_company', false);
 });
 
+it('renders the guided full-screen workspace with responsive conversation and context panels', function () {
+    $user = $this->miUser('user');
+    $this->signInMI($user);
+    config(['services.openai.key' => null]);
+
+    $this->get(route('assistant.workspace'))
+        ->assertOk()
+        ->assertSee('Project Tracker AI')
+        ->assertSee('Your conversations')
+        ->assertSee('A good place to start')
+        ->assertSee('Page context')
+        ->assertSee('2xl:grid-cols-[260px_minmax(0,1fr)_284px]', false)
+        ->assertSee('xl:hidden', false)
+        ->assertSee('statusDetails()', false)
+        ->assertSee('motion-reduce:transition-none', false);
+});
+
+it('adapts the launcher guidance and commerce actions to the MI designer page', function () {
+    $user = $this->miUser('user');
+    $this->signInMI($user);
+
+    $this->getJson(route('assistant.capabilities', ['page_route' => 'mi_app.create']))
+        ->assertOk()
+        ->assertJsonPath('context.key', 'mi_designer')
+        ->assertJsonPath('context.page.title', 'Create Product')
+        ->assertJsonPath('context.suggestions.0', 'How do I create a product?');
+    expect(file_get_contents(resource_path('js/ai-assistant.js')))->toContain('Search products', 'Check a price', 'Create a quotation', 'Explain this page');
+});
+
 it('can resume the assistant migration after its conversation table was left behind', function () {
     $migration = require database_path('migrations/2026_10_26_083437_create_ai_assistant_tables.php');
     $migration->down();

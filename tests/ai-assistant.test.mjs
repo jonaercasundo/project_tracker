@@ -44,6 +44,8 @@ function settings(overrides = {}) {
         workspace: false,
         company: 'MI',
         status: 'ready',
+        attachmentAllowed: true,
+        liquidationAllowed: true,
         routes: {
             conversations: '/assistant/conversations',
             create: '/assistant/conversations',
@@ -125,13 +127,33 @@ test('sends a prompt in the selected conversation and renders streamed text', as
         },
     });
     assistant.conversationId = 42;
+    assistant.draft = 'Hello';
 
     await assistant.send('Hello');
 
     assert.equal(calls[0][0], '/assistant/conversations/42/messages');
     assert.equal(assistant.messages[0].content, 'Hello');
     assert.equal(assistant.messages[1].content, 'Hello from AI');
+    assert.equal(assistant.draft, '');
     assert.equal(assistant.loading, false);
+});
+
+test('keeps the message draft and attachment when the server rejects the send before accepting it', async () => {
+    const { assistant } = createAssistant(settings(), {
+        fetch: async (url) => url.endsWith('/messages')
+            ? { ok: false, status: 403, json: async () => ({ message: 'Permission required.' }) }
+            : { ok: true, json: async () => ({ conversations: [] }) },
+    });
+    assistant.conversationId = 42;
+    assistant.draft = 'Read this attachment';
+    assistant.activeAttachment = { id: 19, filename: 'notes.txt' };
+
+    await assistant.send('Read this attachment');
+
+    assert.equal(assistant.draft, 'Read this attachment');
+    assert.equal(assistant.activeAttachment.id, 19);
+    assert.equal(assistant.messages.length, 0);
+    assert.match(assistant.error, /do not have access/i);
 });
 
 test('parses SSE frames when event fields and separators are split across chunks', () => {

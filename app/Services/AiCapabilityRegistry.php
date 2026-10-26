@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Controllers\Admin\AiConfigurationController;
+use App\Http\Controllers\AiLiquidationAttachmentController;
 use App\Http\Controllers\AssistantController;
 use App\Models\Company;
 use App\Models\MI_Liquidation;
@@ -66,10 +67,13 @@ class AiCapabilityRegistry
             $this->capability('ai.documents.pdf', 'documents_analytics', 'Generate PDF', '*', 'DOCUMENT', 'AI-generated business PDFs are not connected.', [], [], 'unavailable', null, [], 'high', 'explicit_confirmation', 'Not available', ['ai.documents.pdf.generate']),
             $this->capability('ai.excel.export', 'documents_analytics', 'Export Excel', '*', 'EXPORT', 'AI workbook export is not connected.', [], [], 'unavailable', null, [], 'moderate', 'explicit_confirmation', 'Not available', ['ai.excel.export']),
             $this->capability('ai.excel.import', 'documents_analytics', 'Import Excel', '*', 'IMPORT', 'AI workbook import is not connected.', [], [], 'unavailable', null, [], 'high', 'explicit_confirmation', 'Not available', ['ai.excel.import']),
-            $this->capability('ai.excel.analyze', 'documents_analytics', 'Prepare MI Liquidation from Excel', 'MI', 'ANALYZE / DRAFT / FORM FILL', 'Inspect a private workbook and prefill the existing ordinary MI liquidation form without saving or submitting a record.', [], [], 'mi_liquidation_draft', 'AiLiquidationExcelDraftService', [], 'sensitive_read', 'explicit_confirmation', 'AI attachment audit', ['ai.excel.analyze', 'ai.mi.budget-liquidation.assist']),
+            $this->capability('ai.attachments.upload', 'documents_analytics', 'Upload assistant attachments', '*', 'UPLOAD', 'Upload allowlisted private attachments to an owned assistant conversation.', [], [], 'attachment_upload', 'AiLiquidationAttachmentController::upload', [], 'sensitive_read', 'explicit_confirmation', 'AI attachment audit', ['ai.attachments.upload']),
+            $this->capability('ai.attachments.read', 'documents_analytics', 'Read assistant attachments', '*', 'READ', 'Read only the current user’s unexpired attachments from the active company.', [], [], 'attachment_read', 'AssistantController::stream', [], 'sensitive_read', 'explicit_confirmation', 'AI attachment audit', ['ai.attachments.read']),
+            $this->capability('ai.excel.analyze', 'documents_analytics', 'Analyze an Excel workbook', 'MI', 'ANALYZE', 'Inspect a private workbook and extract rows for the existing MI liquidation form.', [], [], 'mi_liquidation_draft', 'AiLiquidationExcelDraftService', [], 'sensitive_read', 'explicit_confirmation', 'AI attachment audit', ['ai.attachments.upload', 'ai.attachments.read', 'ai.excel.analyze', 'ai.mi.liquidation.draft', 'ai.mi.budget-liquidation.assist']),
+            $this->capability('ai.mi.liquidation.form.fill', 'documents_analytics', 'Fill MI liquidation form', 'MI', 'FORM PREFILL', 'Prefill the existing ordinary MI liquidation form with a reviewed workbook draft; saving remains a separate employee action.', [], [], 'mi_liquidation_form_fill', 'AiLiquidationAttachmentController::fill', [], 'sensitive_read', 'explicit_confirmation', 'AI attachment audit', ['ai.attachments.read', 'ai.excel.analyze', 'ai.mi.liquidation.draft', 'ai.mi.liquidation.form.fill', 'ai.mi.budget-liquidation.assist']),
             $this->capability('ai.charts.generate', 'documents_analytics', 'Generate Charts', '*', 'CHART', 'AI chart generation is not connected.', [], [], 'unavailable', null, [], 'moderate', 'none', 'Not available', ['ai.charts.generate']),
             $this->capability('ai.data.forecast', 'documents_analytics', 'Forecast Data', '*', 'FORECAST', 'Forecasting is not connected to a validated data service.', [], [], 'unavailable', null, [], 'moderate', 'none', 'Not available', ['ai.data.forecast']),
-            $this->capability('ai.documents.process', 'documents_analytics', 'Process Uploaded Documents', '*', 'DOCUMENT', 'Uploaded-document processing is not implemented.', [], [], 'unavailable', null, [], 'sensitive_read', 'none', 'Not available', ['ai.documents.process']),
+            $this->capability('ai.documents.process', 'documents_analytics', 'Process uploaded documents', '*', 'ANALYZE', 'Read authorized PDF, DOCX, and TXT attachments in the current AI request.', [], [], 'document_processing', 'AiLiquidationExcelDraftService::inspectAttachment', [], 'sensitive_read', 'explicit_confirmation', 'AI attachment audit', ['ai.documents.process', 'ai.attachments.read']),
         ];
     }
 
@@ -272,6 +276,29 @@ class AiCapabilityRegistry
                     && method_exists(AiLiquidationExcelDraftService::class, 'inspect')
                     && Route::has('assistant.liquidation.attach') && Route::has('assistant.liquidation.fill'),
             ],
+            'mi_liquidation_form_fill' => [
+                'MI company scope' => $company->code === 'MI',
+                'MI_Liquidation create policy' => $company->code === 'MI' && Gate::forUser($user)->allows('create', MI_Liquidation::class),
+                'Form-fill action' => Route::has('assistant.liquidation.fill'),
+            ],
+            'attachment_upload' => [
+                'Attachment upload action' => class_exists(AiLiquidationAttachmentController::class)
+                    && method_exists(AiLiquidationAttachmentController::class, 'upload')
+                    && Route::has('assistant.liquidation.attach'),
+                'Attachment read capability' => $user->can('ai.attachments.read'),
+            ],
+            'attachment_read' => [
+                'Attachment read action' => class_exists(AssistantController::class)
+                    && method_exists(AssistantController::class, 'stream')
+                    && Route::has('assistant.messages.stream'),
+                'Attachment upload capability' => $user->can('ai.attachments.upload'),
+                'Document or Excel analysis permission' => $user->can('ai.documents.process') || $user->can('ai.excel.analyze'),
+            ],
+            'document_processing' => [
+                'Document parsers and assistant request integration' => class_exists(AiLiquidationExcelDraftService::class)
+                    && method_exists(AiLiquidationExcelDraftService::class, 'inspectAttachment')
+                    && class_exists(AiAssistantService::class) && method_exists(AiAssistantService::class, 'respond'),
+            ],
             'ai_settings' => ['ai.settings.manage' => $user->can('ai.settings.manage')],
             'conversation_history' => ['AssistantController conversation routes' => Route::has('assistant.conversations.index') && Route::has('assistant.conversations.store') && Route::has('assistant.conversations.show') && Route::has('assistant.conversations.destroy')],
             default => [],
@@ -318,6 +345,10 @@ class AiCapabilityRegistry
             'mmc_operations_snapshot' => ['ProjectInformation viewAny policy', 'viewMmcDeliveryMonitoring Gate', 'viewMmcInventory Gate'],
             'mmc_inventory' => ['viewMmcInventory Gate'],
             'mi_liquidation_draft' => ['MI company scope', 'MI_Liquidation create policy', 'Excel parser and draft-form actions'],
+            'mi_liquidation_form_fill' => ['MI company scope', 'MI_Liquidation create policy', 'explicit form-fill permission'],
+            'attachment_upload' => ['active company membership', 'owned assistant conversation', 'allowlisted private upload action'],
+            'attachment_read' => ['active company membership', 'attachment owner and company scope', 'authorized AI request action'],
+            'document_processing' => ['attachment read permission', 'allowlisted PDF, DOCX, and TXT text extraction or PDF input action'],
             'mmc_projects' => ['ProjectInformation viewAny policy'],
             'ai_settings' => ['Global scope; ai.settings.manage'],
             'workflow_guidance' => ['AiModuleRegistry pageContext action; no workflow execution authority'],
@@ -367,6 +398,17 @@ class AiCapabilityRegistry
             'mi_liquidation_draft' => class_exists(AiLiquidationExcelDraftService::class)
                 && method_exists(AiLiquidationExcelDraftService::class, 'inspect')
                 && Route::has('assistant.liquidation.attach') && Route::has('assistant.liquidation.fill'),
+            'mi_liquidation_form_fill' => class_exists(AiLiquidationAttachmentController::class)
+                && method_exists(AiLiquidationAttachmentController::class, 'fill')
+                && Route::has('assistant.liquidation.fill'),
+            'attachment_upload' => class_exists(AiLiquidationAttachmentController::class)
+                && method_exists(AiLiquidationAttachmentController::class, 'upload')
+                && Route::has('assistant.liquidation.attach'),
+            'attachment_read' => class_exists(AssistantController::class)
+                && method_exists(AssistantController::class, 'stream') && Route::has('assistant.messages.stream'),
+            'document_processing' => class_exists(AiLiquidationExcelDraftService::class)
+                && method_exists(AiLiquidationExcelDraftService::class, 'inspectAttachment')
+                && class_exists(AiAssistantService::class) && method_exists(AiAssistantService::class, 'respond'),
             'proactive_suggestions' => class_exists(AiAssistantService::class)
                 && method_exists(AiAssistantService::class, 'respond')
                 && class_exists(AiQuotationWorkflowService::class)

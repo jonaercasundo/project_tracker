@@ -22,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -73,10 +74,28 @@ class AssistantController extends Controller
         $attachments = AiAssistantAttachment::query()->where('conversation_id', $conversation->getKey())
             ->where('user_id', $user->getKey())->where('company_id', $company->getKey())
             ->where('expires_at', '>', now())->latest('id')->limit(3)->get()
+            ->filter(function (AiAssistantAttachment $attachment) use ($user, $company): bool {
+                $kind = $attachment->parsed_data['kind'] ?? 'workbook';
+                if (! $user->can('ai.attachments.read')) {
+                    return false;
+                }
+
+                if ($kind === 'workbook') {
+                    return $company->code === 'MI' && $user->can('ai.excel.analyze')
+                        && $user->can('ai.mi.liquidation.draft') && $user->can('ai.mi.budget-liquidation.assist')
+                        && Gate::forUser($user)->allows('create', MI_Liquidation::class);
+                }
+
+                return $user->can('ai.documents.process');
+            })
             ->map(function (AiAssistantAttachment $attachment): array {
                 $preview = $attachment->parsed_data;
-                $preview['rows'] = array_slice($preview['rows'] ?? [], 0, 20);
-                $preview['warnings'] = array_slice($preview['warnings'] ?? [], 0, 20);
+                if (($preview['kind'] ?? 'workbook') === 'workbook') {
+                    $preview['rows'] = array_slice($preview['rows'] ?? [], 0, 20);
+                    $preview['warnings'] = array_slice($preview['warnings'] ?? [], 0, 20);
+                } else {
+                    unset($preview['extracted_text']);
+                }
 
                 return [
                     'id' => $attachment->getKey(), 'filename' => $attachment->original_name,
@@ -134,36 +153,59 @@ class AssistantController extends Controller
 
         $context = $pageContext->current($request);
         if (isset($validated['attachment_id'])) {
-            abort_unless($company->code === 'MI', 404);
-            Gate::authorize('create', MI_Liquidation::class);
-            $diagnostic = app(AiCapabilityRegistry::class)->diagnostic('ai.excel.analyze', $user, $company, true, true);
-            abort_unless($diagnostic['allowed'], 403, $diagnostic['reason']);
             $attachment = AiAssistantAttachment::query()->whereKey($validated['attachment_id'])
                 ->where('conversation_id', $conversation->getKey())->where('user_id', $user->getKey())
                 ->where('company_id', $company->getKey())->where('expires_at', '>', now())->firstOrFail();
             $parsedData = $attachment->parsed_data;
-            $context['uploaded_workbook'] = [
-                'filename' => $attachment->original_name,
-                'worksheets' => $parsedData['worksheets'] ?? [],
-                'item_count' => $parsedData['item_count'] ?? 0,
-                'total_vnd' => $parsedData['total_vnd'] ?? '0.00',
-                'missing_required_count' => $parsedData['missing_required_count'] ?? 0,
-                'duplicate_count' => $parsedData['duplicate_count'] ?? 0,
-                'warnings' => array_slice($parsedData['warnings'] ?? [], 0, 50),
-                'rows' => array_slice($parsedData['rows'] ?? [], 0, 100),
-                'rows_omitted_from_ai_context' => max(0, count($parsedData['rows'] ?? []) - 100),
-            ];
+            if (($parsedData['kind'] ?? 'workbook') === 'workbook') {
+                abort_unless($company->code === 'MI', 404);
+                Gate::authorize('create', MI_Liquidation::class);
+                $diagnostic = app(AiCapabilityRegistry::class)->diagnostic('ai.excel.analyze', $user, $company, true, true);
+                abort_unless($diagnostic['allowed'], 403, $diagnostic['reason']);
+                $context['uploaded_workbook'] = [
+                    'filename' => $attachment->original_name,
+                    'worksheets' => $parsedData['worksheets'] ?? [],
+                    'item_count' => $parsedData['item_count'] ?? 0,
+                    'total_vnd' => $parsedData['total_vnd'] ?? '0.00',
+                    'missing_required_count' => $parsedData['missing_required_count'] ?? 0,
+                    'duplicate_count' => $parsedData['duplicate_count'] ?? 0,
+                    'warnings' => array_slice($parsedData['warnings'] ?? [], 0, 50),
+                    'rows' => array_slice($parsedData['rows'] ?? [], 0, 100),
+                    'rows_omitted_from_ai_context' => max(0, count($parsedData['rows'] ?? []) - 100),
+                ];
+            } else {
+                $diagnostic = app(AiCapabilityRegistry::class)->diagnostic('ai.documents.process', $user, $company, true, true);
+                abort_unless($diagnostic['allowed'], 403, $diagnostic['reason']);
+                $context['uploaded_document'] = [
+                    'filename' => $attachment->original_name,
+                    'type' => $parsedData['kind'],
+                    'text' => $parsedData['extracted_text'],
+                    'warnings' => $parsedData['warnings'] ?? [],
+                ];
+                if ($parsedData['kind'] === 'pdf') {
+                    $fileData = Storage::disk($attachment->disk)->get($attachment->path);
+                    $context['provider_input_file'] = [
+                        'filename' => $attachment->original_name,
+                        'file_data' => 'data:application/pdf;base64,'.base64_encode($fileData),
+                    ];
+                }
+            }
         }
         if (Schema::hasColumn('ai_messages', 'metadata')) {
             $context['verified_previous_products'] = $conversation->messages()->where('role', 'assistant')->whereNotNull('metadata')
                 ->latest('id')->limit(4)->get(['metadata'])->flatMap(fn (AiMessage $message): array => $message->metadata['products'] ?? [])->filter(fn (mixed $product): bool => is_array($product))
                 ->take(8)->map(fn (array $product): array => array_intersect_key($product, array_flip(['id', 'name', 'sku', 'price', 'currency', 'pricing_basis'])))->values()->all();
         }
-        $history = DB::transaction(function () use ($conversation, $text, $isRetry): array {
+        $attachmentId = isset($validated['attachment_id']) ? (int) $validated['attachment_id'] : null;
+        $history = DB::transaction(function () use ($conversation, $text, $isRetry, $attachmentId): array {
             $latestMessage = $conversation->messages()->latest('id')->first();
             $retryingSavedQuestion = $isRetry && $latestMessage?->role === 'user' && hash_equals($latestMessage->content, $text);
             if (! $retryingSavedQuestion) {
-                $conversation->messages()->create(['role' => 'user', 'content' => $text]);
+                $userMessage = ['role' => 'user', 'content' => $text];
+                if ($attachmentId !== null && Schema::hasColumn('ai_messages', 'metadata')) {
+                    $userMessage['metadata'] = ['attachment_id' => $attachmentId];
+                }
+                $conversation->messages()->create($userMessage);
                 if ($conversation->title === 'New conversation') {
                     $conversation->title = Str::limit($text, 100);
                 }

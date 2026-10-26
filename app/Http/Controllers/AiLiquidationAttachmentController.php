@@ -20,12 +20,19 @@ class AiLiquidationAttachmentController extends Controller
 {
     public function upload(Request $request, AiConversation $conversation, AiLiquidationExcelDraftService $drafts, AiCapabilityRegistry $capabilities): JsonResponse
     {
-        [$user, $company] = $this->authorizeContext($request, $conversation, $capabilities);
+        [$user, $company] = $this->authorizeConversationContext($request, $conversation);
+        $this->authorizeCapability($capabilities, 'ai.attachments.upload', $user, $company);
         $validated = $request->validate([
-            'file' => ['required', 'file', 'max:10240', 'extensions:xlsx,xls,csv'],
+            'file' => ['required', 'file', 'max:10240', 'extensions:xlsx,xls,csv,pdf,docx,txt'],
         ]);
+        $extension = strtolower($validated['file']->getClientOriginalExtension());
+        if (in_array($extension, ['xlsx', 'xls', 'csv'], true)) {
+            $this->authorizeLiquidationDraft($capabilities, $user, $company);
+        } else {
+            $this->authorizeCapability($capabilities, 'ai.documents.process', $user, $company);
+        }
         $drafts->purgeExpired();
-        $parsed = $drafts->inspect($validated['file'], $user->name);
+        $parsed = $drafts->inspectAttachment($validated['file'], $user->name);
         $path = $validated['file']->store('private/ai-assistant/liquidation-workbooks', 'local');
         if (! is_string($path) || $path === '') {
             throw ValidationException::withMessages(['file' => 'The workbook could not be stored securely. Try again.']);
@@ -57,10 +64,13 @@ class AiLiquidationAttachmentController extends Controller
         return response()->json(['attachment' => $this->attachmentPayload($attachment)], 201);
     }
 
-    public function fill(Request $request, AiAssistantAttachment $attachment, AiLiquidationExcelDraftService $drafts, AiCapabilityRegistry $capabilities): JsonResponse
+    public function fill(Request $request, AiAssistantAttachment $attachment, AiCapabilityRegistry $capabilities): JsonResponse
     {
-        [$user, $company] = $this->authorizeContext($request, $attachment->conversation, $capabilities);
+        [$user, $company] = $this->authorizeConversationContext($request, $attachment->conversation);
         $this->authorizeAttachment($attachment, $user, $company);
+        abort_unless(($attachment->parsed_data['kind'] ?? 'workbook') === 'workbook', 422, 'Only an analyzed Excel workbook can fill the MI liquidation form.');
+        $this->authorizeLiquidationDraft($capabilities, $user, $company);
+        $this->authorizeCapability($capabilities, 'ai.mi.liquidation.form.fill', $user, $company);
 
         $request->session()->put('ai_liquidation_draft_id', $attachment->getKey());
         $this->audit($attachment, 'form_prefill_requested');
@@ -68,9 +78,9 @@ class AiLiquidationAttachmentController extends Controller
         return response()->json(['url' => route('liquidation.create')]);
     }
 
-    public function destroy(Request $request, AiAssistantAttachment $attachment, AiLiquidationExcelDraftService $drafts, AiCapabilityRegistry $capabilities): JsonResponse
+    public function destroy(Request $request, AiAssistantAttachment $attachment, AiLiquidationExcelDraftService $drafts): JsonResponse
     {
-        [$user, $company] = $this->authorizeContext($request, $attachment->conversation, $capabilities);
+        [$user, $company] = $this->authorizeConversationContext($request, $attachment->conversation);
         $this->authorizeAttachment($attachment, $user, $company);
         $this->audit($attachment, 'cancelled');
         $drafts->forget($attachment);
@@ -79,19 +89,30 @@ class AiLiquidationAttachmentController extends Controller
     }
 
     /** @return array{0: User, 1: Company} */
-    private function authorizeContext(Request $request, AiConversation $conversation, AiCapabilityRegistry $capabilities): array
+    private function authorizeConversationContext(Request $request, AiConversation $conversation): array
     {
         $user = $request->user();
         abort_unless($user instanceof User && $user->can('ai.assistant.use'), 403);
         $company = $user->currentCompany();
-        abort_unless($company instanceof Company && $company->code === 'MI' && $company->is_active
-            && $user->belongsToCompany($company->getKey()), 403, 'Select your active MI company to use liquidation workbook assistance.');
+        abort_unless($company instanceof Company && $company->is_active
+            && $user->belongsToCompany($company->getKey()), 403, 'Select an active company you belong to before uploading attachments.');
         abort_unless((int) $conversation->user_id === (int) $user->getKey() && (int) $conversation->company_id === (int) $company->getKey(), 404);
+
+        return [$user, $company];
+    }
+
+    private function authorizeLiquidationDraft(AiCapabilityRegistry $capabilities, User $user, Company $company): void
+    {
+        abort_unless($company->code === 'MI', 403, 'Excel liquidation drafts are available only in the MI company.');
         Gate::authorize('create', MI_Liquidation::class);
         $diagnostic = $capabilities->diagnostic('ai.excel.analyze', $user, $company, true, true);
         abort_unless($diagnostic['allowed'], 403, $diagnostic['reason']);
+    }
 
-        return [$user, $company];
+    private function authorizeCapability(AiCapabilityRegistry $capabilities, string $capabilityId, User $user, Company $company): void
+    {
+        $diagnostic = $capabilities->diagnostic($capabilityId, $user, $company, true, true);
+        abort_unless($diagnostic['allowed'], 403, $diagnostic['reason']);
     }
 
     private function authorizeAttachment(AiAssistantAttachment $attachment, User $user, Company $company): void
@@ -105,8 +126,12 @@ class AiLiquidationAttachmentController extends Controller
     private function attachmentPayload(AiAssistantAttachment $attachment): array
     {
         $preview = $attachment->parsed_data;
-        $preview['rows'] = array_slice($preview['rows'] ?? [], 0, 20);
-        $preview['warnings'] = array_slice($preview['warnings'] ?? [], 0, 20);
+        if (($preview['kind'] ?? 'workbook') === 'workbook') {
+            $preview['rows'] = array_slice($preview['rows'] ?? [], 0, 20);
+            $preview['warnings'] = array_slice($preview['warnings'] ?? [], 0, 20);
+        } else {
+            unset($preview['extracted_text']);
+        }
 
         return [
             'id' => $attachment->getKey(),

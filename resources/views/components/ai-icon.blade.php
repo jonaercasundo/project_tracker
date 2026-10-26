@@ -38,6 +38,27 @@
         @case('document')
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8m-8 4h8"/>
             @break
+        @case('paperclip')
+            <path d="m21.4 11.1-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5"/>
+            @break
+        @case('spreadsheet')
+            <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18m6-12v12M9 15h12"/>
+            @break
+        @case('fileText')
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8m-8 4h8"/>
+            @break
+        @case('file')
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+            @break
+        @case('upload')
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            @break
+        @case('checkCircle')
+            <circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/>
+            @break
+        @case('alertCircle')
+            <circle cx="12" cy="12" r="9"/><path d="M12 8v4m0 4h.01"/>
+            @break
         @case('activity')
             <path d="M3 12h4l3-8 4 16 3-8h4"/>
             @break

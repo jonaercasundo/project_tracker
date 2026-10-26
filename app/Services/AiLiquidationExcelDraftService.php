@@ -14,6 +14,7 @@ use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use Throwable;
+use ZipArchive;
 
 class AiLiquidationExcelDraftService
 {
@@ -190,6 +191,120 @@ class AiLiquidationExcelDraftService
             'duplicate_count' => collect($rows)->where('duplicate', true)->count(),
             'date_prepared' => now()->toDateString(),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function inspectAttachment(UploadedFile $file, string $defaultRequestedBy): array
+    {
+        $extension = strtolower($file->getClientOriginalExtension());
+        if (in_array($extension, ['xlsx', 'xls', 'csv'], true)) {
+            return [
+                ...$this->inspect($file, $defaultRequestedBy),
+                'kind' => 'workbook',
+                'mime_type' => $file->getMimeType() ?: 'application/octet-stream',
+            ];
+        }
+
+        if (($file->getSize() ?? 0) > self::MAX_BYTES) {
+            throw ValidationException::withMessages(['file' => 'Attachments must be 10 MB or smaller.']);
+        }
+
+        $text = match ($extension) {
+            'txt' => $this->readTextFile($file),
+            'docx' => $this->readWordDocument($file),
+            'pdf' => $this->validatePdf($file),
+            default => throw ValidationException::withMessages(['file' => 'Upload an .xlsx, .xls, .csv, .pdf, .docx, or .txt file.']),
+        };
+
+        $kind = $extension === 'pdf' ? 'pdf' : 'document';
+
+        return [
+            'kind' => $kind,
+            'filename' => mb_substr($file->getClientOriginalName(), 0, 255),
+            'mime_type' => $file->getMimeType() ?: 'application/octet-stream',
+            'extracted_text' => $text,
+            'text_truncated' => $text !== null && mb_strlen($text) >= 50_000,
+            'worksheets' => [],
+            'item_count' => 0,
+            'missing_required_count' => 0,
+            'total_vnd' => '0.00',
+            'rows' => [],
+            'warnings' => $kind === 'pdf' ? ['PDF content is sent securely to the configured AI model for reading; verify all extracted details.'] : [],
+            'duplicate_count' => 0,
+            'date_prepared' => now()->toDateString(),
+        ];
+    }
+
+    private function readTextFile(UploadedFile $file): string
+    {
+        $contents = file_get_contents($file->getRealPath());
+        if (! is_string($contents) || ! mb_check_encoding($contents, 'UTF-8') || str_contains($contents, "\0")) {
+            throw ValidationException::withMessages(['file' => 'The TXT file must contain readable UTF-8 text.']);
+        }
+
+        $text = trim($contents);
+        if ($text === '') {
+            throw ValidationException::withMessages(['file' => 'The TXT file does not contain readable text.']);
+        }
+
+        return mb_substr($text, 0, 50_000);
+    }
+
+    private function readWordDocument(UploadedFile $file): string
+    {
+        $archive = new ZipArchive;
+        if ($archive->open($file->getRealPath()) !== true) {
+            throw ValidationException::withMessages(['file' => 'The DOCX file could not be opened.']);
+        }
+
+        try {
+            if ($archive->numFiles > 500 || $archive->locateName('word/document.xml') === false) {
+                throw ValidationException::withMessages(['file' => 'The DOCX file is invalid or contains too many parts.']);
+            }
+
+            $uncompressedBytes = 0;
+            for ($index = 0; $index < $archive->numFiles; $index++) {
+                $stat = $archive->statIndex($index);
+                $uncompressedBytes += (int) ($stat['size'] ?? 0);
+                if ($uncompressedBytes > 30_000_000) {
+                    throw ValidationException::withMessages(['file' => 'The DOCX contents exceed the 30 MB expanded-size limit.']);
+                }
+            }
+
+            $xml = $archive->getFromName('word/document.xml');
+            if (! is_string($xml) || strlen($xml) > 10_000_000) {
+                throw ValidationException::withMessages(['file' => 'The DOCX document content is missing or too large.']);
+            }
+        } finally {
+            $archive->close();
+        }
+
+        $document = new \DOMDocument;
+        if (! $document->loadXML($xml, LIBXML_NONET | LIBXML_NOBLANKS)) {
+            throw ValidationException::withMessages(['file' => 'The DOCX document content is malformed.']);
+        }
+        $xpath = new \DOMXPath($document);
+        $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+        $paragraphs = [];
+        foreach ($xpath->query('//w:p') ?: [] as $paragraph) {
+            $paragraphs[] = $paragraph->textContent;
+        }
+        $text = trim(implode("\n", $paragraphs));
+        if ($text === '') {
+            throw ValidationException::withMessages(['file' => 'No readable text was found in the DOCX document.']);
+        }
+
+        return mb_substr($text, 0, 50_000);
+    }
+
+    private function validatePdf(UploadedFile $file): ?string
+    {
+        $header = file_get_contents($file->getRealPath(), false, null, 0, 1024);
+        if (! is_string($header) || preg_match('/%PDF-[0-9.]+/', $header) !== 1) {
+            throw ValidationException::withMessages(['file' => 'The PDF file signature is invalid.']);
+        }
+
+        return null;
     }
 
     public function purgeExpired(): int

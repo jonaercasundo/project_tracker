@@ -24,9 +24,12 @@ window.aiAssistant = (settings) => ({
     quoteSearching: false,
     activeAttachment: null,
     attachmentUploading: false,
+    pendingAttachmentName: '',
+    pendingAttachmentSize: 0,
     uploadProgress: 0,
     attachmentError: '',
     draggingWorkbook: false,
+    attachmentMessageSentId: null,
     mobileSidebarOpen: false,
     contextPanelOpen: false,
     contextOpen: false,
@@ -129,12 +132,13 @@ window.aiAssistant = (settings) => ({
         try {
             const response = await fetch(this.routes.create, { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf() } });
             if (!response.ok) throw new Error('Unable to start a conversation.');
-            const { conversation, attachments } = await response.json();
+            const { conversation } = await response.json();
             this.conversationId = conversation.id;
             this.messages = [];
             this.quote = null;
             this.quotePreview = null;
             this.activeAttachment = null;
+            this.attachmentMessageSentId = null;
             sessionStorage.setItem(`assistant:${this.company}`, String(conversation.id));
             await this.refreshConversations();
         } catch (error) { this.error = error.message; }
@@ -151,6 +155,9 @@ window.aiAssistant = (settings) => ({
             this.conversationId = conversation.id;
             this.messages = conversation.messages || [];
             this.activeAttachment = attachments?.[0] || null;
+            this.attachmentMessageSentId = conversation.messages?.some((message) => message.metadata?.attachment_id === this.activeAttachment?.id)
+                ? this.activeAttachment?.id
+                : null;
             this.quote = null;
             this.quotePreview = null;
             const quoteResponse = await fetch(this.endpoint(this.routes.quoteShow, id), { headers: { Accept: 'application/json' } });
@@ -180,6 +187,7 @@ window.aiAssistant = (settings) => ({
             this.quotePreview = null;
             this.quoteDraft = { customer_name: '', items: [] };
             this.activeAttachment = null;
+            this.attachmentMessageSentId = null;
             await this.refreshConversations();
         } catch (error) { this.error = error.message; }
     },
@@ -187,7 +195,9 @@ window.aiAssistant = (settings) => ({
     async submit() {
         const message = this.draft.trim();
         if ((!message && !this.activeAttachment) || this.loading || this.attachmentUploading) return;
-        const prompt = message || 'Inspect this workbook and prepare a new MI petty cash liquidation draft. Report the extracted rows, missing information, warnings, and calculated VND total.';
+        const prompt = message || (this.activeAttachment?.preview?.kind === 'workbook'
+            ? 'Inspect this workbook and prepare a new MI petty cash liquidation draft. Report the extracted rows, missing information, warnings, and calculated VND total.'
+            : `Read the attached file ${this.activeAttachment?.filename || ''}. Summarize its key information and ask me about any missing details.`);
         const quoteUpdated = this.quote && !this.quote.quotation ? this.applyQuoteAnswer(message) : false;
         await this.send(prompt);
         if (quoteUpdated && !this.error) await this.previewQuote();
@@ -215,16 +225,16 @@ window.aiAssistant = (settings) => ({
         if (!this.conversationId) await this.newConversation();
         if (!this.conversationId) return;
         this.lastPrompt = message;
-        this.draft = '';
-        this.$nextTick(() => { if (this.$refs.composer) this.resizeComposer(this.$refs.composer); });
         const lastUserMessage = [...this.messages].reverse().find((item) => item.role === 'user');
         const lastAssistantMessage = this.messages[this.messages.length - 1];
         const isRetry = retry && lastUserMessage?.content === message && lastAssistantMessage?.role === 'assistant' && lastAssistantMessage.failed;
         if (isRetry) this.messages.pop();
-        else this.messages.push({ role: 'user', content: message, created_at: new Date().toISOString() });
+        const userMessage = { role: 'user', content: message, created_at: new Date().toISOString() };
+        if (!isRetry) this.messages.push(userMessage);
         this.messages.push({ role: 'assistant', content: '', created_at: new Date().toISOString(), failed: false, complete: false, error: '' });
         const assistantMessage = this.messages[this.messages.length - 1];
         this.loading = true;
+        let messageAccepted = false;
         this.thinkingLabel = 'Connecting…';
         this.scrollToBottom(true);
         const requestController = new AbortController();
@@ -242,6 +252,13 @@ window.aiAssistant = (settings) => ({
                 const messages = { 403: 'You do not have access to that information. Contact your administrator if you think you need access.', 429: 'The assistant is temporarily at its usage limit. Please try again later.', 503: 'The assistant is not configured right now. Please contact your administrator.' };
                 throw new Error(response.status === 422 ? 'Please check your message and try again.' : messages[response.status] || 'I’m having trouble reaching the assistant right now. Your message is still here; please try again in a moment.');
             }
+
+            messageAccepted = true;
+            if (this.draft.trim() === message) this.draft = '';
+            if (this.$refs.composer) this.resizeComposer(this.$refs.composer);
+            if (this.$refs.drawerComposer) this.resizeComposer(this.$refs.drawerComposer);
+            if (this.$refs.workspaceComposer) this.resizeComposer(this.$refs.workspaceComposer);
+            if (this.activeAttachment) this.attachmentMessageSentId = this.activeAttachment.id;
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -270,6 +287,12 @@ window.aiAssistant = (settings) => ({
             processEvents(parser.finish());
             if (!assistantMessage.complete) throw new Error('The connection ended before the response was complete. Please try again.');
         } catch (error) {
+            if (!messageAccepted) {
+                this.messages = this.messages.filter((item) => item !== userMessage && item !== assistantMessage);
+                this.draft = this.draft || message;
+                this.error = error.message || 'Unable to send this message. Your text and attachment are still ready.';
+                return;
+            }
             const transportFailed = ['AbortError', 'TypeError', 'SyntaxError'].includes(error.name) || ['Failed to fetch', 'NetworkError', 'Load failed'].includes(error.message);
             assistantMessage.error = transportFailed
                 ? (error.name === 'AbortError' ? 'The response took too long to arrive. Your question is still here; please try again.' : 'The connection was interrupted before the response finished. Your question is still here; please try again.')
@@ -285,7 +308,28 @@ window.aiAssistant = (settings) => ({
     },
 
     attachmentPreviewRows() { return (this.activeAttachment?.preview?.rows || []).slice(0, 8); },
-    formatFileSize(size) { return size < 1024 * 1024 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`; },
+    formatFileSize(size) {
+        if (!Number.isFinite(Number(size)) || Number(size) <= 0) return 'Checking size';
+        return size < 1024 * 1024 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    },
+    attachmentIcon() {
+        const extension = (this.activeAttachment?.filename || this.pendingAttachmentName).split('.').pop()?.toLowerCase();
+        if (['xlsx', 'xls', 'csv'].includes(extension)) return 'spreadsheet';
+        if (['pdf', 'docx', 'txt'].includes(extension)) return 'fileText';
+        return 'file';
+    },
+    attachmentTypeLabel() {
+        const extension = (this.activeAttachment?.filename || this.pendingAttachmentName).split('.').pop()?.toLowerCase();
+        return ({ xlsx: 'Excel workbook', xls: 'Excel workbook', csv: 'CSV spreadsheet', pdf: 'PDF document', docx: 'Word document', txt: 'Text document' })[extension] || 'File';
+    },
+    attachmentStatus() {
+        if (this.attachmentUploading) return `Uploading ${this.uploadProgress}%`;
+        return this.attachmentMessageSentId === this.activeAttachment?.id ? 'Attached to this conversation' : 'Ready to send';
+    },
+    openFilePicker() {
+        const picker = this.$refs[this.workspace ? 'workspaceFile' : 'drawerFile'];
+        if (picker) picker.click();
+    },
     uploadDropped(event) {
         this.draggingWorkbook = false;
         const file = event.dataTransfer?.files?.[0];
@@ -297,14 +341,25 @@ window.aiAssistant = (settings) => ({
         if (file) this.uploadWorkbook(file);
     },
     async uploadWorkbook(file) {
-        if (!this.liquidationAllowed) { this.attachmentError = 'Workbook assistance is available only to authorized MI liquidation preparers.'; return; }
-        if (!/\.(xlsx|xls|csv)$/i.test(file.name) || file.size > 10 * 1024 * 1024) {
-            this.attachmentError = 'Choose an .xlsx, .xls, or .csv file smaller than 10 MB.';
+        if (!this.attachmentAllowed) { this.attachmentError = 'You do not have permission to attach files to this assistant conversation.'; return; }
+        if (!/\.(xlsx|xls|csv|pdf|docx|txt)$/i.test(file.name) || file.size > 10 * 1024 * 1024) {
+            this.attachmentError = 'Choose an .xlsx, .xls, .csv, .pdf, .docx, or .txt file smaller than 10 MB.';
+            return;
+        }
+        const workbook = /\.(xlsx|xls|csv)$/i.test(file.name);
+        if (workbook && !this.liquidationAllowed) {
+            this.attachmentError = 'Excel liquidation drafts are available only to authorized MI preparers.';
             return;
         }
         if (!this.conversationId) await this.newConversation();
         if (!this.conversationId) return;
+        if (this.activeAttachment && this.attachmentMessageSentId !== this.activeAttachment.id) {
+            await this.removeAttachment();
+            if (this.activeAttachment) return;
+        }
         this.attachmentError = '';
+        this.pendingAttachmentName = file.name;
+        this.pendingAttachmentSize = file.size;
         this.attachmentUploading = true;
         this.uploadProgress = 0;
         const form = new FormData();
@@ -321,16 +376,23 @@ window.aiAssistant = (settings) => ({
             try { payload = JSON.parse(xhr.responseText || '{}'); } catch { payload = {}; }
             if (xhr.status < 200 || xhr.status >= 300) {
                 this.attachmentError = payload.errors?.file?.[0] || payload.message || 'The workbook could not be inspected.';
+                this.pendingAttachmentName = '';
+                this.pendingAttachmentSize = 0;
                 this.attachmentUploading = false;
                 return;
             }
             this.activeAttachment = payload.attachment;
+            this.attachmentMessageSentId = null;
+            this.pendingAttachmentName = '';
+            this.pendingAttachmentSize = 0;
             this.attachmentUploading = false;
             this.uploadProgress = 100;
             this.scrollToBottom();
         });
         xhr.addEventListener('error', () => {
-            this.attachmentError = 'The workbook upload was interrupted. Check your connection and try again.';
+            this.attachmentError = 'The file upload was interrupted. Check your connection and try again.';
+            this.pendingAttachmentName = '';
+            this.pendingAttachmentSize = 0;
             this.attachmentUploading = false;
         });
         xhr.send(form);
@@ -343,6 +405,7 @@ window.aiAssistant = (settings) => ({
             });
             if (!response.ok) throw new Error('Unable to remove this workbook.');
             this.activeAttachment = null;
+            this.attachmentMessageSentId = null;
             this.attachmentError = '';
         } catch (error) { this.attachmentError = error.message; }
     },

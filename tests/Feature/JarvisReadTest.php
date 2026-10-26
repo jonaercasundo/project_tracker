@@ -2,6 +2,7 @@
 
 use App\Models\Company;
 use App\Models\User;
+use App\Services\MmcProjectIntelligence;
 use App\Services\ProjectDeliveryProgressService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Schema\Blueprint;
@@ -1811,3 +1812,126 @@ it('protects the Logistics feed with the same MMC company and dashboard role bou
 
     $this->getJson('/deliveries/monitoring/logistics')->assertForbidden();
 })->with(['guest', 'wrong role', 'other company', 'no selected company']);
+
+it('resolves formatted project codes to the canonical project record', function () {
+    DB::table('projects')->insert(['project_id' => 3, 'project_name' => '(SME2) Mass Production, Supply, Delivery', 'project_code' => 'SME2', 'ref_no' => 'REF-SME2']);
+    $intelligence = app(MmcProjectIntelligence::class);
+
+    foreach (['SME 2', 'SME-2', 'sme2', '(SME2)'] as $alias) {
+        $resolved = $intelligence->resolve($alias);
+        expect($resolved['status'])->toBe('found')
+            ->and($resolved['project']['project_id'])->toBe(3)
+            ->and($resolved['project']['project_code'])->toBe('SME2');
+    }
+});
+
+it('uses linked bidding codes but returns the implementation project id', function () {
+    Schema::table('projects', function (Blueprint $table): void {
+        $table->unsignedInteger('project_information_id')->nullable();
+    });
+    Schema::create('project_information', function (Blueprint $table): void {
+        $table->increments('id');
+        $table->unsignedInteger('project_id')->nullable();
+        $table->string('project_code')->nullable();
+        $table->string('reference_no')->nullable();
+        $table->string('project_name')->nullable();
+    });
+    DB::table('projects')->insert(['project_id' => 3, 'project_name' => 'Mass Production Award', 'project_code' => null, 'ref_no' => null, 'project_information_id' => 22]);
+    DB::table('project_information')->insert(['id' => 22, 'project_id' => 3, 'project_code' => 'BPC', 'project_name' => 'BPC School Project']);
+
+    $resolved = app(MmcProjectIntelligence::class)->resolve('bpc');
+
+    expect($resolved['status'])->toBe('found')
+        ->and($resolved['project']['project_id'])->toBe(3)
+        ->and($resolved['project']['bidding_id'])->toBe(22)
+        ->and($resolved['project']['project_id'])->not->toBe($resolved['project']['bidding_id']);
+});
+
+it('returns ambiguous results instead of selecting between equally matching projects', function () {
+    DB::table('projects')->insert([
+        ['project_id' => 3, 'project_name' => 'SME2 Project One', 'project_code' => 'SME2'],
+        ['project_id' => 4, 'project_name' => 'SME2 Project Two', 'project_code' => 'SME2'],
+    ]);
+
+    $resolved = app(MmcProjectIntelligence::class)->resolve('SME 2');
+
+    expect($resolved['status'])->toBe('ambiguous')
+        ->and($resolved['candidates'])->toHaveCount(2);
+});
+
+it('prioritizes an exact canonical project code over a similar title alias', function () {
+    DB::table('projects')->insert([
+        ['project_id' => 3, 'project_name' => '(SME2) historical reference', 'project_code' => 'OLD'],
+        ['project_id' => 4, 'project_name' => 'Current project', 'project_code' => 'SME2'],
+    ]);
+
+    $resolved = app(MmcProjectIntelligence::class)->resolve('SME-2');
+
+    expect($resolved['status'])->toBe('found')
+        ->and($resolved['project']['project_id'])->toBe(4)
+        ->and($resolved['project']['match_method'])->toBe('project_code');
+});
+
+it('returns not found when no authorized project matches the supplied reference', function () {
+    $resolved = app(MmcProjectIntelligence::class)->resolve('NO-SUCH-PROJECT');
+
+    expect($resolved['status'])->toBe('not_found')
+        ->and($resolved['candidates'])->toBeEmpty();
+});
+
+it('uses dashboard receipt completion rules for project delivery analytics', function () {
+    jarvisOperations();
+
+    $result = app(MmcProjectIntelligence::class)->deliverySummary('SCI');
+
+    expect($result['status'])->toBe('found')
+        ->and($result['project']['project_id'])->toBe(1)
+        ->and($result['period'])->toBe('all time')
+        ->and($result['counting_unit'])->toContain('project + DR number')
+        ->and($result['delivery_rows_count'])->toBe(2)
+        ->and($result['total_receipts_count'])->toBe(2)
+        ->and($result['delivered_receipts_count'])->toBe(1)
+        ->and($result['unique_schools_with_delivered_or_accepted_rows'])->toBe(1);
+});
+
+it('distinguishes a project with no matching delivery rows and supports delivery date filters', function () {
+    jarvisOperations();
+    DB::table('projects')->insert(['project_id' => 3, 'project_name' => 'No Deliveries', 'project_code' => 'EMPTY']);
+
+    $emptyProject = app(MmcProjectIntelligence::class)->deliverySummary('EMPTY');
+    $filtered = app(MmcProjectIntelligence::class)->deliverySummary('SCI', null, ['date_from' => '2026-10-02', 'date_to' => '2026-10-02']);
+
+    expect($emptyProject['status'])->toBe('found')
+        ->and($emptyProject['has_delivery_records'])->toBeFalse()
+        ->and($emptyProject['delivered_receipts_count'])->toBe(0)
+        ->and($filtered['period'])->toBe(['date_from' => '2026-10-02', 'date_to' => '2026-10-02'])
+        ->and($filtered['delivery_rows_count'])->toBe(1);
+});
+
+it('respects company ownership when the MMC project schema carries a company id', function () {
+    Schema::table('projects', function (Blueprint $table): void {
+        $table->unsignedInteger('company_id')->nullable();
+    });
+    DB::table('projects')->insert([
+        ['project_id' => 3, 'project_name' => 'Authorized project', 'project_code' => 'SHARED', 'company_id' => 11],
+        ['project_id' => 4, 'project_name' => 'Other company project', 'project_code' => 'SHARED', 'company_id' => 22],
+    ]);
+
+    $resolved = app(MmcProjectIntelligence::class)->resolve('SHARED', 11);
+
+    expect($resolved['status'])->toBe('found')
+        ->and($resolved['project']['project_id'])->toBe(3)
+        ->and($resolved['project']['company_id'])->toBe(11);
+});
+
+it('reports delivery analytics as unavailable when the operational calculation fails', function () {
+    DB::table('projects')->insert(['project_id' => 3, 'project_name' => 'Failure fixture', 'project_code' => 'FAIL']);
+    $progress = Mockery::mock(ProjectDeliveryProgressService::class);
+    $progress->shouldReceive('deliveryMetrics')->once()->andThrow(new RuntimeException('database unavailable'));
+    app()->instance(ProjectDeliveryProgressService::class, $progress);
+
+    $result = app(MmcProjectIntelligence::class)->deliverySummary('FAIL');
+
+    expect($result['status'])->toBe('data_unavailable')
+        ->and($result)->not->toHaveKey('exception');
+});

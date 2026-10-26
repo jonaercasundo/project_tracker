@@ -190,6 +190,12 @@ class AiAssistantService
             return 'my_mi_liquidations';
         }
 
+        $asksMmcDeliveryAnalytics = preg_match('/\b(deliver(?:ed|y|ies)?|pending|delayed|completion|completed|schools?)\b|\b(ilan|ilang)\b.*\b(deliver|paaralan|school)/iu', $lastUserMessage) === 1;
+        if ($asksMmcDeliveryAnalytics && in_array('get_mmc_project_delivery_summary', $availableTools, true)
+            && preg_match('/\b(?:in|sa|for|of)\s+[\(\[]?[\pL]{2,}(?:[\s-]*\d+)?[\)\]]?|\b[\pL]{2,}[\s-]*\d+\b/iu', $lastUserMessage)) {
+            return 'get_mmc_project_delivery_summary';
+        }
+
         if (preg_match('/\b(budget|expense|forecast|project|delivery|inventory|liquidation|spend|spent|last\s+month)\b/i', $lastUserMessage)) {
             return null;
         }
@@ -231,6 +237,7 @@ class AiAssistantService
             $moduleVoice,
             'The active company is '.$company->code.'. Use the page context to explain the current page, but use any supplied tool the user is authorized to access even if it belongs to another module in this company. Never claim access to another company. Use only supplied read-only tools for saved records. Page context contains route metadata only, never form values. Never create, edit, delete, submit, release, or approve records.',
             'For MI product price questions, call lookup_mi_product_prices when available; price access is independent from quotation creation. Use search_mi_products for product details without prices. '.$priceGuidance.' Report a price and SKU only when returned by the price tool. State PHP currency and MI product selling price basis. Never treat factory or purchase cost as selling price. If multiple similar products are returned, present distinct options; do not assume Round Table and Round Side Table are the same product.',
+            'For MMC project delivery questions, use get_mmc_project_delivery_summary when available, including for Filipino or Taglish questions and regardless of the current page. It resolves project aliases against actual project codes, names, references, and linked bidding records; always use the returned project_id identity and never treat bidding_id as a project ID. If ambiguous, ask the user to choose from the candidates. Distinguish not found from a found project with no delivery rows and from zero completed receipts. Delivered means completed valid DR receipts (all expected packages delivered or accepted, or all receipt rows delivered/accepted when no package definitions exist). State the period and counting unit. Unique schools counts schools with at least one delivered/accepted delivery row. Never treat delivery rows and DR receipts as interchangeable.',
             $quotationGuidance,
             'Do not invent taxes, discounts, delivery fees, payment terms, forecasts, or unavailable data. If a data tool is unavailable, explain the user-facing limitation briefly without naming internal functions or claiming that a search was made. For COP, explain when tracking is unavailable.',
             $verifiedProductContext,

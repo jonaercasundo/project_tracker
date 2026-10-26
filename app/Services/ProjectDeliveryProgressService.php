@@ -58,6 +58,12 @@ class ProjectDeliveryProgressService
             $query->where('d.delivery_date', '>=', $filters['year'].'-01-01')
                 ->where('d.delivery_date', '<', ((int) $filters['year'] + 1).'-01-01');
         }
+        if (isset($filters['date_from'])) {
+            $query->whereDate('d.delivery_date', '>=', $filters['date_from']);
+        }
+        if (isset($filters['date_to'])) {
+            $query->whereDate('d.delivery_date', '<=', $filters['date_to']);
+        }
         foreach (['region', 'division', 'municipality'] as $column) {
             if (isset($filters[$column])) {
                 $query->where('s.'.$column, $filters[$column]);
@@ -412,6 +418,12 @@ class ProjectDeliveryProgressService
         }
 
         return $query->orderBy('p.project_id');
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function deliveryMetrics(array $filters): ?object
+    {
+        return $this->deliveryStats([...$filters, 'active_only' => false])->first();
     }
 
     /** @param array<string, mixed> $filters */

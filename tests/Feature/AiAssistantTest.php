@@ -3,6 +3,7 @@
 use App\Models\AiConversation;
 use App\Models\BudgetRequest;
 use App\Models\MI_Liquidation;
+use App\Services\AiAssistantService;
 use App\Services\AiReadOnlyToolGateway;
 use Database\Seeders\AiAssistantPermissionSeeder;
 use Database\Seeders\AiBusinessDataPermissionSeeder;
@@ -321,6 +322,35 @@ it('returns page metadata from the authorized registry and denies cross-company 
     $ownRequests = $gateway->call('my_mi_budget_requests', [], $user, $user->currentCompany());
     expect($ownRequests)->toHaveCount(1)->and($ownRequests[0]['department'])->toBe('Design');
 });
+
+it('registers MMC project analytics only within an authorized active MMC workspace', function () {
+    $authorized = $this->miUser('user', 'MMC');
+    $this->actingAs($authorized)->withSession(['company_id' => $authorized->companies()->sole()->getKey()]);
+    $gateway = app(AiReadOnlyToolGateway::class);
+    $tools = collect($gateway->tools($authorized, $authorized->currentCompany(), []))->pluck('name');
+
+    expect($tools)->toContain('get_mmc_project_delivery_summary');
+
+    $wrongModuleUser = $this->miUser('user', 'MI');
+    $this->actingAs($wrongModuleUser)->withSession(['company_id' => $wrongModuleUser->companies()->sole()->getKey()]);
+    expect(collect($gateway->tools($wrongModuleUser, $wrongModuleUser->currentCompany(), []))->pluck('name'))
+        ->not->toContain('get_mmc_project_delivery_summary');
+    expect(fn () => $gateway->call('get_mmc_project_delivery_summary', ['project_references' => ['SME2'], 'date_from' => null, 'date_to' => null], $wrongModuleUser, $wrongModuleUser->currentCompany()))
+        ->toThrow(HttpException::class);
+});
+
+it('routes English and Filipino MMC delivery questions through project analytics', function (string $question) {
+    $assistant = app(AiAssistantService::class);
+    $method = new ReflectionMethod($assistant, 'requiredReadTool');
+
+    expect($method->invoke($assistant, [['role' => 'user', 'content' => $question]], [['name' => 'get_mmc_project_delivery_summary']], []))
+        ->toBe('get_mmc_project_delivery_summary');
+})->with([
+    'How many delivered in SME 2?',
+    'Ilan na delivered sa SME2?',
+    'Compare SME1 and SME2 deliveries.',
+    'How many schools were delivered in SME-2?',
+]);
 
 it('keeps MI catalog and price reads separate from quotation creation permission', function () {
     $user = $this->miUser('user');

@@ -41,6 +41,7 @@ class AiReadOnlyToolGateway
 
         if ($company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator'])) {
             $tools[] = $this->searchTool('search_mmc_projects', 'Search MMC project records visible in the active MMC company.', 'Project name, code, or procuring entity');
+            $tools[] = ['type' => 'function', 'name' => 'get_mmc_project_delivery_summary', 'description' => 'Resolve one or more project codes or aliases and return verified delivery receipt counts using the operational dashboard definition. Use null dates for all time.', 'parameters' => ['type' => 'object', 'properties' => ['project_references' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1, 'maxItems' => 5], 'date_from' => ['type' => ['string', 'null']], 'date_to' => ['type' => ['string', 'null']]], 'required' => ['project_references', 'date_from', 'date_to'], 'additionalProperties' => false], 'strict' => true];
             $tools[] = ['type' => 'function', 'name' => 'mmc_operations_snapshot', 'description' => 'Get calculated MMC project, delivery, package, and inventory totals for the active company workspace.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
             $tools[] = $this->searchTool('search_mmc_deliveries', 'Search read-only MMC delivery records, receipt statuses, and package counts.', 'Project, receipt number, or school to search');
         }
@@ -128,6 +129,34 @@ class AiReadOnlyToolGateway
             $this->logToolExecuted($name, $user, $company, 1);
 
             return $result;
+        }
+
+        if ($name === 'get_mmc_project_delivery_summary' && $company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator'])) {
+            $references = $arguments['project_references'] ?? [];
+            if (! is_array($references) || $references === [] || count($references) > 5) {
+                abort(422, 'Project reference is invalid.');
+            }
+            foreach ($references as $reference) {
+                if (! is_string($reference) || trim($reference) === '' || mb_strlen($reference) > 120) {
+                    abort(422, 'Project reference is invalid.');
+                }
+            }
+            $dateFrom = $arguments['date_from'] ?? null;
+            $dateTo = $arguments['date_to'] ?? null;
+            foreach (['date_from' => $dateFrom, 'date_to' => $dateTo] as $date) {
+                if ($date !== null && ! $this->isValidIsoDate($date)) {
+                    abort(422, 'Delivery date filter is invalid.');
+                }
+            }
+            if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
+                abort(422, 'Delivery date range is invalid.');
+            }
+            $intelligence = app(MmcProjectIntelligence::class);
+            $filters = array_filter(['date_from' => $dateFrom, 'date_to' => $dateTo], fn ($date): bool => $date !== null);
+            $result = array_map(fn (string $reference): array => $intelligence->deliverySummary($reference, $company->getKey(), $filters), $references);
+            $this->logToolExecuted($name, $user, $company, count(array_filter($result, fn (array $row): bool => ($row['status'] ?? '') === 'found')));
+
+            return ['projects' => $result];
         }
 
         if ($name === 'my_mi_budget_requests' && $company->code === 'MI' && $user->hasMIUserAccess()) {
@@ -299,5 +328,14 @@ class AiReadOnlyToolGateway
             && (bool) $company->is_active
             && $user->currentCompany()?->getKey() === $company->getKey()
             && $user->belongsToCompany($company->getKey());
+    }
+
+    private function isValidIsoDate(mixed $date): bool
+    {
+        if (! is_string($date) || ! preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $parts)) {
+            return false;
+        }
+
+        return checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]);
     }
 }

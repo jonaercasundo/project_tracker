@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Company;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 class AiAssistantService
@@ -32,19 +34,34 @@ class AiAssistantService
         $gateway = app(AiReadOnlyToolGateway::class);
         $tools = $gateway->tools($user, $company, $context);
         $input = array_map(fn (array $message): array => ['role' => $message['role'], 'content' => $message['content']], $history);
+        $requiredTool = $this->requiredReadTool($history, $tools);
         $usage = ['model' => $model, 'request_id' => null, 'input_tokens' => null, 'output_tokens' => null];
         $emitted = '';
 
         for ($round = 0; $round < 3; $round++) {
-            $request = $this->client->stream($key, [
+            $requestBody = [
                 'model' => $model,
-                'instructions' => $this->instructions($company, $context),
+                'instructions' => $this->instructions(
+                    $company,
+                    $context,
+                    $user->can('mi.product-prices.view'),
+                    $user->can('mi.quotation.create') && Schema::hasTable('ai_quotation_workflows') && Schema::hasTable('ai_quotations'),
+                ),
                 'input' => $input,
                 'tools' => $tools,
                 'stream' => true,
                 'store' => false,
                 'max_output_tokens' => (int) config('ai_assistant.max_output_tokens', 1200),
-            ]);
+            ];
+            if ($round === 0 && $requiredTool !== null) {
+                $requestBody['tool_choice'] = ['type' => 'function', 'name' => $requiredTool];
+                Log::info('AI assistant required tool selected by intent', [
+                    'tool' => $requiredTool,
+                    'user_id' => $user->getKey(),
+                    'company_id' => $company->getKey(),
+                ]);
+            }
+            $request = $this->client->stream($key, $requestBody);
 
             if (! $request->successful()) {
                 throw new RuntimeException('The AI provider request failed.');
@@ -112,7 +129,7 @@ class AiAssistantService
             foreach ($toolCalls as $call) {
                 $arguments = json_decode((string) ($call['arguments'] ?? '{}'), true);
                 $result = $gateway->call((string) $call['name'], is_array($arguments) ? $arguments : [], $user, $company);
-                if ($call['name'] === 'search_mi_products' && $onProductMatches !== null && $result !== []) {
+                if ($call['name'] === 'lookup_mi_product_prices' && $onProductMatches !== null && $result !== []) {
                     $onProductMatches($result);
                 }
                 $input[] = ['type' => 'function_call_output', 'call_id' => $call['call_id'], 'output' => json_encode($result, JSON_THROW_ON_ERROR)];
@@ -122,9 +139,32 @@ class AiAssistantService
         throw new RuntimeException('The assistant reached its tool-call limit.');
     }
 
-    /** @param array<string, mixed> $context */
-    private function instructions(Company $company, array $context): string
+    /** @param array<int, array{role: string, content: string}> $history
+     * @param  array<int, array<string, mixed>>  $tools
+     */
+    private function requiredReadTool(array $history, array $tools): ?string
     {
-        return 'You are the Project Tracker assistant for the active company '.$company->code.'. Follow the authorized module registry and page context below. Never claim access to another company. Use only the supplied read-only tools for saved business records; never invent SQL or request arbitrary database access. Do not expose secrets or ask for passwords. Page context contains route metadata only, never form values. Never create, edit, delete, submit, release, or approve records. For MI product price questions use the product search tool; state the selling price, SKU, PHP currency, and MI product selling price basis only when supplied. Never treat factory cost or purchase cost as selling price. If a saved product lacks a price say so. Once a product and price are found, proactively ask whether to prepare a quotation, compare products, view details, or stop. Do not claim a quotation was created; the user must complete and confirm the on-screen workflow. Do not invent taxes, discounts, delivery fees, or payment terms.\n\nAuthorized page context: '.json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $lastUserMessage = collect($history)->last(fn (array $message): bool => $message['role'] === 'user')['content'] ?? '';
+        if (! is_string($lastUserMessage) || preg_match('/\b(budget|expense|forecast|project|delivery|inventory|liquidation)\b/i', $lastUserMessage)) {
+            return null;
+        }
+
+        $asksForPrice = preg_match('/\b(how\s+much\s+is|price\s+(?:of|for)|selling\s+price\s+(?:of|for)|what\s+is\s+the\s+price\s+of|cost\s+of)\b/i', $lastUserMessage) === 1;
+        $priceToolAvailable = collect($tools)->contains(fn (array $tool): bool => ($tool['name'] ?? null) === 'lookup_mi_product_prices');
+
+        return $asksForPrice && $priceToolAvailable ? 'lookup_mi_product_prices' : null;
+    }
+
+    /** @param array<string, mixed> $context */
+    private function instructions(Company $company, array $context, bool $canViewProductPrices, bool $canCreateQuotation): string
+    {
+        $priceGuidance = $canViewProductPrices
+            ? 'The user is authorized to use the MI selling-price lookup when it is supplied.'
+            : 'The user is not authorized to view MI selling prices; do not infer that a price is missing, and explain that price-view access is required.';
+        $quotationGuidance = $canCreateQuotation
+            ? 'The user is authorized to prepare a quotation; offer the existing quotation workflow as an optional next step. The user must explicitly confirm before a draft is saved.'
+            : 'The user cannot currently create quotations; do not offer or imply access to quotation creation.';
+
+        return 'You are the Project Tracker assistant for the active company '.$company->code.'. Use the page context to explain the current page, but use any supplied tool the user is authorized to access even when it belongs to another module in this active company. Never claim access to another company. Use only supplied read-only tools for saved business records; never invent SQL or request arbitrary database access. Do not expose secrets or ask for passwords. Page context contains route metadata only, never form values. Never create, edit, delete, submit, release, or approve records. For MI product price questions, call lookup_mi_product_prices when available; this search is allowed independently of quotation creation permission. Use search_mi_products for catalog details without prices. '.$priceGuidance.' Report only a price and SKU returned by the price tool, state PHP currency and MI product selling price basis, and never use factory or purchase costs as selling prices. If multiple similar products are returned, present the distinct options and ask which one the user means; do not assume Round Table and Round Side Table are identical. '.$quotationGuidance.' Do not invent taxes, discounts, delivery fees, payment terms, forecasts, or data that no tool returns. For COP tools, explain if tracking is unavailable rather than guessing.\n\nAuthorized page context: '.json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 }

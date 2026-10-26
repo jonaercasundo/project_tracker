@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 class AiMiProductPresenter
 {
     /** @return array<string, mixed> */
-    public function present(MI_Product $product): array
+    public function present(MI_Product $product, bool $includeSellingPrice = false): array
     {
         $image = $product->images->firstWhere('is_primary', true) ?? $product->images->first();
         $imageUrl = null;
@@ -21,19 +21,26 @@ class AiMiProductPresenter
             }
         }
 
-        return [
+        $presentedProduct = [
             'id' => $product->product_id,
             'name' => $product->item_name,
             'sku' => $product->sku ?: $product->item_code,
             'code' => $product->item_code,
-            'price' => $product->price,
-            'currency' => 'PHP',
-            'pricing_basis' => 'MI product selling price',
             'image' => $imageUrl,
             'category_id' => $product->category_id,
+            'category' => $product->category?->name,
             'sub_category_id' => $product->sub_category_id,
+            'collection' => $product->collection?->name,
             'materials' => $product->materials,
             'colors' => $product->color,
         ];
+
+        if ($includeSellingPrice) {
+            $presentedProduct['price'] = $product->price;
+            $presentedProduct['currency'] = 'PHP';
+            $presentedProduct['pricing_basis'] = 'MI product selling price';
+        }
+
+        return $presentedProduct;
     }
 }

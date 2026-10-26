@@ -3,9 +3,12 @@
 use App\Models\AiConversation;
 use App\Models\AiQuotation;
 use App\Models\MI_Product;
+use App\Services\AiReadOnlyToolGateway;
 use Database\Seeders\AiAssistantPermissionSeeder;
+use Database\Seeders\AiBusinessDataPermissionSeeder;
 use Database\Seeders\AiQuotationPermissionSeeder;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\MIWorkflowTestCase;
@@ -42,6 +45,7 @@ class AiQuotationAssistantTestCase extends MIWorkflowTestCase
     {
         parent::setUp();
         $this->seed(AiAssistantPermissionSeeder::class);
+        $this->seed(AiBusinessDataPermissionSeeder::class);
         $this->seed(AiQuotationPermissionSeeder::class);
     }
 }
@@ -57,7 +61,7 @@ function aiQuotationConversation($user): AiConversation
     ]);
 }
 
-it('shows verified selling prices only to users with quotation permission', function () {
+it('shows verified selling prices only to users with dedicated price-view permission', function () {
     $product = MI_Product::factory()->create(['item_name' => 'ROUND SIDE TABLE (M)', 'sku' => 'FU-AC-XXX-TA-0393', 'price' => '1250.75', 'purchase_cost' => '12.34']);
     $user = $this->miUser();
     $this->signInMI($user);
@@ -76,7 +80,7 @@ it('streams a verified product price card from the authorized assistant tool and
     $user = $this->miUser();
     $this->signInMI($user);
     config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
-    $call = ['type' => 'function_call', 'name' => 'search_mi_products', 'arguments' => '{"query":"ROUND SIDE TABLE (M)"}', 'call_id' => 'call_price'];
+    $call = ['type' => 'function_call', 'name' => 'lookup_mi_product_prices', 'arguments' => '{"query":"ROUND SIDE TABLE (M)"}', 'call_id' => 'call_price'];
     $firstResponse = 'data: '.json_encode(['type' => 'response.output_item.done', 'item' => $call])."\n\n".
         'data: '.json_encode(['type' => 'response.completed', 'response' => ['output' => [$call], 'usage' => ['input_tokens' => 10, 'output_tokens' => 2]]])."\n\n";
     $secondResponse = 'data: '.json_encode(['type' => 'response.output_text.delta', 'delta' => 'I found the product and its selling price. Would you like me to prepare a quotation?'])."\n\n".
@@ -90,6 +94,10 @@ it('streams a verified product price card from the authorized assistant tool and
     $stream = $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'How much is ROUND SIDE TABLE (M)?']);
     $stream->assertOk();
     expect($stream->streamedContent())->toContain('event: products', '1250.75', 'MI product selling price', 'event: done');
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.openai.com/v1/responses'
+        && isset($request['tool_choice'])
+        && $request['tool_choice'] === ['type' => 'function', 'name' => 'lookup_mi_product_prices']
+        && collect($request['tools'])->contains(fn (array $tool): bool => $tool['name'] === 'lookup_mi_product_prices'));
     $message = $this->getJson(route('assistant.conversations.show', $conversation['id']))->assertOk()->json('conversation.messages.1');
     expect($message['metadata']['products'][0]['id'])->toBe($product->getKey())
         ->and($message['metadata']['products'][0]['price'])->toBe('1250.75');
@@ -166,9 +174,104 @@ it('hides saved price-bearing conversations after MI quotation permission is rev
     $this->signInMI($user);
     $conversation = aiQuotationConversation($user);
     $conversation->messages()->create(['role' => 'assistant', 'content' => 'Selling price: PHP 100.00', 'metadata' => ['products' => [['id' => 1, 'price' => '100.00']]]]);
-    Role::findByName('user', 'web')->revokePermissionTo('mi.quotation.create');
+    Role::findByName('user', 'web')->revokePermissionTo('mi.product-prices.view');
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
     $this->getJson(route('assistant.conversations.show', $conversation))->assertForbidden();
     $this->post(route('assistant.messages.stream', $conversation), ['message' => 'Repeat the price'])->assertForbidden();
+});
+
+it('retrieves product selling prices for an authorized read-only user without quotation permission', function () {
+    $product = MI_Product::factory()->create(['item_name' => 'ROUND SIDE TABLE (M)', 'sku' => 'MI-READ-01', 'price' => '1250.75']);
+    $user = $this->miUser();
+    Role::findByName('user', 'web')->revokePermissionTo('mi.quotation.create');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $this->signInMI($user);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    $this->getJson(route('assistant.quotations.products', ['query' => 'Round Side Table']))
+        ->assertOk()->assertJsonPath('products.0.price', '1250.75');
+
+    $call = ['type' => 'function_call', 'name' => 'lookup_mi_product_prices', 'arguments' => '{"query":"Round Side Table (M)"}', 'call_id' => 'call_read_only_price'];
+    $firstResponse = 'data: '.json_encode(['type' => 'response.output_item.done', 'item' => $call])."\n\n".
+        'data: '.json_encode(['type' => 'response.completed', 'response' => ['output' => [$call], 'usage' => ['input_tokens' => 8, 'output_tokens' => 1]]])."\n\n";
+    $secondResponse = 'data: '.json_encode(['type' => 'response.output_text.delta', 'delta' => 'The MI selling price is PHP 1,250.75.'])."\n\n".
+        'data: '.json_encode(['type' => 'response.completed', 'response' => ['output' => [], 'usage' => ['input_tokens' => 11, 'output_tokens' => 12]]])."\n\n";
+    Http::fake(['https://api.openai.com/v1/responses' => Http::sequence()
+        ->push($firstResponse, 200, ['Content-Type' => 'text/event-stream'])
+        ->push($secondResponse, 200, ['Content-Type' => 'text/event-stream'])]);
+    $conversation = $this->postJson(route('assistant.conversations.store'))->assertCreated()->json('conversation');
+    $this->postJson(route('assistant.quotations.start', $conversation['id']), ['product_id' => $product->getKey()])->assertForbidden();
+
+    $stream = $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'How much is Round Side Table (M)?']);
+    $stream->assertOk();
+    expect($stream->streamedContent())->toContain('event: products', '1250.75', 'event: done');
+    $message = $this->getJson(route('assistant.conversations.show', $conversation['id']))->assertOk()->json('conversation.messages.1');
+
+    expect($message['metadata']['products'][0]['id'])->toBe($product->getKey())
+        ->and($message['metadata']['products'][0]['price'])->toBe('1250.75')
+        ->and($user->can('mi.quotation.create'))->toBeFalse();
+    $this->assertDatabaseCount('ai_quotations', 0);
+});
+
+it('matches distinct MI product names case-insensitively and returns prices only from the price tool', function () {
+    $sideTable = MI_Product::factory()->create(['item_name' => 'ROUND SIDE TABLE (M)', 'sku' => 'MI-SIDE-01', 'price' => '1250.75']);
+    $roundTable = MI_Product::factory()->create(['item_name' => 'ROUND TABLE (M)', 'sku' => 'MI-ROUND-01', 'price' => '975.00']);
+    $user = $this->miUser();
+    $this->signInMI($user);
+    $company = $user->currentCompany();
+    $gateway = app(AiReadOnlyToolGateway::class);
+
+    $catalog = $gateway->call('search_mi_products', ['query' => 'round table (m)'], $user, $company);
+    $prices = $gateway->call('lookup_mi_product_prices', ['query' => 'Round Table (M)'], $user, $company);
+
+    expect(array_column($catalog, 'id'))->toContain($roundTable->getKey(), $sideTable->getKey())
+        ->and(array_key_exists('price', $catalog[0]))->toBeFalse()
+        ->and(array_column($prices, 'id'))->toContain($roundTable->getKey(), $sideTable->getKey())
+        ->and(collect($prices)->firstWhere('id', $roundTable->getKey())['price'])->toBe('975.00')
+        ->and(collect($prices)->firstWhere('id', $sideTable->getKey())['price'])->toBe('1250.75');
+});
+
+it('reports MI catalog totals and missing COP records from stored products', function () {
+    $missingCop = MI_Product::factory()->create(['item_name' => 'Missing Origin Product', 'country_of_production' => '   ']);
+    MI_Product::factory()->create(['item_name' => 'Known Origin Product', 'country_of_production' => 'Vietnam']);
+    $user = $this->miUser();
+    $this->signInMI($user);
+    $company = $user->currentCompany();
+    $gateway = app(AiReadOnlyToolGateway::class);
+
+    $summary = $gateway->call('mi_product_catalog_summary', [], $user, $company);
+    $missingProducts = $gateway->call('mi_products_needing_cop', [], $user, $company);
+
+    expect($summary['product_count'])->toBe(2)
+        ->and($summary['products_missing_cop'])->toBe(1)
+        ->and($missingProducts)->toHaveCount(1)
+        ->and($missingProducts[0]['id'])->toBe($missingCop->getKey());
+});
+
+it('keeps read-only assistant product lookup available before the quotation migration is installed', function () {
+    $product = MI_Product::factory()->create(['item_name' => 'ROUND SIDE TABLE (M)', 'sku' => 'MI-PENDING-MIGRATION', 'price' => '1250.75']);
+    $user = $this->miUser();
+    $this->signInMI($user);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    $migration = require database_path('migrations/2026_10_26_095438_create_ai_quotation_workflow_tables.php');
+    $migration->down();
+
+    $call = ['type' => 'function_call', 'name' => 'lookup_mi_product_prices', 'arguments' => '{"query":"ROUND SIDE TABLE (M)"}', 'call_id' => 'call_without_quote_schema'];
+    $firstResponse = 'data: '.json_encode(['type' => 'response.output_item.done', 'item' => $call])."\n\n".
+        'data: '.json_encode(['type' => 'response.completed', 'response' => ['output' => [$call], 'usage' => ['input_tokens' => 8, 'output_tokens' => 1]]])."\n\n";
+    $secondResponse = 'data: '.json_encode(['type' => 'response.output_text.delta', 'delta' => 'The MI selling price is PHP 1,250.75.'])."\n\n".
+        'data: '.json_encode(['type' => 'response.completed', 'response' => ['output' => [], 'usage' => ['input_tokens' => 11, 'output_tokens' => 12]]])."\n\n";
+    Http::fake(['https://api.openai.com/v1/responses' => Http::sequence()
+        ->push($firstResponse, 200, ['Content-Type' => 'text/event-stream'])
+        ->push($secondResponse, 200, ['Content-Type' => 'text/event-stream'])]);
+    $conversation = $this->postJson(route('assistant.conversations.store'))->assertCreated()->json('conversation');
+
+    $stream = $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'How much is ROUND SIDE TABLE (M)?']);
+    $stream->assertOk();
+    expect($stream->streamedContent())->toContain('event: products', '1250.75', 'event: done');
+    $this->getJson(route('assistant.conversations.show', $conversation['id']))->assertOk();
+    $this->postJson(route('assistant.quotations.start', $conversation['id']), ['product_id' => $product->getKey()])->assertStatus(503);
+    expect(Schema::hasColumn('ai_messages', 'metadata'))->toBeFalse()
+        ->and(Schema::hasTable('ai_quotation_workflows'))->toBeFalse()
+        ->and($product->exists)->toBeTrue();
 });

@@ -13,22 +13,23 @@ use App\Services\AiQuotationWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class AiQuotationController extends Controller
 {
     public function products(Request $request, AiMiProductPresenter $presenter): JsonResponse
     {
-        $this->identity($request);
+        $this->identity($request, requiredPermission: 'mi.product-prices.view');
         $validated = $request->validate(['query' => ['required', 'string', 'max:120']]);
         $query = trim($validated['query']);
         abort_if($query === '', 422, 'Enter a product name or SKU to search.');
-        $products = MI_Product::query()->with('images')->where(function ($builder) use ($query): void {
+        $products = MI_Product::query()->with(['images', 'category', 'collection'])->where(function ($builder) use ($query): void {
             $builder->where('item_name', 'like', '%'.$query.'%')->orWhere('sku', 'like', '%'.$query.'%')->orWhere('item_code', 'like', '%'.$query.'%');
         })->orderByRaw('CASE WHEN item_name = ? THEN 0 WHEN sku = ? OR item_code = ? THEN 0 ELSE 1 END', [$query, $query, $query])
             ->orderBy('item_name')->limit(8)->get(['product_id', 'item_name', 'sku', 'item_code', 'price']);
 
-        return response()->json(['products' => $products->map(fn (MI_Product $product): array => $presenter->present($product))]);
+        return response()->json(['products' => $products->map(fn (MI_Product $product): array => $presenter->present($product, true))]);
     }
 
     public function start(Request $request, AiConversation $conversation, AiQuotationWorkflowService $workflow): JsonResponse
@@ -103,11 +104,15 @@ class AiQuotationController extends Controller
     }
 
     /** @return array{0: User, 1: Company} */
-    private function identity(Request $request, ?AiConversation $conversation = null): array
+    private function identity(Request $request, ?AiConversation $conversation = null, string $requiredPermission = 'mi.quotation.create'): array
     {
         $user = $request->user();
         abort_unless($user instanceof User, 401);
-        abort_unless($user->can('ai.assistant.use') && $user->can('mi.quotation.create'), 403);
+        abort_unless($user->can('ai.assistant.use') && $user->can($requiredPermission), 403);
+        if ($requiredPermission === 'mi.quotation.create') {
+            abort_unless($user->can('mi.product-prices.view'), 403);
+            abort_unless(Schema::hasTable('ai_quotation_workflows') && Schema::hasTable('ai_quotations'), 503, 'The quotation workflow is not available until its database migration is installed.');
+        }
         $company = $user->currentCompany();
         abort_unless($company instanceof Company && $company->code === 'MI' && $user->belongsToCompany($company->getKey()), 403);
         abort_unless(app(AiProviderConfiguration::class)->isEnabled(), 503);

@@ -15,6 +15,7 @@ return [
             'label' => 'MI Product Designer',
             'company' => 'MI',
             'roles' => ['user', 'Executive', 'executive', 'Accounting', 'accounting'],
+            'permissions' => ['mi.product-catalog.view'],
             'route_prefixes' => ['mi_app.', 'taxonomy.'],
             'description' => 'MI product catalog and designer workflows. Product attributes and pricing are separate from MMC project and finance records.',
             'pages' => [

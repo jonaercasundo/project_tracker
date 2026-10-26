@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
         // 3. THEN seed user
         $this->call([
             AiAssistantPermissionSeeder::class,
+            AiBusinessDataPermissionSeeder::class,
             AdminUserSeeder::class,
             BillingPermissionSeeder::class,
         ]);

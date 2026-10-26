@@ -4,9 +4,12 @@ use App\Models\AiConversation;
 use App\Models\BudgetRequest;
 use App\Services\AiReadOnlyToolGateway;
 use Database\Seeders\AiAssistantPermissionSeeder;
+use Database\Seeders\AiBusinessDataPermissionSeeder;
 use Database\Seeders\AiQuotationPermissionSeeder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\MIWorkflowTestCase;
 
@@ -26,6 +29,7 @@ class AiAssistantTestCase extends MIWorkflowTestCase
     {
         parent::setUp();
         $this->seed(AiAssistantPermissionSeeder::class);
+        $this->seed(AiBusinessDataPermissionSeeder::class);
         $this->seed(AiQuotationPermissionSeeder::class);
     }
 }
@@ -227,7 +231,8 @@ it('returns page metadata from the authorized registry and denies cross-company 
 
     $gateway = app(AiReadOnlyToolGateway::class);
     expect(collect($gateway->tools($user, $user->currentCompany(), []))->pluck('name')->all())
-        ->toContain('search_mi_products', 'my_mi_budget_requests')->not->toContain('search_mmc_projects');
+        ->toContain('search_mi_products', 'lookup_mi_product_prices', 'mi_product_catalog_summary', 'mi_products_needing_cop', 'my_mi_budget_requests')
+        ->not->toContain('search_mmc_projects');
     expect(fn () => $gateway->call('search_mmc_projects', ['query' => 'secret'], $user, $user->currentCompany()))
         ->toThrow(HttpException::class);
 
@@ -236,4 +241,64 @@ it('returns page metadata from the authorized registry and denies cross-company 
     BudgetRequest::create(['employee_id' => $other->getKey(), 'company_id' => $other->companies()->sole()->getKey(), 'department' => 'Finance', 'budget_total' => 500]);
     $ownRequests = $gateway->call('my_mi_budget_requests', [], $user, $user->currentCompany());
     expect($ownRequests)->toHaveCount(1)->and($ownRequests[0]['department'])->toBe('Design');
+});
+
+it('keeps MI catalog and price reads separate from quotation creation permission', function () {
+    $user = $this->miUser('user');
+    $this->signInMI($user);
+    Role::findByName('user', 'web')->revokePermissionTo('mi.quotation.create');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $gateway = app(AiReadOnlyToolGateway::class);
+    $company = $user->currentCompany();
+    $toolNames = collect($gateway->tools($user, $company, ['key' => 'workspace']))->pluck('name')->all();
+
+    expect($toolNames)->toContain('lookup_mi_product_prices')->and($user->can('mi.quotation.create'))->toBeFalse();
+
+    $readOnlyRole = Role::findOrCreate('MI_Catalog_Read_Only', 'web');
+    $readOnlyRole->givePermissionTo(['ai.assistant.use', 'mi.product-catalog.view']);
+    $readOnlyUser = $this->miUser('MI_Catalog_Read_Only');
+    $this->actingAs($readOnlyUser)->withSession(['company_id' => $readOnlyUser->companies()->sole()->getKey()]);
+    $readOnlyCompany = $readOnlyUser->currentCompany();
+    $readOnlyTools = collect($gateway->tools($readOnlyUser, $readOnlyCompany, []))->pluck('name')->all();
+
+    expect($readOnlyTools)->toContain('search_mi_products')->not->toContain('lookup_mi_product_prices');
+    expect(fn () => $gateway->call('lookup_mi_product_prices', ['query' => 'table'], $readOnlyUser, $readOnlyCompany))
+        ->toThrow(HttpException::class);
+});
+
+it('registers the MI accounting queue summary only for accounting-authorized users', function () {
+    $user = $this->miUser('Accounting');
+    $this->signInMI($user);
+    $company = $user->currentCompany();
+    $gateway = app(AiReadOnlyToolGateway::class);
+
+    expect(collect($gateway->tools($user, $company, []))->pluck('name'))
+        ->toContain('mi_accounting_queue_summary');
+
+    $employee = $this->miUser('user');
+    $this->signInMI($employee);
+    expect(collect($gateway->tools($employee, $employee->currentCompany(), []))->pluck('name'))
+        ->not->toContain('mi_accounting_queue_summary');
+});
+
+it('summarizes MI approvals only for authorized approvers and filters out their own budget requests', function () {
+    $approver = $this->miUser('Executive');
+    $this->signInMI($approver);
+    $employee = $this->miUser('user');
+    BudgetRequest::create([
+        'employee_id' => $employee->getKey(),
+        'company_id' => $approver->companies()->sole()->getKey(),
+        'department' => 'Design',
+        'budget_total' => 300,
+        'status' => 'budget_requested',
+    ]);
+    $gateway = app(AiReadOnlyToolGateway::class);
+    $summary = $gateway->call('mi_pending_approval_summary', [], $approver, $approver->currentCompany());
+
+    expect($summary['pending_budget_approvals'])->toBe(1)
+        ->and($summary['pending_travel_liquidations'])->toBe(0);
+
+    $employeeCompany = $employee->currentCompany();
+    expect(fn () => $gateway->call('mi_pending_approval_summary', [], $employee, $employeeCompany))
+        ->toThrow(HttpException::class);
 });

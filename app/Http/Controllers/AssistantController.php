@@ -15,6 +15,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -117,7 +118,7 @@ class AssistantController extends Controller
                     $emit('delta', ['text' => $delta]);
                 }, function (array $products) use ($emit, &$productCards, $user, $company, $conversation): void {
                     $productCards = $products;
-                    if ($company->code === 'MI' && $user->can('mi.quotation.create')) {
+                    if ($company->code === 'MI' && $user->can('mi.quotation.create') && Schema::hasTable('ai_quotation_audits')) {
                         DB::table('ai_quotation_audits')->insert([
                             'conversation_id' => $conversation->getKey(), 'user_id' => $user->getKey(),
                             'company_id' => $company->getKey(), 'action' => 'quotation_suggestion_shown',
@@ -128,7 +129,11 @@ class AssistantController extends Controller
                     $emit('products', ['items' => $products]);
                 });
                 DB::transaction(function () use ($conversation, $answer, $usage, $user, $company, &$productCards): void {
-                    $conversation->messages()->create(['role' => 'assistant', 'content' => $answer, 'metadata' => $productCards === [] ? null : ['products' => $productCards], 'model' => $usage['model'], 'input_tokens' => $usage['input_tokens'], 'output_tokens' => $usage['output_tokens']]);
+                    $assistantMessage = ['role' => 'assistant', 'content' => $answer, 'model' => $usage['model'], 'input_tokens' => $usage['input_tokens'], 'output_tokens' => $usage['output_tokens']];
+                    if (Schema::hasColumn('ai_messages', 'metadata')) {
+                        $assistantMessage['metadata'] = $productCards === [] ? null : ['products' => $productCards];
+                    }
+                    $conversation->messages()->create($assistantMessage);
                     $conversation->forceFill(['last_message_at' => now()])->save();
                     AiActivity::create(['user_id' => $user->getKey(), 'company_id' => $company->getKey(), 'conversation_id' => $conversation->getKey(), ...$usage, 'status' => 'completed']);
                 });
@@ -169,7 +174,7 @@ class AssistantController extends Controller
 
     private function authorizePriceHistory(User $user, Company $company, AiConversation $conversation): void
     {
-        if ($company->code === 'MI' && ! $user->can('mi.quotation.create')) {
+        if ($company->code === 'MI' && ! $user->can('mi.product-prices.view') && Schema::hasColumn('ai_messages', 'metadata')) {
             abort_if($conversation->messages()->whereNotNull('metadata')->exists(), 403, 'You no longer have permission to view MI product price data in this conversation.');
         }
     }

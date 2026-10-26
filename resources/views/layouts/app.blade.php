@@ -30,14 +30,35 @@
         </div>
 
         @if ($isAdminWorkspace)
-            <div x-data="{ mobileNavOpen: false, sidebarCollapsed: false }" class="min-h-screen flex bg-[#f4f7fb]">
+            <div
+                x-data="{
+                    mobileNavOpen: false,
+                    sidebarCollapsed: window.innerWidth >= 768 && window.innerWidth < 1280,
+                    sidebarManuallyToggled: false,
+                    init() {
+                        window.addEventListener('resize', () => {
+                            if (!this.sidebarManuallyToggled) {
+                                this.sidebarCollapsed = window.innerWidth >= 768 && window.innerWidth < 1280;
+                            }
+                            if (window.innerWidth >= 768) {
+                                this.mobileNavOpen = false;
+                            }
+                        });
+                    },
+                    closeMobileNavigation() {
+                        this.mobileNavOpen = false;
+                        this.$nextTick(() => this.$refs.adminMainContent?.focus());
+                    },
+                }"
+                class="min-h-screen flex bg-[#f4f7fb]"
+            >
                 @include('layouts.admin-sidebar')
 
-                <div class="min-w-0 flex-1 md:pl-0">
+                <div class="flex min-h-screen min-w-0 flex-1 flex-col">
                     <header class="sticky top-0 z-30 h-[68px] border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-                        <div class="flex h-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+                        <div class="flex h-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-6">
                             <div class="flex min-w-0 items-center gap-3">
-                                <button type="button" @click="mobileNavOpen = true" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 md:hidden" aria-label="Open administrator navigation">
+                                <button type="button" @click="mobileNavOpen = true; $nextTick(() => $refs.adminNavigation?.querySelector('a')?.focus())" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 md:hidden" aria-label="Open administrator navigation" aria-controls="admin-sidebar" :aria-expanded="mobileNavOpen.toString()">
                                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
                                 </button>
                                 <div class="min-w-0">
@@ -109,7 +130,7 @@
                         <div class="border-b border-slate-200/70 bg-white px-4 py-3 sm:px-6 lg:px-8">{{ $header }}</div>
                     @endisset
 
-                    <main class="min-h-[calc(100vh-68px)] px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
+                    <main x-ref="adminMainContent" tabindex="-1" class="min-h-[calc(100vh-68px)] min-w-0 px-4 py-5 outline-none sm:px-6 sm:py-6 lg:px-6 lg:py-6">
                         {{ $slot }}
                     </main>
                 </div>

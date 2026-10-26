@@ -41,6 +41,7 @@ it('shows the control center and protects management routes from non-administrat
 
     $this->get(route('admin.dashboard'))->assertOk()->assertSee('A clear view of access and operations.')
         ->assertSee('Administrator navigation')->assertSee('AI Assistant')->assertSee('AI Configuration')
+        ->assertSee('md:w-[72px]')->assertSee('md:w-[260px]')->assertSee('md:sticky')
         ->assertSee(route('roles.index'))->assertSee(route('admin.ai-management.index'))->assertSee(route('roleaccess.index'));
     $this->get(route('admin.access.permissions.index'))->assertOk()->assertSee('Role permission matrix')->assertSee('Administrator navigation');
     $this->get(route('admin.access.review'))->assertOk()->assertSee('User access review')->assertSee('All users &amp; access', false);

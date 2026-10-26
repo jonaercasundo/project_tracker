@@ -1,8 +1,8 @@
-<div x-show="mobileNavOpen" x-cloak @keydown.escape.window="mobileNavOpen = false" class="fixed inset-0 z-50 bg-slate-950/40 md:hidden" @click.self="mobileNavOpen = false">
-    <button type="button" class="absolute inset-0 h-full w-full" aria-label="Close navigation" @click="mobileNavOpen = false"></button>
+<div x-show="mobileNavOpen" x-cloak @keydown.escape.window="closeMobileNavigation()" class="fixed inset-0 z-50 bg-slate-950/40 md:hidden" @click.self="closeMobileNavigation()">
+    <button type="button" class="absolute inset-0 h-full w-full" aria-label="Close navigation" @click="closeMobileNavigation()"></button>
 </div>
 
-<aside :class="[sidebarCollapsed ? 'w-[76px]' : 'w-[252px]', mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0']" class="fixed inset-y-0 left-0 z-[55] flex flex-col border-r border-slate-200/80 bg-white transition-[width,transform] duration-200 motion-reduce:transition-none">
+<aside id="admin-sidebar" :class="[sidebarCollapsed ? 'md:w-[72px]' : 'md:w-[260px]', mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0']" class="fixed inset-y-0 left-0 z-[55] flex w-[260px] flex-col border-r border-slate-200/80 bg-white transition-[width,transform] duration-200 motion-reduce:transition-none md:sticky md:top-0 md:h-screen md:shrink-0">
     <div class="flex h-[68px] shrink-0 items-center justify-between border-b border-slate-100 px-4">
         <a href="{{ route('admin.dashboard') }}" class="flex min-w-0 items-center gap-3" aria-label="Project Tracker Administrator home">
             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#123b72] text-white shadow-sm">
@@ -13,15 +13,15 @@
                 <span class="mt-1 block text-[10px] font-semibold text-slate-400">ADMIN CONTROL CENTER</span>
             </span>
         </a>
-        <button type="button" @click="sidebarCollapsed = !sidebarCollapsed" class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 md:inline-flex" :aria-label="sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'" :aria-expanded="(!sidebarCollapsed).toString()">
+        <button type="button" @click="sidebarManuallyToggled = true; sidebarCollapsed = !sidebarCollapsed" class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 md:inline-flex" :aria-label="sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'" :aria-expanded="(!sidebarCollapsed).toString()">
             <svg class="h-4 w-4 transition-transform" :class="sidebarCollapsed ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m14 5-7 7 7 7m-7-7h13"/></svg>
         </button>
-        <button type="button" @click="mobileNavOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 md:hidden" aria-label="Close navigation">
+        <button type="button" @click="closeMobileNavigation()" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 md:hidden" aria-label="Close navigation">
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m6 6 12 12M18 6 6 18"/></svg>
         </button>
     </div>
 
-    <nav aria-label="Administrator navigation" class="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+    <nav x-ref="adminNavigation" aria-label="Administrator navigation" class="flex-1 space-y-4 overflow-y-auto px-3 py-4">
         <a href="{{ route('admin.dashboard') }}" @class([
             'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500',
             'bg-blue-50 text-blue-800' => request()->routeIs('admin.dashboard'),

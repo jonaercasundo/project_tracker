@@ -1,13 +1,17 @@
 <?php
 
 use App\Models\BudgetRequest;
+use App\Models\FinancialActivity;
 use App\Models\Liquidation;
 use App\Models\MI_Liquidation;
 use App\Models\MI_LiquidationItem;
 use App\Policies\BudgetRequestPolicy;
 use App\Policies\TravelLiquidationPolicy;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\MIBudgetFixtureFactory;
 use Tests\MILiquidationFixtureFactory;
 use Tests\MITravelFixtureFactory;
@@ -32,6 +36,121 @@ it('creates a budget with the authenticated primary key and exact server totals'
     expect($budget->status)->toBe('budget_requested');
     $this->get(route('budget_requests.show', $budget))->assertSee($budget->control_id)->assertDontSee('>Approve<', false);
     $this->get(route('budget_requests.index'))->assertViewHas('budgetRequests', fn ($requests): bool => $requests->total() === 1);
+});
+
+it('creates an ordinary liquidation with multiple items, server title, rate, and list retrieval', function () {
+    Http::preventStrayRequests();
+    Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'base_code' => 'USD', 'time_last_update_unix' => 1792886551, 'rates' => ['VND' => 25432.125]], 200)]);
+    Cache::flush();
+    $owner = $this->miUser();
+    $this->signInMI($owner);
+    $payload = $this->ordinaryPayload();
+    $payload['report_title'] = 'Forged title';
+    $payload['items'][] = array_merge($payload['items'][0], ['payee' => 'Second payee', 'amount_vnd' => '200.25']);
+    $payload['submission_key'] = (string) Str::uuid();
+
+    $response = $this->post(route('liquidation.store'), $payload);
+    $report = MI_Liquidation::sole();
+
+    $response->assertRedirect(route('liquidation.show', $report));
+    expect($report->title)->toBe('October 2026 Report')
+        ->and($report->exchange_rate)->toBe('25432.1250')
+        ->and($report->exchange_rate_source)->toBe('live')
+        ->and($report->company_id)->toBe($owner->currentCompany()->getKey())
+        ->and($report->prepared_by)->toBe($owner->getKey())
+        ->and($report->items)->toHaveCount(2)
+        ->and($report->total_vnd)->toBe(325.75)
+        ->and($report->total_usd)->toBe(0.01)
+        ->and($report->items->first()->amount_usd)->toBe(0.0);
+    $this->get(route('liquidation.index'))->assertOk()->assertSee('October 2026 Report');
+});
+
+it('saves the report with conversion pending when forex lookup fails and never invents a rate', function () {
+    Http::preventStrayRequests();
+    Http::fake(['open.er-api.com/*' => Http::failedConnection()]);
+    Cache::flush();
+    $this->signInMI($this->miUser());
+    $payload = $this->ordinaryPayload();
+    $payload['exchange_rate'] = '26160.0000';
+
+    $this->post(route('liquidation.store'), $payload)->assertRedirect();
+
+    $report = MI_Liquidation::sole();
+    expect($report->exchange_rate)->toBeNull()
+        ->and($report->exchange_rate_source)->toBe('pending');
+    $this->get(route('liquidation.forex'))->assertOk()->assertJsonPath('available', false);
+});
+
+it('uses a validated cached forex rate when the provider is unavailable', function () {
+    Http::preventStrayRequests();
+    Cache::flush();
+    $this->signInMI($this->miUser());
+    Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'base_code' => 'USD', 'time_last_update_unix' => 1792886551, 'rates' => ['VND' => 25123.45]], 200)]);
+    $this->get(route('liquidation.forex'))->assertOk()->assertJsonPath('source', 'live');
+    Cache::forget('mi.forex.usd_vnd.fresh');
+    Http::fake(['open.er-api.com/*' => Http::failedConnection()]);
+
+    $this->get(route('liquidation.forex'))->assertOk()
+        ->assertJsonPath('available', true)
+        ->assertJsonPath('source', 'cached')
+        ->assertJsonPath('rate', '25123.4500');
+});
+
+it('accepts the provider decimal precision and stores the rate at the database scale', function () {
+    Http::preventStrayRequests();
+    Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'base_code' => 'USD', 'time_last_update_unix' => 1792886551, 'rates' => ['VND' => 25829.651426]], 200)]);
+    Cache::flush();
+    $this->signInMI($this->miUser());
+
+    $this->get(route('liquidation.forex'))->assertOk()
+        ->assertJsonPath('available', true)
+        ->assertJsonPath('rate', '25829.6514');
+});
+
+it('returns field validation errors for missing data, impossible dates, and invalid amounts', function () {
+    $this->signInMI($this->miUser());
+    $payload = $this->ordinaryPayload();
+    $payload['date_prepared'] = '2026-02-31';
+    $payload['items'][0]['amount_vnd'] = '-4';
+    $payload['items'][0]['payee'] = '';
+
+    $this->from(route('liquidation.create'))->post(route('liquidation.store'), $payload)
+        ->assertRedirect(route('liquidation.create'))
+        ->assertSessionHasErrors(['date_prepared', 'items.0.amount_vnd', 'items.0.payee']);
+    $this->assertDatabaseCount('mi_liquidations', 0);
+});
+
+it('deduplicates a repeated liquidation submission key', function () {
+    Http::preventStrayRequests();
+    Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'base_code' => 'USD', 'time_last_update_unix' => 1792886551, 'rates' => ['VND' => 25000]], 200)]);
+    Cache::flush();
+    $this->signInMI($this->miUser());
+    $payload = $this->ordinaryPayload();
+    $payload['submission_key'] = (string) Str::uuid();
+    $this->post(route('liquidation.store'), $payload)->assertRedirect();
+    $first = MI_Liquidation::sole();
+
+    $this->post(route('liquidation.store'), $payload)->assertRedirect(route('liquidation.show', $first));
+
+    $this->assertDatabaseCount('mi_liquidations', 1);
+    $this->assertDatabaseCount('mi_liquidation_items', 1);
+});
+
+it('rolls back the header and items when audit recording fails and preserves submitted inputs', function () {
+    Http::preventStrayRequests();
+    Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'base_code' => 'USD', 'time_last_update_unix' => 1792886551, 'rates' => ['VND' => 25000]], 200)]);
+    Cache::flush();
+    $this->signInMI($this->miUser());
+    $payload = $this->ordinaryPayload();
+    $payload['submission_key'] = (string) Str::uuid();
+    FinancialActivity::creating(fn () => throw new RuntimeException('audit unavailable'));
+
+    $this->from(route('liquidation.create'))->post(route('liquidation.store'), $payload)
+        ->assertRedirect(route('liquidation.create'))
+        ->assertSessionHasInput('items.0.payee', 'Fixture payee')
+        ->assertSessionHas('error');
+    $this->assertDatabaseCount('mi_liquidations', 0);
+    $this->assertDatabaseCount('mi_liquidation_items', 0);
 });
 
 it('persists Vietnam as the selected predefined country across budget views and approvals', function () {

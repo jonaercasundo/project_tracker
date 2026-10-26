@@ -6,6 +6,7 @@ use App\Models\MI_Liquidation;
 use App\Models\MI_LiquidationItem;
 use App\Services\MiFinancialAmount;
 use App\Services\MiFinancialWorkflowService;
+use App\Services\MiForexRateService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -235,24 +237,12 @@ class LiquidationController extends Controller
 
             $validated = $request->validate([
 
-                'report_title' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
                 'date_prepared' => [
                     'required',
-                    'date',
+                    'date_format:Y-m-d',
                 ],
 
-                'exchange_rate' => [
-                    'required',
-                    'numeric',
-                    'gt:0',
-                    'max:99999999.9999',
-                    'regex:/^\d+(\.\d{1,4})?$/',
-                ],
+                'submission_key' => ['nullable', 'uuid'],
 
                 'pcf_amount' => [
                     'nullable',
@@ -327,22 +317,28 @@ class LiquidationController extends Controller
             ]);
             MiFinancialAmount::sum(array_column($validated['items'], 'amount_vnd'), 'items', '999999999999.99');
 
+            $companyId = session('company_id');
+            if (method_exists($user, 'currentCompany')) {
+                $companyId = $user->currentCompany()?->getKey() ?? $companyId;
+            }
+            $submissionKey = $validated['submission_key'] ?? (string) Str::uuid();
+            $existing = MI_Liquidation::query()
+                ->where('submission_key', $submissionKey)
+                ->where('prepared_by', $user->getKey())
+                ->where('company_id', $companyId)
+                ->first();
+            if ($existing) {
+                return redirect()->route('liquidation.show', $existing)
+                    ->with('success', 'This liquidation report was already saved.');
+            }
+
+            $rate = app(MiForexRateService::class)->currentRate();
+
             /*
             |--------------------------------------------------------------------------
             | Company
             |--------------------------------------------------------------------------
             */
-
-            $companyId = session('company_id');
-
-            if (method_exists($user, 'currentCompany')) {
-
-                $company = $user->currentCompany();
-
-                if ($company) {
-                    $companyId = $company->company_id;
-                }
-            }
 
             /*
             |--------------------------------------------------------------------------
@@ -356,16 +352,20 @@ class LiquidationController extends Controller
                     $request,
                     $user,
                     $companyId,
+                    $submissionKey,
+                    $rate,
                     &$uploadedPaths
                 ) {
 
                     $liquidation = MI_Liquidation::create([
 
-                        'title' => $validated['report_title'],
+                        'title' => Carbon::parse($validated['date_prepared'])->format('F Y').' Report',
 
                         'date_prepared' => $validated['date_prepared'],
 
-                        'exchange_rate' => $validated['exchange_rate'],
+                        'exchange_rate' => $rate['rate'],
+                        'exchange_rate_source' => $rate['source'],
+                        'submission_key' => $submissionKey,
 
                         'pcf_amount' => $validated['pcf_amount'] ?? null,
 
@@ -502,20 +502,16 @@ class LiquidationController extends Controller
         } catch (Throwable $e) {
             Storage::disk('local')->delete($uploadedPaths);
 
-            Log::error(
-                'Liquidation save failed',
-                [
-                    'user_id' => $user->user_id ?? null,
+            $duplicate = isset($submissionKey, $companyId)
+                ? MI_Liquidation::query()->where('submission_key', $submissionKey)
+                    ->where('prepared_by', $user->getKey())->where('company_id', $companyId)->first()
+                : null;
+            if ($duplicate) {
+                return redirect()->route('liquidation.show', $duplicate)
+                    ->with('success', 'This liquidation report was already saved.');
+            }
 
-                    'message' => $e->getMessage(),
-
-                    'file' => $e->getFile(),
-
-                    'line' => $e->getLine(),
-
-                    'trace' => $e->getTraceAsString(),
-                ]
-            );
+            Log::error('Liquidation save failed.', ['user_id' => $user->getKey(), 'exception' => $e]);
 
             return back()
                 ->withInput()
@@ -597,7 +593,7 @@ class LiquidationController extends Controller
             ],
 
             'exchange_rate' => [
-                'required',
+                'nullable',
                 'numeric',
                 'gt:0',
                 'max:99999999.9999',
@@ -682,13 +678,15 @@ class LiquidationController extends Controller
         MiFinancialAmount::sum(array_column($validated['items'], 'amount_vnd'), 'items', '999999999999.99');
         $uploadedPaths = [];
         try {
-            DB::transaction(function () use ($validated, $request, $liquidation, &$uploadedPaths): void {
+            $rate = app(MiForexRateService::class)->currentRate();
+            DB::transaction(function () use ($validated, $request, $liquidation, $rate, &$uploadedPaths): void {
                 $liquidation = MI_Liquidation::query()->whereKey($liquidation->getKey())->lockForUpdate()->firstOrFail();
                 Gate::authorize('update', $liquidation);
                 $liquidation->update([
                     'title' => $validated['report_title'],
                     'date_prepared' => $validated['date_prepared'],
-                    'exchange_rate' => $validated['exchange_rate'],
+                    'exchange_rate' => $rate['rate'],
+                    'exchange_rate_source' => $rate['source'],
                     'pcf_amount' => $validated['pcf_amount'] ?? null,
                 ]);
                 $keptIds = [];

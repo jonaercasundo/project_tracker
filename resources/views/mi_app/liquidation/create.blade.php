@@ -8,6 +8,12 @@
         |--------------------------------------------------------------------------
         */
         $currentUserName = optional(auth()->user())->name ?? 'Unknown User';
+        $defaultDatePrepared = old('date_prepared', date('Y-m-d'));
+        try {
+            $defaultReportTitle = \Illuminate\Support\Carbon::parse($defaultDatePrepared)->format('F Y').' Report';
+        } catch (\Throwable) {
+            $defaultReportTitle = '';
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -927,6 +933,20 @@
             >
 
                 @csrf
+                <input type="hidden" name="submission_key" value="{{ old('submission_key', (string) \Illuminate\Support\Str::uuid()) }}">
+
+                @if ($errors->any())
+                    <div class="tx-card" role="alert" aria-live="polite">
+                        <div class="tx-card-body">
+                            <strong>Please correct the highlighted form information.</strong>
+                            <ul class="list-disc pl-5">
+                                @foreach ($errors->all() as $message)
+                                    <li>{{ $message }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                @endif
 
 
                 {{-- =====================================================
@@ -962,15 +982,15 @@
                                 type="text"
                                 name="report_title"
                                 id="report_title"
-                                value="{{ old('report_title') }}"
+                                value="{{ $defaultReportTitle }}"
                                 class="tx-input"
                                 readonly
-                                required
                             >
 
                             <div class="tx-help">
                                 Automatically generated from the Date Prepared.
                             </div>
+                            @error('date_prepared')<p class="text-sm text-red-600" role="alert">{{ $message }}</p>@enderror
 
                         </div>
 
@@ -1031,7 +1051,10 @@
                                         Loading...
                                     </div>
 
+                                    <button type="button" id="retryForex" class="tx-btn" aria-label="Retry exchange rate lookup">Retry</button>
+
                                 </div>
+                                <div class="tx-help"><a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer">Rates by ExchangeRate-API</a>. This open rate feed updates daily.</div>
 
                                 <input
                                     type="hidden"
@@ -1191,6 +1214,7 @@
                                                     class="tx-input item-date"
                                                     required
                                                 >
+                                                @error('items.'.$index.'.item_date')<p class="text-sm text-red-600" role="alert">{{ $message }}</p>@enderror
 
                                             </div>
 
@@ -1297,6 +1321,7 @@
                                                     >
 
                                                 @endif
+                                                @error('items.'.$index.'.payee')<p class="text-sm text-red-600" role="alert">{{ $message }}</p>@enderror
 
                                             </div>
 
@@ -1350,6 +1375,7 @@
                                                     @endforeach
 
                                                 </select>
+                                                @error('items.'.$index.'.expense_type')<p class="text-sm text-red-600" role="alert">{{ $message }}</p>@enderror
 
                                                 <div class="tx-help">
                                                     Select the appropriate expense classification.
@@ -1452,6 +1478,7 @@
                                                         placeholder="0.00"
                                                         required
                                                     >
+                                                    @error('items.'.$index.'.amount_vnd')<p class="text-sm text-red-600" role="alert">{{ $message }}</p>@enderror
 
                                                 </div>
 
@@ -1922,19 +1949,14 @@
                     const vndInput =
                         row.querySelector('.amount-vnd');
 
-                    const usdInput =
-                        row.querySelector('.amount-usd');
-
                     const vnd =
                         parseFloat(vndInput?.value) || 0;
 
-                    const usd =
-                        parseFloat(usdInput?.value) || 0;
-
                     vndTotal += vnd;
-                    usdTotal += usd;
 
                 });
+
+                usdTotal = exchangeRate > 0 ? vndTotal / exchangeRate : 0;
 
                 totalVnd.textContent =
                     `₫ ${formatNumber(vndTotal)}`;
@@ -1951,21 +1973,29 @@
 
             async function fetchLiveForex() {
 
+                const retryButton = document.getElementById('retryForex');
+                retryButton.disabled = true;
+
                 forexStatus.textContent =
-                    'Loading live exchange rate...';
+                    'Loading latest exchange rate...';
 
                 forexDisplay.textContent =
                     'Loading...';
 
                 try {
 
-                    const response =
-                        await fetch(
-                            'https://open.er-api.com/v6/latest/USD',
-                            {
-                                cache: 'no-store'
-                            }
-                        );
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => controller.abort(), 10000);
+                    let response;
+                    try {
+                        response = await fetch(@json(route('liquidation.forex')), {
+                            cache: 'no-store',
+                            headers: { 'Accept': 'application/json' },
+                            signal: controller.signal
+                        });
+                    } finally {
+                        clearTimeout(timeout);
+                    }
 
                     if (!response.ok) {
                         throw new Error('Forex request failed');
@@ -1974,25 +2004,19 @@
                     const data =
                         await response.json();
 
-                    if (
-                        data.result !== 'success' ||
-                        !data.rates ||
-                        !data.rates.VND
-                    ) {
-                        throw new Error('Invalid forex response');
+                    if (data.available && Number(data.rate) >= 1000 && Number(data.rate) <= 100000) {
+                        exchangeRate = Number(data.rate);
+                        exchangeRateInput.value = data.rate;
+                        forexDisplay.textContent = `1 USD = ₫ ${formatNumber(exchangeRate)}`;
+                        forexStatus.textContent = data.source === 'cached'
+                            ? `Cached rate from ${new Date(data.updated_at).toLocaleString()}`
+                            : `Latest USD/VND rate · updated ${new Date(data.updated_at).toLocaleString()}`;
+                    } else {
+                        exchangeRate = null;
+                        exchangeRateInput.value = '';
+                        forexDisplay.textContent = 'Conversion pending';
+                        forexStatus.textContent = data.message || 'Rate unavailable. You can save and convert later.';
                     }
-
-                    exchangeRate =
-                        parseFloat(data.rates.VND);
-
-                    exchangeRateInput.value =
-                        exchangeRate;
-
-                    forexDisplay.textContent =
-                        `1 USD = ₫ ${formatNumber(exchangeRate)}`;
-
-                    forexStatus.textContent =
-                        'Live USD/VND rate loaded';
 
                     recalcAll();
 
@@ -2009,9 +2033,12 @@
                         'Unavailable';
 
                     forexStatus.textContent =
-                        'Unable to load live forex rate';
+                        'Rate lookup failed. You can save this report and retry later.';
 
                     exchangeRateInput.value = '';
+
+                } finally {
+                    retryButton.disabled = false;
 
                 }
 
@@ -2914,6 +2941,7 @@
             ============================================================ */
 
             fetchLiveForex();
+            document.getElementById('retryForex').addEventListener('click', fetchLiveForex);
 
 
             /* ============================================================
@@ -2925,22 +2953,6 @@
                 .addEventListener(
                     'submit',
                     function (event) {
-
-                        if (
-                            !exchangeRate ||
-                            exchangeRate <= 0
-                        ) {
-
-                            event.preventDefault();
-
-                            alert(
-                                'The live USD/VND forex rate is not available. Please wait for the forex rate to load before saving.'
-                            );
-
-                            return;
-
-                        }
-
 
                         const rows =
                             expenseList.querySelectorAll(

@@ -30,6 +30,7 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\LogisticsChannelController;
 use App\Http\Controllers\MIAppController;
 use App\Http\Controllers\MIApprovalController;
+use App\Http\Controllers\MIForexRateController;
 use App\Http\Controllers\MmcPplManagementController;
 use App\Http\Controllers\MmcPplWorkbookImportController;
 use App\Http\Controllers\OperationsLifecycleController;
@@ -642,6 +643,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/liquidation', [LiquidationController::class, 'index'])->name('liquidation.index');
         Route::get('/liquidation/create', [LiquidationController::class, 'create'])->name('liquidation.create');
+        Route::get('/liquidation/forex', MIForexRateController::class)->middleware('throttle:30,1')->name('liquidation.forex');
         Route::post('/liquidation', [LiquidationController::class, 'store'])->name('liquidation.store');
         Route::get('/liquidation/{liquidation}', [LiquidationController::class, 'show'])->name('liquidation.show');
         Route::get(

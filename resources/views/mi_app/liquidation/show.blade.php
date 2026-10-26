@@ -1549,6 +1549,8 @@
 
                     </div>
 
+                    <div class="liq-info-value">Rate source: {{ ucfirst($liquidation->exchange_rate_source ?? 'live') }}</div>
+
                 </div>
 
 

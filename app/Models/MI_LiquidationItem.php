@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -24,7 +26,7 @@ class MI_LiquidationItem extends Model
     ];
 
     protected $casts = [
-        'item_date'  => 'date',
+        'item_date' => 'date',
         'amount_vnd' => 'decimal:2',
     ];
 
@@ -55,16 +57,13 @@ class MI_LiquidationItem extends Model
      */
     public function getAmountUsdAttribute(): float
     {
-        $rate = (float) ($this->report?->exchange_rate ?? 0);
+        $rate = $this->report?->exchange_rate;
 
-        if ($rate <= 0) {
+        if (! $rate || (float) $rate <= 0) {
             return 0;
         }
 
-        return round(
-            (float) $this->amount_vnd / $rate,
-            2
-        );
+        return BigDecimal::of($this->amount_vnd)->dividedBy($rate, 2, RoundingMode::HALF_UP)->toFloat();
     }
 
     /**
@@ -72,6 +71,6 @@ class MI_LiquidationItem extends Model
      */
     public function getHasReceiptAttribute(): bool
     {
-        return !empty($this->receipt_image);
+        return ! empty($this->receipt_image);
     }
 }

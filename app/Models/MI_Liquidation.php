@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Services\MiFinancialAmount;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +24,8 @@ class MI_Liquidation extends Model
         'title',
         'date_prepared',
         'exchange_rate',
+        'exchange_rate_source',
+        'submission_key',
         'pcf_amount',
         'company_id',
         'prepared_by',
@@ -92,16 +96,14 @@ class MI_Liquidation extends Model
      */
     public function getTotalUsdAttribute(): float
     {
-        $rate = (float) $this->exchange_rate;
+        $rate = $this->exchange_rate;
 
-        if ($rate <= 0) {
+        if (! $rate || (float) $rate <= 0) {
             return 0.0;
         }
 
-        return round(
-            $this->total_vnd / $rate,
-            2
-        );
+        return (float) BigDecimal::of(MiFinancialAmount::sum($this->items->pluck('amount_vnd'), 'items', '999999999999.99'))
+            ->dividedBy($rate, 2, RoundingMode::HALF_UP)->toFloat();
     }
 
     /**

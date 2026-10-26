@@ -1352,12 +1352,18 @@
 
                                             <span class="tx-rate">
 
+                                                @if($report->exchange_rate)
+
                                                 {{
                                                     number_format(
                                                         (float) ($report->exchange_rate ?? 0),
                                                         2
                                                     )
                                                 }}
+
+                                                @else
+                                                    Pending
+                                                @endif
 
                                             </span>
 

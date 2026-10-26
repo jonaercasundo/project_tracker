@@ -1899,10 +1899,6 @@
 
                                     Report Title
 
-                                    <span class="liq-required">
-                                        *
-                                    </span>
-
                                 </label>
 
                                 <input
@@ -1964,11 +1960,10 @@
                                     id="exchangeRate"
                                     class="liq-input liq-mono"
                                     value="{{ $exchangeRate }}"
-                                    required
                                 >
 
                                 <div class="liq-help">
-                                    VND per USD
+                                    VND per USD. A missing rate remains pending until the verified service rate is available.
                                 </div>
 
                             </div>

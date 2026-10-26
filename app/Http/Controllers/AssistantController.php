@@ -56,7 +56,8 @@ class AssistantController extends Controller
 
     public function showConversation(Request $request, AiConversation $conversation): JsonResponse
     {
-        $this->authorizeConversation($request, $conversation);
+        [$user, $company] = $this->authorizeConversation($request, $conversation);
+        $this->authorizePriceHistory($user, $company, $conversation);
         $conversation->load(['messages' => fn ($query) => $query->latest('id')->limit((int) config('ai_assistant.message_limit', 20))]);
         $conversation->setRelation('messages', $conversation->messages->sortBy('id')->values());
 
@@ -74,6 +75,7 @@ class AssistantController extends Controller
     public function stream(Request $request, AiConversation $conversation, AiPageContextService $pageContext, AiAssistantService $assistant, AiProviderConfiguration $configuration): StreamedResponse
     {
         [$user, $company] = $this->authorizeConversation($request, $conversation);
+        $this->authorizePriceHistory($user, $company, $conversation);
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:'.(int) config('ai_assistant.max_message_characters', 4000)],
             'page_route' => ['nullable', 'string', 'max:160'],
@@ -100,6 +102,7 @@ class AssistantController extends Controller
 
         return response()->stream(function () use ($assistant, $user, $company, $context, $history, $conversation): void {
             $answer = '';
+            $productCards = [];
             $emit = static function (string $event, array $data): void {
                 echo 'event: '.$event."\n".'data: '.json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n\n";
                 if (ob_get_level() > 0) {
@@ -112,9 +115,20 @@ class AssistantController extends Controller
                 $usage = $assistant->respond($user, $company, $context, $history, function (string $delta) use (&$answer, $emit): void {
                     $answer .= $delta;
                     $emit('delta', ['text' => $delta]);
+                }, function (array $products) use ($emit, &$productCards, $user, $company, $conversation): void {
+                    $productCards = $products;
+                    if ($company->code === 'MI' && $user->can('mi.quotation.create')) {
+                        DB::table('ai_quotation_audits')->insert([
+                            'conversation_id' => $conversation->getKey(), 'user_id' => $user->getKey(),
+                            'company_id' => $company->getKey(), 'action' => 'quotation_suggestion_shown',
+                            'metadata' => json_encode(['item_count' => count($products)], JSON_THROW_ON_ERROR),
+                            'created_at' => now(), 'updated_at' => now(),
+                        ]);
+                    }
+                    $emit('products', ['items' => $products]);
                 });
-                DB::transaction(function () use ($conversation, $answer, $usage, $user, $company): void {
-                    $conversation->messages()->create(['role' => 'assistant', 'content' => $answer, 'model' => $usage['model'], 'input_tokens' => $usage['input_tokens'], 'output_tokens' => $usage['output_tokens']]);
+                DB::transaction(function () use ($conversation, $answer, $usage, $user, $company, &$productCards): void {
+                    $conversation->messages()->create(['role' => 'assistant', 'content' => $answer, 'metadata' => $productCards === [] ? null : ['products' => $productCards], 'model' => $usage['model'], 'input_tokens' => $usage['input_tokens'], 'output_tokens' => $usage['output_tokens']]);
                     $conversation->forceFill(['last_message_at' => now()])->save();
                     AiActivity::create(['user_id' => $user->getKey(), 'company_id' => $company->getKey(), 'conversation_id' => $conversation->getKey(), ...$usage, 'status' => 'completed']);
                 });
@@ -151,6 +165,13 @@ class AssistantController extends Controller
         }
 
         return [$user, $company];
+    }
+
+    private function authorizePriceHistory(User $user, Company $company, AiConversation $conversation): void
+    {
+        if ($company->code === 'MI' && ! $user->can('mi.quotation.create')) {
+            abort_if($conversation->messages()->whereNotNull('metadata')->exists(), 403, 'You no longer have permission to view MI product price data in this conversation.');
+        }
     }
 
     private function pruneExpired(User $user, Company $company): void

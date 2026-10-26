@@ -14,7 +14,7 @@ class AiAssistantService
      * @param  callable(string): void  $onDelta
      * @return array{model: string, request_id: ?string, input_tokens: ?int, output_tokens: ?int}
      */
-    public function respond(User $user, Company $company, array $context, array $history, callable $onDelta): array
+    public function respond(User $user, Company $company, array $context, array $history, callable $onDelta, ?callable $onProductMatches = null): array
     {
         if (! $this->configuration->isEnabled()) {
             throw new RuntimeException('The AI assistant is currently disabled.');
@@ -112,6 +112,9 @@ class AiAssistantService
             foreach ($toolCalls as $call) {
                 $arguments = json_decode((string) ($call['arguments'] ?? '{}'), true);
                 $result = $gateway->call((string) $call['name'], is_array($arguments) ? $arguments : [], $user, $company);
+                if ($call['name'] === 'search_mi_products' && $onProductMatches !== null && $result !== []) {
+                    $onProductMatches($result);
+                }
                 $input[] = ['type' => 'function_call_output', 'call_id' => $call['call_id'], 'output' => json_encode($result, JSON_THROW_ON_ERROR)];
             }
         }
@@ -122,6 +125,6 @@ class AiAssistantService
     /** @param array<string, mixed> $context */
     private function instructions(Company $company, array $context): string
     {
-        return 'You are the Project Tracker assistant for the active company '.$company->code.'. Follow the authorized module registry and page context below. Never claim access to another company. Use only the supplied read-only tools for saved business records; never invent SQL or request arbitrary database access. Do not expose secrets or ask for passwords. Page context contains route metadata only, never form values. Never create, edit, delete, submit, release, or approve records. Explain workflows and calculations clearly, identify assumptions, and say when data is unavailable.\n\nAuthorized page context: '.json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return 'You are the Project Tracker assistant for the active company '.$company->code.'. Follow the authorized module registry and page context below. Never claim access to another company. Use only the supplied read-only tools for saved business records; never invent SQL or request arbitrary database access. Do not expose secrets or ask for passwords. Page context contains route metadata only, never form values. Never create, edit, delete, submit, release, or approve records. For MI product price questions use the product search tool; state the selling price, SKU, PHP currency, and MI product selling price basis only when supplied. Never treat factory cost or purchase cost as selling price. If a saved product lacks a price say so. Once a product and price are found, proactively ask whether to prepare a quotation, compare products, view details, or stop. Do not claim a quotation was created; the user must complete and confirm the on-screen workflow. Do not invent taxes, discounts, delivery fees, or payment terms.\n\nAuthorized page context: '.json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 }

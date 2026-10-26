@@ -5,6 +5,7 @@ use App\Http\Controllers\Accounting_LiquidationController;
 use App\Http\Controllers\AccountingWorkspaceController;
 use App\Http\Controllers\ActionCrawlerController;
 use App\Http\Controllers\Admin\AiConfigurationController;
+use App\Http\Controllers\AiQuotationController;
 use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\BiddingController;
 use App\Http\Controllers\BiddingDocumentController;
@@ -80,6 +81,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/assistant/conversations/{conversation}', [AssistantController::class, 'showConversation'])->middleware('throttle:ai-assistant')->name('assistant.conversations.show');
     Route::delete('/assistant/conversations/{conversation}', [AssistantController::class, 'deleteConversation'])->middleware('throttle:ai-assistant')->name('assistant.conversations.destroy');
     Route::post('/assistant/conversations/{conversation}/messages', [AssistantController::class, 'stream'])->middleware('throttle:ai-assistant')->name('assistant.messages.stream');
+    Route::get('/assistant/mi-products/search', [AiQuotationController::class, 'products'])->middleware('throttle:ai-assistant')->name('assistant.quotations.products');
+    Route::prefix('/assistant/conversations/{conversation}/quotation')->name('assistant.quotations.')->middleware('throttle:ai-assistant')->group(function (): void {
+        Route::get('/', [AiQuotationController::class, 'show'])->name('show');
+        Route::post('/', [AiQuotationController::class, 'start'])->name('start');
+        Route::post('/preview', [AiQuotationController::class, 'preview'])->name('preview');
+        Route::post('/confirm', [AiQuotationController::class, 'confirm'])->name('confirm');
+        Route::delete('/', [AiQuotationController::class, 'cancel'])->name('cancel');
+    });
+    Route::get('/assistant/quotations/{quotation}/print', [AiQuotationController::class, 'print'])->middleware('throttle:ai-assistant')->name('assistant.quotations.print');
 
     Route::get('/dashboard/launch', DashboardLaunchController::class)->name('dashboard.launch');
 

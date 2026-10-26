@@ -21,6 +21,7 @@ class AiConfigurationTestCase extends MIWorkflowTestCase
         $migrationPaths = parent::migrateFreshUsing();
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_083437_create_ai_assistant_tables.php';
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_085724_create_ai_provider_settings_tables.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_10_26_095438_create_ai_quotation_workflow_tables.php';
 
         return $migrationPaths;
     }

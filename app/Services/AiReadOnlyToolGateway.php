@@ -14,8 +14,8 @@ class AiReadOnlyToolGateway
     {
         $tools = [];
 
-        if ($company->code === 'MI' && $user->hasMIUserAccess()) {
-            $tools[] = ['type' => 'function', 'name' => 'search_mi_products', 'description' => 'Search the MI product catalog for matching products. Use only when the user asks about saved product records.', 'parameters' => ['type' => 'object', 'properties' => ['query' => ['type' => 'string', 'description' => 'Product name or code to search']], 'required' => ['query'], 'additionalProperties' => false], 'strict' => true];
+        if ($company->code === 'MI' && $user->can('ai.assistant.use') && $user->can('mi.quotation.create')) {
+            $tools[] = ['type' => 'function', 'name' => 'search_mi_products', 'description' => 'Search MI product records and authorized selling prices. Prices are from the MI product selling price field only; never use costs.', 'parameters' => ['type' => 'object', 'properties' => ['query' => ['type' => 'string', 'description' => 'Product name, SKU, or item code']], 'required' => ['query'], 'additionalProperties' => false], 'strict' => true];
         }
 
         if ($company->code === 'MMC' && $user->hasAnyRole(['user', 'Administrator'])) {
@@ -56,13 +56,12 @@ class AiReadOnlyToolGateway
         $query = trim((string) ($arguments['query'] ?? ''));
         abort_if($query === '' || mb_strlen($query) > 120, 422, 'Search query is invalid.');
 
-        if ($name === 'search_mi_products' && $company->code === 'MI' && $user->hasMIUserAccess()) {
-            return MI_Product::query()
-                ->where(function ($builder) use ($query): void {
-                    $builder->where('item_name', 'like', '%'.$query.'%')->orWhere('item_code', 'like', '%'.$query.'%');
-                })
-                ->orderBy('item_name')->limit(8)->get(['product_id', 'item_name', 'item_code', 'category_id', 'sub_category_id', 'materials', 'color'])
-                ->map(fn (MI_Product $product): array => ['name' => $product->item_name, 'code' => $product->item_code, 'category_id' => $product->category_id, 'sub_category_id' => $product->sub_category_id, 'materials' => $product->materials, 'colors' => $product->color])
+        if ($name === 'search_mi_products' && $company->code === 'MI' && $user->can('ai.assistant.use') && $user->can('mi.quotation.create')) {
+            return MI_Product::query()->with('images')->where(function ($builder) use ($query): void {
+                $builder->where('item_name', 'like', '%'.$query.'%')->orWhere('sku', 'like', '%'.$query.'%')->orWhere('item_code', 'like', '%'.$query.'%');
+            })->orderByRaw('CASE WHEN item_name = ? THEN 0 WHEN sku = ? OR item_code = ? THEN 0 ELSE 1 END', [$query, $query, $query])
+                ->orderBy('item_name')->limit(8)->get(['product_id', 'item_name', 'sku', 'item_code', 'price', 'category_id', 'sub_category_id', 'materials', 'color'])
+                ->map(fn (MI_Product $product): array => app(AiMiProductPresenter::class)->present($product))
                 ->all();
         }
 

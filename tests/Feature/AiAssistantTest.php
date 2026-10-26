@@ -4,6 +4,7 @@ use App\Models\AiConversation;
 use App\Models\BudgetRequest;
 use App\Services\AiReadOnlyToolGateway;
 use Database\Seeders\AiAssistantPermissionSeeder;
+use Database\Seeders\AiQuotationPermissionSeeder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -16,6 +17,7 @@ class AiAssistantTestCase extends MIWorkflowTestCase
         $migrationPaths = parent::migrateFreshUsing();
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_083437_create_ai_assistant_tables.php';
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_085724_create_ai_provider_settings_tables.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_10_26_095438_create_ai_quotation_workflow_tables.php';
 
         return $migrationPaths;
     }
@@ -24,6 +26,7 @@ class AiAssistantTestCase extends MIWorkflowTestCase
     {
         parent::setUp();
         $this->seed(AiAssistantPermissionSeeder::class);
+        $this->seed(AiQuotationPermissionSeeder::class);
     }
 }
 

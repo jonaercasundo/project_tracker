@@ -8,6 +8,14 @@ window.aiAssistant = (settings) => ({
     loading: false,
     error: '',
     lastPrompt: '',
+    quote: null,
+    quoteDraft: { customer_name: '', items: [] },
+    quotePreview: null,
+    quoteProducts: [],
+    quoteSearch: '',
+    quoteError: '',
+    quoteLoading: false,
+    quoteSearching: false,
 
     async init() {
         this.open = Boolean(this.workspace);
@@ -47,6 +55,8 @@ window.aiAssistant = (settings) => ({
             const { conversation } = await response.json();
             this.conversationId = conversation.id;
             this.messages = [];
+            this.quote = null;
+            this.quotePreview = null;
             sessionStorage.setItem(`assistant:${this.company}`, String(conversation.id));
             await this.refreshConversations();
         } catch (error) { this.error = error.message; }
@@ -61,6 +71,17 @@ window.aiAssistant = (settings) => ({
             const { conversation } = await response.json();
             this.conversationId = conversation.id;
             this.messages = conversation.messages || [];
+            this.quote = null;
+            this.quotePreview = null;
+            const quoteResponse = await fetch(this.endpoint(this.routes.quoteShow, id), { headers: { Accept: 'application/json' } });
+            if (quoteResponse.ok) {
+                const payload = await quoteResponse.json();
+                this.quote = payload.workflow;
+                if (this.quote) {
+                    this.quoteDraft = { customer_name: this.quote.state.customer_name || '', items: this.quote.state.items || [] };
+                    if (this.quote.state.preview_items) this.quotePreview = { customer_name: this.quote.state.customer_name, items: this.quote.state.preview_items, total: this.sumQuote(this.quote.state.preview_items), currency: 'PHP' };
+                }
+            }
             sessionStorage.setItem(`assistant:${this.company}`, String(conversation.id));
             this.scrollToBottom();
         } catch (error) { this.error = error.message; }
@@ -81,7 +102,25 @@ window.aiAssistant = (settings) => ({
     async submit() {
         const message = this.draft.trim();
         if (!message || this.loading) return;
+        const quoteUpdated = this.quote && !this.quote.quotation ? this.applyQuoteAnswer(message) : false;
         await this.send(message);
+        if (quoteUpdated && !this.error) await this.previewQuote();
+    },
+
+    applyQuoteAnswer(message) {
+        let updated = false;
+        const quantity = message.match(/\b(\d{1,6})\s*(?:pieces?|pcs?|units?)\b/i);
+        if (quantity && this.quoteDraft.items.length === 1) {
+            this.quoteDraft.items[0].quantity = Number(quantity[1]);
+            updated = true;
+        }
+        const customer = message.match(/\b(?:for|customer(?:\s+is)?|company(?:\s+is)?)\s+([^,;]+?)(?=\s*,|\s+delivery\b|\s+quantity\b|$)/i);
+        if (customer?.[1]) {
+            this.quoteDraft.customer_name = customer[1].trim().replace(/[.?!]+$/, '');
+            updated = true;
+        }
+
+        return updated;
     },
 
     async send(message) {
@@ -123,6 +162,7 @@ window.aiAssistant = (settings) => ({
                     if (!data) continue;
                     const payload = JSON.parse(data);
                     if (event === 'delta') assistantMessage.content += payload.text || '';
+                    if (event === 'products') assistantMessage.products = payload.items || [];
                     if (event === 'error') throw new Error(payload.message || 'The assistant could not complete this response.');
                     this.scrollToBottom();
                 }
@@ -136,6 +176,88 @@ window.aiAssistant = (settings) => ({
             this.loading = false;
             this.scrollToBottom();
         }
+    },
+
+    async quoteRequest(path, method = 'GET', body = null) {
+        const options = { method, headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf() } };
+        if (body !== null) {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(body);
+        }
+        const response = await fetch(path, options);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok && response.status !== 409) throw new Error(payload.message || payload.errors?.customer_name?.[0] || 'Unable to update the quotation.');
+        return { response, payload };
+    },
+
+    async startQuote(product = null) {
+        if (!this.conversationId) await this.newConversation();
+        if (!this.conversationId) return;
+        this.quoteLoading = true;
+        this.quoteError = '';
+        try {
+            const { payload } = await this.quoteRequest(this.endpoint(this.routes.quoteStart, this.conversationId), 'POST', product ? { product_id: product.id } : {});
+            this.quote = { ...payload, quotation: null };
+            this.quoteDraft = { customer_name: payload.state.customer_name || '', items: payload.state.items || [] };
+            this.quotePreview = null;
+        } catch (error) { this.quoteError = error.message; }
+        finally { this.quoteLoading = false; }
+    },
+
+    async searchQuoteProducts() {
+        if (this.quoteSearch.trim().length < 2) { this.quoteProducts = []; return; }
+        this.quoteSearching = true;
+        try {
+            const url = new URL(this.routes.quoteProducts, window.location.origin);
+            url.searchParams.set('query', this.quoteSearch.trim());
+            const response = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (!response.ok) throw new Error('Product search is unavailable.');
+            this.quoteProducts = (await response.json()).products || [];
+        } catch (error) { this.quoteError = error.message; }
+        finally { this.quoteSearching = false; }
+    },
+
+    addQuoteProduct(product) {
+        const existing = this.quoteDraft.items.find((item) => Number(item.id) === Number(product.id));
+        if (existing) existing.quantity += 1;
+        else this.quoteDraft.items.push({ id: product.id, quantity: 1, name: product.name, sku: product.sku });
+        this.quoteSearch = '';
+        this.quoteProducts = [];
+        this.quotePreview = null;
+    },
+
+    removeQuoteProduct(index) { this.quoteDraft.items.splice(index, 1); this.quotePreview = null; },
+    sumQuote(items) { return items.reduce((total, item) => total + Math.round(Number(item.subtotal || 0) * 100), 0) / 100; },
+
+    async previewQuote() {
+        this.quoteLoading = true;
+        this.quoteError = '';
+        try {
+            const { payload } = await this.quoteRequest(this.endpoint(this.routes.quotePreview, this.conversationId), 'POST', this.quoteDraft);
+            this.quotePreview = payload.preview;
+        } catch (error) { this.quoteError = error.message; }
+        finally { this.quoteLoading = false; }
+    },
+
+    async confirmQuote() {
+        this.quoteLoading = true;
+        this.quoteError = '';
+        try {
+            const { response, payload } = await this.quoteRequest(this.endpoint(this.routes.quoteConfirm, this.conversationId), 'POST');
+            if (response.status === 409) { this.quotePreview = payload.preview; this.quoteError = payload.message; return; }
+            this.quote.quotation = payload.quotation;
+            this.quote.quotation_id = payload.quotation.id;
+        } catch (error) { this.quoteError = error.message; }
+        finally { this.quoteLoading = false; }
+    },
+
+    async cancelQuote() {
+        try {
+            await this.quoteRequest(this.endpoint(this.routes.quoteShow, this.conversationId), 'DELETE');
+            this.quote = null;
+            this.quotePreview = null;
+            this.quoteDraft = { customer_name: '', items: [] };
+        } catch (error) { this.quoteError = error.message; }
     },
 
     scrollToBottom() {

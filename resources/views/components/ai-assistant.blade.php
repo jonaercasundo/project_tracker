@@ -28,6 +28,11 @@
                     destroy: @js(route('assistant.conversations.destroy', ['conversation' => '__ID__'])),
                     stream: @js(route('assistant.messages.stream', ['conversation' => '__ID__'])),
                     capabilities: @js(route('assistant.capabilities')),
+                    quoteShow: @js(route('assistant.quotations.show', ['conversation' => '__ID__'])),
+                    quoteStart: @js(route('assistant.quotations.start', ['conversation' => '__ID__'])),
+                    quotePreview: @js(route('assistant.quotations.preview', ['conversation' => '__ID__'])),
+                    quoteConfirm: @js(route('assistant.quotations.confirm', ['conversation' => '__ID__'])),
+                    quoteProducts: @js(route('assistant.quotations.products')),
                     full: @js(route('assistant.workspace'))
                 }
             })"
@@ -94,9 +99,57 @@
                                 </template>
                                 <template x-for="(message, index) in messages" :key="index">
                                     <div class="flex" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
-                                        <div class="max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-6 whitespace-pre-wrap" :class="message.role === 'user' ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-800'" x-text="message.content"></div>
+                                        <div class="max-w-[92%] min-w-0 rounded-2xl px-3.5 py-2.5 text-sm leading-6 whitespace-pre-wrap" :class="message.role === 'user' ? 'bg-blue-50 text-slate-900' : 'border border-slate-200 bg-white text-slate-800'">
+                                            <p x-text="message.content"></p>
+                                            <template x-for="product in message.products || message.metadata?.products || []" :key="product.id">
+                                                <article x-show="!(message.dismissedProducts || []).includes(product.id)" class="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                                                    <div class="flex gap-3">
+                                                        <img x-show="product.image" :src="product.image" :alt="product.name" class="h-16 w-16 shrink-0 rounded-lg border border-slate-100 object-cover">
+                                                        <div x-show="!product.image" class="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400">MI</div>
+                                                        <div class="min-w-0">
+                                                            <h3 class="font-semibold text-slate-900" x-text="product.name"></h3>
+                                                            <p class="text-xs text-slate-500" x-text="`SKU: ${product.sku || product.code || '—'}`"></p>
+                                                            <p class="mt-1 text-xs text-slate-700" x-text="product.price === null ? 'Selling price unavailable' : `Selling price: ₱${Number(product.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`"></p>
+                                                            <p class="text-[11px] text-slate-500" x-text="product.price === null ? 'Ask an authorized pricing administrator' : 'MI product selling price · verify before quotation'"></p>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mt-3 flex flex-wrap gap-2">
+                                                        <button x-show="product.price !== null" type="button" @click="startQuote(product)" class="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">Yes, create quotation</button>
+                                                        <button type="button" @click="send(`Compare ${product.name} with similar products`)" class="rounded-full border border-slate-300 px-3 py-1.5 text-xs text-slate-700">Compare products</button>
+                                                        <a :href="`/mi/${product.id}`" class="rounded-full border border-slate-300 px-3 py-1.5 text-xs text-slate-700">View product details</a>
+                                                        <button type="button" @click="message.dismissedProducts = [...(message.dismissedProducts || []), product.id]" class="rounded-full border border-slate-300 px-3 py-1.5 text-xs text-slate-500">No, thanks</button>
+                                                    </div>
+                                                </article>
+                                            </template>
+                                        </div>
                                     </div>
                                 </template>
+                                <section x-show="quote" class="rounded-xl border border-blue-200 bg-white p-4 shadow-sm" aria-label="Quotation draft workflow">
+                                    <div class="flex items-center justify-between"><h3 class="font-semibold text-slate-900">Quotation draft</h3><button x-show="!quote?.quotation" type="button" @click="cancelQuote()" class="text-xs text-slate-500 underline">Cancel</button></div>
+                                    <p class="mt-1 text-xs text-slate-500">Prices use current MI selling price records. No tax or discount rules are configured here.</p>
+                                    <div x-show="!quote?.quotation">
+                                        <label class="mt-3 block text-xs font-medium text-slate-700">Customer / company</label>
+                                        <input x-model="quoteDraft.customer_name" maxlength="150" class="mt-1 w-full rounded-lg border-slate-300 text-sm" placeholder="Customer name">
+                                        <label class="mt-3 block text-xs font-medium text-slate-700">Add product by name or SKU</label>
+                                        <input x-model="quoteSearch" @input.debounce.300ms="searchQuoteProducts()" @keydown.escape="quoteProducts = []" class="mt-1 w-full rounded-lg border-slate-300 text-sm" placeholder="Search MI products">
+                                        <p x-show="quoteSearching" class="mt-1 text-xs text-slate-500" role="status">Searching products…</p>
+                                        <div x-show="quoteProducts.length" class="mt-1 max-h-32 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+                                            <template x-for="product in quoteProducts" :key="product.id"><button type="button" @click="addQuoteProduct(product)" class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"><span x-text="product.name"></span><span class="ml-2 text-xs text-slate-500" x-text="product.sku"></span></button></template>
+                                        </div>
+                                        <div class="mt-3 space-y-2">
+                                            <template x-for="(item, index) in quoteDraft.items" :key="item.id"><div class="flex items-center gap-2 rounded-lg bg-slate-50 p-2"><span class="min-w-0 flex-1 truncate text-xs text-slate-700" x-text="item.name || `Product #${item.id}`"></span><label class="sr-only" :for="`quote-quantity-${index}`">Quantity</label><input :id="`quote-quantity-${index}`" type="number" min="1" max="100000" step="1" x-model.number="item.quantity" @input="quotePreview = null" class="w-20 rounded border-slate-300 py-1 text-xs"><button type="button" @click="removeQuoteProduct(index)" class="px-1 text-xs text-rose-600">Remove</button></div></template>
+                                        </div>
+                                        <button type="button" @click="previewQuote()" :disabled="quoteLoading || !quoteDraft.items.length || !quoteDraft.customer_name.trim()" class="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" x-text="quoteLoading ? 'Loading…' : 'Preview quotation'"></button>
+                                    </div>
+                                    <div x-show="quotePreview && !quote?.quotation" class="mt-3 rounded-lg border border-slate-200 p-3">
+                                        <p class="font-medium text-slate-800" x-text="quotePreview?.customer_name"></p>
+                                        <template x-for="item in quotePreview?.items || []" :key="item.id"><div class="flex justify-between gap-2 py-1 text-xs text-slate-600"><span x-text="`${item.name} · ${item.quantity} × ₱${Number(item.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}`"></span><span x-text="`₱${Number(item.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}`"></span></div></template>
+                                        <div class="mt-2 flex justify-between border-t border-slate-200 pt-2 text-sm font-semibold"><span>Total (PHP)</span><span x-text="`₱${Number(quotePreview?.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`"></span></div>
+                                        <button type="button" @click="confirmQuote()" :disabled="quoteLoading" class="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Confirm and save draft</button>
+                                    </div>
+                                    <div x-show="quote?.quotation" class="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900"><p x-text="`Saved as ${quote?.quotation?.quote_number || 'quotation draft'}`"></p><a :href="quote?.quotation?.print_url" target="_blank" class="mt-2 inline-block font-semibold underline">Open printable quotation</a></div>
+                                    <p x-show="quoteError" x-text="quoteError" role="alert" class="mt-2 text-xs text-rose-700"></p>
+                                </section>
                                 <p x-show="loading" class="text-xs text-slate-500">Assistant is thinking…</p>
                                 <div x-show="error" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
                                     <p x-text="error" aria-live="polite"></p>

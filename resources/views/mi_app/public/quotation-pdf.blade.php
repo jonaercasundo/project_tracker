@@ -584,7 +584,7 @@
 
 
                 <td class="num">
-                    ${{ number_format(
+                    {{ $currency_symbol ?? '₱' }}{{ number_format(
                         $itemUnitPrice,
                         2
                     ) }}
@@ -592,7 +592,7 @@
 
 
                 <td class="num">
-                    ${{ number_format(
+                    {{ $currency_symbol ?? '₱' }}{{ number_format(
                         $itemSubtotal,
                         2
                     ) }}
@@ -620,7 +620,7 @@
         </td>
 
         <td class="value">
-            ${{ number_format(
+            {{ $currency_symbol ?? '₱' }}{{ number_format(
                 (float) $total,
                 2
             ) }}
@@ -636,7 +636,7 @@
         </td>
 
         <td class="value">
-            ${{ number_format(
+            {{ $currency_symbol ?? '₱' }}{{ number_format(
                 (float) $total,
                 2
             ) }}

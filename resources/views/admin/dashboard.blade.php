@@ -139,6 +139,21 @@
             </div>
         @endrole
 
+        @role('Administrator')
+        @can('ai.settings.manage')
+            <div class="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Settings / AI</span>
+                    <h3 class="text-lg font-bold text-slate-900 mt-1">AI Configuration</h3>
+                    <p class="text-sm text-slate-500 mt-1">Manage the OpenAI credential, model, access, and usage limits.</p>
+                </div>
+                <a href="{{ route('admin.ai-configuration.index') }}" class="inline-flex items-center justify-center px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Manage AI Configuration
+                </a>
+            </div>
+        @endcan
+        @endrole
+
         {{-- ================= STATISTICS ================= --}}
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 

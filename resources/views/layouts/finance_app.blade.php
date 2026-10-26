@@ -109,5 +109,6 @@
                 }
             });
         </script>
+        <x-ai-assistant />
     </body>
 </html>

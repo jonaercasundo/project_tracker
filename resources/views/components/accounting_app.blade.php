@@ -94,6 +94,7 @@
             });
         </script>
         @stack('scripts')
+          <x-ai-assistant />
           </body> 
     
 </html>

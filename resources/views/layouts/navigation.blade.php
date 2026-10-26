@@ -32,6 +32,13 @@
                                 {{ __('API Access / Integrations') }}
                             </x-dropdown-link>
                         @endrole
+                        @role('Administrator')
+                            @can('ai.settings.manage')
+                                <x-dropdown-link :href="route('admin.ai-configuration.index')">
+                                    {{ __('Settings / AI Configuration') }}
+                                </x-dropdown-link>
+                            @endcan
+                        @endrole
                         <x-dropdown-link :href="route('profile.edit')">
                             {{ __('Profile') }}
                         </x-dropdown-link>
@@ -82,6 +89,13 @@
                     <x-responsive-nav-link :href="route('integrations.jarvis.index')">
                         {{ __('API Access / Integrations') }}
                     </x-responsive-nav-link>
+                @endrole
+                @role('Administrator')
+                    @can('ai.settings.manage')
+                        <x-responsive-nav-link :href="route('admin.ai-configuration.index')">
+                            {{ __('Settings / AI Configuration') }}
+                        </x-responsive-nav-link>
+                    @endcan
                 @endrole
                 <x-responsive-nav-link :href="route('profile.edit')">
                     {{ __('Profile') }}

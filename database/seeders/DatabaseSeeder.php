@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,11 +16,12 @@ class DatabaseSeeder extends Seeder
         Role::firstOrCreate(['name' => 'user']);
 
         // 2. CLEAR CACHE BEFORE assigning roles
-        app(\Spatie\Permission\PermissionRegistrar::class)
+        app(PermissionRegistrar::class)
             ->forgetCachedPermissions();
 
         // 3. THEN seed user
         $this->call([
+            AiAssistantPermissionSeeder::class,
             AdminUserSeeder::class,
             BillingPermissionSeeder::class,
         ]);

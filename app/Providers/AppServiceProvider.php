@@ -15,8 +15,12 @@ use App\Policies\MIProductPolicy;
 use App\Policies\ProjectInformationPolicy;
 use App\Policies\TravelLiquidationPolicy;
 use App\Services\AccountingWorkspace;
+use App\Services\AiProviderConfiguration;
 use App\Services\MIApprovalQueue;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +34,13 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        RateLimiter::for('ai-assistant', function (Request $request): Limit {
+            $userId = $request->user()?->getAuthIdentifier() ?? $request->ip();
+
+            return Limit::perMinute(app(AiProviderConfiguration::class)->perUserRequestLimit())->by((string) $userId);
+        });
+        RateLimiter::for('ai-configuration-test', fn (Request $request): Limit => Limit::perMinute(3)->by((string) ($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
         Gate::policy(BudgetRequest::class, BudgetRequestPolicy::class);
         Gate::policy(Liquidation::class, TravelLiquidationPolicy::class);
         Gate::policy(MI_Liquidation::class, MILiquidationPolicy::class);

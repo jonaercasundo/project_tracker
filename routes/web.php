@@ -4,6 +4,8 @@ use App\Http\Controllers\Accounting_DashboardController;
 use App\Http\Controllers\Accounting_LiquidationController;
 use App\Http\Controllers\AccountingWorkspaceController;
 use App\Http\Controllers\ActionCrawlerController;
+use App\Http\Controllers\Admin\AiConfigurationController;
+use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\BiddingController;
 use App\Http\Controllers\BiddingDocumentController;
 use App\Http\Controllers\BiddingFolderController;
@@ -71,6 +73,14 @@ Route::get('/', function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth'])->group(function () {
+    Route::get('/assistant', [AssistantController::class, 'workspace'])->name('assistant.workspace');
+    Route::get('/assistant/capabilities', [AssistantController::class, 'capabilities'])->middleware('throttle:ai-assistant')->name('assistant.capabilities');
+    Route::get('/assistant/conversations', [AssistantController::class, 'conversations'])->middleware('throttle:ai-assistant')->name('assistant.conversations.index');
+    Route::post('/assistant/conversations', [AssistantController::class, 'createConversation'])->middleware('throttle:ai-assistant')->name('assistant.conversations.store');
+    Route::get('/assistant/conversations/{conversation}', [AssistantController::class, 'showConversation'])->middleware('throttle:ai-assistant')->name('assistant.conversations.show');
+    Route::delete('/assistant/conversations/{conversation}', [AssistantController::class, 'deleteConversation'])->middleware('throttle:ai-assistant')->name('assistant.conversations.destroy');
+    Route::post('/assistant/conversations/{conversation}/messages', [AssistantController::class, 'stream'])->middleware('throttle:ai-assistant')->name('assistant.messages.stream');
+
     Route::get('/dashboard/launch', DashboardLaunchController::class)->name('dashboard.launch');
 
     Route::get('/deliveries/monitoring', [DeliveryMonitoringController::class, 'index'])
@@ -119,6 +129,14 @@ Route::middleware(['auth'])->group(function () {
 
     });
     Route::middleware(['role:Administrator'])->group(function () {
+
+        Route::middleware(['can:ai.settings.manage'])->prefix('admin/settings/ai')->name('admin.ai-configuration.')->group(function () {
+            Route::get('/', [AiConfigurationController::class, 'index'])->name('index');
+            Route::post('/', [AiConfigurationController::class, 'store'])->name('store');
+            Route::delete('/key', [AiConfigurationController::class, 'removeKey'])->name('key.destroy');
+            Route::post('/test-connection', [AiConfigurationController::class, 'testConnection'])
+                ->middleware('throttle:ai-configuration-test')->name('test-connection');
+        });
 
         Route::post('/users', [UserController::class, 'store'])
             ->name('users.store');

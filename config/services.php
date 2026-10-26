@@ -16,6 +16,11 @@ return [
     'apify' => [
         'token' => env('APIFY_API_TOKEN'),
     ],
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+        'assistant_model' => env('OPENAI_ASSISTANT_MODEL', 'gpt-5.5'),
+        'assistant_timeout' => env('OPENAI_ASSISTANT_TIMEOUT', 90),
+    ],
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
     ],

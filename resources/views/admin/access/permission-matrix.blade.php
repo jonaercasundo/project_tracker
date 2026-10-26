@@ -1,3 +1,4 @@
+<x-app-layout>
 <div class="mx-auto flex max-w-[1500px] flex-col gap-5" x-data="{ dirty: false }" @change="dirty = true">
     <section class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -85,3 +86,4 @@
         </section>
     </form>
 </div>
+</x-app-layout>

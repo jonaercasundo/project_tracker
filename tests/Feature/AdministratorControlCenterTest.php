@@ -13,6 +13,8 @@ class AdministratorControlCenterTestCase extends MIWorkflowTestCase
     {
         $migrationPaths = parent::migrateFreshUsing();
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_115437_add_description_to_roles_and_create_admin_activity_logs_table.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_10_26_083437_create_ai_assistant_tables.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_10_26_085724_create_ai_provider_settings_tables.php';
 
         return $migrationPaths;
     }
@@ -37,10 +39,15 @@ function controlCenterAdmin(): User
 it('shows the control center and protects management routes from non-administrators', function () {
     $admin = controlCenterAdmin();
 
-    $this->get(route('admin.dashboard'))->assertOk()->assertSee('A clear view of access and operations.');
-    $this->get(route('admin.access.permissions.index'))->assertOk()->assertSee('Role permission matrix');
-    $this->get(route('admin.access.review'))->assertOk()->assertSee('User access review');
-    $this->get(route('admin.audit.index'))->assertOk()->assertSee('Activity and access log');
+    $this->get(route('admin.dashboard'))->assertOk()->assertSee('A clear view of access and operations.')
+        ->assertSee('Administrator navigation')->assertSee('AI Assistant')->assertSee('AI Configuration')
+        ->assertSee(route('roles.index'))->assertSee(route('admin.ai-management.index'))->assertSee(route('roleaccess.index'));
+    $this->get(route('admin.access.permissions.index'))->assertOk()->assertSee('Role permission matrix')->assertSee('Administrator navigation');
+    $this->get(route('admin.access.review'))->assertOk()->assertSee('User access review')->assertSee('All users &amp; access', false);
+    $this->get(route('admin.audit.index'))->assertOk()->assertSee('Activity and access log')->assertSee('Roles &amp; permissions', false);
+    $this->get(route('admin.ai-management.index'))->assertOk()->assertSee('Assistant capabilities and usage')->assertSee('AI Assistant');
+    $this->get(route('roles.index'))->assertOk()->assertSee('Role management')->assertSee('Roles &amp; permissions', false);
+    $this->get(route('roleaccess.index'))->assertOk()->assertSee('Role Access Management');
 
     $member = $this->miUser('user');
     $this->actingAs($member)->withSession(['company_id' => $member->companies()->sole()->getKey()]);

@@ -1,3 +1,4 @@
+<x-app-layout>
 <div class="mx-auto flex max-w-[1500px] flex-col gap-5">
     <section class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
         <div><p class="text-[10px] font-extrabold uppercase tracking-[.15em] text-blue-700">Access governance</p><h2 class="mt-1 text-xl font-extrabold tracking-tight text-[#172a45]">User access review</h2><p class="mt-1.5 max-w-3xl text-xs leading-relaxed text-slate-500">Roles are global to the web guard. Effective permissions combine role and direct grants; company membership is listed separately and does not replace module-level authorization.</p></div>
@@ -35,3 +36,4 @@
         <div class="border-t border-slate-100 px-4 py-3">{{ $users->links() }}</div>
     </section>
 </div>
+</x-app-layout>

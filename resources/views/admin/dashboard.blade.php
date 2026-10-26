@@ -1,3 +1,4 @@
+<x-app-layout>
 <div class="mx-auto flex max-w-[1500px] flex-col gap-6">
     <section class="relative overflow-hidden rounded-2xl border border-[#dce5f0] bg-white p-5 shadow-[0_10px_30px_-28px_rgba(15,35,65,.55)] sm:p-7">
         <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-blue-700 via-blue-500 to-cyan-400"></div>
@@ -124,3 +125,4 @@
         </section>
     </div>
 </div>
+</x-app-layout>

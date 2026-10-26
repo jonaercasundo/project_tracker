@@ -1,3 +1,4 @@
+<x-app-layout>
 <div class="mx-auto flex max-w-[1500px] flex-col gap-5">
     <section class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-[10px] font-extrabold uppercase tracking-[.15em] text-blue-700">Roles &amp; permissions</p><h2 class="mt-1 text-xl font-extrabold tracking-tight text-[#172a45]">Role management</h2><p class="mt-1.5 text-xs text-slate-500">Manage web-guard roles and their descriptions. Assign permissions in the role matrix.</p></div><div class="flex flex-wrap gap-2"><a href="{{ route('admin.access.permissions.index') }}" class="rounded-xl border border-slate-200 px-3.5 py-2.5 text-[10px] font-bold text-slate-700 hover:bg-slate-50">Permission matrix</a><a href="{{ route('roles.create') }}" class="rounded-xl bg-[#174b8a] px-3.5 py-2.5 text-[10px] font-bold text-white hover:bg-[#123b72]">Create role</a></div></div>
@@ -16,3 +17,4 @@
         <div class="border-t border-slate-100 px-4 py-3">{{ $roles->links() }}</div>
     </section>
 </div>
+</x-app-layout>

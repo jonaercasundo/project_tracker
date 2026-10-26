@@ -1,3 +1,4 @@
+<x-app-layout>
 <div class="mx-auto flex max-w-[1500px] flex-col gap-5">
     <section class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -22,3 +23,4 @@
         <div class="border-t border-slate-100 px-4 py-3">{{ $activities->links() }}</div>
     </section>
 </div>
+</x-app-layout>

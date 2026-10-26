@@ -4,6 +4,7 @@ use App\Http\Controllers\Accounting_DashboardController;
 use App\Http\Controllers\Accounting_LiquidationController;
 use App\Http\Controllers\AccountingWorkspaceController;
 use App\Http\Controllers\ActionCrawlerController;
+use App\Http\Controllers\Admin\AdminControlCenterController;
 use App\Http\Controllers\Admin\AiConfigurationController;
 use App\Http\Controllers\AiQuotationController;
 use App\Http\Controllers\AssistantController;
@@ -73,7 +74,7 @@ Route::get('/', function () {
 | AUTH ROUTES
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/assistant', [AssistantController::class, 'workspace'])->name('assistant.workspace');
     Route::get('/assistant/capabilities', [AssistantController::class, 'capabilities'])->middleware('throttle:ai-assistant')->name('assistant.capabilities');
     Route::get('/assistant/conversations', [AssistantController::class, 'conversations'])->middleware('throttle:ai-assistant')->name('assistant.conversations.index');
@@ -159,10 +160,13 @@ Route::middleware(['auth'])->group(function () {
             |--------------------------------------------------------------------------
             */
 
-        Route::get('/admin/dashboard', [
-            RoleAccessPermissionController::class,
-            'index',
-        ])->name('admin.dashboard');
+        Route::get('/admin/dashboard', [AdminControlCenterController::class, 'dashboard'])->name('admin.dashboard');
+        Route::get('/admin/ai-management', [AdminControlCenterController::class, 'aiOverview'])->name('admin.ai-management.index');
+        Route::get('/admin/access/permissions', [AdminControlCenterController::class, 'permissionMatrix'])->name('admin.access.permissions.index');
+        Route::get('/admin/access/ai-permissions', [AdminControlCenterController::class, 'aiPermissionMatrix'])->name('admin.access.permissions.ai');
+        Route::patch('/admin/access/permissions', [AdminControlCenterController::class, 'updatePermissionMatrix'])->name('admin.access.permissions.update');
+        Route::get('/admin/access/review', [AdminControlCenterController::class, 'accessReview'])->name('admin.access.review');
+        Route::get('/admin/audit', [AdminControlCenterController::class, 'auditLog'])->name('admin.audit.index');
 
         /*
         |--------------------------------------------------------------------------

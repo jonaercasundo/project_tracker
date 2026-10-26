@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Listeners\LogSuccessfulLogin;
 use App\Models\BudgetRequest;
 use App\Models\Liquidation;
 use App\Models\LogisticsIntegration;
@@ -17,8 +18,10 @@ use App\Policies\TravelLiquidationPolicy;
 use App\Services\AccountingWorkspace;
 use App\Services\AiProviderConfiguration;
 use App\Services\MIApprovalQueue;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
@@ -34,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::listen(Login::class, LogSuccessfulLogin::class);
         RateLimiter::for('ai-assistant', function (Request $request): Limit {
             $userId = $request->user()?->getAuthIdentifier() ?? $request->ip();
 

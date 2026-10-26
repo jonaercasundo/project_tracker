@@ -8,7 +8,7 @@
                 </h2>
 
                 <p class="text-sm text-gray-500 mt-1">
-                    Update the role name.
+                    Update the role description and role name when it is not assigned to users.
                 </p>
             </div>
 
@@ -67,6 +67,12 @@
                                 {{ $message }}
                             </p>
                         @enderror
+                    </div>
+
+                    <div class="mt-5">
+                        <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">Role description</label>
+                        <textarea id="description" name="description" maxlength="500" rows="4" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Describe the access this role is intended to provide.">{{ old('description', $role->description) }}</textarea>
+                        @error('description')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
                     </div>
 
                     <div class="flex justify-end gap-3 mt-6">

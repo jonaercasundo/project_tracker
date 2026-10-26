@@ -115,6 +115,12 @@
                             </p>
                         </div>
 
+                        <div class="mt-5">
+                            <label for="description" class="block text-sm font-medium text-gray-700 mb-2">Role description</label>
+                            <textarea id="description" name="description" maxlength="500" rows="3" class="w-full rounded-xl border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Describe the access this role is intended to provide.">{{ old('description') }}</textarea>
+                            @error('description')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+
                     </div>
 
                     {{-- Footer --}}

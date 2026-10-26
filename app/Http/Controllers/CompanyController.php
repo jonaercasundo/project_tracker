@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Services\AdminAuditLogger;
 use App\Services\DashboardService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,7 @@ class CompanyController extends Controller
     /**
      * Store a new company.
      */
-    public function store(Request $request)
+    public function store(Request $request, AdminAuditLogger $audit)
     {
         $validated = $request->validate([
             'name' => [
@@ -53,7 +54,8 @@ class CompanyController extends Controller
 
         $validated['is_active'] = $request->boolean('is_active');
 
-        Company::create($validated);
+        $company = Company::create($validated);
+        $audit->record($request->user(), 'company.created', 'company', $company->getKey(), 'Created company '.$company->name.'.', $company->getKey(), ['code' => $company->code]);
 
         return redirect()
             ->route('companies.index')
@@ -71,7 +73,7 @@ class CompanyController extends Controller
     /**
      * Update a company.
      */
-    public function update(Request $request, Company $company)
+    public function update(Request $request, Company $company, AdminAuditLogger $audit)
     {
         $validated = $request->validate([
             'name' => [
@@ -93,22 +95,31 @@ class CompanyController extends Controller
 
         $validated['is_active'] = $request->boolean('is_active');
 
+        $before = ['name' => $company->name, 'code' => $company->code, 'is_active' => (bool) $company->is_active];
         $company->update($validated);
+        $audit->record($request->user(), 'company.updated', 'company', $company->getKey(), 'Updated company '.$company->name.'.', $company->getKey(), ['before' => $before, 'after' => ['name' => $company->name, 'code' => $company->code, 'is_active' => (bool) $company->is_active]]);
 
         return redirect()
-            ->route('admin.companies.index')
+            ->route('companies.index')
             ->with('success', 'Company updated successfully.');
     }
 
     /**
      * Delete a company.
      */
-    public function destroy(Company $company)
+    public function destroy(Request $request, Company $company, AdminAuditLogger $audit)
     {
+        if ($company->users()->exists()) {
+            return back()->withErrors(['company' => 'Remove this company from all user accounts before deleting it.']);
+        }
+
+        $name = $company->name;
+        $id = $company->getKey();
         $company->delete();
+        $audit->record($request->user(), 'company.deleted', 'company', $id, 'Deleted company '.$name.'.', $id);
 
         return redirect()
-            ->route('admin.companies.index')
+            ->route('companies.index')
             ->with('success', 'Company deleted successfully.');
     }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AiActivity;
 use App\Models\AiProviderSetting;
 use App\Models\User;
+use App\Services\AdminAuditLogger;
 use App\Services\AiProviderConfiguration;
 use App\Services\OpenAiResponsesClient;
 use Illuminate\Contracts\View\View;
@@ -56,7 +57,7 @@ class AiConfigurationController extends Controller
         ]);
     }
 
-    public function store(Request $request, AiProviderConfiguration $configuration): JsonResponse
+    public function store(Request $request, AiProviderConfiguration $configuration, AdminAuditLogger $audit): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'openai_api_key' => ['nullable', 'string', 'max:255'],
@@ -79,7 +80,7 @@ class AiConfigurationController extends Controller
         $setting = $existing ?? new AiProviderSetting(['id' => 1]);
         $keyWasReplaced = $submittedKey !== '';
 
-        DB::transaction(function () use ($setting, $data, $submittedKey, $keyWasReplaced, $user, $before): void {
+        DB::transaction(function () use ($setting, $data, $submittedKey, $keyWasReplaced, $user, $before, $audit): void {
             $setting->provider = 'openai';
             $setting->model = $data['model'];
             $setting->enabled = (bool) $data['enabled'];
@@ -97,13 +98,18 @@ class AiConfigurationController extends Controller
                 'before' => $before,
                 'after' => $this->safeSnapshot($setting),
             ]);
+            $audit->record($user, $keyWasReplaced ? 'ai.configuration_key_replaced' : 'ai.configuration_updated', 'ai_provider_setting', 1, 'Updated OpenAI assistant configuration.', $user->currentCompany()?->getKey(), [
+                'model' => $data['model'],
+                'enabled' => (bool) $data['enabled'],
+                'credential_replaced' => $keyWasReplaced,
+            ]);
         });
 
         return response()->json(['message' => 'AI configuration saved. The API key is stored encrypted and will not be shown again.'])
             ->header('Cache-Control', 'no-store');
     }
 
-    public function removeKey(Request $request, AiProviderConfiguration $configuration): JsonResponse
+    public function removeKey(Request $request, AiProviderConfiguration $configuration, AdminAuditLogger $audit): JsonResponse
     {
         $setting = $configuration->setting();
         $before = $this->safeSnapshot($setting);
@@ -114,7 +120,7 @@ class AiConfigurationController extends Controller
                 ->header('Cache-Control', 'no-store');
         }
 
-        DB::transaction(function () use ($setting, $request, $before): void {
+        DB::transaction(function () use ($setting, $request, $before, $audit): void {
             $setting->api_key = null;
             $setting->configured_by = $request->user()->getAuthIdentifier();
             $setting->save();
@@ -122,6 +128,7 @@ class AiConfigurationController extends Controller
                 'before' => $before,
                 'after' => $this->safeSnapshot($setting),
             ]);
+            $audit->record($request->user(), 'ai.configuration_key_removed', 'ai_provider_setting', 1, 'Removed the saved OpenAI credential.', $request->user()->currentCompany()?->getKey());
         });
 
         return response()->json(['message' => $configuration->credentialSource() === 'environment'
@@ -130,7 +137,7 @@ class AiConfigurationController extends Controller
             ->header('Cache-Control', 'no-store');
     }
 
-    public function testConnection(Request $request, AiProviderConfiguration $configuration, OpenAiResponsesClient $client): JsonResponse
+    public function testConnection(Request $request, AiProviderConfiguration $configuration, OpenAiResponsesClient $client, AdminAuditLogger $audit): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'openai_api_key' => ['nullable', 'string', 'max:255'],
@@ -154,6 +161,11 @@ class AiConfigurationController extends Controller
         $this->audit($request->user()->getAuthIdentifier(), 'connection_test', [
             'status' => $result['status'],
             'message' => $result['message'],
+            'model' => $data['model'],
+            'credential_source' => $submittedKey !== '' ? 'submitted' : $configuration->credentialSource(),
+        ]);
+        $audit->record($request->user(), 'ai.connection_tested', 'ai_provider_setting', 1, 'Tested the OpenAI connection: '.$result['status'].'.', $request->user()->currentCompany()?->getKey(), [
+            'status' => $result['status'],
             'model' => $data['model'],
             'credential_source' => $submittedKey !== '' ? 'submitted' : $configuration->credentialSource(),
         ]);

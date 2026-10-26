@@ -70,7 +70,7 @@
     $avatarPalette = ['#2f5fe0', '#7c3aed', '#0d9488', '#e0405a', '#d97706', '#4f46e5'];
 @endphp
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 py-8" x-data="{ addOpen: false }">
+<div id="user-directory" class="max-w-7xl mx-auto px-4 sm:px-6 py-8" x-data="{ addOpen: @js(request('add') === '1') }">
 
     {{-- ================= HEADER ================= --}}
     <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -138,6 +138,12 @@
                 placeholder="Search by name, email, or department..."
                 class="w-full bg-transparent border-0 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-0">
         </div>
+        <label for="user-status" class="sr-only">Account status</label>
+        <select id="user-status" name="status" class="rounded-lg border-slate-200 text-sm text-slate-700 focus:border-blue-500 focus:ring-blue-500/20">
+            <option value="all" @selected($status === 'all')>All statuses</option>
+            <option value="active" @selected($status === 'active')>Active</option>
+            <option value="inactive" @selected($status === 'inactive')>Inactive</option>
+        </select>
         <button type="submit" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg transition-colors">
             Search
         </button>
@@ -157,6 +163,7 @@
                         <th class="text-left font-semibold text-slate-500 text-xs uppercase tracking-wide px-5 py-3">Employee ID</th>
                         <th class="text-left font-semibold text-slate-500 text-xs uppercase tracking-wide px-5 py-3">Department</th>
                         <th class="text-left font-semibold text-slate-500 text-xs uppercase tracking-wide px-5 py-3">Companies</th>
+                        <th class="text-left font-semibold text-slate-500 text-xs uppercase tracking-wide px-5 py-3">Status</th>
                         <th class="text-right font-semibold text-slate-500 text-xs uppercase tracking-wide px-5 py-3">Action</th>
                     </tr>
                 </thead>
@@ -205,6 +212,12 @@
                             @empty
                                 <span class="text-slate-400 text-sm">No company assigned</span>
                             @endforelse
+                        </td>
+
+                        <td class="px-5 py-3.5">
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold {{ $user->is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">
+                                {{ $user->is_active ? 'Active' : 'Inactive' }}
+                            </span>
                         </td>
 
                         {{-- ACTION --}}
@@ -372,6 +385,14 @@
                                                             text-sm px-3 py-2"
                                                         value="{{ $user->email }}"
                                                         disabled>
+                                                </div>
+
+                                                <div class="col-span-2">
+                                                    <label for="edit_status_{{ $user->user_id }}" class="block text-xs font-semibold text-slate-700 mb-1">Account status</label>
+                                                    <select id="edit_status_{{ $user->user_id }}" name="is_active" class="w-full rounded-xl border-slate-300 focus:border-blue-500 focus:ring-blue-500" required>
+                                                        <option value="1" @selected($user->is_active)>Active — user can sign in</option>
+                                                        <option value="0" @selected(!$user->is_active)>Inactive — sign-in blocked</option>
+                                                    </select>
                                                 </div>
 
                                             </div>
@@ -820,7 +841,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="text-center py-14 text-slate-400">
+                        <td colspan="7" class="text-center py-14 text-slate-400">
                             <svg class="w-7 h-7 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
                             </svg>

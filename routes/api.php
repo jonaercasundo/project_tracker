@@ -3,6 +3,7 @@
 use App\Http\Controllers\JarvisReadController;
 use App\Http\Controllers\JarvisTestController;
 use App\Http\Controllers\LogisticsWebhookController;
+use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureJarvisCompany;
 use App\Http\Middleware\EnsureJarvisToken;
 use App\Http\Middleware\EnsureLogisticsWebhookSignature;
@@ -13,7 +14,7 @@ Route::post('/v1/logistics/webhooks/delivery-status', LogisticsWebhookController
     ->name('api.v1.logistics.webhooks.delivery-status');
 
 Route::prefix('jarvis')->name('jarvis.')
-    ->middleware(['auth:sanctum', EnsureJarvisToken::class, 'throttle:60,1'])
+    ->middleware(['auth:sanctum', EnsureActiveUser::class, EnsureJarvisToken::class, 'throttle:60,1'])
     ->group(function () {
         Route::get('/test', JarvisTestController::class)->name('test');
         Route::middleware(EnsureJarvisCompany::class)->group(function () {

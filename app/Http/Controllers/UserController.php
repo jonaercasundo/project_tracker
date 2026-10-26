@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\AdminAuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +12,7 @@ use Throwable;
 
 class UserController extends Controller
 {
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AdminAuditLogger $audit): RedirectResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -33,7 +34,7 @@ class UserController extends Controller
 
         try {
 
-            DB::transaction(function () use ($validated): void {
+            DB::transaction(function () use ($validated, $request, $audit): void {
                 $user = User::create([
                     'name' => $validated['name'],
                     'email' => $validated['email'],
@@ -53,6 +54,10 @@ class UserController extends Controller
 
                 // Assign role
                 $user->assignRole($validated['roles']);
+                $audit->record($request->user(), 'user.created', 'user', $user->getKey(), 'Created user '.$user->name.'.', $request->user()->currentCompany()?->getKey(), [
+                    'roles' => $validated['roles'],
+                    'company_ids' => array_map('intval', $validated['company_ids']),
+                ]);
             });
 
             return back()->with(
@@ -121,11 +126,20 @@ class UserController extends Controller
         );
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id, AdminAuditLogger $audit)
     {
         $user = User::findOrFail($id);
 
+        if ($user->getKey() === $request->user()->getKey()) {
+            abort(403, 'You cannot delete your own account.');
+        }
+        if ($user->hasRole('Administrator') && User::query()->role('Administrator', 'web')->where('is_active', true)->count() <= 1) {
+            abort(422, 'The last active Administrator cannot be deleted.');
+        }
+        $userName = $user->name;
+        $userId = $user->getKey();
         $user->delete();
+        $audit->record($request->user(), 'user.deleted', 'user', $userId, 'Removed user '.$userName.'.', $request->user()->currentCompany()?->getKey());
 
         return redirect()
             ->route('admin.dashboard')
@@ -135,7 +149,7 @@ class UserController extends Controller
             );
     }
 
-    public function resetPassword(Request $request)
+    public function resetPassword(Request $request, AdminAuditLogger $audit)
     {
         $validated = $request->validate([
             'user_id' => [
@@ -156,6 +170,7 @@ class UserController extends Controller
         $user->update([
             'password' => Hash::make($validated['password']),
         ]);
+        $audit->record($request->user(), 'user.password_reset', 'user', $user->getKey(), 'Reset password for '.$user->name.'.', $request->user()->currentCompany()?->getKey());
 
         return back()->with(
             'success',

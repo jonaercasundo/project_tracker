@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UpdateMIProductRequest;
 use App\Models\MI_Category;
 use App\Models\MI_Collection;
+use App\Models\MI_Color;
 use App\Models\MI_Material;
 use App\Models\MI_Product;
 use App\Models\MI_Product_Image;
 use App\Models\MI_ProductType;
 use App\Models\MI_SubCategory;
+use App\Services\MIProductAttributeOptionService;
 use App\Services\MIProductFactoryCostService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -175,12 +177,16 @@ class MIAppController extends Controller
         $subCategories = MI_SubCategory::orderBy('name')->get();
         $productTypes = MI_ProductType::orderBy('name')->get();
         $collections = MI_Collection::orderBy('name')->get();
+        $materialOptions = MI_Material::where('is_active', true)->orderBy('material_name')->get();
+        $colorOptions = MI_Color::where('is_active', true)->orderBy('color_name')->get();
 
         return view('mi_app.designer_module.create', compact(
             'categories',
             'subCategories',
             'productTypes',
-            'collections'
+            'collections',
+            'materialOptions',
+            'colorOptions'
         ));
     }
 
@@ -309,12 +315,21 @@ class MIAppController extends Controller
                     */
                 case 'material':
 
+                    $materialName = trim((string) $request->input('material_name', ''));
+                    $normalizedName = mb_strtolower($materialName);
+                    $request->merge(['material_name' => $materialName]);
                     $request->validate([
-                        'material_name' => 'required|string|max:255|unique:mi_materials,material_name',
+                        'material_name' => 'required|string|max:255',
                     ]);
 
+                    if (MI_Material::where('normalized_name', $normalizedName)
+                        ->orWhereRaw('LOWER(TRIM(material_name)) = ?', [$normalizedName])->exists()) {
+                        throw ValidationException::withMessages(['material_name' => 'The material name has already been taken.']);
+                    }
+
                     MI_Material::create([
-                        'material_name' => $request->material_name,
+                        'material_name' => $materialName,
+                        'normalized_name' => $normalizedName,
                         'is_active' => true,
                     ]);
 
@@ -409,8 +424,15 @@ class MIAppController extends Controller
         return $path;
     }
 
-    public function store(Request $request, MIProductFactoryCostService $factoryCosts)
+    public function store(Request $request, MIProductFactoryCostService $factoryCosts, MIProductAttributeOptionService $attributeOptions)
     {
+        foreach (['materials', 'color'] as $field) {
+            $values = $request->input($field);
+            if (is_array($values)) {
+                $request->merge([$field => array_map(static fn ($value): string => trim((string) $value), $values)]);
+            }
+        }
+
         // Remove blank image link values before validation so optional empty inputs do not fail the URL rule.
         if ($request->has('image_links')) {
             $request->merge([
@@ -439,13 +461,13 @@ class MIAppController extends Controller
             'designed_by' => 'nullable|string|max:255',
 
             // Attributes
-            'materials' => 'required|array|min:1',
-            'materials.*' => 'string|max:255',
+            'materials' => 'required|array|min:1|max:100',
+            'materials.*' => 'required|string|max:255',
 
             'type' => 'nullable|string|max:255',
 
-            'color' => 'nullable|array',
-            'color.*' => 'string|max:255',
+            'color' => 'nullable|array|max:100',
+            'color.*' => 'required|string|max:255',
 
             // Product Dimensions
             'product_height' => 'nullable|numeric',
@@ -504,6 +526,11 @@ class MIAppController extends Controller
 
         try {
 
+            $validated['materials'] = $attributeOptions->persistMaterials($validated['materials']);
+            $validated['color'] = $attributeOptions->persistColors($validated['color'] ?? []);
+            if ($validated['materials'] === []) {
+                throw ValidationException::withMessages(['materials' => 'Select at least one material.']);
+            }
             $product = MI_Product::create($validated);
             $factoryCosts->synchronize($product, $factoryCostRows, []);
 
@@ -643,11 +670,13 @@ class MIAppController extends Controller
         $subCategories = MI_SubCategory::orderBy('name')->get();
         $productTypes = MI_ProductType::orderBy('name')->get();
         $collections = MI_Collection::orderBy('name')->get();
+        $materialOptions = MI_Material::where('is_active', true)->orderBy('material_name')->get();
+        $colorOptions = MI_Color::where('is_active', true)->orderBy('color_name')->get();
 
-        return view('mi_app.designer_module.edit', compact('product', 'categories', 'subCategories', 'productTypes', 'collections'));
+        return view('mi_app.designer_module.edit', compact('product', 'categories', 'subCategories', 'productTypes', 'collections', 'materialOptions', 'colorOptions'));
     }
 
-    public function update(UpdateMIProductRequest $request, MI_Product $product, MIProductFactoryCostService $factoryCosts): RedirectResponse
+    public function update(UpdateMIProductRequest $request, MI_Product $product, MIProductFactoryCostService $factoryCosts, MIProductAttributeOptionService $attributeOptions): RedirectResponse
     {
         $validated = $request->validated();
         $removeIds = array_map('intval', $validated['remove_image_ids'] ?? []);
@@ -668,8 +697,15 @@ class MIAppController extends Controller
         $removedPaths = [];
 
         try {
-            DB::transaction(function () use ($product, $attributes, $validated, $request, $removeIds, $factoryCosts, &$uploadedPaths, &$removedPaths): void {
+            DB::transaction(function () use ($product, $attributes, $validated, $request, $removeIds, $factoryCosts, $attributeOptions, &$uploadedPaths, &$removedPaths): void {
                 $lockedProduct = MI_Product::whereKey($product->getKey())->lockForUpdate()->firstOrFail();
+                $attributes['materials'] = $attributeOptions->persistMaterials($attributes['materials']);
+                if ($attributes['materials'] === []) {
+                    throw ValidationException::withMessages(['materials' => 'Select at least one material.']);
+                }
+                if (array_key_exists('color', $attributes)) {
+                    $attributes['color'] = $attributeOptions->persistColors($attributes['color']);
+                }
                 $validatedTaxonomy = array_replace($lockedProduct->only(['category_id', 'sub_category_id', 'product_type_id', 'collection_id']), $attributes);
                 $this->validateProductTaxonomy($validatedTaxonomy);
                 $lockedProduct->fill($attributes)->save();

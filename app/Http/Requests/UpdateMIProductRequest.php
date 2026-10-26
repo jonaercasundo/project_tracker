@@ -11,6 +11,16 @@ use Illuminate\Validation\Validator;
 
 class UpdateMIProductRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        foreach (['materials', 'color'] as $field) {
+            $values = $this->input($field);
+            if (is_array($values)) {
+                $this->merge([$field => array_map(static fn ($value): string => trim((string) $value), $values)]);
+            }
+        }
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */

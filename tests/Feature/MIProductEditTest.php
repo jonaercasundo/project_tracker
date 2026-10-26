@@ -3,6 +3,7 @@
 use App\Models\MI_Product;
 use App\Models\MI_Product_Factory_Cost;
 use App\Models\MI_Product_Image;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Filesystem\FilesystemAdapter;
@@ -22,6 +23,7 @@ beforeEach(function () {
         '2026_07_29_075746_create_product_types_table.php',
         '2026_07_29_075829_create_collections_table.php',
         '2026_07_30_085237_create_mi_materials_table.php',
+        '2026_10_26_075908_add_persistent_mi_product_attribute_options.php',
         '2026_07_31_015928_update_mi_products_table_for_new_product_system.php',
         '2026_07_31_020944_change_materials_and_color_to_json_in_mi_products_table.php',
         '2026_08_17_000000_add_price_to_products_table.php',
@@ -434,6 +436,74 @@ it('creates a product with prices factory costs and media then loads its shared 
     $this->get(route('mi_app.edit', $created))->assertSee('Acacia Wood')->assertSee('Natural');
     $this->put(route('mi_app.update', $created), miProductEditPayload($created))->assertSessionHasNoErrors();
     expect($created->images()->count())->toBe(2);
+});
+
+it('persists normalized custom materials and colors for reuse across products and edits', function () {
+    $fixture = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+    $payload = array_replace(miProductEditPayload($fixture), [
+        'item_name' => 'Custom option first product',
+        'materials' => [' Bamboo Composite ', 'bAMboo composite', 'Oak Wood'],
+        'color' => [' Sea Glass ', 'sea glass', 'Blue'],
+    ]);
+
+    $this->post(route('mi_app.store_1'), $payload)->assertRedirect(route('mi_app.index'))->assertSessionHasNoErrors();
+
+    $product = MI_Product::where('item_name', 'Custom option first product')->sole();
+    expect($product->materials)->toBe(['Bamboo Composite', 'Oak Wood']);
+    expect($product->color)->toBe(['Sea Glass', 'Blue']);
+    $material = DB::table('mi_materials')->where('normalized_name', 'bamboo composite')->sole();
+    $color = DB::table('mi_colors')->where('normalized_name', 'sea glass')->sole();
+    expect(DB::table('mi_materials')->where('normalized_name', 'bamboo composite')->count())->toBe(1);
+    expect(DB::table('mi_colors')->where('normalized_name', 'sea glass')->count())->toBe(1);
+    $this->get(route('mi_app.create'))->assertSee('Bamboo Composite')->assertSee('Sea Glass');
+
+    $secondPayload = array_replace(miProductEditPayload($fixture), [
+        'item_name' => 'Custom option second product',
+        'materials' => ['BAMBOO COMPOSITE'],
+        'color' => ['SEA GLASS'],
+    ]);
+    $this->post(route('mi_app.store_1'), $secondPayload)->assertSessionHasNoErrors();
+    $second = MI_Product::where('item_name', 'Custom option second product')->sole();
+    expect($second->materials)->toBe(['Bamboo Composite']);
+    expect($second->color)->toBe(['Sea Glass']);
+
+    $this->put(route('mi_app.update', $product), array_replace(miProductEditPayload($product), [
+        'materials' => [' Oak Wood '], 'color' => [],
+    ]))->assertSessionHasNoErrors();
+    expect($product->fresh()->materials)->toBe(['Oak Wood']);
+    expect($product->fresh()->color)->toBe([]);
+    $this->assertDatabaseHas('mi_materials', ['id' => $material->id, 'material_name' => 'Bamboo Composite']);
+    $this->assertDatabaseHas('mi_colors', ['id' => $color->id, 'color_name' => 'Sea Glass']);
+});
+
+it('enforces normalized material and color uniqueness in the database', function () {
+    DB::table('mi_materials')->insert(['material_name' => 'Oak Wood', 'normalized_name' => 'oak wood', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('mi_colors')->insert(['color_name' => 'Sea Glass', 'normalized_name' => 'sea glass', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+
+    expect(fn () => DB::table('mi_materials')->insert(['material_name' => 'OAK WOOD', 'normalized_name' => 'oak wood', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]))->toThrow(QueryException::class);
+    expect(fn () => DB::table('mi_colors')->insert(['color_name' => 'SEA GLASS', 'normalized_name' => 'sea glass', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]))->toThrow(QueryException::class);
+});
+
+it('rolls back new options when the product insert fails', function () {
+    $fixture = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+    DB::listen(static function (QueryExecuted $query): void {
+        if (str_starts_with(strtolower($query->sql), 'insert into "mi_products"')) {
+            throw new RuntimeException('Simulated product insert failure.');
+        }
+    });
+    $payload = array_replace(miProductEditPayload($fixture), [
+        'item_name' => 'Rolled back product',
+        'materials' => ['Rolled Back Timber'],
+        'color' => ['Rolled Back Blue'],
+    ]);
+
+    $this->from(route('mi_app.create'))->post(route('mi_app.store_1'), $payload)->assertRedirect(route('mi_app.create'))->assertSessionHasErrors('error');
+
+    expect(MI_Product::where('item_name', 'Rolled back product')->exists())->toBeFalse();
+    expect(DB::table('mi_materials')->where('normalized_name', 'rolled back timber')->exists())->toBeFalse();
+    expect(DB::table('mi_colors')->where('normalized_name', 'rolled back blue')->exists())->toBeFalse();
 });
 
 it('rejects multiple primary factory costs when creating a product', function () {

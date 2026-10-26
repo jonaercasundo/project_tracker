@@ -782,6 +782,10 @@
             gap: 9px;
         }
 
+        body > .ts-dropdown {
+            z-index: 10000;
+        }
+
         .tx-multi-toolbar {
             display: flex;
             align-items: center;

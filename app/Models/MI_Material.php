@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class MI_Material extends Model
 {
@@ -13,6 +13,7 @@ class MI_Material extends Model
 
     protected $fillable = [
         'material_name',
+        'normalized_name',
         'is_active',
     ];
 }

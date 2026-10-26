@@ -1665,14 +1665,24 @@
 
                             maxItems: 100,
 
-                            create: false,
+                            createOnBlur: false,
+                            persist: false,
+                            dropdownParent: 'body',
+                            createFilter: (input, callback) => {
+                                const normalizedInput = input.trim().toLocaleLowerCase();
+                                return normalizedInput.length > 0 && !Array.from(colorSelect.options).some((option) => option.value.trim().toLocaleLowerCase() === normalizedInput);
+                            },
+                            create: (input) => input.trim(),
 
                             closeAfterSelect: false,
 
                             hideSelected: true,
 
-                            placeholder:
-                                'Select one or more colors...'
+                            placeholder: 'Select or add colors...',
+                            render: {
+                                option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim())}"</div>`,
+                                no_results: () => '<div class="no-results">No color found</div>',
+                            },
                         }
                     );
 
@@ -1693,7 +1703,14 @@
                         {
                             plugins: ['remove_button'],
 
-                            create: false,
+                            createOnBlur: false,
+                            persist: false,
+                            dropdownParent: 'body',
+                            createFilter: (input, callback) => {
+                                const normalizedInput = input.trim().toLocaleLowerCase();
+                                return normalizedInput.length > 0 && !Array.from(materialsSelect.options).some((option) => option.value.trim().toLocaleLowerCase() === normalizedInput);
+                            },
+                            create: (input) => input.trim(),
 
                             maxItems: 100,
 
@@ -1701,12 +1718,15 @@
 
                             closeAfterSelect: false,
 
-                            placeholder:
-                                'Select one or more materials...',
+                            placeholder: 'Select or add materials...',
 
                             searchField: ['text'],
 
                             render: {
+
+                                option_create: function (data, escape) {
+                                    return `<div class="create">+ Add "${escape(data.input.trim())}"</div>`;
+                                },
 
                                 no_results:
                                     function (data, escape) {

@@ -213,10 +213,6 @@
                                         <div id="{{ $field }}_chips" class="tx-multi-chips" aria-live="polite"></div>
                                         <p id="{{ $field }}_selection_error" class="tx-error" data-multi-error hidden>Select at least one material.</p>
                                         <p class="tx-hint" data-native-multi-hint>Hold Ctrl or Command to select multiple values.</p>
-                                        <div class="tx-edit-inline">
-                                            <input type="text" maxlength="255" data-custom-value="{{ $field }}" aria-label="Custom {{ strtolower($label) }}" placeholder="Add a custom value" class="tx-field">
-                                            <button type="button" data-add-value="{{ $field }}" class="tx-btn-small">Add</button>
-                                        </div>
                                     </div>
                                     @foreach($errors->get($field) + $errors->get($field.'.*') as $messages)
                                         @foreach((array) $messages as $message)<p id="{{ $field }}_error" class="tx-error">{{ $message }}</p>@endforeach
@@ -332,4 +328,30 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('select.tx-multi-select').forEach((select) => {
+                const label = select.id === 'materials' ? 'Material' : 'Color';
+                new TomSelect(select, {
+                    plugins: ['remove_button'],
+                    maxItems: 100,
+                    createOnBlur: false,
+                    persist: false,
+                    closeAfterSelect: false,
+                    hideSelected: true,
+                    dropdownParent: 'body',
+                    placeholder: `Select or add ${label.toLowerCase()}s...`,
+                    createFilter: (input) => {
+                        const normalizedInput = input.trim().toLocaleLowerCase();
+                        return normalizedInput.length > 0 && !Array.from(select.options).some((option) => option.value.trim().toLocaleLowerCase() === normalizedInput);
+                    },
+                    create: (input) => input.trim(),
+                    render: {
+                        option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim())}"</div>`,
+                        no_results: () => '<div class="no-results">No matching option</div>',
+                    },
+                });
+            });
+        });
+    </script>
 </x-mi_app>

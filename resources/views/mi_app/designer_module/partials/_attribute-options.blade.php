@@ -278,7 +278,13 @@ $colorGroups = [
     ];
     $groups = $attribute === 'materials' ? $materialGroups : $colorGroups;
     $knownValues = array_merge(...array_values($groups));
-    $customValues = array_diff($selectedValues, $knownValues);
+    $options = $attribute === 'materials' ? $materialOptions : $colorOptions;
+    $optionName = $attribute === 'materials' ? 'material_name' : 'color_name';
+    $knownKeys = array_map(fn ($value) => mb_strtolower(trim($value)), $knownValues);
+    $customValues = $options->pluck($optionName)->all();
+    $customValues = array_merge($customValues, array_diff($selectedValues, $knownValues));
+    $customValues = collect($customValues)->unique(fn ($value) => mb_strtolower(trim($value)))
+        ->reject(fn ($value) => in_array(mb_strtolower(trim($value)), $knownKeys, true))->values();
 @endphp
 @foreach($groups as $group => $choices)
     <optgroup label="{{ $group }}">
@@ -287,8 +293,8 @@ $colorGroups = [
         @endforeach
     </optgroup>
 @endforeach
-@if($customValues)
+@if($customValues->isNotEmpty())
     <optgroup label="Saved custom values">
-        @foreach($customValues as $value)<option selected value="{{ $value }}">{{ $value }}</option>@endforeach
+        @foreach($customValues as $value)<option value="{{ $value }}" @selected(in_array($value, $selectedValues, true))>{{ $value }}</option>@endforeach
     </optgroup>
 @endif

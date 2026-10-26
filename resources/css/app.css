@@ -5,3 +5,18 @@
 [x-cloak] {
     display: none !important;
 }
+
+.ai-markdown p + p { margin-top: 0.75rem; }
+.ai-markdown ul, .ai-markdown ol { margin: 0.65rem 0; padding-left: 1.35rem; }
+.ai-markdown ul { list-style: disc; }
+.ai-markdown ol { list-style: decimal; }
+.ai-markdown li + li { margin-top: 0.25rem; }
+.ai-markdown a { color: #3150a4; text-decoration: underline; text-underline-offset: 2px; }
+.ai-markdown code { border-radius: 0.25rem; background: rgb(148 163 184 / 14%); padding: 0.1rem 0.3rem; font-size: 0.9em; }
+.ai-markdown pre { overflow-x: auto; margin: 0.75rem 0; border-radius: 0.65rem; background: #172033; padding: 0.85rem; color: #f8fafc; }
+.ai-markdown pre code { background: transparent; padding: 0; color: inherit; }
+.ai-typing-dot { height: 0.4rem; width: 0.4rem; border-radius: 9999px; background: #64748b; animation: ai-typing 1s ease-in-out infinite; }
+.ai-typing-dot:nth-child(2) { animation-delay: 120ms; }
+.ai-typing-dot:nth-child(3) { animation-delay: 240ms; }
+@keyframes ai-typing { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .ai-typing-dot { animation: none; opacity: 0.7; } }

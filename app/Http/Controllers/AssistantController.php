@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
 class AssistantController extends Controller
@@ -89,6 +90,11 @@ class AssistantController extends Controller
         abort_if($configuration->monthlyLimitReached(), 429, 'The system monthly AI token limit has been reached.');
 
         $context = $pageContext->current($request);
+        if (Schema::hasColumn('ai_messages', 'metadata')) {
+            $context['verified_previous_products'] = $conversation->messages()->where('role', 'assistant')->whereNotNull('metadata')
+                ->latest('id')->limit(4)->get(['metadata'])->flatMap(fn (AiMessage $message): array => $message->metadata['products'] ?? [])->filter(fn (mixed $product): bool => is_array($product))
+                ->take(8)->map(fn (array $product): array => array_intersect_key($product, array_flip(['id', 'name', 'sku', 'price', 'currency', 'pricing_basis'])))->values()->all();
+        }
         $history = DB::transaction(function () use ($conversation, $text): array {
             $conversation->messages()->create(['role' => 'user', 'content' => $text]);
             if ($conversation->title === 'New conversation') {
@@ -141,7 +147,12 @@ class AssistantController extends Controller
             } catch (Throwable $exception) {
                 report($exception);
                 AiActivity::create(['user_id' => $user->getKey(), 'company_id' => $company->getKey(), 'conversation_id' => $conversation->getKey(), 'status' => 'failed']);
-                $emit('error', ['message' => 'The assistant could not complete this response. Please try again.']);
+                $latestUserMessage = collect($history)->last(fn (array $message): bool => $message['role'] === 'user')['content'] ?? '';
+                $isFilipino = preg_match('/\b(?:magkano|itong|ito|akin|ko|mo|paki|salamat|sige|hindi|paano|ano|pwede|po|naman)\b/i', $latestUserMessage) === 1;
+                $message = $exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 403
+                    ? ($isFilipino ? 'Wala kang pahintulot para makita ang impormasyong iyon. Makipag-ugnayan sa administrator kung kailangan mo ng access.' : 'You do not have access to that information. Contact your administrator if you think you need access.')
+                    : ($isFilipino ? 'Hindi ko makuha ang impormasyong iyon sa ngayon. Nandito pa rin ang mensahe mo; subukan natin ulit mamaya.' : 'I’m having trouble retrieving that right now. Your message is still here; would you like to try again?');
+                $emit('error', ['message' => $message]);
             }
         }, 200, ['Content-Type' => 'text/event-stream', 'Cache-Control' => 'no-cache, no-transform', 'X-Accel-Buffering' => 'no', 'Connection' => 'keep-alive']);
     }

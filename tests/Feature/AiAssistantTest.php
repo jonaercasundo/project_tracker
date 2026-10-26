@@ -2,12 +2,14 @@
 
 use App\Models\AiConversation;
 use App\Models\BudgetRequest;
+use App\Models\MI_Liquidation;
 use App\Services\AiReadOnlyToolGateway;
 use Database\Seeders\AiAssistantPermissionSeeder;
 use Database\Seeders\AiBusinessDataPermissionSeeder;
 use Database\Seeders\AiQuotationPermissionSeeder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -176,6 +178,40 @@ it('stores conversation messages and streams provider deltas without saving prov
         && $request['store'] === false && $request['stream'] === true
         && str_contains($request['instructions'], 'MI Product Designer'));
     expect(Http::recorded()->first()[0]['instructions'])->toContain('Materials and colors support searching');
+});
+
+it('routes a Filipino product price question to the authorized catalog tool', function () {
+    $user = $this->miUser('user');
+    $this->signInMI($user);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fake(['https://api.openai.com/v1/responses' => Http::response(
+        "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Titingnan ko ang presyo.\"}\n\n".
+        "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{},\"output\":[]}}\n\n",
+        200,
+        ['Content-Type' => 'text/event-stream'],
+    )]);
+    $conversation = $this->postJson(route('assistant.conversations.store'))->assertCreated()->json('conversation');
+
+    $response = $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'Magkano ang Round Side Table (M)?'])
+        ->assertOk();
+    $response->streamedContent();
+
+    Http::assertSent(fn ($request): bool => ($request['tool_choice'] ?? null) === ['type' => 'function', 'name' => 'lookup_mi_product_prices']);
+});
+
+it('limits liquidation answers to the signed-in employee’s own status records', function () {
+    $user = $this->miUser('user');
+    $user->givePermissionTo(Permission::findOrCreate('mi.liquidation.view', 'web'));
+    $other = $this->miUser('user');
+    $companyId = $user->companies()->sole()->getKey();
+    MI_Liquidation::create(['title' => 'My travel advance', 'date_prepared' => '2026-10-01', 'exchange_rate' => 1, 'company_id' => $companyId, 'prepared_by' => $user->getKey(), 'status' => 'Pending']);
+    MI_Liquidation::create(['title' => 'Private advance', 'date_prepared' => '2026-10-02', 'exchange_rate' => 1, 'company_id' => $companyId, 'prepared_by' => $other->getKey(), 'status' => 'Approved']);
+    $this->signInMI($user);
+    $gateway = app(AiReadOnlyToolGateway::class);
+
+    expect(collect($gateway->tools($user, $user->currentCompany(), []))->pluck('name'))->toContain('my_mi_liquidations');
+    expect($gateway->call('my_mi_liquidations', [], $user, $user->currentCompany()))
+        ->toBe([['type' => 'ordinary', 'reference' => 'My travel advance', 'date' => '2026-10-01', 'status' => 'Pending']]);
 });
 
 it('isolates conversation reads and deletion by user and active company', function () {

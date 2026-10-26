@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\BudgetRequest;
 use App\Models\Company;
+use App\Models\Liquidation;
+use App\Models\MI_Liquidation;
 use App\Models\MI_Product;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
@@ -49,6 +51,10 @@ class AiReadOnlyToolGateway
 
         if ($company->code === 'MI' && $user->hasMIUserAccess()) {
             $tools[] = ['type' => 'function', 'name' => 'my_mi_budget_requests', 'description' => 'List only the authenticated MI employee’s own budget requests and their status.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
+        }
+
+        if ($company->code === 'MI' && $user->can('mi.liquidation.view')) {
+            $tools[] = ['type' => 'function', 'name' => 'my_mi_liquidations', 'description' => 'List the authenticated employee’s own MI liquidation titles, preparation dates, and statuses. Does not return financial amounts.', 'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => [], 'additionalProperties' => false], 'strict' => true];
         }
 
         if ($company->code === 'MI' && $user->hasAccountingRole() && $user->can('mi.accounting.dashboard.view')) {
@@ -128,6 +134,21 @@ class AiReadOnlyToolGateway
             $result = BudgetRequest::query()->where('company_id', $company->getKey())->where('employee_id', $user->getKey())
                 ->latest('id')->limit(10)->get(['control_id', 'department', 'budget_total', 'status', 'travel_date_from', 'travel_date_to'])
                 ->map(fn (BudgetRequest $budgetRequest): array => $budgetRequest->only(['control_id', 'department', 'budget_total', 'status', 'travel_date_from', 'travel_date_to']))->all();
+            $this->logToolExecuted($name, $user, $company, count($result));
+
+            return $result;
+        }
+
+        if ($name === 'my_mi_liquidations' && $company->code === 'MI' && $user->can('mi.liquidation.view')) {
+            $ordinary = MI_Liquidation::query()->where('company_id', $company->getKey())->where('prepared_by', $user->getKey())
+                ->latest('id')->limit(10)->get(['title', 'date_prepared', 'status'])
+                ->map(fn (MI_Liquidation $liquidation): array => ['type' => 'ordinary', 'reference' => $liquidation->title, 'date' => $liquidation->date_prepared?->toDateString(), 'status' => $liquidation->status]);
+            $travel = Liquidation::query()->where('company_id', $company->getKey())
+                ->whereHas('budgetRequest', fn ($query) => $query->where('company_id', $company->getKey())->where('employee_id', $user->getKey()))
+                ->with('budgetRequest:id,control_id,employee_id,company_id')
+                ->latest('id')->limit(10)->get(['id', 'budget_request_id', 'status', 'submitted_at'])
+                ->map(fn (Liquidation $liquidation): array => ['type' => 'travel', 'reference' => $liquidation->budgetRequest?->control_id, 'date' => $liquidation->submitted_at?->toDateString(), 'status' => $liquidation->status]);
+            $result = $ordinary->concat($travel)->take(10)->values()->all();
             $this->logToolExecuted($name, $user, $company, count($result));
 
             return $result;

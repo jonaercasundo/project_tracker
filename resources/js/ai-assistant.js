@@ -1,3 +1,5 @@
+import { renderAiMarkdown } from './ai-markdown.js';
+
 window.aiAssistant = (settings) => ({
     ...settings,
     open: Boolean(settings.workspace),
@@ -22,6 +24,8 @@ window.aiAssistant = (settings) => ({
     mobileSidebarOpen: false,
     contextPanelOpen: false,
     contextOpen: false,
+
+    renderMarkdown(content) { return renderAiMarkdown(content || ''); },
 
     async init() {
         this.open = Boolean(this.workspace);
@@ -215,7 +219,8 @@ window.aiAssistant = (settings) => ({
             });
             if (!response.ok) {
                 const payload = await response.json().catch(() => ({}));
-                throw new Error(payload.errors?.message?.[0] || payload.message || 'The assistant could not start. Check the message and try again.');
+                const messages = { 403: 'You do not have access to that information. Contact your administrator if you think you need access.', 429: 'The assistant is temporarily at its usage limit. Please try again later.', 503: 'The assistant is not configured right now. Please contact your administrator.' };
+                throw new Error(response.status === 422 ? 'Please check your message and try again.' : messages[response.status] || 'I’m having trouble reaching the assistant right now. Your message is still here; please try again in a moment.');
             }
 
             const reader = response.body.getReader();
@@ -234,14 +239,14 @@ window.aiAssistant = (settings) => ({
                     const payload = JSON.parse(data);
                     if (event === 'delta') assistantMessage.content += payload.text || '';
                     if (event === 'products') assistantMessage.products = payload.items || [];
-                    if (event === 'error') throw new Error(payload.message || 'The assistant could not complete this response.');
+                    if (event === 'error') throw new Error(payload.message || 'I’m having trouble retrieving that right now. Your message is still here; would you like to try again?');
                     this.scrollToBottom();
                 }
             }
             await this.refreshConversations();
         } catch (error) {
-            if (!assistantMessage.content) this.messages.pop();
-            this.error = error.message || 'The assistant could not complete this response.';
+            assistantMessage.content = assistantMessage.content || (error.message || 'I’m having trouble retrieving that right now. Your message is still here; would you like to try again?');
+            this.error = '';
             this.draft = message;
         } finally {
             this.loading = false;

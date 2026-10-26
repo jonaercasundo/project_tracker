@@ -34,7 +34,7 @@ class AiAssistantService
         $gateway = app(AiReadOnlyToolGateway::class);
         $tools = $gateway->tools($user, $company, $context);
         $input = array_map(fn (array $message): array => ['role' => $message['role'], 'content' => $message['content']], $history);
-        $requiredTool = $this->requiredReadTool($history, $tools);
+        $requiredTool = $this->requiredReadTool($history, $tools, $context);
         $usage = ['model' => $model, 'request_id' => null, 'input_tokens' => null, 'output_tokens' => null];
         $emitted = '';
 
@@ -142,22 +142,54 @@ class AiAssistantService
     /** @param array<int, array{role: string, content: string}> $history
      * @param  array<int, array<string, mixed>>  $tools
      */
-    private function requiredReadTool(array $history, array $tools): ?string
+    private function requiredReadTool(array $history, array $tools, array $context): ?string
     {
         $lastUserMessage = collect($history)->last(fn (array $message): bool => $message['role'] === 'user')['content'] ?? '';
-        if (! is_string($lastUserMessage) || preg_match('/\b(budget|expense|forecast|project|delivery|inventory|liquidation)\b/i', $lastUserMessage)) {
+        if (! is_string($lastUserMessage)) {
             return null;
         }
 
-        $asksForPrice = preg_match('/\b(how\s+much\s+is|price\s+(?:of|for)|selling\s+price\s+(?:of|for)|what\s+is\s+the\s+price\s+of|cost\s+of)\b/i', $lastUserMessage) === 1;
-        $priceToolAvailable = collect($tools)->contains(fn (array $tool): bool => ($tool['name'] ?? null) === 'lookup_mi_product_prices');
+        $availableTools = collect($tools)->pluck('name')->all();
+        if (preg_match('/\b(?:missing\s+(?:cop|country\s+of\s+production)|cop\s+(?:updates|missing)|products?\s+needing\s+cop)\b/i', $lastUserMessage)
+            && in_array('mi_products_needing_cop', $availableTools, true)) {
+            return 'mi_products_needing_cop';
+        }
 
-        return $asksForPrice && $priceToolAvailable ? 'lookup_mi_product_prices' : null;
+        if (preg_match('/\bhow\s+many\b.*\bmi\s+products?\b|\bcount\s+(?:the\s+)?mi\s+products?\b|\b(?:ilang|ilan)\b.*\b(?:mi\s+)?products?\b/i', $lastUserMessage)
+            && in_array('mi_product_catalog_summary', $availableTools, true)) {
+            return 'mi_product_catalog_summary';
+        }
+
+        if (preg_match('/\b(?:my\s+)?(?:pending\s+)?budget\s+requests?\b|\b(?:pending\s+)?budget\b.*\b(?:ko|akin)\b/i', $lastUserMessage)
+            && in_array('my_mi_budget_requests', $availableTools, true)) {
+            return 'my_mi_budget_requests';
+        }
+
+        if (preg_match('/\b(?:my\s+)?(?:pending\s+)?(?:travel\s+)?liquidations?\b|\b(?:status|pending|liquidation|liquidations)\b.*\b(?:ko|akin)\b/i', $lastUserMessage)
+            && in_array('my_mi_liquidations', $availableTools, true)) {
+            return 'my_mi_liquidations';
+        }
+
+        if (preg_match('/\b(budget|expense|forecast|project|delivery|inventory|liquidation|spend|spent|last\s+month)\b/i', $lastUserMessage)) {
+            return null;
+        }
+
+        $asksForPrice = preg_match('/\b(how\s+much\s+(?:is|for)|price\s+(?:of|for)|selling\s+price\s+(?:of|for)|what\s+is\s+the\s+price\s+(?:of|for)|cost\s+of|magkano)\b/i', $lastUserMessage) === 1;
+        $specificProductTerms = preg_replace('/\b(?:how\s+much\s+(?:is|for)|price\s+(?:of|for)|selling\s+price\s+(?:of|for)|what\s+is\s+the\s+price\s+(?:of|for)|cost\s+of|magkano(?:\s+(?:ba|ang|itong|ito|sa))?|the|a|an|item|product|this|that|it|please|naman|po|ba|itong)\b/i', ' ', $lastUserMessage);
+        $specificProductTerms = trim(preg_replace('/[^\pL\pN]+/u', ' ', (string) $specificProductTerms));
+        $hasKnownProducts = ! empty($context['verified_previous_products']);
+        $priceFollowUp = $hasKnownProducts && preg_match('/\b(how\s+about|what\s+about|larger|large|smaller|small|another|other\s+one|the\s+next\s+one|mas\s+malaki|mas\s+maliit|yung\s+malaki|iyong\s+malaki)\b/i', $lastUserMessage) === 1;
+        $priceToolAvailable = in_array('lookup_mi_product_prices', $availableTools, true);
+
+        return $priceToolAvailable && (($asksForPrice && $specificProductTerms !== '') || $priceFollowUp)
+            ? 'lookup_mi_product_prices'
+            : null;
     }
 
     /** @param array<string, mixed> $context */
     private function instructions(Company $company, array $context, bool $canViewProductPrices, bool $canCreateQuotation): string
     {
+        $conversation = config('ai_assistant.conversation', []);
         $priceGuidance = $canViewProductPrices
             ? 'The user is authorized to use the MI selling-price lookup when it is supplied.'
             : 'The user is not authorized to view MI selling prices; do not infer that a price is missing, and explain that price-view access is required.';
@@ -165,6 +197,24 @@ class AiAssistantService
             ? 'The user is authorized to prepare a quotation; offer the existing quotation workflow as an optional next step. The user must explicitly confirm before a draft is saved.'
             : 'The user cannot currently create quotations; do not offer or imply access to quotation creation.';
 
-        return 'You are the Project Tracker assistant for the active company '.$company->code.'. Use the page context to explain the current page, but use any supplied tool the user is authorized to access even when it belongs to another module in this active company. Never claim access to another company. Use only supplied read-only tools for saved business records; never invent SQL or request arbitrary database access. Do not expose secrets or ask for passwords. Page context contains route metadata only, never form values. Never create, edit, delete, submit, release, or approve records. For MI product price questions, call lookup_mi_product_prices when available; this search is allowed independently of quotation creation permission. Use search_mi_products for catalog details without prices. '.$priceGuidance.' Report only a price and SKU returned by the price tool, state PHP currency and MI product selling price basis, and never use factory or purchase costs as selling prices. If multiple similar products are returned, present the distinct options and ask which one the user means; do not assume Round Table and Round Side Table are identical. '.$quotationGuidance.' Do not invent taxes, discounts, delivery fees, payment terms, forecasts, or data that no tool returns. For COP tools, explain if tracking is unavailable rather than guessing.\n\nAuthorized page context: '.json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $moduleVoice = $conversation['module_voice'][$context['key'] ?? ''] ?? 'For this module, explain verified information in practical terms and adapt your level of detail to the user’s question.';
+        $verifiedProductContext = ! empty($context['verified_previous_products'])
+            ? 'Verified MI product results from earlier in this conversation: '.json_encode($context['verified_previous_products'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).'. Use these facts to resolve follow-up references. If the user asks about another size or variant, search using the product family and requested variant; do not assume a match.'
+            : '';
+
+        return implode(' ', array_filter([
+            $conversation['personality'] ?? 'You are Project Tracker’s AI business assistant. Be friendly, professional, and concise.',
+            $conversation['language'] ?? 'Reply in the language and style of the user’s latest message, including Filipino or Taglish when appropriate.',
+            $conversation['conversation'] ?? 'Use recent conversation history to resolve follow-up questions and ask only concise clarifying questions when needed.',
+            $conversation['proactivity'] ?? 'Offer a useful next step only when it is relevant, and confirm before consequential actions.',
+            $conversation['safety'] ?? 'Never invent business facts or claim a tool succeeded when it failed. Respect server-enforced permissions and company isolation.',
+            $moduleVoice,
+            'The active company is '.$company->code.'. Use the page context to explain the current page, but use any supplied tool the user is authorized to access even if it belongs to another module in this company. Never claim access to another company. Use only supplied read-only tools for saved records. Page context contains route metadata only, never form values. Never create, edit, delete, submit, release, or approve records.',
+            'For MI product price questions, call lookup_mi_product_prices when available; price access is independent from quotation creation. Use search_mi_products for product details without prices. '.$priceGuidance.' Report a price and SKU only when returned by the price tool. State PHP currency and MI product selling price basis. Never treat factory or purchase cost as selling price. If multiple similar products are returned, present distinct options; do not assume Round Table and Round Side Table are the same product.',
+            $quotationGuidance,
+            'Do not invent taxes, discounts, delivery fees, payment terms, forecasts, or unavailable data. If a data tool is unavailable, explain the user-facing limitation briefly without naming internal functions or claiming that a search was made. For COP, explain when tracking is unavailable.',
+            $verifiedProductContext,
+            'Authorized page context: '.json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]));
     }
 }

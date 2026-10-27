@@ -212,8 +212,8 @@ it('confirms a complete same-DR group and queues sheet sync per delivery package
         ->assertSee('Lot 9')
         ->assertSee('Delivered')
         ->assertSee('Pending')
-        ->assertSee('#'.$firstId)
-        ->assertSee('#'.$secondId)
+        ->assertDontSee('Delivery #'.$firstId)
+        ->assertDontSee('Delivery #'.$secondId)
         ->assertViewHas('recordGroups', fn ($recordGroups): bool => $recordGroups->count() === 1
             && $recordGroups->first()->count() === 2);
 });

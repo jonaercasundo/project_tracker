@@ -41,11 +41,6 @@
                             <tr class="align-top hover:bg-slate-50/70">
                                 <th scope="row" class="whitespace-nowrap px-4 py-4 font-mono font-semibold text-slate-900">
                                     <p>{{ $drRecords->first()->dr_no ?? '—' }}</p>
-                                    <div class="mt-2 space-y-1 font-sans text-xs font-medium">
-                                        @foreach ($deliveryRecords as $record)
-                                            <a href="{{ route('billing.records.show', $record->delivery_id) }}" class="block text-blue-700 hover:underline">Delivery #{{ $record->delivery_id }}</a>
-                                        @endforeach
-                                    </div>
                                 </th>
                                 <td class="whitespace-nowrap px-4 py-4 text-slate-700">{{ number_format($deliveryRecords->count()) }}</td>
                                 <td class="min-w-[16rem] px-4 py-4 font-medium text-slate-800">

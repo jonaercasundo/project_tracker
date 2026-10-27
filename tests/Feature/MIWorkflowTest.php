@@ -92,7 +92,15 @@ it('assigns the next unique reference to expenses added while editing and preser
     $this->get(route('liquidation.edit', $report))
         ->assertSee('LF-20261006-001')
         ->assertSee('readonly', false)
-        ->assertDontSee('name="items[0][ref_no]"', false);
+        ->assertDontSee('name="items[0][ref_no]"', false)
+        ->assertSeeInOrder([
+            'id="expenseContainer"',
+            'id="addExpenseBtn"',
+            'class="totals-panel"',
+            'id="saveBtn"',
+        ], false)
+        ->assertSee('class="liq-btn expense-add-button"', false)
+        ->assertSee('+ Add Another Expense');
 
     $payload = $this->ordinaryPayload();
     $payload['items'][0]['id'] = $originalItem->getKey();

@@ -511,6 +511,27 @@
 
         }
 
+        .expense-add-button {
+            width: 100%;
+            min-height: 48px;
+            margin-top: 16px;
+            justify-content: center;
+            border: 1px dashed #93c5fd;
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .expense-add-button:hover {
+            border-color: #3b82f6;
+            background: #dbeafe;
+            box-shadow: 0 5px 14px rgba(37, 99, 235, .1);
+        }
+
+        .expense-add-button:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, .3);
+            outline-offset: 3px;
+        }
+
 
         .liq-btn-danger {
 
@@ -2165,26 +2186,6 @@
                         </div>
 
 
-                        <button
-                            type="button"
-                            class="liq-btn liq-btn-primary"
-                            id="addExpenseBtn"
-                        >
-
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                            >
-                                <path d="M12 5v14"/>
-                                <path d="M5 12h14"/>
-                            </svg>
-
-                            Add Expense
-
-                        </button>
-
                     </div>
 
 
@@ -2725,6 +2726,19 @@
                             @endforeach
 
                         </div>
+
+                        <button
+                            type="button"
+                            class="liq-btn expense-add-button"
+                            id="addExpenseBtn"
+                            aria-label="+ Add Another Expense"
+                        >
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                <path d="M12 5v14"/>
+                                <path d="M5 12h14"/>
+                            </svg>
+                            <span>+ Add Another Expense</span>
+                        </button>
 
 
                         {{-- =====================================================
@@ -4049,6 +4063,19 @@
                     renumberExpenses();
 
                     calculateTotals();
+
+                    requestAnimationFrame(() => {
+                        const firstEditableField = wrapper.querySelector(
+                            'input:not([type="hidden"]):not([readonly]):not([disabled]), select:not([disabled]), textarea:not([readonly]):not([disabled])'
+                        );
+                        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+                        wrapper.scrollIntoView({
+                            behavior: prefersReducedMotion ? 'auto' : 'smooth',
+                            block: 'center',
+                        });
+                        firstEditableField?.focus({ preventScroll: true });
+                    });
 
                 }
 

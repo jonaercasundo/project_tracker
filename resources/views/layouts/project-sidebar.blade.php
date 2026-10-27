@@ -161,8 +161,8 @@
             </a>
         @endif
 
-        @if($currentCompany?->code === 'MMC' && $currentCompany?->is_active && ($currentUser?->can('billing.qr.scan') || $currentUser?->can('billing.records.view')))
-            @php($billingMenuActive = request()->routeIs('billing.dashboard', 'billing.prepare*', 'billing.batches.*', 'billing.records.*', 'billing.scanner*'))
+        @if($currentCompany?->code === 'MMC' && $currentCompany?->is_active && ($currentUser?->hasRole('Administrator') || $currentUser?->can('billing.qr.scan') || $currentUser?->can('billing.records.view')))
+            @php($billingMenuActive = request()->routeIs('billing.dashboard', 'billing.prepare*', 'billing.batches.*', 'billing.records.*', 'billing.scanner*', 'billing.google-sheets-settings*'))
             <div x-data="{ open: {{ $billingMenuActive ? 'true' : 'false' }} }" class="block">
                 <button type="button" @click="open = !open" :aria-expanded="open"
                         class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 focus:outline-none {{ $billingMenuActive ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
@@ -219,6 +219,15 @@
                             </a>
                         </li>
                     @endcan
+                    @if($currentUser?->hasRole('Administrator'))
+                        <li>
+                            <a href="{{ route('billing.google-sheets-settings') }}" @if(request()->routeIs('billing.google-sheets-settings*')) aria-current="page" @endif
+                               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors {{ request()->routeIs('billing.google-sheets-settings*') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                                <svg class="w-3.5 h-3.5 shrink-0 {{ request()->routeIs('billing.google-sheets-settings*') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4.75h16v14.5H4zM4 9.5h16M9 4.75v14.5m6-14.5v14.5M6 12h1m-1 3h1m10-3h1m-1 3h1" /></svg>
+                                <span>Google Sheets Sync</span>
+                            </a>
+                        </li>
+                    @endif
                 </ul>
             </div>
         @endif

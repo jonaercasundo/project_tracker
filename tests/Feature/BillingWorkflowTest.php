@@ -172,7 +172,7 @@ it('reports the exact missing service account configuration before attempting sy
 
     expect(app(GoogleSheetsApiClient::class)->configurationStatus())->toBe([
         'configured' => false,
-        'reason' => 'Service account credential file is not configured (GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON).',
+        'reason' => 'Service account credentials are not configured. Save credentials or configure GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON as a fallback.',
     ]);
 });
 
@@ -194,8 +194,8 @@ it('matches sheet rows by the exact BIR DR and package code within that lot', fu
     $rows = [$rows[0], $wrongPackage, $wrongDr, $exact];
     $sheets = Mockery::mock(GoogleSheetsApiClient::class);
     $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
-    $sheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CI")->andReturn($rows);
-    $sheets->shouldReceive('updateCell')->once()->with("'Copy of SME LOT 2,9,11'!BF4", $sync->transition_date->toDateString());
+    $sheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CI", $sync->spreadsheet_id)->andReturn($rows);
+    $sheets->shouldReceive('updateCell')->once()->with("'Copy of SME LOT 2,9,11'!BF4", $sync->transition_date->toDateString(), $sync->spreadsheet_id);
 
     app(BillingSheetSyncService::class)->sync($sync, $sheets);
 

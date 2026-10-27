@@ -13,7 +13,11 @@ The target spreadsheet ID supplied for this feature is `1sOESkXSA8CbgkJMA_Y-sYzk
 
 ## Application configuration
 
-Set these environment values through the deployment secret/configuration system:
+Before an Administrator saves settings in **Billing → Google Sheets Sync**, the sync continues to use the environment configuration below. Saving the settings page creates an encrypted database override for spreadsheet ID, worksheet name, enablement, and optional credentials; a blank credential field preserves the saved credential or uses the environment credential fallback.
+
+The persisted service-account JSON is encrypted with Laravel's `APP_KEY`. Keep the same application key across web/queue servers and retain it in secure backups; changing it makes saved credentials unreadable. Credential values are never returned to the browser or written to audit details.
+
+Environment fallback values are supplied through the deployment secret/configuration system:
 
 ```dotenv
 PROJECT_BILLING_SHEETS_ENABLED=true
@@ -26,7 +30,7 @@ QUEUE_CONNECTION=database
 
 Set the timezone to the Project Tracker business timezone if it differs from `Asia/Manila`. The stored value comes from the recorded `submitted_for_billing_at` transition timestamp, not the time the job runs.
 
-Apply the new `billing_sheet_syncs` migration, then run a queue worker for the default queue, for example:
+Apply the `billing_sheet_syncs` and `google_sheets_settings` migrations, then run a queue worker for the default queue, for example:
 
 ```shell
 php artisan queue:work database --queue=default --tries=5

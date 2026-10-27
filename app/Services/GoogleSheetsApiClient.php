@@ -6,41 +6,46 @@ use App\Exceptions\GoogleSheetsApiException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use OpenSSLAsymmetricKey;
 use Throwable;
 
 class GoogleSheetsApiClient
 {
+    public function __construct(private GoogleSheetsBillingConfiguration $configuration) {}
+
     /** @return array{configured: bool, reason: ?string} */
     public function configurationStatus(): array
     {
-        if (! config('google_sheets.billing.enabled')) {
+        $settings = $this->configuration->current();
+        if (! $settings['enabled']) {
             return ['configured' => false, 'reason' => 'Google Sheets billing sync is disabled by configuration.'];
         }
 
-        if (! is_string(config('google_sheets.billing.spreadsheet_id')) || trim((string) config('google_sheets.billing.spreadsheet_id')) === '') {
+        if (trim($settings['spreadsheet_id']) === '') {
             return ['configured' => false, 'reason' => 'Spreadsheet ID is not configured.'];
         }
 
-        $credentialsPath = config('google_sheets.billing.service_account_json');
-        if (! is_string($credentialsPath) || trim($credentialsPath) === '') {
-            return ['configured' => false, 'reason' => 'Service account credential file is not configured (GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON).'];
+        if ($settings['credential_error'] !== null) {
+            return ['configured' => false, 'reason' => $settings['credential_error']];
         }
 
-        if (! File::isFile($credentialsPath) || ! File::isReadable($credentialsPath)) {
-            return ['configured' => false, 'reason' => 'Configured Google service account credential file is missing or unreadable.'];
+        if (! is_string($settings['credential_json']) || trim($settings['credential_json']) === '') {
+            return ['configured' => false, 'reason' => 'Service account credentials are not configured. Save credentials or configure GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON as a fallback.'];
         }
 
-        try {
-            $credentials = json_decode(File::get($credentialsPath), true, 512, JSON_THROW_ON_ERROR);
-        } catch (Throwable) {
-            return ['configured' => false, 'reason' => 'Google service account credential file is not valid JSON.'];
+        $credentials = $this->configuration->credentials();
+        if ($credentials === null) {
+            return ['configured' => false, 'reason' => 'Service account credential content is not valid JSON.'];
         }
 
-        if (! is_array($credentials) || ! is_string($credentials['client_email'] ?? null) || ! is_string($credentials['private_key'] ?? null)) {
-            return ['configured' => false, 'reason' => 'Service account credentials must include client_email and private_key.'];
+        if (! is_string($credentials['client_email'] ?? null) || ! filter_var($credentials['client_email'], FILTER_VALIDATE_EMAIL)
+            || ! is_string($credentials['private_key'] ?? null)) {
+            return ['configured' => false, 'reason' => 'Service account credentials must include a valid client_email and private_key.'];
+        }
+
+        if (! extension_loaded('openssl')) {
+            return ['configured' => false, 'reason' => 'The PHP OpenSSL extension is required to authenticate the service account.'];
         }
 
         if (! (openssl_pkey_get_private($credentials['private_key']) instanceof OpenSSLAsymmetricKey)) {
@@ -51,9 +56,9 @@ class GoogleSheetsApiClient
     }
 
     /** @return array<int, array<int, mixed>> */
-    public function values(string $range): array
+    public function values(string $range, ?string $spreadsheetId = null): array
     {
-        $spreadsheetId = (string) config('google_sheets.billing.spreadsheet_id');
+        $spreadsheetId ??= $this->configuration->current()['spreadsheet_id'];
         $url = rtrim((string) config('google_sheets.billing.api_base_url'), '/').'/'.rawurlencode($spreadsheetId).'/values/'.rawurlencode($range);
         $response = $this->request()->get($url, ['valueRenderOption' => 'FORMATTED_VALUE']);
         $this->throwForFailedResponse($response->status(), $response->json('error.message'));
@@ -66,9 +71,9 @@ class GoogleSheetsApiClient
         return $values;
     }
 
-    public function updateCell(string $range, string $value): void
+    public function updateCell(string $range, string $value, ?string $spreadsheetId = null): void
     {
-        $spreadsheetId = (string) config('google_sheets.billing.spreadsheet_id');
+        $spreadsheetId ??= $this->configuration->current()['spreadsheet_id'];
         $url = rtrim((string) config('google_sheets.billing.api_base_url'), '/').'/'.rawurlencode($spreadsheetId).'/values/'.rawurlencode($range).'?valueInputOption=RAW';
         $response = $this->request()->put($url, [
             'range' => $range,
@@ -76,6 +81,28 @@ class GoogleSheetsApiClient
             'values' => [[$value]],
         ]);
         $this->throwForFailedResponse($response->status(), $response->json('error.message'));
+    }
+
+    /** @return array{status: string, message: string} */
+    public function testConnection(): array
+    {
+        $status = $this->configurationStatus();
+        if (! $status['configured']) {
+            return ['status' => 'configuration_required', 'message' => $status['reason'] ?? 'Google Sheets is not configured.'];
+        }
+
+        $settings = $this->configuration->current();
+        $range = "'".str_replace("'", "''", $settings['sheet_tab'])."'!A1";
+
+        try {
+            $this->values($range, $settings['spreadsheet_id']);
+        } catch (GoogleSheetsApiException $exception) {
+            return ['status' => 'failed', 'message' => $this->safeFailureMessage($exception)];
+        } catch (Throwable) {
+            return ['status' => 'failed', 'message' => 'Google Sheets connection test failed due to a network or application error.'];
+        }
+
+        return ['status' => 'success', 'message' => 'The configured account can access the spreadsheet and worksheet.'];
     }
 
     private function request(): PendingRequest
@@ -90,9 +117,12 @@ class GoogleSheetsApiClient
 
     private function accessToken(): string
     {
-        $credentialsPath = (string) config('google_sheets.billing.service_account_json');
-        $credentials = json_decode(File::get($credentialsPath), true, 512, JSON_THROW_ON_ERROR);
-        $cacheKey = 'google_sheets_access_token_'.hash('sha256', (string) $credentials['client_email']);
+        $credentials = $this->configuration->credentials();
+        if ($credentials === null) {
+            throw new GoogleSheetsApiException('Google service account credentials are unavailable.');
+        }
+
+        $cacheKey = $this->accessTokenCacheKey($credentials);
         $cachedToken = Cache::get($cacheKey);
         if (is_string($cachedToken) && $cachedToken !== '') {
             return $cachedToken;
@@ -146,9 +176,10 @@ class GoogleSheetsApiClient
         }
 
         if ($statusCode === 401) {
-            $credentialsPath = (string) config('google_sheets.billing.service_account_json');
-            $credentials = is_file($credentialsPath) ? json_decode(file_get_contents($credentialsPath), true) : [];
-            Cache::forget('google_sheets_access_token_'.hash('sha256', (string) ($credentials['client_email'] ?? '')));
+            $credentials = $this->configuration->credentials();
+            if ($credentials !== null) {
+                Cache::forget($this->accessTokenCacheKey($credentials));
+            }
         }
 
         $detail = is_string($apiMessage) && $apiMessage !== '' ? ' '.mb_substr($apiMessage, 0, 500) : '';
@@ -158,5 +189,23 @@ class GoogleSheetsApiClient
     private function base64UrlEncode(string $value): string
     {
         return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+    }
+
+    /** @param array<string, mixed> $credentials */
+    private function accessTokenCacheKey(array $credentials): string
+    {
+        return 'google_sheets_access_token_'.hash('sha256', (string) $credentials['client_email'].'|'.hash('sha256', (string) $credentials['private_key']));
+    }
+
+    private function safeFailureMessage(GoogleSheetsApiException $exception): string
+    {
+        return match ($exception->statusCode) {
+            401 => 'Google rejected the service account credentials. Check whether the key is valid or revoked.',
+            403 => 'Google denied spreadsheet access. Share the spreadsheet with the service account as an Editor.',
+            404 => 'The spreadsheet or worksheet was not found. Verify the ID and exact worksheet name.',
+            429 => 'Google Sheets rate limited the connection test. Try again later.',
+            null => 'Google Sheets could not be reached. Check server network access and try again.',
+            default => 'Google Sheets connection test failed (HTTP '.$exception->statusCode.').',
+        };
     }
 }

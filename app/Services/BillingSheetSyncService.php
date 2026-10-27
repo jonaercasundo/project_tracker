@@ -13,6 +13,8 @@ use Throwable;
 
 class BillingSheetSyncService
 {
+    public function __construct(private GoogleSheetsBillingConfiguration $configuration) {}
+
     /**
      * Queue a sheet reconciliation row for every package in the delivery's lot.
      */
@@ -22,8 +24,9 @@ class BillingSheetSyncService
         $transitionAt = $billingRecord->submitted_for_billing_at?->timezone($timezone)
             ?? $history->created_at?->timezone($timezone)
             ?? now($timezone);
-        $spreadsheetId = (string) config('google_sheets.billing.spreadsheet_id');
-        $tab = (string) config('google_sheets.billing.sheet_tab');
+        $settings = $this->configuration->current();
+        $spreadsheetId = $settings['spreadsheet_id'];
+        $tab = $settings['sheet_tab'];
         $packages = DB::table('package_status as package_status')
             ->join('package as package', 'package.package_id', '=', 'package_status.package_id')
             ->leftJoin('lot as lot', 'lot.lot_id', '=', 'package.lot_id')
@@ -103,7 +106,7 @@ class BillingSheetSyncService
         }
 
         $range = $this->quotedTab($sync->sheet_tab).'!'.config('google_sheets.billing.read_range', 'A:CI');
-        $rows = $sheets->values($range);
+        $rows = $sheets->values($range, $sync->spreadsheet_id);
         $headers = $this->findHeaderColumns($rows, $sync->lot_number);
         if ($headers === null) {
             $this->finish($sync, 'reconciliation_error', 'Could not identify unique BIR DR and Core Package Code headers for Lot '.$sync->lot_number.'.');
@@ -150,7 +153,7 @@ class BillingSheetSyncService
             return;
         }
 
-        $sheets->updateCell($this->quotedTab($sync->sheet_tab).'!'.$cell, $sync->transition_date->toDateString());
+        $sheets->updateCell($this->quotedTab($sync->sheet_tab).'!'.$cell, $sync->transition_date->toDateString(), $sync->spreadsheet_id);
         $this->finish($sync, 'synced', null, $cell);
     }
 

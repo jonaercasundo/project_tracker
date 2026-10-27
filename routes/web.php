@@ -6,6 +6,7 @@ use App\Http\Controllers\AccountingWorkspaceController;
 use App\Http\Controllers\ActionCrawlerController;
 use App\Http\Controllers\Admin\AdminControlCenterController;
 use App\Http\Controllers\Admin\AiConfigurationController;
+use App\Http\Controllers\Admin\GoogleSheetsSettingsController;
 use App\Http\Controllers\AiLiquidationAttachmentController;
 use App\Http\Controllers\AiQuotationController;
 use App\Http\Controllers\AssistantController;
@@ -755,6 +756,16 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         ->name('billing.')
         ->middleware('company.context:MMC')
         ->group(function (): void {
+            Route::middleware('role:Administrator')->group(function (): void {
+                Route::get('/google-sheets-settings', [GoogleSheetsSettingsController::class, 'index'])
+                    ->name('google-sheets-settings');
+                Route::post('/google-sheets-settings', [GoogleSheetsSettingsController::class, 'store'])
+                    ->name('google-sheets-settings.store');
+                Route::post('/google-sheets-settings/test-connection', [GoogleSheetsSettingsController::class, 'testConnection'])
+                    ->middleware('throttle:5,1')
+                    ->name('google-sheets-settings.test-connection');
+            });
+
             Route::get('/dashboard', [BillingDashboardController::class, 'index'])
                 ->middleware('can:billing.records.view')
                 ->name('dashboard');

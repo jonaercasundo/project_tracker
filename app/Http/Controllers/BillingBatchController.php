@@ -32,11 +32,11 @@ class BillingBatchController extends Controller
             ->where('billing.billing_batch_id', $batch->getKey())
             ->orderBy('d.delivery_id')
             ->get([
-                'd.delivery_id', 'd.project_id', 'd.dr_no', 'p.project_name', 'l.lot_name', 's.school_name',
+                'd.delivery_id', 'd.dr_no', 'p.project_name', 'l.lot_name', 's.school_name',
                 'd.delivery_date', 'd.status as delivery_status', 'billing.status as billing_status',
                 'invoice.invoice_no',
             ]);
-        $recordGroups = $records->groupBy(fn (object $record): string => $record->project_id.'|'.$record->dr_no);
+        $recordGroups = $records->groupBy('dr_no');
 
         return view('billing.batches.show', compact('batch', 'records', 'recordGroups'));
     }

@@ -141,6 +141,54 @@ it('combines warehouse with search project and status filters', function (array 
     'no match' => [['search' => 'chair', 'project_id' => 2], []],
 ]);
 
+it('shows inventory transactions and current stock grouped by item and warehouse', function () {
+    inventoryFilterUser();
+    inventoryFilterFixtures();
+    Inventory::create(['inventory_id' => 5, 'item_id' => 1, 'warehouse_id' => 1, 'qty' => 7, 'inventory_status' => 'Approved', 'created_at' => '2026-10-03 12:00:00']);
+    DB::table('inventory_history')->insert([
+        ['item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 10, 'new_qty' => 15, 'change_type' => 'stock_in'],
+        ['item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 15, 'new_qty' => 12, 'change_type' => 'stock_out'],
+        ['item_id' => 1, 'warehouse_id' => 2, 'old_qty' => 0, 'new_qty' => 8, 'change_type' => 'stock_in'],
+    ]);
+
+    $filtered = $this->get('/inventory-balances?'.http_build_query([
+        'project_id' => 1,
+        'warehouse_id' => 1,
+        'search' => 'Chair',
+    ]));
+
+    $filtered->assertOk()->assertSee('Stock In Quantity')->assertSee('Stock Out Quantity')->assertSee('Stock on Hand Quantity');
+    expect($filtered->viewData('inventories')->total())->toBe(1);
+    expect((array) $filtered->viewData('inventories')->first())->toMatchArray([
+        'stock_in_quantity' => 5,
+        'stock_out_quantity' => 3,
+        'stock_on_hand_quantity' => 17,
+    ]);
+
+    $projectRows = $this->get('/inventory-balances?project_id=1')->viewData('inventories');
+    expect($projectRows->total())->toBe(3);
+    expect($projectRows->getCollection()->pluck('warehouse_name')->unique()->count())->toBe(3);
+});
+
+it('does not allow the inventory balances filter to select another company project', function () {
+    $user = inventoryFilterUser();
+    inventoryFilterFixtures();
+    Schema::table('projects', fn ($table) => $table->unsignedInteger('company_id')->nullable());
+    DB::table('projects')->where('project_id', 1)->update(['company_id' => $user->currentCompany()->getKey()]);
+    DB::table('projects')->where('project_id', 2)->update(['company_id' => 999]);
+
+    $this->get('/inventory-balances?project_id=2')->assertNotFound();
+});
+
+it('keeps the inventory balances page limited to MMC users', function (string $company, string $role) {
+    inventoryFilterUser($company, $role);
+
+    $this->get('/inventory-balances')->assertForbidden();
+})->with([
+    'other company' => ['MI', 'user'],
+    'other role' => ['MMC', 'accounting'],
+]);
+
 it('preserves every filter on pagination links and keeps pages warehouse scoped', function () {
     inventoryFilterUser();
     inventoryFilterFixtures();

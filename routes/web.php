@@ -362,6 +362,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
 
         Route::get('/inventory-history', [InventoryController::class, 'history'])
             ->name('inventory.history');
+        Route::get('/inventory-balances', [InventoryController::class, 'balances'])
+            ->middleware(['company.context:MMC', 'role:user'])
+            ->name('inventory.balances');
         Route::post('/inventory', [InventoryController::class, 'store'])
             ->name('inventory.store');
 

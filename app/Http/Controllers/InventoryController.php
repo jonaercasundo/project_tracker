@@ -88,6 +88,87 @@ class InventoryController extends Controller
         return view('inventory.index', compact('inventories', 'projects', 'warehouses'));
     }
 
+    public function balances(Request $request): View
+    {
+        $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'project_id' => ['nullable', 'integer', 'min:1'],
+            'warehouse_id' => ['nullable', 'integer', Rule::exists(Warehouse::class, 'warehouse_id')],
+        ]);
+
+        $company = $request->user()->currentCompany();
+        $projectsQuery = Project::query()->orderBy('project_name');
+
+        if ($company && Schema::hasColumn('projects', 'company_id')) {
+            $projectsQuery->where(function ($query) use ($company): void {
+                $query->whereNull('company_id')->orWhere('company_id', $company->getKey());
+            });
+        }
+
+        $projects = $projectsQuery->get(['project_id', 'project_name', 'project_code', 'ref_no']);
+
+        if ($request->filled('project_id')) {
+            abort_unless($projects->contains('project_id', $request->integer('project_id')), 404);
+        }
+
+        $transactionTotals = DB::table('inventory_history')
+            ->whereIn('change_type', ['stock_in', 'stock_out'])
+            ->select(['item_id', 'warehouse_id'])
+            ->selectRaw("SUM(CASE WHEN change_type = 'stock_in' THEN new_qty - old_qty ELSE 0 END) as stock_in_quantity")
+            ->selectRaw("SUM(CASE WHEN change_type = 'stock_out' THEN old_qty - new_qty ELSE 0 END) as stock_out_quantity")
+            ->groupBy('item_id', 'warehouse_id');
+
+        $currentBalances = DB::table('inventory')
+            ->select(['item_id', 'warehouse_id'])
+            ->selectRaw('SUM(COALESCE(qty, 0)) as stock_on_hand_quantity')
+            ->groupBy('item_id', 'warehouse_id');
+
+        $query = DB::query()
+            ->fromSub($currentBalances, 'balances')
+            ->join('item as items', 'items.item_id', '=', 'balances.item_id')
+            ->leftJoin('warehouse as warehouses', 'warehouses.warehouse_id', '=', 'balances.warehouse_id')
+            ->leftJoinSub($transactionTotals, 'transactions', function ($join): void {
+                $join->on('transactions.item_id', '=', 'balances.item_id')
+                    ->on('transactions.warehouse_id', '=', 'balances.warehouse_id');
+            })
+            ->select([
+                'items.item_id',
+                'items.item_name',
+                'items.project_id',
+                'warehouses.warehouse_id',
+                'warehouses.warehouse_name',
+            ])
+            ->selectRaw('COALESCE(transactions.stock_in_quantity, 0) as stock_in_quantity')
+            ->selectRaw('COALESCE(transactions.stock_out_quantity, 0) as stock_out_quantity')
+            ->selectRaw('balances.stock_on_hand_quantity');
+
+        if ($request->filled('project_id')) {
+            $query->where('items.project_id', $request->integer('project_id'));
+        }
+
+        if ($request->filled('warehouse_id')) {
+            $query->where('balances.warehouse_id', $request->integer('warehouse_id'));
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($searchQuery) use ($search): void {
+                $searchQuery->where('items.item_name', 'like', "%{$search}%")
+                    ->orWhere('warehouses.warehouse_name', 'like', "%{$search}%");
+            });
+        }
+
+        $inventories = $query
+            ->orderBy('items.item_name')
+            ->orderBy('warehouses.warehouse_name')
+            ->paginate(25)
+            ->withQueryString();
+
+        $warehouses = Warehouse::query()->orderBy('warehouse_name')->get();
+
+        return view('inventory.balances', compact('inventories', 'projects', 'warehouses'));
+    }
+
     public function create()
     {
         $items = Item::orderBy('item_name')->get();

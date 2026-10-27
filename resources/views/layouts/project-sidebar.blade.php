@@ -280,6 +280,17 @@
                 </li>
 
                 <li>
+                    <a href="{{ route('inventory.balances') }}"
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
+                    {{ request()->routeIs('inventory.balances') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                        <svg class="w-3.5 h-3.5 shrink-0 transition-colors {{ request()->routeIs('inventory.balances') ? 'text-blue-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h16.5v15h-16.5zM7.5 8.25h3m-3 3.75h3m-3 3.75h3m3-7.5h3m-3 3.75h3m-3 3.75h3" />
+                        </svg>
+                        <span>Inventories</span>
+                    </a>
+                </li>
+
+                <li>
                     <a href="{{ route('inventory.history') }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors
                     {{ request()->routeIs('inventory.history') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">

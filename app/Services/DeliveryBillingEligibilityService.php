@@ -69,6 +69,10 @@ class DeliveryBillingEligibilityService
             return ['eligible' => false, 'reason' => 'Cancelled'];
         }
 
+        if (! in_array($deliveryStatus, ['pending', 'accepted', 'delivered'], true)) {
+            return ['eligible' => false, 'reason' => 'Delivery status is not eligible for billing'];
+        }
+
         return match ($billingStatus) {
             'for_billing' => ['eligible' => false, 'reason' => 'Already For Billing'],
             'billed' => ['eligible' => false, 'reason' => 'Already Billed'],

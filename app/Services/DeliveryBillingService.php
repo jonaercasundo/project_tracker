@@ -17,7 +17,7 @@ class DeliveryBillingService
     public function markForBilling(int $deliveryId, User $actor, ?int $billingBatchId = null): DeliveryBillingRecord
     {
         return DB::transaction(function () use ($deliveryId, $actor, $billingBatchId): DeliveryBillingRecord {
-            $delivery = $this->lockEligibleDelivery($deliveryId, allowBeforeDelivery: true);
+            $delivery = $this->lockEligibleDelivery($deliveryId, allowBeforeDelivery: $billingBatchId !== null);
             $billingRecord = $this->lockBillingRecord($deliveryId);
             $currentStatus = $billingRecord?->status ?? DeliveryBillingRecord::PENDING_BILLING;
 
@@ -171,10 +171,16 @@ class DeliveryBillingService
     {
         $delivery = Delivery::query()->whereKey($deliveryId)->lockForUpdate()->firstOrFail();
 
-        if ($delivery->status === 'cancelled' || (! $allowBeforeDelivery && ! in_array($delivery->status, ['delivered', 'accepted'], true))) {
+        $allowedStatuses = $allowBeforeDelivery
+            ? ['pending', 'delivered', 'accepted']
+            : ['delivered', 'accepted'];
+
+        if (! in_array($delivery->status, $allowedStatuses, true)) {
             throw new BillingTransitionException($delivery->status === 'cancelled'
                 ? 'Cancelled deliveries cannot be marked for billing.'
-                : 'Only delivered or accepted deliveries can move to this billing stage.', 422);
+                : ($allowBeforeDelivery
+                    ? 'Only pending, delivered, or accepted deliveries can move to this billing stage.'
+                    : 'Only delivered or accepted deliveries can move to this billing stage.'), 422);
         }
 
         return $delivery;

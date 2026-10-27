@@ -1182,21 +1182,46 @@ it('confirms a batch into the existing Billing queue idempotently without creati
 });
 
 it('allows pre-delivery billing confirmation and leaves delivery and POD state unchanged', function (): void {
-    signInBillingUser();
+    [$actor] = signInBillingUser();
     $eligibleId = createBillingDelivery('1001', 'delivered');
     $projectId = (int) DB::table('deliveries')->where('delivery_id', $eligibleId)->value('project_id');
     $pendingId = createDeliveryForBillingProject($projectId, '1001', 'pending');
+    $releasedId = createDeliveryForBillingProject($projectId, '1001', 'released');
+
+    $this->getJson(route('billing.prepare.search', ['q' => '1001']))
+        ->assertOk()
+        ->assertJsonPath('records.0.eligible', true)
+        ->assertJsonPath('records.0.eligible_count', 2)
+        ->assertJsonPath('records.0.excluded_count', 1)
+        ->assertJsonPath('records.0.records.1.eligible', true)
+        ->assertJsonPath('records.0.records.1.remarks', 'Eligible')
+        ->assertJsonPath('records.0.records.2.eligible', false)
+        ->assertJsonPath('records.0.records.2.remarks', 'Delivery status is not eligible for billing');
 
     $this->postJson(route('billing.prepare.confirm'), [
         'mode' => 'mixed',
-        'delivery_ids' => [$eligibleId, $pendingId],
+        'delivery_ids' => [$eligibleId, $pendingId, $releasedId],
         'idempotency_key' => (string) Str::uuid(),
-    ])->assertCreated()->assertJsonPath('batch.delivery_count', 2)->assertJsonPath('batch.group_count', 1);
+    ])->assertCreated()->assertJsonPath('batch.delivery_count', 2)->assertJsonPath('batch.group_count', 1)
+        ->assertJsonPath('rejected_records.0.delivery_id', $releasedId)
+        ->assertJsonPath('rejected_records.0.reason', 'Delivery status is not eligible for billing');
 
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $pendingId, 'status' => 'pending']);
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $eligibleId, 'status' => 'delivered']);
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $releasedId, 'status' => 'released']);
     $this->assertDatabaseCount('delivery_proofs', 0);
     $this->assertDatabaseCount('delivery_billing_records', 2);
+    $pendingBillingRecordId = (int) DB::table('delivery_billing_records')->where('delivery_id', $pendingId)->value('id');
+    $this->assertDatabaseHas('delivery_billing_histories', [
+        'delivery_billing_record_id' => $pendingBillingRecordId,
+        'previous_status' => 'pending_billing',
+        'new_status' => 'for_billing',
+        'changed_by' => $actor->getKey(),
+        'changed_by_name' => $actor->name,
+    ]);
+    expect(DB::table('delivery_billing_histories')
+        ->where('delivery_billing_record_id', $pendingBillingRecordId)
+        ->value('created_at'))->not->toBeNull();
 });
 
 it('confirms Select All from server-side criteria and rejects stale previews', function (): void {

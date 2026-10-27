@@ -1305,7 +1305,7 @@ it('confirms a batch into the existing Billing queue idempotently without creati
     $this->assertDatabaseCount('invoices', 1);
 });
 
-it('reports existing duplicate ledger rows without deleting or merging them', function (): void {
+it('keeps duplicate ledger groups in view data without rendering the warning or modifying rows', function (): void {
     signInBillingUser();
     $deliveryId = createBillingDelivery('35470');
     $response = $this->postJson(route('billing.prepare.confirm'), [
@@ -1331,9 +1331,9 @@ it('reports existing duplicate ledger rows without deleting or merging them', fu
 
     $this->get(route('billing.records.index', ['billing_status' => 'for_billing']))
         ->assertOk()
-        ->assertSee('Possible duplicate billing ledger rows found')
-        ->assertSee('#'.$original->id.', #'.$duplicateId)
-        ->assertSee('separate reviewed cleanup');
+        ->assertDontSee('Possible duplicate billing ledger rows found')
+        ->assertViewHas('duplicateLedgerGroups', fn ($groups): bool => $groups->count() === 1
+            && collect($groups->first()->billing_record_ids)->sort()->values()->all() === collect([$original->id, $duplicateId])->sort()->values()->all());
 
     $this->assertDatabaseCount('delivery_billing_records', 2);
 });

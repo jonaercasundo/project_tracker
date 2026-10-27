@@ -6,6 +6,7 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MI_LiquidationItem extends Model
 {
@@ -40,6 +41,11 @@ class MI_LiquidationItem extends Model
             MI_Liquidation::class,
             'liquidation_id'
         );
+    }
+
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(MI_LiquidationItemReceipt::class, 'liquidation_item_id')->orderBy('id');
     }
 
     /**

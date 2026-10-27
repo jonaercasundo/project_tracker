@@ -693,6 +693,31 @@
             font-weight: 700;
         }
 
+        .receipt-manager { display: grid; gap: 9px; width: 100%; }
+        .receipt-dropzone {
+            display: grid; place-items: center; gap: 7px; min-height: 108px; padding: 14px;
+            border: 1px dashed #94a3b8; border-radius: 10px; background: #f8fafc; color: #475569;
+            text-align: center; cursor: pointer; transition: border-color .15s ease, background .15s ease;
+        }
+        .receipt-dropzone:hover, .receipt-dropzone.is-dragover { border-color: #2563eb; background: #eff6ff; }
+        .receipt-dropzone:focus-within { outline: 3px solid rgba(37, 99, 235, .25); outline-offset: 2px; }
+        .receipt-dropzone svg { width: 22px; height: 22px; color: #2563eb; }
+        .receipt-dropzone strong { font-size: 12px; color: #1e293b; }
+        .receipt-dropzone small { font-size: 10px; color: #64748b; }
+        .receipt-picker { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+        .receipt-attachment-list { display: grid; gap: 8px; }
+        .receipt-file-entry { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 9px; border: 1px solid #e2e8f0; border-radius: 9px; background: white; }
+        .receipt-file-thumb { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 7px; background: #f8fafc; color: #475569; }
+        .receipt-file-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .receipt-file-meta { flex: 1 1 auto; min-width: 0; }
+        .receipt-file-name { display: block; overflow-wrap: anywhere; color: #1e293b; font-size: 11px; font-weight: 700; }
+        .receipt-file-size, .receipt-file-ocr { display: block; margin-top: 2px; color: #64748b; font-size: 10px; line-height: 1.4; }
+        .receipt-file-remove { flex: 0 0 auto; border: 0; background: transparent; color: #dc2626; font-size: 11px; font-weight: 700; cursor: pointer; }
+        .receipt-file-remove:focus-visible { outline: 2px solid #dc2626; outline-offset: 2px; }
+        .receipt-count { color: #475569; font-size: 10px; font-weight: 700; }
+        @media (max-width: 560px) { .receipt-file-entry { align-items: flex-start; } .receipt-file-thumb { width: 36px; height: 36px; flex-basis: 36px; } }
+        @media (prefers-reduced-motion: reduce) { .receipt-dropzone, .receipt-file-entry { transition: none !important; } }
+
         /* ============================================================
            ADD BUTTON
         ============================================================ */
@@ -1582,37 +1607,18 @@
                                                     Receipt Image
                                                 </div>
 
-                                                <div class="tx-receipt-wrapper">
-
-                                                    <label class="tx-upload-btn">
-
-                                                        📷
-                                                        <span>
-                                                            Upload / Scan Receipt
-                                                        </span>
-
-                                                        <input
-                                                            type="file"
-                                                            name="items[{{ $index }}][receipt_image]"
-                                                            class="receipt-file-input tx-receipt-input"
-                                                            accept="image/jpeg,image/png,image/webp"
-                                                            capture="environment"
-                                                        >
-
-                                                    </label>
-
-                                                    <div class="tx-receipt-preview">
-                                                        <img src="" alt="Receipt preview">
-                                                    </div>
-
-                                                    <div class="tx-receipt-status">
-                                                        No receipt
-                                                    </div>
-
-                                                </div>
-
-                                                <div class="tx-help">
-                                                    Uploading a receipt automatically scans it with OCR to fill in the Date and Amount VND above — please double-check the values it fills in.
+                                                <div class="receipt-manager" data-receipt-manager>
+    <label class="receipt-dropzone">
+        <input type="file" class="receipt-picker" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v4h16v-4"/></svg>
+        <strong>Choose Files / Drag and Drop</strong>
+        <small>PDF, JPG, JPEG, PNG or WEBP · up to 20 MB each · 10 per expense</small>
+    </label>
+    <div class="receipt-count" data-receipt-count>0 receipts selected</div>
+    <div class="receipt-attachment-list" data-receipt-list aria-live="polite"></div>
+    <div class="tx-receipt-status" data-receipt-status>No receipts selected</div>
+</div><div class="tx-help">
+                                                    Each image is scanned separately. OCR references stay with their receipt; the first detected date and amount fill empty expense fields only.
                                                 </div>
 
                                             </div>
@@ -2137,12 +2143,12 @@
                 return match ? match[1].trim() : null;
             }
 
-            async function scanReceipt(row, file) {
+            async function scanReceipt(row, file, receiptReferenceInput = null) {
 
                 const status = row.querySelector('.tx-receipt-status');
                 const dateInput = row.querySelector('.item-date');
                 const vndInput = row.querySelector('.amount-vnd');
-                const ocrReferenceInput = row.querySelector('.ocr-reference');
+                const ocrReferenceInput = receiptReferenceInput;
 
                 if (typeof Tesseract === 'undefined') {
 
@@ -2171,12 +2177,12 @@
 
                     const found = [];
 
-                    if (foundDate && dateInput) {
+                    if (foundDate && dateInput && !dateInput.value) {
                         dateInput.value = foundDate;
                         found.push('date');
                     }
 
-                    if (foundAmount && vndInput) {
+                    if (foundAmount && vndInput && !vndInput.value) {
                         vndInput.value = foundAmount;
                         found.push('amount');
                     }
@@ -2581,37 +2587,18 @@
                                     Receipt Image
                                 </div>
 
-                                <div class="tx-receipt-wrapper">
-
-                                    <label class="tx-upload-btn">
-
-                                        📷
-                                        <span>
-                                            Upload / Scan Receipt
-                                        </span>
-
-                                        <input
-                                            type="file"
-                                            name="items[${index}][receipt_image]"
-                                            class="receipt-file-input tx-receipt-input"
-                                            accept="image/jpeg,image/png,image/webp"
-                                            capture="environment"
-                                        >
-
-                                    </label>
-
-                                    <div class="tx-receipt-preview">
-                                        <img src="" alt="Receipt preview">
-                                    </div>
-
-                                    <div class="tx-receipt-status">
-                                        No receipt
-                                    </div>
-
-                                </div>
-
-                                <div class="tx-help">
-                                    Uploading a receipt automatically scans it with OCR to fill in the Date and Amount VND above — please double-check the values it fills in.
+                                <div class="receipt-manager" data-receipt-manager>
+    <label class="receipt-dropzone">
+        <input type="file" class="receipt-picker" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v4h16v-4"/></svg>
+        <strong>Choose Files / Drag and Drop</strong>
+        <small>PDF, JPG, JPEG, PNG or WEBP · up to 20 MB each · 10 per expense</small>
+    </label>
+    <div class="receipt-count" data-receipt-count>0 receipts selected</div>
+    <div class="receipt-attachment-list" data-receipt-list aria-live="polite"></div>
+    <div class="tx-receipt-status" data-receipt-status>No receipts selected</div>
+</div><div class="tx-help">
+                                    Each image is scanned separately. OCR references stay with their receipt; the first detected date and amount fill empty expense fields only.
                                 </div>
 
                             </div>
@@ -2871,27 +2858,6 @@
                 }
 
 
-                const receiptInput =
-                    row.querySelector('.receipt-file-input');
-
-                if (receiptInput) {
-
-                    receiptInput.addEventListener(
-                        'change',
-                        function () {
-
-                            previewReceipt(this);
-
-                            if (this.files && this.files[0]) {
-                                scanReceipt(row, this.files[0]);
-                            }
-
-                        }
-                    );
-
-                }
-
-
                 row.querySelectorAll('.remove-row')
                     .forEach(button => {
 
@@ -3053,6 +3019,70 @@
 
                     }
                 );
+
+            const allowedReceiptTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+            document.addEventListener('change', event => {
+                const picker = event.target.closest('.receipt-picker');
+                if (!picker) return;
+                const manager = picker.closest('[data-receipt-manager]');
+                const row = picker.closest('.expense-row');
+                const list = manager.querySelector('[data-receipt-list]');
+                const existing = list.querySelectorAll('.receipt-file-entry').length;
+                const newFiles = Array.from(picker.files || []);
+                const uploadedBytes = Array.from(document.querySelectorAll('[data-receipt-list] input[type="file"]')).reduce((sum, input) => sum + Array.from(input.files || []).reduce((fileSum, file) => fileSum + file.size, 0), 0);
+                if (uploadedBytes + newFiles.reduce((sum, file) => sum + file.size, 0) > 35 * 1024 * 1024) {
+                    manager.querySelector('[data-receipt-status]').textContent = 'Receipt uploads must total no more than 35 MB per submission.';
+                    picker.value = '';
+                    return;
+                }
+                if (existing + newFiles.length > 10) {
+                    manager.querySelector('[data-receipt-status]').textContent = 'You can attach up to 10 receipts per expense.';
+                    picker.value = '';
+                    return;
+                }
+                newFiles.forEach(file => {
+                    const extension = file.name.split('.').pop().toLowerCase();
+                    if (file.size > 20 * 1024 * 1024 || !['pdf','jpg','jpeg','png','webp'].includes(extension) || !allowedReceiptTypes.includes(file.type)) {
+                        manager.querySelector('[data-receipt-status]').textContent = `${file.name} is unsupported or exceeds 20 MB.`;
+                        return;
+                    }
+                    const token = `r${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+                    const entry = document.createElement('article');
+                    entry.className = 'receipt-file-entry';
+                    entry.innerHTML = `<div class="receipt-file-thumb" aria-hidden="true">${file.type.startsWith('image/') ? `<img alt="" src="${URL.createObjectURL(file)}">` : 'PDF'}</div><div class="receipt-file-meta"><strong class="receipt-file-name"></strong><span class="receipt-file-size"></span><span class="receipt-file-ocr">Scanning receipt…</span></div><button type="button" class="receipt-file-remove" aria-label="Remove receipt">Remove</button>`;
+                    entry.querySelector('.receipt-file-name').textContent = file.name;
+                    entry.querySelector('.receipt-file-size').textContent = `${(file.size / 1024).toFixed(0)} KB`;
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file'; fileInput.hidden = true; fileInput.name = `items[${getRowIndex(picker)}][receipt_files][${token}]`;
+                    const transfer = new DataTransfer(); transfer.items.add(file); fileInput.files = transfer.files;
+                    const ocrInput = document.createElement('input'); ocrInput.type = 'hidden'; ocrInput.name = `items[${getRowIndex(picker)}][receipt_ocr_references][${token}]`;
+                    entry.append(fileInput, ocrInput); list.append(entry);
+                    scanReceipt(row, file, ocrInput).then(() => {
+                        entry.querySelector('.receipt-file-ocr').textContent = ocrInput.value ? `Receipt reference: ${ocrInput.value}` : 'Receipt attached';
+                    });
+                });
+                picker.value = '';
+                manager.querySelector('[data-receipt-count]').textContent = `${list.querySelectorAll('.receipt-file-entry').length} receipt(s) selected`;
+                manager.querySelector('[data-receipt-status]').textContent = 'Receipts are ready to save with this expense.';
+            });
+            document.addEventListener('click', event => {
+                const remove = event.target.closest('.receipt-file-remove');
+                if (!remove) return;
+                const manager = remove.closest('[data-receipt-manager]');
+                const entry = remove.closest('.receipt-file-entry');
+                const image = entry.querySelector('img'); if (image?.src.startsWith('blob:')) URL.revokeObjectURL(image.src);
+                entry.remove();
+                manager.querySelector('[data-receipt-count]').textContent = `${manager.querySelectorAll('.receipt-file-entry').length} receipt(s) selected`;
+            });
+            document.addEventListener('dragover', event => { const zone = event.target.closest('.receipt-dropzone'); if (zone) { event.preventDefault(); zone.classList.add('is-dragging'); } });
+            document.addEventListener('dragleave', event => event.target.closest('.receipt-dropzone')?.classList.remove('is-dragging'));
+            document.addEventListener('drop', event => {
+                const zone = event.target.closest('.receipt-dropzone'); if (!zone) return;
+                event.preventDefault(); zone.classList.remove('is-dragging');
+                const picker = zone.querySelector('.receipt-picker');
+                const transfer = new DataTransfer(); Array.from(event.dataTransfer.files).forEach(file => transfer.items.add(file));
+                picker.files = transfer.files; picker.dispatchEvent(new Event('change', { bubbles: true }));
+            });
 
         });
     </script>

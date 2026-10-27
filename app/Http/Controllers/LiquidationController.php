@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AiAssistantAttachment;
 use App\Models\MI_Liquidation;
 use App\Models\MI_LiquidationItem;
+use App\Models\MI_LiquidationItemReceipt;
 use App\Services\MiFinancialAmount;
 use App\Services\MiFinancialWorkflowService;
 use App\Services\MiForexRateService;
@@ -13,6 +14,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -22,6 +24,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -325,13 +328,21 @@ class LiquidationController extends Controller
                     'max:5000',
                 ],
 
+                'items.*.receipt_files' => ['sometimes', 'array', 'max:10'],
+                'items.*.receipt_files.*' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'extensions:pdf,jpg,jpeg,png,webp', 'max:20480'],
+                'items.*.receipt_ocr_references' => ['sometimes', 'array', 'max:10'],
+                'items.*.receipt_ocr_references.*' => ['nullable', 'string', 'max:500'],
                 'items.*.receipt_image' => [
                     'nullable',
-                    'image',
-                    'mimes:jpg,jpeg,png,webp',
-                    'max:10240',
+                    'file',
+                    'mimes:pdf,jpg,jpeg,png,webp',
+                    'extensions:pdf,jpg,jpeg,png,webp',
+                    'max:20480',
                 ],
             ]);
+            if ($this->receiptUploadBytes($request) > 35 * 1024 * 1024) {
+                throw ValidationException::withMessages(['items' => 'Receipt uploads must total no more than 35 MB per submission.']);
+            }
             MiFinancialAmount::sum(array_column($validated['items'], 'amount_vnd'), 'items', '999999999999.99');
 
             $companyId = session('company_id');
@@ -414,37 +425,6 @@ class LiquidationController extends Controller
                         $validated['items'] as $index => $item
                     ) {
 
-                        $receiptPath = null;
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Receipt Upload
-                        |--------------------------------------------------------------------------
-                        */
-
-                        if (
-                            $request->hasFile(
-                                "items.{$index}.receipt_image"
-                            )
-                        ) {
-
-                            $file = $request->file(
-                                "items.{$index}.receipt_image"
-                            );
-
-                            if (
-                                $file &&
-                                $file->isValid()
-                            ) {
-
-                                $receiptPath = $file->store('private/liquidations/receipts', 'local');
-                                if (! $receiptPath) {
-                                    throw new \RuntimeException('Unable to store receipt.');
-                                }
-                                $uploadedPaths[] = $receiptPath;
-                            }
-                        }
-
                         /*
                         |--------------------------------------------------------------------------
                         | Reference Number
@@ -454,13 +434,19 @@ class LiquidationController extends Controller
                         $refNo = app(MiLiquidationExpenseReferenceGenerator::class)
                             ->next($validated['date_prepared']);
 
+                        $legacyReceipt = $request->file("items.{$index}.receipt_image");
+                        $legacyReceiptPath = $legacyReceipt?->store('private/liquidations/receipts', 'local');
+                        if (is_string($legacyReceiptPath)) {
+                            $uploadedPaths[] = $legacyReceiptPath;
+                        }
+
                         /*
                         |--------------------------------------------------------------------------
                         | Create Item
                         |--------------------------------------------------------------------------
                         */
 
-                        MI_LiquidationItem::create([
+                        $expense = MI_LiquidationItem::create([
 
                             'liquidation_id' => $liquidation->id,
 
@@ -484,8 +470,17 @@ class LiquidationController extends Controller
 
                             'remarks' => $item['remarks'] ?? null,
 
-                            'receipt_image' => $receiptPath,
+                            'receipt_image' => $legacyReceiptPath,
                         ]);
+
+                        $this->storeReceiptAttachments(
+                            $expense,
+                            $request->file("items.{$index}.receipt_files", []),
+                            null,
+                            $item['receipt_ocr_references'] ?? [],
+                            (int) $user->getKey(),
+                            $uploadedPaths
+                        );
                     }
 
                     app(MiFinancialWorkflowService::class)->activity($liquidation, $user, 'ordinary_liquidation_created');
@@ -513,10 +508,10 @@ class LiquidationController extends Controller
                 );
 
         } catch (ValidationException $e) {
-            Storage::disk('local')->delete($uploadedPaths);
+            $this->deleteStoredReceiptPaths($uploadedPaths);
             throw $e;
         } catch (Throwable $e) {
-            Storage::disk('local')->delete($uploadedPaths);
+            $this->deleteStoredReceiptPaths($uploadedPaths);
 
             $duplicate = isset($submissionKey, $companyId)
                 ? MI_Liquidation::query()->where('submission_key', $submissionKey)
@@ -555,10 +550,11 @@ class LiquidationController extends Controller
         Gate::authorize('view', $liquidation);
         $liquidation->load([
             'activities',
-            'items',
+            'items.receipts',
             'preparer',
             'company',
         ]);
+        $this->prepareLegacyReceiptMetadata($liquidation);
 
         /*
         |--------------------------------------------------------------------------
@@ -584,7 +580,8 @@ class LiquidationController extends Controller
     public function edit(MI_Liquidation $liquidation): View
     {
         Gate::authorize('update', $liquidation);
-        $liquidation->load('items', 'preparer', 'company', 'activities');
+        $liquidation->load('items.receipts', 'preparer', 'company', 'activities');
+        $this->prepareLegacyReceiptMetadata($liquidation);
 
         return view('mi_app.liquidation.edit', ['report' => $liquidation]);
     }
@@ -683,21 +680,61 @@ class LiquidationController extends Controller
                 'max:5000',
             ],
 
+            'items.*.receipt_files' => ['sometimes', 'array', 'max:10'],
+            'items.*.receipt_files.*' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'extensions:pdf,jpg,jpeg,png,webp', 'max:20480'],
+            'items.*.receipt_ocr_references' => ['sometimes', 'array', 'max:10'],
+            'items.*.receipt_ocr_references.*' => ['nullable', 'string', 'max:500'],
+            'remove_receipt_ids' => ['sometimes', 'array', 'max:100'],
+            'remove_receipt_ids.*' => ['required', 'integer', 'distinct'],
+            'remove_legacy_receipt_ids' => ['sometimes', 'array', 'max:100'],
+            'remove_legacy_receipt_ids.*' => ['required', 'integer', 'distinct'],
             'items.*.receipt_image' => [
                 'nullable',
-                'image',
-                'mimes:jpg,jpeg,png,webp',
-                'max:10240',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp',
+                'extensions:pdf,jpg,jpeg,png,webp',
+                'max:20480',
             ],
         ]);
 
+        if ($this->receiptUploadBytes($request) > 35 * 1024 * 1024) {
+            throw ValidationException::withMessages(['items' => 'Receipt uploads must total no more than 35 MB per submission.']);
+        }
         MiFinancialAmount::sum(array_column($validated['items'], 'amount_vnd'), 'items', '999999999999.99');
         $uploadedPaths = [];
+        $receiptPathsToDelete = [];
         try {
             $rate = app(MiForexRateService::class)->currentRate();
-            DB::transaction(function () use ($validated, $request, $liquidation, $rate, &$uploadedPaths): void {
+            DB::transaction(function () use ($validated, $request, $liquidation, $rate, &$uploadedPaths, &$receiptPathsToDelete): void {
                 $liquidation = MI_Liquidation::query()->whereKey($liquidation->getKey())->lockForUpdate()->firstOrFail();
                 Gate::authorize('update', $liquidation);
+
+                $removeReceiptIds = array_map('intval', $validated['remove_receipt_ids'] ?? []);
+                $receiptsToRemove = MI_LiquidationItemReceipt::query()
+                    ->whereIn('id', $removeReceiptIds)
+                    ->whereHas('expense', fn ($query) => $query->where('liquidation_id', $liquidation->getKey()))
+                    ->lockForUpdate()
+                    ->get();
+                if ($receiptsToRemove->count() !== count($removeReceiptIds)) {
+                    throw ValidationException::withMessages(['remove_receipt_ids' => 'One or more selected receipts are not attached to this liquidation.']);
+                }
+                $receiptPathsToDelete = array_merge($receiptPathsToDelete, $receiptsToRemove->pluck('storage_path')->all());
+                $receiptsToRemove->each->delete();
+
+                $removeLegacyReceiptIds = array_map('intval', $validated['remove_legacy_receipt_ids'] ?? []);
+                $legacyReceiptsToRemove = $liquidation->items()
+                    ->whereIn('id', $removeLegacyReceiptIds)
+                    ->whereNotNull('receipt_image')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+                if ($legacyReceiptsToRemove->count() !== count($removeLegacyReceiptIds)) {
+                    throw ValidationException::withMessages(['remove_legacy_receipt_ids' => 'One or more selected receipts are no longer available.']);
+                }
+                foreach ($legacyReceiptsToRemove as $legacyReceipt) {
+                    $receiptPathsToDelete[] = $legacyReceipt->receipt_image;
+                }
+
                 $liquidation->update([
                     'title' => $validated['report_title'],
                     'date_prepared' => $validated['date_prepared'],
@@ -711,12 +748,8 @@ class LiquidationController extends Controller
                         ? $liquidation->items()->whereKey($row['id'])->firstOrFail()
                         : $liquidation->items()->make();
                     $receiptPath = $item->receipt_image;
-                    if ($request->hasFile("items.{$index}.receipt_image")) {
-                        $receiptPath = $request->file("items.{$index}.receipt_image")->store('private/liquidations/receipts', 'local');
-                        if (! $receiptPath) {
-                            throw new \RuntimeException('Unable to store receipt.');
-                        }
-                        $uploadedPaths[] = $receiptPath;
+                    if (in_array((int) $item->getKey(), $removeLegacyReceiptIds, true)) {
+                        $receiptPath = null;
                     }
                     $item->fill([
                         'line_no' => $index + 1,
@@ -733,15 +766,33 @@ class LiquidationController extends Controller
                         'receipt_image' => $receiptPath,
                     ])->save();
                     $keptIds[] = $item->getKey();
+
+                    $this->storeReceiptAttachments(
+                        $item,
+                        $request->file("items.{$index}.receipt_files", []),
+                        $request->file("items.{$index}.receipt_image"),
+                        $row['receipt_ocr_references'] ?? [],
+                        (int) $request->user()->getKey(),
+                        $uploadedPaths
+                    );
                 }
-                $removed = $liquidation->items()->whereNotIn('id', $keptIds)->get()->toArray();
+                $removedItems = $liquidation->items()->with('receipts')->whereNotIn('id', $keptIds)->get();
+                foreach ($removedItems as $removedItem) {
+                    if ($removedItem->receipt_image !== null) {
+                        $receiptPathsToDelete[] = $removedItem->receipt_image;
+                    }
+                    $receiptPathsToDelete = array_merge($receiptPathsToDelete, $removedItem->receipts->pluck('storage_path')->all());
+                }
+                $removed = $removedItems->toArray();
                 app(MiFinancialWorkflowService::class)->activity($liquidation, $request->user(), 'ordinary_liquidation_updated', $liquidation->status, ['metadata' => ['removed_items' => $removed]]);
                 $liquidation->items()->whereNotIn('id', $keptIds)->delete();
             });
         } catch (Throwable $exception) {
-            Storage::disk('local')->delete($uploadedPaths);
+            $this->deleteStoredReceiptPaths($uploadedPaths);
             throw $exception;
         }
+
+        $this->deleteStoredReceiptPaths($receiptPathsToDelete);
 
         return redirect()->route('liquidation.show', $liquidation)->with('success', 'Liquidation report updated successfully.');
     }
@@ -766,10 +817,206 @@ class LiquidationController extends Controller
         abort_unless($item->report, 404);
         Gate::authorize('view', $item->report);
         $path = $item->receipt_image;
-        abort_unless(is_string($path) && preg_match('~^(?:private/)?liquidations/receipts/[A-Za-z0-9._-]+$~D', $path), 404);
-        $disk = str_starts_with($path, 'private/') ? 'local' : 'public';
+        abort_unless(is_string($path) && ($disk = $this->legacyReceiptDisk($path)) !== null, 404);
         abort_unless(Storage::disk($disk)->exists($path), 404);
 
-        return Storage::disk($disk)->response($path, null, ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
+        return $this->streamReceipt($disk, $path, basename(str_replace('\\', '/', $path)), Storage::disk($disk)->mimeType($path), false);
+    }
+
+    public function downloadReceipt(MI_LiquidationItem $item): StreamedResponse
+    {
+        abort_unless($item->report, 404);
+        Gate::authorize('view', $item->report);
+        $path = $item->receipt_image;
+        abort_unless(is_string($path) && ($disk = $this->legacyReceiptDisk($path)) !== null, 404);
+        abort_unless(Storage::disk($disk)->exists($path), 404);
+
+        return $this->streamReceipt($disk, $path, basename(str_replace('\\', '/', $path)), Storage::disk($disk)->mimeType($path), true);
+    }
+
+    public function receiptAttachment(MI_LiquidationItemReceipt $receipt): StreamedResponse
+    {
+        $receipt->loadMissing('expense.report');
+        abort_unless($receipt->expense?->report, 404);
+        Gate::authorize('view', $receipt->expense->report);
+
+        $path = $receipt->storage_path;
+        abort_unless(is_string($path) && preg_match('~^private/liquidations/receipts/[A-Za-z0-9._-]+$~D', $path), 404);
+        abort_unless(Storage::disk('local')->exists($path), 404);
+
+        return $this->streamReceipt('local', $path, $receipt->original_filename, $receipt->mime_type, false);
+    }
+
+    public function downloadReceiptAttachment(MI_LiquidationItemReceipt $receipt): StreamedResponse
+    {
+        $receipt->loadMissing('expense.report');
+        abort_unless($receipt->expense?->report, 404);
+        Gate::authorize('view', $receipt->expense->report);
+
+        $path = $receipt->storage_path;
+        abort_unless(is_string($path) && preg_match('~^private/liquidations/receipts/[A-Za-z0-9._-]+$~D', $path), 404);
+        abort_unless(Storage::disk('local')->exists($path), 404);
+
+        return $this->streamReceipt('local', $path, $receipt->original_filename, $receipt->mime_type, true);
+    }
+
+    /**
+     * Save uploaded receipt files as private attachment records.
+     *
+     * @param  array<array-key, UploadedFile>|null  $receiptFiles
+     * @param  array<array-key, string|null>  $ocrReferences
+     * @param  array<int, string>  $uploadedPaths
+     */
+    private function storeReceiptAttachments(
+        MI_LiquidationItem $expense,
+        ?array $receiptFiles,
+        ?UploadedFile $legacyUpload,
+        array $ocrReferences,
+        int $uploadedBy,
+        array &$uploadedPaths
+    ): void {
+        $receiptFiles ??= [];
+
+        if ($legacyUpload !== null) {
+            $receiptFiles['legacy_'.count($receiptFiles)] = $legacyUpload;
+        }
+
+        if (count($receiptFiles) > 10) {
+            throw ValidationException::withMessages(['items' => 'Upload no more than 10 receipts per expense.']);
+        }
+
+        foreach ($receiptFiles as $key => $file) {
+            if (! $file instanceof UploadedFile || ! $file->isValid()) {
+                throw ValidationException::withMessages(['items' => 'A receipt upload could not be read. Please select the file again.']);
+            }
+
+            $storagePath = $file->store('private/liquidations/receipts', 'local');
+            if (! is_string($storagePath) || ! preg_match('~^private/liquidations/receipts/[A-Za-z0-9._-]+$~D', $storagePath)) {
+                throw new \RuntimeException('Unable to store receipt.');
+            }
+            $uploadedPaths[] = $storagePath;
+
+            $originalFilename = basename(str_replace('\\', '/', $file->getClientOriginalName()));
+            $originalFilename = preg_replace('/[\x00-\x1F\x7F]/u', '_', $originalFilename) ?: 'receipt';
+
+            MI_LiquidationItemReceipt::query()->create([
+                'liquidation_item_id' => $expense->getKey(),
+                'original_filename' => mb_substr($originalFilename, 0, 255),
+                'storage_path' => $storagePath,
+                'mime_type' => $file->getMimeType() ?: 'application/octet-stream',
+                'file_size' => (int) $file->getSize(),
+                'uploaded_by' => $uploadedBy,
+                'ocr_reference' => is_string($ocrReferences[$key] ?? null) ? trim($ocrReferences[$key]) : null,
+            ]);
+        }
+    }
+
+    private function receiptUploadBytes(Request $request): int
+    {
+        $totalBytes = 0;
+        foreach ($request->file('items', []) as $rowFiles) {
+            if (! is_array($rowFiles)) {
+                continue;
+            }
+
+            foreach (['receipt_files', 'receipt_image'] as $field) {
+                $files = $rowFiles[$field] ?? [];
+                foreach (is_array($files) ? $files : [$files] as $file) {
+                    if ($file instanceof UploadedFile && $file->isValid()) {
+                        $totalBytes += (int) $file->getSize();
+                    }
+                }
+            }
+        }
+
+        return $totalBytes;
+    }
+
+    /**
+     * Delete generated receipt paths after their database rows have committed.
+     *
+     * @param  array<int, string>  $paths
+     */
+    private function deleteStoredReceiptPaths(array $paths): void
+    {
+        foreach (array_unique($paths) as $path) {
+            if (! is_string($path) || ($disk = $this->legacyReceiptDisk($path)) === null) {
+                continue;
+            }
+
+            try {
+                if (Storage::disk($disk)->exists($path) && ! Storage::disk($disk)->delete($path)) {
+                    Log::warning('Unable to delete removed liquidation receipt.', ['storage_path' => $path]);
+                }
+            } catch (Throwable $exception) {
+                Log::warning('Unable to delete removed liquidation receipt.', ['storage_path' => $path, 'exception' => $exception]);
+            }
+        }
+    }
+
+    private function legacyReceiptDisk(string $path): ?string
+    {
+        if (preg_match('~^private/liquidations/receipts/[A-Za-z0-9._-]+$~D', $path) === 1) {
+            return 'local';
+        }
+
+        if (preg_match('~^liquidations/receipts/[A-Za-z0-9._-]+$~D', $path) === 1) {
+            return 'public';
+        }
+
+        return null;
+    }
+
+    private function streamReceipt(string $disk, string $path, string $filename, ?string $mimeType, bool $download): StreamedResponse
+    {
+        $stream = Storage::disk($disk)->readStream($path);
+        abort_unless(is_resource($stream), 404);
+
+        $safeMimeType = in_array($mimeType, ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'], true)
+            ? $mimeType
+            : 'application/octet-stream';
+        $filename = basename(str_replace('\\', '/', $filename));
+        $filename = preg_replace('/[\x00-\x1F\x7F]/u', '_', $filename) ?: 'receipt';
+        $filenameFallback = Str::ascii($filename);
+        $filenameFallback = preg_replace('/[^A-Za-z0-9._-]/', '_', $filenameFallback) ?: 'receipt';
+        $disposition = (new ResponseHeaderBag)->makeDisposition($download ? 'attachment' : 'inline', $filename, $filenameFallback);
+
+        return response()->stream(function () use ($stream): void {
+            try {
+                fpassthru($stream);
+            } finally {
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type' => $safeMimeType,
+            'Content-Disposition' => $disposition,
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    private function prepareLegacyReceiptMetadata(MI_Liquidation $liquidation): void
+    {
+        foreach ($liquidation->items as $item) {
+            $path = $item->receipt_image;
+            $disk = is_string($path) ? $this->legacyReceiptDisk($path) : null;
+            if ($disk === null) {
+                continue;
+            }
+
+            try {
+                if (! Storage::disk($disk)->exists($path)) {
+                    continue;
+                }
+
+                $item->setAttribute('legacy_receipt', [
+                    'filename' => basename(str_replace('\\', '/', $path)),
+                    'file_size' => Storage::disk($disk)->size($path),
+                    'mime_type' => Storage::disk($disk)->mimeType($path),
+                ]);
+            } catch (Throwable $exception) {
+                Log::warning('Unable to read legacy liquidation receipt metadata.', ['storage_path' => $path, 'exception' => $exception]);
+            }
+        }
     }
 }

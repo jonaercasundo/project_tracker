@@ -186,10 +186,21 @@
                         'amount_vnd' => $item->amount_vnd,
                         'amount_usd' => $item->amount_usd,
                         'receipt_image' => $item->receipt_image,
+                        'receipts' => $item->receipts,
+                        'legacy_receipt' => $item->getAttribute('legacy_receipt'),
                     ];
 
                 })
                 ->toArray();
+        } else {
+            $persistedItems = $report->items->keyBy('id');
+            $existingItems = array_map(function (array $item) use ($persistedItems): array {
+                $persistedItem = $persistedItems->get((int) ($item['id'] ?? 0));
+                $item['receipts'] = $persistedItem?->receipts ?? collect();
+                $item['legacy_receipt'] = $persistedItem?->getAttribute('legacy_receipt');
+
+                return $item;
+            }, $existingItems);
         }
 
 
@@ -1195,6 +1206,27 @@
             cursor: pointer;
 
         }
+
+        .receipt-manager { display: grid; gap: 10px; width: 100%; }
+        .receipt-dropzone { min-height: 116px; display: grid; place-items: center; gap: 7px; padding: 18px; border: 1px dashed #94a3b8; border-radius: 12px; background: #f8fafc; color: #475569; text-align: center; cursor: pointer; }
+        .receipt-dropzone svg { width: 25px; height: 25px; color: #2563eb; }
+        .receipt-dropzone small { color: #64748b; }
+        .receipt-dropzone.is-dragging { border-color: #2563eb; background: #eff6ff; }
+        .receipt-picker { position: absolute; width: 1px; height: 1px; opacity: 0; }
+        .receipt-attachment-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,280px),1fr)); gap: 8px; }
+        .receipt-file-entry { min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+        .receipt-file-thumb { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; overflow: hidden; border-radius: 7px; background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 700; }
+        .receipt-file-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .receipt-file-meta { min-width: 0; display: grid; gap: 3px; flex: 1; font-size: 12px; }
+        .receipt-file-meta span { color: #64748b; overflow-wrap: anywhere; }
+        .receipt-file-name { overflow-wrap: anywhere; }
+        .receipt-file-remove { border: 0; background: transparent; color: #b91c1c; padding: 6px; font-weight: 600; cursor: pointer; }
+        .receipt-count { color: #64748b; font-size: 12px; }
+        .existing-receipt-entry[data-removing="true"] { opacity: .45; text-decoration: line-through; }
+        .existing-receipt-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .existing-receipt-actions a { color: #1d4ed8; font-size: 12px; }
+        .receipt-dropzone:focus-within { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
+        @media (prefers-reduced-motion: reduce) { .receipt-dropzone, .receipt-file-entry { transition: none !important; } }
 
 
         .receipt-preview {
@@ -2595,14 +2627,35 @@
                                                     Receipt
                                                 </label>
 
-                                                <div class="receipt-box">
+                                                <div class="receipt-manager" data-receipt-manager>
+                                                    <label class="receipt-dropzone">
+                                                        <input type="file" class="receipt-picker" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
+                                                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v4h16v-4"/></svg>
+                                                        <strong>Choose Files / Drag and Drop</strong>
+                                                        <small>PDF, JPG, JPEG, PNG or WEBP - up to 20 MB each, 10 per expense</small>
+                                                    </label>
+                                                    <div class="receipt-count" data-receipt-count>{{ count($item['receipts'] ?? []) + (!empty($item['legacy_receipt']) ? 1 : 0) }} saved receipt(s)</div>
+                                                    <div class="receipt-attachment-list" data-receipt-list>
+                                                        @foreach(($item['receipts'] ?? []) as $receipt)
+                                                            <article class="receipt-file-entry existing-receipt-entry">
+                                                                <div class="receipt-file-thumb">@if(str_starts_with($receipt->mime_type, 'image/'))<img src="{{ route('liquidation.receipt-attachments.preview', $receipt) }}" alt="Receipt thumbnail">@else PDF @endif</div>
+                                                                <div class="receipt-file-meta"><strong class="receipt-file-name">{{ $receipt->original_filename }}</strong><span>{{ number_format($receipt->file_size / 1024, 0) }} KB</span>@if($receipt->ocr_reference)<span>OCR reference: {{ $receipt->ocr_reference }}</span>@endif<div class="existing-receipt-actions"><a href="{{ route('liquidation.receipt-attachments.preview', $receipt) }}" target="_blank" rel="noopener">Preview</a><a href="{{ route('liquidation.receipt-attachments.download', $receipt) }}">Download</a></div></div>
+                                                                <input type="checkbox" name="remove_receipt_ids[]" value="{{ $receipt->id }}" hidden>
+                                                                <button type="button" class="receipt-file-remove existing-receipt-remove">Remove</button>
+                                                            </article>
+                                                        @endforeach
+                                                        @if(!empty($item['legacy_receipt']))
+                                                            <article class="receipt-file-entry existing-receipt-entry">
+                                                                <div class="receipt-file-thumb">@if(str_starts_with((string) $item['legacy_receipt']['mime_type'], 'image/'))<img src="{{ route('liquidation.receipt', $item['id']) }}" alt="Receipt thumbnail">@else PDF @endif</div>
+                                                                <div class="receipt-file-meta"><strong class="receipt-file-name">{{ $item['legacy_receipt']['filename'] }}</strong><span>{{ number_format($item['legacy_receipt']['file_size'] / 1024, 0) }} KB</span><div class="existing-receipt-actions"><a href="{{ route('liquidation.receipt', $item['id']) }}" target="_blank" rel="noopener">Preview</a><a href="{{ route('liquidation.receipt.download', $item['id']) }}">Download</a></div></div>
+                                                                <input type="checkbox" name="remove_legacy_receipt_ids[]" value="{{ $item['id'] }}" hidden>
+                                                                <button type="button" class="receipt-file-remove existing-receipt-remove">Remove</button>
+                                                            </article>
+                                                        @endif
+                                                    </div>
+                                                    <div class="liq-help">New receipt references are scanned separately and stored with each file.</div>
 
-                                                    <input
-                                                        type="file"
-                                                        name="items[{{ $index }}][receipt_image]"
-                                                        class="receipt-input"
-                                                        accept="image/*"
-                                                    >
+                                                    {{--
 
 
                                                     @if(!empty($item['receipt_image']))
@@ -2626,6 +2679,7 @@
                                                         Scanning receipt...
                                                     </div>
 
+                                                    --}}
                                                 </div>
 
                                             </div>
@@ -3947,24 +4001,15 @@
                                         Receipt
                                     </label>
 
-                                    <div class="receipt-box">
-
-                                        <input
-                                            type="file"
-                                            name="items[${index}][receipt_image]"
-                                            class="receipt-input"
-                                            accept="image/*"
-                                        >
-
-                                        <img
-                                            class="receipt-preview"
-                                            alt="Receipt preview"
-                                        >
-
-                                        <div class="ocr-status">
-                                            Scanning receipt...
-                                        </div>
-
+                                    <div class="receipt-manager" data-receipt-manager>
+                                        <label class="receipt-dropzone">
+                                            <input type="file" class="receipt-picker" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
+                                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v4h16v-4"/></svg>
+                                            <strong>Choose Files / Drag and Drop</strong>
+                                            <small>PDF, JPG, JPEG, PNG or WEBP - up to 20 MB each, 10 per expense</small>
+                                        </label>
+                                        <div class="receipt-count" data-receipt-count>0 receipt(s)</div>
+                                        <div class="receipt-attachment-list" data-receipt-list></div>
                                     </div>
 
                                 </div>
@@ -4469,6 +4514,85 @@
 
             });
 
+    </script>
+
+    <script>
+        document.addEventListener('change', async event => {
+            const picker = event.target.closest('.receipt-picker');
+            if (!picker) return;
+            const manager = picker.closest('[data-receipt-manager]');
+            const item = picker.closest('.expense-item');
+            const list = manager.querySelector('[data-receipt-list]');
+            const current = list.querySelectorAll('.receipt-file-entry:not([data-removing="true"])').length;
+            const files = Array.from(picker.files || []);
+            const uploadedBytes = Array.from(document.querySelectorAll('[data-receipt-list] input[type="file"]')).reduce((sum, input) => sum + Array.from(input.files || []).reduce((fileSum, selected) => fileSum + selected.size, 0), 0);
+            if (uploadedBytes + files.reduce((sum, file) => sum + file.size, 0) > 35 * 1024 * 1024) {
+                manager.querySelector('[data-receipt-count]').textContent = 'Receipt uploads must total no more than 35 MB per submission.';
+                picker.value = '';
+                return;
+            }
+            if (current + files.length > 10) {
+                manager.querySelector('[data-receipt-count]').textContent = 'Maximum 10 receipts per expense.';
+                picker.value = '';
+                return;
+            }
+            for (const file of files) {
+                const extension = file.name.split('.').pop().toLowerCase();
+                if (file.size > 20 * 1024 * 1024 || !['pdf','jpg','jpeg','png','webp'].includes(extension)) continue;
+                const token = `r${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+                const entry = document.createElement('article');
+                entry.className = 'receipt-file-entry';
+                const thumb = document.createElement('div'); thumb.className = 'receipt-file-thumb';
+                if (file.type.startsWith('image/')) { const image = document.createElement('img'); image.alt = ''; image.src = URL.createObjectURL(file); thumb.append(image); } else { thumb.textContent = 'PDF'; }
+                const meta = document.createElement('div'); meta.className = 'receipt-file-meta';
+                const name = document.createElement('strong'); name.className = 'receipt-file-name'; name.textContent = file.name;
+                const size = document.createElement('span'); size.textContent = `${(file.size / 1024).toFixed(0)} KB`;
+                const status = document.createElement('span'); status.textContent = 'Receipt attached'; meta.append(name, size, status);
+                const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'receipt-file-remove'; remove.textContent = 'Remove';
+                const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.hidden = true; fileInput.name = `items[${item.dataset.index}][receipt_files][${token}]`;
+                const transfer = new DataTransfer(); transfer.items.add(file); fileInput.files = transfer.files;
+                const ocr = document.createElement('input'); ocr.type = 'hidden'; ocr.name = `items[${item.dataset.index}][receipt_ocr_references][${token}]`;
+                entry.append(thumb, meta, remove, fileInput, ocr); list.append(entry);
+                if (file.type.startsWith('image/') && typeof Tesseract !== 'undefined') {
+                    status.textContent = 'Scanning receipt…';
+                    try {
+                        const result = await Tesseract.recognize(file, 'eng');
+                        const text = result?.data?.text || '';
+                        const match = text.match(/\b(?:REF(?:ERENCE)?|O\.?R\.?|RECEIPT)[\s:#-]*([A-Z0-9-]{5,30})\b/i);
+                        if (match) { ocr.value = match[1].trim(); status.textContent = `OCR reference: ${ocr.value}`; }
+                        else status.textContent = 'Receipt scanned; no reference detected.';
+                    } catch (error) { status.textContent = 'Receipt attached; OCR scan failed.'; }
+                }
+            }
+            picker.value = '';
+            manager.querySelector('[data-receipt-count]').textContent = `${list.querySelectorAll('.receipt-file-entry:not([data-removing="true"])').length} receipt(s)`;
+        });
+        document.addEventListener('click', event => {
+            const remove = event.target.closest('.existing-receipt-remove');
+            if (remove) {
+                const entry = remove.closest('.existing-receipt-entry');
+                const checkbox = entry.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+                entry.dataset.removing = checkbox.checked ? 'true' : 'false';
+                remove.textContent = checkbox.checked ? 'Undo' : 'Remove';
+                remove.setAttribute('aria-pressed', checkbox.checked ? 'true' : 'false');
+                return;
+            }
+            const removeNew = event.target.closest('.receipt-file-remove:not(.existing-receipt-remove)');
+            if (!removeNew) return;
+            const entry = removeNew.closest('.receipt-file-entry');
+            const image = entry.querySelector('img'); if (image?.src.startsWith('blob:')) URL.revokeObjectURL(image.src);
+            const manager = entry.closest('[data-receipt-manager]'); entry.remove();
+            manager.querySelector('[data-receipt-count]').textContent = `${manager.querySelectorAll('.receipt-file-entry:not([data-removing="true"])').length} receipt(s)`;
+        });
+        document.addEventListener('dragover', event => { const zone = event.target.closest('.receipt-dropzone'); if (zone) { event.preventDefault(); zone.classList.add('is-dragging'); } });
+        document.addEventListener('dragleave', event => event.target.closest('.receipt-dropzone')?.classList.remove('is-dragging'));
+        document.addEventListener('drop', event => {
+            const zone = event.target.closest('.receipt-dropzone'); if (!zone) return;
+            event.preventDefault(); zone.classList.remove('is-dragging');
+            const transfer = new DataTransfer(); Array.from(event.dataTransfer.files).forEach(file => transfer.items.add(file));
+            const picker = zone.querySelector('.receipt-picker'); picker.files = transfer.files; picker.dispatchEvent(new Event('change', { bubbles: true }));
+        });
     </script>
 
     <script>

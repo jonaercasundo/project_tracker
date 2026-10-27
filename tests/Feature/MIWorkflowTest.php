@@ -650,11 +650,75 @@ it('returns field validation errors for invalid ordinary uploads', function (str
     $this->signInMI($this->miUser());
     $payload = $this->ordinaryPayload();
     $payload['items'][0]['receipt_image'] = $kind === 'oversized'
-        ? UploadedFile::fake()->image('receipt.png')->size(10241)
-        : UploadedFile::fake()->create('receipt.pdf', 10, 'application/pdf');
+        ? UploadedFile::fake()->image('receipt.png')->size(20481)
+        : UploadedFile::fake()->create('receipt.txt', 10, 'text/plain');
     $this->postJson(route('liquidation.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors('items.0.receipt_image');
     $this->assertDatabaseCount('mi_liquidations', 0);
 })->with(['unsupported' => 'unsupported', 'oversized' => 'oversized']);
+
+it('stores several private receipts per expense and renders controlled preview and download links', function () {
+    Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'base_code' => 'USD', 'time_last_update_unix' => 1792886551, 'rates' => ['VND' => 25432.125]], 200)]);
+    Storage::fake('local');
+    Storage::fake('public');
+    Cache::flush();
+    $owner = $this->miUser();
+    $this->signInMI($owner);
+    $payload = $this->ordinaryPayload();
+    $payload['items'][0]['receipt_files'] = [
+        'invoice' => UploadedFile::fake()->createWithContent('invoice.pdf', '%PDF-1.4 sample receipt'),
+        'photo' => UploadedFile::fake()->image('receipt.webp'),
+    ];
+    $payload['items'][0]['receipt_ocr_references'] = ['invoice' => 'INV-5521', 'photo' => 'OR-991'];
+    $payload['items'][] = array_merge($payload['items'][0], [
+        'payee' => 'Second vendor',
+        'receipt_files' => ['second' => UploadedFile::fake()->image('second.jpg')],
+        'receipt_ocr_references' => ['second' => 'REF-2026'],
+    ]);
+
+    $response = $this->post(route('liquidation.store'), $payload);
+    $report = MI_Liquidation::sole();
+    $response->assertRedirect(route('liquidation.show', $report));
+    $items = $report->items()->with('receipts')->orderBy('line_no')->get();
+    expect($items[0]->receipts)->toHaveCount(2)
+        ->and($items[1]->receipts)->toHaveCount(1)
+        ->and($items[0]->receipts->pluck('ocr_reference')->all())->toContain('INV-5521', 'OR-991');
+    foreach ($items->flatMap->receipts as $receipt) {
+        expect($receipt->storage_path)->toStartWith('private/liquidations/receipts/');
+        Storage::disk('local')->assertExists($receipt->storage_path);
+    }
+    $this->get(route('liquidation.show', $report))->assertOk()->assertSee('invoice.pdf')->assertSee('receipt.webp')->assertSee('Preview')->assertSee('Download');
+    $this->get(route('liquidation.receipt-attachments.preview', $items[0]->receipts[0]))->assertOk()->assertHeader('cache-control', 'no-store, private');
+    $this->get(route('liquidation.receipt-attachments.download', $items[0]->receipts[0]))->assertOk()->assertHeader('content-disposition');
+    $this->signInMI($this->miUser('user', 'MMC'));
+    $this->get(route('liquidation.receipt-attachments.preview', $items[0]->receipts[0]))->assertForbidden();
+});
+
+it('preserves existing receipt attachments on edit and removes only explicitly selected attachments', function () {
+    Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'base_code' => 'USD', 'time_last_update_unix' => 1792886551, 'rates' => ['VND' => 25432.125]], 200)]);
+    Storage::fake('local');
+    Cache::flush();
+    $owner = $this->miUser();
+    $this->signInMI($owner);
+    $payload = $this->ordinaryPayload();
+    $payload['items'][0]['receipt_files'] = [
+        'keep' => UploadedFile::fake()->image('keep.png'),
+        'remove' => UploadedFile::fake()->createWithContent('remove.pdf', '%PDF-1.4 old'),
+    ];
+    $this->post(route('liquidation.store'), $payload)->assertRedirect();
+    $report = MI_Liquidation::sole();
+    $item = $report->items()->with('receipts')->sole();
+    $removedReceipt = $item->receipts->firstWhere('original_filename', 'remove.pdf');
+    $keptReceipt = $item->receipts->firstWhere('original_filename', 'keep.png');
+    $this->get(route('liquidation.edit', $report))->assertOk()->assertSee('keep.png')->assertSee('Choose Files / Drag and Drop')->assertSee('remove_receipt_ids[]', false);
+    $update = $this->ordinaryPayload();
+    $update['items'][0]['id'] = $item->getKey();
+    $update['items'][0]['receipt_files'] = ['new' => UploadedFile::fake()->image('added.jpg')];
+    $update['remove_receipt_ids'] = [$removedReceipt->getKey()];
+    $this->put(route('liquidation.update', $report), $update)->assertRedirect(route('liquidation.show', $report));
+    expect($item->fresh()->receipts()->pluck('original_filename')->all())->toContain('keep.png', 'added.jpg')->not->toContain('remove.pdf');
+    Storage::disk('local')->assertExists($keptReceipt->storage_path);
+    Storage::disk('local')->assertMissing($removedReceipt->storage_path);
+});
 
 it('scopes accounting dashboard totals to the selected company', function () {
     $miOwner = $this->miUser();
@@ -846,7 +910,8 @@ it('retains original receipt files and cleans new uploads when an ordinary edit 
     $item = $report->items()->create(array_merge($this->ordinaryPayload()['items'][0], ['line_no' => 1, 'ref_no' => 'FIX-1', 'receipt_image' => $path]));
     $payload = $this->ordinaryPayload();
     $payload['items'][0]['id'] = $item->getKey();
-    $payload['items'][0]['receipt_image'] = UploadedFile::fake()->image('replacement.png');
+    $payload['items'][0]['receipt_files'] = ['replacement' => UploadedFile::fake()->image('replacement.png')];
+    $payload['items'][0]['amount_vnd'] = '126.50';
     $payload['items'][0]['ref_no'] = 'Attempt update';
     MI_LiquidationItem::updating(function (): void {
         throw new RuntimeException('Fixture persistence failure');

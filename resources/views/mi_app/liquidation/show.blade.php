@@ -813,6 +813,16 @@
         text-decoration: underline;
     }
 
+    .liq-receipt-list h4 { margin: 12px 0 6px; color: #334155; font-size: 13px; }
+    .liq-receipt-list h4 span { margin-left: 5px; padding: 2px 7px; border-radius: 999px; background: #e2e8f0; font-size: 11px; }
+    .liq-receipt-info { flex: 1; }
+    .liq-receipt-title { overflow-wrap: anywhere; font-size: 13px; }
+    .liq-receipt-sub { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+    .liq-receipt-actions { display: flex; gap: 12px; margin-top: 5px; font-size: 12px; }
+    .liq-receipt-actions a { color: #1d4ed8; text-decoration: none; }
+    .liq-receipt-file-icon { width: 52px; height: 52px; display: grid; place-items: center; border: 1px solid #dbe3ed; border-radius: 8px; background: #fff; color: #475569; font-weight: 700; }
+    @media (max-width: 640px) { .liq-receipt { align-items: flex-start; padding: 9px; } .liq-receipt-preview, .liq-receipt-file-icon { width: 44px; height: 44px; flex-basis: 44px; } }
+
     .liq-no-receipt {
         display: flex;
         align-items: center;
@@ -1934,66 +1944,28 @@
                                      RECEIPT
                                 =================================================== --}}
 
-@if($item->receipt_image)
-
-    @php
-        $receiptPath = ltrim($item->receipt_image, '/');
-        $receiptUrl = route('liquidation.receipt', $item);
-    @endphp
-
-    <div class="liq-receipt">
-
-        {{-- Receipt Preview --}}
-        <a
-            href="{{ $receiptUrl }}"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open receipt"
-        >
-            <img
-                src="{{ $receiptUrl }}"
-                alt="Receipt for {{ $item->ref_no }}"
-                class="liq-receipt-preview"
-            >
-        </a>
-
-
-        <div class="liq-receipt-info">
-
-            <div class="liq-receipt-title">
-                Receipt Attached
-            </div>
-
-            <div class="liq-receipt-sub">
-                {{ $item->ref_no }}
-            </div>
-
-            <a
-                href="{{ $receiptUrl }}"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="liq-receipt-link"
-            >
-                View Full Receipt →
+@php
+    $receiptCount = $item->receipts->count() + ($item->getAttribute('legacy_receipt') ? 1 : 0);
+@endphp
+<section class="liq-receipt-list" aria-label="Expense receipts">
+    <h4>Receipts <span>{{ $receiptCount }}</span></h4>
+    @foreach($item->receipts as $receipt)
+        @php $previewUrl = route('liquidation.receipt-attachments.preview', $receipt); @endphp
+        <article class="liq-receipt">
+            <a href="{{ $previewUrl }}" target="_blank" rel="noopener noreferrer">
+                @if(str_starts_with($receipt->mime_type, 'image/'))
+                    <img src="{{ $previewUrl }}" alt="Receipt {{ $receipt->original_filename }}" class="liq-receipt-preview">
+                @else <span class="liq-receipt-file-icon" aria-hidden="true">PDF</span> @endif
             </a>
-
-        </div>
-
-    </div>
-
-@else
-
-    <div class="liq-no-receipt">
-
-        <span>📎</span>
-
-        <span>
-            No receipt image attached for this expense.
-        </span>
-
-    </div>
-
-@endif
+            <div class="liq-receipt-info"><div class="liq-receipt-title">{{ $receipt->original_filename }}</div><div class="liq-receipt-sub">{{ number_format($receipt->file_size / 1024, 0) }} KB @if($receipt->ocr_reference) · OCR: {{ $receipt->ocr_reference }} @endif</div><div class="liq-receipt-actions"><a href="{{ $previewUrl }}" target="_blank" rel="noopener">Preview</a><a href="{{ route('liquidation.receipt-attachments.download', $receipt) }}">Download</a></div></div>
+        </article>
+    @endforeach
+    @if($item->getAttribute('legacy_receipt'))
+        @php $legacyUrl = route('liquidation.receipt', $item); $legacy = $item->getAttribute('legacy_receipt'); @endphp
+        <article class="liq-receipt"><a href="{{ $legacyUrl }}" target="_blank" rel="noopener noreferrer">@if(str_starts_with((string) $legacy['mime_type'], 'image/'))<img src="{{ $legacyUrl }}" alt="Legacy receipt {{ $legacy['filename'] }}" class="liq-receipt-preview">@else <span class="liq-receipt-file-icon" aria-hidden="true">PDF</span> @endif</a><div class="liq-receipt-info"><div class="liq-receipt-title">{{ $legacy['filename'] }}</div><div class="liq-receipt-sub">{{ number_format($legacy['file_size'] / 1024, 0) }} KB · Existing receipt</div><div class="liq-receipt-actions"><a href="{{ $legacyUrl }}" target="_blank" rel="noopener">Preview</a><a href="{{ route('liquidation.receipt.download', $item) }}">Download</a></div></div></article>
+    @endif
+    @if($receiptCount === 0)<div class="liq-no-receipt">No receipts attached to this expense.</div>@endif
+</section>
 
 
                             </div>

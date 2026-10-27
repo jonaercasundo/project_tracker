@@ -732,6 +732,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     });
     Route::middleware(['company.context:MI', 'role:user,Executive,executive,Accounting,accounting'])->group(function () {
         Route::get('/mi-liquidation-receipts/{item}', [LiquidationController::class, 'receipt'])->name('liquidation.receipt');
+        Route::get('/mi-liquidation-receipts/{item}/download', [LiquidationController::class, 'downloadReceipt'])->name('liquidation.receipt.download');
+        Route::get('/mi-liquidation-receipt-attachments/{receipt}/preview', [LiquidationController::class, 'receiptAttachment'])->name('liquidation.receipt-attachments.preview');
+        Route::get('/mi-liquidation-receipt-attachments/{receipt}/download', [LiquidationController::class, 'downloadReceiptAttachment'])->name('liquidation.receipt-attachments.download');
     });
     Route::middleware(['company.context:MI', 'role:Accounting,accounting'])->group(function () {
         Route::post('/budget-requests/{budgetRequest}/note', [BudgetRequestController::class, 'noteByAccounting'])->name('budget_requests.note');

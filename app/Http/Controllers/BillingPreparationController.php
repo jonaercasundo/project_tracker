@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\BillingBatchEligibilityException;
 use App\Exceptions\ExpiredBillingQrCodeException;
 use App\Exceptions\InvalidBillingQrCodeException;
+use App\Models\BillingBatch;
 use App\Models\User;
 use App\Services\BillingBatchService;
 use App\Services\DeliveryBillingEligibilityService;
@@ -13,6 +14,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -94,9 +96,16 @@ class BillingPreparationController extends Controller
             return response()->json(['message' => 'No delivery record matches this QR code.'], 404);
         }
 
+        $groups = $this->groupsForRows($rows);
+        if ($groups->sum('delivery_count') > $this->maxBatchSize()) {
+            return response()->json(['message' => 'This DR group contains more delivery records than one review can hold. Search by DR number, project, or school to narrow the results.'], 422);
+        }
+
         return response()->json([
-            'records' => $rows->map(fn (object $row): array => $this->eligibility->present($row))->values(),
-            'message' => $rows->count() > 1 ? 'Multiple delivery rows share this DR number. Select the correct school and project.' : 'Delivery record found.',
+            'records' => $groups,
+            'message' => $groups->count() > 1
+                ? 'This DR number is associated with multiple project groups. Review the conflict before confirming.'
+                : ($groups->first()['delivery_count'] > 1 ? 'Matching deliveries are grouped under this DR number.' : 'Delivery record found.'),
         ]);
     }
 
@@ -111,14 +120,13 @@ class BillingPreparationController extends Controller
         }
 
         $perPage = min(max($request->integer('per_page', 25), 10), 50);
-        $records = $this->eligibility->query($filters)
-            ->orderByDesc('d.delivery_date')
-            ->orderByDesc('d.delivery_id')
+        $records = $this->groupedQuery($this->eligibility->query($filters))
             ->paginate($perPage)
             ->withQueryString();
+        $groups = $this->groupsForRows($records->getCollection());
 
         return response()->json([
-            'records' => collect($records->items())->map(fn (object $row): array => $this->eligibility->present($row))->values(),
+            'records' => $groups,
             'pagination' => ['current_page' => $records->currentPage(), 'last_page' => $records->lastPage(), 'total' => $records->total()],
         ]);
     }
@@ -190,6 +198,47 @@ class BillingPreparationController extends Controller
         $filters = null;
         $selectionFilters = null;
         $deliveryIds = array_map('intval', $validated['delivery_ids'] ?? []);
+        $groupKeys = null;
+        $groupCount = 0;
+        $excludedRecords = collect();
+
+        // A retry must be replayed before current eligibility is recalculated: the
+        // original records are already For Billing by the time a client retries.
+        $priorBatch = BillingBatch::query()->where('idempotency_key', $validated['idempotency_key'])->first();
+        if ($priorBatch) {
+            $selectionFilters = $validated['mode'] === 'all'
+                ? $this->validatedFilters($request)
+                : ($validated['mode'] === 'range' ? $request->input('selection_filters') : null);
+            $retryIds = $validated['mode'] === 'all'
+                ? array_map('intval', $validated['expected_delivery_ids'] ?? [])
+                : $deliveryIds;
+            if ($validated['mode'] !== 'all' && $retryIds !== []) {
+                $retryRows = $this->eligibility->query()->whereIn('d.delivery_id', $retryIds)->get();
+                $groupKeys = $this->groupsForRows($retryRows)->pluck('group_key')->all();
+            }
+            $groupCount = $validated['mode'] === 'all'
+                ? $this->eligibility->presentGroups($this->eligibility->query()->whereIn('d.delivery_id', $retryIds)->get())->count()
+                : count($groupKeys ?? []);
+            try {
+                $result = $this->batches->confirm($retryIds, $validated['mode'], $validated['idempotency_key'], $actor, $selectionFilters, $groupKeys);
+            } catch (BillingBatchEligibilityException $exception) {
+                return response()->json(['message' => $exception->getMessage(), 'rejected' => $exception->rejectedRecords], $exception->httpStatus);
+            }
+
+            return response()->json([
+                'message' => 'This selection was already confirmed.',
+                'updated_records' => $this->updatedRecordDetails($retryIds),
+                'rejected_records' => [],
+                'batch' => [
+                    'id' => $result['batch']->getKey(),
+                    'batch_ref' => $result['batch']->batch_ref,
+                    'status' => $result['batch']->status,
+                    'delivery_count' => count($retryIds),
+                    'group_count' => $groupCount,
+                    'url' => route('billing.batches.show', $result['batch']),
+                ],
+            ]);
+        }
 
         if ($validated['mode'] === 'range') {
             $selectionFilters = $request->validate([
@@ -235,19 +284,10 @@ class BillingPreparationController extends Controller
             }
 
             $excludedIds = array_map('intval', $validated['excluded_delivery_ids'] ?? []);
-            $eligibleIds = $this->eligibility->query($filters)
-                ->whereIn('d.status', ['delivered', 'accepted'])
-                ->where(function (Builder $query): void {
-                    $query->whereNull('billing.status')->orWhere('billing.status', 'pending_billing');
-                })
-                ->orderBy('d.delivery_id')
-                ->pluck('d.delivery_id')
-                ->map(fn (mixed $id): int => (int) $id)
-                ->reject(fn (int $id): bool => in_array($id, $excludedIds, true))
-                ->values()
-                ->all();
+            $allGroups = $this->eligibility->presentGroups($this->eligibility->query($filters)->orderBy('d.delivery_id')->get());
             $expectedIds = array_values(array_unique(array_map('intval', $validated['expected_delivery_ids'])));
-            sort($eligibleIds);
+            $eligibleIds = $allGroups->flatMap(fn (array $group): array => $group['eligible_delivery_ids'])
+                ->reject(fn (int $id): bool => in_array($id, $excludedIds, true))->unique()->sort()->values()->all();
             sort($expectedIds);
 
             if ($eligibleIds !== $expectedIds) {
@@ -258,10 +298,26 @@ class BillingPreparationController extends Controller
             }
             $deliveryIds = $eligibleIds;
             $selectionFilters = $filters;
+            $groupCount = $allGroups->where('eligible', true)->count();
+        } else {
+            // A selected DR represents its complete project-scoped group. Re-read the group
+            // server-side so callers cannot submit only a subset of its deliveries.
+            $selectedRows = $this->eligibility->query()->whereIn('d.delivery_id', $deliveryIds)->get();
+            $groups = $this->groupsForRows($selectedRows);
+            if ($groups->contains(fn (array $group): bool => $group['conflict'])) {
+                return response()->json(['message' => 'A selected DR is ambiguous across projects and requires review.', 'rejected' => $groups->where('conflict')->flatMap(fn (array $group): array => $group['excluded_records'])->values()], 409);
+            }
+            $groupKeys = $groups->pluck('group_key')->all();
+            $groupCount = $groups->count();
+            $deliveryIds = $groups->flatMap(fn (array $group): array => $group['eligible_delivery_ids'])->unique()->values()->all();
+            $excludedRecords = $groups->flatMap(fn (array $group): array => $group['excluded_records'])->values();
+            if ($deliveryIds === []) {
+                return response()->json(['message' => 'No records in the selected DR groups are eligible for billing.', 'rejected' => $excludedRecords], 409);
+            }
         }
 
         try {
-            $result = $this->batches->confirm($deliveryIds, $validated['mode'], $validated['idempotency_key'], $actor, $selectionFilters);
+            $result = $this->batches->confirm($deliveryIds, $validated['mode'], $validated['idempotency_key'], $actor, $selectionFilters, $groupKeys ?? null);
         } catch (BillingBatchEligibilityException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),
@@ -271,11 +327,14 @@ class BillingPreparationController extends Controller
 
         return response()->json([
             'message' => $result['created'] ? 'Deliveries confirmed for Billing.' : 'This selection was already confirmed.',
+            'updated_records' => $this->updatedRecordDetails($deliveryIds),
+            'rejected_records' => $excludedRecords ?? collect(),
             'batch' => [
                 'id' => $result['batch']->getKey(),
                 'batch_ref' => $result['batch']->batch_ref,
                 'status' => $result['batch']->status,
                 'delivery_count' => count($deliveryIds),
+                'group_count' => $groupCount,
                 'url' => route('billing.batches.show', $result['batch']),
             ],
         ], $result['created'] ? 201 : 200);
@@ -382,18 +441,104 @@ class BillingPreparationController extends Controller
             ], 422);
         }
 
-        $records = $query->get()->map(fn (object $row): array => $this->eligibility->present($row))->values();
-        $eligibleCount = $records->where('eligible', true)->count();
+        $groups = $this->groupsForRows($query->get());
+        $deliveryCount = $groups->sum('delivery_count');
+        if ($deliveryCount > $this->maxBatchSize()) {
+            return response()->json([
+                'message' => 'The matching DR groups contain more delivery records than the configured batch limit of '.$this->maxBatchSize().'. Narrow the scope and preview again.',
+                'total' => $groups->count(),
+                'max_batch_size' => $this->maxBatchSize(),
+            ], 422);
+        }
+        $eligibleCount = $groups->where('eligible', true)->count();
 
         return response()->json([
             'mode' => $mode,
-            'records' => $records,
-            'summary' => ['total' => $records->count(), 'eligible' => $eligibleCount, 'excluded' => $records->count() - $eligibleCount],
+            'records' => $groups,
+            'summary' => [
+                'total' => $groups->count(),
+                'eligible' => $eligibleCount,
+                'excluded' => $groups->count() - $eligibleCount,
+                'delivery_records' => $deliveryCount,
+            ],
         ]);
+    }
+
+    private function groupedQuery(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('d.dr_no')
+            ->whereRaw("TRIM(d.dr_no) <> ''")
+            ->select(['d.dr_no', 'd.project_id', 'p.project_name'])
+            ->selectRaw('MAX(d.delivery_date) as latest_delivery_date')
+            ->selectRaw('COUNT(DISTINCT d.delivery_id) as delivery_count')
+            ->groupBy('d.dr_no', 'd.project_id', 'p.project_name')
+            ->orderByDesc('latest_delivery_date')
+            ->orderBy('d.dr_no')
+            ->orderBy('d.project_id');
+    }
+
+    /** @param Collection<int, object> $matchedRows
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function groupsForRows(Collection $matchedRows): Collection
+    {
+        if ($matchedRows->isEmpty()) {
+            return collect();
+        }
+
+        $keys = $matchedRows->map(function (object $row): array {
+            return [
+                'project_id' => (int) $row->project_id,
+                'dr_no' => (string) $row->dr_no,
+                'delivery_id' => isset($row->delivery_id) ? (int) $row->delivery_id : null,
+            ];
+        });
+        $query = $this->eligibility->query()->where(function (Builder $groupQuery) use ($keys): void {
+            foreach ($keys as $key) {
+                $groupQuery->orWhere(function (Builder $group) use ($key): void {
+                    $group->where('d.project_id', $key['project_id']);
+                    if ($key['dr_no'] === '' && $key['delivery_id'] !== null) {
+                        $group->where('d.delivery_id', $key['delivery_id']);
+                    } else {
+                        $group->where('d.dr_no', $key['dr_no']);
+                    }
+                });
+            }
+        });
+        $groups = $this->eligibility->presentGroups($query->orderBy('d.delivery_id')->get())->keyBy('group_key');
+        $orderedKeys = $keys->map(fn (array $key): string => DeliveryBillingEligibilityService::groupKey($key['project_id'], $key['dr_no'], $key['delivery_id']))
+            ->unique()
+            ->values();
+
+        return $orderedKeys->map(fn (string $key): ?array => $groups->get($key))->filter()->values();
     }
 
     private function maxBatchSize(): int
     {
         return (int) config('billing.max_batch_size', 500);
+    }
+
+    /** @param array<int, int> $deliveryIds
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function updatedRecordDetails(array $deliveryIds): Collection
+    {
+        if ($deliveryIds === []) {
+            return collect();
+        }
+
+        return DB::table('deliveries as d')
+            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
+            ->leftJoin('lot as l', 'l.lot_id', '=', 'd.lot_id')
+            ->leftJoin('school as s', 's.school_id', '=', 'd.school_id')
+            ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
+            ->whereIn('d.delivery_id', $deliveryIds)
+            ->orderBy('d.delivery_id')
+            ->get([
+                'd.delivery_id', 'd.dr_no', 'd.status as delivery_status',
+                'p.project_name', 'l.lot_name', 's.school_name', 'billing.status as billing_status',
+            ])
+            ->map(fn (object $record): array => (array) $record);
     }
 }

@@ -220,10 +220,10 @@
 
                 <section data-billing-panel="all" role="tabpanel" class="hidden space-y-3">
                     <div>
-                        <h2 class="font-bold text-slate-900">Select all eligible Delivered DRs</h2>
-                        <p class="mt-1 text-sm text-slate-500">This uses the Year, Project, Lot, Division, School, and date filters above. At least one scope filter is required; large previews must be narrowed to the configured batch limit.</p>
+                        <h2 class="font-bold text-slate-900">Select all eligible DR groups</h2>
+                        <p class="mt-1 text-sm text-slate-500">Billing confirmation may be recorded before delivery is completed. The delivery status and POD remain unchanged. This uses the Year, Project, Lot, Division, School, and date filters above.</p>
                     </div>
-                    <button id="billing-preparation-all-button" type="button" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">Preview all eligible delivered DRs</button>
+                    <button id="billing-preparation-all-button" type="button" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">Preview all eligible DR groups</button>
                 </section>
 
                 <div id="billing-preparation-feedback" class="hidden rounded-lg border px-4 py-3 text-sm" role="status" aria-live="polite"></div>
@@ -232,7 +232,7 @@
                         <div>
                             <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-700">Shared review</p>
                             <h2 class="mt-1 text-lg font-extrabold text-slate-900">Delivery receipts</h2>
-                            <p id="billing-preparation-summary" class="mt-1 text-sm text-slate-500">No deliveries loaded.</p>
+                            <p id="billing-preparation-summary" class="mt-1 text-sm text-slate-500">No DR groups loaded. Confirming for Billing does not mark deliveries as Delivered or create a POD.</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             <button id="billing-preparation-clear" type="button" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-rose-400 hover:text-rose-700">Clear review</button>
@@ -256,7 +256,7 @@
                                 </tr>
                             </thead>
                             <tbody id="billing-preparation-results" class="divide-y divide-slate-100">
-                                <tr><td colspan="10" class="px-5 py-10 text-center text-slate-500">Choose a method above to find deliveries.</td></tr>
+                                <tr><td colspan="10" class="px-5 py-10 text-center text-slate-500">Choose a method above to find delivery receipt groups.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -270,7 +270,8 @@
         <form method="dialog" class="space-y-4 p-5">
             <div>
                 <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700">Final confirmation</p>
-                <h2 class="mt-1 text-lg font-extrabold text-slate-900">Send deliveries to Billing?</h2>
+                <h2 class="mt-1 text-lg font-extrabold text-slate-900">Confirm DR groups for Billing?</h2>
+                <p class="mt-2 text-sm leading-5 text-slate-600">This records billing confirmation only. Pending delivery statuses and proof-of-delivery records are not changed.</p>
             </div>
             <dl class="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2 text-sm">
                 <dt class="font-semibold text-slate-500">Projects</dt><dd id="billing-confirm-projects" class="break-words text-slate-900"></dd>

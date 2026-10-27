@@ -12,11 +12,12 @@ export function classifyScanRecords(records, selectedIds) {
             return { record, status: 'rejected' };
         }
 
-        if (seenIds.has(record.delivery_id)) {
+        const key = record.group_key ?? record.delivery_id;
+        if (seenIds.has(key)) {
             return { record, status: 'duplicate' };
         }
 
-        seenIds.add(record.delivery_id);
+        seenIds.add(key);
 
         return { record, status: 'eligible' };
     });
@@ -33,6 +34,7 @@ export function buildConfirmationPayload({
     allCriteria,
     selectionFilters,
     excludedIds,
+    expectedIds = selectedIds,
     idempotencyKey,
 }) {
     const isAllSelection = selectionMode === 'all' && allCriteria !== null && selectionMethods.size === 1;
@@ -42,7 +44,7 @@ export function buildConfirmationPayload({
 
     if (isAllSelection) {
         Object.assign(body, allCriteria);
-        body.expected_delivery_ids = [...selectedIds];
+        body.expected_delivery_ids = [...expectedIds];
         body.excluded_delivery_ids = [...excludedIds];
     } else {
         body.delivery_ids = [...selectedIds];

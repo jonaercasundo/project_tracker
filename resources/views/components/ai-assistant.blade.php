@@ -63,10 +63,10 @@
             @dragover.prevent="if (attachmentAllowed && $event.dataTransfer?.types?.includes('Files')) draggingWorkbook = true"
             @dragleave="if ($event.target === $el) draggingWorkbook = false"
             @drop.prevent="if (attachmentAllowed) { draggingWorkbook = false; uploadDropped($event); }"
-            class="fixed z-[110] bottom-5 right-5 sm:bottom-6 sm:right-6"
+            class="fixed z-[1000] bottom-5 right-5 sm:bottom-6 sm:right-6"
             data-ai-assistant
         >
-            <div x-show="draggingWorkbook" x-transition.opacity class="pointer-events-none fixed inset-0 z-[180] grid place-items-center bg-blue-950/30 p-6 text-center text-lg font-semibold text-white" role="status">Drop a supported file to attach it to this conversation.</div>
+            <div x-show="draggingWorkbook" x-transition.opacity class="pointer-events-none fixed inset-0 z-[1001] grid place-items-center bg-blue-950/30 p-6 text-center text-lg font-semibold text-white" role="status">Drop a supported file to attach it to this conversation.</div>
             @unless ($workspace)
                 <button type="button" @click="toggle()" class="flex items-center gap-3 rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl transition hover:bg-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-300" aria-label="Open AI Assistant">
                     <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500"><x-ai-icon name="sparkles" size="16" /></span>
@@ -75,7 +75,7 @@
             @endunless
 
             @if ($workspace)
-                <section x-cloak x-show="open" x-transition.opacity class="fixed inset-0 z-[111] flex flex-col overflow-hidden bg-[#f5f7fb] text-slate-800" aria-label="AI Assistant workspace">
+                <section x-cloak x-show="open" x-transition.opacity class="fixed inset-0 z-[1001] flex flex-col overflow-hidden bg-[#f5f7fb] text-slate-800" aria-label="AI Assistant workspace">
                     <header class="relative z-20 flex min-h-[76px] items-center justify-between gap-3 border-b border-slate-200/80 bg-white px-4 py-3 shadow-[0_2px_12px_rgba(18,34,61,0.04)] sm:px-6">
                         <div class="flex min-w-0 items-center gap-3">
                             <button type="button" @click="mobileSidebarOpen = true" class="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 xl:hidden" aria-label="Open conversations"><x-ai-icon name="menu" /></button>
@@ -259,7 +259,7 @@
                     </div>
                 </section>
             @else
-            <section x-cloak x-show="open" x-transition.opacity class="fixed inset-0 z-[111] bg-slate-950/30 sm:bg-transparent" @click.self="if (!workspace) close()" :class="workspace ? 'sm:inset-0' : ''">
+            <section x-cloak x-show="open" x-transition.opacity class="fixed inset-0 z-[1001] bg-slate-950/30 sm:bg-transparent" @click.self="if (!workspace) close()" :class="workspace ? 'sm:inset-0' : ''">
                 <div class="fixed inset-x-0 bottom-0 flex h-[min(92vh,820px)] flex-col overflow-hidden rounded-t-[26px] border border-slate-200/70 bg-white shadow-[0_18px_60px_rgba(18,34,61,0.15)] sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(780px,calc(100vh-3rem))] sm:w-[min(760px,calc(100vw-3rem))] sm:rounded-[26px]" :class="workspace ? 'sm:!inset-6 sm:!h-auto sm:!w-auto sm:rounded-2xl' : ''" role="dialog" aria-modal="true" aria-label="Project Tracker Assistant">
                     <header class="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
                         <div class="flex min-w-0 items-center gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#203d83] text-white"><x-ai-icon name="sparkles" size="19" /></span><div class="min-w-0"><div class="flex items-center gap-2"><h2 class="truncate text-base font-bold tracking-tight text-slate-900">AI Assistant</h2><span class="rounded-full bg-blue-50/80 px-2.5 py-1 text-[10px] font-semibold text-blue-800" x-text="context?.label || company || 'Workspace'"></span></div><p class="mt-1 truncate text-xs text-slate-500" x-text="context?.page?.title || 'Context-aware workspace help'"></p></div></div>

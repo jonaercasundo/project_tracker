@@ -128,12 +128,14 @@ if (root) {
 
     function appendSelected(record, source) {
         if (!record.eligible) return false;
-        if (!selected.has(record.delivery_id) && selected.size >= maxBatchSize) {
-            showFeedback(`A batch can contain at most ${maxBatchSize} deliveries. Remove a delivery or confirm the current review first.`, 'warning');
+        const groupKey = record.group_key;
+        const selectedDeliveryCount = [...selected.values()].reduce((total, group) => total + group.eligible_delivery_ids.length, 0);
+        if (!selected.has(groupKey) && selectedDeliveryCount + record.eligible_delivery_ids.length > maxBatchSize) {
+            showFeedback(`A batch can contain at most ${maxBatchSize} delivery records. Remove a DR group or confirm the current review first.`, 'warning');
             return false;
         }
-        const isNewSelection = !selected.has(record.delivery_id);
-        selected.set(record.delivery_id, record);
+        const isNewSelection = !selected.has(groupKey);
+        selected.set(groupKey, record);
         selectionMethods.add(source);
 
         return isNewSelection;
@@ -150,7 +152,7 @@ if (root) {
         } else {
             allCriteria = filters;
             allExcluded = new Set();
-            allExpected = records.filter((record) => record.eligible).map((record) => record.delivery_id);
+            allExpected = records.filter((record) => record.eligible).flatMap((record) => record.eligible_delivery_ids);
         }
         selectionFilters = ['range', 'all'].includes(source) ? filters : null;
         if (selectEligible) {
@@ -181,53 +183,79 @@ if (root) {
         row.className = 'hover:bg-slate-50/70';
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.checked = selected.has(record.delivery_id);
+        checkbox.checked = selected.has(record.group_key);
         checkbox.disabled = !record.eligible;
         checkbox.className = 'mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600 disabled:opacity-40';
-        checkbox.setAttribute('aria-label', `Select DR ${record.dr_no}, ${record.project_name}, ${record.school_name}`);
+        checkbox.setAttribute('aria-label', `Select DR ${record.dr_no}, ${record.project_name}, ${record.delivery_count} delivery records`);
         checkbox.addEventListener('change', () => {
             if (checkbox.checked) {
-                if (selectionMode === 'all') allExcluded.delete(record.delivery_id);
+                if (selectionMode === 'all') record.eligible_delivery_ids.forEach((id) => allExcluded.delete(id));
                 appendSelected(record, selectionMode === 'all' ? 'all' : selectionMode);
             } else {
-                selected.delete(record.delivery_id);
-                if (selectionMode === 'all') allExcluded.add(record.delivery_id);
+                selected.delete(record.group_key);
+                if (selectionMode === 'all') record.eligible_delivery_ids.forEach((id) => allExcluded.add(id));
             }
             render();
         });
         addCell(row, checkbox);
-        addCell(row, record.dr_no, 'whitespace-nowrap font-mono font-bold text-slate-900');
+        const drCell = document.createElement('div');
+        drCell.className = 'font-mono font-bold text-slate-900';
+        drCell.textContent = record.dr_no || 'No DR number';
+        const countLabel = label(`${record.delivery_count} delivery record${record.delivery_count === 1 ? '' : 's'} · ${record.package_count} linked package${record.package_count === 1 ? '' : 's'}`, 'mt-1 block whitespace-nowrap font-sans text-xs font-medium text-slate-500');
+        drCell.append(countLabel);
+        addCell(row, drCell);
         const project = document.createElement('span');
         project.className = 'block min-w-48 max-w-sm whitespace-normal break-words font-medium text-slate-800';
         project.textContent = record.project_name;
         addCell(row, project);
         const place = document.createElement('div');
-        place.append(label(record.lot_name, 'block font-semibold text-slate-800'));
-        place.append(label(record.school_name, 'mt-1 block max-w-64 whitespace-normal break-words text-slate-700'));
-        place.append(label(`${record.division} · ${record.school_id}`, 'mt-1 block text-xs text-slate-500'));
+        place.append(label(record.lots.join(', ') || 'No lot recorded', 'block font-semibold text-slate-800'));
+        place.append(label(record.schools.join(', ') || 'No school recorded', 'mt-1 block max-w-64 whitespace-normal break-words text-slate-700'));
         addCell(row, place);
-        addCell(row, record.delivery_date, 'whitespace-nowrap text-slate-600');
+        addCell(row, record.records.map((item) => item.delivery_date).filter(Boolean).join(', '), 'whitespace-normal text-slate-600');
         addCell(row, label(record.delivery_status, 'rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700'));
-        addCell(row, label(record.pod_available ? 'Available' : 'Not recorded', record.pod_available ? 'text-emerald-700' : 'text-slate-500'));
+        addCell(row, label(record.pod_state, record.pod_state === 'Available' ? 'text-emerald-700' : 'text-slate-500'));
         addCell(row, record.billing_status.replaceAll('_', ' '), 'capitalize text-slate-700');
         addCell(row, label(record.remarks, record.eligible ? 'font-semibold text-emerald-700' : 'font-semibold text-amber-800'));
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'rounded px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50';
-        remove.textContent = selected.has(record.delivery_id) ? 'Remove' : 'Dismiss';
+        remove.textContent = selected.has(record.group_key) ? 'Remove' : 'Dismiss';
         remove.setAttribute('aria-label', `Remove DR ${record.dr_no} from review`);
         remove.addEventListener('click', () => {
-            selected.delete(record.delivery_id);
-            if (selectionMode === 'all') allExcluded.add(record.delivery_id);
-            visibleRecords = visibleRecords.filter((item) => item.delivery_id !== record.delivery_id);
+            selected.delete(record.group_key);
+            if (selectionMode === 'all') record.eligible_delivery_ids.forEach((id) => allExcluded.add(id));
+            visibleRecords = visibleRecords.filter((item) => item.group_key !== record.group_key);
             render();
         });
         addCell(row, remove, 'whitespace-nowrap');
+        const detailRow = document.createElement('tr');
+        const detailCell = document.createElement('td');
+        detailCell.colSpan = 10;
+        detailCell.className = 'bg-slate-50 px-5 py-3';
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.className = 'cursor-pointer text-xs font-semibold text-blue-800';
+        summary.textContent = `Inspect ${record.delivery_count} linked delivery records and their statuses`;
+        const list = document.createElement('div');
+        list.className = 'mt-3 grid gap-2 md:grid-cols-2';
+        record.records.forEach((item) => {
+            const card = document.createElement('div');
+            card.className = 'rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5';
+            card.textContent = `Delivery #${item.delivery_id} · ${item.lot_name} · ${item.school_name} · ${item.delivery_status} · POD ${item.pod_available ? 'available' : 'not recorded'} · Billing ${item.billing_status.replaceAll('_', ' ')}${item.eligible ? '' : ` · Excluded: ${item.remarks}`}`;
+            list.append(card);
+        });
+        details.append(summary, list);
+        detailCell.append(details);
+        detailRow.append(detailCell);
+        row.dataset.groupKey = record.group_key;
+        detailRow.dataset.groupKey = record.group_key;
+        row._detailRow = detailRow;
         return row;
     }
 
     function displayedRecords() {
-        const rows = new Map(visibleRecords.map((record) => [record.delivery_id, record]));
+        const rows = new Map(visibleRecords.map((record) => [record.group_key, record]));
         selected.forEach((record, id) => rows.set(id, record));
         return [...rows.values()];
     }
@@ -261,13 +289,17 @@ if (root) {
             cell.colSpan = 10;
             results.append(empty);
         } else {
-            rows.forEach((record) => results.append(renderRecord(record)));
+            rows.forEach((record) => {
+                const row = renderRecord(record);
+                results.append(row, row._detailRow);
+            });
         }
 
         const eligibleVisible = visibleRecords.filter((record) => record.eligible).length;
         const excludedVisible = visibleRecords.length - eligibleVisible;
         const selectedProjects = new Set([...selected.values()].map((record) => record.project_name));
-        summary.textContent = `${selected.size} selected · ${selected.size} eligible · ${excludedVisible} excluded in this review${currentPage ? ` · ${currentPage.total} matching results` : ''}${selectedProjects.size ? ` · ${selectedProjects.size} project(s)` : ''}`;
+        const selectedDeliveries = [...selected.values()].reduce((total, group) => total + group.eligible_delivery_ids.length, 0);
+        summary.textContent = `${selected.size} DR group(s) selected · ${selectedDeliveries} eligible delivery record(s) · ${excludedVisible} excluded group(s) in this review${currentPage ? ` · ${currentPage.total} matching DR groups` : ''}${selectedProjects.size ? ` · ${selectedProjects.size} project(s)` : ''}`;
         confirmButton.textContent = selected.size ? `Confirm for Billing (${selected.size})` : 'Confirm for Billing';
         confirmButton.disabled = selected.size === 0 || !canConfirm;
         renderPagination();
@@ -473,21 +505,23 @@ if (root) {
     confirmButton.addEventListener('click', () => {
         const projectNames = [...new Set([...selected.values()].map((record) => record.project_name))];
         document.getElementById('billing-confirm-projects').textContent = projectNames.join(', ');
-        document.getElementById('billing-confirm-count').textContent = String(selected.size);
-        document.getElementById('billing-confirm-eligible').textContent = String(selected.size);
-        const excludedCount = visibleRecords.filter((record) => !record.eligible).length;
-        document.getElementById('billing-confirm-excluded').textContent = String(excludedCount);
+        document.getElementById('billing-confirm-count').textContent = `${selected.size} DR group(s)`;
+        document.getElementById('billing-confirm-eligible').textContent = `${selected.size} groups · ${[...selected.values()].reduce((sum, group) => sum + group.eligible_delivery_ids.length, 0)} records`;
+        const excludedGroups = visibleRecords.filter((record) => !record.eligible || record.excluded_count > 0).length;
+        const excludedRecords = visibleRecords.reduce((sum, group) => sum + group.excluded_count, 0);
+        document.getElementById('billing-confirm-excluded').textContent = `${excludedGroups} group(s) · ${excludedRecords} record(s)`;
         confirmDialog.showModal();
     });
 
     confirmSubmit?.addEventListener('click', async () => {
         const body = buildConfirmationPayload({
             selectionMode,
-            selectedIds: selected.keys(),
+            selectedIds: [...selected.values()].flatMap((group) => group.eligible_delivery_ids),
             selectionMethods,
             allCriteria,
             selectionFilters,
             excludedIds: allExcluded,
+            expectedIds: allExpected.filter((id) => !allExcluded.has(id)),
             idempotencyKey: createIdempotencyKey(),
         });
 
@@ -501,7 +535,9 @@ if (root) {
             });
             const payload = await readResponse(response);
             confirmDialog.close();
-            showFeedback(`${payload.message} Batch ${payload.batch.batch_ref} contains ${payload.batch.delivery_count} DR(s).`, 'success');
+            const updated = Array.isArray(payload.updated_records) ? payload.updated_records.map((record) => `DR ${record.dr_no} · #${record.delivery_id}${record.lot_name ? ` · ${record.lot_name}` : ''}`).join('; ') : '';
+            const rejected = Array.isArray(payload.rejected_records) ? payload.rejected_records.map((record) => `DR ${record.dr_no} / #${record.delivery_id}: ${record.reason}`).join('; ') : '';
+            showFeedback(`${payload.message} Batch ${payload.batch.batch_ref} updated ${payload.batch.delivery_count} delivery record(s) across ${payload.batch.group_count ?? selected.size} DR group(s).${updated ? ` Updated records: ${updated}.` : ''}${rejected ? ` Not updated: ${rejected}` : ''}`, rejected ? 'warning' : 'success');
             const link = document.createElement('a');
             link.href = payload.batch.url;
             link.textContent = 'Open batch details';

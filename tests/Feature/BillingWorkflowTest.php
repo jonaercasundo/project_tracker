@@ -163,6 +163,38 @@ it('queues auditable syncs for Lots 2, 9, and 11 with their configured target co
     Queue::assertPushed(SyncBillingSheetDate::class, 3);
 });
 
+it('confirms a complete same-DR group and queues sheet sync per delivery package lot', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    config(['queue.default' => 'database', 'queue.connections.database.driver' => 'database']);
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $firstId = createBillingDelivery('BIR-SHARED-DR', 'delivered');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('project_id');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $firstId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($firstId, 'CORE-LOT2');
+    $secondLotId = (int) DB::table('lot')->insertGetId(['project_id' => $projectId, 'lot_name' => 'Lot 9', 'contract_no' => 'CONTRACT-'.$projectId.'-9']);
+    $secondId = createDeliveryForBillingProject($projectId, 'BIR-SHARED-DR', 'pending');
+    DB::table('deliveries')->where('delivery_id', $secondId)->update(['lot_id' => $secondLotId]);
+    addPackageToBillingDelivery($secondId, 'CORE-LOT9');
+
+    $preview = $this->getJson(route('billing.prepare.search', ['q' => 'BIR-SHARED-DR']))
+        ->assertOk()->assertJsonCount(1, 'records')->assertJsonPath('records.0.delivery_count', 2);
+    $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$firstId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated()->assertJsonPath('batch.delivery_count', 2)->assertJsonPath('batch.group_count', 1);
+
+    expect(BillingSheetSync::query()->orderBy('lot_number')->pluck('lot_number')->all())->toBe(['2', '9']);
+    expect(BillingSheetSync::query()->where('delivery_id', $secondId)->value('package_code'))->toBe('CORE-LOT9');
+    expect(BillingSheetSync::query()->where('outcome', 'queued')->count())->toBe(2);
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $secondId, 'status' => 'pending']);
+});
+
 it('reports the exact missing service account configuration before attempting synchronization', function (): void {
     config([
         'google_sheets.billing.enabled' => true,
@@ -373,7 +405,7 @@ it('shows pending status until a user explicitly confirms For Billing', function
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $deliveryId, 'status' => 'accepted']);
 });
 
-it('resolves the signed DR number QR to every delivery row with that DR number', function () {
+it('flags a signed DR number associated with separate projects for review', function () {
     signInBillingUser();
     $firstDeliveryId = createBillingDelivery('DR-SHARED');
     $secondDeliveryId = createBillingDelivery('DR-SHARED');
@@ -383,7 +415,6 @@ it('resolves the signed DR number QR to every delivery row with that DR number',
         ->assertOk()
         ->assertJsonCount(2, 'records')
         ->assertJsonPath('records.0.dr_no', 'DR-SHARED')
-        ->assertJsonPath('records.1.dr_no', 'DR-SHARED')
         ->assertJsonPath('records.0.delivery_id', $firstDeliveryId)
         ->assertJsonPath('records.1.delivery_id', $secondDeliveryId);
 });
@@ -942,13 +973,13 @@ it('resolves signed QR values through the Operations preparation lookup', functi
 
     $this->getJson(route('billing.prepare.scan', ['q' => $payload]))
         ->assertOk()
-        ->assertJsonPath('records.0.delivery_id', $deliveryId)
+        ->assertJsonPath('records.0.records.0.delivery_id', $deliveryId)
         ->assertJsonPath('records.0.eligible', true);
     $this->getJson(route('billing.prepare.scan', ['q' => 'unsigned-delivery-id']))
         ->assertUnprocessable();
 });
 
-it('returns all candidates for a shared label QR without choosing or queueing a delivery', function (): void {
+it('flags separate project groups for a shared label QR without queueing a delivery', function (): void {
     signInBillingUser();
     $firstDeliveryId = createBillingDelivery('DR-SHARED-LABEL');
     $secondDeliveryId = createBillingDelivery('DR-SHARED-LABEL');
@@ -957,10 +988,10 @@ it('returns all candidates for a shared label QR without choosing or queueing a 
     $this->getJson(route('billing.prepare.scan', ['q' => $payload]))
         ->assertOk()
         ->assertJsonCount(2, 'records')
-        ->assertJsonPath('records.0.delivery_id', $firstDeliveryId)
-        ->assertJsonPath('records.1.delivery_id', $secondDeliveryId)
-        ->assertJsonPath('records.0.dr_no', 'DR-SHARED-LABEL')
-        ->assertJsonPath('records.1.dr_no', 'DR-SHARED-LABEL');
+        ->assertJsonPath('records.0.records.0.delivery_id', $firstDeliveryId)
+        ->assertJsonPath('records.0.conflict', true)
+        ->assertJsonPath('records.1.conflict', true)
+        ->assertJsonPath('records.0.dr_no', 'DR-SHARED-LABEL');
 
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $firstDeliveryId, 'status' => 'accepted']);
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $secondDeliveryId, 'status' => 'accepted']);
@@ -1003,7 +1034,7 @@ it('allows read-only preparation access without allowing billing confirmation', 
     $this->assertDatabaseCount('billing_batches', 0);
 });
 
-it('searches duplicate DR numbers by exact delivery records and shows eligibility and POD state', function (): void {
+it('groups duplicate DR search results and shows all linked delivery and POD states', function (): void {
     signInBillingUser();
     $firstId = createBillingDelivery('1001');
     $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('project_id');
@@ -1017,12 +1048,31 @@ it('searches duplicate DR numbers by exact delivery records and shows eligibilit
 
     $response = $this->getJson(route('billing.prepare.search', ['q' => '1001']))
         ->assertOk()
-        ->assertJsonCount(2, 'records')
+        ->assertJsonCount(1, 'records')
+        ->assertJsonPath('records.0.delivery_count', 2)
         ->assertJsonPath('records.0.eligible', true);
 
-    expect(collect($response->json('records'))->contains(fn (array $record): bool => $record['pod_available']))->toBeTrue();
+    expect(collect($response->json('records.0.records'))->contains(fn (array $record): bool => $record['pod_available']))->toBeTrue();
 
     expect($firstId)->not->toBe($secondId);
+});
+
+it('flags the same DR across different projects and refuses to combine those groups', function (): void {
+    signInBillingUser();
+    $firstId = createBillingDelivery('DR-COLLISION');
+    createBillingDelivery('DR-COLLISION');
+
+    $this->getJson(route('billing.prepare.search', ['q' => 'DR-COLLISION']))
+        ->assertOk()->assertJsonCount(2, 'records')
+        ->assertJsonPath('records.0.conflict', true)
+        ->assertJsonPath('records.1.conflict', true);
+
+    $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$firstId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertStatus(409)->assertJsonPath('message', 'A selected DR is ambiguous across projects and requires review.');
+    $this->assertDatabaseCount('billing_batches', 0);
 });
 
 it('previews a numeric DR range without casting nonnumeric receipt identifiers', function (): void {
@@ -1075,8 +1125,8 @@ it('previews only scoped deliveries and explains excluded statuses for Select Al
     $this->getJson(route('billing.prepare.all', ['year' => 2026, 'project_id' => $projectId]))
         ->assertOk()
         ->assertJsonPath('summary.total', 3)
-        ->assertJsonPath('summary.eligible', 1)
-        ->assertJsonPath('summary.excluded', 2);
+        ->assertJsonPath('summary.eligible', 2)
+        ->assertJsonPath('summary.excluded', 1);
 
     $this->getJson(route('billing.prepare.all'))->assertUnprocessable();
     $this->assertDatabaseCount('delivery_billing_records', 1);
@@ -1131,23 +1181,22 @@ it('confirms a batch into the existing Billing queue idempotently without creati
     $this->assertDatabaseCount('invoices', 1);
 });
 
-it('rejects a mixed eligible and ineligible confirmation atomically', function (): void {
+it('allows pre-delivery billing confirmation and leaves delivery and POD state unchanged', function (): void {
     signInBillingUser();
-    $eligibleId = createBillingDelivery('1001');
+    $eligibleId = createBillingDelivery('1001', 'delivered');
     $projectId = (int) DB::table('deliveries')->where('delivery_id', $eligibleId)->value('project_id');
-    $pendingId = createDeliveryForBillingProject($projectId, '1002', 'pending');
+    $pendingId = createDeliveryForBillingProject($projectId, '1001', 'pending');
 
     $this->postJson(route('billing.prepare.confirm'), [
         'mode' => 'mixed',
         'delivery_ids' => [$eligibleId, $pendingId],
         'idempotency_key' => (string) Str::uuid(),
-    ])->assertStatus(409)
-        ->assertJsonPath('rejected.0.delivery_id', $pendingId)
-        ->assertJsonPath('rejected.0.reason', 'Not Yet Delivered');
+    ])->assertCreated()->assertJsonPath('batch.delivery_count', 2)->assertJsonPath('batch.group_count', 1);
 
-    $this->assertDatabaseCount('billing_batches', 0);
-    $this->assertDatabaseCount('delivery_billing_records', 0);
-    $this->assertDatabaseCount('delivery_billing_histories', 0);
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $pendingId, 'status' => 'pending']);
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $eligibleId, 'status' => 'delivered']);
+    $this->assertDatabaseCount('delivery_proofs', 0);
+    $this->assertDatabaseCount('delivery_billing_records', 2);
 });
 
 it('confirms Select All from server-side criteria and rejects stale previews', function (): void {
@@ -1157,7 +1206,7 @@ it('confirms Select All from server-side criteria and rejects stale previews', f
     $secondId = createDeliveryForBillingProject($projectId, '1002');
     $criteria = ['year' => 2026, 'project_id' => $projectId];
     $preview = $this->getJson(route('billing.prepare.all', $criteria))->assertOk();
-    $expected = collect($preview->json('records'))->where('eligible', true)->pluck('delivery_id')->all();
+    $expected = collect($preview->json('records'))->where('eligible', true)->flatMap(fn (array $group): array => $group['eligible_delivery_ids'])->all();
 
     $this->postJson(route('billing.prepare.confirm'), $criteria + [
         'mode' => 'all',
@@ -1171,7 +1220,7 @@ it('confirms Select All from server-side criteria and rejects stale previews', f
         'mode' => 'all',
         'year' => 2026,
         'project_id' => $projectId,
-        'expected_delivery_ids' => collect($stalePreview->json('records'))->pluck('delivery_id')->all(),
+        'expected_delivery_ids' => [$secondId],
         'idempotency_key' => $staleKey,
     ])->assertStatus(409);
 });

@@ -20,6 +20,7 @@ class BillingBatchService
     /**
      * @param  array<int, int>  $deliveryIds
      * @param  array<string, mixed>|null  $selectionFilters
+     * @param  array<int, string>|null  $selectionGroups
      * @return array{batch: BillingBatch, created: bool}
      */
     public function confirm(
@@ -27,15 +28,21 @@ class BillingBatchService
         string $selectionMethod,
         string $idempotencyKey,
         User $actor,
-        ?array $selectionFilters = null
+        ?array $selectionFilters = null,
+        ?array $selectionGroups = null
     ): array {
         $deliveryIds = array_values(array_unique(array_map('intval', $deliveryIds)));
         sort($deliveryIds);
-        $selectionHash = hash('sha256', json_encode([
+        $selectionData = [
             'method' => $selectionMethod,
             'delivery_ids' => $deliveryIds,
             'filters' => $selectionFilters,
-        ], JSON_THROW_ON_ERROR));
+        ];
+        if ($selectionGroups !== null) {
+            sort($selectionGroups);
+            $selectionData['groups'] = array_values(array_unique($selectionGroups));
+        }
+        $selectionHash = hash('sha256', json_encode($selectionData, JSON_THROW_ON_ERROR));
 
         return DB::transaction(function () use ($deliveryIds, $selectionMethod, $idempotencyKey, $actor, $selectionFilters, $selectionHash): array {
             $existing = BillingBatch::query()->where('idempotency_key', $idempotencyKey)->lockForUpdate()->first();
@@ -70,10 +77,7 @@ class BillingBatchService
                     continue;
                 }
 
-                $assessment = $this->eligibility->assess(
-                    (string) $delivery->status,
-                    $billingRecords->get($deliveryId)?->status
-                );
+                $assessment = $this->eligibility->assess((string) $delivery->status, $billingRecords->get($deliveryId)?->status);
                 if (! $assessment['eligible']) {
                     $rejected[] = ['delivery_id' => $deliveryId, 'dr_no' => (string) $delivery->dr_no, 'reason' => $assessment['reason']];
                 }

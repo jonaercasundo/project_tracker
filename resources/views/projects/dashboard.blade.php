@@ -174,7 +174,7 @@
 
             {{-- MAP --}}
             <div class="lg:col-span-2">
-                <div id="deliveryMap" style="height:500px;"></div>
+                <div id="deliveryMap" class="relative z-0 isolate" style="height:500px;"></div>
             </div>
 
             {{-- LIST --}}

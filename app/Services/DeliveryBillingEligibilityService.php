@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class DeliveryBillingEligibilityService
@@ -68,16 +69,123 @@ class DeliveryBillingEligibilityService
             return ['eligible' => false, 'reason' => 'Cancelled'];
         }
 
-        if (! in_array($deliveryStatus, ['delivered', 'accepted'], true)) {
-            return ['eligible' => false, 'reason' => 'Not Yet Delivered'];
-        }
-
         return match ($billingStatus) {
             'for_billing' => ['eligible' => false, 'reason' => 'Already For Billing'],
             'billed' => ['eligible' => false, 'reason' => 'Already Billed'],
             'on_hold' => ['eligible' => false, 'reason' => 'On Hold'],
             default => ['eligible' => true, 'reason' => 'Eligible'],
         };
+    }
+
+    /** @param Collection<int, object> $rows
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function presentGroups(Collection $rows): Collection
+    {
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $deliveryIds = $rows->pluck('delivery_id')->map(fn (mixed $id): int => (int) $id)->all();
+        $drNumbers = $rows->pluck('dr_no')->filter(fn (mixed $dr): bool => is_string($dr) && $dr !== '')->unique()->values()->all();
+        $packageCounts = DB::table('package_status')
+            ->whereIn('delivery_id', $deliveryIds)
+            ->select('delivery_id')
+            ->selectRaw('COUNT(DISTINCT package_id) as package_count')
+            ->groupBy('delivery_id')
+            ->pluck('package_count', 'delivery_id');
+        $projectCounts = DB::table('deliveries')
+            ->whereIn('dr_no', $drNumbers)
+            ->select('dr_no')
+            ->selectRaw('COUNT(DISTINCT project_id) as project_count')
+            ->groupBy('dr_no')
+            ->pluck('project_count', 'dr_no');
+
+        return $rows->groupBy(fn (object $row): string => self::groupKey((int) $row->project_id, (string) $row->dr_no, (int) $row->delivery_id))
+            ->map(function (Collection $groupRows, string $groupKey) use ($packageCounts, $projectCounts): array {
+                $records = $groupRows->map(function (object $row) use ($packageCounts): array {
+                    $record = $this->present($row);
+                    $record['package_count'] = (int) ($packageCounts[$row->delivery_id] ?? 0);
+
+                    return $record;
+                })->values();
+                $first = $records->first();
+                $missingDr = trim($first['dr_no']) === '';
+                $projectConflict = ! $missingDr && (int) ($projectCounts[$first['dr_no']] ?? 0) > 1;
+                $requiresReview = $missingDr || $projectConflict;
+                $excludedRecords = $records->where('eligible', false)->map(fn (array $record): array => [
+                    'delivery_id' => $record['delivery_id'],
+                    'dr_no' => $record['dr_no'],
+                    'project_name' => $record['project_name'],
+                    'lot_name' => $record['lot_name'],
+                    'school_name' => $record['school_name'],
+                    'delivery_status' => $record['delivery_status'],
+                    'billing_status' => $record['billing_status'],
+                    'reason' => $record['remarks'],
+                ])->values();
+                if ($requiresReview) {
+                    $excludedRecords = $records->map(fn (array $record): array => [
+                        'delivery_id' => $record['delivery_id'],
+                        'dr_no' => $record['dr_no'],
+                        'project_name' => $record['project_name'],
+                        'lot_name' => $record['lot_name'],
+                        'school_name' => $record['school_name'],
+                        'delivery_status' => $record['delivery_status'],
+                        'billing_status' => $record['billing_status'],
+                        'reason' => $missingDr ? 'DR number is missing; review required.' : 'DR number is associated with multiple projects; review required.',
+                    ])->values();
+                    $records = $records->map(function (array $record) use ($missingDr): array {
+                        $record['eligible'] = false;
+                        $record['remarks'] = $missingDr ? 'DR number is missing; review required.' : 'DR number is associated with multiple projects; review required.';
+
+                        return $record;
+                    });
+                }
+
+                $eligibleRecords = $requiresReview ? collect() : $records->where('eligible')->values();
+                $deliveryStatuses = $records->pluck('delivery_status')->unique()->values();
+                $podCount = $records->where('pod_available', true)->count();
+                $billingStatuses = $records->pluck('billing_status')->unique()->values();
+                $lots = $records->pluck('lot_name')->filter()->unique()->values();
+                $schools = $records->pluck('school_name')->filter()->unique()->values();
+                $eligible = ! $requiresReview && $eligibleRecords->isNotEmpty();
+                $reason = $requiresReview
+                    ? ($missingDr ? 'Missing DR number; review required.' : 'Ambiguous DR number across multiple projects.')
+                    : ($eligible
+                        ? 'Eligible'.($excludedRecords->isNotEmpty() ? '; some records are excluded.' : '')
+                        : ($records->pluck('remarks')->unique()->implode('; ') ?: 'No eligible delivery records.'));
+
+                return [
+                    'group_key' => $groupKey,
+                    'dr_no' => (string) $first['dr_no'],
+                    'project_id' => (int) $first['project_id'],
+                    'project_name' => (string) $first['project_name'],
+                    'conflict' => $requiresReview,
+                    'eligible' => $eligible,
+                    'remarks' => $reason,
+                    'delivery_count' => $records->count(),
+                    'eligible_count' => $eligibleRecords->count(),
+                    'excluded_count' => $requiresReview ? $records->count() : $records->count() - $eligibleRecords->count(),
+                    'package_count' => $records->sum('package_count'),
+                    'delivery_status' => $deliveryStatuses->count() === 1 ? $deliveryStatuses->first() : 'Mixed',
+                    'pod_state' => $podCount === 0 ? 'Not recorded' : ($podCount === $records->count() ? 'Available' : 'Some available'),
+                    'billing_status' => $billingStatuses->count() === 1 ? $billingStatuses->first() : 'Mixed',
+                    'lots' => $lots->all(),
+                    'schools' => $schools->all(),
+                    'eligible_delivery_ids' => $eligibleRecords->pluck('delivery_id')->all(),
+                    'excluded_records' => $excludedRecords->all(),
+                    'records' => $records->all(),
+                ];
+            })->values();
+    }
+
+    public static function groupKey(int $projectId, string $drNumber, ?int $deliveryId = null): string
+    {
+        if (trim($drNumber) === '') {
+            return $projectId.'-missing-'.($deliveryId ?? 0);
+        }
+
+        return $projectId.'-'.hash('sha256', $drNumber);
     }
 
     /**

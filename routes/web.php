@@ -25,6 +25,7 @@ use App\Http\Controllers\DashboardLaunchController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryMonitoringController;
 use App\Http\Controllers\DeliveryReceiveController;
+use App\Http\Controllers\DuplicateDrCleanupController;
 use App\Http\Controllers\EntryController;
 use App\Http\Controllers\Finance_Item;
 use App\Http\Controllers\InventoryController;
@@ -102,6 +103,15 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/deliveries/monitoring', [DeliveryMonitoringController::class, 'index'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring');
+    Route::get('/deliveries/duplicate-cleanup', [DuplicateDrCleanupController::class, 'index'])
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.duplicate-cleanup');
+    Route::get('/deliveries/duplicate-cleanup/export', [DuplicateDrCleanupController::class, 'export'])
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.duplicate-cleanup.export');
+    Route::post('/deliveries/duplicate-cleanup/resolve', [DuplicateDrCleanupController::class, 'resolve'])
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.duplicate-cleanup.resolve');
     Route::get('/deliveries/monitoring/logistics', [DeliveryMonitoringController::class, 'logistics'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring.logistics');

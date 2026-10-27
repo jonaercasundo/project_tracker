@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 class AdminAuditLogger
 {
-    /** @param array<string, scalar|null> $details */
+    /** @param array<string, mixed> $details */
     public function record(
         ?User $actor,
         string $event,

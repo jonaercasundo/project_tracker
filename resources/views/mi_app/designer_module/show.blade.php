@@ -80,7 +80,7 @@
             ? $product->color
             : (empty($product->color) ? [] : [$product->color]);
 
-        $primaryFactoryCost = $product->factoryCosts->firstWhere('is_primary', true);
+        $factoryCosts = $product->factoryCosts;
     @endphp
 
     <style>
@@ -410,6 +410,11 @@
             font-weight: 700;
         }
 
+        .pd-card-icon svg {
+            width: 18px;
+            height: 18px;
+        }
+
         .pd-card-icon.blue {
             color: var(--pd-blue);
             background: var(--pd-blue-soft);
@@ -479,6 +484,160 @@
 
         .pd-grid-4 {
             grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .pd-pricing-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr);
+            gap: 22px;
+            align-items: start;
+        }
+
+        .pd-factory-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .pd-factory-heading h3 {
+            margin: 0;
+            color: var(--pd-ink);
+            font-family: var(--pd-font-display);
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .pd-factory-heading p {
+            margin: 4px 0 0;
+            color: var(--pd-secondary);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .pd-factory-count {
+            flex: 0 0 auto;
+            padding: 5px 9px;
+            border: 1px solid var(--pd-border);
+            border-radius: 999px;
+            background: var(--pd-soft);
+            color: var(--pd-secondary);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .pd-factory-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr));
+            gap: 12px;
+        }
+
+        .pd-factory-card {
+            min-width: 0;
+            padding: 15px;
+            border: 1px solid var(--pd-border);
+            border-radius: 12px;
+            background: var(--pd-surface);
+        }
+
+        .pd-factory-card.is-primary {
+            border-color: #a7f3d0;
+            background: linear-gradient(145deg, #fff 55%, var(--pd-green-soft));
+        }
+
+        .pd-factory-card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            min-width: 0;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--pd-border);
+        }
+
+        .pd-factory-name {
+            min-width: 0;
+            color: var(--pd-ink);
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .pd-primary-badge {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 8px;
+            border: 1px solid #a7f3d0;
+            border-radius: 999px;
+            background: var(--pd-green-soft);
+            color: #047857;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .pd-factory-fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            padding-top: 12px;
+        }
+
+        .pd-factory-field-label {
+            display: block;
+            margin-bottom: 4px;
+            color: var(--pd-muted);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+        }
+
+        .pd-factory-field-value {
+            color: var(--pd-ink);
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .pd-factory-field-value.empty {
+            color: var(--pd-muted);
+            font-weight: 500;
+        }
+
+        .pd-product-prices {
+            display: grid;
+            gap: 12px;
+        }
+
+        .pd-product-price {
+            padding: 15px;
+            border: 1px solid var(--pd-border);
+            border-radius: 12px;
+            background: var(--pd-soft);
+        }
+
+        .pd-factory-empty {
+            padding: 20px;
+            border: 1px dashed var(--pd-border);
+            border-radius: 12px;
+            color: var(--pd-secondary);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .product-page.dark .pd-factory-card.is-primary {
+            border-color: #065f46;
+            background: linear-gradient(145deg, var(--pd-surface) 55%, var(--pd-green-soft));
+        }
+
+        .product-page.dark .pd-primary-badge {
+            border-color: #065f46;
+            color: #6ee7b7;
         }
 
         .pd-field-label {
@@ -974,7 +1133,8 @@
 
             .pd-grid-3,
             .pd-grid-2,
-            .pd-dimensions {
+            .pd-dimensions,
+            .pd-pricing-layout {
                 grid-template-columns: 1fr;
             }
 
@@ -1449,8 +1609,10 @@
 
                 <div class="pd-card-header">
 
-                    <span class="pd-card-icon green">
-                        PHP
+                    <span class="pd-card-icon green" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M8 9h.01M16 9h.01M8 12h.01M16 12h.01"/>
+                        </svg>
                     </span>
 
                     <div class="pd-card-heading">
@@ -1458,7 +1620,7 @@
                         <h2>Pricing</h2>
 
                         <p>
-                            Primary factory cost, purchase price, and selling price.
+                            Factory options and product pricing.
                         </p>
 
                     </div>
@@ -1467,65 +1629,75 @@
 
                 <div class="pd-card-body">
 
-                    <div class="pd-grid pd-grid-3">
-
+                    <div class="pd-pricing-layout">
                         <div>
-
-                            <span class="pd-field-label">
-                                Primary Factory Cost
-                            </span>
-
-                            @if($primaryFactoryCost)
-                                <div class="pd-field-value">
-                                    PHP {{ $primaryFactoryCost->factory_cost }}
+                            <div class="pd-factory-heading">
+                                <div>
+                                    <h3>Factory Information</h3>
+                                    <p>Factory costs are shown in their recorded currencies.</p>
                                 </div>
-                                <span class="pd-reference green">
-                                    {{ $primaryFactoryCost->factory_name }}
-                                </span>
-                            @else
-                                <div class="pd-field-value empty">
-                                    Not set
-                                </div>
-                            @endif
+                                <span class="pd-factory-count">{{ $factoryCosts->count() }} {{ $factoryCosts->count() === 1 ? 'factory' : 'factories' }}</span>
+                            </div>
 
-                        </div>
+                            @if($factoryCosts->isNotEmpty())
+                                <div class="pd-factory-list">
+                                    @foreach($factoryCosts as $factoryCost)
+                                        <article class="pd-factory-card {{ $factoryCost->is_primary ? 'is-primary' : '' }}">
+                                            <div class="pd-factory-card-header">
+                                                <div class="pd-factory-name">{{ $factoryCost->factory_name }}</div>
+                                                @if($factoryCost->is_primary)
+                                                    <span class="pd-primary-badge">
+                                                        <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 8 3 3 7-7"/></svg>
+                                                        Primary
+                                                    </span>
+                                                @endif
+                                            </div>
 
-                        <div>
-
-                            <span class="pd-field-label">
-                                Purchase Price
-                            </span>
-
-                            @if($product->purchase_cost !== null)
-                                <div class="pd-field-value">
-                                    PHP {{ $product->purchase_cost }}
-                                </div>
-                            @else
-                                <div class="pd-field-value empty">
-                                    Not set
-                                </div>
-                            @endif
-
-                        </div>
-
-                        <div>
-
-                            <span class="pd-field-label">
-                                Selling Price
-                            </span>
-
-                            @if($product->price !== null)
-                                <div class="pd-field-value">
-                                    PHP {{ $product->price }}
+                                            <div class="pd-factory-fields">
+                                                <div>
+                                                    <span class="pd-factory-field-label">Factory Cost</span>
+                                                    <div class="pd-factory-field-value {{ $factoryCost->factory_cost === null ? 'empty' : '' }}">
+                                                        {{ $factoryCost->factory_cost === null ? 'Not set' : $factoryCost->factory_cost }}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span class="pd-factory-field-label">Currency</span>
+                                                    <div class="pd-factory-field-value {{ $factoryCost->currency ? '' : 'empty' }}">
+                                                        {{ $factoryCost->currency ?: 'Not set' }}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span class="pd-factory-field-label">Country / Location</span>
+                                                    <div class="pd-factory-field-value empty">Not recorded</div>
+                                                </div>
+                                            </div>
+                                        </article>
+                                    @endforeach
                                 </div>
                             @else
-                                <div class="pd-field-value empty">
-                                    Not set
-                                </div>
+                                <div class="pd-factory-empty">No factory information has been recorded for this product.</div>
                             @endif
-
                         </div>
 
+                        <div class="pd-product-prices">
+                            <div class="pd-product-price">
+                                <span class="pd-field-label">Purchase Price</span>
+                                @if($product->purchase_cost !== null)
+                                    <div class="pd-field-value">PHP {{ $product->purchase_cost }}</div>
+                                @else
+                                    <div class="pd-field-value empty">Not set</div>
+                                @endif
+                            </div>
+
+                            <div class="pd-product-price">
+                                <span class="pd-field-label">Selling Price</span>
+                                @if($product->price !== null)
+                                    <div class="pd-field-value">PHP {{ $product->price }}</div>
+                                @else
+                                    <div class="pd-field-value empty">Not set</div>
+                                @endif
+                            </div>
+                        </div>
                     </div>
 
                 </div>

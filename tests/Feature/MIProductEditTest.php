@@ -684,7 +684,7 @@ it('keeps the product list available while the additive COP migration is pending
         ->assertOk()->assertSee('2 products need COP updates')->assertSee('Needs COP Update');
 });
 
-it('shows the primary factory cost and product prices on the detail page', function () {
+it('shows every factory and product prices on the detail page', function () {
     $product = MI_Product::factory()->create(['purchase_cost' => '88.25', 'price' => '120.50']);
     MI_Product_Factory_Cost::factory()->for($product, 'product')->create([
         'factory_name' => 'Other Factory',
@@ -696,15 +696,61 @@ it('shows the primary factory cost and product prices on the detail page', funct
     ]);
     $this->signInMI($this->miUser());
 
+    $factoryQueries = 0;
+    DB::listen(function (QueryExecuted $query) use (&$factoryQueries): void {
+        if (str_contains($query->sql, 'mi_product_factory_costs')) {
+            $factoryQueries++;
+        }
+    });
+
     $this->get(route('mi_app.show', $product))
-        ->assertSee('Primary Factory Cost')
+        ->assertSee('Factory Information')
         ->assertSee('Selected Factory')
-        ->assertSee('PHP 63.75')
+        ->assertSee('Other Factory')
+        ->assertSee('63.75')
+        ->assertSee('61.11')
+        ->assertSee('Primary')
+        ->assertSee('Country / Location')
+        ->assertSee('Not recorded')
         ->assertSee('Purchase Price')
         ->assertSee('PHP 88.25')
         ->assertSee('Selling Price')
         ->assertSee('PHP 120.50')
-        ->assertDontSee('PHP 61.11');
+        ->assertDontSee('Primary Factory Cost');
+
+    expect($factoryQueries)->toBe(1);
+});
+
+it('shows factory information empty state when a product has no linked factories', function () {
+    $product = MI_Product::factory()->create(['purchase_cost' => '88.25', 'price' => '120.50']);
+    $this->signInMI($this->miUser());
+
+    $this->get(route('mi_app.show', $product))
+        ->assertOk()
+        ->assertSee('Factory Information')
+        ->assertSee('No factory information has been recorded for this product.')
+        ->assertSee('Purchase Price')
+        ->assertSee('PHP 88.25')
+        ->assertSee('Selling Price')
+        ->assertSee('PHP 120.50');
+});
+
+it('shows a single non-primary factory with its stored currency and cost', function () {
+    $product = MI_Product::factory()->create();
+    MI_Product_Factory_Cost::factory()->for($product, 'product')->create([
+        'factory_name' => 'Single Supplier',
+        'factory_cost' => '0.00',
+        'currency' => 'PHP',
+    ]);
+    $this->signInMI($this->miUser());
+
+    $this->get(route('mi_app.show', $product))
+        ->assertOk()
+        ->assertSee('Single Supplier')
+        ->assertSee('0.00')
+        ->assertSee('PHP')
+        ->assertSee('1 factory')
+        ->assertDontSee('Primary');
 });
 
 it('adds the first factory cost as primary without changing legacy cost or selling price', function (string $amount, string $storedAmount) {

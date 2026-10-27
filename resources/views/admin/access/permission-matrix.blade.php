@@ -1,5 +1,167 @@
 <x-app-layout>
-<div class="mx-auto flex max-w-[1500px] flex-col gap-5" x-data="{ dirty: false, bulkRole: '', filterRows() { const module = document.getElementById('permission-module-filter').value; const operation = document.getElementById('permission-type-filter').value; const implementation = document.getElementById('permission-status-filter').value; this.$root.querySelectorAll('[data-permission-row]').forEach((row) => { const matches = (module === 'all' || row.dataset.module === module) && (operation === 'all' || row.dataset.operation === operation) && (implementation === 'all' || row.dataset.implementation === implementation); const group = this.$root.querySelector(`[data-group-header='${row.dataset.group}']`); row.hidden = !matches || group?.dataset.open === 'false'; }); }, toggleGroup(group) { const header = this.$root.querySelector(`[data-group-header='${group}']`); header.dataset.open = header.dataset.open === 'false' ? 'true' : 'false'; this.filterRows(); }, setRolePermissions(roleId, checked) { this.$root.querySelectorAll(`input[type=checkbox][name^='permissions[${roleId}]']`).forEach((input) => { if (!input.disabled && !input.closest('[data-permission-row]')?.hidden) { input.checked = checked; } }); this.dirty = true; }, resetChanges() { this.$root.querySelectorAll('[data-original-checked]').forEach((input) => { input.checked = input.dataset.originalChecked === 'true'; }); this.dirty = false; } }" @change="if ($event.target.matches('[data-permission-checkbox]')) dirty = true">
+<div class="mx-auto flex w-full min-w-0 max-w-[1500px] flex-col gap-5 {{ $scope === 'ai' ? 'pb-32' : '' }}" x-data="{ dirty: false, bulkRole: '', capabilitySearch: '', capabilityCategory: 'all', capabilityCompany: 'all', capabilityStatus: 'all', visibleCapabilities: 0, matchesCapability(card) { const query = this.capabilitySearch.trim().toLowerCase(); return (this.capabilityCategory === 'all' || card.dataset.category === this.capabilityCategory) && (this.capabilityCompany === 'all' || card.dataset.company === this.capabilityCompany) && (this.capabilityStatus === 'all' || card.dataset.status === this.capabilityStatus) && (query === '' || card.dataset.search.includes(query)); }, filterCapabilities() { this.visibleCapabilities = [...this.$root.querySelectorAll('[data-capability-card]')].filter((card) => this.matchesCapability(card)).length; }, filterRows() { const module = document.getElementById('permission-module-filter').value; const operation = document.getElementById('permission-type-filter').value; const implementation = document.getElementById('permission-status-filter').value; this.$root.querySelectorAll('[data-permission-row]').forEach((row) => { const matches = (module === 'all' || row.dataset.module === module) && (operation === 'all' || row.dataset.operation === operation) && (implementation === 'all' || row.dataset.implementation === implementation); const group = this.$root.querySelector(`[data-group-header='${row.dataset.group}']`); row.hidden = !matches || group?.dataset.open === 'false'; }); }, toggleGroup(group) { const header = this.$root.querySelector(`[data-group-header='${group}']`); header.dataset.open = header.dataset.open === 'false' ? 'true' : 'false'; this.filterRows(); }, setRolePermissions(roleId, checked) { this.$root.querySelectorAll(`input[type=checkbox][name^='permissions[${roleId}]']`).forEach((input) => { if (!input.disabled && !input.closest('[data-permission-row]')?.hidden) { input.checked = checked; } }); this.dirty = true; }, resetChanges() { this.$root.querySelectorAll('[data-original-checked]').forEach((input) => { input.checked = input.dataset.originalChecked === 'true'; }); this.dirty = false; } }" @change="if ($event.target.matches('[data-permission-checkbox]')) dirty = true" @input.debounce.150ms="if ($event.target.matches('[data-capability-search]')) filterCapabilities()" x-init="$nextTick(() => filterCapabilities())">
+    @if ($scope === 'ai')
+        @php
+            $allCapabilities = collect($capabilityGroups)->flatMap(fn (array $category): array => $category['capabilities'])->values();
+            $availableCapabilityCount = $allCapabilities->whereIn('status', ['Implemented', 'Partially Implemented'])->count();
+            $permissionRestrictedCount = $allCapabilities->where('status', 'Permission Restricted')->count();
+            $notImplementedCount = $allCapabilities->where('status', 'Not Implemented')->count();
+            $companyScopes = $allCapabilities->pluck('company')->unique()->sort()->values();
+        @endphp
+        <section class="overflow-hidden rounded-2xl border border-[#dbe3ed] bg-white shadow-[0_14px_40px_rgba(23,42,69,0.06)]">
+            <div class="relative overflow-hidden bg-[#132944] px-5 py-6 text-white sm:px-7 sm:py-7">
+                <div class="absolute inset-y-0 left-0 w-1 bg-[#5f9ff7]"></div>
+                <div class="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+                    <div class="max-w-3xl">
+                        <p class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.16em] text-blue-200"><x-ai-icon name="shield" size="15" /> Access control / AI</p>
+                        <h2 class="mt-2 text-2xl font-bold tracking-tight sm:text-[28px]">AI capability permissions</h2>
+                        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">A readable map of what the assistant can do, which company each capability serves, and why access is available or restricted.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                        <span class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2"><span class="h-2 w-2 rounded-full {{ $aiEnabled && $aiConfigured ? 'bg-emerald-400' : 'bg-amber-300' }}"></span>{{ $aiEnabled ? 'Assistant enabled' : 'Assistant disabled' }}</span>
+                        <span class="rounded-full border border-white/15 px-3 py-2 text-slate-200">{{ $aiConfigured ? 'Provider configured' : 'Configuration required' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4">
+                <div class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4"><span class="absolute inset-y-0 left-0 w-1 bg-[#315d91]"></span><p class="text-xs font-semibold text-slate-500">Total AI capabilities</p><p class="mt-2 text-3xl font-bold tracking-tight text-[#172a45]">{{ $allCapabilities->count() }}</p><p class="mt-1 text-xs text-slate-500">Across {{ count($capabilityGroups) }} categories</p></div>
+                <div class="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50/60 p-4"><span class="absolute inset-y-0 left-0 w-1 bg-emerald-500"></span><p class="text-xs font-semibold text-emerald-800">Available</p><p class="mt-2 text-3xl font-bold tracking-tight text-emerald-950">{{ $availableCapabilityCount }}</p><p class="mt-1 text-xs text-emerald-800">Implemented and partially implemented</p></div>
+                <div class="relative overflow-hidden rounded-xl border border-rose-200 bg-rose-50/60 p-4"><span class="absolute inset-y-0 left-0 w-1 bg-rose-500"></span><p class="text-xs font-semibold text-rose-800">Permission restricted</p><p class="mt-2 text-3xl font-bold tracking-tight text-rose-950">{{ $permissionRestrictedCount }}</p><p class="mt-1 text-xs text-rose-800">Missing AI permissions</p></div>
+                <div class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-4"><span class="absolute inset-y-0 left-0 w-1 bg-slate-400"></span><p class="text-xs font-semibold text-slate-600">Not implemented</p><p class="mt-2 text-3xl font-bold tracking-tight text-slate-800">{{ $notImplementedCount }}</p><p class="mt-1 text-xs text-slate-500">No executable capability available</p></div>
+            </div>
+        </section>
+
+        <section class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-labelledby="capability-directory-title">
+            <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div><p class="text-xs font-bold uppercase tracking-[.12em] text-[#315d91]">Capability directory</p><h3 id="capability-directory-title" class="mt-1 text-lg font-bold text-[#172a45]">Browse capabilities</h3></div>
+                <p class="text-xs text-slate-500"><span x-text="visibleCapabilities"></span> of {{ $allCapabilities->count() }} shown</p>
+            </div>
+            <div class="mt-4 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                <label class="relative min-w-0 sm:col-span-2"><span class="sr-only">Search capabilities</span><span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><x-ai-icon name="search" size="17" /></span><input type="search" data-capability-search x-model="capabilitySearch" placeholder="Search capabilities, permissions, or tools" class="w-full rounded-xl border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-blue-500/20"></label>
+                <label class="min-w-0"><span class="sr-only">Filter category</span><select x-model="capabilityCategory" @change="filterCapabilities()" class="w-full rounded-xl border-slate-200 bg-slate-50 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:ring-blue-500/20"><option value="all">All categories</option>@foreach ($capabilityGroups as $category)<option value="{{ $category['id'] }}">{{ $category['label'] }}</option>@endforeach</select></label>
+                <label class="min-w-0"><span class="sr-only">Filter company</span><select x-model="capabilityCompany" @change="filterCapabilities()" class="w-full rounded-xl border-slate-200 bg-slate-50 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:ring-blue-500/20"><option value="all">All companies</option>@foreach ($companyScopes as $companyOption)<option value="{{ $companyOption === '*' ? 'global' : $companyOption }}">{{ $companyOption === '*' ? 'Global' : $companyOption }}</option>@endforeach</select></label>
+                <label class="min-w-0"><span class="sr-only">Filter status</span><select x-model="capabilityStatus" @change="filterCapabilities()" class="w-full rounded-xl border-slate-200 bg-slate-50 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:ring-blue-500/20"><option value="all">All statuses</option><option value="implemented">Implemented</option><option value="partially-implemented">Partially implemented</option><option value="permission-restricted">Permission restricted</option><option value="business-access-restricted">Business access restricted</option><option value="company-restricted">Company restricted</option><option value="configuration-required">Configuration required</option><option value="disabled">Disabled</option><option value="not-implemented">Not implemented</option></select></label>
+            </div>
+
+            <div class="mt-4 grid min-w-0 grid-cols-1 items-start gap-3 xl:grid-cols-2">
+                @foreach ($capabilityGroups as $category)
+                    @foreach ($category['capabilities'] as $capability)
+                        @php
+                            $diagnostic = $capability['diagnostic_details'];
+                            $categoryIcon = match ($category['icon']) {
+                                'help' => 'help',
+                                'search' => 'search',
+                                'create' => 'plus',
+                                'edit' => 'shield',
+                                'analytics' => 'chart',
+                                default => 'sparkles',
+                            };
+                            $statusStyle = match ($capability['status']) {
+                                'Implemented' => 'border-emerald-200 bg-emerald-50 text-emerald-800',
+                                'Partially Implemented', 'Configuration Required', 'Disabled' => 'border-amber-200 bg-amber-50 text-amber-900',
+                                'Permission Restricted', 'Business Access Restricted', 'Company Restricted' => 'border-rose-200 bg-rose-50 text-rose-800',
+                                default => 'border-slate-200 bg-slate-100 text-slate-700',
+                            };
+                            $implementationStyle = match ($diagnostic['implementation_status']) {
+                                'Implemented' => 'bg-emerald-50 text-emerald-800',
+                                'Partially Implemented' => 'bg-amber-50 text-amber-900',
+                                default => 'bg-slate-100 text-slate-600',
+                            };
+                            $cardSearch = mb_strtolower(implode(' ', array_filter([
+                                $capability['label'], $capability['description'], $capability['id'], $capability['handler'] ?? '',
+                                implode(' ', $capability['tool_names']), implode(' ', $diagnostic['required_ai_permissions']),
+                                implode(' ', $diagnostic['business_policy_requirements']),
+                            ])));
+                            $capabilityCardId = 'capability-'.\Illuminate\Support\Str::slug($capability['id']);
+                        @endphp
+                        <article data-capability-card data-category="{{ $category['id'] }}" data-company="{{ $capability['company'] === '*' ? 'global' : $capability['company'] }}" data-status="{{ \Illuminate\Support\Str::slug($capability['status']) }}" data-search="{{ $cardSearch }}" x-show="matchesCapability($el)" x-transition.opacity.duration.150ms :aria-hidden="(!matchesCapability($el)).toString()" x-data="{ expanded: false }" class="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white transition duration-150 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_10px_26px_rgba(23,42,69,0.08)] motion-reduce:transform-none motion-reduce:transition-none">
+                            <button type="button" @click="expanded = !expanded" :aria-expanded="expanded.toString()" aria-controls="{{ $capabilityCardId }}" class="flex w-full min-w-0 items-start gap-3 p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:p-5">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#edf3fa] text-[#315d91]"><x-ai-icon :name="$categoryIcon" size="20" /></span>
+                                <span class="min-w-0 flex-1">
+                                    <span class="flex min-w-0 flex-wrap items-center gap-2"><span class="break-words text-[15px] font-bold leading-5 text-[#172a45]">{{ $capability['label'] }}</span><span class="max-w-full break-all rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-600">{{ $capability['id'] }}</span></span>
+                                    <span class="mt-1.5 block text-sm leading-5 text-slate-600">{{ $capability['description'] }}</span>
+                                    <span class="mt-3 flex flex-wrap items-center gap-2">
+                                        <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold {{ $statusStyle }}">{{ $capability['status'] }}</span>
+                                        <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $implementationStyle }}">{{ $diagnostic['implementation_status'] }}</span>
+                                        <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ $capability['company'] === '*' ? 'Global' : $capability['company'] }}</span>
+                                    </span>
+                                </span>
+                                <svg aria-hidden="true" class="mt-2 h-4 w-4 shrink-0 text-slate-400 transition-transform duration-150 motion-reduce:transition-none" :class="expanded ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                            </button>
+                            <div id="{{ $capabilityCardId }}" x-cloak x-show="expanded" x-transition.opacity.duration.150ms class="border-t border-slate-100 bg-slate-50/70 px-4 py-4 sm:px-5">
+                                <p class="text-sm leading-6 text-slate-700"><span class="font-semibold text-slate-900">Why this status:</span> {{ $capability['diagnostic_reason'] }}</p>
+                                <div class="mt-4 grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-2">
+                                    @foreach ([['Required AI permissions', $diagnostic['required_ai_permissions'], 'slate'], ['Granted permissions', $diagnostic['granted_ai_permissions'], 'emerald'], ['Missing permissions', $diagnostic['missing_ai_permissions'], 'rose'], ['Business-policy requirements', $diagnostic['business_policy_requirements'], 'blue']] as [$listTitle, $listItems, $listTone])
+                                        @php
+                                            $listToneClass = match ($listTone) {
+                                                'emerald' => 'bg-emerald-50 text-emerald-800',
+                                                'rose' => 'bg-rose-50 text-rose-800',
+                                                'blue' => 'bg-blue-50 text-blue-800',
+                                                default => 'bg-slate-100 text-slate-700',
+                                            };
+                                        @endphp
+                                        <section class="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
+                                            <h4 class="text-xs font-bold text-slate-700">{{ $listTitle }}</h4>
+                                            @if ($listItems !== [])
+                                                <ul class="mt-2 flex min-w-0 flex-wrap gap-1.5">
+                                                    @foreach ($listItems as $listItem)<li class="max-w-full break-all rounded-md px-2 py-1 text-xs leading-4 {{ $listToneClass }}">{{ $listItem }}</li>@endforeach
+                                                </ul>
+                                            @else
+                                                <p class="mt-2 text-sm text-slate-500">{{ $listTitle === 'Business-policy requirements' ? 'No additional business policy' : 'None' }}</p>
+                                            @endif
+                                        </section>
+                                    @endforeach
+                                    <section class="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
+                                        <h4 class="text-xs font-bold text-slate-700">Failed checks</h4>
+                                        @php
+                                            $failedChecks = collect($diagnostic['checks'])->filter(fn (array $check): bool => ! $check['granted'])->values();
+                                        @endphp
+                                        @if ($failedChecks->isNotEmpty())
+                                            <ul class="mt-2 grid gap-1.5">@foreach ($failedChecks as $check)<li class="break-words rounded-md bg-rose-50 px-2.5 py-2 text-xs leading-5 text-rose-800"><span class="font-semibold">{{ ucfirst(str_replace('_', ' ', $check['type'])) }}:</span> {{ $check['name'] }}</li>@endforeach</ul>
+                                        @else
+                                            <p class="mt-2 text-sm text-emerald-700">All required checks passed.</p>
+                                        @endif
+                                    </section>
+                                    <section class="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
+                                        <h4 class="text-xs font-bold text-slate-700">Implementation and risk</h4>
+                                        <dl class="mt-2 grid min-w-0 gap-2 text-sm sm:grid-cols-2">
+                                            <div class="min-w-0"><dt class="text-xs font-medium text-slate-500">Handler</dt><dd class="mt-0.5 break-words text-slate-800">{{ $capability['handler'] ?? 'Not connected' }}</dd></div>
+                                            <div><dt class="text-xs font-medium text-slate-500">Operation / risk</dt><dd class="mt-0.5 text-slate-800">{{ $capability['operation'] }} / {{ ucfirst(str_replace('_', ' ', $capability['risk'])) }}</dd></div>
+                                            <div class="min-w-0"><dt class="text-xs font-medium text-slate-500">Company scope</dt><dd class="mt-0.5 text-slate-800">{{ $capability['company'] === '*' ? 'Global' : $capability['company'] }}</dd></div>
+                                            <div class="min-w-0"><dt class="text-xs font-medium text-slate-500">Confirmation / audit</dt><dd class="mt-0.5 break-words text-slate-800">{{ str_replace('_', ' ', $capability['confirmation']) }} / {{ $capability['audit'] }}</dd></div>
+                                            @if ($capability['roles'] !== [])<div class="sm:col-span-2"><dt class="text-xs font-medium text-slate-500">Role restrictions</dt><dd class="mt-0.5 break-words text-slate-800">{{ implode(', ', $capability['roles']) }}</dd></div>@endif
+                                            @if ($capability['tool_names'] !== [])<div class="sm:col-span-2"><dt class="text-xs font-medium text-slate-500">Registered tools</dt><dd class="mt-0.5 flex flex-wrap gap-1.5">@foreach ($capability['tool_names'] as $toolName)<span class="break-all rounded bg-slate-100 px-2 py-1 font-mono text-xs text-slate-700">{{ $toolName }}</span>@endforeach</dd></div>@endif
+                                        </dl>
+                                    </section>
+                                    <details class="min-w-0 rounded-lg border border-slate-200 bg-white p-3 lg:col-span-2">
+                                        <summary class="cursor-pointer text-xs font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">Input and output contract</summary>
+                                        <div class="mt-3 grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-2">
+                                            <div class="min-w-0"><h4 class="text-xs font-bold text-slate-600">Input schema</h4><pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#132944] p-3 text-xs leading-5 text-slate-100">{{ json_encode($capability['input_schema'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre></div>
+                                            <div class="min-w-0"><h4 class="text-xs font-bold text-slate-600">Output schema</h4><pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#132944] p-3 text-xs leading-5 text-slate-100">{{ json_encode($capability['output_schema'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre></div>
+                                        </div>
+                                    </details>
+                                </div>
+                            </div>
+                        </article>
+                    @endforeach
+                @endforeach
+                <div x-cloak x-show="visibleCapabilities === 0" class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center sm:col-span-2"><p class="text-sm font-semibold text-slate-700">No capabilities match these filters.</p><p class="mt-1 text-sm text-slate-500">Try another search term or clear a filter.</p></div>
+            </div>
+        </section>
+
+        @if (session('success'))<div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{{ session('success') }}</div>@endif
+        @if ($errors->any())<div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{{ $errors->first() }}</div>@endif
+    @endif
+
+    @if ($scope === 'ai')
+        <details class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-blue-500 sm:px-6">
+                <span><span class="block text-sm font-bold text-[#172a45]">Role assignments and access diagnostics</span><span class="mt-1 block text-sm text-slate-500">Manage permission grants, inspect a user’s effective access, and review the full matrix.</span></span>
+                <svg aria-hidden="true" class="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180 motion-reduce:transition-none" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+            </summary>
+            <div class="flex min-w-0 flex-col gap-5 border-t border-slate-100 bg-slate-50/50 p-3 sm:p-5">
+    @endif
     <section class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div class="max-w-2xl">
@@ -88,51 +250,8 @@
         @endif
     </section>
 
-    @if ($scope === 'ai')
-        <section class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div><h3 class="text-sm font-bold text-[#172a45]">Effective access diagnostics</h3><p class="mt-1 text-[10px] text-slate-500">{{ $diagnosticUser?->name ?? 'No user selected' }} · {{ $diagnosticCompany?->name ?? 'No company selected' }} · permissions are evaluated using the same registry as the AI tool gateway.</p></div>
-                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-semibold text-slate-600">{{ $aiEnabled ? 'Assistant enabled' : 'Assistant disabled' }} · {{ $aiConfigured ? 'Provider configured' : 'Configuration required' }}</span>
-            </div>
-            <div class="mt-4 grid gap-3">
-                @foreach ($capabilityGroups as $category)
-                    <details open class="rounded-xl border border-slate-100">
-                        <summary class="cursor-pointer bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700">{{ $category['label'] }} <span class="ml-1 text-[10px] font-medium text-slate-400">{{ count($category['capabilities']) }} capabilities</span></summary>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-[1350px] text-left text-[10px]">
-                                <thead class="bg-white text-[9px] uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2">Capability</th><th class="px-3 py-2">Company scope</th><th class="px-3 py-2">Required AI permissions</th><th class="px-3 py-2">Granted</th><th class="px-3 py-2">Missing</th><th class="px-3 py-2">Business-policy requirements</th><th class="px-3 py-2">Implementation status / risk</th><th class="px-3 py-2">Effective access / reason</th></tr></thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    @foreach ($category['capabilities'] as $capability)
-                                        @php
-                                            $diagnostic = $capability['diagnostic_details'];
-                                        @endphp
-                                        <tr>
-                                            <td class="px-3 py-2 font-semibold text-slate-700">{{ $capability['label'] }}<span class="mt-0.5 block font-mono text-[9px] font-normal text-slate-400">{{ $capability['id'] }}</span></td>
-                                            <td class="px-3 py-2 text-slate-600">{{ $diagnostic['company_scope'] === '*' ? 'Global' : $diagnostic['company_scope'] }}</td>
-                                            <td class="max-w-[210px] break-words px-3 py-2 text-slate-600">{{ implode(', ', $diagnostic['required_ai_permissions']) ?: 'None' }}</td>
-                                            <td class="max-w-[180px] break-words px-3 py-2 text-emerald-700">{{ implode(', ', $diagnostic['granted_ai_permissions']) ?: 'None' }}</td>
-                                            <td class="max-w-[180px] break-words px-3 py-2 text-rose-700">{{ implode(', ', $diagnostic['missing_ai_permissions']) ?: 'None' }}</td>
-                                            <td class="max-w-[260px] break-words px-3 py-2 text-slate-600">
-                                                <span>{{ implode(', ', $diagnostic['business_policy_requirements']) ?: 'No additional business policy' }}</span>
-                                                @if ($diagnostic['failed_business_checks'] !== [])
-                                                    <span class="mt-1 block text-rose-700">Failed: {{ implode('; ', $diagnostic['failed_business_checks']) }}</span>
-                                                @endif
-                                            </td>
-                                            <td class="px-3 py-2 text-slate-600">{{ $diagnostic['implementation_status'] }}<span class="mt-0.5 block">Risk: {{ $capability['risk'] }}</span></td>
-                                            <td class="max-w-[300px] px-3 py-2"><span class="inline-flex rounded-full px-2 py-1 font-bold {{ in_array($capability['status'], ['Implemented', 'Partially Implemented'], true) ? 'bg-emerald-50 text-emerald-700' : (in_array($capability['status'], ['Permission Restricted', 'Business Access Restricted', 'Company Restricted'], true) ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-800') }}">{{ $capability['status'] }}</span><p class="mt-1 leading-relaxed text-slate-500">{{ $capability['diagnostic_reason'] }}</p></td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </details>
-                @endforeach
-            </div>
-        </section>
-    @endif
-
-    @if (session('success'))<div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800">{{ session('success') }}</div>@endif
-    @if ($errors->any())<div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{{ $errors->first() }}</div>@endif
+    @if ($scope !== 'ai' && session('success'))<div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800">{{ session('success') }}</div>@endif
+    @if ($scope !== 'ai' && $errors->any())<div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{{ $errors->first() }}</div>@endif
 
     <form method="POST" action="{{ route('admin.access.permissions.update') }}" @submit="if (dirty && !window.confirm('Save these role permission changes? Administrator role changes require the confirmation below.')) $event.preventDefault()">
         @csrf @method('PATCH')
@@ -205,11 +324,15 @@
                     </tbody>
                 </table>
             </div>
-            <div class="sticky bottom-0 z-30 flex flex-col gap-4 border-t border-slate-100 bg-white/95 px-4 py-4 pr-20 shadow-[0_-8px_18px_-18px_rgba(15,23,42,.5)] backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:pr-5">
+            <div class="sticky bottom-0 z-30 flex flex-col gap-4 border-t border-slate-100 bg-white/95 px-4 py-4 {{ $scope === 'ai' ? 'pb-24 pr-5' : 'pr-20' }} shadow-[0_-8px_18px_-18px_rgba(15,23,42,.5)] backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-5 {{ $scope === 'ai' ? 'sm:pb-24 sm:pr-5' : 'sm:pr-5' }}">
                 <label class="flex max-w-2xl items-start gap-2.5 text-[10px] leading-relaxed text-slate-500"><input type="checkbox" name="confirm_critical" value="1" class="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-500"><span>Confirm critical Administrator role changes. <span class="font-semibold text-slate-700">ai.settings.manage</span> must remain with Administrator; the last active Administrator cannot be removed from an account.</span></label>
                 <div class="flex shrink-0 flex-wrap items-center gap-2"><a href="{{ $scope === 'ai' ? route('admin.access.permissions.ai') : route('admin.access.permissions.index') }}" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</a><button type="button" @click="resetChanges()" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Reset changes</button><button type="submit" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#174b8a] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#123b72] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Save Permissions</button></div>
             </div>
         </section>
     </form>
+    @if ($scope === 'ai')
+            </div>
+        </details>
+    @endif
 </div>
 </x-app-layout>

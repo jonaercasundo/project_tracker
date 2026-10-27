@@ -50,11 +50,13 @@ it('shows the control center and protects management routes from non-administrat
         ->assertSee(route('roles.index'))->assertSee(route('admin.ai-management.index'))->assertSee(route('roleaccess.index'));
     $this->get(route('admin.access.permissions.index'))->assertOk()->assertSee('Role permission matrix')->assertSee('Administrator navigation');
     $this->get(route('admin.access.permissions.ai'))->assertOk()->assertSee('AI capability permissions')
+        ->assertSee('Capability directory')->assertSee('Total AI capabilities')->assertSee('Available')
+        ->assertSee('Search capabilities, permissions, or tools')->assertSee('Role assignments and access diagnostics')
         ->assertSee('ai.page-help.use')->assertSee('ai.business-search.use')->assertSee('Capability details')
         ->assertSee('ai.mmc.projects.view')->assertSee('Filter by implementation status')->assertSee('Select visible')->assertSee('Reset changes')
-        ->assertSee('Effective access diagnostics')->assertSee('MMC Intelligence')
+        ->assertSee('MMC Intelligence')
         ->assertSee('Required AI permissions')->assertSee('Business-policy requirements')
-        ->assertSee('Implementation status / risk')->assertSee('Company scope')
+        ->assertSee('Implementation and risk')->assertSee('Company scope')
         ->assertSee('Diagnose Access')->assertSee('Configure access for')->assertSee('Save &amp; Verify Access', false);
     $this->get(route('admin.access.review'))->assertOk()->assertSee('User access review')->assertSee('All users &amp; access', false);
     $this->get(route('admin.audit.index'))->assertOk()->assertSee('Activity and access log')->assertSee('Roles &amp; permissions', false);

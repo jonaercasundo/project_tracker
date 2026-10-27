@@ -10,9 +10,11 @@ use App\Models\BillingBatch;
 use App\Models\DeliveryBillingRecord;
 use App\Models\User;
 use App\Services\BillingBatchService;
+use App\Services\BillingSheetSyncService;
 use App\Services\DeliveryBillingEligibilityService;
 use App\Services\DeliveryBillingQrCodeService;
 use App\Services\DeliveryBillingService;
+use App\Services\GoogleSheetsApiClient;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -27,7 +29,9 @@ class BillingPreparationController extends Controller
         private DeliveryBillingEligibilityService $eligibility,
         private DeliveryBillingQrCodeService $qrCodes,
         private BillingBatchService $batches,
-        private DeliveryBillingService $billing
+        private DeliveryBillingService $billing,
+        private BillingSheetSyncService $sheetSync,
+        private GoogleSheetsApiClient $sheets
     ) {}
 
     public function index(Request $request): View|RedirectResponse
@@ -213,24 +217,29 @@ class BillingPreparationController extends Controller
             $selectionFilters = $validated['mode'] === 'all'
                 ? $this->validatedFilters($request)
                 : ($validated['mode'] === 'range' ? $request->input('selection_filters') : null);
-            $retryIds = $validated['mode'] === 'all'
+            $submittedIds = $validated['mode'] === 'all'
                 ? array_map('intval', $validated['expected_delivery_ids'] ?? [])
                 : $deliveryIds;
-            if ($validated['mode'] !== 'all' && $retryIds !== []) {
-                $retryRows = $this->eligibility->query()->whereIn('d.delivery_id', $retryIds)->get();
+            $retryIds = $priorBatch->deliveryBillingRecords()
+                ->orderBy('delivery_id')
+                ->pluck('delivery_id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all();
+            if ($validated['mode'] !== 'all' && $submittedIds !== []) {
+                $retryRows = $this->eligibility->query()->whereIn('d.delivery_id', $submittedIds)->get();
                 $groupKeys = $this->groupsForRows($retryRows)->pluck('group_key')->all();
             }
-            $groupCount = $validated['mode'] === 'all'
-                ? $this->eligibility->presentGroups($this->eligibility->query()->whereIn('d.delivery_id', $retryIds)->get())->count()
-                : count($groupKeys ?? []);
+            $groupCount = $this->eligibility->presentGroups($this->eligibility->query()->whereIn('d.delivery_id', $retryIds)->get())->count();
             try {
                 $result = $this->batches->confirm($retryIds, $validated['mode'], $validated['idempotency_key'], $actor, $selectionFilters, $groupKeys);
             } catch (BillingBatchEligibilityException $exception) {
                 return response()->json(['message' => $exception->getMessage(), 'rejected' => $exception->rejectedRecords], $exception->httpStatus);
             }
+            $sheetSync = $this->sheetSync->syncBatch((int) $result['batch']->getKey(), $this->sheets);
 
             return response()->json([
                 'message' => 'This selection was already confirmed.',
+                'sheet_sync' => $sheetSync,
                 'updated_records' => $this->updatedRecordDetails($retryIds),
                 'rejected_records' => [],
                 'batch' => [
@@ -278,9 +287,11 @@ class BillingPreparationController extends Controller
                 if ($existingBatch && $sameSelectAllRequest) {
                     $retryRows = $this->eligibility->query()->whereIn('d.delivery_id', $alreadySubmittedIds)->get();
                     $groupCount = $this->groupsForRows($retryRows)->count();
+                    $sheetSync = $this->sheetSync->syncBatch((int) $existingBatch->getKey(), $this->sheets);
 
                     return response()->json([
                         'message' => 'This delivery selection is already confirmed for Billing.',
+                        'sheet_sync' => $sheetSync,
                         'updated_records' => $this->updatedRecordDetails($alreadySubmittedIds),
                         'rejected_records' => [],
                         'batch' => [
@@ -380,9 +391,11 @@ class BillingPreparationController extends Controller
                 'rejected' => $exception->rejectedRecords,
             ], $exception->httpStatus);
         }
+        $sheetSync = $this->sheetSync->syncBatch((int) $result['batch']->getKey(), $this->sheets);
 
         return response()->json([
             'message' => $result['created'] ? 'Deliveries confirmed for Billing.' : 'This selection was already confirmed.',
+            'sheet_sync' => $sheetSync,
             'updated_records' => $this->updatedRecordDetails($deliveryIds),
             'rejected_records' => $excludedRecords ?? collect(),
             'batch' => [

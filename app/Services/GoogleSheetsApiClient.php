@@ -83,6 +83,22 @@ class GoogleSheetsApiClient
         $this->throwForFailedResponse($response->status(), $response->json('error.message'));
     }
 
+    /** @param array<int, array{range: string, majorDimension: string, values: array<int, array<int, string>>}> $updates */
+    public function updateCells(array $updates, ?string $spreadsheetId = null): void
+    {
+        if ($updates === []) {
+            return;
+        }
+
+        $spreadsheetId ??= $this->configuration->current()['spreadsheet_id'];
+        $url = rtrim((string) config('google_sheets.billing.api_base_url'), '/').'/'.rawurlencode($spreadsheetId).'/values:batchUpdate';
+        $response = $this->request()->post($url, [
+            'valueInputOption' => 'RAW',
+            'data' => $updates,
+        ]);
+        $this->throwForFailedResponse($response->status(), $response->json('error.message'));
+    }
+
     /** @return array{status: string, message: string} */
     public function testConnection(): array
     {

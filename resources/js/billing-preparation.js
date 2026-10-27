@@ -573,7 +573,21 @@ if (root) {
             confirmDialog.close();
             const updated = Array.isArray(payload.updated_records) ? payload.updated_records.map((record) => `DR ${record.dr_no} · #${record.delivery_id}${record.lot_name ? ` · ${record.lot_name}` : ''}`).join('; ') : '';
             const rejected = Array.isArray(payload.rejected_records) ? payload.rejected_records.map((record) => `DR ${record.dr_no} / #${record.delivery_id}: ${record.reason}`).join('; ') : '';
-            showFeedback(`${payload.message} Batch ${payload.batch.batch_ref} updated ${payload.batch.delivery_count} delivery record(s) across ${payload.batch.group_count ?? selected.size} DR group(s).${updated ? ` Updated records: ${updated}.` : ''}${rejected ? ` Not updated: ${rejected}` : ''}`, rejected ? 'warning' : 'success');
+            const sheetSync = payload.sheet_sync;
+            const sheetIssues = Array.isArray(sheetSync?.issues) ? sheetSync.issues : [];
+            const sheetSummary = sheetSync ? ` Google Sheets: ${sheetSync.message}` : '';
+            const tone = sheetSync?.status === 'error' ? 'error' : (rejected ? 'warning' : 'success');
+            showFeedback(`${payload.message} Batch ${payload.batch.batch_ref} updated ${payload.batch.delivery_count} delivery record(s) across ${payload.batch.group_count ?? selected.size} DR group(s).${updated ? ` Updated records: ${updated}.` : ''}${rejected ? ` Not updated: ${rejected}` : ''}${sheetSummary}`, tone);
+            if (sheetIssues.length > 0) {
+                const issueList = document.createElement('ul');
+                issueList.className = 'mt-2 list-disc space-y-1 pl-5';
+                sheetIssues.forEach((issue) => {
+                    const item = document.createElement('li');
+                    item.textContent = `DR ${issue.dr_no || 'not available'} · Core Package Code ${issue.package_code || 'not available'} · Lot ${issue.lot_number || 'not identified'} · Delivery #${issue.delivery_id}: ${issue.reason}`;
+                    issueList.append(item);
+                });
+                feedback.append(issueList);
+            }
             const link = document.createElement('a');
             link.href = payload.batch.url;
             link.textContent = 'Open batch details';

@@ -14,6 +14,12 @@
     </x-slot>
 
     <div class="mx-auto max-w-5xl space-y-5">
+        @if (session('success'))
+            <div role="status" aria-live="polite" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('success') }}</div>
+        @endif
+        @if (session('error'))
+            <div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{{ session('error') }}</div>
+        @endif
         @php
             $billingStatusLabel = match ($record->billing_status) {
                 'for_billing' => 'For Billing',
@@ -53,7 +59,7 @@
                     @php
                         $syncLabel = str($sync->outcome)->replace('_', ' ')->title();
                         $syncTone = in_array($sync->outcome, ['synced', 'already_synced'], true) ? 'bg-emerald-50 text-emerald-800'
-                            : (in_array($sync->outcome, ['conflict', 'no_match', 'duplicate_match', 'reconciliation_error', 'api_failed'], true) ? 'bg-rose-50 text-rose-800'
+                            : (in_array($sync->outcome, ['conflict', 'no_match', 'duplicate_match', 'reconciliation_error', 'api_failed', 'ambiguous_write', 'batch_blocked'], true) ? 'bg-rose-50 text-rose-800'
                                 : (in_array($sync->outcome, ['configuration_missing', 'queue_unavailable', 'dispatch_failed', 'retrying'], true) ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-700'));
                         $canRetrySheetSync = !in_array($sync->outcome, ['synced', 'already_synced', 'not_applicable'], true);
                     @endphp

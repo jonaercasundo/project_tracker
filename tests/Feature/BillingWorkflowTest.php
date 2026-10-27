@@ -163,7 +163,7 @@ it('queues auditable syncs for Lots 2, 9, and 11 with their configured target co
     Queue::assertPushed(SyncBillingSheetDate::class, 3);
 });
 
-it('confirms a complete same-DR group and queues sheet sync per delivery package lot', function (): void {
+it('confirms a complete same-DR group and syncs each lot once with idempotent retries', function (): void {
     signInBillingUser();
     Queue::fake();
     config(['queue.default' => 'database', 'queue.connections.database.driver' => 'database']);
@@ -181,19 +181,50 @@ it('confirms a complete same-DR group and queues sheet sync per delivery package
     DB::table('deliveries')->where('delivery_id', $secondId)->update(['lot_id' => $secondLotId]);
     addPackageToBillingDelivery($secondId, 'CORE-LOT9');
 
+    $sheetRows = array_fill(0, 3, array_fill(0, 87, ''));
+    $sheetRows[0][1] = 'BIR DR Lot 2';
+    $sheetRows[0][2] = 'Core Package Code Lot 2';
+    $sheetRows[0][3] = 'BIR DR Lot 9';
+    $sheetRows[0][4] = 'Core Package Code Lot 9';
+    $sheetRows[1][1] = 'BIR-SHARED-DR';
+    $sheetRows[1][2] = 'CORE-LOT2';
+    $sheetRows[2][3] = 'BIR-SHARED-DR';
+    $sheetRows[2][4] = 'CORE-LOT9';
+    $transitionDate = now('Asia/Manila')->toDateString();
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CI", 'test-spreadsheet-id')->andReturn($sheetRows);
+    $sheets->shouldReceive('updateCells')->once()->with([
+        ['range' => "'Copy of SME LOT 2,9,11'!BF2", 'majorDimension' => 'ROWS', 'values' => [[$transitionDate]]],
+        ['range' => "'Copy of SME LOT 2,9,11'!BU3", 'majorDimension' => 'ROWS', 'values' => [[$transitionDate]]],
+    ], 'test-spreadsheet-id');
+    app()->instance(GoogleSheetsApiClient::class, $sheets);
+
     $preview = $this->getJson(route('billing.prepare.search', ['q' => 'BIR-SHARED-DR']))
         ->assertOk()->assertJsonCount(1, 'records')->assertJsonPath('records.0.delivery_count', 2);
-    $confirmation = $this->postJson(route('billing.prepare.confirm'), [
+    $payload = [
         'mode' => 'search',
         'delivery_ids' => [$firstId],
         'idempotency_key' => (string) Str::uuid(),
-    ])->assertCreated()->assertJsonPath('batch.delivery_count', 2)->assertJsonPath('batch.group_count', 1);
+    ];
+    $confirmation = $this->postJson(route('billing.prepare.confirm'), $payload)
+        ->assertCreated()
+        ->assertJsonPath('batch.delivery_count', 2)
+        ->assertJsonPath('batch.group_count', 1)
+        ->assertJsonPath('sheet_sync.status', 'success')
+        ->assertJsonPath('sheet_sync.synced_count', 2);
     $batchId = (int) $confirmation->json('batch.id');
 
     expect(BillingSheetSync::query()->orderBy('lot_number')->pluck('lot_number')->all())->toBe(['2', '9']);
     expect(BillingSheetSync::query()->where('delivery_id', $secondId)->value('package_code'))->toBe('CORE-LOT9');
-    expect(BillingSheetSync::query()->where('outcome', 'queued')->count())->toBe(2);
+    expect(BillingSheetSync::query()->where('outcome', 'synced')->count())->toBe(2);
+    Queue::assertNotPushed(SyncBillingSheetDate::class);
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $secondId, 'status' => 'pending']);
+
+    $this->postJson(route('billing.prepare.confirm'), $payload)
+        ->assertOk()
+        ->assertJsonPath('sheet_sync.status', 'success')
+        ->assertJsonPath('sheet_sync.message', 'All matching Google Sheet values were already synchronized; no duplicate writes were made.');
 
     $this->get(route('billing.batches.index'))
         ->assertOk()
@@ -216,6 +247,52 @@ it('confirms a complete same-DR group and queues sheet sync per delivery package
         ->assertDontSee('Delivery #'.$secondId)
         ->assertViewHas('recordGroups', fn ($recordGroups): bool => $recordGroups->count() === 1
             && $recordGroups->first()->count() === 2);
+});
+
+it('does not write any batch sheet cells when one DR and package code cannot be matched uniquely', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $firstId = createBillingDelivery('BIR-PREFLIGHT-DR', 'delivered');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('project_id');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $firstId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($firstId, 'CORE-MATCHED');
+    $secondLotId = (int) DB::table('lot')->insertGetId(['project_id' => $projectId, 'lot_name' => 'Lot 9', 'contract_no' => 'CONTRACT-'.$projectId.'-9']);
+    $secondId = createDeliveryForBillingProject($projectId, 'BIR-PREFLIGHT-DR', 'delivered');
+    DB::table('deliveries')->where('delivery_id', $secondId)->update(['lot_id' => $secondLotId]);
+    addPackageToBillingDelivery($secondId, 'CORE-MISSING');
+
+    $sheetRows = array_fill(0, 2, array_fill(0, 87, ''));
+    $sheetRows[0][1] = 'BIR DR Lot 2';
+    $sheetRows[0][2] = 'Core Package Code Lot 2';
+    $sheetRows[0][3] = 'BIR DR Lot 9';
+    $sheetRows[0][4] = 'Core Package Code Lot 9';
+    $sheetRows[1][1] = 'BIR-PREFLIGHT-DR';
+    $sheetRows[1][2] = 'CORE-MATCHED';
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->andReturn($sheetRows);
+    $sheets->shouldNotReceive('updateCells');
+    app()->instance(GoogleSheetsApiClient::class, $sheets);
+
+    $response = $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$firstId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated()
+        ->assertJsonPath('sheet_sync.status', 'error')
+        ->assertJsonPath('sheet_sync.issues.0.dr_no', 'BIR-PREFLIGHT-DR')
+        ->assertJsonPath('sheet_sync.issues.1.package_code', 'CORE-MISSING');
+
+    expect(BillingSheetSync::query()->where('outcome', 'no_match')->count())->toBe(1)
+        ->and(BillingSheetSync::query()->where('outcome', 'batch_blocked')->count())->toBe(1)
+        ->and($response->json('sheet_sync.message'))->toContain('no sheet cells were written');
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $firstId, 'status' => 'for_billing']);
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $secondId, 'status' => 'for_billing']);
 });
 
 it('reports the exact missing service account configuration before attempting synchronization', function (): void {

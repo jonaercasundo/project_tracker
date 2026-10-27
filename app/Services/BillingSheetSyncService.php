@@ -7,6 +7,7 @@ use App\Models\BillingSheetSync;
 use App\Models\Delivery;
 use App\Models\DeliveryBillingHistory;
 use App\Models\DeliveryBillingRecord;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -85,7 +86,7 @@ class BillingSheetSyncService
                 'idempotency_key' => hash('sha256', 'billing-history:'.$history->getKey().':package-status:'.$package->package_status_id),
                 'outcome' => $supportedLot ? 'queued' : 'not_applicable',
                 'error_details' => $supportedLot ? null : 'Only Lots 2, 9, and 11 are configured for the target sheet.',
-            ], $supportedLot);
+            ], $supportedLot && $billingRecord->billing_batch_id === null);
         }
     }
 
@@ -157,6 +158,264 @@ class BillingSheetSyncService
         $this->finish($sync, 'synced', null, $cell);
     }
 
+    /**
+     * Validate every pending package row in a confirmed batch before writing any target cells.
+     *
+     * @return array{status: string, message: string, synced_count: int, issues: array<int, array{delivery_id: int, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}>}
+     */
+    public function syncBatch(int $batchId, GoogleSheetsApiClient $sheets): array
+    {
+        $syncIds = DB::table('billing_sheet_syncs as sync')
+            ->join('delivery_billing_records as billing', 'billing.delivery_id', '=', 'sync.delivery_id')
+            ->join('delivery_billing_histories as history', 'history.id', '=', 'sync.delivery_billing_history_id')
+            ->where('billing.billing_batch_id', $batchId)
+            ->whereColumn('history.delivery_billing_record_id', 'billing.id')
+            ->where('history.new_status', DeliveryBillingRecord::FOR_BILLING)
+            ->whereRaw('history.id = (select MAX(latest.id) from delivery_billing_histories as latest where latest.delivery_billing_record_id = billing.id and latest.new_status = ?)', [DeliveryBillingRecord::FOR_BILLING])
+            ->orderBy('sync.id')
+            ->pluck('sync.id');
+        $syncs = BillingSheetSync::query()->whereIn('id', $syncIds)->orderBy('id')->get();
+
+        if ($syncs->isEmpty()) {
+            return [
+                'status' => 'error',
+                'message' => 'No Google Sheets reconciliation entries were found for this batch. Billing records remain confirmed and available for review.',
+                'synced_count' => 0,
+                'issues' => [],
+            ];
+        }
+
+        $pendingSyncs = $syncs->reject(fn (BillingSheetSync $sync): bool => in_array($sync->outcome, ['synced', 'already_synced'], true))->values();
+        if ($pendingSyncs->isEmpty()) {
+            return $this->batchSyncSuccess($syncs, 0);
+        }
+
+        $pendingSyncs->each(fn (BillingSheetSync $sync) => $sync->forceFill([
+            'attempts' => $sync->attempts + 1,
+            'error_details' => null,
+        ])->save());
+
+        try {
+            $configuration = $sheets->configurationStatus();
+        } catch (Throwable $exception) {
+            Log::error('Unable to read Google Sheets configuration for confirmed billing batch.', [
+                'billing_batch_id' => $batchId,
+                'billing_sheet_sync_ids' => $pendingSyncs->pluck('id')->all(),
+                'exception' => $exception,
+            ]);
+            $issue = 'Google Sheets configuration could not be read. Billing records remain confirmed and available for review.';
+            $this->markBatchFailure($pendingSyncs, 'configuration_missing', $issue);
+
+            return $this->batchSyncFailure($syncs, $issue);
+        }
+
+        if (! $configuration['configured']) {
+            $issue = $configuration['reason'] ?? 'Google Sheets is not configured.';
+            $this->markBatchFailure($pendingSyncs, 'configuration_missing', $issue);
+
+            return $this->batchSyncFailure($syncs, $issue);
+        }
+
+        $sheetTargets = $pendingSyncs->map(fn (BillingSheetSync $sync): string => $sync->spreadsheet_id.'|'.$sync->sheet_tab)->unique();
+        if ($sheetTargets->count() !== 1) {
+            $issue = 'The batch contains multiple Google Sheets targets. Confirm the batch again only after its saved sheet settings are reviewed.';
+            $this->markBatchFailure($pendingSyncs, 'configuration_mismatch', $issue);
+
+            return $this->batchSyncFailure($syncs, $issue);
+        }
+
+        $invalidSyncs = collect();
+        foreach ($pendingSyncs as $sync) {
+            if ($sync->outcome === 'not_applicable') {
+                $invalidSyncs->push([$sync, 'reconciliation_error', $sync->error_details ?? 'This lot does not have a configured target column.']);
+
+                continue;
+            }
+
+            $expectedColumn = $sync->lot_number === null ? null : $this->targetColumn($sync->lot_number);
+            if ($sync->lot_number === null || $sync->bir_dr === null || trim($sync->bir_dr) === ''
+                || $sync->package_code === null || trim($sync->package_code) === ''
+                || $expectedColumn === null || $sync->target_cell !== $expectedColumn) {
+                $invalidSyncs->push([$sync, 'reconciliation_error', 'The BIR DR, Core Package Code, lot, or unique target column could not be validated.']);
+            }
+        }
+
+        if ($invalidSyncs->isNotEmpty()) {
+            $invalidSyncs->each(fn (array $failure) => $this->finish($failure[0], $failure[1], $failure[2]));
+            $invalidIds = $invalidSyncs->map(fn (array $failure): int => (int) $failure[0]->getKey())->all();
+            $blockedSyncs = $pendingSyncs->reject(fn (BillingSheetSync $sync): bool => in_array((int) $sync->getKey(), $invalidIds, true));
+            $this->markBatchFailure($blockedSyncs, 'batch_blocked', 'No sheet cells were written because another DR/package code in this batch failed validation.');
+
+            return $this->batchSyncFailure($syncs, 'One or more DR/package codes failed validation; no sheet cells were written.');
+        }
+
+        $pendingSyncs->each(fn (BillingSheetSync $sync) => $sync->forceFill(['outcome' => 'syncing'])->save());
+
+        $firstSync = $pendingSyncs->first();
+        $range = $this->quotedTab($firstSync->sheet_tab).'!'.config('google_sheets.billing.read_range', 'A:CI');
+        try {
+            $rows = $sheets->values($range, $firstSync->spreadsheet_id);
+        } catch (Throwable $exception) {
+            Log::error('Unable to read Google Sheets rows for confirmed billing batch.', [
+                'billing_batch_id' => $batchId,
+                'billing_sheet_sync_ids' => $pendingSyncs->pluck('id')->all(),
+                'exception' => $exception,
+            ]);
+            $issue = 'Google Sheets could not be read. No sheet cells were changed; retry reconciliation after checking the connection.';
+            $this->markBatchFailure($pendingSyncs, 'api_failed', $issue);
+
+            return $this->batchSyncFailure($syncs, $issue);
+        }
+
+        $headersByLot = [];
+        $plans = [];
+        $issues = [];
+        foreach ($pendingSyncs as $sync) {
+            $lotNumber = (string) $sync->lot_number;
+            $headersByLot[$lotNumber] ??= $this->findHeaderColumns($rows, $lotNumber);
+            $headers = $headersByLot[$lotNumber];
+            if ($headers === null) {
+                $issues[] = [$sync, 'reconciliation_error', 'Could not identify one unique BIR DR and Core Package Code header pair for Lot '.$lotNumber.'.'];
+
+                continue;
+            }
+
+            $matches = [];
+            foreach ($rows as $rowIndex => $row) {
+                if ($rowIndex <= $headers['header_row']) {
+                    continue;
+                }
+
+                if ($this->normalizeCell($row[$headers['bir_dr_column']] ?? '') === $this->normalizeCell($sync->bir_dr)
+                    && $this->normalizeCell($row[$headers['package_code_column']] ?? '') === $this->normalizeCell($sync->package_code)) {
+                    $matches[] = ['row' => $rowIndex + 1, 'values' => $row];
+                }
+            }
+
+            if (count($matches) !== 1) {
+                $outcome = count($matches) === 0 ? 'no_match' : 'duplicate_match';
+                $message = count($matches) === 0
+                    ? 'No sheet row matched both BIR DR and Core Package Code for Lot '.$lotNumber.'.'
+                    : 'Multiple sheet rows matched both BIR DR and Core Package Code for Lot '.$lotNumber.'.';
+                $issues[] = [$sync, $outcome, $message];
+
+                continue;
+            }
+
+            $cell = $sync->target_cell.$matches[0]['row'];
+            $existingValue = trim((string) ($matches[0]['values'][$this->columnIndex($sync->target_cell)] ?? ''));
+            if ($existingValue !== '' && $existingValue !== $sync->transition_date->toDateString()) {
+                $issues[] = [$sync, 'conflict', 'Target cell '.$cell.' already contains another value; it was left unchanged.'];
+
+                continue;
+            }
+
+            $plans[] = ['sync' => $sync, 'cell' => $cell, 'value' => $sync->transition_date->toDateString(), 'already_synced' => $existingValue !== ''];
+        }
+
+        $plansByCell = collect($plans)->groupBy('cell');
+        foreach ($plansByCell as $cell => $cellPlans) {
+            if ($cellPlans->pluck('value')->unique()->count() > 1) {
+                foreach ($cellPlans as $plan) {
+                    $issues[] = [$plan['sync'], 'ambiguous_write', 'Multiple confirmed records map to '.$cell.' with different values.'];
+                }
+            }
+        }
+
+        if ($issues !== []) {
+            foreach ($issues as [$sync, $outcome, $message]) {
+                $this->finish($sync, $outcome, $message);
+            }
+            $issueIds = collect($issues)->map(fn (array $issue): int => (int) $issue[0]->getKey())->all();
+            $blockedSyncs = $pendingSyncs->reject(fn (BillingSheetSync $sync): bool => in_array((int) $sync->getKey(), $issueIds, true));
+            $this->markBatchFailure($blockedSyncs, 'batch_blocked', 'No sheet cells were written because another DR/package code in this batch needs correction.');
+
+            return $this->batchSyncFailure($syncs, 'One or more DR/package codes were unmatched, ambiguous, or conflicted; no sheet cells were written.');
+        }
+
+        $updates = [];
+        foreach ($plansByCell as $cell => $cellPlans) {
+            if (! $cellPlans->first()['already_synced']) {
+                $updates[] = [
+                    'range' => $this->quotedTab($firstSync->sheet_tab).'!'.$cell,
+                    'majorDimension' => 'ROWS',
+                    'values' => [[$cellPlans->first()['value']]],
+                ];
+            }
+        }
+
+        try {
+            $sheets->updateCells($updates, $firstSync->spreadsheet_id);
+        } catch (Throwable $exception) {
+            Log::error('Google Sheets batch update failed after preflight.', [
+                'billing_batch_id' => $batchId,
+                'billing_sheet_sync_ids' => $pendingSyncs->pluck('id')->all(),
+                'exception' => $exception,
+            ]);
+            $issue = 'Google Sheets could not apply the validated batch update. Retry reconciliation; billing records remain confirmed.';
+            $this->markBatchFailure($pendingSyncs, 'api_failed', $issue);
+
+            return $this->batchSyncFailure($syncs, $issue);
+        }
+
+        foreach ($plans as $plan) {
+            $this->finish($plan['sync'], $plan['already_synced'] ? 'already_synced' : 'synced', null, $plan['cell']);
+        }
+
+        $updatedSyncs = BillingSheetSync::query()->whereIn('id', $syncs->pluck('id'))->orderBy('id')->get();
+
+        return $this->batchSyncSuccess($updatedSyncs, count($updates));
+    }
+
+    /** @param Collection<int, BillingSheetSync> $syncs
+     * @return array{status: string, message: string, synced_count: int, issues: array<int, array{delivery_id: int, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}>}
+     */
+    private function batchSyncSuccess(Collection $syncs, int $updatedCellCount): array
+    {
+        return [
+            'status' => 'success',
+            'message' => $updatedCellCount > 0
+                ? 'Updated '.$updatedCellCount.' Google Sheet cell(s).'
+                : 'All matching Google Sheet values were already synchronized; no duplicate writes were made.',
+            'synced_count' => $syncs->whereIn('outcome', ['synced', 'already_synced'])->count(),
+            'issues' => [],
+        ];
+    }
+
+    /** @param Collection<int, BillingSheetSync> $allSyncs
+     * @return array{status: string, message: string, synced_count: int, issues: array<int, array{delivery_id: int, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}>}
+     */
+    private function batchSyncFailure(Collection $allSyncs, string $message): array
+    {
+        $updatedSyncs = BillingSheetSync::query()->whereIn('id', $allSyncs->pluck('id'))->orderBy('id')->get();
+        $issues = $updatedSyncs
+            ->filter(fn (BillingSheetSync $sync): bool => ! in_array($sync->outcome, ['synced', 'already_synced'], true))
+            ->map(fn (BillingSheetSync $sync): array => [
+                'delivery_id' => (int) $sync->delivery_id,
+                'dr_no' => $sync->bir_dr,
+                'package_code' => $sync->package_code,
+                'lot_number' => $sync->lot_number,
+                'reason' => $sync->error_details ?? 'This package row needs reconciliation.',
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'status' => 'error',
+            'message' => $message,
+            'synced_count' => $updatedSyncs->whereIn('outcome', ['synced', 'already_synced'])->count(),
+            'issues' => $issues,
+        ];
+    }
+
+    /** @param Collection<int, BillingSheetSync> $syncs */
+    private function markBatchFailure(Collection $syncs, string $outcome, string $message): void
+    {
+        foreach ($syncs as $sync) {
+            $this->finish($sync, $outcome, $message);
+        }
+    }
+
     /** @param array<string, mixed> $attributes */
     private function createAndDispatch(array $attributes, bool $dispatch): void
     {
@@ -215,6 +474,7 @@ class BillingSheetSyncService
     private function findHeaderColumns(array $rows, string $lotNumber): ?array
     {
         $maxRows = min(count($rows), (int) config('google_sheets.billing.header_scan_rows', 20));
+        $headerCandidates = [];
         for ($rowIndex = 0; $rowIndex < $maxRows; $rowIndex++) {
             $birColumns = [];
             $packageColumns = [];
@@ -229,12 +489,16 @@ class BillingSheetSyncService
                 }
             }
 
-            if (count($birColumns) === 1 && count($packageColumns) === 1) {
-                return ['header_row' => $rowIndex, 'bir_dr_column' => $birColumns[0], 'package_code_column' => $packageColumns[0]];
+            if ($birColumns !== [] || $packageColumns !== []) {
+                if (count($birColumns) !== 1 || count($packageColumns) !== 1) {
+                    return null;
+                }
+
+                $headerCandidates[] = ['header_row' => $rowIndex, 'bir_dr_column' => $birColumns[0], 'package_code_column' => $packageColumns[0]];
             }
         }
 
-        return null;
+        return count($headerCandidates) === 1 ? $headerCandidates[0] : null;
     }
 
     private function lotNumber(string $lotName): ?string

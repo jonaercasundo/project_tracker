@@ -108,10 +108,20 @@ class BillingRecordController extends Controller
         ]);
     }
 
-    public function retrySheetSync(int $delivery, BillingSheetSync $sync, BillingSheetSyncService $syncService): RedirectResponse
+    public function retrySheetSync(int $delivery, BillingSheetSync $sync, BillingSheetSyncService $syncService, GoogleSheetsApiClient $sheets): RedirectResponse
     {
         abort_unless((int) $sync->delivery_id === $delivery, 404);
         abort_if(in_array($sync->outcome, ['synced', 'already_synced', 'not_applicable'], true), 409);
+
+        $billingBatchId = DeliveryBillingRecord::query()
+            ->where('delivery_id', $delivery)
+            ->value('billing_batch_id');
+        if ($billingBatchId !== null) {
+            $result = $syncService->syncBatch((int) $billingBatchId, $sheets);
+
+            return redirect()->route('billing.records.show', $delivery)
+                ->with($result['status'] === 'success' ? 'success' : 'error', $result['message']);
+        }
 
         $sync->forceFill(['outcome' => 'queued', 'error_details' => null])->save();
         $syncService->dispatch($sync);

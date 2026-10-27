@@ -10,6 +10,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -172,6 +173,68 @@ it('resets all filters through the existing reset link', function () {
     $response->assertOk();
     expect(parse_url($reset, PHP_URL_QUERY))->toBeNull();
     expect($response->viewData('inventories')->total())->toBe(4);
+});
+
+it('filters inventory history by a company-scoped project and preserves the selected project', function () {
+    $user = inventoryFilterUser();
+    inventoryFilterFixtures();
+    Schema::table('projects', fn ($table) => $table->unsignedInteger('company_id')->nullable());
+    Schema::table('inventory_history', function ($table): void {
+        $table->string('changed_by')->nullable();
+        $table->text('remarks')->nullable();
+    });
+    $companyId = $user->currentCompany()->getKey();
+    DB::table('projects')->where('project_id', 1)->update(['company_id' => $companyId]);
+    DB::table('projects')->where('project_id', 2)->update(['company_id' => 999]);
+    foreach (range(1, 51) as $id) {
+        DB::table('inventory_history')->insert([
+            'history_id' => $id,
+            'item_id' => 1,
+            'warehouse_id' => 1,
+            'old_qty' => $id,
+            'new_qty' => $id + 1,
+            'change_type' => 'update',
+            'changed_at' => '2026-10-01 12:00:00',
+        ]);
+    }
+    DB::table('inventory_history')->insert([
+        ['history_id' => 52, 'item_id' => 2, 'warehouse_id' => 1, 'old_qty' => 2, 'new_qty' => 3, 'change_type' => 'update', 'changed_at' => '2026-10-02 12:00:00'],
+        ['history_id' => 53, 'item_id' => null, 'warehouse_id' => 1, 'old_qty' => 3, 'new_qty' => 4, 'change_type' => 'update', 'changed_at' => '2026-10-03 12:00:00'],
+    ]);
+
+    $filters = [
+        'project_id' => 1,
+        'search' => 'Chair',
+        'change_type' => 'update',
+        'warehouse_id' => 1,
+        'date_from' => '2026-10-01',
+        'date_to' => '2026-10-01',
+    ];
+    $response = $this->get('/inventory-history?'.http_build_query($filters));
+
+    $response->assertOk()->assertSee('Project')->assertSee('School');
+    expect($response->viewData('histories')->total())->toBe(51);
+    expect($response->viewData('projects')->pluck('project_id')->all())->toBe([1]);
+    parse_str(parse_url($response->viewData('histories')->nextPageUrl(), PHP_URL_QUERY), $parameters);
+    expect($parameters)->toMatchArray([
+        'project_id' => '1',
+        'search' => 'Chair',
+        'change_type' => 'update',
+        'warehouse_id' => '1',
+        'date_from' => '2026-10-01',
+        'date_to' => '2026-10-01',
+    ]);
+
+    $this->get($response->viewData('histories')->nextPageUrl())->assertOk();
+});
+
+it('does not expose a project outside the selected company through the history filter', function () {
+    $user = inventoryFilterUser();
+    inventoryFilterFixtures();
+    Schema::table('projects', fn ($table) => $table->unsignedInteger('company_id')->nullable());
+    DB::table('projects')->where('project_id', 2)->update(['company_id' => 999]);
+
+    $this->get('/inventory-history?project_id=2')->assertNotFound();
 });
 
 it('rejects invalid warehouse IDs with validation errors', function (mixed $id) {

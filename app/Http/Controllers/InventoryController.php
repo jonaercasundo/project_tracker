@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class InventoryController extends Controller
@@ -256,6 +257,24 @@ class InventoryController extends Controller
 
     public function history(Request $request)
     {
+        $company = $request->user()->currentCompany();
+        $projectsQuery = Project::query()->orderBy('project_name');
+
+        if ($company && Schema::hasColumn('projects', 'company_id')) {
+            $projectsQuery->where(function ($query) use ($company): void {
+                $query->whereNull('company_id')->orWhere('company_id', $company->getKey());
+            });
+        }
+
+        $projects = $projectsQuery->get(['project_id', 'project_name', 'project_code', 'ref_no']);
+
+        if ($request->filled('project_id')) {
+            $validated = $request->validate([
+                'project_id' => ['required', 'integer'],
+            ]);
+            abort_unless($projects->contains('project_id', (int) $validated['project_id']), 404);
+        }
+
         $batchExpr = "IFNULL(batch_no, CONCAT('IND-', history_id))";
 
         $query = InventoryHistory::query()
@@ -315,6 +334,13 @@ class InventoryController extends Controller
             $query->where('warehouse_id', $request->warehouse_id);
         }
 
+        if ($request->filled('project_id')) {
+            $projectId = (int) $request->input('project_id');
+            $query->whereHas('item', function ($itemQuery) use ($projectId): void {
+                $itemQuery->where('project_id', $projectId);
+            });
+        }
+
         if ($request->filled('date_from')) {
             $query->whereDate('changed_at', '>=', $request->date_from);
         }
@@ -363,7 +389,8 @@ class InventoryController extends Controller
 
         return view('inventory.history', compact(
             'histories',
-            'warehouses'
+            'warehouses',
+            'projects'
         ));
     }
 

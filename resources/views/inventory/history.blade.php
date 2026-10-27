@@ -31,7 +31,7 @@
 
     {{-- FILTERS --}}
     <form method="GET" class="mt-8 bg-slate-50 border border-slate-200/60 rounded-xl p-3">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
 
             {{-- Search --}}
             <div class="relative">
@@ -45,6 +45,15 @@
                     placeholder="Search item, user, remarks..."
                     class="w-full pl-9 h-9 text-xs rounded-lg border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition">
             </div>
+
+            {{-- Project --}}
+            <x-searchable-project-filter
+                :projects="$projects"
+                name="project_id"
+                :selected="request('project_id', '')"
+                all-label="All Projects"
+                id="inventory-history-project"
+                rounded="rounded-lg" />
 
             {{-- Change Type --}}
             <select

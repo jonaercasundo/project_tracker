@@ -8,9 +8,17 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
+     *
+     * MySQL may leave the table created if a later ALTER TABLE constraint fails.
+     * The uploader id is optional audit metadata, so it does not depend on the
+     * legacy users.user_id column type. The expense foreign key remains enforced.
      */
     public function up(): void
     {
+        if (Schema::hasTable('mi_liquidation_item_receipts')) {
+            return;
+        }
+
         Schema::create('mi_liquidation_item_receipts', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('liquidation_item_id')
@@ -21,7 +29,6 @@ return new class extends Migration
             $table->string('mime_type', 127);
             $table->unsignedBigInteger('file_size');
             $table->unsignedBigInteger('uploaded_by')->nullable();
-            $table->foreign('uploaded_by')->references('user_id')->on('users')->nullOnDelete();
             $table->text('ocr_reference')->nullable();
             $table->timestamps();
 

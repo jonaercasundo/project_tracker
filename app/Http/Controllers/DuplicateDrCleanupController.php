@@ -25,7 +25,7 @@ class DuplicateDrCleanupController extends Controller
         ]);
         $projects = DB::table('projects')->when(Schema::hasColumn('projects', 'company_id'), function ($query) use ($company): void {
             $query->whereNull('company_id')->orWhere('company_id', $company->company_id);
-        })->orderBy('project_name')->get(['project_id', 'project_name']);
+        })->orderBy('project_name')->get();
 
         return view('deliveries.duplicate-cleanup', [
             'groups' => $this->cleanup->groups((int) $company->company_id, $filters),

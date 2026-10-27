@@ -31,19 +31,23 @@
 
     {{-- FILTERS --}}
     <form method="GET" class="mt-8 bg-slate-50 border border-slate-200/60 rounded-xl p-3">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div class="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
 
             {{-- Search --}}
-            <div class="relative">
-                <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-                </svg>
-                <input
-                    type="text"
-                    name="search"
-                    value="{{ request('search') }}"
-                    placeholder="Search item, user, remarks..."
-                    class="w-full pl-9 h-9 text-xs rounded-lg border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition">
+            <div class="min-w-0 space-y-1">
+                <label for="inventory-history-search" class="text-xs font-semibold text-slate-600">Search</label>
+                <div class="relative">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                    </svg>
+                    <input
+                        id="inventory-history-search"
+                        type="text"
+                        name="search"
+                        value="{{ request('search') }}"
+                        placeholder="Item, user, remarks..."
+                        class="h-[42px] w-full rounded-lg border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                </div>
             </div>
 
             {{-- Project --}}
@@ -52,57 +56,74 @@
                 name="project_id"
                 :selected="request('project_id', '')"
                 all-label="All Projects"
+                :truncate-selected="true"
                 id="inventory-history-project"
                 rounded="rounded-lg" />
 
             {{-- Change Type --}}
-            <select
-                name="change_type"
-                class="w-full h-9 text-xs rounded-lg border-slate-200 bg-white text-slate-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition">
-                <option value="">All Changes</option>
-                <option value="insert" {{ request('change_type') == 'insert' ? 'selected' : '' }}>Insert</option>
-                <option value="update" {{ request('change_type') == 'update' ? 'selected' : '' }}>Update</option>
-                <option value="delete" {{ request('change_type') == 'delete' ? 'selected' : '' }}>Delete</option>
-                <option value="stock_in" {{ request('change_type') == 'stock_in' ? 'selected' : '' }}>Stock In</option>
-                <option value="stock_out" {{ request('change_type') == 'stock_out' ? 'selected' : '' }}>Stock Out</option>
-            </select>
+            <div class="min-w-0 space-y-1">
+                <label for="inventory-history-change-type" class="text-xs font-semibold text-slate-600">Change Type</label>
+                <select
+                    id="inventory-history-change-type"
+                    name="change_type"
+                    class="h-[42px] w-full rounded-lg border-slate-200 bg-white text-xs text-slate-700 transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    <option value="">All Changes</option>
+                    <option value="insert" {{ request('change_type') == 'insert' ? 'selected' : '' }}>Insert</option>
+                    <option value="update" {{ request('change_type') == 'update' ? 'selected' : '' }}>Update</option>
+                    <option value="delete" {{ request('change_type') == 'delete' ? 'selected' : '' }}>Delete</option>
+                    <option value="stock_in" {{ request('change_type') == 'stock_in' ? 'selected' : '' }}>Stock In</option>
+                    <option value="stock_out" {{ request('change_type') == 'stock_out' ? 'selected' : '' }}>Stock Out</option>
+                </select>
+            </div>
 
             {{-- Warehouse --}}
-            <select
-                name="warehouse_id"
-                class="w-full h-9 text-xs rounded-lg border-slate-200 bg-white text-slate-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition">
-                <option value="">All Warehouses</option>
-                @foreach($warehouses as $warehouse)
-                    <option value="{{ $warehouse->warehouse_id }}" {{ request('warehouse_id') == $warehouse->warehouse_id ? 'selected' : '' }}>
-                        {{ $warehouse->warehouse_name }}
-                    </option>
-                @endforeach
-            </select>
+            <div class="min-w-0 space-y-1">
+                <label for="inventory-history-warehouse" class="text-xs font-semibold text-slate-600">Warehouse</label>
+                <select
+                    id="inventory-history-warehouse"
+                    name="warehouse_id"
+                    class="h-[42px] w-full rounded-lg border-slate-200 bg-white text-xs text-slate-700 transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    <option value="">All Warehouses</option>
+                    @foreach($warehouses as $warehouse)
+                        <option value="{{ $warehouse->warehouse_id }}" {{ request('warehouse_id') == $warehouse->warehouse_id ? 'selected' : '' }}>
+                            {{ $warehouse->warehouse_name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
 
             {{-- Date From --}}
-            <input
-                type="date"
-                name="date_from"
-                value="{{ request('date_from') }}"
-                class="w-full h-9 text-xs rounded-lg border-slate-200 bg-white text-slate-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition">
+            <div class="min-w-0 space-y-1">
+                <label for="inventory-history-date-from" class="text-xs font-semibold text-slate-600">Start Date</label>
+                <input
+                    id="inventory-history-date-from"
+                    type="date"
+                    name="date_from"
+                    value="{{ request('date_from') }}"
+                    class="h-[42px] w-full rounded-lg border-slate-200 bg-white px-3 text-xs text-slate-600 transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            </div>
 
             {{-- Date To --}}
-            <input
-                type="date"
-                name="date_to"
-                value="{{ request('date_to') }}"
-                class="w-full h-9 text-xs rounded-lg border-slate-200 bg-white text-slate-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition">
+            <div class="min-w-0 space-y-1">
+                <label for="inventory-history-date-to" class="text-xs font-semibold text-slate-600">End Date</label>
+                <input
+                    id="inventory-history-date-to"
+                    type="date"
+                    name="date_to"
+                    value="{{ request('date_to') }}"
+                    class="h-[42px] w-full rounded-lg border-slate-200 bg-white px-3 text-xs text-slate-600 transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            </div>
         </div>
 
         {{-- Action Buttons --}}
-        <div class="mt-3 flex gap-2 justify-end">
+        <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
             <a href="{{ route('inventory.history') }}"
-               class="px-4 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition">
+               class="flex h-[42px] items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
                 Reset
             </a>
             <button
                 type="submit"
-                class="px-5 h-9 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 active:bg-slate-950 transition tracking-wide">
+                class="h-[42px] rounded-lg bg-slate-900 px-5 text-xs font-semibold tracking-wide text-white transition hover:bg-slate-800 active:bg-slate-950">
                 Filter
             </button>
         </div>

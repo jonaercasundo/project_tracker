@@ -3,6 +3,7 @@
     'name' => 'project_id',
     'selected' => '',
     'allLabel' => 'All Projects',
+    'truncateSelected' => false,
     'enabled' => true,
     'rounded' => 'rounded-lg',
     'id' => 'project-filter',
@@ -46,8 +47,8 @@
             @keydown.escape.stop="open && dismiss()"
             :disabled="!enabled" :aria-expanded="open.toString()"
             aria-haspopup="listbox" aria-controls="{{ $optionsId }}" aria-labelledby="{{ $labelId }}"
-            class="flex min-h-[42px] w-full items-center justify-between gap-3 {{ $rounded }} border border-slate-300 bg-white px-3 py-2.5 text-left text-sm font-normal text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
-            <span class="min-w-0 whitespace-normal break-words" x-text="selectedLabel()">{{ $projects->firstWhere('project_id', $selected)?->project_name ?? $allLabel }}</span>
+            class="flex {{ $truncateSelected ? 'h-[42px]' : 'min-h-[42px]' }} w-full min-w-0 items-center justify-between gap-3 {{ $rounded }} border border-slate-300 bg-white px-3 py-2 text-left text-sm font-normal text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
+            <span class="{{ $truncateSelected ? 'min-w-0 flex-1 truncate whitespace-nowrap' : 'min-w-0 whitespace-normal break-words' }}" :title="selectedLabel()" x-text="selectedLabel()">{{ $projects->firstWhere('project_id', $selected)?->project_name ?? $allLabel }}</span>
             <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
         </button>
 

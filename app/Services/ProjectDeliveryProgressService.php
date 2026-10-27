@@ -371,6 +371,44 @@ class ProjectDeliveryProgressService
         return $deliveries;
     }
 
+    /**
+     * Count distinct valid DRs whose current package status is released and whose
+     * project item has a recorded stock-out history entry.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function stockOutDrStats(array $filters): Builder
+    {
+        $historyItems = DB::table('inventory_history as history')
+            ->join('item as history_item', 'history_item.item_id', '=', 'history.item_id')
+            ->where('history.change_type', 'stock_out')
+            ->whereColumn('history.old_qty', '>', 'history.new_qty')
+            ->select(['history_item.project_id', 'history.item_id'])
+            ->distinct();
+
+        $releasedDrs = DB::query()->fromSub($this->packageAllocations($filters), 'allocation')
+            ->join('package_content as content', 'content.package_id', '=', 'allocation.package_id')
+            ->joinSub($historyItems, 'stock_out_history', function (JoinClause $join): void {
+                $join->on('stock_out_history.project_id', '=', 'allocation.project_id')
+                    ->on('stock_out_history.item_id', '=', 'content.item_id');
+            })
+            ->where('allocation.package_status', 'released')
+            ->select(['allocation.project_id', 'allocation.dr_no']);
+        $this->groupReceipts($releasedDrs, 'allocation');
+
+        $matchedReceipts = DB::query()->fromSub($this->receipts($filters)->select(['receipt.project_id', 'receipt.dr_no']), 'receipt')
+            ->joinSub($releasedDrs, 'stock_out_dr', function (JoinClause $join): void {
+                $this->matchReceipt($join, 'stock_out_dr', 'receipt');
+            })
+            ->select(['receipt.project_id', 'receipt.dr_no']);
+        $this->groupReceipts($matchedReceipts, 'receipt');
+
+        return DB::query()->fromSub($matchedReceipts, 'stock_out_receipt')
+            ->select('stock_out_receipt.project_id')
+            ->selectRaw('COUNT(*) as stock_out_drs_count')
+            ->groupBy('stock_out_receipt.project_id');
+    }
+
     /** Each join is already reduced to at most one row per project. @param array<string, mixed> $filters */
     public function recordsQuery(array $filters): Builder
     {
@@ -379,6 +417,10 @@ class ProjectDeliveryProgressService
             ->leftJoinSub($this->billingStats($filters), 'billing_stats', 'billing_stats.project_id', '=', 'p.project_id')
             ->leftJoinSub($this->deliveryBillingStats($filters), 'delivery_billing_stats', 'delivery_billing_stats.project_id', '=', 'p.project_id')
             ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'delivery_stats.last_delivery_date', 'delivery_stats.last_accepted_date', 'delivery_stats.last_dr_date', 'billing_stats.last_billing_date']);
+        if (! (bool) ($filters['compact'] ?? false)) {
+            $query->leftJoinSub($this->stockOutDrStats($filters), 'stock_out_stats', 'stock_out_stats.project_id', '=', 'p.project_id')
+                ->selectRaw('COALESCE(stock_out_stats.stock_out_drs_count, 0) as stock_out_drs_count');
+        }
         if (! (bool) ($filters['compact'] ?? false)) {
             $lotNames = $this->deliveries($filters)
                 ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
@@ -684,7 +726,7 @@ class ProjectDeliveryProgressService
                 $summary[$column] = (int) $projects->sum($column);
             }
         }
-        foreach (['total_deliveries_count', 'delivery_rows_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count', 'billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count', 'delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count'] as $column) {
+        foreach (['total_deliveries_count', 'delivery_rows_count', 'stock_out_drs_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count', 'billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count', 'delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count'] as $column) {
             $summary[$column] ??= 0;
         }
         $summary['progress_basis'] = $summary['total_deliveries_count'] > 0 ? 'delivery_receipts' : 'no_delivery_receipts';
@@ -740,11 +782,9 @@ class ProjectDeliveryProgressService
 
         return [
             'dr' => $this->stage($counts['total_deliveries_count'], $counts['total_deliveries_count'], 'DR receipts') + ['label' => 'DR', 'context' => 'Recorded receipts; the workflow baseline', 'source' => 'deliveries grouped by exact project_id + dr_no'],
-            'stock_out' => [
-                'label' => 'Stock Out', 'completed' => $warehouse['stock_out'], 'total' => $warehouse['required'], 'percent' => $warehouse['stock_out_percent'],
-                'unit' => $warehouse['unit'], 'available' => $warehouse['stock_out'] !== null,
-                'context' => 'Recorded project item quantities released from warehouse; whole-project history',
-                'source' => 'inventory_history stock_out quantity (old_qty - new_qty), project via item.project_id',
+            'stock_out' => $this->stage($counts['stock_out_drs_count'], $counts['total_deliveries_count'], 'DRs') + [
+                'label' => 'Stock Out', 'context' => 'Distinct valid DRs with a released package and matching project-item stock-out history',
+                'source' => 'Latest released package status joined to package contents and project inventory_history stock_out items; grouped by exact project_id + DR number',
             ],
             'delivered' => $this->stage($counts['completed_deliveries_count'], $counts['total_deliveries_count'], 'Delivery Receipts') + [
                 'label' => 'Delivered', 'context' => 'Valid DRs with all expected packages delivered or accepted; delivery status fallback when no packages exist',
@@ -823,11 +863,11 @@ class ProjectDeliveryProgressService
     public function definitions(): array
     {
         return [
-            'pipeline' => 'Warehouse readiness is separate from DR -> Stock Out -> Delivered -> Billing -> Billed. Stock Out uses project item transaction quantities, delivery uses valid DR receipts, and billing uses matched DR/group records. Stage units are not interchangeable.',
+            'pipeline' => 'Warehouse readiness is separate from DR -> Stock Out -> Delivered -> Billing -> Billed. Stock Out counts distinct valid DRs with a released package and matching project-item stock-out history; delivery uses valid DR receipts, and billing uses matched DR/group records.',
             'stock_in' => 'SUM(new_qty - old_qty) for inventory_history.change_type = stock_in, grouped by item then project through item.project_id. Manual inventory insert deltas are reported separately as opening stock. Stock In does not require a DR link.',
-            'stock_out' => 'SUM(old_qty - new_qty) for inventory_history.change_type = stock_out, project via item.project_id. The QR workflow releases package contents and records content.qty x delivery.package_qty as item quantities. History stores item, warehouse, batch_no and changed_at, but no DR/package reference; these are whole-project item releases, not inferred DR releases.',
+            'stock_out' => 'Distinct valid project DRs with at least one current released package allocation and a stock-out history entry for a project item contained in that package. The inventory history table does not store a direct DR/package key; current package release status is recorded in the same transaction as its item stock-out history.',
             'warehouse_readiness' => 'Current stock is SUM(inventory.qty), exactly the balance used by Inventory and the scanner. History net is SUM(new_qty - old_qty), including insert/update adjustments; disagreements are flagged. Required item quantity is SUM(package_content.qty x deliveries.package_qty) over expected project DR allocations; non-positive content.qty uses 1, matching the scanner. Availability covers at most the required quantity of each item. Readiness = sum covered item quantities / sum required quantities x 100 within a single item unit; mixed units remain separate. Missing delivery package quantities make readiness unavailable. Warehouse inventory/history always use the whole project, while DR filters restrict delivery/billing.',
-            'operational_progress' => 'Normalized quantity ratios, each weighted 25%: recorded Stock Out item quantity / planned DR item quantity; completed valid DR receipts / total valid DR receipts; for billing + billed + paid records / recorded DR/group records; billed + paid records / recorded DR/group records. DR creation is the baseline. Warehouse readiness is not a completion stage. Mixed stock units, missing quantities or zero denominators make overall progress unavailable. A DR year/location/status filter also makes overall unavailable because project-wide inventory history cannot be assigned to that DR subset.',
+            'operational_progress' => 'Normalized DR ratios, each weighted 25%: distinct stock-out DRs / total valid DRs; completed valid DR receipts / total valid DR receipts; for billing + billed + paid records / recorded DR/group records; billed + paid records / recorded DR/group records. DR creation is the baseline. Warehouse readiness is not a completion stage. Zero denominators make overall progress unavailable. Delivery filters scope the delivery-backed stages and project-item history matches.',
             'pipeline_billed' => 'Billed stage shows exact current billed records; paid stays separate. The normalized final billing milestone includes paid because it is a later billing stage. Billing entry includes all three recorded billing statuses. Unrecorded billing is unknown.',
             'last_activity' => 'Latest recorded deliveries.created_at, delivered_date, accepted_date, billing_grouped.created_at or project inventory_history.changed_at. Billing recorded is the DR/group link date, not an invented billed-status update timestamp. Inventory activity is attributed via the existing item project relationship.',
             'deliveries' => 'Distinct exact DR receipts per project, rather than delivery rows. Receipt status is uniform expected package status, otherwise mixed; delivery row status is the fallback when no packages are defined.',

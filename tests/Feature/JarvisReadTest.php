@@ -251,6 +251,45 @@ it('keeps unassigned DRs in project totals and renders receipt based delivery pr
     $this->getJson('/deliveries/monitoring/1/details?section=delivered')->assertJsonPath('records.total', 2);
 });
 
+it('counts distinct stock-out DRs once when matching package item history exists', function () {
+    jarvisOperations();
+    DB::table('package_status')->insert([
+        ['delivery_id' => 1, 'package_id' => 2, 'status' => 'released'],
+    ]);
+    DB::table('inventory_history')->insert([
+        ['item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 20, 'new_qty' => 18, 'change_type' => 'stock_out', 'batch_no' => 'BATCH-1'],
+        ['item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 18, 'new_qty' => 16, 'change_type' => 'stock_out', 'batch_no' => 'BATCH-2'],
+    ]);
+
+    $project = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1])['projects']->first();
+
+    expect($project['operational_pipeline']['stock_out'])->toMatchArray([
+        'completed' => 1,
+        'total' => 2,
+        'percent' => 50.0,
+        'unit' => 'DRs',
+    ]);
+});
+
+it('shows zero stock-out DRs and zero percent when no matching stock-out history exists', function () {
+    jarvisOperations();
+    DB::table('item')->insert(['item_id' => 3, 'item_name' => 'Workbook', 'project_id' => 1, 'unit' => 'boxes']);
+    DB::table('package_content')->insert(['package_id' => 1, 'item_id' => 3, 'qty' => 1]);
+
+    $user = jarvisReader();
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    $page = $this->get('/deliveries/monitoring?project_id=1');
+    $project = $page->viewData('report')['projects']->first();
+
+    $page->assertSee('2 DRs')->assertSee('0.0%')->assertDontSee('Per item unit');
+    expect($project['operational_pipeline']['stock_out'])->toMatchArray([
+        'completed' => 0,
+        'total' => 2,
+        'percent' => 0.0,
+    ]);
+});
+
 it('excludes invalid DRs even when their package statuses indicate delivery completion', function (string $status) {
     jarvisOperations();
     DB::table('deliveries')->where('delivery_id', 2)->update(['status' => $status]);
@@ -1024,10 +1063,10 @@ it('reconciles manually encoded stock quantities and current inventory through t
         ->assertJsonPath('data.projects.0.warehouse_readiness.history_balance', 85)
         ->assertJsonPath('data.projects.0.warehouse_readiness.covered', 55)
         ->assertJsonPath('data.projects.0.warehouse_readiness.percent', 100)
-        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.completed', 25)
-        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.total', 55)
-        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.percent', 45.45)
-        ->assertJsonPath('data.projects.0.overall_progress', 73.86)
+        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.completed', 1)
+        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.total', 2)
+        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.percent', 50)
+        ->assertJsonPath('data.projects.0.overall_progress', 75)
         ->assertJsonPath('data.projects.0.last_activity.type', 'Inventory activity')
         ->assertJsonCount(0, 'data.projects.0.data_integrity_flags');
     jarvisRead('inventory', $token, ['project_id' => 1, 'item_id' => 1])->assertJsonPath('data.0.qty', 85);
@@ -1060,7 +1099,9 @@ it('keeps different inventory units separate instead of summing incompatible qua
         ->assertJsonCount(2, 'data.projects.0.warehouse_readiness.by_unit')
         ->assertJsonPath('data.projects.0.warehouse_readiness.by_unit.0.required', 15)
         ->assertJsonPath('data.projects.0.warehouse_readiness.by_unit.1.required', 6)
-        ->assertJsonPath('data.projects.0.overall_progress', null);
+        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.completed', 0)
+        ->assertJsonPath('data.projects.0.operational_pipeline.stock_out.total', 2)
+        ->assertJsonPath('data.projects.0.overall_progress', 62.5);
 });
 
 it('keeps project-wide inventory unchanged by DR filters and suppresses a mixed-scope overall percentage', function () {

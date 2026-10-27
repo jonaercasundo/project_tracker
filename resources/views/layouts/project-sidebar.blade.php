@@ -161,20 +161,6 @@
             </a>
         @endif
 
-        @if($currentUser?->hasAnyRole(['user', 'Administrator']) && $currentCompany?->code === 'MMC' && $currentCompany?->is_active)
-            <a href="{{ route('deliveries.duplicate-cleanup') }}"
-               @if(request()->routeIs('deliveries.duplicate-cleanup*')) aria-current="page" @endif
-               class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('deliveries.duplicate-cleanup*') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
-                @if(request()->routeIs('deliveries.duplicate-cleanup*'))
-                    <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
-                @endif
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h11M8 12h11M8 17h11M4 7h.01M4 12h.01M4 17h.01" />
-                </svg>
-                <span>Duplicate DR Cleanup</span>
-            </a>
-        @endif
-
         @if($currentCompany?->code === 'MMC' && $currentCompany?->is_active && ($currentUser?->hasRole('Administrator') || $currentUser?->hasRole('user') || $currentUser?->can('billing.qr.scan') || $currentUser?->can('billing.records.view')))
             @php($billingMenuActive = request()->routeIs('billing.dashboard', 'billing.prepare*', 'billing.batches.*', 'billing.records.*', 'billing.scanner*', 'billing.google-sheets-settings*'))
             <div x-data="{ open: {{ $billingMenuActive ? 'true' : 'false' }} }" class="block">

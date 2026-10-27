@@ -272,9 +272,11 @@ if (monitoring) {
 
     function restoreFilters(url) {
         const filters = new URL(url).searchParams;
-        for (const name of ['year', 'project_id', 'delivery_status', 'region', 'search', 'sort']) {
+        for (const name of ['year', 'delivery_status', 'region', 'search', 'sort']) {
             form.elements[name].value = filters.get(name) ?? '';
         }
+        form.elements.project_id.value = filters.get('project_id') ?? '';
+        form.elements.project_id.dispatchEvent(new Event('change', { bubbles: true }));
         form.elements.direction.value = filters.get('direction') ?? 'asc';
         document.getElementById('monitoring-active').checked = filters.get('active_only') === '1';
         fillLocations(division, 'division', [], filters.get('division') ?? '');

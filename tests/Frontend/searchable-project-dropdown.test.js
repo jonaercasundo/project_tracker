@@ -73,3 +73,25 @@ test('positions its fixed menu within a narrow viewport and caps its height at 3
     assert.equal(dropdown.dropdownStyle.maxHeight, '350px');
     globalThis.window = originalWindow;
 });
+
+test('keeps its project menu inside the desktop viewport while using the available trigger width', () => {
+    const originalWindow = globalThis.window;
+    globalThis.window = { innerWidth: 1440, innerHeight: 900 };
+    const dropdown = searchableProjectDropdown({
+        options: [],
+        selectedId: '',
+        enabled: true,
+        allLabel: 'All Projects',
+        idPrefix: 'monitoring-project',
+    });
+    dropdown.$refs = {
+        trigger: { getBoundingClientRect: () => ({ left: 1300, right: 1700, top: 300, bottom: 342, width: 400 }) },
+    };
+
+    dropdown.positionDropdown();
+
+    assert.equal(dropdown.dropdownStyle.width, '400px');
+    assert.equal(dropdown.dropdownStyle.left, '1032px');
+    assert.equal(dropdown.dropdownStyle.maxHeight, '350px');
+    globalThis.window = originalWindow;
+});

@@ -16,7 +16,7 @@
     $projectOptions = $projects->map(fn ($project) => [
         'id' => (string) $project->project_id,
         'name' => (string) $project->project_name,
-        'code' => (string) ($project->project_code ?: $project->ref_no ?: ''),
+        'code' => (string) (($project->project_code ?? null) ?: ($project->ref_no ?? '')),
     ])->values();
 @endphp
 
@@ -30,6 +30,7 @@
         idPrefix: @js($id),
     })"
          @click.outside="dismiss()"
+         @change="selectedId = $refs.project.value"
          @keydown.escape.window="open && dismiss()"
          @keydown.tab="open = false; search = ''"
          @resize.window="open && positionDropdown()"

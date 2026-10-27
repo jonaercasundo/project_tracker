@@ -1111,9 +1111,12 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
 
     $this->get('/deliveries/monitoring')->assertOk()->assertSee('Project Delivery Monitoring')
         ->assertSee('Delivery Monitoring')->assertSee('Science Kits')->assertSee('Oct 03, 2026')
+        ->assertSee('id="monitoring-project-trigger"', false)->assertSee('role="listbox"', false)
+        ->assertSee('Search projects by name or code...', false)
         ->assertDontSee('data-detail-section')->assertDontSee('deliveryMonitoringLocations')
         ->assertSee('Operational Progress')->assertSee('Warehouse Readiness')->assertSee('Stock Out')->assertSee('Last Activity')
         ->assertDontSee('DR link missing');
+    $this->get('/deliveries/monitoring?project_id=1')->assertOk()->assertSee('name="project_id" value="1"', false);
     $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()
         ->assertJsonPath('projects.0.delivery_progress_percent', 50)
         ->assertJsonPath('summary.total_packages_count', 4)->assertJsonStructure(['summary_html', 'projects_html']);
@@ -1127,6 +1130,22 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
     expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
     $this->get('/deliveries/monitoring?project_id=2&active_only=1')->assertOk()
         ->assertSee('The selected project is inactive and Active projects only is enabled.');
+});
+
+it('renders long project names in a searchable monitoring filter without losing the selected project', function () {
+    jarvisOperations();
+    $projectName = '2026 School Nutrition and Learning Materials Distribution Program - Northern Division';
+    DB::table('projects')->where('project_id', 1)->update(['project_name' => $projectName]);
+    $user = jarvisReader(true, true, false);
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->get('/deliveries/monitoring?project_id=1')->assertOk()
+        ->assertSee($projectName)
+        ->assertSee('id="monitoring-project-trigger"', false)
+        ->assertSee('name="project_id" value="1"', false)
+        ->assertSee('role="listbox"', false)
+        ->assertSee('whitespace-normal break-words', false);
 });
 
 it('shows every project status by default and keeps the optional active filter explicit', function () {

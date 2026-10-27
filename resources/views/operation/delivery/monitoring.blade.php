@@ -25,14 +25,15 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
-                    <label for="monitoring-project" class="mb-1 block text-xs font-semibold text-slate-600">Project</label>
-                    <select id="monitoring-project" name="project_id" class="w-full rounded-xl border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
-                        <option value="">All projects</option>
-                        @foreach($projects as $project)
-                            <option value="{{ $project->project_id }}" @selected(($filters['project_id'] ?? '') == $project->project_id)>{{ $project->project_name }}</option>
-                        @endforeach
-                    </select>
+                <div class="min-w-0">
+                    <x-searchable-project-filter
+                        :projects="$projects"
+                        name="project_id"
+                        :selected="$filters['project_id'] ?? ''"
+                        all-label="All projects"
+                        id="monitoring-project"
+                        rounded="rounded-xl"
+                    />
                 </div>
                 <div>
                     <label for="monitoring-status" class="mb-1 block text-xs font-semibold text-slate-600">Delivery Status</label>

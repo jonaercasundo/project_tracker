@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BillingSheetSync;
 use App\Models\DeliveryBillingRecord;
+use App\Services\BillingSheetSyncService;
+use App\Services\GoogleSheetsApiClient;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -58,7 +62,28 @@ class BillingRecordController extends Controller
                 'invoice.amount as invoice_amount',
             ]);
 
-        return view('billing.records.show', compact('record', 'history'));
+        $sheetSyncs = BillingSheetSync::query()
+            ->where('delivery_id', $delivery)
+            ->orderByDesc('id')
+            ->get();
+
+        return view('billing.records.show', [
+            'record' => $record,
+            'history' => $history,
+            'sheetSyncs' => $sheetSyncs,
+            'sheetConfiguration' => app(GoogleSheetsApiClient::class)->configurationStatus(),
+        ]);
+    }
+
+    public function retrySheetSync(int $delivery, BillingSheetSync $sync, BillingSheetSyncService $syncService): RedirectResponse
+    {
+        abort_unless((int) $sync->delivery_id === $delivery, 404);
+        abort_if(in_array($sync->outcome, ['synced', 'already_synced', 'not_applicable'], true), 409);
+
+        $sync->forceFill(['outcome' => 'queued', 'error_details' => null])->save();
+        $syncService->dispatch($sync);
+
+        return redirect()->route('billing.records.show', $delivery)->with('success', 'Google Sheets reconciliation has been queued.');
     }
 
     public function export(Request $request): StreamedResponse

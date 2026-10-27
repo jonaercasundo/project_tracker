@@ -4,10 +4,13 @@ namespace App\Services;
 
 use App\Exceptions\BillingTransitionException;
 use App\Models\Delivery;
+use App\Models\DeliveryBillingHistory;
 use App\Models\DeliveryBillingRecord;
 use App\Models\Invoice;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class DeliveryBillingService
 {
@@ -30,7 +33,16 @@ class DeliveryBillingService
             $billingRecord->billing_batch_id = $billingBatchId;
             $billingRecord->save();
 
-            $this->recordTransition($billingRecord, $currentStatus, DeliveryBillingRecord::FOR_BILLING, $actor);
+            $history = $this->recordTransition($billingRecord, $currentStatus, DeliveryBillingRecord::FOR_BILLING, $actor);
+            try {
+                app(BillingSheetSyncService::class)->queueForTransition($delivery, $billingRecord, $history);
+            } catch (Throwable $exception) {
+                Log::error('Unable to record the billing-to-Google-Sheets reconciliation event.', [
+                    'delivery_id' => $delivery->delivery_id,
+                    'billing_record_id' => $billingRecord->getKey(),
+                    'exception' => $exception,
+                ]);
+            }
 
             return $billingRecord->refresh();
         }, 3);
@@ -181,8 +193,8 @@ class DeliveryBillingService
         User $actor,
         ?int $invoiceId = null,
         ?string $remarks = null
-    ): void {
-        $billingRecord->histories()->create([
+    ): DeliveryBillingHistory {
+        return $billingRecord->histories()->create([
             'previous_status' => $previousStatus,
             'new_status' => $newStatus,
             'invoice_id' => $invoiceId,

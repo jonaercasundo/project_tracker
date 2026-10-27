@@ -813,6 +813,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
             Route::get('/records/export', [BillingRecordController::class, 'export'])
                 ->middleware('can:billing.reports.export')
                 ->name('records.export');
+            Route::post('/records/{delivery}/sheet-sync/{sync}/retry', [BillingRecordController::class, 'retrySheetSync'])
+                ->whereNumber(['delivery', 'sync'])
+                ->middleware('can:billing.records.view')
+                ->name('records.sheet-sync.retry');
             Route::get('/records/{delivery}', [BillingRecordController::class, 'show'])
                 ->whereNumber('delivery')
                 ->middleware('can:billing.records.view')

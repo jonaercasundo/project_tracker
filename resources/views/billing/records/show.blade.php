@@ -45,6 +45,44 @@
 
         <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div class="border-b border-slate-200 px-5 py-4">
+                <h2 class="font-bold text-slate-900">Google Sheets delivery-date reconciliation</h2>
+                <p class="mt-1 text-sm text-slate-600">{{ $sheetConfiguration['configured'] ? 'Google Sheets credentials and target are configured.' : $sheetConfiguration['reason'] }}</p>
+            </div>
+            <div class="divide-y divide-slate-100">
+                @forelse ($sheetSyncs as $sync)
+                    @php
+                        $syncLabel = str($sync->outcome)->replace('_', ' ')->title();
+                        $syncTone = in_array($sync->outcome, ['synced', 'already_synced'], true) ? 'bg-emerald-50 text-emerald-800'
+                            : (in_array($sync->outcome, ['conflict', 'no_match', 'duplicate_match', 'reconciliation_error', 'api_failed'], true) ? 'bg-rose-50 text-rose-800'
+                                : (in_array($sync->outcome, ['configuration_missing', 'queue_unavailable', 'dispatch_failed', 'retrying'], true) ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-700'));
+                        $canRetrySheetSync = !in_array($sync->outcome, ['synced', 'already_synced', 'not_applicable'], true);
+                    @endphp
+                    <article class="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto] sm:items-start">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <strong class="text-sm text-slate-900">{{ $sync->lot_number ? 'Lot '.$sync->lot_number : 'Lot not identified' }}</strong>
+                                <span class="rounded-full px-2.5 py-1 text-xs font-bold {{ $syncTone }}">{{ $syncLabel }}</span>
+                                @if ($sync->target_cell)<span class="font-mono text-xs text-slate-500">{{ $sync->sheet_tab }}!{{ $sync->target_cell }}</span>@endif
+                            </div>
+                            <p class="mt-2 break-words text-sm text-slate-700">BIR DR: <span class="font-mono">{{ $sync->bir_dr ?? 'Not available' }}</span> · Core Package Code: <span class="font-mono">{{ $sync->package_code ?? 'Not available' }}</span></p>
+                            <p class="mt-1 text-xs text-slate-500">Transition date: {{ $sync->transition_date->toDateString() }} · Attempts: {{ $sync->attempts }}</p>
+                            @if ($sync->error_details)<p class="mt-2 break-words text-sm text-rose-700">{{ $sync->error_details }}</p>@endif
+                        </div>
+                        @if ($canRetrySheetSync)
+                            <form method="POST" action="{{ route('billing.records.sheet-sync.retry', [$record->delivery_id, $sync]) }}">
+                                @csrf
+                                <button type="submit" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-500 hover:text-blue-700">Retry reconciliation</button>
+                            </form>
+                        @endif
+                    </article>
+                @empty
+                    <p class="px-5 py-5 text-sm text-slate-500">No Billing transition has been queued for Google Sheets.</p>
+                @endforelse
+            </div>
+        </section>
+
+        <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div class="border-b border-slate-200 px-5 py-4">
                 <h2 class="font-bold text-slate-900">Billing history</h2>
                 <p class="mt-1 text-sm text-slate-500">Status transitions are append-only and retain the acting user and timestamp.</p>
             </div>

@@ -1,9 +1,16 @@
 <?php
 
+use App\Exceptions\GoogleSheetsApiException;
+use App\Jobs\SyncBillingSheetDate;
+use App\Models\BillingSheetSync;
 use App\Models\User;
+use App\Services\BillingSheetSyncService;
 use App\Services\DeliveryBillingQrCodeService;
+use App\Services\DeliveryBillingService;
+use App\Services\GoogleSheetsApiClient;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
@@ -95,6 +102,209 @@ function confirmDeliveryForBilling(int $deliveryId): void
 {
     test()->postJson(route('billing.for-billing', $deliveryId))->assertOk();
 }
+
+function addPackageToBillingDelivery(int $deliveryId, string $packageCode): int
+{
+    $delivery = DB::table('deliveries')->where('delivery_id', $deliveryId)->first();
+    $packageId = (int) DB::table('package')->insertGetId([
+        'lot_id' => $delivery->lot_id,
+        'package_code' => $packageCode,
+    ], 'package_id');
+    DB::table('package_status')->insert([
+        'delivery_id' => $deliveryId,
+        'package_id' => $packageId,
+        'status' => 'pending',
+    ]);
+
+    return $packageId;
+}
+
+/** @return array<int, array<int, string>> */
+function billingSheetRows(string $lotNumber, string $birDr, string $packageCode, string $targetCellValue = ''): array
+{
+    $header = array_fill(0, 87, '');
+    $header[1] = 'BIR DR Lot '.$lotNumber;
+    $header[2] = 'Core Package Code Lot'.$lotNumber;
+    $record = array_fill(0, 87, '');
+    $record[1] = $birDr;
+    $record[2] = $packageCode;
+    $targetColumnIndex = ['2' => 57, '9' => 72, '11' => 86][$lotNumber];
+    $record[$targetColumnIndex] = $targetCellValue;
+
+    return [$header, $record];
+}
+
+it('queues auditable syncs for Lots 2, 9, and 11 with their configured target columns', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    config(['queue.default' => 'database', 'queue.connections.database.driver' => 'database']);
+    config([
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $targetColumns = ['2' => 'BF', '9' => 'BU', '11' => 'CI'];
+    foreach ($targetColumns as $lotNumber => $column) {
+        $deliveryId = createBillingDelivery('BIR-DR-'.$lotNumber);
+        DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot '.$lotNumber]);
+        $packageId = addPackageToBillingDelivery($deliveryId, 'CORE-'.$lotNumber);
+
+        confirmDeliveryForBilling($deliveryId);
+
+        $sync = BillingSheetSync::query()->where('delivery_id', $deliveryId)->sole();
+        expect($sync->package_id)->toBe($packageId)
+            ->and($sync->lot_number)->toBe((string) $lotNumber)
+            ->and($sync->bir_dr)->toBe('BIR-DR-'.$lotNumber)
+            ->and($sync->package_code)->toBe('CORE-'.$lotNumber)
+            ->and($sync->spreadsheet_id)->toBe('test-spreadsheet-id')
+            ->and($sync->sheet_tab)->toBe('Copy of SME LOT 2,9,11')
+            ->and($sync->target_cell)->toBe($column)
+            ->and($sync->outcome)->toBe('queued');
+    }
+    Queue::assertPushed(SyncBillingSheetDate::class, 3);
+});
+
+it('reports the exact missing service account configuration before attempting synchronization', function (): void {
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'configured-sheet-id',
+        'google_sheets.billing.service_account_json' => null,
+    ]);
+
+    expect(app(GoogleSheetsApiClient::class)->configurationStatus())->toBe([
+        'configured' => false,
+        'reason' => 'Service account credential file is not configured (GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON).',
+    ]);
+});
+
+it('matches sheet rows by the exact BIR DR and package code within that lot', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    $deliveryId = createBillingDelivery('BIR-00351');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($deliveryId, 'CP-LOT2-01');
+    confirmDeliveryForBilling($deliveryId);
+    $sync = BillingSheetSync::query()->sole();
+
+    $rows = billingSheetRows('2', 'BIR-00351', 'CP-LOT2-01');
+    $wrongPackage = $rows[1];
+    $wrongPackage[2] = 'CP-LOT2-OTHER';
+    $wrongDr = $rows[1];
+    $wrongDr[1] = 'BIR-00352';
+    $exact = $rows[1];
+    $rows = [$rows[0], $wrongPackage, $wrongDr, $exact];
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CI")->andReturn($rows);
+    $sheets->shouldReceive('updateCell')->once()->with("'Copy of SME LOT 2,9,11'!BF4", $sync->transition_date->toDateString());
+
+    app(BillingSheetSyncService::class)->sync($sync, $sheets);
+
+    expect($sync->fresh()->outcome)->toBe('synced')->and($sync->fresh()->target_cell)->toBe('BF4');
+});
+
+it('does not match a DR and package code found only in another lot', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    $deliveryId = createBillingDelivery('BIR-LOT-SHARED');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($deliveryId, 'CORE-SHARED');
+    confirmDeliveryForBilling($deliveryId);
+    $sync = BillingSheetSync::query()->sole();
+    $rows = billingSheetRows('2', 'BIR-OTHER', 'CORE-OTHER');
+    $rows[1][72] = 'BIR-LOT-SHARED';
+    $rows[1][73] = 'CORE-SHARED';
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->andReturn($rows);
+    $sheets->shouldNotReceive('updateCell');
+
+    app(BillingSheetSyncService::class)->sync($sync, $sheets);
+
+    expect($sync->fresh()->outcome)->toBe('no_match');
+});
+
+it('records no-match, duplicate-match, and occupied-cell conflicts without writing', function (string $case, string $expectedOutcome): void {
+    signInBillingUser();
+    Queue::fake();
+    $deliveryId = createBillingDelivery('BIR-DR-CHECK');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 9']);
+    addPackageToBillingDelivery($deliveryId, 'CORE-09');
+    confirmDeliveryForBilling($deliveryId);
+    $sync = BillingSheetSync::query()->sole();
+    $rows = billingSheetRows('9', 'BIR-DR-CHECK', 'CORE-09', $case === 'occupied' ? '2026-01-01' : '');
+    if ($case === 'missing') {
+        $rows[1][1] = 'DIFFERENT-DR';
+    } elseif ($case === 'duplicate') {
+        $rows[] = $rows[1];
+    }
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->andReturn($rows);
+    $sheets->shouldNotReceive('updateCell');
+
+    app(BillingSheetSyncService::class)->sync($sync, $sheets);
+
+    expect($sync->fresh()->outcome)->toBe($expectedOutcome);
+})->with([
+    'no match' => ['missing', 'no_match'],
+    'duplicate match' => ['duplicate', 'duplicate_match'],
+    'existing value' => ['occupied', 'conflict'],
+]);
+
+it('treats an already-written date as idempotent and does not update it again', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    $deliveryId = createBillingDelivery('BIR-DR-IDEMPOTENT');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 11']);
+    addPackageToBillingDelivery($deliveryId, 'CORE-11');
+    confirmDeliveryForBilling($deliveryId);
+    $sync = BillingSheetSync::query()->sole();
+    $rows = billingSheetRows('11', 'BIR-DR-IDEMPOTENT', 'CORE-11', $sync->transition_date->toDateString());
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->andReturn($rows);
+    $sheets->shouldNotReceive('updateCell');
+
+    app(BillingSheetSyncService::class)->sync($sync, $sheets);
+
+    expect($sync->fresh()->outcome)->toBe('already_synced');
+});
+
+it('retries API failures as a queued job without rolling back the billing status', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    $deliveryId = createBillingDelivery('BIR-DR-RETRY');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($deliveryId, 'CORE-RETRY');
+    confirmDeliveryForBilling($deliveryId);
+    $sync = BillingSheetSync::query()->sole();
+    $failedSheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $failedSheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $failedSheets->shouldReceive('values')->once()->andThrow(new GoogleSheetsApiException('Simulated API outage.', 503));
+
+    try {
+        (new SyncBillingSheetDate($sync->getKey()))->handle(app(BillingSheetSyncService::class), $failedSheets);
+    } catch (GoogleSheetsApiException) {
+    }
+
+    expect($sync->fresh()->outcome)->toBe('retrying')->and($sync->fresh()->attempts)->toBe(1);
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
+});
+
+it('does not create sheet sync records for non-billing status transitions or repeated billing saves', function (): void {
+    [$user] = signInBillingUser();
+    Queue::fake();
+    $heldDelivery = createBillingDelivery('DR-ON-HOLD');
+    app(DeliveryBillingService::class)->placeOnHold($heldDelivery, 'Review required', $user);
+    expect(BillingSheetSync::query()->count())->toBe(0);
+
+    $deliveryId = createBillingDelivery('DR-ONE-TRANSITION');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($deliveryId, 'CORE-ONE');
+    confirmDeliveryForBilling($deliveryId);
+    $this->postJson(route('billing.for-billing', $deliveryId))->assertStatus(409);
+    expect(BillingSheetSync::query()->where('delivery_id', $deliveryId)->count())->toBe(1);
+});
 
 it('repairs the history index after a partial migration without losing billing data', function () {
     signInBillingUser();

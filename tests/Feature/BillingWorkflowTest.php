@@ -295,6 +295,53 @@ it('does not write any batch sheet cells when one DR and package code cannot be 
     $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $secondId, 'status' => 'for_billing']);
 });
 
+it('rebuilds missing batch reconciliation entries and verifies existing sheet values before retrying', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $deliveryId = createBillingDelivery('BIR-REBUILD-AUDIT', 'delivered');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($deliveryId, 'CORE-REBUILD');
+    $sheetRows = billingSheetRows('2', 'BIR-REBUILD-AUDIT', 'CORE-REBUILD');
+    $initialSheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $initialSheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $initialSheets->shouldReceive('values')->once()->andReturn($sheetRows);
+    $initialSheets->shouldReceive('updateCells')->once();
+    app()->instance(GoogleSheetsApiClient::class, $initialSheets);
+
+    $confirmation = $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$deliveryId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated()->assertJsonPath('sheet_sync.status', 'success');
+    $batchId = (int) $confirmation->json('batch.id');
+    $sync = BillingSheetSync::query()->sole();
+    $sheetRows[1][57] = $sync->transition_date->toDateString();
+    BillingSheetSync::query()->delete();
+
+    $retrySheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $retrySheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $retrySheets->shouldReceive('values')->once()->andReturn($sheetRows);
+    $retrySheets->shouldReceive('updateCells')->once()->with([], 'test-spreadsheet-id');
+    app()->instance(GoogleSheetsApiClient::class, $retrySheets);
+
+    $this->get(route('billing.batches.show', $batchId))
+        ->assertSee('No reconciliation entries were recorded yet.')
+        ->assertSee('Retry Google Sheets sync');
+    $this->post(route('billing.batches.sheet-sync.retry', $batchId))
+        ->assertRedirect(route('billing.batches.show', $batchId))
+        ->assertSessionHas('success', 'All matching Google Sheet values were already synchronized; no duplicate writes were made.');
+    $this->get(route('billing.batches.show', $batchId))
+        ->assertSee('All 1 package row(s) are synchronized.');
+
+    expect(BillingSheetSync::query()->sole()->outcome)->toBe('already_synced');
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
+});
+
 it('reports the exact missing service account configuration before attempting synchronization', function (): void {
     config([
         'google_sheets.billing.enabled' => true,

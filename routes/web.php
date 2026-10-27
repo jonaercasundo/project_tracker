@@ -818,6 +818,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
                 ->whereNumber('batch')
                 ->middleware('can:billing.records.view')
                 ->name('batches.show');
+            Route::post('/batches/{batch}/sheet-sync/retry', [BillingBatchController::class, 'retrySheetSync'])
+                ->whereNumber('batch')
+                ->middleware('can:billing.for-billing.mark')
+                ->name('batches.sheet-sync.retry');
             Route::post('/records/{delivery}/for-billing', [BillingScannerController::class, 'markForBilling'])
                 ->whereNumber('delivery')
                 ->middleware('can:billing.for-billing.mark')

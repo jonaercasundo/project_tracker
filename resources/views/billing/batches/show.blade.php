@@ -9,11 +9,47 @@
     </x-slot>
 
     <main class="mx-auto max-w-7xl space-y-5">
+        @if (session('success'))
+            <div role="status" aria-live="polite" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('success') }}</div>
+        @endif
+        @if (session('error'))
+            <div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{{ session('error') }}</div>
+        @endif
         <section class="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
             <div><p class="text-xs font-bold uppercase tracking-wide text-slate-500">Status</p><p class="mt-1 font-semibold text-blue-800">{{ str($batch->status)->replace('_', ' ')->title() }}</p></div>
             <div><p class="text-xs font-bold uppercase tracking-wide text-slate-500">DR Count</p><p class="mt-1 font-mono text-lg font-bold text-slate-900">{{ number_format($recordGroups->count()) }}</p></div>
             <div><p class="text-xs font-bold uppercase tracking-wide text-slate-500">Created / confirmed by</p><p class="mt-1 text-sm text-slate-900">{{ $batch->confirmed_by_name ?? $batch->confirmedBy?->name ?? 'Former user' }}</p><p class="mt-1 text-xs text-slate-500">{{ $batch->confirmed_at?->format('Y-m-d H:i:s') }}</p></div>
             <div><p class="text-xs font-bold uppercase tracking-wide text-slate-500">Selection source</p><p class="mt-1 capitalize text-slate-900">{{ str($batch->selection_method)->replace('_', ' ') }}</p><p class="mt-1 text-xs text-slate-500">Queued for Billing review; no invoice created.</p></div>
+        </section>
+
+        <section class="rounded-xl border border-slate-200 bg-white p-5">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 class="font-bold text-slate-900">Google Sheets reconciliation</h2>
+                    @if ($sheetSyncs->isEmpty())
+                        <p class="mt-1 text-sm text-amber-800">No reconciliation entries were recorded yet. Retry to prepare them from this batch’s confirmed delivery records.</p>
+                    @elseif ($sheetSyncNeedsRetry)
+                        <p class="mt-1 text-sm text-rose-700">Some DR/package rows need correction. Billing records remain confirmed.</p>
+                    @else
+                        <p class="mt-1 text-sm text-emerald-700">All {{ $sheetSyncs->count() }} package row(s) are synchronized.</p>
+                    @endif
+                </div>
+                @if ($sheetSyncNeedsRetry)
+                    @can('billing.for-billing.mark')
+                        <form method="POST" action="{{ route('billing.batches.sheet-sync.retry', $batch) }}">
+                            @csrf
+                            <button type="submit" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-500 hover:text-blue-700">Retry Google Sheets sync</button>
+                        </form>
+                    @endcan
+                @endif
+            </div>
+            @if ($sheetSyncNeedsRetry && $sheetSyncs->isNotEmpty())
+                <ul class="mt-4 space-y-2 border-t border-slate-100 pt-4 text-sm">
+                    @foreach ($sheetSyncs->whereNotIn('outcome', ['synced', 'already_synced']) as $sync)
+                        <li class="text-rose-800">DR {{ $sync->bir_dr ?? 'not available' }} · Core Package Code {{ $sync->package_code ?? 'not available' }} · Lot {{ $sync->lot_number ?? 'not identified' }}: {{ $sync->error_details ?? str($sync->outcome)->replace('_', ' ')->title() }}</li>
+                    @endforeach
+                </ul>
+            @endif
         </section>
 
         <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">

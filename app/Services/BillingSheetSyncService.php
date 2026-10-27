@@ -165,24 +165,38 @@ class BillingSheetSyncService
      */
     public function syncBatch(int $batchId, GoogleSheetsApiClient $sheets): array
     {
-        $syncIds = DB::table('billing_sheet_syncs as sync')
-            ->join('delivery_billing_records as billing', 'billing.delivery_id', '=', 'sync.delivery_id')
-            ->join('delivery_billing_histories as history', 'history.id', '=', 'sync.delivery_billing_history_id')
-            ->where('billing.billing_batch_id', $batchId)
-            ->whereColumn('history.delivery_billing_record_id', 'billing.id')
-            ->where('history.new_status', DeliveryBillingRecord::FOR_BILLING)
-            ->whereRaw('history.id = (select MAX(latest.id) from delivery_billing_histories as latest where latest.delivery_billing_record_id = billing.id and latest.new_status = ?)', [DeliveryBillingRecord::FOR_BILLING])
-            ->orderBy('sync.id')
-            ->pluck('sync.id');
-        $syncs = BillingSheetSync::query()->whereIn('id', $syncIds)->orderBy('id')->get();
+        $entryIssues = $this->ensureBatchSyncEntries($batchId);
+        $historyIds = $this->batchConfirmationHistoryIds($batchId);
+        $syncs = BillingSheetSync::query()
+            ->whereIn('delivery_billing_history_id', $historyIds)
+            ->orderBy('id')
+            ->get();
 
         if ($syncs->isEmpty()) {
+            if ($entryIssues !== []) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Google Sheets reconciliation entries could not be created for this batch. Billing records remain confirmed and available for review.',
+                    'synced_count' => 0,
+                    'issues' => $entryIssues,
+                ];
+            }
+
             return [
                 'status' => 'error',
                 'message' => 'No Google Sheets reconciliation entries were found for this batch. Billing records remain confirmed and available for review.',
                 'synced_count' => 0,
                 'issues' => [],
             ];
+        }
+
+        if ($entryIssues !== []) {
+            $pendingSyncs = $syncs->reject(fn (BillingSheetSync $sync): bool => in_array($sync->outcome, ['synced', 'already_synced'], true))->values();
+            $this->markBatchFailure($pendingSyncs, 'batch_blocked', 'No sheet cells were written because the batch audit entries could not be fully prepared.');
+            $result = $this->batchSyncFailure($syncs, 'Google Sheets reconciliation entries could not be prepared for every confirmed record; no sheet cells were written.');
+            $result['issues'] = array_merge($result['issues'], $entryIssues);
+
+            return $result;
         }
 
         $pendingSyncs = $syncs->reject(fn (BillingSheetSync $sync): bool => in_array($sync->outcome, ['synced', 'already_synced'], true))->values();
@@ -365,6 +379,86 @@ class BillingSheetSyncService
         $updatedSyncs = BillingSheetSync::query()->whereIn('id', $syncs->pluck('id'))->orderBy('id')->get();
 
         return $this->batchSyncSuccess($updatedSyncs, count($updates));
+    }
+
+    /** @return array<int, int> */
+    private function batchConfirmationHistoryIds(int $batchId): array
+    {
+        $billingRecordIds = DB::table('delivery_billing_records')
+            ->where('billing_batch_id', $batchId)
+            ->pluck('id');
+
+        return DB::table('delivery_billing_histories')
+            ->whereIn('delivery_billing_record_id', $billingRecordIds)
+            ->where('new_status', DeliveryBillingRecord::FOR_BILLING)
+            ->orderByDesc('id')
+            ->get(['id', 'delivery_billing_record_id'])
+            ->unique('delivery_billing_record_id')
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /** @return array<int, array{delivery_id: int, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}> */
+    private function ensureBatchSyncEntries(int $batchId): array
+    {
+        $billingRecords = DeliveryBillingRecord::query()->where('billing_batch_id', $batchId)->get();
+        if ($billingRecords->isEmpty()) {
+            return [];
+        }
+
+        $billingRecordIds = $billingRecords->pluck('id');
+        $historyByBillingRecord = DeliveryBillingHistory::query()
+            ->whereIn('delivery_billing_record_id', $billingRecordIds)
+            ->where('new_status', DeliveryBillingRecord::FOR_BILLING)
+            ->orderByDesc('id')
+            ->get()
+            ->unique('delivery_billing_record_id')
+            ->keyBy('delivery_billing_record_id');
+        $deliveriesById = Delivery::query()
+            ->whereIn('delivery_id', $billingRecords->pluck('delivery_id'))
+            ->get()
+            ->keyBy('delivery_id');
+        $issues = [];
+
+        foreach ($billingRecords as $billingRecord) {
+            $delivery = $deliveriesById->get($billingRecord->delivery_id);
+            $history = $historyByBillingRecord->get($billingRecord->getKey());
+            if ($delivery === null || $history === null) {
+                $issues[] = [
+                    'delivery_id' => (int) $billingRecord->delivery_id,
+                    'dr_no' => $delivery?->dr_no,
+                    'package_code' => null,
+                    'lot_number' => null,
+                    'reason' => $delivery === null
+                        ? 'The confirmed delivery record could not be loaded to prepare its sheet audit entry.'
+                        : 'No For Billing history entry exists for this confirmed delivery.',
+                ];
+
+                continue;
+            }
+
+            try {
+                $this->queueForTransition($delivery, $billingRecord, $history);
+            } catch (Throwable $exception) {
+                Log::error('Could not prepare Google Sheets reconciliation entries for a confirmed billing batch.', [
+                    'billing_batch_id' => $batchId,
+                    'delivery_id' => $delivery->delivery_id,
+                    'billing_record_id' => $billingRecord->getKey(),
+                    'exception' => $exception,
+                ]);
+                $issues[] = [
+                    'delivery_id' => (int) $delivery->delivery_id,
+                    'dr_no' => $delivery->dr_no,
+                    'package_code' => null,
+                    'lot_number' => null,
+                    'reason' => 'The reconciliation audit entry could not be created. Check the billing sheet configuration and retry.',
+                ];
+            }
+        }
+
+        return $issues;
     }
 
     /** @param Collection<int, BillingSheetSync> $syncs

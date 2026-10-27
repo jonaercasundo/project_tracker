@@ -88,23 +88,28 @@ function createGoogleSheetsSyncDelivery(string $birDr = 'BIR-DR-SETTINGS'): int
     return $deliveryId;
 }
 
-it('restricts settings access to Administrators and exposes the settings link in Billing', function (): void {
-    googleSheetsSettingsUser('user');
+it('allows the MMC user role to manage settings while denying Administrators and other roles', function (): void {
+    googleSheetsSettingsUser('finance');
     $this->get(route('billing.google-sheets-settings'))->assertForbidden();
     $this->post(route('billing.google-sheets-settings.store'), googleSheetsSettingsPayload())->assertForbidden();
     $this->post(route('billing.google-sheets-settings.test-connection'))->assertForbidden();
     $this->assertDatabaseCount('google_sheets_settings', 0);
 
-    googleSheetsSettingsUser('Administrator');
+    googleSheetsSettingsUser('user');
     $this->get(route('billing.google-sheets-settings'))
         ->assertOk()
         ->assertSee('Google Sheets Sync')
         ->assertSee('Copy of SME LOT 2,9,11')
         ->assertSee(route('billing.google-sheets-settings'));
+    $this->post(route('billing.google-sheets-settings.store'), googleSheetsSettingsPayload())
+        ->assertRedirect(route('billing.google-sheets-settings'));
+
+    googleSheetsSettingsUser('Administrator');
+    $this->get(route('billing.google-sheets-settings'))->assertForbidden();
 });
 
 it('stores service account credentials encrypted and never returns them to the browser', function (): void {
-    googleSheetsSettingsUser('Administrator');
+    googleSheetsSettingsUser('user');
     Schema::create('admin_activity_logs', function (Blueprint $table): void {
         $table->id();
         $table->unsignedBigInteger('actor_user_id')->nullable();
@@ -138,7 +143,7 @@ it('stores service account credentials encrypted and never returns them to the b
 });
 
 it('updates spreadsheet settings while preserving a saved credential when the input is blank', function (): void {
-    googleSheetsSettingsUser('Administrator');
+    googleSheetsSettingsUser('user');
     $secret = json_encode(['client_email' => 'billing-sheets@example.test', 'private_key' => 'preserved-private-key'], JSON_THROW_ON_ERROR);
     GoogleSheetsSetting::query()->create([
         'id' => 1,
@@ -163,7 +168,7 @@ it('updates spreadsheet settings while preserving a saved credential when the in
 });
 
 it('rejects invalid identifiers, worksheet names, and credential JSON without persisting settings', function (): void {
-    googleSheetsSettingsUser('Administrator');
+    googleSheetsSettingsUser('user');
     $secret = '{not-valid-json';
 
     $this->postJson(route('billing.google-sheets-settings.store'), googleSheetsSettingsPayload([
@@ -178,7 +183,7 @@ it('rejects invalid identifiers, worksheet names, and credential JSON without pe
 });
 
 it('shows an application-key diagnostic when saved credentials cannot be decrypted', function (): void {
-    googleSheetsSettingsUser('Administrator');
+    googleSheetsSettingsUser('user');
     GoogleSheetsSetting::query()->create([
         'id' => 1,
         'spreadsheet_id' => 'sheet-ID_1234567890',
@@ -195,7 +200,7 @@ it('shows an application-key diagnostic when saved credentials cannot be decrypt
 });
 
 it('shows sanitized connection-test success and failure messages', function (): void {
-    googleSheetsSettingsUser('Administrator');
+    googleSheetsSettingsUser('user');
     $this->post(route('billing.google-sheets-settings.store'), googleSheetsSettingsPayload([
         'service_account_json' => json_encode(['client_email' => 'billing-sheets@example.test', 'private_key' => 'not-rendered'], JSON_THROW_ON_ERROR),
     ]))->assertRedirect(route('billing.google-sheets-settings'));

@@ -13,7 +13,7 @@ The target spreadsheet ID supplied for this feature is `1sOESkXSA8CbgkJMA_Y-sYzk
 
 ## Application configuration
 
-Before an Administrator saves settings in **Billing → Google Sheets Sync**, the sync continues to use the environment configuration below. Saving the settings page creates an encrypted database override for spreadsheet ID, worksheet name, enablement, and optional credentials; a blank credential field preserves the saved credential or uses the environment credential fallback.
+Before an authorized MMC `user` saves settings in **Billing → Google Sheets Sync**, the sync continues to use the environment configuration below. Saving the settings page creates an encrypted database override for spreadsheet ID, worksheet name, enablement, and optional credentials; a blank credential field preserves the saved credential or uses the environment credential fallback.
 
 The persisted service-account JSON is encrypted with Laravel's `APP_KEY`. Keep the same application key across web/queue servers and retain it in secure backups; changing it makes saved credentials unreadable. Credential values are never returned to the browser or written to audit details.
 

@@ -756,7 +756,7 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         ->name('billing.')
         ->middleware('company.context:MMC')
         ->group(function (): void {
-            Route::middleware('role:Administrator')->group(function (): void {
+            Route::middleware('role:user')->group(function (): void {
                 Route::get('/google-sheets-settings', [GoogleSheetsSettingsController::class, 'index'])
                     ->name('google-sheets-settings');
                 Route::post('/google-sheets-settings', [GoogleSheetsSettingsController::class, 'store'])

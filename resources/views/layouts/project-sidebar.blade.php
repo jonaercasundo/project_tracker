@@ -161,7 +161,7 @@
             </a>
         @endif
 
-        @if($currentCompany?->code === 'MMC' && $currentCompany?->is_active && ($currentUser?->hasRole('Administrator') || $currentUser?->can('billing.qr.scan') || $currentUser?->can('billing.records.view')))
+        @if($currentCompany?->code === 'MMC' && $currentCompany?->is_active && ($currentUser?->hasRole('Administrator') || $currentUser?->hasRole('user') || $currentUser?->can('billing.qr.scan') || $currentUser?->can('billing.records.view')))
             @php($billingMenuActive = request()->routeIs('billing.dashboard', 'billing.prepare*', 'billing.batches.*', 'billing.records.*', 'billing.scanner*', 'billing.google-sheets-settings*'))
             <div x-data="{ open: {{ $billingMenuActive ? 'true' : 'false' }} }" class="block">
                 <button type="button" @click="open = !open" :aria-expanded="open"
@@ -219,7 +219,7 @@
                             </a>
                         </li>
                     @endcan
-                    @if($currentUser?->hasRole('Administrator'))
+                    @if($currentUser?->hasRole('user'))
                         <li>
                             <a href="{{ route('billing.google-sheets-settings') }}" @if(request()->routeIs('billing.google-sheets-settings*')) aria-current="page" @endif
                                class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors {{ request()->routeIs('billing.google-sheets-settings*') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">

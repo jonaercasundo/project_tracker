@@ -1164,14 +1164,7 @@
 
                 <p class="liq-subtitle">
 
-                    LIQ-{{
-                        str_pad(
-                            $liquidation->id,
-                            6,
-                            '0',
-                            STR_PAD_LEFT
-                        )
-                    }}
+                    {{ $liquidation->display_reference_no }}
 
                     @if($liquidation->date_prepared)
 
@@ -1445,27 +1438,28 @@
             <div class="liq-info-grid">
 
 
-                {{-- REPORT ID --}}
+                {{-- REFERENCE NUMBER --}}
 
                 <div class="liq-info-item">
 
                     <div class="liq-info-label">
-                        Report ID
+                        Reference No.
                     </div>
 
-                    <div class="liq-info-value mono">
-
-                        LIQ-{{
-                            str_pad(
-                                $liquidation->id,
-                                6,
-                                '0',
-                                STR_PAD_LEFT
-                            )
-                        }}
-
+                    <div class="liq-info-value mono" style="display:flex;align-items:center;gap:8px;">
+                        <svg aria-hidden="true" style="width:16px;height:16px;flex:none;color:#2563eb;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4h8l4 4v12H4V4h4Z"/><path d="M8 4v5h8V4M8 15h8M8 18h5"/></svg>
+                        <span>{{ $liquidation->display_reference_no }}</span>
+                        <button type="button" data-copy-reference="{{ $liquidation->display_reference_no }}" aria-label="Copy reference number" title="Copy reference number" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid #cbd5e1;border-radius:7px;background:white;color:#475569;cursor:pointer;">
+                            <svg aria-hidden="true" style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+                        </button>
                     </div>
+                    <span class="sr-only" data-reference-copy-status role="status" aria-live="polite"></span>
 
+                </div>
+
+                <div class="liq-info-item">
+                    <div class="liq-info-label">Report ID</div>
+                    <div class="liq-info-value mono">#{{ $liquidation->id }}</div>
                 </div>
 
 
@@ -2209,4 +2203,23 @@
 </div>
 
 @include('mi_app.financial_history', ['activities' => $liquidation->activities])
+<script>
+    document.addEventListener('click', async function (event) {
+        const button = event.target.closest('[data-copy-reference]');
+        if (!button || !navigator.clipboard) {
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(button.dataset.copyReference);
+            const status = document.querySelector('[data-reference-copy-status]');
+            if (status) {
+                status.textContent = 'Reference number copied.';
+            }
+            button.setAttribute('aria-label', 'Reference number copied');
+        } catch (error) {
+            button.setAttribute('aria-label', 'Unable to copy reference number');
+        }
+    });
+</script>
 </x-mi_app>

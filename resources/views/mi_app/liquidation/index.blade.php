@@ -1253,14 +1253,7 @@
 
                                             <span class="tx-report-id">
 
-                                                LIQ-{{
-                                                    str_pad(
-                                                        $report->id,
-                                                        6,
-                                                        '0',
-                                                        STR_PAD_LEFT
-                                                    )
-                                                }}
+                                                {{ $report->display_reference_no }}
 
                                             </span>
 

@@ -21,6 +21,8 @@
 
         $liquidationId = $report->id;
 
+        $displayReferenceNo = $report->display_reference_no;
+
         $currentUserId = auth()->id();
 
         $currentUserName = auth()->user()?->name ?? 'Unknown User';
@@ -1909,6 +1911,25 @@
                                     placeholder="Enter liquidation report title"
                                     required
                                 >
+
+                            </div>
+
+                            {{-- REFERENCE NUMBER --}}
+
+                            <div class="liq-col-6">
+
+                                <label class="liq-label" for="reference_no_display">
+                                    <svg aria-hidden="true" style="display:inline-block;width:15px;height:15px;margin-right:5px;vertical-align:-3px;color:#2563eb;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4h8l4 4v12H4V4h4Z"/><path d="M8 4v5h8V4M8 15h8M8 18h5"/></svg>
+                                    Reference No.
+                                </label>
+
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <input type="text" id="reference_no_display" class="liq-input" value="{{ $displayReferenceNo }}" readonly aria-readonly="true">
+                                    <button type="button" class="liq-btn liq-btn-secondary" data-copy-reference="{{ $displayReferenceNo }}" aria-label="Copy reference number" title="Copy reference number">
+                                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+                                    </button>
+                                </div>
+                                <span class="sr-only" data-reference-copy-status role="status" aria-live="polite"></span>
 
                             </div>
 
@@ -4437,6 +4458,26 @@
 
             });
 
+    </script>
+
+    <script>
+        document.addEventListener('click', async function (event) {
+            const button = event.target.closest('[data-copy-reference]');
+            if (!button || !navigator.clipboard) {
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(button.dataset.copyReference);
+                const status = document.querySelector('[data-reference-copy-status]');
+                if (status) {
+                    status.textContent = 'Reference number copied.';
+                }
+                button.setAttribute('aria-label', 'Reference number copied');
+            } catch (error) {
+                button.setAttribute('aria-label', 'Unable to copy reference number');
+            }
+        });
     </script>
 
 

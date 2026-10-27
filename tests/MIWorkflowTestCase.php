@@ -104,6 +104,7 @@ class MIWorkflowTestCase extends TestCase
             'database/migrations/2026_09_18_091209_create_liquidations_items_table.php',
             'database/migrations/2026_10_06_031105_add_mi_financial_attribution_and_audit_tables.php',
             'database/migrations/2026_10_26_000001_make_mi_liquidation_rate_optional_and_add_submission_key.php',
+            'database/migrations/2026_10_27_031652_add_reference_no_to_mi_liquidations_table.php',
         ]];
     }
 

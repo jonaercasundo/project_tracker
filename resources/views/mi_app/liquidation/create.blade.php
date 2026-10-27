@@ -1007,6 +1007,15 @@
 
                         </div>
 
+                        <div class="tx-field">
+                            <label class="tx-label" for="reference_no_preview">Reference No.</label>
+                            <div class="relative">
+                                <svg aria-hidden="true" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4h8l4 4v12H4V4h4Z"/><path d="M8 4v5h8V4M8 15h8M8 18h5"/></svg>
+                                <input type="text" id="reference_no_preview" value="Generated when saved" class="tx-input pl-10" readonly aria-readonly="true">
+                            </div>
+                            <div class="tx-help">The system assigns a unique reference number after this report is saved.</div>
+                        </div>
+
 
                             {{-- Date Prepared --}}
                             <div class="tx-field">

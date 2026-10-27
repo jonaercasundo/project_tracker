@@ -7,8 +7,10 @@ use App\Models\MI_Liquidation;
 use App\Models\MI_LiquidationItem;
 use App\Policies\BudgetRequestPolicy;
 use App\Policies\TravelLiquidationPolicy;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -54,6 +56,7 @@ it('creates an ordinary liquidation with multiple items, server title, rate, and
 
     $response->assertRedirect(route('liquidation.show', $report));
     expect($report->title)->toBe('October 2026 Report')
+        ->and($report->reference_no)->toBe('LIQ-000001')
         ->and($report->exchange_rate)->toBe('25432.1250')
         ->and($report->exchange_rate_source)->toBe('live')
         ->and($report->company_id)->toBe($owner->currentCompany()->getKey())
@@ -63,6 +66,51 @@ it('creates an ordinary liquidation with multiple items, server title, rate, and
         ->and($report->total_usd)->toBe(0.01)
         ->and($report->items->first()->amount_usd)->toBe(0.0);
     $this->get(route('liquidation.index'))->assertOk()->assertSee('October 2026 Report');
+    $this->get(route('liquidation.edit', $report))->assertSee('Reference No.')->assertSee('LIQ-000001');
+    $this->get(route('liquidation.show', $report))->assertSee('Reference No.')->assertSee('LIQ-000001');
+});
+
+it('assigns sequential reference numbers from unique database-generated liquidation IDs', function () {
+    $first = MI_Liquidation::query()->create(['title' => 'First reference test', 'date_prepared' => '2026-10-06', 'status' => 'Pending']);
+    $second = MI_Liquidation::query()->create(['title' => 'Second reference test', 'date_prepared' => '2026-10-06', 'status' => 'Pending']);
+
+    expect($first->reference_no)->toBe('LIQ-000001')
+        ->and($second->reference_no)->toBe('LIQ-000002')
+        ->and(MI_Liquidation::query()->whereNotNull('reference_no')->pluck('reference_no')->unique()->count())->toBe(2);
+});
+
+it('rejects duplicate persisted liquidation reference numbers at the database constraint', function () {
+    $first = MI_Liquidation::query()->create(['title' => 'First unique reference', 'date_prepared' => '2026-10-06', 'status' => 'Pending']);
+    $second = MI_Liquidation::query()->create(['title' => 'Second unique reference', 'date_prepared' => '2026-10-06', 'status' => 'Pending']);
+
+    expect(fn () => DB::table('mi_liquidations')->where('id', $second->getKey())->update(['reference_no' => $first->reference_no]))
+        ->toThrow(QueryException::class);
+});
+
+it('keeps the existing reference for liquidation record six unchanged after editing', function () {
+    Http::preventStrayRequests();
+    Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'base_code' => 'USD', 'time_last_update_unix' => 1792886551, 'rates' => ['VND' => 25432.125]], 200)]);
+    Cache::flush();
+    $owner = $this->miUser();
+    $report = new MI_Liquidation([
+        'title' => 'Legacy report six',
+        'date_prepared' => '2026-10-06',
+        'status' => 'Pending',
+        'prepared_by' => $owner->getKey(),
+        'company_id' => $owner->companies()->first()->getKey(),
+    ]);
+    $report->id = 6;
+    $report->reference_no = 'LIQ-000006';
+    $report->saveQuietly();
+    $this->signInMI($owner);
+
+    $this->get(route('liquidation.edit', $report))->assertOk()->assertSee('LIQ-000006')->assertSee('readonly', false);
+    $payload = $this->ordinaryPayload();
+    $payload['reference_no'] = 'FORGED-REFERENCE';
+    $this->put(route('liquidation.update', $report), $payload)->assertRedirect(route('liquidation.show', $report));
+
+    expect($report->fresh()->reference_no)->toBe('LIQ-000006');
+    $this->get(route('liquidation.show', $report))->assertSee('LIQ-000006');
 });
 
 it('saves the report with conversion pending when forex lookup fails and never invents a rate', function () {

@@ -41,6 +41,23 @@ class MI_Liquidation extends Model
         'pcf_amount' => 'decimal:2',
     ];
 
+    protected static function booted(): void
+    {
+        static::created(function (self $liquidation): void {
+            if ($liquidation->reference_no !== null) {
+                return;
+            }
+
+            $liquidation->reference_no = 'LIQ-'.str_pad((string) $liquidation->getKey(), 6, '0', STR_PAD_LEFT);
+            $liquidation->saveQuietly();
+        });
+    }
+
+    public function getDisplayReferenceNoAttribute(): string
+    {
+        return $this->reference_no ?? 'LIQ-'.str_pad((string) $this->getKey(), 6, '0', STR_PAD_LEFT);
+    }
+
     /**
      * Liquidation expense items.
      */

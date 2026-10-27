@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Liquidation Report LIQ-{{ str_pad($liquidation->id, 6, '0', STR_PAD_LEFT) }}</title>
+<title>Liquidation Report {{ $liquidation->display_reference_no }}</title>
 <style>
 
     /* ==============================================================
@@ -325,7 +325,7 @@
 
     $expenseCount = $liquidation->items?->count() ?? 0;
 
-    $reportId = 'LIQ-' . str_pad($liquidation->id, 6, '0', STR_PAD_LEFT);
+    $reportId = $liquidation->display_reference_no;
 
 @endphp
 
@@ -390,7 +390,7 @@
 <table class="info-table">
     <tr>
         <td>
-            <div class="info-label">Report ID</div>
+            <div class="info-label">Reference No.</div>
             <div class="info-value mono">{{ $reportId }}</div>
         </td>
         <td>

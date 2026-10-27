@@ -1232,6 +1232,11 @@ it('confirms a batch into the existing Billing queue idempotently without creati
     signInBillingUser();
     $deliveryId = createBillingDelivery('1001');
     $key = (string) Str::uuid();
+    $duplicatePayload = ['mode' => 'scan', 'delivery_ids' => [$deliveryId, $deliveryId], 'idempotency_key' => $key];
+
+    $this->postJson(route('billing.prepare.confirm'), $duplicatePayload)->assertUnprocessable();
+    $this->assertDatabaseCount('delivery_billing_records', 0);
+
     $payload = ['mode' => 'scan', 'delivery_ids' => [$deliveryId], 'idempotency_key' => $key];
 
     $created = $this->postJson(route('billing.prepare.confirm'), $payload)
@@ -1255,6 +1260,7 @@ it('confirms a batch into the existing Billing queue idempotently without creati
         'billing_batch_id' => $batchId,
         'status' => 'for_billing',
     ]);
+    $this->assertDatabaseCount('delivery_billing_records', 1);
     $this->assertDatabaseHas('billing_batches', [
         'id' => $batchId,
         'batch_ref' => $batchRef,

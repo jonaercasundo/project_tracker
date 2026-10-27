@@ -117,7 +117,7 @@
                 </div>
             </a>
 
-            <a href="{{ route('inventory.index') }}"
+            <a href="{{ route('inventory.history') }}"
                class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-emerald-500 hover:shadow-md hover:shadow-emerald-500/5 transition-all duration-200 flex flex-col justify-between h-full min-h-[150px] relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-[3px] bg-emerald-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
                 <div class="flex items-start justify-between">

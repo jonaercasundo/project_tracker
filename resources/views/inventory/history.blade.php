@@ -132,14 +132,16 @@
     {{-- HISTORY TABLE --}}
     <div class="mt-6 bg-white rounded-xl shadow-[0_2px_8px_-3px_rgba(0,0,0,0.04)] border border-slate-100 overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-100">
+            <table class="min-w-[1180px] divide-y divide-slate-100">
                 <thead class="bg-slate-50/70 backdrop-blur sticky top-0 z-10 border-b border-slate-100">
                     <tr>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date</th>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Batch No.</th>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Item</th>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Warehouse</th>
-                        <th class="px-5 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">Qty Change</th>
+                        <th class="px-4 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider leading-4">Previous Quantity</th>
+                        <th class="px-4 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider leading-4">Current Quantity</th>
+                        <th class="px-4 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider leading-4">Quantity Variance</th>
                         <th class="px-5 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">Change Type</th>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Changed By</th>
                         <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Remarks</th>
@@ -164,10 +166,19 @@
                         // $history->qty_change, a column that doesn't exist on
                         // inventory_history — that dead/wrong block has been removed.)
                         $qtyDelta = $history->qty_change;
-                        $deltaSign = $qtyDelta > 0 ? '+' : '';
-                        $deltaClass = $qtyDelta > 0
+                        $previousQty = $history->old_qty === null ? '—' : number_format((float) $history->old_qty, 0);
+                        $currentQty = $history->new_qty === null ? '—' : number_format((float) $history->new_qty, 0);
+                        $deltaMagnitude = $qtyDelta === null ? null : number_format(abs((float) $qtyDelta), 0);
+                        $deltaSign = $qtyDelta === null || (float) $qtyDelta === 0.0
+                            ? ''
+                            : (in_array($history->change_type, ['stock_in', 'insert'], true) || ($history->change_type !== 'stock_out' && $qtyDelta > 0)
+                                ? '+'
+                                : ($history->change_type === 'stock_out' || $qtyDelta < 0 ? '−' : ''));
+                        $deltaClass = $history->change_type === 'stock_out' || $qtyDelta < 0
+                            ? 'text-rose-600 font-semibold'
+                            : ($qtyDelta > 0
                             ? 'text-emerald-600 font-semibold'
-                            : ($qtyDelta < 0 ? 'text-rose-600 font-semibold' : 'text-slate-400');
+                            : 'text-slate-400');
                     @endphp
 
                     <tr class="hover:bg-slate-50/40 transition-colors duration-150">
@@ -193,21 +204,19 @@
                             {{ optional($history->warehouse)->warehouse_name }}
                         </td>
 
-                        {{-- Qty Change --}}
-                        <td class="px-5 py-3.5 whitespace-nowrap">
-                            <div class="flex items-center justify-center gap-2 text-xs tabular-nums">
-                                <span class="text-slate-400 font-normal">{{ $history->old_qty }}</span>
+                        {{-- Previous Quantity --}}
+                        <td class="px-4 py-3.5 text-right text-xs font-medium tabular-nums text-slate-600 whitespace-nowrap">
+                            {{ $previousQty }}
+                        </td>
 
-                                <svg class="h-3 w-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                </svg>
+                        {{-- Current Quantity --}}
+                        <td class="px-4 py-3.5 text-right text-xs font-semibold tabular-nums text-slate-800 whitespace-nowrap">
+                            {{ $currentQty }}
+                        </td>
 
-                                <span class="font-semibold text-slate-800">{{ $history->new_qty }}</span>
-
-                                <span class="text-[11px] {{ $deltaClass }}">
-                                    ({{ $deltaSign }}{{ $qtyDelta }})
-                                </span>
-                            </div>
+                        {{-- Quantity Variance --}}
+                        <td class="px-4 py-3.5 text-right text-xs tabular-nums whitespace-nowrap {{ $deltaClass }}">
+                            {{ $deltaMagnitude === null ? '—' : $deltaSign.$deltaMagnitude }}
                         </td>
 
                         {{-- Change Badge --}}
@@ -230,7 +239,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="py-14">
+                        <td colspan="10" class="py-14">
                             <div class="flex flex-col items-center justify-center text-center px-4">
                                 <div class="h-11 w-11 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center mb-3 border border-slate-100">
                                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">

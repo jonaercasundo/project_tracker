@@ -10,6 +10,12 @@ use Spatie\Permission\PermissionRegistrar;
 
 class AiAssistantPermissionSeeder extends Seeder
 {
+    /** @return array<int, string> */
+    public static function permissions(): array
+    {
+        return ['ai.assistant.use', 'ai.settings.manage', 'ai.page-help.use', 'ai.business-search.use'];
+    }
+
     /**
      * Run the database seeds.
      */
@@ -17,10 +23,11 @@ class AiAssistantPermissionSeeder extends Seeder
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        Permission::findOrCreate('ai.assistant.use', 'web');
-        Permission::findOrCreate('ai.settings.manage', 'web');
-        $pageHelpPermission = Permission::findOrCreate('ai.page-help.use', 'web');
-        $businessSearchPermission = Permission::findOrCreate('ai.business-search.use', 'web');
+        foreach (self::permissions() as $permission) {
+            Permission::findOrCreate($permission, 'web');
+        }
+        $pageHelpPermission = Permission::findByName('ai.page-help.use', 'web');
+        $businessSearchPermission = Permission::findByName('ai.business-search.use', 'web');
 
         $administrator = Role::findOrCreate('Administrator', 'web');
         $administrator->givePermissionTo(['ai.assistant.use', 'ai.settings.manage']);

@@ -169,6 +169,7 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         Route::get('/admin/access/permissions', [AdminControlCenterController::class, 'permissionMatrix'])->name('admin.access.permissions.index');
         Route::get('/admin/access/ai-permissions', [AdminControlCenterController::class, 'aiPermissionMatrix'])->name('admin.access.permissions.ai');
         Route::patch('/admin/access/ai-permissions/configure', [AdminControlCenterController::class, 'configureAiPermission'])->name('admin.access.permissions.ai.configure');
+        Route::post('/admin/access/ai-permissions/register', [AdminControlCenterController::class, 'registerAiPermission'])->name('admin.access.permissions.ai.register');
         Route::patch('/admin/access/permissions', [AdminControlCenterController::class, 'updatePermissionMatrix'])->name('admin.access.permissions.update');
         Route::get('/admin/access/review', [AdminControlCenterController::class, 'accessReview'])->name('admin.access.review');
         Route::get('/admin/audit', [AdminControlCenterController::class, 'auditLog'])->name('admin.audit.index');

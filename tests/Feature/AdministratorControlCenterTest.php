@@ -57,7 +57,7 @@ it('shows the control center and protects management routes from non-administrat
         ->assertSee('MMC Intelligence')
         ->assertSee('Required AI permissions')->assertSee('Business-policy requirements')
         ->assertSee('Implementation and risk')->assertSee('Company scope')
-        ->assertSee('Diagnose Access')->assertSee('Configure access for')->assertSee('Save &amp; Verify Access', false);
+        ->assertSee('Diagnose Access')->assertSee('AI permission catalog')->assertSee('Review and save selected');
     $this->get(route('admin.access.review'))->assertOk()->assertSee('User access review')->assertSee('All users &amp; access', false);
     $this->get(route('admin.audit.index'))->assertOk()->assertSee('Activity and access log')->assertSee('Roles &amp; permissions', false);
     $this->get(route('admin.ai-management.index'))->assertOk()->assertSee('Assistant capabilities and usage')->assertSee('AI Assistant');

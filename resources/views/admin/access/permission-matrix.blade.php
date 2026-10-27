@@ -112,6 +112,9 @@
                                             @endif
                                         </section>
                                     @endforeach
+                                    @if ($diagnostic['missing_ai_permissions'] !== [])
+                                        <div class="lg:col-span-2"><a class="inline-flex rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-800 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500" href="{{ route('admin.access.permissions.ai', array_filter(['catalog_subject_type' => $diagnosticUser ? 'user' : 'none', 'catalog_user_id' => $diagnosticUser?->getKey(), 'catalog_capability_id' => $capability['id'], 'catalog_status' => 'needs-attention', 'diagnostic_user_id' => $diagnosticUser?->getKey(), 'company_id' => $diagnosticCompany?->getKey(), 'diagnostic_capability_id' => $capability['id']])) }}#ai-permission-catalog">Manage Missing Permissions</a></div>
+                                    @endif
                                     <section class="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
                                         <h4 class="text-xs font-bold text-slate-700">Failed checks</h4>
                                         @php
@@ -192,8 +195,8 @@
             <select id="permission-status-filter" @change="filterRows()" class="rounded-xl border-slate-200 bg-slate-50 text-xs focus:border-blue-500 focus:ring-blue-500/20"><option value="all">All implementation statuses</option><option value="implemented">Implemented</option><option value="partial">Partially implemented</option><option value="unavailable">Not implemented</option><option value="permission_only">Permission only</option></select>
         </div>
         @if ($scope === 'ai')
-            <form method="GET" action="{{ route('admin.access.permissions.ai') }}" class="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-blue-100 bg-blue-50/50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-                <input type="hidden" name="scope" value="ai"><input type="hidden" name="company" value="{{ $companyScope }}"><input type="hidden" name="search" value="{{ $search }}"><input type="hidden" name="module" value="{{ $moduleFilter }}">
+            <form method="GET" action="{{ route('admin.access.permissions.ai') }}" class="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-blue-100 bg-blue-50/50 p-3 sm:grid-cols-2 xl:grid-cols-5 xl:items-end">
+                <input type="hidden" name="scope" value="ai"><input type="hidden" name="company" value="{{ $companyScope }}"><input type="hidden" name="search" value="{{ $search }}"><input type="hidden" name="module" value="{{ $moduleFilter }}"><input type="hidden" name="catalog_capability_id" value="{{ $catalogCapabilityId }}"><input type="hidden" name="catalog_status" value="{{ $catalogStatusFilter }}">
                 <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Diagnostic company
                     <select name="company_id" class="rounded-lg border-slate-200 bg-white text-xs">
                         <option value="">Select a company</option>
@@ -201,7 +204,7 @@
                     </select>
                 </label>
                 <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Effective access for user
-                    <select name="diagnostic_user_id" class="rounded-lg border-slate-200 bg-white text-xs">
+                    <select name="diagnostic_user_id" @change="$el.form.catalog_subject_type.value = 'user'; $el.form.catalog_user_id.value = $event.target.value; $el.form.requestSubmit()" class="rounded-lg border-slate-200 bg-white text-xs">
                         @foreach ($diagnosticUsers as $diagnosticUserOption)<option value="{{ $diagnosticUserOption->getKey() }}" @selected($diagnosticUser?->getKey() === $diagnosticUserOption->getKey())>{{ $diagnosticUserOption->name }} · {{ $diagnosticUserOption->email }}</option>@endforeach
                     </select>
                 </label>
@@ -210,6 +213,15 @@
                         <option value="">All capabilities</option>
                         @foreach ($diagnosticCapabilities as $capabilityOption)<option value="{{ $capabilityOption['id'] }}" @selected($diagnosticCapabilityId === $capabilityOption['id'])>{{ $capabilityOption['label'] }} · {{ $capabilityOption['company'] === '*' ? 'Global' : $capabilityOption['company'] }}</option>@endforeach
                     </select>
+                </label>
+                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Permission catalog subject
+                    <select name="catalog_subject_type" class="rounded-lg border-slate-200 bg-white text-xs"><option value="none" @selected($catalogSubjectType === 'none')>Select a user or role</option><option value="user" @selected($catalogSubjectType === 'user')>User and inherited roles</option><option value="role" @selected($catalogSubjectType === 'role')>Role permissions only</option></select>
+                </label>
+                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Catalog user
+                    <select name="catalog_user_id" @change="$el.form.requestSubmit()" class="rounded-lg border-slate-200 bg-white text-xs"><option value="">Select a user</option>@foreach ($diagnosticUsers as $userOption)<option value="{{ $userOption->getKey() }}" @selected($catalogUser?->getKey() === $userOption->getKey())>{{ $userOption->name }} · {{ $userOption->email }}</option>@endforeach</select>
+                </label>
+                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Catalog role
+                    <select name="catalog_role_id" @change="$el.form.requestSubmit()" class="rounded-lg border-slate-200 bg-white text-xs"><option value="">Select a role</option>@foreach ($roles as $roleOption)<option value="{{ $roleOption->getKey() }}" @selected($catalogRole?->getKey() === $roleOption->getKey())>{{ $roleOption->name }} · {{ $roleOption->users_count }} users</option>@endforeach</select>
                 </label>
                 <button class="rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800">Diagnose Access</button>
             </form>
@@ -221,27 +233,50 @@
                     <ul class="mt-2 grid gap-1 sm:grid-cols-2">@foreach ($selectedCapabilityDiagnostic['checks'] as $check)<li class="flex items-center justify-between gap-2 rounded-lg bg-white/70 px-2 py-1"><span class="text-slate-600">{{ $check['type'] }} · {{ $check['name'] }}</span><strong class="{{ $check['granted'] ? 'text-emerald-700' : 'text-rose-700' }}">{{ $check['granted'] ? 'Passed' : 'Failed' }}</strong></li>@endforeach</ul>
                 </div>
             @endif
-            <form method="POST" action="{{ route('admin.access.permissions.ai.configure') }}" class="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4" x-data="{ targetType: 'user' }" @submit="if (targetType === 'role' && !window.confirm('This changes a shared role and may affect every assigned user. Continue?')) $event.preventDefault()">
-                @csrf @method('PATCH')
-                @if ($diagnosticCompany)<input type="hidden" name="company_id" value="{{ $diagnosticCompany->getKey() }}">@endif
-                @if ($diagnosticUser)<input type="hidden" name="diagnostic_user_id" value="{{ $diagnosticUser->getKey() }}">@endif
-                <input type="hidden" name="diagnostic_capability_id" value="{{ $diagnosticCapabilityId }}">
-                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Configure access for
-                    <select name="subject_type" x-model="targetType" class="rounded-lg border-slate-200 text-xs"><option value="user">One user</option><option value="role">Shared role</option></select>
-                </label>
-                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">User
-                    <select name="user_subject_id" x-show="targetType === 'user'" x-bind:disabled="targetType !== 'user'" class="rounded-lg border-slate-200 text-xs"><option value="">Select user</option>@foreach ($diagnosticUsers as $userOption)<option value="{{ $userOption->getKey() }}">{{ $userOption->name }} · {{ $userOption->email }}</option>@endforeach</select>
-                    <select name="role_subject_id" x-show="targetType === 'role'" x-bind:disabled="targetType !== 'role'" class="rounded-lg border-slate-200 text-xs"><option value="">Select role</option>@foreach ($roles as $roleOption)<option value="{{ $roleOption->getKey() }}" @disabled($roleOption->name === 'Administrator')>{{ $roleOption->name }} · {{ $roleOption->users_count }} users</option>@endforeach</select>
-                </label>
-                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">AI permission
-                    <select name="permission_id" required class="rounded-lg border-slate-200 text-xs"><option value="">Select AI permission</option>@foreach ($aiPermissions as $aiPermission)<option value="{{ $aiPermission->getKey() }}">{{ $aiPermission->name }}</option>@endforeach</select>
-                </label>
-                <label class="grid gap-1 text-[10px] font-semibold text-slate-600">Action
-                    <select name="action" required class="rounded-lg border-slate-200 text-xs"><option value="grant">Grant</option><option value="revoke">Revoke</option></select>
-                </label>
-                <label class="flex items-start gap-2 text-[10px] leading-relaxed text-amber-800 sm:col-span-2 lg:col-span-3"><input type="checkbox" name="confirm_shared_role" value="1" x-bind:required="targetType === 'role'" class="mt-0.5 rounded border-amber-300"><span>Confirm shared-role impact when configuring a role. This only changes AI-specific permissions; business permissions and company policies remain independently enforced.</span></label>
-                <button class="rounded-lg bg-[#174b8a] px-4 py-2 text-xs font-bold text-white hover:bg-[#123b72]">Save &amp; Verify Access</button>
-            </form>
+            <section id="ai-permission-catalog" class="mt-4 rounded-xl border border-slate-200 bg-white p-4" x-data="{ permissionSearch: '', permissionStatus: @js($catalogStatusFilter), permissionCompany: 'all', permissionCategory: 'all', permissionCapability: @js($catalogCapabilityId), matches(item) { const search = this.permissionSearch.trim().toLowerCase(); const statusMatches = this.permissionStatus === 'all' || (this.permissionStatus === 'needs-attention' && ['missing', 'not-registered'].includes(item.dataset.status)) || item.dataset.status === this.permissionStatus; return (search === '' || item.dataset.name.includes(search) || item.dataset.capabilities.includes(search)) && statusMatches && (this.permissionCompany === 'all' || item.dataset.company.split('|').includes(this.permissionCompany)) && (this.permissionCategory === 'all' || item.dataset.group === this.permissionCategory) && (this.permissionCapability === '' || item.dataset.capabilityIds.split('|').includes(this.permissionCapability)); } }">
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="text-sm font-bold text-[#172a45]">AI permission catalog</h3><p class="mt-1 text-xs leading-5 text-slate-500">Discovered from capability definitions and AI permission seeders. Missing entries can be registered without granting them.</p></div><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ count($permissionCatalog) }} predefined permissions</span></div>
+                @if ($catalogSubjectType === 'none' || ($catalogSubjectType === 'user' && ! $catalogUser) || ($catalogSubjectType === 'role' && ! $catalogRole))
+                    <p role="status" class="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm text-blue-900">Select a user to evaluate missing permissions, or select a role to inspect permissions assigned directly to that role.</p>
+                @endif
+                <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                    <label class="sm:col-span-2"><span class="sr-only">Search AI permissions</span><input type="search" x-model="permissionSearch" placeholder="Search permission or capability" class="w-full rounded-lg border-slate-200 bg-slate-50 text-sm"></label>
+                    <label><span class="sr-only">Filter permissions by status</span><select x-model="permissionStatus" class="w-full rounded-lg border-slate-200 bg-slate-50 text-xs"><option value="all">All permissions</option><option value="missing">Missing only</option><option value="granted">Granted only</option><option value="not-registered">Not registered</option><option value="needs-attention">Missing and not registered</option></select></label>
+                    <label><span class="sr-only">Filter by company</span><select x-model="permissionCompany" class="w-full rounded-lg border-slate-200 bg-slate-50 text-xs"><option value="all">All companies</option><option value="MMC">MMC</option><option value="MI">MI</option><option value="Global">Global</option></select></label>
+                    <label><span class="sr-only">Filter by capability category</span><select x-model="permissionCategory" class="w-full rounded-lg border-slate-200 bg-slate-50 text-xs"><option value="all">All categories</option><option value="core-ai">Core AI</option><option value="mmc-intelligence">MMC Intelligence</option><option value="mi-intelligence">MI Intelligence</option><option value="ai-business-actions">AI Business Actions</option><option value="documents-analytics">Documents &amp; Analytics</option></select></label>
+                </div>
+                <div class="mt-3 max-h-[34rem] space-y-3 overflow-y-auto pr-1">
+                    @foreach (collect($permissionCatalog)->groupBy('group') as $groupLabel => $catalogEntries)
+                        <details open class="rounded-lg border border-slate-200"><summary class="sticky top-0 cursor-pointer bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700">{{ $groupLabel }} <span class="ml-1 font-medium text-slate-500">{{ count($catalogEntries) }}</span></summary><div class="divide-y divide-slate-100">
+                            @foreach ($catalogEntries as $catalogEntry)
+                                @php
+                                    $catalogStatus = ! $catalogEntry['registered']
+                                        ? 'not-registered'
+                                        : (($catalogSubjectType === 'none' || ($catalogSubjectType === 'user' && ! $catalogUser) || ($catalogSubjectType === 'role' && ! $catalogRole))
+                                            ? 'not-applicable'
+                                            : ($catalogEntry['granted'] ? 'granted' : 'missing'));
+                                @endphp
+                                <div data-permission-item data-name="{{ strtolower($catalogEntry['name']) }}" data-capabilities="{{ strtolower(implode(' ', $catalogEntry['capabilities'])) }}" data-status="{{ $catalogStatus }}" data-company="{{ implode('|', array_map(fn (string $scope): string => $scope === '*' ? 'Global' : $scope, $catalogEntry['scopes'])) }}" data-group="{{ \Illuminate\Support\Str::slug($groupLabel) }}" data-capability-ids="{{ implode('|', $catalogEntry['capability_ids']) }}" x-show="matches($el)" class="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 px-3 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+                                    <input type="checkbox" form="ai-permission-mutation" name="permission_ids[]" value="{{ $catalogEntry['permission_id'] }}" @disabled(! $catalogEntry['registered'] || ($catalogSubjectType === 'user' && $catalogEntry['inherited'] && ! $catalogEntry['direct']) || ($catalogSubjectType === 'none') || ($catalogSubjectType === 'user' && ! $catalogUser) || ($catalogSubjectType === 'role' && ! $catalogRole)) class="mt-1 rounded border-slate-300 text-blue-700 focus:ring-blue-500" aria-label="Select {{ $catalogEntry['name'] }}">
+                                    <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><code class="break-all text-xs font-bold text-slate-800">{{ $catalogEntry['name'] }}</code>
+                                        @if (! $catalogEntry['registered'])<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Not Registered</span>@elseif ($catalogSubjectType === 'none' || ($catalogSubjectType === 'user' && ! $catalogUser) || ($catalogSubjectType === 'role' && ! $catalogRole))<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">Not Applicable</span>@elseif ($catalogEntry['granted'])<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-900">Granted</span>@else<span class="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-900">Missing</span>@endif
+                                        @if ($catalogEntry['registered'])<span class="rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">Registered · web</span>@endif
+                                    </div><p class="mt-1 text-xs leading-5 text-slate-600">{{ $catalogEntry['description'] }}</p><p class="mt-1 break-words text-[11px] leading-5 text-slate-500">Capabilities: {{ implode(', ', $catalogEntry['capabilities']) ?: 'Shared AI permission' }} · Scope: {{ implode(', ', array_map(fn (string $scope): string => $scope === '*' ? 'Global' : $scope, $catalogEntry['scopes'])) }} · {{ $catalogEntry['implementation_available'] ? 'Implementation available' : 'Implementation unavailable' }}</p>
+                                        @if ($catalogEntry['inherited'])<p class="mt-1 text-[11px] font-medium text-blue-800">Inherited through role: {{ implode(', ', $catalogEntry['inherited_roles']) }}. <a class="underline" href="{{ route('admin.access.permissions.ai', array_filter(['catalog_subject_type' => 'role', 'catalog_role_id' => $catalogEntry['inherited_role_ids'][0] ?? null, 'diagnostic_user_id' => $diagnosticUser?->getKey(), 'company_id' => $diagnosticCompany?->getKey(), 'diagnostic_capability_id' => $diagnosticCapabilityId, 'catalog_capability_id' => $catalogCapabilityId])) }}#ai-permission-catalog">Manage role permission</a></p>@elseif ($catalogEntry['registered'] && $catalogSubjectType !== 'none' && (($catalogSubjectType === 'user' && $catalogUser) || ($catalogSubjectType === 'role' && $catalogRole)))<p class="mt-1 text-[11px] text-slate-500">Grant source: {{ $catalogEntry['source'] }}</p>@endif
+                                    </div>
+                                    @if (! $catalogEntry['registered'])<form method="POST" action="{{ route('admin.access.permissions.ai.register') }}" class="col-start-2 sm:col-start-auto">@csrf<input type="hidden" name="permission_name" value="{{ $catalogEntry['name'] }}"><input type="hidden" name="company_id" value="{{ $diagnosticCompany?->getKey() }}"><input type="hidden" name="diagnostic_user_id" value="{{ $diagnosticUser?->getKey() }}"><input type="hidden" name="diagnostic_capability_id" value="{{ $diagnosticCapabilityId }}"><input type="hidden" name="catalog_subject_type" value="{{ $catalogSubjectType }}"><input type="hidden" name="catalog_user_id" value="{{ $catalogUser?->getKey() }}"><input type="hidden" name="catalog_role_id" value="{{ $catalogRole?->getKey() }}"><input type="hidden" name="catalog_capability_id" value="{{ $catalogCapabilityId }}"><input type="hidden" name="catalog_status" value="{{ $catalogStatusFilter }}"><button class="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-50">Register Permission</button></form>@endif
+                                </div>
+                            @endforeach
+                        </div></details>
+                    @endforeach
+                </div>
+                <form id="ai-permission-mutation" method="POST" action="{{ route('admin.access.permissions.ai.configure') }}" class="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-blue-100 bg-blue-50/40 p-3 sm:grid-cols-2 lg:grid-cols-4" @submit="if (!window.confirm('Review the selected AI permission change and its impact. Continue?')) $event.preventDefault()">
+                    @csrf @method('PATCH')<input type="hidden" name="subject_type" value="{{ $catalogSubjectType === 'role' ? 'role' : 'user' }}"><input type="hidden" name="user_subject_id" value="{{ $catalogUser?->getKey() }}"><input type="hidden" name="role_subject_id" value="{{ $catalogRole?->getKey() }}"><input type="hidden" name="company_id" value="{{ $diagnosticCompany?->getKey() }}"><input type="hidden" name="diagnostic_user_id" value="{{ $diagnosticUser?->getKey() }}"><input type="hidden" name="diagnostic_capability_id" value="{{ $diagnosticCapabilityId }}"><input type="hidden" name="catalog_capability_id" value="{{ $catalogCapabilityId }}"><input type="hidden" name="catalog_status" value="{{ $catalogStatusFilter }}">
+                    <label class="grid gap-1 text-xs font-semibold text-slate-700">Action<select name="action" required class="rounded-lg border-slate-200 bg-white text-xs"><option value="grant">Grant selected</option><option value="revoke">Revoke selected direct grants</option></select></label>
+                    <label class="flex items-start gap-2 text-xs leading-5 text-amber-900 sm:col-span-2"><input type="checkbox" name="confirm_changes" value="1" class="mt-1 rounded border-amber-300"><span>I reviewed this permission change. Shared role changes affect every assigned user. Sensitive and bulk changes require confirmation.</span></label>
+                    @if ($catalogSubjectType === 'role')<label class="flex items-start gap-2 text-xs leading-5 text-amber-900 sm:col-span-2"><input type="checkbox" name="confirm_shared_role" value="1" required class="mt-1 rounded border-amber-300"><span>Confirm this shared role change and its impact on every role member.</span></label>@endif
+                    <button type="submit" @disabled($catalogSubjectType === 'none' || ($catalogSubjectType === 'user' && ! $catalogUser) || ($catalogSubjectType === 'role' && ! $catalogRole)) class="rounded-lg bg-[#174b8a] px-4 py-2 text-xs font-bold text-white hover:bg-[#123b72] disabled:cursor-not-allowed disabled:opacity-50">Review and save selected</button>
+                </form>
+            </section>
             <div class="mt-3 flex flex-wrap items-center gap-3 text-[10px]">
                 <a href="{{ route('admin.access.review', array_filter(['company' => $diagnosticCompany?->getKey()])) }}" class="font-semibold text-blue-700 hover:underline">Review user access</a>
                 <a href="{{ route('admin.audit.index', ['event' => 'role.permissions_updated']) }}" class="font-semibold text-blue-700 hover:underline">Permission change audit history</a>

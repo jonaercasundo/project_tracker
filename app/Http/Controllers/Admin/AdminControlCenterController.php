@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\User;
 use App\Services\AdminAuditLogger;
 use App\Services\AiCapabilityRegistry;
+use App\Services\AiPermissionCatalog;
 use App\Services\AiProviderConfiguration;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -72,7 +73,7 @@ class AdminControlCenterController extends Controller
         ]);
     }
 
-    public function permissionMatrix(Request $request, AiCapabilityRegistry $capabilities): View
+    public function permissionMatrix(Request $request, AiCapabilityRegistry $capabilities, AiPermissionCatalog $permissionCatalog): View
     {
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
@@ -82,6 +83,11 @@ class AdminControlCenterController extends Controller
             'company_id' => ['nullable', 'integer', Rule::exists('companies', 'company_id')],
             'diagnostic_user_id' => ['nullable', 'integer', Rule::exists('users', 'user_id')],
             'diagnostic_capability_id' => ['nullable', 'string', 'max:120'],
+            'catalog_subject_type' => ['nullable', Rule::in(['none', 'user', 'role'])],
+            'catalog_user_id' => ['nullable', 'integer', Rule::exists('users', 'user_id')],
+            'catalog_role_id' => ['nullable', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],
+            'catalog_capability_id' => ['nullable', 'string', 'max:120'],
+            'catalog_status' => ['nullable', Rule::in(['all', 'missing', 'granted', 'not-registered', 'needs-attention'])],
         ]);
         $scope = $validated['scope'] ?? 'all';
         $company = $validated['company'] ?? 'all';
@@ -114,6 +120,13 @@ class AdminControlCenterController extends Controller
         $diagnosticUser = isset($validated['diagnostic_user_id'])
             ? User::query()->with(['roles.permissions', 'permissions', 'companies'])->findOrFail($validated['diagnostic_user_id'])
             : auth()->user();
+        $catalogSubjectType = $validated['catalog_subject_type'] ?? 'none';
+        $catalogUser = $catalogSubjectType === 'user' && isset($validated['catalog_user_id'])
+            ? User::query()->with(['roles.permissions', 'permissions'])->findOrFail($validated['catalog_user_id'])
+            : null;
+        $catalogRole = $catalogSubjectType === 'role' && isset($validated['catalog_role_id'])
+            ? Role::query()->where('guard_name', 'web')->with('permissions')->findOrFail($validated['catalog_role_id'])
+            : null;
         $diagnosticCompany = isset($validated['company_id'])
             ? Company::query()->findOrFail($validated['company_id'])
             : $diagnosticUser->companies()->where('companies.is_active', true)->orderBy('companies.company_id')->first();
@@ -179,6 +192,12 @@ class AdminControlCenterController extends Controller
             'aiEnabled' => $aiEnabled,
             'aiConfigured' => $aiConfigured,
             'aiPermissions' => Permission::query()->where('guard_name', 'web')->where('name', 'like', 'ai.%')->where('name', '!=', 'ai.settings.manage')->orderBy('name')->get(),
+            'permissionCatalog' => $permissionCatalog->entries($capabilities, $catalogUser, $catalogRole, $diagnosticCompany, $definitions),
+            'catalogSubjectType' => $catalogSubjectType,
+            'catalogUser' => $catalogUser,
+            'catalogRole' => $catalogRole,
+            'catalogCapabilityId' => $validated['catalog_capability_id'] ?? '',
+            'catalogStatusFilter' => $validated['catalog_status'] ?? 'all',
             'diagnosticCapabilityId' => $validated['diagnostic_capability_id'] ?? '',
             'selectedCapability' => $selectedCapability,
             'selectedCapabilityDiagnostic' => $selectedCapabilityDiagnostic,
@@ -186,29 +205,44 @@ class AdminControlCenterController extends Controller
         ]);
     }
 
-    public function aiPermissionMatrix(Request $request, AiCapabilityRegistry $capabilities): View
+    public function aiPermissionMatrix(Request $request, AiCapabilityRegistry $capabilities, AiPermissionCatalog $permissionCatalog): View
     {
         $request->merge(['scope' => 'ai']);
 
-        return $this->permissionMatrix($request, $capabilities);
+        return $this->permissionMatrix($request, $capabilities, $permissionCatalog);
     }
 
-    public function configureAiPermission(Request $request, AdminAuditLogger $audit): RedirectResponse
+    public function configureAiPermission(Request $request, AiCapabilityRegistry $capabilities, AdminAuditLogger $audit): RedirectResponse
     {
         $validated = $request->validate([
             'subject_type' => ['required', Rule::in(['user', 'role'])],
             'user_subject_id' => ['nullable', 'required_if:subject_type,user', 'integer', Rule::exists('users', 'user_id')],
             'role_subject_id' => ['nullable', 'required_if:subject_type,role', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],
-            'permission_id' => ['required', 'integer', Rule::exists('permissions', 'id')->where('guard_name', 'web')],
+            'permission_id' => ['nullable', 'integer', Rule::exists('permissions', 'id')->where('guard_name', 'web')],
+            'permission_ids' => ['nullable', 'array', 'min:1', 'max:100'],
+            'permission_ids.*' => ['required', 'integer', Rule::exists('permissions', 'id')->where('guard_name', 'web')],
             'action' => ['required', Rule::in(['grant', 'revoke'])],
             'confirm_shared_role' => ['nullable', 'boolean'],
+            'confirm_changes' => ['nullable', 'boolean'],
             'company_id' => ['nullable', 'integer', Rule::exists('companies', 'company_id')],
             'diagnostic_user_id' => ['nullable', 'integer', Rule::exists('users', 'user_id')],
             'diagnostic_capability_id' => ['nullable', 'string', 'max:120'],
+            'catalog_capability_id' => ['nullable', 'string', 'max:120'],
+            'catalog_status' => ['nullable', Rule::in(['all', 'missing', 'granted', 'not-registered', 'needs-attention'])],
         ]);
 
-        $permission = Permission::query()->where('guard_name', 'web')->whereKey($validated['permission_id'])->firstOrFail();
-        abort_unless(str_starts_with($permission->name, 'ai.') && $permission->name !== 'ai.settings.manage', 422, 'Only non-configuration AI-specific permissions can be changed here.');
+        $permissionIds = array_values(array_unique(array_map('intval', $validated['permission_ids'] ?? (isset($validated['permission_id']) ? [$validated['permission_id']] : []))));
+        abort_if($permissionIds === [], 422, 'Select at least one AI permission.');
+        $permissions = Permission::query()->where('guard_name', 'web')->whereIn('id', $permissionIds)->get();
+        abort_if($permissions->count() !== count($permissionIds), 422, 'One or more selected permissions are invalid for the web guard.');
+        $allowedNames = app(AiPermissionCatalog::class)->names($capabilities);
+        abort_unless($permissions->every(fn (Permission $permission): bool => in_array($permission->name, $allowedNames, true) && $permission->name !== 'ai.settings.manage'), 422, 'Only predefined, non-configuration AI permissions can be changed here.');
+        $sensitivePermissionNames = collect($capabilities->definitions())
+            ->filter(fn (array $definition): bool => in_array($definition['risk'], ['critical', 'high'], true))
+            ->flatMap(fn (array $definition): array => $definition['ai_permissions'] ?? [])
+            ->unique()->values()->all();
+        $requiresConfirmation = count($permissions) > 1 || $permissions->contains(fn (Permission $permission): bool => in_array($permission->name, $sensitivePermissionNames, true));
+        abort_if($requiresConfirmation && ! $request->boolean('confirm_changes'), 422, 'Confirm the sensitive or bulk AI permission change before saving.');
         $actor = $request->user();
         if ($validated['subject_type'] === 'user') {
             $subject = User::query()->findOrFail($validated['user_subject_id'] ?? null);
@@ -216,6 +250,11 @@ class AdminControlCenterController extends Controller
             $subjectLabel = $subject->name.' ('.$subject->email.')';
             $relation = $subject;
             $verificationUser = $subject;
+            if ($validated['action'] === 'revoke') {
+                $directPermissionNames = $subject->permissions()->whereIn('permissions.id', $permissionIds)->pluck('permissions.name')->all();
+                $notDirectlyAssigned = $permissions->filter(fn (Permission $permission): bool => ! in_array($permission->name, $directPermissionNames, true));
+                abort_if($notDirectlyAssigned->isNotEmpty(), 422, 'Some selected permissions are not directly assigned to this user. Remove inherited permissions from the relevant role instead.');
+            }
         } else {
             $relation = Role::query()->where('guard_name', 'web')->findOrFail($validated['role_subject_id'] ?? null);
             abort_if($relation->name === 'Administrator', 422, 'The protected Administrator role must be managed through the role matrix.');
@@ -223,23 +262,36 @@ class AdminControlCenterController extends Controller
             if (! $request->boolean('confirm_shared_role')) {
                 return back()->withErrors(['confirm_shared_role' => 'Confirm this change to a shared role before saving.'])->withInput();
             }
+            if ($validated['action'] === 'revoke') {
+                $notAssigned = $permissions->filter(fn (Permission $permission): bool => ! $relation->hasPermissionTo($permission));
+                abort_if($notAssigned->isNotEmpty(), 422, 'One or more selected AI permissions are not directly assigned to this role.');
+            }
             $subjectLabel = $relation->name.' role ('.$relation->users()->count().' users)';
             $verificationUser = $relation->users()->orderBy('name')->first();
         }
 
-        DB::transaction(function () use ($relation, $permission, $validated, $audit, $actor, $subjectLabel): void {
-            if ($validated['action'] === 'grant') {
-                $relation->givePermissionTo($permission);
-            } else {
-                $relation->revokePermissionTo($permission);
+        if ($validated['action'] === 'grant') {
+            $alreadyGranted = $permissions->first(fn (Permission $permission): bool => $validated['subject_type'] === 'user'
+                ? $relation->can($permission->name)
+                : $relation->hasPermissionTo($permission));
+            abort_if($alreadyGranted !== null, 422, 'One or more selected AI permissions are already effective. Review the direct or role grant source before changing access.');
+        }
+
+        DB::transaction(function () use ($relation, $permissions, $validated, $audit, $actor, $subjectLabel): void {
+            foreach ($permissions as $permission) {
+                if ($validated['action'] === 'grant') {
+                    $relation->givePermissionTo($permission);
+                } else {
+                    $relation->revokePermissionTo($permission);
+                }
+                $event = $validated['action'] === 'grant' ? 'ai.permission_granted' : 'ai.permission_revoked';
+                $audit->record($actor, $event, $validated['subject_type'], $relation->getKey(), ucfirst($validated['action']).' '.$permission->name.' for '.$subjectLabel.'.', null, [
+                    'permission' => $permission->name,
+                    'subject_type' => $validated['subject_type'],
+                    'action' => $validated['action'],
+                    'preview_company_id' => $validated['company_id'] ?? null,
+                ]);
             }
-            $event = $validated['action'] === 'grant' ? 'ai.permission_granted' : 'ai.permission_revoked';
-            $audit->record($actor, $event, $validated['subject_type'], $relation->getKey(), ucfirst($validated['action']).' '.$permission->name.' for '.$subjectLabel.'.', null, [
-                'permission' => $permission->name,
-                'subject_type' => $validated['subject_type'],
-                'action' => $validated['action'],
-                'preview_company_id' => $validated['company_id'] ?? null,
-            ]);
         });
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -252,7 +304,46 @@ class AdminControlCenterController extends Controller
             'company_id' => $verificationCompanyId,
             'diagnostic_user_id' => $verificationUser?->getKey() ?? $validated['diagnostic_user_id'] ?? null,
             'diagnostic_capability_id' => $validated['diagnostic_capability_id'] ?? null,
+            'catalog_subject_type' => $validated['subject_type'] === 'role' ? 'role' : 'user',
+            'catalog_user_id' => $validated['subject_type'] === 'user' ? $verificationUser?->getKey() : null,
+            'catalog_role_id' => $validated['subject_type'] === 'role' ? $relation->getKey() : null,
+            'catalog_capability_id' => $validated['catalog_capability_id'] ?? null,
+            'catalog_status' => $validated['catalog_status'] ?? null,
         ]))->with('success', 'AI permission change saved. Effective access has been refreshed; review the updated diagnostics below.');
+    }
+
+    public function registerAiPermission(Request $request, AiCapabilityRegistry $capabilities, AdminAuditLogger $audit): RedirectResponse
+    {
+        $validated = $request->validate([
+            'permission_name' => ['required', 'string', 'max:191'],
+            'company_id' => ['nullable', 'integer', Rule::exists('companies', 'company_id')],
+            'diagnostic_user_id' => ['nullable', 'integer', Rule::exists('users', 'user_id')],
+            'diagnostic_capability_id' => ['nullable', 'string', 'max:120'],
+            'catalog_subject_type' => ['nullable', Rule::in(['none', 'user', 'role'])],
+            'catalog_user_id' => ['nullable', 'integer', Rule::exists('users', 'user_id')],
+            'catalog_role_id' => ['nullable', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],
+            'catalog_capability_id' => ['nullable', 'string', 'max:120'],
+            'catalog_status' => ['nullable', Rule::in(['all', 'missing', 'granted', 'not-registered', 'needs-attention'])],
+        ]);
+        $permissionName = $validated['permission_name'];
+        abort_unless(in_array($permissionName, app(AiPermissionCatalog::class)->names($capabilities), true), 422, 'Only predefined AI permissions can be registered.');
+
+        $wasRegistered = Permission::query()->where('name', $permissionName)->where('guard_name', 'web')->exists();
+        $permission = DB::transaction(function () use ($permissionName, $request, $audit, $wasRegistered): Permission {
+            $permission = Permission::findOrCreate($permissionName, 'web');
+            if (! $wasRegistered) {
+                $audit->record($request->user(), 'ai.permission_registered', 'permission', $permission->getKey(), 'Registered predefined AI permission '.$permissionName.'.', null, [
+                    'permission' => $permissionName,
+                    'guard_name' => 'web',
+                    'granted' => false,
+                ]);
+            }
+
+            return $permission;
+        });
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return redirect()->route('admin.access.permissions.ai', array_filter($validated))->with('success', $wasRegistered ? 'Permission is already registered for the web guard. No access was changed.' : 'Permission registered for the web guard. It has not been granted to anyone.');
     }
 
     public function updatePermissionMatrix(Request $request, AdminAuditLogger $audit): RedirectResponse

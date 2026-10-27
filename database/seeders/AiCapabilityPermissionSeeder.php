@@ -40,11 +40,17 @@ class AiCapabilityPermissionSeeder extends Seeder
         'ai.documents.process',
     ];
 
+    /** @return array<int, string> */
+    public static function permissions(): array
+    {
+        return self::PERMISSIONS;
+    }
+
     public function run(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        foreach (self::PERMISSIONS as $permission) {
+        foreach (self::permissions() as $permission) {
             Permission::findOrCreate($permission, 'web');
         }
 

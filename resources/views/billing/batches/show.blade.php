@@ -21,57 +21,90 @@
             <div class="overflow-x-auto">
                 <table class="min-w-full text-left text-sm">
                     <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                        <tr><th class="px-4 py-3">DR Number</th><th class="px-4 py-3">Delivery Records</th><th class="px-4 py-3">Billing Status</th><th class="px-4 py-3">Invoice</th><th class="px-4 py-3">Details</th></tr>
+                        <tr><th class="px-4 py-3">DR Number</th><th class="px-4 py-3">Delivery Records</th><th class="px-4 py-3">Project</th><th class="px-4 py-3">Lot / School</th><th class="px-4 py-3">Delivery Date</th><th class="px-4 py-3">Delivery Status</th><th class="px-4 py-3">Billing Status</th><th class="px-4 py-3">Invoice</th></tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         @forelse ($recordGroups as $drRecords)
                             @php
-                                $billingStatuses = $drRecords->pluck('billing_status')->unique();
-                                $invoiceNumbers = $drRecords->pluck('invoice_no')->filter()->unique();
+                                $deliveryRecords = $drRecords->unique('delivery_id')->values();
+                                $projects = $drRecords->pluck('project_name')->filter()->unique()->values();
+                                $lotSchools = $drRecords
+                                    ->map(fn (object $record): string => collect([$record->lot_name ?? 'All lots', $record->school_name])->filter()->implode(' · '))
+                                    ->filter()
+                                    ->unique()
+                                    ->values();
+                                $deliveryDates = $drRecords->pluck('delivery_date')->filter()->unique()->values();
+                                $deliveryStatuses = $drRecords->pluck('delivery_status')->filter()->unique()->values();
+                                $billingStatuses = $drRecords->pluck('billing_status')->filter()->unique()->values();
+                                $invoiceNumbers = $drRecords->pluck('invoice_no')->filter()->unique()->values();
                             @endphp
                             <tr class="align-top hover:bg-slate-50/70">
-                                <th scope="row" class="whitespace-nowrap px-4 py-4 font-mono font-semibold text-slate-900">{{ $drRecords->first()->dr_no ?: '—' }}</th>
-                                <td class="whitespace-nowrap px-4 py-4 text-slate-700">{{ number_format($drRecords->count()) }}</td>
+                                <th scope="row" class="whitespace-nowrap px-4 py-4 font-mono font-semibold text-slate-900">
+                                    <p>{{ $drRecords->first()->dr_no ?? '—' }}</p>
+                                    <div class="mt-2 space-y-1 font-sans text-xs font-medium">
+                                        @foreach ($deliveryRecords as $record)
+                                            <a href="{{ route('billing.records.show', $record->delivery_id) }}" class="block text-blue-700 hover:underline">Delivery #{{ $record->delivery_id }}</a>
+                                        @endforeach
+                                    </div>
+                                </th>
+                                <td class="whitespace-nowrap px-4 py-4 text-slate-700">{{ number_format($deliveryRecords->count()) }}</td>
+                                <td class="min-w-[16rem] px-4 py-4 font-medium text-slate-800">
+                                    <ul class="space-y-1">
+                                        @forelse ($projects as $project)
+                                            <li>{{ $project }}</li>
+                                        @empty
+                                            <li>—</li>
+                                        @endforelse
+                                    </ul>
+                                </td>
+                                <td class="min-w-[12rem] px-4 py-4 text-slate-700">
+                                    <ul class="space-y-1">
+                                        @forelse ($lotSchools as $lotSchool)
+                                            <li>{{ $lotSchool }}</li>
+                                        @empty
+                                            <li>—</li>
+                                        @endforelse
+                                    </ul>
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-4 text-slate-600">
+                                    <ul class="space-y-1">
+                                        @forelse ($deliveryDates as $deliveryDate)
+                                            <li>{{ $deliveryDate }}</li>
+                                        @empty
+                                            <li>—</li>
+                                        @endforelse
+                                    </ul>
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-4 capitalize text-slate-700">
+                                    <ul class="space-y-1">
+                                        @forelse ($deliveryStatuses as $deliveryStatus)
+                                            <li>{{ str($deliveryStatus)->replace('_', ' ')->title() }}</li>
+                                        @empty
+                                            <li>—</li>
+                                        @endforelse
+                                    </ul>
+                                </td>
                                 <td class="whitespace-nowrap px-4 py-4 font-semibold capitalize text-blue-800">
-                                    {{ $billingStatuses->count() === 1 ? str($billingStatuses->first())->replace('_', ' ') : 'Mixed' }}
+                                    <ul class="space-y-1">
+                                        @forelse ($billingStatuses as $billingStatus)
+                                            <li>{{ str($billingStatus)->replace('_', ' ')->title() }}</li>
+                                        @empty
+                                            <li>—</li>
+                                        @endforelse
+                                    </ul>
                                 </td>
                                 <td class="whitespace-nowrap px-4 py-4 text-slate-700">
-                                    @if ($invoiceNumbers->isEmpty())
-                                        —
-                                    @elseif ($invoiceNumbers->count() === 1)
-                                        {{ $invoiceNumbers->first() }}
-                                    @else
-                                        {{ $invoiceNumbers->count() }} invoices
-                                    @endif
-                                </td>
-                                <td class="min-w-[16rem] px-4 py-4">
-                                    <details>
-                                        <summary class="w-fit cursor-pointer list-none rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500">View details</summary>
-                                        <div class="mt-3 overflow-x-auto rounded-lg border border-slate-200">
-                                            <table class="min-w-[64rem] text-left text-xs">
-                                                <thead class="bg-slate-50 uppercase tracking-wide text-slate-500">
-                                                    <tr><th class="px-3 py-2">Delivery record ID</th><th class="px-3 py-2">Project</th><th class="px-3 py-2">Lot / School</th><th class="px-3 py-2">Delivery date</th><th class="px-3 py-2">Delivery status</th><th class="px-3 py-2">Billing status</th><th class="px-3 py-2">Invoice</th></tr>
-                                                </thead>
-                                                <tbody class="divide-y divide-slate-100">
-                                                    @foreach ($drRecords as $record)
-                                                        <tr>
-                                                            <td class="whitespace-nowrap px-3 py-2 font-mono font-semibold"><a href="{{ route('billing.records.show', $record->delivery_id) }}" class="text-blue-700 hover:underline">#{{ $record->delivery_id }}</a></td>
-                                                            <td class="max-w-sm whitespace-normal break-words px-3 py-2 font-medium text-slate-800">{{ $record->project_name }}</td>
-                                                            <td class="px-3 py-2"><p class="font-semibold text-slate-800">{{ $record->lot_name ?? '—' }}</p><p class="mt-1 text-slate-500">{{ $record->school_name }}</p></td>
-                                                            <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ $record->delivery_date }}</td>
-                                                            <td class="whitespace-nowrap px-3 py-2 capitalize text-slate-700">{{ $record->delivery_status }}</td>
-                                                            <td class="whitespace-nowrap px-3 py-2 capitalize font-semibold text-blue-800">{{ str($record->billing_status)->replace('_', ' ') }}</td>
-                                                            <td class="whitespace-nowrap px-3 py-2 text-slate-700">{{ $record->invoice_no ?? '—' }}</td>
-                                                        </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </details>
+                                    <ul class="space-y-1">
+                                        @forelse ($invoiceNumbers as $invoiceNumber)
+                                            <li>{{ $invoiceNumber }}</li>
+                                        @empty
+                                            <li>—</li>
+                                        @endforelse
+                                    </ul>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="px-5 py-10 text-center text-slate-500">This batch does not have linked delivery records.</td></tr>
+                            <tr><td colspan="8" class="px-5 py-10 text-center text-slate-500">This batch does not have linked delivery records.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

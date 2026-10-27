@@ -61,12 +61,41 @@ class BillingBatchService
                 return $this->existingResult($existing, $selectionHash);
             }
 
-            $billingRecords = DeliveryBillingRecord::query()
+            $billingRecordRows = DeliveryBillingRecord::query()
                 ->whereIn('delivery_id', $deliveryIds)
                 ->orderBy('delivery_id')
                 ->lockForUpdate()
-                ->get()
-                ->keyBy('delivery_id');
+                ->get();
+            $billingRecordGroups = $billingRecordRows->groupBy('delivery_id');
+            $duplicateBillingRecords = $billingRecordGroups->filter(fn ($records): bool => $records->count() > 1);
+            if ($duplicateBillingRecords->isNotEmpty()) {
+                $rejected = [];
+                foreach ($duplicateBillingRecords as $deliveryId => $records) {
+                    $delivery = $deliveries->firstWhere('delivery_id', (int) $deliveryId);
+                    $rejected[] = [
+                        'delivery_id' => (int) $deliveryId,
+                        'dr_no' => (string) ($delivery?->dr_no ?? $deliveryId),
+                        'reason' => 'Multiple billing ledger records already exist for this delivery. Review billing record IDs: '.$records->pluck('id')->implode(', ').'.',
+                    ];
+                }
+
+                throw new BillingBatchEligibilityException(
+                    $rejected,
+                    'Duplicate billing ledger records require a separate reviewed cleanup. No delivery was added to a billing batch.',
+                    409,
+                );
+            }
+
+            if ($deliveryIds !== [] && $billingRecordRows->count() === count($deliveryIds)
+                && $billingRecordRows->every(fn (DeliveryBillingRecord $record): bool => $record->status === DeliveryBillingRecord::FOR_BILLING)
+                && $billingRecordRows->pluck('billing_batch_id')->filter()->unique()->count() === 1) {
+                $existingBatch = BillingBatch::query()->lockForUpdate()->find((int) $billingRecordRows->first()->billing_batch_id);
+                if ($existingBatch) {
+                    return ['batch' => $existingBatch, 'created' => false];
+                }
+            }
+
+            $billingRecords = $billingRecordRows->keyBy('delivery_id');
             $rejected = [];
 
             foreach ($deliveryIds as $deliveryId) {

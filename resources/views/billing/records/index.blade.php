@@ -54,6 +54,22 @@
             </div>
         </form>
 
+        @if($duplicateLedgerGroups->isNotEmpty())
+            <section class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950" aria-labelledby="duplicate-ledger-warning">
+                <h2 id="duplicate-ledger-warning" class="font-bold">Possible duplicate billing ledger rows found</h2>
+                <p class="mt-1 text-sm">No existing records were changed. A separate reviewed cleanup is required before removing or merging any rows.</p>
+                <ul class="mt-3 space-y-2 text-sm">
+                    @foreach($duplicateLedgerGroups as $duplicate)
+                        <li class="break-words rounded-lg border border-amber-200 bg-white/70 px-3 py-2">
+                            <strong>DR {{ $duplicate->dr_no }}</strong> · {{ $duplicate->project_name }} · {{ $duplicate->school_name }} · {{ $duplicate->delivery_date }} · {{ $duplicate->lot_name ?? 'All lots' }} · {{ $duplicate->batch_ref ?? 'Legacy / individual' }}
+                            <div class="mt-1 text-xs">Delivery IDs: {{ collect($duplicate->delivery_ids)->map(fn ($id) => '#'.$id)->implode(', ') }} · Billing record IDs: {{ collect($duplicate->billing_record_ids)->map(fn ($id) => '#'.$id)->implode(', ') }}</div>
+                            <div class="mt-1 text-xs font-semibold">{{ $duplicate->duplicate_source }}</div>
+                        </li>
+                    @endforeach
+                </ul>
+            </section>
+        @endif
+
         <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-4">
                 <div>
@@ -79,7 +95,7 @@
                     <tbody class="divide-y divide-slate-100">
                         @forelse ($records as $record)
                             <tr class="hover:bg-slate-50/80">
-                                <td class="whitespace-nowrap px-4 py-3 font-mono font-semibold text-slate-900">{{ $record->dr_no }}</td>
+                                <td class="whitespace-nowrap px-4 py-3 font-mono font-semibold text-slate-900">{{ $record->dr_no }}<span class="mt-1 block font-sans text-[10px] font-normal text-slate-400">Billing record #{{ $record->billing_record_id }} · Delivery #{{ $record->delivery_id }}</span></td>
                                 <td class="min-w-64 px-4 py-3">
                                     <p class="font-medium text-slate-800">{{ $record->project_name }}</p>
                                     <p class="mt-1 text-xs text-slate-500">{{ $record->lot_name ?? 'All lots' }} · {{ $record->school_name }} · {{ $record->school_id }}</p>

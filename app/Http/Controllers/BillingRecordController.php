@@ -9,6 +9,7 @@ use App\Services\GoogleSheetsApiClient;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -26,6 +27,7 @@ class BillingRecordController extends Controller
 
         return view('billing.records.index', [
             'records' => $records,
+            'duplicateLedgerGroups' => $this->duplicateLedgerGroups($filters),
             'filters' => $filters,
             'projects' => DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name', 'project_code', 'ref_no']),
             'schools' => DB::table('school')->orderBy('school_name')->get(['school_id', 'school_name']),
@@ -139,7 +141,7 @@ class BillingRecordController extends Controller
     /**
      * @param  array<string, mixed>  $filters
      */
-    private function recordsQuery(array $filters): Builder
+    private function recordsQuery(array $filters, bool $applyDistinct = true): Builder
     {
         return DB::table('deliveries as d')
             ->leftJoin('projects as p', 'p.project_id', '=', 'd.project_id')
@@ -149,6 +151,7 @@ class BillingRecordController extends Controller
             ->leftJoin('invoices as invoice', 'invoice.invoice_id', '=', 'billing.invoice_id')
             ->leftJoin('billing_batches as batch', 'batch.id', '=', 'billing.billing_batch_id')
             ->select([
+                'billing.id as billing_record_id',
                 'd.delivery_id',
                 'd.dr_no',
                 'd.project_id',
@@ -168,6 +171,7 @@ class BillingRecordController extends Controller
                 'billing.billing_reference',
                 'billing.billing_remarks',
             ])
+            ->when($applyDistinct, fn (Builder $query) => $query->distinct())
             ->selectRaw("COALESCE(billing.status, 'pending_billing') as billing_status")
             ->when(isset($filters['project_id']), fn (Builder $query) => $query->where('d.project_id', $filters['project_id']))
             ->when(isset($filters['dr_no']), fn (Builder $query) => $query->where('d.dr_no', 'like', '%'.$filters['dr_no'].'%'))
@@ -185,6 +189,57 @@ class BillingRecordController extends Controller
             ->when(isset($filters['date_from']), fn (Builder $query) => $query->whereDate('d.delivery_date', '>=', $filters['date_from']))
             ->when(isset($filters['date_to']), fn (Builder $query) => $query->whereDate('d.delivery_date', '<=', $filters['date_to']))
             ->when(isset($filters['invoice_no']), fn (Builder $query) => $query->where('invoice.invoice_no', 'like', '%'.$filters['invoice_no'].'%'));
+    }
+
+    /** @param array<string, mixed> $filters
+     * @return Collection<int, object>
+     */
+    private function duplicateLedgerGroups(array $filters): Collection
+    {
+        $groups = $this->recordsQuery($filters, applyDistinct: false)
+            ->whereNotNull('billing.id')
+            ->whereNotNull('d.dr_no')
+            ->whereRaw("TRIM(d.dr_no) <> ''")
+            ->select('d.project_id', 'd.school_id', 'd.lot_id', 'd.delivery_date', 'billing.billing_batch_id')
+            ->selectRaw('LOWER(TRIM(d.dr_no)) as normalized_dr, COUNT(billing.id) as billing_record_count')
+            ->groupBy('d.project_id', 'd.school_id', 'd.lot_id', 'd.delivery_date', 'billing.billing_batch_id')
+            ->groupByRaw('LOWER(TRIM(d.dr_no))')
+            ->havingRaw('COUNT(billing.id) > 1')
+            ->get();
+
+        return $groups->map(function (object $group) use ($filters): object {
+            $recordsQuery = $this->recordsQuery($filters, applyDistinct: false)
+                ->where('d.project_id', $group->project_id)
+                ->where('d.school_id', $group->school_id)
+                ->where('d.delivery_date', $group->delivery_date)
+                ->whereRaw('LOWER(TRIM(d.dr_no)) = ?', [$group->normalized_dr]);
+            $group->lot_id === null
+                ? $recordsQuery->whereNull('d.lot_id')
+                : $recordsQuery->where('d.lot_id', $group->lot_id);
+            $group->billing_batch_id === null
+                ? $recordsQuery->whereNull('billing.billing_batch_id')
+                : $recordsQuery->where('billing.billing_batch_id', $group->billing_batch_id);
+
+            $duplicates = $recordsQuery->get(['billing.id as billing_record_id', 'd.delivery_id']);
+            $group->ledger_row_count = $duplicates->count();
+            $group->billing_record_ids = $duplicates->pluck('billing_record_id')->unique()->values()->all();
+            $group->delivery_ids = $duplicates->pluck('delivery_id')->unique()->values()->all();
+            $group->duplicate_source = count($group->billing_record_ids) < $group->ledger_row_count
+                ? 'One or more joins multiplied a billing record in the ledger query.'
+                : 'Multiple billing records exist in the stored ledger for this project, DR, school, date, lot, and batch scope; a separate reviewed cleanup is required.';
+            $group->dr_no = $this->recordsQuery($filters, applyDistinct: false)
+                ->where('d.project_id', $group->project_id)
+                ->where('d.school_id', $group->school_id)
+                ->where('d.delivery_date', $group->delivery_date)
+                ->whereRaw('LOWER(TRIM(d.dr_no)) = ?', [$group->normalized_dr])
+                ->value('d.dr_no');
+            $group->project_name = DB::table('projects')->where('project_id', $group->project_id)->value('project_name');
+            $group->school_name = DB::table('school')->where('school_id', $group->school_id)->value('school_name');
+            $group->lot_name = $group->lot_id === null ? null : DB::table('lot')->where('lot_id', $group->lot_id)->value('lot_name');
+            $group->batch_ref = $group->billing_batch_id === null ? null : DB::table('billing_batches')->where('id', $group->billing_batch_id)->value('batch_ref');
+
+            return $group;
+        });
     }
 
     /**

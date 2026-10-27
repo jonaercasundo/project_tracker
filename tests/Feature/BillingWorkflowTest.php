@@ -951,11 +951,10 @@ it('shows the billing sidebar links to MMC users with billing permissions', func
 
     expect($sidebar)
         ->toContain('Billing')
-        ->toContain('href="'.route('billing.dashboard').'"')
         ->toContain('href="'.route('billing.prepare').'"')
         ->toContain('href="'.route('billing.batches.index').'"')
         ->toContain('href="'.route('billing.records.index').'"')
-        ->toContain('Billing Dashboard')
+        ->not->toContain('Billing Dashboard')
         ->toContain('Prepare for Billing')
         ->toContain('Billing Batches')
         ->toContain('Billing History');
@@ -972,7 +971,7 @@ it('shows the billing sidebar to the user role with its seeded billing permissio
         ->toContain('href="'.route('billing.batches.index').'"')
         ->toContain('href="'.route('billing.records.index').'"')
         ->toContain('href="'.route('billing.scanner').'"')
-        ->toContain('Billing Dashboard');
+        ->not->toContain('Billing Dashboard');
 });
 
 it('hides the billing sidebar from MMC users without billing permissions', function (): void {
@@ -998,7 +997,7 @@ it('shows only billing history links to MMC users with read-only billing access'
     $sidebar = view('layouts.project-sidebar')->render();
 
     expect($sidebar)
-        ->toContain('Billing Dashboard')
+        ->not->toContain('Billing Dashboard')
         ->toContain('Billing Batches')
         ->toContain('Billing History')
         ->not->toContain('Prepare for Billing')
@@ -1020,7 +1019,6 @@ it('expands the Billing sidebar and highlights the current page link', function 
     signInBillingUser('finance');
 
     foreach ([
-        'billing.dashboard' => route('billing.dashboard'),
         'billing.prepare' => route('billing.prepare'),
         'billing.batches.index' => route('billing.batches.index'),
         'billing.records.index' => route('billing.records.index'),
@@ -1247,6 +1245,11 @@ it('confirms a batch into the existing Billing queue idempotently without creati
         ->assertOk()
         ->assertJsonPath('batch.id', $batchId);
 
+    $this->postJson(route('billing.prepare.confirm'), [
+        ...$payload,
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertOk()->assertJsonPath('batch.id', $batchId);
+
     $this->assertDatabaseHas('delivery_billing_records', [
         'delivery_id' => $deliveryId,
         'billing_batch_id' => $batchId,
@@ -1259,6 +1262,7 @@ it('confirms a batch into the existing Billing queue idempotently without creati
         'confirmed_by' => auth()->id(),
     ]);
     $this->assertDatabaseCount('delivery_billing_histories', 1);
+    $this->assertDatabaseCount('billing_batches', 1);
     $this->assertDatabaseCount('invoices', 0);
 
     $this->get(route('billing.records.index', ['billing_status' => 'for_billing']))
@@ -1276,6 +1280,61 @@ it('confirms a batch into the existing Billing queue idempotently without creati
     ])->assertOk()->assertJsonPath('record.billing_status', 'billed');
     $this->assertDatabaseHas('billing_batches', ['id' => $batchId, 'status' => 'billed']);
     $this->assertDatabaseCount('invoices', 1);
+});
+
+it('reports existing duplicate ledger rows without deleting or merging them', function (): void {
+    signInBillingUser();
+    $deliveryId = createBillingDelivery('35470');
+    $response = $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'scan',
+        'delivery_ids' => [$deliveryId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated();
+    $billingBatchId = (int) $response->json('batch.id');
+    $original = DB::table('delivery_billing_records')->where('delivery_id', $deliveryId)->first();
+    Schema::table('delivery_billing_records', function (Blueprint $table): void {
+        $table->dropUnique('delivery_billing_records_delivery_id_unique');
+    });
+    $duplicateId = DB::table('delivery_billing_records')->insertGetId([
+        'delivery_id' => $deliveryId,
+        'status' => $original->status,
+        'invoice_id' => $original->invoice_id,
+        'billing_batch_id' => $billingBatchId,
+        'submitted_for_billing_by' => $original->submitted_for_billing_by,
+        'submitted_for_billing_at' => $original->submitted_for_billing_at,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->get(route('billing.records.index', ['billing_status' => 'for_billing']))
+        ->assertOk()
+        ->assertSee('Possible duplicate billing ledger rows found')
+        ->assertSee('#'.$original->id.', #'.$duplicateId)
+        ->assertSee('separate reviewed cleanup');
+
+    $this->assertDatabaseCount('delivery_billing_records', 2);
+});
+
+it('adds the delivery and billing batch uniqueness index when the existing data is clean', function (): void {
+    (require database_path('migrations/2026_10_27_093515_add_unique_delivery_batch_index_to_delivery_billing_records.php'))->up();
+
+    expect(Schema::hasIndex('delivery_billing_records', ['delivery_id', 'billing_batch_id']))->toBeTrue();
+});
+
+it('leaves existing duplicate billing rows untouched and skips the unique index until reviewed cleanup', function (): void {
+    $deliveryId = createBillingDelivery('35471');
+    Schema::table('delivery_billing_records', function (Blueprint $table): void {
+        $table->dropUnique('delivery_billing_records_delivery_id_unique');
+    });
+    DB::table('delivery_billing_records')->insert([
+        ['delivery_id' => $deliveryId, 'status' => 'pending_billing', 'created_at' => now(), 'updated_at' => now()],
+        ['delivery_id' => $deliveryId, 'status' => 'pending_billing', 'created_at' => now(), 'updated_at' => now()],
+    ]);
+
+    (require database_path('migrations/2026_10_27_093515_add_unique_delivery_batch_index_to_delivery_billing_records.php'))->up();
+
+    expect(Schema::hasIndex('delivery_billing_records', ['delivery_id', 'billing_batch_id']))->toBeFalse();
+    $this->assertDatabaseCount('delivery_billing_records', 2);
 });
 
 it('allows pre-delivery billing confirmation and leaves delivery and POD state unchanged', function (): void {

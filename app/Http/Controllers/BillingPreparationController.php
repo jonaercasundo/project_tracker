@@ -7,6 +7,7 @@ use App\Exceptions\BillingTransitionException;
 use App\Exceptions\ExpiredBillingQrCodeException;
 use App\Exceptions\InvalidBillingQrCodeException;
 use App\Models\BillingBatch;
+use App\Models\DeliveryBillingRecord;
 use App\Models\User;
 use App\Services\BillingBatchService;
 use App\Services\DeliveryBillingEligibilityService;
@@ -241,6 +242,58 @@ class BillingPreparationController extends Controller
                     'url' => route('billing.batches.show', $result['batch']),
                 ],
             ]);
+        }
+
+        $alreadySubmittedIds = $validated['mode'] === 'all'
+            ? array_map('intval', $validated['expected_delivery_ids'] ?? [])
+            : $deliveryIds;
+        if ($alreadySubmittedIds !== []) {
+            $alreadySubmittedRecords = DB::table('delivery_billing_records')
+                ->whereIn('delivery_id', $alreadySubmittedIds)
+                ->orderBy('delivery_id')
+                ->get(['delivery_id', 'billing_batch_id', 'status']);
+            $existingBatchIds = $alreadySubmittedRecords->pluck('billing_batch_id')->filter()->unique();
+            $allAlreadyConfirmedTogether = $alreadySubmittedRecords->count() === count($alreadySubmittedIds)
+                && $alreadySubmittedRecords->every(fn (object $record): bool => $record->status === DeliveryBillingRecord::FOR_BILLING)
+                && $existingBatchIds->count() === 1;
+
+            if ($allAlreadyConfirmedTogether) {
+                $existingBatch = BillingBatch::query()->find((int) $existingBatchIds->first());
+                $sameSelectAllRequest = $validated['mode'] !== 'all';
+                if ($existingBatch && $validated['mode'] === 'all') {
+                    $submittedFilters = $this->validatedFilters($request);
+                    $batchDeliveryIds = $existingBatch->deliveryBillingRecords()
+                        ->orderBy('delivery_id')
+                        ->pluck('delivery_id')
+                        ->map(fn (mixed $id): int => (int) $id)
+                        ->all();
+                    $submittedDeliveryIds = $alreadySubmittedIds;
+                    sort($batchDeliveryIds);
+                    sort($submittedDeliveryIds);
+                    $sameSelectAllRequest = $existingBatch->selection_method === 'all'
+                        && $existingBatch->selection_filters == $submittedFilters
+                        && $batchDeliveryIds === $submittedDeliveryIds;
+                }
+
+                if ($existingBatch && $sameSelectAllRequest) {
+                    $retryRows = $this->eligibility->query()->whereIn('d.delivery_id', $alreadySubmittedIds)->get();
+                    $groupCount = $this->groupsForRows($retryRows)->count();
+
+                    return response()->json([
+                        'message' => 'This delivery selection is already confirmed for Billing.',
+                        'updated_records' => $this->updatedRecordDetails($alreadySubmittedIds),
+                        'rejected_records' => [],
+                        'batch' => [
+                            'id' => $existingBatch->getKey(),
+                            'batch_ref' => $existingBatch->batch_ref,
+                            'status' => $existingBatch->status,
+                            'delivery_count' => count($alreadySubmittedIds),
+                            'group_count' => $groupCount,
+                            'url' => route('billing.batches.show', $existingBatch),
+                        ],
+                    ]);
+                }
+            }
         }
 
         if ($validated['mode'] === 'range') {

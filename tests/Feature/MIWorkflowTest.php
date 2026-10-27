@@ -49,7 +49,14 @@ it('creates an ordinary liquidation with multiple items, server title, rate, and
     $payload = $this->ordinaryPayload();
     $payload['report_title'] = 'Forged title';
     $payload['items'][] = array_merge($payload['items'][0], ['payee' => 'Second payee', 'amount_vnd' => '200.25']);
+    $payload['items'][0]['ref_no'] = 'USER-CHOSEN-REFERENCE';
+    $payload['items'][0]['ocr_reference'] = 'RECEIPT-7788';
     $payload['submission_key'] = (string) Str::uuid();
+
+    $this->get(route('liquidation.create'))
+        ->assertSee('Assigned when saved')
+        ->assertSee('readonly', false)
+        ->assertDontSee('name="items[0][ref_no]"', false);
 
     $response = $this->post(route('liquidation.store'), $payload);
     $report = MI_Liquidation::sole();
@@ -62,12 +69,75 @@ it('creates an ordinary liquidation with multiple items, server title, rate, and
         ->and($report->company_id)->toBe($owner->currentCompany()->getKey())
         ->and($report->prepared_by)->toBe($owner->getKey())
         ->and($report->items)->toHaveCount(2)
+        ->and($report->items[0]->ref_no)->toBe('LF-20261006-001')
+        ->and($report->items[1]->ref_no)->toBe('LF-20261006-002')
+        ->and($report->items[0]->ocr_reference)->toBe('RECEIPT-7788')
         ->and($report->total_vnd)->toBe(325.75)
         ->and($report->total_usd)->toBe(0.01)
         ->and($report->items->first()->amount_usd)->toBe(0.0);
     $this->get(route('liquidation.index'))->assertOk()->assertSee('October 2026 Report');
     $this->get(route('liquidation.edit', $report))->assertSee('Reference No.')->assertSee('LIQ-000001');
     $this->get(route('liquidation.show', $report))->assertSee('Reference No.')->assertSee('LIQ-000001');
+});
+
+it('assigns the next unique reference to expenses added while editing and preserves saved references', function () {
+    Http::preventStrayRequests();
+    Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'base_code' => 'USD', 'time_last_update_unix' => 1792886551, 'rates' => ['VND' => 25432.125]], 200)]);
+    Cache::flush();
+    $owner = $this->miUser();
+    $this->signInMI($owner);
+    $this->post(route('liquidation.store'), $this->ordinaryPayload())->assertRedirect();
+    $report = MI_Liquidation::sole();
+    $originalItem = $report->items()->sole();
+    $this->get(route('liquidation.edit', $report))
+        ->assertSee('LF-20261006-001')
+        ->assertSee('readonly', false)
+        ->assertDontSee('name="items[0][ref_no]"', false);
+
+    $payload = $this->ordinaryPayload();
+    $payload['items'][0]['id'] = $originalItem->getKey();
+    $payload['items'][0]['ocr_reference'] = 'ORIGINAL-RECEIPT-REF';
+    $payload['items'][] = array_replace($payload['items'][0], [
+        'id' => null,
+        'payee' => 'New expense',
+        'amount_vnd' => '25.00',
+        'ocr_reference' => 'NEW-RECEIPT-REF',
+    ]);
+    $payload['items'][0]['ref_no'] = 'ATTEMPTED-OVERWRITE';
+
+    $this->put(route('liquidation.update', $report), $payload)->assertRedirect(route('liquidation.show', $report));
+
+    $items = $report->items()->orderBy('line_no')->get();
+    expect($items)->toHaveCount(2)
+        ->and($items[0]->ref_no)->toBe('LF-20261006-001')
+        ->and($items[1]->ref_no)->toBe('LF-20261006-002')
+        ->and($items[0]->ocr_reference)->toBe('ORIGINAL-RECEIPT-REF')
+        ->and($items[1]->ocr_reference)->toBe('NEW-RECEIPT-REF');
+});
+
+it('continues after a legacy expense reference and enforces unique expense references', function () {
+    $owner = $this->miUser();
+    $report = MILiquidationFixtureFactory::new()->create([
+        'prepared_by' => $owner->getKey(),
+        'company_id' => $owner->companies()->first()->getKey(),
+    ]);
+    $row = $this->ordinaryPayload()['items'][0];
+    $legacyItem = $report->items()->create(array_merge($row, [
+        'line_no' => 1,
+        'ref_no' => 'LF-20261006-009',
+    ]));
+
+    expect(fn () => $report->items()->create(array_merge($row, [
+        'line_no' => 2,
+        'ref_no' => $legacyItem->ref_no,
+    ])))->toThrow(QueryException::class);
+
+    $this->signInMI($owner);
+    $this->post(route('liquidation.store'), $this->ordinaryPayload())->assertRedirect();
+
+    $newItem = MI_Liquidation::query()->latest('id')->firstOrFail()->items()->sole();
+    expect($legacyItem->fresh()->ref_no)->toBe('LF-20261006-009')
+        ->and($newItem->ref_no)->toBe('LF-20261006-010');
 });
 
 it('assigns sequential reference numbers from unique database-generated liquidation IDs', function () {

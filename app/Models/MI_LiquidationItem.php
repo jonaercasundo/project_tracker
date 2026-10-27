@@ -15,6 +15,7 @@ class MI_LiquidationItem extends Model
         'liquidation_id',
         'line_no',
         'ref_no',
+        'ocr_reference',
         'item_date',
         'requested_by',
         'payee',

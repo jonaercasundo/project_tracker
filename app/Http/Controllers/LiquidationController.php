@@ -8,6 +8,7 @@ use App\Models\MI_LiquidationItem;
 use App\Services\MiFinancialAmount;
 use App\Services\MiFinancialWorkflowService;
 use App\Services\MiForexRateService;
+use App\Services\MiLiquidationExpenseReferenceGenerator;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -277,10 +278,10 @@ class LiquidationController extends Controller
 
                 'items.*' => ['required', 'array'],
 
-                'items.*.ref_no' => [
+                'items.*.ocr_reference' => [
                     'nullable',
                     'string',
-                    'max:50',
+                    'max:255',
                 ],
 
                 'items.*.item_date' => [
@@ -403,10 +404,6 @@ class LiquidationController extends Controller
                     |--------------------------------------------------------------------------
                     */
 
-                    $datePrefix = Carbon::parse(
-                        $validated['date_prepared']
-                    )->format('Ymd');
-
                     /*
                     |--------------------------------------------------------------------------
                     | Create Items
@@ -454,11 +451,8 @@ class LiquidationController extends Controller
                         |--------------------------------------------------------------------------
                         */
 
-                        $refNo = sprintf(
-                            'LF-%s-%03d',
-                            $datePrefix,
-                            $index + 1
-                        );
+                        $refNo = app(MiLiquidationExpenseReferenceGenerator::class)
+                            ->next($validated['date_prepared']);
 
                         /*
                         |--------------------------------------------------------------------------
@@ -471,6 +465,8 @@ class LiquidationController extends Controller
                             'liquidation_id' => $liquidation->id,
 
                             'ref_no' => $refNo,
+
+                            'ocr_reference' => $item['ocr_reference'] ?? null,
 
                             'line_no' => $index + 1,
 
@@ -638,10 +634,10 @@ class LiquidationController extends Controller
             'items.*.id' => ['nullable', 'integer', 'distinct', Rule::exists('mi_liquidation_items', 'id')->where('liquidation_id', $liquidation->getKey())],
             'items.*' => ['required', 'array'],
 
-            'items.*.ref_no' => [
+            'items.*.ocr_reference' => [
                 'nullable',
                 'string',
-                'max:50',
+                'max:255',
             ],
 
             'items.*.item_date' => [
@@ -710,7 +706,6 @@ class LiquidationController extends Controller
                     'pcf_amount' => $validated['pcf_amount'] ?? null,
                 ]);
                 $keptIds = [];
-                $datePrefix = Carbon::parse($validated['date_prepared'])->format('Ymd');
                 foreach (array_values($validated['items']) as $index => $row) {
                     $item = isset($row['id'])
                         ? $liquidation->items()->whereKey($row['id'])->firstOrFail()
@@ -725,7 +720,9 @@ class LiquidationController extends Controller
                     }
                     $item->fill([
                         'line_no' => $index + 1,
-                        'ref_no' => $item->ref_no ?? sprintf('LF-%s-%03d', $datePrefix, $index + 1),
+                        'ref_no' => $item->ref_no ?? app(MiLiquidationExpenseReferenceGenerator::class)
+                            ->next($validated['date_prepared']),
+                        'ocr_reference' => $row['ocr_reference'] ?? null,
                         'item_date' => $row['item_date'],
                         'requested_by' => $row['requested_by'],
                         'payee' => $row['payee'],

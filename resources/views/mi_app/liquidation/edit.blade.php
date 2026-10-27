@@ -171,6 +171,7 @@
                         'id' => $item->id,
                         'line_no' => $item->line_no,
                         'ref_no' => $item->ref_no,
+                        'ocr_reference' => $item->ocr_reference,
 
                         'item_date' => $item->item_date
                             ? \Carbon\Carbon::parse($item->item_date)->format('Y-m-d')
@@ -207,6 +208,7 @@
                 'line_no' => 1,
 
                 'ref_no' => '',
+                'ocr_reference' => '',
 
                 'item_date' => $datePrepared,
 
@@ -2290,19 +2292,14 @@
 
                                                     Reference No.
 
-                                                    <span class="liq-required">
-                                                        *
-                                                    </span>
-
                                                 </label>
 
                                                 <input
                                                     type="text"
-                                                    name="items[{{ $index }}][ref_no]"
                                                     class="liq-input liq-mono ref-no"
-                                                    value="{{ old("items.$index.ref_no", $item['ref_no'] ?? '') }}"
-                                                    placeholder="LF-YYYYMMDD-001"
-                                                    required
+                                                    value="{{ $item['ref_no'] ?? 'Assigned when saved' }}"
+                                                    readonly
+                                                    aria-readonly="true"
                                                 >
 
                                             </div>
@@ -2644,7 +2641,8 @@
                                                 <input
                                                     type="text"
                                                     class="liq-input ocr-reference"
-                                                    value="{{ old("items.$index.ref_no", $item['ref_no'] ?? '') }}"
+                                                    name="items[{{ $index }}][ocr_reference]"
+                                                    value="{{ old("items.$index.ocr_reference", $item['ocr_reference'] ?? '') }}"
                                                     placeholder="Detected reference number"
                                                 >
 
@@ -3753,10 +3751,11 @@
 
                                     <input
                                         type="text"
-                                        name="items[${index}][ref_no]"
                                         class="liq-input liq-mono ref-no"
                                         placeholder="LF-YYYYMMDD-001"
-                                        required
+                                        value="Assigned when saved"
+                                        readonly
+                                        aria-readonly="true"
                                     >
 
                                 </div>
@@ -3966,6 +3965,7 @@
                                     <input
                                         type="text"
                                         class="liq-input ocr-reference"
+                                        name="items[${index}][ocr_reference]"
                                         placeholder="Detected reference number"
                                     >
 
@@ -4331,22 +4331,6 @@
                                 ocrReference.value =
                                     detected;
 
-
-                                const refNo =
-                                    item.querySelector(
-                                        '.ref-no'
-                                    );
-
-
-                                if (
-                                    refNo &&
-                                    !refNo.value.trim()
-                                ) {
-
-                                    refNo.value =
-                                        detected;
-
-                                }
 
                             }
 

@@ -1113,7 +1113,7 @@
                         </div>
 
                         <div style="font-size:11px;color:#64748b;">
-                            Receipts are matched using the Ref No.
+                            Receipt references from OCR are stored separately from system expense references.
                         </div>
 
                     </div>
@@ -1199,25 +1199,10 @@
                                                 <div class="tx-ref-box">
 
                                                     <span class="ref-value tx-ref-value">
-                                                        LF-{{ date('Ymd') }}-{{ str_pad($index + 1, 3, '0', STR_PAD_LEFT) }}
+                                                        Assigned when saved
                                                     </span>
 
-                                                    <button
-                                                        type="button"
-                                                        class="tx-copy-ref copy-ref"
-                                                        title="Copy Ref No."
-                                                    >
-                                                        Copy
-                                                    </button>
-
                                                 </div>
-
-                                                <input
-                                                    type="hidden"
-                                                    name="items[{{ $index }}][ref_no]"
-                                                    class="ref-input"
-                                                    value="LF-{{ date('Ymd') }}-{{ str_pad($index + 1, 3, '0', STR_PAD_LEFT) }}"
-                                                >
 
                                             </div>
 
@@ -1538,6 +1523,22 @@
                                             <div class="tx-field">
 
                                                 <div class="tx-row-label">
+                                                    OCR / Receipt Reference
+                                                </div>
+
+                                                <input
+                                                    type="text"
+                                                    name="items[{{ $index }}][ocr_reference]"
+                                                    value="{{ old('items.'.$index.'.ocr_reference', $item['ocr_reference'] ?? '') }}"
+                                                    class="tx-input ocr-reference"
+                                                    placeholder="Detected receipt reference"
+                                                >
+
+                                            </div>
+
+                                            <div class="tx-field">
+
+                                                <div class="tx-row-label">
                                                     Remarks
                                                 </div>
 
@@ -1823,10 +1824,7 @@
             ============================================================ */
 
             function generateRefNumber(index) {
-
-                const prefix = getDatePrefix();
-
-                return `LF-${prefix}-${String(index + 1).padStart(3, '0')}`;
+                return 'Assigned when saved';
 
             }
 
@@ -1867,8 +1865,6 @@
                     const refValue =
                         row.querySelector('.ref-value');
 
-                    const refInput =
-                        row.querySelector('.ref-input');
 
                     if (refDisplay) {
                         refDisplay.textContent = refNumber;
@@ -1878,9 +1874,6 @@
                         refValue.textContent = refNumber;
                     }
 
-                    if (refInput) {
-                        refInput.value = refNumber;
-                    }
 
 
                     /* ---------------------------------------------
@@ -2138,11 +2131,18 @@
 
             }
 
+            function extractReferenceFromText(text) {
+                const match = text.match(/\b(?:REF(?:ERENCE)?|O\.?R\.?|RECEIPT)[\s:#-]*([A-Z0-9-]{5,30})\b/i);
+
+                return match ? match[1].trim() : null;
+            }
+
             async function scanReceipt(row, file) {
 
                 const status = row.querySelector('.tx-receipt-status');
                 const dateInput = row.querySelector('.item-date');
                 const vndInput = row.querySelector('.amount-vnd');
+                const ocrReferenceInput = row.querySelector('.ocr-reference');
 
                 if (typeof Tesseract === 'undefined') {
 
@@ -2167,6 +2167,7 @@
 
                     const foundDate = extractDateFromText(text);
                     const foundAmount = extractAmountFromText(text);
+                    const foundReference = extractReferenceFromText(text);
 
                     const found = [];
 
@@ -2178,6 +2179,11 @@
                     if (foundAmount && vndInput) {
                         vndInput.value = foundAmount;
                         found.push('amount');
+                    }
+
+                    if (foundReference && ocrReferenceInput) {
+                        ocrReferenceInput.value = foundReference;
+                        found.push('receipt reference');
                     }
 
                     recalcAll();
@@ -2288,21 +2294,7 @@
                                         ${generateRefNumber(index)}
                                     </span>
 
-                                    <button
-                                        type="button"
-                                        class="tx-copy-ref copy-ref"
-                                    >
-                                        Copy
-                                    </button>
-
                                 </div>
-
-                                <input
-                                    type="hidden"
-                                    name="items[${index}][ref_no]"
-                                    class="ref-input"
-                                    value="${generateRefNumber(index)}"
-                                >
 
                             </div>
 
@@ -2530,6 +2522,21 @@
 
 
                             <!-- REMARKS -->
+
+                            <div class="tx-field">
+
+                                <div class="tx-row-label">
+                                    OCR / Receipt Reference
+                                </div>
+
+                                <input
+                                    type="text"
+                                    name="items[${index}][ocr_reference]"
+                                    class="tx-input ocr-reference"
+                                    placeholder="Detected receipt reference"
+                                >
+
+                            </div>
 
                             <div class="tx-field">
 

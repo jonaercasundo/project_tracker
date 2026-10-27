@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\CheckCompany;
+use App\Http\Middleware\EnsureActiveUser;
+use App\Http\Middleware\RoleMiddleware;
 use App\Models\User;
 use App\Services\DuplicateDrCleanupService;
 use Illuminate\Database\Schema\Blueprint;
@@ -75,5 +78,25 @@ class DuplicateDrCleanupTest extends BillingWorkflowTestCase
 
         $this->expectException(ValidationException::class);
         app(DuplicateDrCleanupService::class)->resolve(1, User::findOrFail($actorId), 11, [12]);
+    }
+
+    public function test_authorized_company_user_can_load_the_cleanup_page(): void
+    {
+        $companyId = DB::table('companies')->insertGetId([
+            'name' => 'Metro Mobilia', 'code' => 'MMC', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ], 'company_id');
+        $userId = DB::table('users')->insertGetId([
+            'name' => 'Reviewer', 'username' => 'page-reviewer', 'password' => bcrypt('secret'), 'employee_id' => 'E3',
+            'department' => 'Operations', 'position' => 'Manager', 'created_at' => now(), 'updated_at' => now(),
+        ], 'user_id');
+        DB::table('company_user')->insert(['company_id' => $companyId, 'user_id' => $userId, 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->withoutMiddleware([CheckCompany::class, EnsureActiveUser::class, RoleMiddleware::class])
+            ->withoutVite()
+            ->actingAs(User::findOrFail($userId))
+            ->withSession(['company_id' => $companyId]);
+        $response = $this->get(route('deliveries.duplicate-cleanup'));
+
+        $response->assertOk()->assertSee('Duplicate DR Cleanup')->assertSee('No possible duplicate delivery groups');
     }
 }

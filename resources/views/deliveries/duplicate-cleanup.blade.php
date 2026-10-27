@@ -1,6 +1,4 @@
-@extends('layouts.app')
-
-@section('content')
+<x-project_app-layout>
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -93,4 +91,4 @@ document.querySelectorAll('.resolve-form').forEach((form) => {
     update();
 });
 </script>
-@endsection
+</x-project_app-layout>

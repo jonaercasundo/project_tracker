@@ -48,6 +48,55 @@ class DeliveryBillingService
         }, 3);
     }
 
+    public function undoForBilling(int $deliveryId, User $actor): DeliveryBillingRecord
+    {
+        return DB::transaction(function () use ($deliveryId, $actor): DeliveryBillingRecord {
+            Delivery::query()->whereKey($deliveryId)->lockForUpdate()->firstOrFail();
+            $billingRecord = $this->lockBillingRecord($deliveryId);
+
+            if (! $billingRecord) {
+                throw new BillingTransitionException('This delivery has no billing confirmation to undo.', 409);
+            }
+
+            if ($billingRecord->status === DeliveryBillingRecord::BILLED) {
+                throw new BillingTransitionException('This confirmation cannot be undone because the delivery has already been billed.', 409);
+            }
+
+            if ($billingRecord->status === DeliveryBillingRecord::ON_HOLD) {
+                throw new BillingTransitionException('This confirmation cannot be undone while the delivery is on hold. Resolve the hold first.', 409);
+            }
+
+            if ($billingRecord->status !== DeliveryBillingRecord::FOR_BILLING) {
+                throw new BillingTransitionException('This delivery is no longer confirmed for billing.', 409);
+            }
+
+            if ($billingRecord->invoice_id !== null) {
+                throw new BillingTransitionException('This confirmation cannot be undone because an invoice is linked to the delivery.', 409);
+            }
+
+            $latestHistory = $billingRecord->histories()->latest('id')->first();
+            if ($latestHistory?->previous_status !== DeliveryBillingRecord::PENDING_BILLING
+                || $latestHistory?->new_status !== DeliveryBillingRecord::FOR_BILLING) {
+                throw new BillingTransitionException('This confirmation cannot be undone because a later billing transaction depends on it or its audit history is incomplete.', 409);
+            }
+
+            $billingRecord->status = DeliveryBillingRecord::PENDING_BILLING;
+            $billingRecord->status_before_hold = null;
+            $billingRecord->save();
+
+            $this->recordTransition(
+                $billingRecord,
+                DeliveryBillingRecord::FOR_BILLING,
+                DeliveryBillingRecord::PENDING_BILLING,
+                $actor,
+                null,
+                'For Billing confirmation undone by '.$actor->name.'.'
+            );
+
+            return $billingRecord->refresh();
+        }, 3);
+    }
+
     /**
      * @param  array{invoice_no: string, invoice_date: string, amount: string|float|int, billing_amount?: string|float|null, billing_reference?: string|null, billing_remarks?: string|null}  $data
      */

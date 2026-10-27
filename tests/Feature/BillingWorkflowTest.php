@@ -405,6 +405,103 @@ it('shows pending status until a user explicitly confirms For Billing', function
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $deliveryId, 'status' => 'accepted']);
 });
 
+it('undoes a For Billing confirmation with a new audit entry and unchanged delivery state', function (): void {
+    [$actor] = signInBillingUser();
+    $deliveryId = createBillingDelivery('DR-UNDO-1001', 'pending');
+    $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'scan',
+        'delivery_ids' => [$deliveryId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated();
+    $billingRecordId = (int) DB::table('delivery_billing_records')->where('delivery_id', $deliveryId)->value('id');
+
+    $this->postJson(route('billing.prepare.undo', $deliveryId))
+        ->assertOk()
+        ->assertJsonPath('billing_status', 'pending_billing')
+        ->assertJsonPath('group.eligible', true)
+        ->assertJsonPath('group.records.0.billing_status', 'pending_billing');
+
+    $this->assertDatabaseHas('delivery_billing_records', [
+        'id' => $billingRecordId,
+        'delivery_id' => $deliveryId,
+        'status' => 'pending_billing',
+    ]);
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $deliveryId, 'status' => 'pending']);
+    $this->assertDatabaseCount('delivery_proofs', 0);
+    $this->assertDatabaseCount('delivery_billing_histories', 2);
+    $this->assertDatabaseHas('delivery_billing_histories', [
+        'delivery_billing_record_id' => $billingRecordId,
+        'previous_status' => 'pending_billing',
+        'new_status' => 'for_billing',
+        'changed_by' => $actor->getKey(),
+        'changed_by_name' => $actor->name,
+    ]);
+    $this->assertDatabaseHas('delivery_billing_histories', [
+        'delivery_billing_record_id' => $billingRecordId,
+        'previous_status' => 'for_billing',
+        'new_status' => 'pending_billing',
+        'changed_by' => $actor->getKey(),
+        'changed_by_name' => $actor->name,
+        'remarks' => 'For Billing confirmation undone by '.$actor->name.'.',
+    ]);
+    expect(DB::table('delivery_billing_histories')
+        ->where('delivery_billing_record_id', $billingRecordId)
+        ->where('new_status', 'pending_billing')
+        ->value('created_at'))->not->toBeNull();
+});
+
+it('blocks undo after billing or a later billing transaction', function (): void {
+    signInBillingUser();
+    $billedDeliveryId = createBillingDelivery('DR-UNDO-BILLED');
+    confirmDeliveryForBilling($billedDeliveryId);
+    $this->postJson(route('billing.billed', $billedDeliveryId), [
+        'invoice_no' => 'INV-UNDO-BLOCK',
+        'invoice_date' => '2026-09-21',
+        'amount' => '100.00',
+    ])->assertOk();
+
+    $this->postJson(route('billing.prepare.undo', $billedDeliveryId))
+        ->assertConflict()
+        ->assertJsonPath('message', 'This confirmation cannot be undone because the delivery has already been billed.');
+
+    $releasedDeliveryId = createBillingDelivery('DR-UNDO-LATER-TRANSACTION');
+    confirmDeliveryForBilling($releasedDeliveryId);
+    $this->postJson(route('billing.hold', $releasedDeliveryId), ['remarks' => 'Review'])->assertOk();
+    $this->postJson(route('billing.release-hold', $releasedDeliveryId))->assertOk();
+
+    $this->postJson(route('billing.prepare.undo', $releasedDeliveryId))
+        ->assertConflict()
+        ->assertJsonPath('message', 'This confirmation cannot be undone because a later billing transaction depends on it or its audit history is incomplete.');
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $releasedDeliveryId, 'status' => 'for_billing']);
+});
+
+it('requires the billing confirmation permission to undo a confirmation', function (): void {
+    [, $companyId] = signInBillingUser();
+    $deliveryId = createBillingDelivery('DR-UNDO-FORBIDDEN');
+    confirmDeliveryForBilling($deliveryId);
+    $viewer = User::query()->create([
+        'name' => 'Billing Viewer',
+        'username' => 'billing-viewer-'.$companyId,
+        'password' => 'test-password',
+        'role' => 'viewer',
+        'employee_id' => 'VIEWER-'.$companyId,
+        'department' => 'Finance',
+        'position' => 'Viewer',
+    ]);
+    $viewer->assignRole(Role::findOrCreate('viewer', 'web'));
+    DB::table('company_user')->insert([
+        'user_id' => $viewer->getKey(),
+        'company_id' => $companyId,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    test()->actingAs($viewer)->withSession(['company_id' => $companyId]);
+
+    $this->postJson(route('billing.prepare.undo', $deliveryId))->assertForbidden();
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
+    $this->assertDatabaseCount('delivery_billing_histories', 1);
+});
+
 it('flags a signed DR number associated with separate projects for review', function () {
     signInBillingUser();
     $firstDeliveryId = createBillingDelivery('DR-SHARED');

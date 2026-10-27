@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\BillingBatchEligibilityException;
+use App\Exceptions\BillingTransitionException;
 use App\Exceptions\ExpiredBillingQrCodeException;
 use App\Exceptions\InvalidBillingQrCodeException;
 use App\Models\BillingBatch;
@@ -10,6 +11,7 @@ use App\Models\User;
 use App\Services\BillingBatchService;
 use App\Services\DeliveryBillingEligibilityService;
 use App\Services\DeliveryBillingQrCodeService;
+use App\Services\DeliveryBillingService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +25,8 @@ class BillingPreparationController extends Controller
     public function __construct(
         private DeliveryBillingEligibilityService $eligibility,
         private DeliveryBillingQrCodeService $qrCodes,
-        private BillingBatchService $batches
+        private BillingBatchService $batches,
+        private DeliveryBillingService $billing
     ) {}
 
     public function index(Request $request): View|RedirectResponse
@@ -338,6 +341,29 @@ class BillingPreparationController extends Controller
                 'url' => route('billing.batches.show', $result['batch']),
             ],
         ], $result['created'] ? 201 : 200);
+    }
+
+    public function undo(Request $request, int $delivery): JsonResponse
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 401);
+
+        try {
+            $billingRecord = $this->billing->undoForBilling($delivery, $actor);
+        } catch (BillingTransitionException $exception) {
+            return response()->json(['message' => $exception->getMessage()], $exception->httpStatus);
+        }
+
+        $deliveryRow = $this->eligibility->query()
+            ->where('d.delivery_id', $delivery)
+            ->firstOrFail();
+        $group = $this->groupsForRows(collect([$deliveryRow]))->first();
+
+        return response()->json([
+            'message' => 'For Billing confirmation was undone. Billing status returned to Pending Billing.',
+            'billing_status' => $billingRecord->status,
+            'group' => $group,
+        ]);
     }
 
     /** @return array<string, mixed> */

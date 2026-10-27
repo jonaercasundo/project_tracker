@@ -241,8 +241,44 @@ if (root) {
         list.className = 'mt-3 grid gap-2 md:grid-cols-2';
         record.records.forEach((item) => {
             const card = document.createElement('div');
-            card.className = 'rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5';
-            card.textContent = `Delivery #${item.delivery_id} · ${item.lot_name} · ${item.school_name} · ${item.delivery_status} · POD ${item.pod_available ? 'available' : 'not recorded'} · Billing ${item.billing_status.replaceAll('_', ' ')}${item.eligible ? '' : ` · Excluded: ${item.remarks}`}`;
+            card.className = 'flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5';
+            const detailsText = document.createElement('span');
+            detailsText.textContent = `Delivery #${item.delivery_id} · ${item.lot_name} · ${item.school_name} · ${item.delivery_status} · POD ${item.pod_available ? 'available' : 'not recorded'} · Billing ${item.billing_status.replaceAll('_', ' ')}${item.eligible ? '' : ` · Excluded: ${item.remarks}`}`;
+            card.append(detailsText);
+            if (canConfirm && item.billing_status === 'for_billing') {
+                const undoButton = document.createElement('button');
+                undoButton.type = 'button';
+                undoButton.className = 'shrink-0 rounded border border-amber-300 px-2.5 py-1 font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50';
+                undoButton.textContent = 'Undo';
+                undoButton.setAttribute('aria-label', `Undo For Billing confirmation for delivery ${item.delivery_id}`);
+                undoButton.addEventListener('click', async () => {
+                    const confirmed = window.confirm(`Undo For Billing for DR ${record.dr_no}, delivery #${item.delivery_id}? Its billing status will return to Pending Billing. Delivery status and POD will not change.`);
+                    if (!confirmed) return;
+
+                    try {
+                        setBusy(undoButton, true, 'Undoing...');
+                        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                        const undoUrl = root.dataset.undoUrlTemplate.replace('__DELIVERY__', encodeURIComponent(item.delivery_id));
+                        const response = await fetch(undoUrl, {
+                            method: 'POST',
+                            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token },
+                        });
+                        const payload = await readResponse(response);
+                        visibleRecords = visibleRecords.map((group) => group.group_key === payload.group.group_key ? payload.group : group);
+                        if (selected.has(payload.group.group_key)) {
+                            if (payload.group.eligible) selected.set(payload.group.group_key, payload.group);
+                            else selected.delete(payload.group.group_key);
+                        }
+                        render();
+                        showFeedback(payload.message, 'success');
+                    } catch (error) {
+                        showFeedback(error.message, 'error');
+                    } finally {
+                        setBusy(undoButton, false, '');
+                    }
+                });
+                card.append(undoButton);
+            }
             list.append(card);
         });
         details.append(summary, list);

@@ -797,6 +797,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
             Route::post('/prepare/confirm', [BillingPreparationController::class, 'confirm'])
                 ->middleware('can:billing.for-billing.mark')
                 ->name('prepare.confirm');
+            Route::post('/prepare/{delivery}/undo', [BillingPreparationController::class, 'undo'])
+                ->whereNumber('delivery')
+                ->middleware('can:billing.for-billing.mark')
+                ->name('prepare.undo');
             Route::get('/batches', [BillingBatchController::class, 'index'])
                 ->middleware('can:billing.records.view')
                 ->name('batches.index');

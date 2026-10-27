@@ -75,8 +75,8 @@ class DeliveryBillingEligibilityService
 
         return match ($billingStatus) {
             'for_billing' => ['eligible' => false, 'reason' => 'Already For Billing'],
-            'billed' => ['eligible' => false, 'reason' => 'Already Billed'],
-            'on_hold' => ['eligible' => false, 'reason' => 'On Hold'],
+            'billed' => ['eligible' => false, 'reason' => 'Already Billed; confirmation cannot be undone'],
+            'on_hold' => ['eligible' => false, 'reason' => 'On Hold; resolve the hold before undoing'],
             default => ['eligible' => true, 'reason' => 'Eligible'],
         };
     }

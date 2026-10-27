@@ -14,11 +14,12 @@
           data-range-url="{{ route('billing.prepare.range') }}"
           data-all-url="{{ route('billing.prepare.all') }}"
           data-confirm-url="{{ route('billing.prepare.confirm') }}"
+          data-undo-url-template="{{ route('billing.prepare.undo', ['delivery' => '__DELIVERY__']) }}"
           data-max-batch-size="{{ config('billing.max_batch_size', 500) }}"
           data-can-confirm="{{ auth()->user()->can('billing.for-billing.mark') ? 'true' : 'false' }}">
         <section class="rounded-xl border border-cyan-200 bg-cyan-50/70 px-5 py-4 text-sm text-cyan-950">
             <p class="font-bold">This review submits deliveries to the existing Billing queue.</p>
-            <p class="mt-1 text-cyan-900">Submission does not create an invoice or change payment status. Eligible delivery states follow the current workflow: Delivered or Accepted, and not already For Billing, Billed, or On Hold.</p>
+            <p class="mt-1 text-cyan-900">Submission does not create an invoice or change payment status. Eligible delivery states include Pending, Delivered, or Accepted, and records already For Billing, Billed, or On Hold cannot be confirmed again.</p>
             <p class="mt-1 text-cyan-900">Proof of Delivery is shown for review. The existing For Billing transition does not require a POD record, so missing POD is not treated as a new blocker.</p>
         </section>
 

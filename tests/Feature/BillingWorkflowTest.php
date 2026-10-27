@@ -183,16 +183,31 @@ it('confirms a complete same-DR group and queues sheet sync per delivery package
 
     $preview = $this->getJson(route('billing.prepare.search', ['q' => 'BIR-SHARED-DR']))
         ->assertOk()->assertJsonCount(1, 'records')->assertJsonPath('records.0.delivery_count', 2);
-    $this->postJson(route('billing.prepare.confirm'), [
+    $confirmation = $this->postJson(route('billing.prepare.confirm'), [
         'mode' => 'search',
         'delivery_ids' => [$firstId],
         'idempotency_key' => (string) Str::uuid(),
     ])->assertCreated()->assertJsonPath('batch.delivery_count', 2)->assertJsonPath('batch.group_count', 1);
+    $batchId = (int) $confirmation->json('batch.id');
 
     expect(BillingSheetSync::query()->orderBy('lot_number')->pluck('lot_number')->all())->toBe(['2', '9']);
     expect(BillingSheetSync::query()->where('delivery_id', $secondId)->value('package_code'))->toBe('CORE-LOT9');
     expect(BillingSheetSync::query()->where('outcome', 'queued')->count())->toBe(2);
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $secondId, 'status' => 'pending']);
+
+    $this->get(route('billing.batches.index'))
+        ->assertOk()
+        ->assertViewHas('batches', fn ($batches): bool => (int) $batches->first()->dr_count === 1);
+
+    $this->get(route('billing.batches.show', $batchId))
+        ->assertOk()
+        ->assertSee('DR Count')
+        ->assertSee('BIR-SHARED-DR')
+        ->assertSee('View details')
+        ->assertSee('#'.$firstId)
+        ->assertSee('#'.$secondId)
+        ->assertViewHas('recordGroups', fn ($recordGroups): bool => $recordGroups->count() === 1
+            && $recordGroups->first()->count() === 2);
 });
 
 it('reports the exact missing service account configuration before attempting synchronization', function (): void {
@@ -777,10 +792,12 @@ it('does not advance an already billed record and includes accurate project dash
             'completion_percentage' => 25.0,
         ])
         ->assertViewHas('recentBatches', fn ($batches): bool => $batches->count() === 2
-            && $batches->contains('batch_ref', 'BILL-DASHBOARD-TEST'))
+            && $batches->contains('batch_ref', 'BILL-DASHBOARD-TEST')
+            && (int) $batches->firstWhere('batch_ref', 'BILL-DASHBOARD-TEST')->dr_count === 1)
         ->assertViewHas('returnedBatchCount', 1)
         ->assertViewHas('returnedBatches', fn ($batches): bool => $batches->count() === 1
-            && $batches->first()->batch_ref === 'BILL-RETURNED-TEST')
+            && $batches->first()->batch_ref === 'BILL-RETURNED-TEST'
+            && (int) $batches->first()->dr_count === 1)
         ->assertViewHas('activityTrend', fn (array $trend): bool => count($trend) === 1
             && $trend[0]['submitted'] === 2
             && $trend[0]['billed'] === 1);

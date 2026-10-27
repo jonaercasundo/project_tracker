@@ -246,7 +246,7 @@ class BillingDashboardController extends Controller
                 'batch.created_at',
                 'batch.created_by_name',
             ])
-            ->selectRaw('COUNT(DISTINCT d.delivery_id) as delivery_count')
+            ->selectRaw('COUNT(DISTINCT d.dr_no) as dr_count')
             ->selectRaw('GROUP_CONCAT(DISTINCT p.project_name) as project_names')
             ->orderByDesc('batch.created_at')
             ->limit(8)
@@ -289,7 +289,7 @@ class BillingDashboardController extends Controller
             ->where('batch.status', 'returned_for_correction')
             ->groupBy('batch.id', 'batch.batch_ref', 'batch.created_at', 'batch.created_by_name')
             ->select(['batch.id', 'batch.batch_ref', 'batch.created_at', 'batch.created_by_name'])
-            ->selectRaw('COUNT(DISTINCT d.delivery_id) as delivery_count')
+            ->selectRaw('COUNT(DISTINCT d.dr_no) as dr_count')
             ->selectRaw('GROUP_CONCAT(DISTINCT p.project_name) as project_names')
             ->orderByDesc('batch.created_at')
             ->limit(6)

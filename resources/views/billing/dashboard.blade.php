@@ -292,7 +292,7 @@
                                 <tr>
                                     <td class="whitespace-nowrap px-5 py-3"><a href="{{ route('billing.batches.show', $batch->id) }}" class="font-mono text-xs font-bold text-blue-700 hover:underline">{{ $batch->batch_ref }}</a><p class="mt-1 text-[11px] text-slate-400">{{ \Illuminate\Support\Carbon::parse($batch->created_at)->format('M j, Y') }} · {{ $batch->created_by_name ?? 'Former user' }}</p></td>
                                     <td class="max-w-48 px-3 py-3"><span class="block whitespace-normal break-words text-xs leading-5 text-slate-600">{{ $batch->project_names ?: 'Project details unavailable' }}</span></td>
-                                    <td class="px-3 py-3 text-right font-mono tabular-nums text-slate-700">{{ number_format($batch->delivery_count) }}</td>
+                                    <td class="px-3 py-3 text-right font-mono tabular-nums text-slate-700">{{ number_format($batch->dr_count) }}</td>
                                     <td class="whitespace-nowrap px-5 py-3 text-right"><span class="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-800">{{ str_replace('_', ' ', ucfirst($batch->status)) }}</span></td>
                                 </tr>
                             @empty
@@ -366,7 +366,7 @@
                                 <li class="flex items-start justify-between gap-3 py-2.5">
                                     <div class="min-w-0">
                                         <a href="{{ route('billing.batches.show', $batch->id) }}" class="font-mono text-xs font-bold text-blue-700 hover:underline">{{ $batch->batch_ref }}</a>
-                                        <p class="mt-1 whitespace-normal break-words text-xs leading-5 text-slate-500">{{ $batch->project_names ?: 'Project details unavailable' }} · {{ number_format($batch->delivery_count) }} DRs · {{ $batch->created_by_name ?? 'Former user' }}</p>
+                                        <p class="mt-1 whitespace-normal break-words text-xs leading-5 text-slate-500">{{ $batch->project_names ?: 'Project details unavailable' }} · {{ number_format($batch->dr_count) }} DRs · {{ $batch->created_by_name ?? 'Former user' }}</p>
                                     </div>
                                     <time class="shrink-0 text-[11px] tabular-nums text-slate-500">{{ \Illuminate\Support\Carbon::parse($batch->created_at)->format('M j, Y') }}</time>
                                 </li>

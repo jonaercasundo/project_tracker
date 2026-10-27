@@ -12,7 +12,12 @@ class BillingBatchController extends Controller
     {
         $batches = BillingBatch::query()
             ->with(['createdBy', 'confirmedBy'])
-            ->withCount('deliveryBillingRecords')
+            ->addSelect([
+                'dr_count' => DB::table('delivery_billing_records as billing')
+                    ->join('deliveries as d', 'd.delivery_id', '=', 'billing.delivery_id')
+                    ->whereColumn('billing.billing_batch_id', 'billing_batches.id')
+                    ->selectRaw('COUNT(DISTINCT d.dr_no)'),
+            ])
             ->orderByDesc('confirmed_at')
             ->orderByDesc('id')
             ->paginate(25);

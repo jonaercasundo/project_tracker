@@ -23,7 +23,7 @@
                         @forelse ($batches as $batch)
                             <tr class="hover:bg-slate-50/70">
                                 <td class="whitespace-nowrap px-4 py-3 font-mono font-bold text-blue-700"><a href="{{ route('billing.batches.show', $batch) }}" class="hover:underline">{{ $batch->batch_ref }}</a></td>
-                                <td class="px-4 py-3 font-semibold tabular-nums text-slate-900">{{ number_format($batch->delivery_billing_records_count) }}</td>
+                                <td class="px-4 py-3 font-semibold tabular-nums text-slate-900">{{ number_format($batch->dr_count) }}</td>
                                 <td class="px-4 py-3 text-slate-700">{{ $batch->created_by_name ?? $batch->createdBy?->name ?? 'Former user' }}</td>
                                 <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ $batch->created_at?->format('Y-m-d H:i') }}</td>
                                 <td class="px-4 py-3 text-slate-700">{{ $batch->confirmed_by_name ?? $batch->confirmedBy?->name ?? 'Former user' }}</td>

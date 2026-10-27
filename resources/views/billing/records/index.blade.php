@@ -58,7 +58,7 @@
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-4">
                 <div>
                     <h2 class="font-bold text-slate-900">Delivery billing ledger</h2>
-                    <p class="mt-1 text-sm text-slate-500">{{ number_format($records->total()) }} matching records</p>
+                    <p class="mt-1 text-sm text-slate-500">{{ number_format($drGroups->total()) }} matching DR numbers</p>
                 </div>
                 <p class="text-xs text-slate-500">Logistics delivery status and billing status are tracked separately.</p>
             </div>
@@ -77,37 +77,77 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        @forelse ($records as $record)
+                        @forelse ($recordGroups as $drNo => $drRecords)
                             <tr class="hover:bg-slate-50/80">
-                                <td class="whitespace-nowrap px-4 py-3 font-mono font-semibold text-slate-900">{{ $record->dr_no }}<span class="mt-1 block font-sans text-[10px] font-normal text-slate-400">Billing record #{{ $record->billing_record_id }} · Delivery #{{ $record->delivery_id }}</span></td>
-                                <td class="min-w-64 px-4 py-3">
-                                    <p class="font-medium text-slate-800">{{ $record->project_name }}</p>
-                                    <p class="mt-1 text-xs text-slate-500">{{ $record->lot_name ?? 'All lots' }} · {{ $record->school_name }} · {{ $record->school_id }}</p>
+                                @php
+                                    $deliveryIds = $drRecords->pluck('delivery_id')->unique()->values();
+                                    $deliveryGroups = $drRecords->groupBy('delivery_id');
+                                    $projectSchoolGroups = $drRecords->map(fn ($record) => [
+                                        'project_name' => $record->project_name,
+                                        'lot_name' => $record->lot_name,
+                                        'school_name' => $record->school_name,
+                                        'school_id' => $record->school_id,
+                                    ])->unique(fn ($record) => json_encode($record))->values();
+                                    $deliveryDates = $drRecords->pluck('delivery_date')->unique()->values();
+                                    $deliveryStatuses = $drRecords->pluck('delivery_status')->unique()->values();
+                                    $billingStatuses = $drRecords->pluck('billing_status')->unique()->values();
+                                    $batches = $drRecords->map(fn ($record) => [
+                                        'id' => $record->billing_batch_id,
+                                        'reference' => $record->batch_ref,
+                                    ])->unique(fn ($batch) => (string) ($batch['id'] ?? 'legacy'))->values();
+                                    $invoices = $drRecords->pluck('invoice_no')->map(fn ($invoiceNo) => $invoiceNo ?: '—')->unique()->values();
+                                @endphp
+                                <td class="whitespace-nowrap px-4 py-3 font-mono font-semibold text-slate-900">
+                                    {{ $drNo ?: '—' }}
+                                    <span class="mt-1 block font-sans text-xs font-normal text-slate-500">{{ $deliveryIds->count() }} {{ \Illuminate\Support\Str::plural('delivery record', $deliveryIds->count()) }}</span>
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ $record->delivery_date }}</td>
-                                <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">{{ $record->delivery_status }}</span></td>
-                                <td class="whitespace-nowrap px-4 py-3">
-                                    @php
-                                        $billingTone = match ($record->billing_status) {
-                                            'billed' => 'bg-emerald-50 text-emerald-800',
-                                            'for_billing' => 'bg-blue-50 text-blue-800',
-                                            'on_hold' => 'bg-rose-50 text-rose-800',
-                                            default => 'bg-amber-50 text-amber-800',
-                                        };
-                                    @endphp
-                                    <span class="rounded-full px-2.5 py-1 text-xs font-bold {{ $billingTone }}">{{ $statuses[$record->billing_status] ?? $record->billing_status }}</span>
-                                </td>
-                                <td class="whitespace-nowrap px-4 py-3 text-xs font-semibold text-blue-700">
-                                    @if ($record->billing_batch_id)
-                                        <a href="{{ route('billing.batches.show', $record->billing_batch_id) }}" class="hover:underline">{{ $record->batch_ref }}</a>
-                                    @else
-                                        <span class="text-slate-400">Legacy / individual</span>
-                                    @endif
-                                </td>
-                                <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ $record->invoice_no ?? '—' }}</td>
-                                <td class="whitespace-nowrap px-4 py-3 text-right">
-                                    <a href="{{ route('billing.records.show', $record->delivery_id) }}" class="font-semibold text-blue-700 hover:text-blue-900">Details <span aria-hidden="true">→</span></a>
-                                </td>
+                                <td class="min-w-64 px-4 py-3"><div class="space-y-2">
+                                    @foreach ($projectSchoolGroups as $projectSchool)
+                                        <div>
+                                            <p class="font-medium text-slate-800">{{ $projectSchool['project_name'] }}</p>
+                                            <p class="mt-1 text-xs text-slate-500">{{ $projectSchool['lot_name'] ?? 'All lots' }} · {{ $projectSchool['school_name'] }} · {{ $projectSchool['school_id'] }}</p>
+                                        </div>
+                                    @endforeach
+                                </div></td>
+                                <td class="whitespace-nowrap px-4 py-3 text-slate-600"><div class="space-y-1">@foreach ($deliveryDates as $deliveryDate)<p>{{ $deliveryDate }}</p>@endforeach</div></td>
+                                <td class="px-4 py-3"><div class="space-y-1">@foreach ($deliveryStatuses as $deliveryStatus)<span class="inline-block rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">{{ $deliveryStatus }}</span>@endforeach</div></td>
+                                <td class="px-4 py-3"><div class="space-y-1">
+                                    @foreach ($billingStatuses as $billingStatus)
+                                        @php
+                                            $billingTone = match ($billingStatus) {
+                                                'billed' => 'bg-emerald-50 text-emerald-800',
+                                                'for_billing' => 'bg-blue-50 text-blue-800',
+                                                'on_hold' => 'bg-rose-50 text-rose-800',
+                                                default => 'bg-amber-50 text-amber-800',
+                                            };
+                                        @endphp
+                                        <span class="inline-block rounded-full px-2.5 py-1 text-xs font-bold {{ $billingTone }}">{{ $statuses[$billingStatus] ?? $billingStatus }}</span>
+                                    @endforeach
+                                </div></td>
+                                <td class="px-4 py-3 text-xs font-semibold text-blue-700"><div class="space-y-1">
+                                    @foreach ($batches as $batch)
+                                        @if ($batch['id'])
+                                            <a href="{{ route('billing.batches.show', $batch['id']) }}" class="block hover:underline">{{ $batch['reference'] }}</a>
+                                        @else
+                                            <span class="block text-slate-400">Legacy / individual</span>
+                                        @endif
+                                    @endforeach
+                                </div></td>
+                                <td class="px-4 py-3 text-slate-700"><div class="space-y-1">
+                                    @foreach ($invoices as $invoiceNo)
+                                        <p>{{ $invoiceNo }}</p>
+                                    @endforeach
+                                </div></td>
+                                <td class="px-4 py-3 text-right"><div class="space-y-1">
+                                    @foreach ($deliveryGroups as $deliveryId => $deliveryRecords)
+                                        <div>
+                                            <a href="{{ route('billing.records.show', $deliveryId) }}" class="block whitespace-nowrap font-semibold text-blue-700 hover:text-blue-900">Delivery #{{ $deliveryId }} details <span aria-hidden="true">→</span></a>
+                                            @if ($deliveryRecords->pluck('billing_record_id')->filter()->isNotEmpty())
+                                                <span class="block text-[10px] font-normal text-slate-400">Billing record #{{ $deliveryRecords->pluck('billing_record_id')->filter()->unique()->implode(', #') }}</span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div></td>
                             </tr>
                         @empty
                             <tr><td colspan="8" class="px-5 py-12 text-center text-slate-500">No delivery records match these filters.</td></tr>
@@ -115,7 +155,7 @@
                     </tbody>
                 </table>
             </div>
-            <div class="border-t border-slate-200 px-5 py-4">{{ $records->links() }}</div>
+            <div class="border-t border-slate-200 px-5 py-4">{{ $drGroups->links() }}</div>
         </section>
     </div>
 </x-project_app-layout>

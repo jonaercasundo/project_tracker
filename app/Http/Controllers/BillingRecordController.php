@@ -19,14 +19,45 @@ class BillingRecordController extends Controller
     public function index(Request $request): View
     {
         $filters = $this->validatedFilters($request);
-        $records = $this->recordsQuery($filters)
-            ->orderByDesc('d.delivery_date')
-            ->orderByDesc('d.delivery_id')
+        $drGroups = $this->recordsQuery($filters)
+            ->select('d.dr_no')
+            ->selectRaw('MAX(d.delivery_date) as latest_delivery_date')
+            ->groupBy('d.dr_no')
+            ->orderByDesc('latest_delivery_date')
+            ->orderBy('d.dr_no')
             ->paginate(25)
             ->withQueryString();
+        $pageDrNumbers = collect($drGroups->items())->pluck('dr_no');
+        $recordsQuery = $this->recordsQuery($filters);
+        $nonNullDrNumbers = $pageDrNumbers->filter(fn (mixed $drNumber): bool => $drNumber !== null)->values();
+        $includesNullDrNumber = $pageDrNumbers->contains(fn (mixed $drNumber): bool => $drNumber === null);
+
+        if ($pageDrNumbers->isEmpty()) {
+            $records = collect();
+        } else {
+            $records = $recordsQuery
+                ->where(function (Builder $query) use ($nonNullDrNumbers, $includesNullDrNumber): void {
+                    if ($nonNullDrNumbers->isNotEmpty()) {
+                        $query->whereIn('d.dr_no', $nonNullDrNumbers->all());
+                    }
+
+                    if ($includesNullDrNumber) {
+                        $nonNullDrNumbers->isNotEmpty()
+                            ? $query->orWhereNull('d.dr_no')
+                            : $query->whereNull('d.dr_no');
+                    }
+                })
+                ->orderBy('d.dr_no')
+                ->orderByDesc('d.delivery_date')
+                ->orderByDesc('d.delivery_id')
+                ->orderByDesc('billing.id')
+                ->get()
+                ->groupBy('dr_no');
+        }
 
         return view('billing.records.index', [
-            'records' => $records,
+            'drGroups' => $drGroups,
+            'recordGroups' => $records,
             'duplicateLedgerGroups' => $this->duplicateLedgerGroups($filters),
             'filters' => $filters,
             'projects' => DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name', 'project_code', 'ref_no']),

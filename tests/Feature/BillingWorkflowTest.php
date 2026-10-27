@@ -946,6 +946,32 @@ it('filters billing records by project while preserving the remaining ledger fil
         ->assertSee('MMC-PRJ-2026-002');
 });
 
+it('groups ledger deliveries by DR number and counts distinct DR numbers', function (): void {
+    signInBillingUser();
+    $firstDeliveryId = createBillingDelivery('SHARED-DR');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstDeliveryId)->value('project_id');
+    $secondDeliveryId = createDeliveryForBillingProject($projectId, 'SHARED-DR');
+    $secondLotId = DB::table('lot')->insertGetId([
+        'lot_name' => 'Lot B',
+        'project_id' => $projectId,
+        'contract_no' => 'CONTRACT-'.$projectId.'-B',
+    ], 'lot_id');
+    DB::table('deliveries')->where('delivery_id', $secondDeliveryId)->update(['lot_id' => $secondLotId]);
+    confirmDeliveryForBilling($firstDeliveryId);
+    confirmDeliveryForBilling($secondDeliveryId);
+
+    $this->get(route('billing.records.index'))
+        ->assertSee('1 matching DR numbers')
+        ->assertSee('2 delivery records')
+        ->assertSee('Lot A')
+        ->assertSee('Lot B')
+        ->assertSee('Delivery #'.$firstDeliveryId.' details')
+        ->assertSee('Delivery #'.$secondDeliveryId.' details')
+        ->assertViewHas('drGroups', fn ($drGroups): bool => $drGroups->total() === 1)
+        ->assertViewHas('recordGroups', fn ($recordGroups): bool => $recordGroups->count() === 1
+            && $recordGroups->first()->pluck('delivery_id')->unique()->sort()->values()->all() === [$firstDeliveryId, $secondDeliveryId]);
+});
+
 it('blocks users outside the MMC company context from billing routes', function () {
     signInBillingUser('finance', 'MI');
 

@@ -79,7 +79,7 @@ it('shows the AI capability registry with implemented and unavailable functions 
         ->assertSee('Generate business PDFs')
         ->assertSee('Documents &amp; Analytics', false)
         ->assertSee('Forecast Data')
-        ->assertSee('Process Uploaded Documents')
+        ->assertSee('Process uploaded documents')
         ->assertSee('Workflow guidance')
         ->assertSee('Context-aware next steps')
         ->assertSee('MI Product Catalog Search')

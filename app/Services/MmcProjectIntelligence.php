@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PDOException;
 use Throwable;
 
 class MmcProjectIntelligence
@@ -169,6 +171,9 @@ class MmcProjectIntelligence
         $allowedFilters = array_intersect_key($filters, array_flip(['year', 'date_from', 'date_to']));
         try {
             $metrics = $this->deliveryProgress->deliveryMetrics($allowedFilters + ['project_id' => $project['project_id']]);
+            $latestActivity = $this->latestActivity((int) $project['project_id']);
+        } catch (QueryException|PDOException $exception) {
+            throw $exception;
         } catch (Throwable) {
             return [
                 'status' => 'data_unavailable',
@@ -224,8 +229,34 @@ class MmcProjectIntelligence
             ],
             'completion_percentage' => (int) $metrics->total_deliveries_count > 0 ? round((int) $metrics->completed_deliveries_count / (int) $metrics->total_deliveries_count * 100, 2) : null,
             'has_delivery_records' => $linkedDeliveryRowsCount > 0,
+            'latest_activity' => $latestActivity,
             'definition' => 'Delivered means the receipt has all expected packages delivered or accepted; if no package definitions exist, all receipt rows must be delivered or accepted. Blank DR numbers and invalid/cancelled receipts are excluded. Delivery rows are all linked delivery records, while valid receipt rows exclude blank DRs and invalid receipts. Unique schools counts schools with at least one delivery row whose row status is delivered or accepted.',
         ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function latestActivity(int $projectId): ?array
+    {
+        if (! Schema::hasTable('deliveries')) {
+            return null;
+        }
+
+        $availableColumns = array_values(array_filter(
+            ['delivery_id', 'dr_no', 'status', 'delivery_date', 'delivered_date', 'accepted_date', 'created_at'],
+            fn (string $column): bool => Schema::hasColumn('deliveries', $column),
+        ));
+        $orderColumn = collect(['created_at', 'delivery_date', 'delivered_date', 'accepted_date', 'delivery_id'])
+            ->first(fn (string $column): bool => in_array($column, $availableColumns, true));
+
+        if ($orderColumn === null) {
+            return null;
+        }
+
+        return (array) DB::table('deliveries')
+            ->where('project_id', $projectId)
+            ->orderByDesc($orderColumn)
+            ->when(in_array('delivery_id', $availableColumns, true) && $orderColumn !== 'delivery_id', fn (Builder $query) => $query->orderByDesc('delivery_id'))
+            ->first($availableColumns);
     }
 
     public static function normalizeReference(string $reference): string

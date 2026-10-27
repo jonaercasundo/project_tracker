@@ -3,11 +3,16 @@
 namespace App\Services;
 
 use App\Exceptions\AiRequiredToolUnavailable;
+use App\Exceptions\AiToolExecutionException;
 use App\Models\Company;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use PDOException;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
 
 class AiAssistantService
 {
@@ -176,7 +181,19 @@ class AiAssistantService
                 $arguments = $isRequiredMmcCall
                     ? $requiredCall['arguments']
                     : json_decode((string) ($call['arguments'] ?? '{}'), true);
-                $result = $gateway->call((string) $call['name'], is_array($arguments) ? $arguments : [], $user, $company);
+                try {
+                    $result = $gateway->call((string) $call['name'], is_array($arguments) ? $arguments : [], $user, $company);
+                } catch (HttpExceptionInterface|QueryException|PDOException $exception) {
+                    throw $exception;
+                } catch (Throwable $exception) {
+                    Log::error('AI assistant tool execution failed', [
+                        'tool' => $call['name'] ?? 'unknown',
+                        'user_id' => $user->getKey(),
+                        'company_id' => $company->getKey(),
+                        'exception' => $exception::class,
+                    ]);
+                    throw new AiToolExecutionException('The authorized assistant tool failed during execution.', previous: $exception);
+                }
                 if ($call['name'] === 'lookup_mi_product_prices' && $onProductMatches !== null && $result !== []) {
                     $onProductMatches($result);
                 }
@@ -247,28 +264,51 @@ class AiAssistantService
         }
 
         $hasProjectReference = preg_match('/\b(?:[\pL]{2,10}[\s-]*\d{1,4}|BPC)\b/iu', $question) === 1;
-        if (! $hasProjectReference) {
+        $asksProjectSearch = preg_match('/\b(?:find|search|look\s+up|show\s+me)\b.{0,40}\bprojects?\b|\bprojects?\b.{0,40}\b(?:find|search|lookup)\b/iu', $question) === 1;
+        $priorProjectPrompt = collect($history)->slice(0, -1)->last(fn (array $message): bool => $message['role'] === 'assistant')['content'] ?? '';
+        $isProjectReferenceFollowUp = is_string($priorProjectPrompt)
+            && preg_match('/\bwhich\s+project\b|\bwhat\s+project\b|\bproject\s+(?:name|code|reference)\b/iu', $priorProjectPrompt) === 1;
+        $isShortProjectReference = mb_strlen(trim($question)) <= 120
+            && preg_match('/^[\pL\pN\s-]+$/u', trim($question)) === 1;
+        $priorProjectQuestion = collect($history)->slice(0, -1)->reverse()->first(fn (array $message): bool => $message['role'] === 'user'
+            && preg_match('/\b(?:[\pL]{2,10}[\s-]*\d{1,4}|BPC)\b/iu', $message['content']) === 1)['content'] ?? null;
+        $asksProjectDataFollowUp = preg_match('/\b(deliver(?:ed|y|ies)?|pending|delayed|remaining|completion|completed|progress|receipts?|schools?|status|activity|activities|latest|recent)\b/iu', $question) === 1;
+        if (! $hasProjectReference && ! $asksProjectSearch && ! ($isProjectReferenceFollowUp && $isShortProjectReference)
+            && ! ($priorProjectQuestion !== null && $asksProjectDataFollowUp)) {
             return [];
         }
 
         $asksComparison = preg_match('/\b(compare|comparison|versus|vs\.?|kumpara)\b/iu', $question) === 1;
         $asksDeliveryPerformance = preg_match('/\b(deliver(?:ed|y|ies)?|pending|delayed|remaining|completion|completed|progress|receipts?|schools?)\b|\b(ilan|ilang)\b.*\b(deliver|paaralan|school)/iu', $question) === 1;
+        $asksProjectActivity = preg_match('/\b(latest|recent|last)\b.{0,30}\bactivity\b|\bactivity\b.{0,30}\bproject\b/iu', $question) === 1;
         $lifecycleQuestion = preg_replace('/\b(?:(?:delivery|completion)\s+status|status\s+of\s+deliver(?:y|ies))\b/iu', ' ', $question);
         $asksProjectLifecycle = preg_match('/\b(?:project\s+(?:status|stage)|(?:what(?:\s+is|\'s)?|show|tell\s+me|current)\s+(?:the\s+)?status\s+(?:of|for)|status\s+(?:of|for)|lifecycle)\b/iu', (string) $lifecycleQuestion) === 1;
 
-        if (! $asksComparison && ! $asksDeliveryPerformance && ! $asksProjectLifecycle) {
+        if (! $asksComparison && ! $asksDeliveryPerformance && ! $asksProjectActivity && ! $asksProjectLifecycle
+            && ! $asksProjectSearch && ! ($isProjectReferenceFollowUp && $isShortProjectReference)) {
             return [];
         }
 
         $availableTools = collect($tools)->pluck('name')->all();
         $references = $gateway->projectReferencesInQuestion($question, $user, $company);
+        if ($references === [] && $priorProjectQuestion !== null && $asksProjectDataFollowUp) {
+            $references = $gateway->projectReferencesInQuestion($priorProjectQuestion, $user, $company);
+        }
+        if ($references === [] && ($asksProjectSearch || ($isProjectReferenceFollowUp && $isShortProjectReference))) {
+            $searchText = preg_replace('/^\s*(?:please\s+)?(?:find|search|look\s+up|show\s+me)\s+(?:a\s+|the\s+)?projects?\s*/iu', '', $question);
+            $searchText = preg_replace('/\s+projects?\s*$/iu', '', (string) $searchText);
+            if (trim((string) $searchText) !== '') {
+                $references = [trim((string) $searchText)];
+            }
+        }
         if ($references === []) {
             return [];
         }
         $references = array_slice($references, 0, 5);
 
-        $mustSearchProjects = $asksProjectLifecycle || $asksComparison;
-        $mustReadDeliveries = $asksDeliveryPerformance || $asksComparison;
+        $mustSearchProjects = $asksProjectLifecycle || $asksComparison || $asksProjectSearch
+            || ($isProjectReferenceFollowUp && $isShortProjectReference);
+        $mustReadDeliveries = $asksDeliveryPerformance || $asksProjectActivity || $asksComparison;
         $requiredNames = array_values(array_filter([
             $mustSearchProjects ? 'search_mmc_projects' : null,
             $mustReadDeliveries ? 'get_mmc_project_delivery_summary' : null,

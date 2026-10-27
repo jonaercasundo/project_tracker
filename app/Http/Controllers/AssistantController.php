@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AiRequiredToolUnavailable;
+use App\Exceptions\AiToolExecutionException;
 use App\Models\AiActivity;
 use App\Models\AiAssistantAttachment;
 use App\Models\AiConversation;
@@ -17,6 +18,7 @@ use App\Services\AiModuleRegistry;
 use App\Services\AiPageContextService;
 use App\Services\AiProviderConfiguration;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +27,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PDOException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
@@ -266,6 +269,10 @@ class AssistantController extends Controller
                     $message = $isFilipino
                         ? 'Hindi available ang kinakailangang project data lookup sa assistant tool registry. Makipag-ugnayan sa administrator.'
                         : 'A required project data lookup is missing from the active assistant tool registry. Contact your administrator.';
+                } elseif ($this->isDatabaseConnectionFailure($exception)) {
+                    $message = $isFilipino ? 'Hindi makakonekta ang assistant sa database ngayon. Napanatili ang mensahe mo; subukan ulit mamaya.' : 'The assistant could not connect to the project database. Your message is saved; please try again later.';
+                } elseif ($exception instanceof AiToolExecutionException) {
+                    $message = $isFilipino ? 'Nagkaroon ng error habang kinukuha ang project records. Napanatili ang mensahe mo; subukan ulit mamaya.' : 'The project lookup encountered an execution error. Your message is saved; please try again later.';
                 } else {
                     $message = $exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 403
                     ? ($isFilipino ? 'Wala kang pahintulot para makita ang impormasyong iyon. Makipag-ugnayan sa administrator kung kailangan mo ng access.' : 'You do not have access to that information. Contact your administrator if you think you need access.')
@@ -274,6 +281,19 @@ class AssistantController extends Controller
                 $emit('error', ['message' => $message]);
             }
         }, 200, ['Content-Type' => 'text/event-stream', 'Cache-Control' => 'no-cache, no-transform', 'X-Accel-Buffering' => 'no', 'Connection' => 'keep-alive']);
+    }
+
+    private function isDatabaseConnectionFailure(Throwable $exception): bool
+    {
+        if (! $exception instanceof QueryException && ! $exception instanceof PDOException) {
+            return false;
+        }
+
+        $message = strtolower($exception->getMessage());
+
+        return preg_match('/sqlstate\[[^]]+\]\s*\[(?:2002|2006|2013|1049)\]/', $message) === 1
+            || str_contains($message, 'could not find driver')
+            || str_contains($message, 'connection refused');
     }
 
     /** @return array{0: User, 1: Company} */

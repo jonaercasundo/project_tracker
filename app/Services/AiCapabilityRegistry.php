@@ -531,7 +531,7 @@ class AiCapabilityRegistry
                 'lookup_mi_product_prices' => ['type' => 'array', 'items' => ['id' => 'integer', 'name' => 'string', 'sku' => 'string|null', 'specifications' => 'verified product details and dimensions', 'selling_price' => 'number|null', 'currency' => 'string', 'url' => 'authorized MI product page URL']],
                 'mi_product_catalog_summary' => ['type' => 'object', 'properties' => ['product_count' => 'integer', 'products_missing_cop' => 'integer|null']],
                 'mi_products_needing_cop' => ['type' => 'array', 'items' => ['id' => 'integer', 'name' => 'string', 'sku' => 'string|null']],
-                'search_mmc_projects' => ['type' => 'object', 'properties' => ['status' => 'found|no_results', 'projects' => 'array of authorized matching projects']],
+                'search_mmc_projects' => ['type' => 'object', 'properties' => ['status' => 'found|ambiguous|no_results', 'reference' => 'searched project name, code, alias, or reference', 'projects' => 'array of authorized matching project records']],
                 'search_mmc_deliveries' => ['type' => 'array', 'items' => ['delivery' => 'authorized MMC delivery record']],
                 'search_mmc_inventory' => ['type' => 'array', 'items' => ['inventory' => 'authorized MMC inventory record']],
                 'get_mmc_project_delivery_summary' => ['type' => 'object', 'properties' => ['projects' => 'array of verified project delivery summaries']],

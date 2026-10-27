@@ -10,6 +10,7 @@ use App\Services\AiAssistantService;
 use App\Services\AiCapabilityRegistry;
 use App\Services\AiLiquidationExcelDraftService;
 use App\Services\AiReadOnlyToolGateway;
+use App\Services\MmcProjectIntelligence;
 use App\Services\ProjectDeliveryProgressService;
 use Database\Seeders\AiAssistantPermissionSeeder;
 use Database\Seeders\AiBusinessDataPermissionSeeder;
@@ -476,6 +477,114 @@ it('forces project lifecycle status through authorized project search and return
         ->and($projectResult['projects'][0])->toMatchArray(['project_code' => 'SME2', 'status' => 'Ongoing']);
 });
 
+it('searches projects for a short alias follow-up and resolves spacing and punctuation variants', function () {
+    DB::table('projects')->insert([
+        'project_id' => 61,
+        'project_code' => 'SME2',
+        'ref_no' => 'MMC-REF-61',
+        'project_name' => 'SME2 School Expansion',
+        'status' => 'Ongoing',
+        'start_date' => '2026-01-05',
+        'end_date' => '2026-12-31',
+    ]);
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    $gateway = app(AiReadOnlyToolGateway::class);
+
+    foreach (['SME 2', 'sme2', 'SME-2'] as $alias) {
+        $result = $gateway->call('search_mmc_projects', ['query' => $alias], $user, $company);
+        expect($result['status'])->toBe('found')
+            ->and($result['projects'][0])->toMatchArray([
+                'project_code' => 'SME2',
+                'ref_no' => 'MMC-REF-61',
+                'project_name' => 'SME2 School Expansion',
+                'status' => 'Ongoing',
+                'start_date' => '2026-01-05',
+                'end_date' => '2026-12-31',
+            ]);
+    }
+
+    expect($gateway->call('search_mmc_projects', ['query' => 'school expan'], $user, $company)['status'])->toBe('found');
+});
+
+it('forces a live project lookup when a user answers a project-selection prompt with an alias', function () {
+    DB::table('projects')->insert(['project_id' => 62, 'project_code' => 'SME2', 'project_name' => 'SME2 School Expansion', 'status' => 'Ongoing']);
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fakeSequence('https://api.openai.com/v1/responses')
+        ->push(aiAssistantToolSse('search_mmc_projects'), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(aiAssistantTextSse('SME2 is ongoing.'), 200, ['Content-Type' => 'text/event-stream']);
+
+    app(AiAssistantService::class)->respond($user, $company, [], [
+        ['role' => 'user', 'content' => 'Find a project'],
+        ['role' => 'assistant', 'content' => 'Which project are you looking for?'],
+        ['role' => 'user', 'content' => 'sme 2'],
+    ], fn (string $delta) => null);
+
+    $requests = Http::recorded()->map(fn (array $pair) => $pair[0]);
+    $toolOutput = collect($requests[1]['input'])->first(fn (array $item): bool => ($item['type'] ?? null) === 'function_call_output');
+    $projectResult = json_decode($toolOutput['output'], true, flags: JSON_THROW_ON_ERROR);
+
+    expect($requests)->toHaveCount(2)
+        ->and($requests[0]['tool_choice'])->toBe(['type' => 'function', 'name' => 'search_mmc_projects'])
+        ->and($projectResult['projects'][0])->toMatchArray(['project_code' => 'SME2', 'status' => 'Ongoing']);
+});
+
+it('uses the selected project for delivery follow-ups that omit the project alias', function () {
+    DB::table('projects')->insert(['project_id' => 63, 'project_code' => 'SME2', 'project_name' => 'SME2 School Expansion', 'status' => 'Ongoing']);
+    DB::table('deliveries')->insert(['delivery_id' => 64, 'project_id' => 63, 'dr_no' => 'DR-64', 'status' => 'delivered', 'delivery_date' => '2026-10-20']);
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fakeSequence('https://api.openai.com/v1/responses')
+        ->push(aiAssistantToolSse('get_mmc_project_delivery_summary'), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(aiAssistantTextSse('There is one completed receipt.'), 200, ['Content-Type' => 'text/event-stream']);
+
+    app(AiAssistantService::class)->respond($user, $company, [], [
+        ['role' => 'user', 'content' => 'SME2'],
+        ['role' => 'assistant', 'content' => 'I found SME2.'],
+        ['role' => 'user', 'content' => 'How many are completed?'],
+    ], fn (string $delta) => null);
+
+    $requests = Http::recorded()->map(fn (array $pair) => $pair[0]);
+    $toolOutput = collect($requests[1]['input'])->filter(fn (array $item): bool => ($item['type'] ?? null) === 'function_call_output')->first();
+    $deliverySummary = json_decode($toolOutput['output'], true, flags: JSON_THROW_ON_ERROR)['projects'][0];
+    expect($requests)->toHaveCount(2)
+        ->and($requests[0]['tool_choice'])->toBe(['type' => 'function', 'name' => 'get_mmc_project_delivery_summary'])
+        ->and($deliverySummary['project']['project_code'])->toBe('SME2')
+        ->and($deliverySummary['latest_activity'])->toMatchArray(['dr_no' => 'DR-64', 'status' => 'delivered']);
+});
+
+it('reports a project database connection failure distinctly in the streamed assistant error', function () {
+    $user = $this->miUser('user', 'MMC');
+    $company = $user->companies()->sole();
+    $this->actingAs($user)->withSession(['company_id' => $company->getKey()]);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::fakeSequence('https://api.openai.com/v1/responses')
+        ->push(aiAssistantToolSse('search_mmc_projects'), 200, ['Content-Type' => 'text/event-stream']);
+
+    $resolveCalls = 0;
+    $intelligence = Mockery::mock(MmcProjectIntelligence::class)->makePartial();
+    $intelligence->shouldReceive('resolve')->twice()->andReturnUsing(function () use (&$resolveCalls): array {
+        $resolveCalls++;
+        if ($resolveCalls === 2) {
+            throw new PDOException('SQLSTATE[HY000] [2002] Connection refused');
+        }
+
+        return ['status' => 'found', 'reference' => 'SME2', 'project' => ['project_id' => 1]];
+    });
+    app()->instance(MmcProjectIntelligence::class, $intelligence);
+
+    $conversation = $this->postJson(route('assistant.conversations.store'))->assertCreated()->json('conversation');
+    $response = $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'Find project SME2']);
+
+    expect($response->streamedContent())->toContain('event: error', 'could not connect to the project database');
+});
+
 it('retrieves SME2 project status and delivery statistics for a combined natural-language question', function () {
     DB::table('projects')->insert(['project_id' => 24, 'project_code' => 'SME2', 'project_name' => 'SME2 School Expansion', 'status' => 'Ongoing']);
     DB::table('deliveries')->insert([
@@ -634,7 +743,7 @@ it('reports a recognized project lookup with zero matches as no results', functi
     $requests = Http::recorded()->map(fn (array $pair) => $pair[0]);
     $toolOutput = collect($requests[1]['input'])->first(fn (array $item): bool => ($item['type'] ?? null) === 'function_call_output');
     expect($requests[0]['tool_choice']['name'])->toBe('search_mmc_projects')
-        ->and(json_decode($toolOutput['output'], true, flags: JSON_THROW_ON_ERROR))->toBe(['status' => 'no_results', 'projects' => []]);
+        ->and(json_decode($toolOutput['output'], true, flags: JSON_THROW_ON_ERROR))->toMatchArray(['status' => 'no_results', 'projects' => []]);
 });
 
 it('does not stream an answer when OpenAI omits a required MMC project lookup', function () {

@@ -89,6 +89,10 @@
                                     <span>{{ $capability['confirmation'] === 'explicit_confirmation' ? 'Confirmation required' : 'No write action' }}</span>
                                 </div>
                                 <p class="mt-1 break-words text-[9px] text-slate-400">Requires: {{ $capability['permission_label'] }}{{ $capability['roles'] !== [] ? ' · Roles: '.implode(', ', $capability['roles']) : '' }}</p>
+                                @if ($capability['status'] !== 'Implemented' && $capability['status'] !== 'Partially Implemented')
+                                    <p class="mt-1 rounded-md bg-amber-50 px-2 py-1.5 text-[9px] leading-relaxed text-amber-900"><span class="font-bold">Unavailable because:</span> {{ $capability['diagnostic_reason'] }}
+                                    </p>
+                                @endif
                                 <details class="mt-2 text-[9px] text-slate-500">
                                     <summary class="cursor-pointer font-semibold hover:text-blue-700">Handler, audit and data contract</summary>
                                     <div class="mt-2 grid gap-2 lg:grid-cols-2">

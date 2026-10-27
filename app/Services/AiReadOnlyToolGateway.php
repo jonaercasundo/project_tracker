@@ -61,7 +61,7 @@ class AiReadOnlyToolGateway
         }
 
         if ($this->capabilities->allows('mmc.projects.view', $user, $company)) {
-            $tools[] = $this->searchTool('search_mmc_projects', 'Search MMC project records visible in the active MMC company.', 'Project name, code, or procuring entity');
+            $tools[] = $this->searchTool('search_mmc_projects', 'Search MMC projects visible in the selected MMC company by project name, code or alias, reference number, and partial case-insensitive name.', 'Project name, code or alias (such as SME2), reference number, or partial name');
         }
         if ($this->capabilities->allows('mmc.deliveries.analyze', $user, $company)) {
             $tools[] = ['type' => 'function', 'name' => 'get_mmc_project_delivery_summary', 'description' => 'Resolve one or more project codes or aliases and return verified delivery receipt counts using the operational dashboard definition. Use null dates for all time.', 'parameters' => ['type' => 'object', 'properties' => ['project_references' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1, 'maxItems' => 5], 'date_from' => ['type' => ['string', 'null']], 'date_to' => ['type' => ['string', 'null']]], 'required' => ['project_references', 'date_from', 'date_to'], 'additionalProperties' => false], 'strict' => true];
@@ -270,15 +270,33 @@ class AiReadOnlyToolGateway
         }
 
         if ($name === 'search_mmc_projects' && $company->code === 'MMC') {
-            $projects = $this->jarvisReadService->projectRecords(['search' => $query]);
+            $intelligence = app(MmcProjectIntelligence::class);
+            $resolved = $intelligence->resolve($query, $company->getKey());
+            if ($resolved['status'] === 'ambiguous') {
+                return ['status' => 'ambiguous', 'reference' => $query, 'projects' => $resolved['candidates']];
+            }
+
+            $projects = $this->jarvisReadService->projectRecords([]);
             if (Schema::hasColumn('projects', 'company_id')) {
                 $projects->where('p.company_id', $company->getKey());
             }
-            $result = $projects
-                ->orderBy('p.project_id')->limit(8)->get()->map(fn (object $project): array => (array) $project)->all();
+            if ($resolved['status'] === 'found') {
+                $projects->where('p.project_id', $resolved['project']['project_id']);
+            } else {
+                $search = mb_strtolower($query);
+                $projects->where(function ($builder) use ($search): void {
+                    foreach (['p.project_name', 'p.project_code', 'p.ref_no'] as $column) {
+                        $builder->orWhereRaw('LOWER('.$column.') LIKE ?', ['%'.$search.'%']);
+                    }
+                });
+            }
+            $result = $projects->orderBy('p.project_id')->limit(8)->get()
+                ->map(fn (object $project): array => (array) $project)->all();
             $this->logToolExecuted($name, $user, $company, count($result));
 
-            return $result === [] ? ['status' => 'no_results', 'projects' => []] : ['status' => 'found', 'projects' => $result];
+            return $result === []
+                ? ['status' => 'no_results', 'reference' => $query, 'projects' => []]
+                : ['status' => 'found', 'reference' => $query, 'projects' => $result];
         }
 
         if ($name === 'search_mmc_deliveries' && $company->code === 'MMC') {

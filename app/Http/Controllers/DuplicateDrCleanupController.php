@@ -29,6 +29,7 @@ class DuplicateDrCleanupController extends Controller
 
         return view('deliveries.duplicate-cleanup', [
             'groups' => $this->cleanup->groups((int) $company->company_id, $filters),
+            'summary' => $this->cleanup->summary((int) $company->company_id, $filters),
             'projects' => $projects,
             'filters' => $filters,
         ]);
@@ -45,14 +46,19 @@ class DuplicateDrCleanupController extends Controller
         ]);
         $groups = $this->cleanup->allGroups((int) $company->company_id, $filters);
         $stream = fopen('php://temp', 'r+');
-        fputcsv($stream, ['Project', 'DR Number', 'School', 'Lot', 'Delivery IDs', 'Statuses', 'Packages', 'Resolution eligibility', 'Excluded because']);
+        fputcsv($stream, ['Project', 'Normalized DR Number', 'Review label', 'Delivery ID', 'School', 'Lot', 'Keystage', 'Delivery date', 'Status', 'Packages', 'Exact duplicate subset', 'Resolution blocked because']);
         foreach ($groups as $group) {
-            fputcsv($stream, [
-                $group->project_name, $group->dr_no, $group->school_name, $group->lot_name,
-                $group->records->pluck('delivery_id')->implode(', '), $group->records->pluck('status')->implode(', '),
-                $group->packages->map(fn ($package): string => 'Package '.$package->package_num.' ('.$package->status.')')->implode('; '),
-                $group->eligible ? 'Review eligible' : 'Blocked', $group->exclusion,
-            ]);
+            foreach ($group->records as $record) {
+                $matchingSet = $group->exactDuplicateSets->first(fn (object $set): bool => $set->records->contains('delivery_id', $record->delivery_id));
+                $packages = $group->packages->where('delivery_id', $record->delivery_id)
+                    ->map(fn (object $package): string => 'Package '.$package->package_num.' ('.$package->status.')')->implode('; ');
+                fputcsv($stream, [
+                    $group->project_name, $group->normalized_dr, 'Possible duplicate', $record->delivery_id,
+                    $record->school_name, $record->lot_name, $record->keystage_id ?? '', $record->delivery_date ?? '', $record->status,
+                    $packages, $matchingSet ? $matchingSet->records->pluck('delivery_id')->implode(', ') : '',
+                    $matchingSet && ! $matchingSet->eligible ? $matchingSet->exclusion : '',
+                ]);
+            }
         }
         rewind($stream);
         $csv = stream_get_contents($stream);

@@ -31,6 +31,7 @@ class DuplicateDrCleanupTest extends BillingWorkflowTestCase
         });
         DB::table('projects')->insert(['project_name' => 'Project A', 'project_code' => 'A', 'status' => 'Active']);
         DB::table('school')->insert(['school_id' => 'S1', 'school_name' => 'School One']);
+        DB::table('school')->insert(['school_id' => 'S2', 'school_name' => 'School Two']);
         DB::table('lot')->insert(['lot_name' => '1', 'project_id' => 1, 'contract_no' => 'C1']);
     }
 
@@ -38,11 +39,14 @@ class DuplicateDrCleanupTest extends BillingWorkflowTestCase
     {
         DB::table('deliveries')->insert([
             ['delivery_id' => 1, 'project_id' => 1, 'school_id' => 'S1', 'lot_id' => 1, 'dr_no' => 'DR-10', 'delivery_date' => '2026-10-01', 'status' => 'Pending'],
-            ['delivery_id' => 2, 'project_id' => 1, 'school_id' => 'S1', 'lot_id' => 1, 'dr_no' => 'DR-10', 'delivery_date' => '2026-10-01', 'status' => 'Pending'],
-            ['delivery_id' => 3, 'project_id' => 1, 'school_id' => 'S2', 'lot_id' => 1, 'dr_no' => 'DR-10', 'delivery_date' => '2026-10-01', 'status' => 'Pending'],
+            ['delivery_id' => 2, 'project_id' => 1, 'school_id' => 'S1', 'lot_id' => 1, 'dr_no' => ' dr-10 ', 'delivery_date' => '2026-10-01', 'status' => 'Pending'],
+            ['delivery_id' => 3, 'project_id' => 1, 'school_id' => 'S2', 'lot_id' => 1, 'dr_no' => 'DR-10', 'delivery_date' => '2026-10-03', 'status' => 'Delivered'],
         ]);
         DB::table('package')->insert(['package_id' => 1, 'lot_id' => 1, 'package_code' => 'P1']);
-        DB::table('package_status')->insert(['delivery_id' => 2, 'package_id' => 1, 'status' => 'Pending']);
+        DB::table('package_status')->insert([
+            ['delivery_id' => 1, 'package_id' => 1, 'status' => 'Pending'],
+            ['delivery_id' => 2, 'package_id' => 1, 'status' => 'Pending'],
+        ]);
         DB::table('delivery_proofs')->insert(['package_status_id' => 1, 'photo' => 'proof.jpg']);
         $actorId = DB::table('users')->insertGetId([
             'name' => 'Reviewer', 'username' => 'reviewer', 'password' => bcrypt('secret'), 'employee_id' => 'E1',
@@ -53,12 +57,15 @@ class DuplicateDrCleanupTest extends BillingWorkflowTestCase
         $groups = $service->groups(1, []);
 
         $this->assertCount(1, $groups);
-        $this->assertSame([1, 2], $groups->first()->records->pluck('delivery_id')->map(fn ($id): int => (int) $id)->all());
+        $this->assertSame([1, 2, 3], $groups->first()->records->pluck('delivery_id')->map(fn ($id): int => (int) $id)->all());
+        $this->assertSame([1, 2], $groups->first()->exactDuplicateSets->first()->records->pluck('delivery_id')->map(fn ($id): int => (int) $id)->all());
+        $this->assertSame(['groups' => 1, 'records' => 3], $service->summary(1, ['status' => 'Pending']));
+        $this->assertSame(['groups' => 1, 'records' => 3], $service->summary(1, ['search' => 'School Two']));
         $service->resolve(1, User::findOrFail($actorId), 1, [2]);
 
         $this->assertSame('Pending', DB::table('deliveries')->where('delivery_id', 1)->value('status'));
         $this->assertSame('cancelled', DB::table('deliveries')->where('delivery_id', 2)->value('status'));
-        $this->assertSame('Pending', DB::table('deliveries')->where('delivery_id', 3)->value('status'));
+        $this->assertSame('Delivered', DB::table('deliveries')->where('delivery_id', 3)->value('status'));
         $this->assertDatabaseHas('package_status', ['delivery_id' => 2, 'status' => 'Pending']);
         $this->assertDatabaseHas('delivery_proofs', ['id' => 1, 'photo' => 'proof.jpg']);
         $this->assertDatabaseHas('admin_activity_logs', ['actor_user_id' => $actorId, 'event' => 'duplicate_dr_cleanup']);
@@ -97,6 +104,6 @@ class DuplicateDrCleanupTest extends BillingWorkflowTestCase
             ->withSession(['company_id' => $companyId]);
         $response = $this->get(route('deliveries.duplicate-cleanup'));
 
-        $response->assertOk()->assertSee('Duplicate DR Cleanup')->assertSee('No possible duplicate delivery groups');
+        $response->assertOk()->assertSee('Duplicate DR Cleanup')->assertSee('0')->assertSee('No possible duplicate DR-number groups');
     }
 }

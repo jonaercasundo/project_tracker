@@ -97,6 +97,16 @@ class BillingSheetSyncService
 
     public function sync(BillingSheetSync $sync, GoogleSheetsApiClient $sheets): void
     {
+        $isRevoked = DB::table('delivery_billing_records')
+            ->where('delivery_id', $sync->delivery_id)
+            ->where('status', DeliveryBillingRecord::REVOKED)
+            ->exists();
+        if ($isRevoked) {
+            $this->finish($sync, 'revoked', 'The billing row was revoked; no Google Sheets update was attempted.');
+
+            return;
+        }
+
         $sync->forceFill(['outcome' => 'syncing', 'attempts' => $sync->attempts + 1, 'error_details' => null])->save();
         $configuration = $sheets->configurationStatus();
         if (! $configuration['configured']) {
@@ -178,6 +188,15 @@ class BillingSheetSyncService
             ->get();
 
         if ($syncs->isEmpty()) {
+            if ($entryIssues === []) {
+                return [
+                    'status' => 'success',
+                    'message' => 'No active billing rows remain in this batch; revoked rows were excluded from Google Sheets sync.',
+                    'synced_count' => 0,
+                    'issues' => [],
+                ];
+            }
+
             if ($entryIssues !== []) {
                 return [
                     'status' => 'error',
@@ -391,6 +410,7 @@ class BillingSheetSyncService
     {
         $billingRecordIds = DB::table('delivery_billing_records')
             ->where('billing_batch_id', $batchId)
+            ->where('status', '!=', DeliveryBillingRecord::REVOKED)
             ->pluck('id');
 
         return DB::table('delivery_billing_histories')
@@ -408,7 +428,11 @@ class BillingSheetSyncService
     /** @return array<int, array{delivery_id: int, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}> */
     private function ensureBatchSyncEntries(int $batchId): array
     {
-        $billingRecords = DeliveryBillingRecord::query()->with('batch')->where('billing_batch_id', $batchId)->get();
+        $billingRecords = DeliveryBillingRecord::query()
+            ->with('batch')
+            ->where('billing_batch_id', $batchId)
+            ->where('status', '!=', DeliveryBillingRecord::REVOKED)
+            ->get();
         if ($billingRecords->isEmpty()) {
             return [];
         }

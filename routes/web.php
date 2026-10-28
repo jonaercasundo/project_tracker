@@ -853,6 +853,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
                 ->whereNumber('batch')
                 ->middleware('can:billing.records.view')
                 ->name('batches.show');
+            Route::post('/batches/{batch}/records/{record}/revoke', [BillingBatchController::class, 'revokeRecord'])
+                ->whereNumber(['batch', 'record'])
+                ->middleware('can:billing.for-billing.mark')
+                ->name('batches.records.revoke');
             Route::post('/batches/{batch}/sheet-sync/retry', [BillingBatchController::class, 'retrySheetSync'])
                 ->whereNumber('batch')
                 ->middleware('can:billing.for-billing.mark')

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\DeliveryBillingRecord;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -94,6 +95,7 @@ class DeliveryBillingEligibilityService
             'for_billing' => ['eligible' => false, 'reason' => 'Already For Billing'],
             'billed' => ['eligible' => false, 'reason' => 'Already Billed; confirmation cannot be undone'],
             'on_hold' => ['eligible' => false, 'reason' => 'On Hold; resolve the hold before undoing'],
+            DeliveryBillingRecord::REVOKED => ['eligible' => false, 'reason' => 'Revoked; this delivery is excluded from billing'],
             default => ['eligible' => true, 'reason' => 'Eligible'],
         };
     }

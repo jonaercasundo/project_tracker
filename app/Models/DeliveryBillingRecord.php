@@ -16,6 +16,8 @@ class DeliveryBillingRecord extends Model
 
     public const ON_HOLD = 'on_hold';
 
+    public const REVOKED = 'revoked';
+
     protected $table = 'delivery_billing_records';
 
     protected $guarded = [];

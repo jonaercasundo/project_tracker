@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\DeliveryBillingRecord;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
@@ -368,7 +369,7 @@ class ProjectDeliveryProgressService
             ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
             ->select('d.project_id')
             ->selectRaw($this->receiptExpression('d').' as dr_no')
-            ->selectRaw('CASE WHEN billing.delivery_id IS NOT NULL THEN 1 ELSE 0 END as has_billing_record')
+            ->selectRaw("CASE WHEN billing.delivery_id IS NOT NULL AND billing.status <> 'revoked' THEN 1 ELSE 0 END as has_billing_record")
             ->selectRaw("CASE WHEN billing.delivery_id IS NULL OR billing.status = 'pending_billing' THEN 1 ELSE 0 END as has_pending_status")
             ->selectRaw("CASE WHEN billing.status = 'for_billing' THEN 1 ELSE 0 END as has_for_billing_status")
             ->selectRaw("CASE WHEN billing.status IN ('for_billing', 'billed') THEN 1 ELSE 0 END as has_billing_stage")
@@ -845,6 +846,7 @@ class ProjectDeliveryProgressService
 
         $billingStatusByDelivery = DB::table('delivery_billing_records as billing')
             ->select('billing.delivery_id')
+            ->selectRaw("MAX(CASE WHEN billing.status = 'revoked' THEN 1 ELSE 0 END) as is_revoked")
             ->selectRaw("MAX(CASE WHEN billing.status = 'billed' THEN 1 ELSE 0 END) as has_billed")
             ->selectRaw("MAX(CASE WHEN billing.status = 'for_billing' THEN 1 ELSE 0 END) as has_for_billing")
             ->selectRaw("MAX(CASE WHEN billing.status = 'on_hold' THEN 1 ELSE 0 END) as has_on_hold")
@@ -870,6 +872,7 @@ class ProjectDeliveryProgressService
             ->whereIn('d.project_id', $projectIds)
             ->whereNotNull('d.lot_id')
             ->whereNotNull('d.dr_no')->whereRaw("TRIM(d.dr_no) <> ''")
+            ->whereRaw('COALESCE(billing_status.is_revoked, 0) = 0')
             ->whereRaw("LOWER(TRIM(COALESCE(d.status, ''))) NOT IN ('cancelled', 'canceled', 'void', 'voided', 'deleted', 'rejected')")
             ->select(['d.project_id', 'd.lot_id'])
             ->selectRaw('SUM(COALESCE(item.price, 0) * CASE WHEN content.qty > 0 THEN content.qty ELSE 1 END * CASE WHEN d.package_qty > 0 THEN d.package_qty ELSE 1 END) as amount')
@@ -906,6 +909,9 @@ class ProjectDeliveryProgressService
             ->leftJoin('billing_batches as batch', 'batch.id', '=', 'billing.billing_batch_id')
             ->leftJoin('invoices as invoice', 'invoice.invoice_id', '=', 'billing.invoice_id')
             ->whereIn('l.project_id', $projectIds)
+            ->where(function (Builder $query): void {
+                $query->whereNull('billing.id')->orWhere('billing.status', '!=', DeliveryBillingRecord::REVOKED);
+            })
             ->select(['l.project_id', 'l.lot_id', 'l.lot_name', 'l.contract_price', 'billing.billing_batch_id', 'batch.batch_ref', 'batch.status as batch_status', 'batch.confirmed_at as batch_confirmed_at', 'batch.created_at as batch_created_at', 'billing.invoice_id', 'invoice.invoice_no'])
             ->selectRaw('MAX(billing.id) as billing_record_id')
             ->selectRaw("CASE WHEN billing.billing_batch_id IS NOT NULL THEN 'batch' WHEN billing.invoice_id IS NOT NULL THEN 'invoice' ELSE 'record' END as cycle_type")

@@ -15,9 +15,12 @@
         @if (session('error'))
             <div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{{ session('error') }}</div>
         @endif
+        @if ($errors->any())
+            <div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{{ $errors->first() }}</div>
+        @endif
         <section class="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
             <div><p class="text-xs font-bold uppercase tracking-wide text-slate-500">Status</p><p class="mt-1 font-semibold text-blue-800">{{ str($batch->status)->replace('_', ' ')->title() }}</p></div>
-            <div><p class="text-xs font-bold uppercase tracking-wide text-slate-500">DR Count</p><p class="mt-1 font-mono text-lg font-bold text-slate-900">{{ number_format($recordGroups->count()) }}</p></div>
+            <div><p class="text-xs font-bold uppercase tracking-wide text-slate-500">Active DR Count</p><p class="mt-1 font-mono text-lg font-bold text-slate-900">{{ number_format($activeDrCount) }}</p></div>
             <div><p class="text-xs font-bold uppercase tracking-wide text-slate-500">Created / confirmed by</p><p class="mt-1 text-sm text-slate-900">{{ $batch->confirmed_by_name ?? $batch->confirmedBy?->name ?? 'Former user' }}</p><p class="mt-1 text-xs text-slate-500">{{ $batch->confirmed_at?->format('Y-m-d H:i:s') }}</p><p class="mt-1 text-xs text-slate-500">Confirmation date: {{ $batch->confirmation_date?->toDateString() ?? 'Not recorded' }}</p></div>
             <div><p class="text-xs font-bold uppercase tracking-wide text-slate-500">Selection source</p><p class="mt-1 capitalize text-slate-900">{{ str($batch->selection_method)->replace('_', ' ') }}</p><p class="mt-1 text-xs text-slate-500">Queued for Billing review; no invoice created.</p></div>
         </section>
@@ -26,12 +29,14 @@
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 class="font-bold text-slate-900">Google Sheets reconciliation</h2>
-                    @if ($sheetSyncs->isEmpty())
+                    @if ($activeBillingRecordCount === 0)
+                        <p class="mt-1 text-sm text-slate-600">Revoked package rows are excluded from sync. No active package rows remain to synchronize.</p>
+                    @elseif ($activeSheetSyncs->isEmpty())
                         <p class="mt-1 text-sm text-amber-800">No reconciliation entries were recorded yet. Retry to prepare them from this batch’s confirmed delivery records.</p>
                     @elseif ($sheetSyncNeedsRetry)
                         <p class="mt-1 text-sm text-rose-700">Some DR/package rows need correction. Billing records remain confirmed.</p>
                     @else
-                        <p class="mt-1 text-sm text-emerald-700">All {{ $sheetSyncs->count() }} package row(s) are synchronized.</p>
+                        <p class="mt-1 text-sm text-emerald-700">All {{ $activeSheetSyncs->count() }} active package row(s) are synchronized. {{ $revokedSheetSyncCount }} revoked row(s) are excluded.</p>
                     @endif
                 </div>
                 @if ($sheetSyncNeedsRetry)
@@ -45,7 +50,7 @@
             </div>
             @if ($sheetSyncNeedsRetry && $sheetSyncs->isNotEmpty())
                 <ul class="mt-4 space-y-2 border-t border-slate-100 pt-4 text-sm">
-                    @foreach ($sheetSyncs->whereNotIn('outcome', ['synced', 'already_synced']) as $sync)
+                    @foreach ($activeSheetSyncs->whereNotIn('outcome', ['synced', 'already_synced']) as $sync)
                         <li class="text-rose-800">DR {{ $sync->bir_dr ?? 'not available' }} · Core Package Code {{ $sync->package_code ?? 'not available' }} · Lot {{ $sync->lot_number ?? 'not identified' }}: {{ $sync->error_details ?? str($sync->outcome)->replace('_', ' ')->title() }}</li>
                     @endforeach
                 </ul>
@@ -57,7 +62,7 @@
             <div class="overflow-x-auto">
                 <table class="min-w-full text-left text-sm">
                     <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                        <tr><th class="px-4 py-3">DR Number</th><th class="px-4 py-3">Delivery Records</th><th class="px-4 py-3">Project</th><th class="px-4 py-3">Lot / School</th><th class="px-4 py-3">Delivery Date</th><th class="px-4 py-3">Delivery Status</th><th class="px-4 py-3">Billing Status</th><th class="px-4 py-3">Invoice</th></tr>
+                        <tr><th class="px-4 py-3">DR Number</th><th class="px-4 py-3">Delivery Records</th><th class="px-4 py-3">Project</th><th class="px-4 py-3">Lot / School</th><th class="px-4 py-3">Delivery Date</th><th class="px-4 py-3">Delivery Status</th><th class="px-4 py-3">Billing Status</th><th class="px-4 py-3">Invoice</th><th class="px-4 py-3">Actions</th></tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         @forelse ($recordGroups as $drRecords)
@@ -133,9 +138,37 @@
                                         @endforelse
                                     </ul>
                                 </td>
+                                <td class="min-w-[18rem] px-4 py-4 text-slate-700">
+                                    <ul class="space-y-3">
+                                        @foreach ($deliveryRecords as $deliveryRecord)
+                                            <li class="rounded-lg border border-slate-200 p-3">
+                                                @if ($deliveryRecord->billing_status === 'revoked')
+                                                    @php($revocation = $revocationHistories->get($deliveryRecord->billing_record_id))
+                                                    <p class="font-semibold text-rose-700">Revoked</p>
+                                                    <p class="mt-1 text-xs text-slate-500">By {{ $revocation?->changed_by_name ?? 'Former user' }} · {{ $revocation?->created_at ? $revocation->created_at : 'Time unavailable' }}</p>
+                                                    @if ($revocation?->remarks)
+                                                        <p class="mt-1 text-xs text-slate-600">{{ $revocation->remarks }}</p>
+                                                    @endif
+                                                @elseif ($deliveryRecord->billing_status === 'for_billing' && $deliveryRecord->invoice_id === null)
+                                                    <p class="mb-2 text-xs text-slate-500">{{ $deliveryRecord->lot_name ?? 'All lots' }} · {{ $deliveryRecord->school_name ?? 'Unknown school' }} · Delivery {{ $deliveryRecord->delivery_id }}</p>
+                                                    @can('billing.for-billing.mark')
+                                                        <form method="POST" action="{{ route('billing.batches.records.revoke', [$batch, $deliveryRecord->billing_record_id]) }}" onsubmit="return window.confirm('Revoke this selected DR delivery and all its package rows from billing and future Google Sheets syncs?')">
+                                                            @csrf
+                                                            <label class="sr-only" for="revoke-reason-{{ $deliveryRecord->billing_record_id }}">Optional revocation reason</label>
+                                                            <input id="revoke-reason-{{ $deliveryRecord->billing_record_id }}" name="reason" type="text" maxlength="1000" placeholder="Optional reason" class="mb-2 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-700">
+                                                            <button type="submit" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100">Revoke DR / packages</button>
+                                                        </form>
+                                                    @endcan
+                                                @else
+                                                    <p class="text-xs text-slate-500">{{ $deliveryRecord->lot_name ?? 'All lots' }} · {{ $deliveryRecord->school_name ?? 'Unknown school' }} · {{ str($deliveryRecord->billing_status)->replace('_', ' ')->title() }}</p>
+                                                @endif
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="px-5 py-10 text-center text-slate-500">This batch does not have linked delivery records.</td></tr>
+                            <tr><td colspan="9" class="px-5 py-10 text-center text-slate-500">This batch does not have linked delivery records.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

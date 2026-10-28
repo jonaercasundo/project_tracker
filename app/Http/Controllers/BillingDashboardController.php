@@ -21,7 +21,7 @@ class BillingDashboardController extends Controller
         $filters = array_filter($validated, static fn (mixed $value): bool => $value !== null && $value !== '');
         $deliveries = $this->deliveredDeliveries($filters);
         $summary = (clone $deliveries)
-            ->selectRaw('COUNT(DISTINCT d.delivery_id) as total')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status IS NULL OR billing.status <> 'revoked' THEN d.delivery_id END) as total")
             ->selectRaw("COUNT(DISTINCT CASE WHEN billing.delivery_id IS NULL OR billing.status = 'pending_billing' THEN d.delivery_id END) as ready")
             ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'for_billing' THEN d.delivery_id END) as for_billing")
             ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'billed' THEN d.delivery_id END) as billed")
@@ -78,6 +78,7 @@ class BillingDashboardController extends Controller
                 DeliveryBillingRecord::FOR_BILLING => 'For Billing',
                 DeliveryBillingRecord::BILLED => 'Billed',
                 DeliveryBillingRecord::ON_HOLD => 'On Hold',
+                DeliveryBillingRecord::REVOKED => 'Revoked',
             ],
         ]);
     }
@@ -116,7 +117,7 @@ class BillingDashboardController extends Controller
             ->join('projects as p', 'p.project_id', '=', 'd.project_id')
             ->groupBy('p.project_id', 'p.project_name', 'p.project_code', 'p.ref_no')
             ->select('p.project_id', 'p.project_name', 'p.project_code', 'p.ref_no')
-            ->selectRaw('COUNT(DISTINCT d.delivery_id) as total')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status IS NULL OR billing.status <> 'revoked' THEN d.delivery_id END) as total")
             ->selectRaw("COUNT(DISTINCT CASE WHEN billing.delivery_id IS NULL OR billing.status = 'pending_billing' THEN d.delivery_id END) as ready")
             ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'for_billing' THEN d.delivery_id END) as for_billing")
             ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'billed' THEN d.delivery_id END) as billed")
@@ -262,6 +263,7 @@ class BillingDashboardController extends Controller
             ->join('delivery_billing_records as billing', 'billing.billing_batch_id', '=', 'batch.id')
             ->join('deliveries as d', 'd.delivery_id', '=', 'billing.delivery_id')
             ->leftJoin('projects as p', 'p.project_id', '=', 'd.project_id')
+            ->where('billing.status', '!=', DeliveryBillingRecord::REVOKED)
             ->whereIn('d.status', ['delivered', 'accepted'])
             ->when(isset($filters['project_id']), fn (Builder $query) => $query->where('d.project_id', $filters['project_id']))
             ->when(isset($filters['date_from']), fn (Builder $query) => $query->whereDate('d.delivery_date', '>=', $filters['date_from']))

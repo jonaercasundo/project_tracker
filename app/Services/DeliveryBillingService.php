@@ -100,6 +100,42 @@ class DeliveryBillingService
         }, 3);
     }
 
+    public function revokeFromBatch(int $billingRecordId, int $batchId, User $actor, ?string $reason = null): DeliveryBillingRecord
+    {
+        return DB::transaction(function () use ($billingRecordId, $batchId, $actor, $reason): DeliveryBillingRecord {
+            $billingRecord = DeliveryBillingRecord::query()->whereKey($billingRecordId)->lockForUpdate()->firstOrFail();
+
+            if ((int) $billingRecord->billing_batch_id !== $batchId) {
+                throw new BillingTransitionException('This billing row does not belong to the selected batch.', 404);
+            }
+
+            if ($billingRecord->status === DeliveryBillingRecord::REVOKED) {
+                throw new BillingTransitionException('This billing row has already been revoked.', 409);
+            }
+
+            if ($billingRecord->status !== DeliveryBillingRecord::FOR_BILLING || $billingRecord->invoice_id !== null) {
+                throw new BillingTransitionException('Only un-invoiced For Billing rows can be revoked.', 409);
+            }
+
+            $billingRecord->status = DeliveryBillingRecord::REVOKED;
+            $billingRecord->status_before_hold = null;
+            $billingRecord->save();
+
+            $remarks = 'Billing row revoked by '.$actor->name.'.'.($reason ? ' Reason: '.$reason : '');
+            $this->recordTransition(
+                $billingRecord,
+                DeliveryBillingRecord::FOR_BILLING,
+                DeliveryBillingRecord::REVOKED,
+                $actor,
+                null,
+                $remarks
+            );
+            $this->syncBatchStatus($batchId);
+
+            return $billingRecord->refresh();
+        }, 3);
+    }
+
     /**
      * @param  array{invoice_no: string, invoice_date: string, amount: string|float|int, billing_amount?: string|float|null, billing_reference?: string|null, billing_remarks?: string|null}  $data
      */
@@ -274,21 +310,25 @@ class DeliveryBillingService
         DB::table('billing_batches')->where('id', $batchId)->lockForUpdate()->first();
         $counts = DB::table('delivery_billing_records')
             ->where('billing_batch_id', $batchId)
+            ->where('status', '!=', DeliveryBillingRecord::REVOKED)
             ->selectRaw('COUNT(*) as total')
             ->selectRaw("SUM(CASE WHEN status = 'billed' THEN 1 ELSE 0 END) as billed")
             ->selectRaw("SUM(CASE WHEN status = 'on_hold' THEN 1 ELSE 0 END) as on_hold")
             ->first();
 
         $status = match (true) {
+            (int) $counts->total === 0 => null,
             (int) $counts->total > 0 && (int) $counts->billed === (int) $counts->total => 'billed',
             (int) $counts->on_hold > 0 => 'returned_for_correction',
             (int) $counts->billed > 0 => 'under_billing_review',
             default => 'for_billing',
         };
 
-        DB::table('billing_batches')->where('id', $batchId)->update([
-            'status' => $status,
-            'updated_at' => now(),
-        ]);
+        if ($status !== null) {
+            DB::table('billing_batches')->where('id', $batchId)->update([
+                'status' => $status,
+                'updated_at' => now(),
+            ]);
+        }
     }
 }

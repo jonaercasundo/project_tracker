@@ -67,6 +67,7 @@ class BillingRecordController extends Controller
                 DeliveryBillingRecord::FOR_BILLING => 'For Billing',
                 DeliveryBillingRecord::BILLED => 'Billed',
                 DeliveryBillingRecord::ON_HOLD => 'On Hold',
+                DeliveryBillingRecord::REVOKED => 'Revoked',
             ],
         ]);
     }
@@ -113,9 +114,15 @@ class BillingRecordController extends Controller
         abort_unless((int) $sync->delivery_id === $delivery, 404);
         abort_if(in_array($sync->outcome, ['synced', 'already_synced', 'not_applicable'], true), 409);
 
-        $billingBatchId = DeliveryBillingRecord::query()
+        $billingRecord = DeliveryBillingRecord::query()
             ->where('delivery_id', $delivery)
-            ->value('billing_batch_id');
+            ->first(['billing_batch_id', 'status']);
+        if ($billingRecord?->status === DeliveryBillingRecord::REVOKED) {
+            return redirect()->route('billing.records.show', $delivery)
+                ->with('error', 'This billing row was revoked and is excluded from Google Sheets sync.');
+        }
+
+        $billingBatchId = $billingRecord?->billing_batch_id;
         if ($billingBatchId !== null) {
             $result = $syncService->syncBatch((int) $billingBatchId, $sheets);
 
@@ -292,7 +299,7 @@ class BillingRecordController extends Controller
             'project_id' => ['nullable', 'integer', 'exists:projects,project_id'],
             'dr_no' => ['nullable', 'string', 'max:100'],
             'school_id' => ['nullable', 'string', 'max:255', 'exists:school,school_id'],
-            'billing_status' => ['nullable', 'in:pending_billing,for_billing,billed,on_hold'],
+            'billing_status' => ['nullable', 'in:pending_billing,for_billing,billed,on_hold,revoked'],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'invoice_no' => ['nullable', 'string', 'max:100'],

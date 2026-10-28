@@ -282,11 +282,14 @@ if (monitoring) {
             if (updateHistory) {
                 window.history.pushState({}, '', url);
             }
+            return true;
         } catch (exception) {
             if (exception.name !== 'AbortError') {
                 error.textContent = exception.message;
                 error.classList.remove('hidden');
             }
+
+            return false;
         } finally {
             if (currentRequest === request) {
                 currentRequest = undefined;
@@ -334,6 +337,31 @@ if (monitoring) {
         loadReport(new URL(window.location.href), false);
     });
     monitoring.addEventListener('click', event => {
+        const syncButton = event.target.closest('[data-sync-billing]');
+        if (syncButton) {
+            event.preventDefault();
+            const projectId = syncButton.dataset.syncBilling;
+            if (!window.confirm('Sync billing DRs for this project? Eligible deliveries will be marked Stock Out and Delivered, and inventory quantities will be deducted.')) {
+                return;
+            }
+
+            const setFeedback = (message, isError = false) => {
+                monitoring.querySelectorAll(`[data-sync-billing-feedback="${projectId}"]`).forEach(feedback => {
+                    feedback.textContent = message;
+                    feedback.classList.toggle('text-rose-700', isError);
+                    feedback.classList.toggle('text-emerald-700', !isError);
+                });
+            };
+
+            const originalLabel = syncButton.textContent;
+            syncButton.disabled = true;
+            syncButton.textContent = 'Syncing…';
+            setFeedback('Syncing billing deliveries and inventory…');
+
+            trySyncBilling(syncButton, projectId, originalLabel, setFeedback);
+            return;
+        }
+
         const pageButton = event.target.closest('[data-detail-page]');
         if (pageButton && !pageButton.disabled) {
             loadDetails(pageButton.closest('[data-lazy-details]'), Number(pageButton.dataset.detailPage));
@@ -387,6 +415,38 @@ if (monitoring) {
         }
         button.closest('[data-actions-menu]')?.removeAttribute('open');
     });
+
+    async function trySyncBilling(button, projectId, originalLabel, setFeedback) {
+        try {
+            const response = await fetch(button.dataset.endpoint, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+                credentials: 'same-origin',
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(result.message ?? 'Sync Billing failed. No changes were saved.');
+            }
+
+            const refreshed = await loadReport(new URL(window.location.href), false);
+            if (!refreshed) {
+                throw new Error(`${result.message} The sync completed, but pipeline counts could not refresh. Reload the page.`);
+            }
+
+            setFeedback(`${result.message} Pipeline counts refreshed.`);
+        } catch (exception) {
+            setFeedback(exception.message, true);
+        } finally {
+            if (button.isConnected) {
+                button.disabled = false;
+                button.textContent = originalLabel;
+            }
+        }
+    }
     monitoring.addEventListener('change', event => {
         if (event.target.matches('[data-detail-section], [data-detail-per-page]')) {
             loadDetails(event.target.closest('[data-lazy-details]'));

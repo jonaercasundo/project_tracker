@@ -128,6 +128,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         ->whereNumber('project')
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring.billing');
+    Route::post('/deliveries/monitoring/{project}/sync-billing', [DeliveryMonitoringController::class, 'syncBilling'])
+        ->whereNumber('project')
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.monitoring.sync-billing');
     Route::get('/site-maintenance', function () {
         return view('site.maintenance');
     })->name('site.maintenance');

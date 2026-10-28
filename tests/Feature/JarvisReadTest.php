@@ -1302,6 +1302,84 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
         ->assertJsonPath('lot_billing_progress.0.contract_price', '0.00');
 });
 
+it('syncs eligible billing DRs through stock out and delivery exactly once', function () {
+    jarvisOperations();
+    DB::table('inventory')->where('inventory_id', 1)->update(['qty' => 6]);
+    DB::table('delivery_billing_records')->insert([
+        ['delivery_id' => 1, 'status' => 'billed', 'billing_amount' => '500.00'],
+    ]);
+    DB::table('deliveries')->insert([
+        ['delivery_id' => 4, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => 'CANCELLED-DR', 'status' => 'cancelled'],
+    ]);
+    DB::table('delivery_billing_records')->insert([
+        ['delivery_id' => 4, 'status' => 'billed', 'billing_amount' => '100.00'],
+    ]);
+    $user = jarvisReader(true, true, true);
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->get('/deliveries/monitoring')->assertOk()
+        ->assertSee('Sync Billing')
+        ->assertSee('data-sync-billing="1"', false);
+
+    $firstSync = $this->postJson('/deliveries/monitoring/1/sync-billing')
+        ->assertOk()
+        ->assertJsonPath('synced_dr_count', 1);
+
+    expect(DB::table('inventory')->where('inventory_id', 1)->value('qty'))->toBe(0)
+        ->and(DB::table('package_status')->where('delivery_id', 1)->where('package_id', 1)->orderByDesc('package_status_id')->value('status'))->toBe('delivered')
+        ->and(DB::table('package_status')->where('delivery_id', 1)->where('package_id', 2)->orderByDesc('package_status_id')->value('status'))->toBe('delivered')
+        ->and(DB::table('package_status')->where('delivery_id', 4)->count())->toBe(0)
+        ->and(DB::table('inventory_history')->where('project_id', 1)->where('delivery_id', 1)->where('dr_no', '3502')->where('quantity', 6)->value('change_type'))->toBe('stock_out')
+        ->and(DB::table('inventory_history')->where('project_id', 1)->where('delivery_id', 1)->where('quantity', 6)->whereNotNull('changed_at')->exists())->toBeTrue();
+
+    $progress = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1, 'active_only' => 0])['projects']->first();
+    expect($progress['stock_out_drs_count'])->toBe(1)
+        ->and($progress['completed_deliveries_count'])->toBe(2)
+        ->and($progress['for_billing_deliveries_count'])->toBe(0)
+        ->and($progress['billed_deliveries_count'])->toBe(2);
+
+    $secondSync = $this->postJson('/deliveries/monitoring/1/sync-billing')
+        ->assertOk()
+        ->assertJsonPath('synced_dr_count', 0)
+        ->assertJsonPath('skipped_dr_count', 1);
+
+    expect(DB::table('inventory')->where('inventory_id', 1)->value('qty'))->toBe(0)
+        ->and(DB::table('inventory_history')->where('batch_no', 'like', 'BILLING-SYNC-%')->count())->toBe(2)
+        ->and(DB::table('package_status')->where('delivery_id', 1)->count())->toBe(4)
+        ->and($secondSync->json('message'))->toContain('No eligible billing DRs needed syncing');
+});
+
+it('rolls back billing sync when inventory cannot cover a DR', function () {
+    jarvisOperations();
+    DB::table('inventory')->where('inventory_id', 1)->update(['qty' => 5]);
+    DB::table('delivery_billing_records')->insert([
+        ['delivery_id' => 1, 'status' => 'for_billing', 'billing_amount' => '500.00'],
+    ]);
+    $user = jarvisReader(true, true, true);
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $failedSync = $this->postJson('/deliveries/monitoring/1/sync-billing')->assertUnprocessable();
+
+    expect($failedSync->json('message'))->toContain('Insufficient inventory')
+        ->toContain('No changes were saved.');
+
+    expect(DB::table('inventory')->where('inventory_id', 1)->value('qty'))->toBe(5)
+        ->and(DB::table('package_status')->where('delivery_id', 1)->count())->toBe(1)
+        ->and(DB::table('inventory_history')->where('batch_no', 'like', 'BILLING-SYNC-%')->count())->toBe(0)
+        ->and(DB::table('delivery_history')->count())->toBe(0);
+});
+
+it('forbids users outside the delivery monitoring roles from syncing billing', function () {
+    jarvisOperations();
+    $user = User::factory()->create(['username' => fake()->unique()->userName(), 'role' => 'Guest']);
+    $user->assignRole(Role::findOrCreate('Guest', 'web'));
+    $company = Company::create(['name' => 'MMC', 'code' => 'MMC', 'is_active' => true]);
+    $user->companies()->attach($company);
+    $this->actingAs($user)->withSession(['company_id' => $company->company_id]);
+
+    $this->postJson('/deliveries/monitoring/1/sync-billing')->assertForbidden();
+});
+
 it('renders long project names in a searchable monitoring filter without losing the selected project', function () {
     jarvisOperations();
     $projectName = '2026 School Nutrition and Learning Materials Distribution Program - Northern Division';

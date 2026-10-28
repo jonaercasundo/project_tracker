@@ -419,8 +419,8 @@ class ProjectDeliveryProgressService
     }
 
     /**
-     * Count distinct valid DRs whose current package status is released and whose
-     * project item has a recorded stock-out history entry.
+     * Count distinct valid DRs with a released package and stock-out history, plus
+     * billing-synced DRs whose final delivered status supersedes the released row.
      *
      * @param  array<string, mixed>  $filters
      */
@@ -450,10 +450,29 @@ class ProjectDeliveryProgressService
             ->select(['receipt.project_id', 'receipt.dr_no']);
         $this->groupReceipts($matchedReceipts, 'receipt');
 
-        return DB::query()->fromSub($matchedReceipts, 'stock_out_receipt')
-            ->select('stock_out_receipt.project_id')
-            ->selectRaw('COUNT(*) as stock_out_drs_count')
-            ->groupBy('stock_out_receipt.project_id');
+        $syncedDrs = DB::table('inventory_history as history')
+            ->whereIn('history.change_type', ['stock_out', 'stock_out_verified'])
+            ->whereNotNull('history.project_id')
+            ->whereNotNull('history.dr_no')
+            ->select('history.project_id')
+            ->selectRaw($this->receiptExpression('history').' as dr_no')
+            ->distinct();
+        $matchedSyncedReceipts = DB::query()->fromSub($this->receipts($filters)->select(['receipt.project_id', 'receipt.dr_no']), 'receipt')
+            ->joinSub($syncedDrs, 'synced_stock_out', function (JoinClause $join): void {
+                $this->matchReceipt($join, 'synced_stock_out', 'receipt');
+            })
+            ->select(['receipt.project_id', 'receipt.dr_no']);
+        $this->groupReceipts($matchedSyncedReceipts, 'receipt');
+
+        $stockOutRows = DB::query()->fromSub($matchedReceipts->unionAll($matchedSyncedReceipts), 'stock_out_rows')
+            ->select('stock_out_rows.project_id');
+        if ($this->usesMysql()) {
+            $stockOutRows->selectRaw("COUNT(DISTINCT CONCAT(OCTET_LENGTH(stock_out_rows.dr_no), ':', BINARY stock_out_rows.dr_no)) as stock_out_drs_count");
+        } else {
+            $stockOutRows->selectRaw('COUNT(DISTINCT stock_out_rows.dr_no) as stock_out_drs_count');
+        }
+
+        return $stockOutRows->groupBy('stock_out_rows.project_id');
     }
 
     /** Each join is already reduced to at most one row per project. @param array<string, mixed> $filters */
@@ -1011,7 +1030,7 @@ class ProjectDeliveryProgressService
             'dr' => $this->stage($counts['total_deliveries_count'], $counts['total_deliveries_count'], 'DR receipts') + ['label' => 'DR', 'context' => 'Recorded receipts; the workflow baseline', 'source' => 'deliveries grouped by exact project_id + dr_no'],
             'stock_out' => $this->stage($counts['stock_out_drs_count'], $counts['total_deliveries_count'], 'DRs') + [
                 'label' => 'Stock Out', 'context' => 'Distinct valid DRs with a released package and matching project-item stock-out history',
-                'source' => 'Latest released package status joined to package contents and project inventory_history stock_out items; grouped by exact project_id + DR number',
+                'source' => 'Latest released package status joined to package contents and stock-out history, plus billing-sync inventory history keyed by exact project_id + DR number',
             ],
             'delivered' => $this->stage($counts['completed_deliveries_count'], $counts['total_deliveries_count'], 'Delivery Receipts') + [
                 'label' => 'Delivered', 'context' => 'Valid DRs with all expected packages delivered or accepted; delivery status fallback when no packages exist',
@@ -1092,7 +1111,7 @@ class ProjectDeliveryProgressService
         return [
             'pipeline' => 'Warehouse readiness is separate from DR -> Stock Out -> Delivered -> Billing -> Billed. Stock Out counts distinct valid DRs with a released package and matching project-item stock-out history; delivery uses valid DR receipts, and billing uses matched DR/group records.',
             'stock_in' => 'SUM(new_qty - old_qty) for inventory_history.change_type = stock_in, grouped by item then project through item.project_id. Manual inventory insert deltas are reported separately as opening stock. Stock In does not require a DR link.',
-            'stock_out' => 'Distinct valid project DRs with at least one current released package allocation and a stock-out history entry for a project item contained in that package. The inventory history table does not store a direct DR/package key; current package release status is recorded in the same transaction as its item stock-out history.',
+            'stock_out' => 'Distinct valid project DRs with a current released package allocation and project-item stock-out history, plus billing-synced DRs recorded in inventory_history by exact project_id + DR number. Billing sync records item-level quantities and retains Stock Out progress after package statuses advance to delivered.',
             'warehouse_readiness' => 'Current stock is SUM(inventory.qty), exactly the balance used by Inventory and the scanner. History net is SUM(new_qty - old_qty), including insert/update adjustments; disagreements are flagged. Required item quantity is SUM(package_content.qty x deliveries.package_qty) over expected project DR allocations; non-positive content.qty uses 1, matching the scanner. Availability covers at most the required quantity of each item. Readiness = sum covered item quantities / sum required quantities x 100 within a single item unit; mixed units remain separate. Missing delivery package quantities make readiness unavailable. Warehouse inventory/history always use the whole project, while DR filters restrict delivery/billing.',
             'operational_progress' => 'Normalized DR ratios, each weighted 25%: distinct stock-out DRs / total valid DRs; completed valid DR receipts / total valid DR receipts; distinct DRs with for_billing or billed delivery billing status / total valid DRs; distinct billed delivery billing DRs / DRs that entered billing. DR creation is the baseline. Warehouse readiness is not a completion stage. Zero denominators make overall progress unavailable. Delivery filters scope the delivery-backed stages and project-item history matches.',
             'pipeline_billed' => 'Billing stage counts distinct project DRs with a delivery_billing_records status of for_billing or billed, regardless of delivery completion. Billed counts the distinct DRs with billed status among those that entered billing.',

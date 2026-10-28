@@ -128,6 +128,13 @@ Schema::create('inventory_history', function (Blueprint $table): void {
     $table->string('change_type')->nullable();
     $table->string('batch_no')->nullable();
     $table->dateTime('changed_at')->nullable();
+    $table->string('changed_by')->nullable();
+    $table->text('remarks')->nullable();
+    $table->integer('project_id')->nullable();
+    $table->integer('delivery_id')->nullable();
+    $table->integer('package_id')->nullable();
+    $table->string('dr_no')->nullable();
+    $table->integer('quantity')->nullable();
 });
 
 Schema::create('lot', function (Blueprint $table): void {
@@ -167,6 +174,16 @@ Schema::create('package_status', function (Blueprint $table): void {
     $table->decimal('latitude')->nullable();
     $table->decimal('longitude')->nullable();
     $table->integer('accuracy')->nullable();
+});
+
+Schema::create('delivery_history', function (Blueprint $table): void {
+    $table->increments('id');
+    $table->integer('package_status_id')->nullable();
+    $table->integer('user_id')->nullable();
+    $table->string('status')->nullable();
+    $table->text('remarks')->nullable();
+    $table->dateTime('created_at')->nullable();
+    $table->dateTime('updated_at')->nullable();
 });
 
 Schema::create('package_content', function (Blueprint $table): void {

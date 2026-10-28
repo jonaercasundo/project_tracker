@@ -6,12 +6,17 @@ use App\Http\Requests\DeliveryMonitoringDetailsRequest;
 use App\Http\Requests\DeliveryMonitoringLocationsRequest;
 use App\Http\Requests\DeliveryMonitoringLogisticsRequest;
 use App\Http\Requests\DeliveryMonitoringRequest;
+use App\Services\BillingOperationalSyncService;
 use App\Services\LogisticsDrTrackingService;
 use App\Services\ProjectDeliveryProgressService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
+use Throwable;
 
 class DeliveryMonitoringController extends Controller
 {
@@ -77,6 +82,29 @@ class DeliveryMonitoringController extends Controller
             'lot_billing_progress' => $lotBillingProgress,
             'html' => view('operation.delivery.partials.monitoring-lot-billing', ['project' => $projectData])->render(),
         ])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function syncBilling(int $project, BillingOperationalSyncService $sync): JsonResponse
+    {
+        try {
+            $result = $sync->syncProject($project, (int) Auth::id(), (string) Auth::user()->name);
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage().' No changes were saved.',
+            ], 422);
+        } catch (Throwable $exception) {
+            Log::error('Sync Billing failed.', [
+                'project_id' => $project,
+                'user_id' => Auth::id(),
+                'exception' => $exception,
+            ]);
+
+            return response()->json([
+                'message' => 'Sync Billing could not complete. No changes were saved. Please try again or contact an administrator.',
+            ], 500);
+        }
+
+        return response()->json($result)->header('Cache-Control', 'private, no-store');
     }
 
     public function index(DeliveryMonitoringRequest $request): View|JsonResponse

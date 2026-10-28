@@ -225,7 +225,7 @@ class BillingOperationalSyncService
                         'delivery_id' => $package['delivery_id'],
                         'package_id' => $package['package_id'],
                         'status' => 'released',
-                        'remarks' => 'Stock Out completed by Sync Billing.',
+                        'remarks' => 'Stock Out bypassed during the billing process by Sync Billing.',
                     ]);
                 }
 
@@ -233,7 +233,7 @@ class BillingOperationalSyncService
                     'delivery_id' => $package['delivery_id'],
                     'package_id' => $package['package_id'],
                     'status' => 'delivered',
-                    'remarks' => 'Delivered by Sync Billing.',
+                    'remarks' => 'Delivery bypassed during the billing process by Sync Billing.',
                     'delivered_at' => $now,
                     'delivered_by' => $userId,
                     'receiver_name' => $userName,
@@ -243,7 +243,7 @@ class BillingOperationalSyncService
                     'package_status_id' => $packageStatusId,
                     'user_id' => $userId,
                     'status' => 'delivered',
-                    'remarks' => 'Delivered by Sync Billing.',
+                    'remarks' => 'Delivery bypassed during the billing process by Sync Billing.',
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
@@ -309,7 +309,7 @@ class BillingOperationalSyncService
                     'old_qty' => $runningQuantity,
                     'new_qty' => $nextQuantity,
                     'changed_by' => $changedBy,
-                    'remarks' => "Sync Billing stock out: content quantity {$line['content_quantity']} x package quantity {$line['package_quantity']}.",
+                    'remarks' => "Stock Out bypassed during the billing process by Sync Billing: content quantity {$line['content_quantity']} x package quantity {$line['package_quantity']}.",
                     'change_type' => 'stock_out',
                     'changed_at' => $changedAt,
                     'project_id' => $line['project_id'],
@@ -340,7 +340,7 @@ class BillingOperationalSyncService
                 'old_qty' => null,
                 'new_qty' => null,
                 'changed_by' => $changedBy,
-                'remarks' => 'Sync Billing verified the prior Stock Out; no additional inventory was deducted.',
+                'remarks' => 'Stock Out was bypassed during the billing process by Sync Billing; prior deduction verified and no additional inventory was deducted.',
                 'change_type' => 'stock_out_verified',
                 'changed_at' => $changedAt,
                 'project_id' => $projectId,

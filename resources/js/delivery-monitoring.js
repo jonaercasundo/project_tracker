@@ -294,7 +294,7 @@ if (monitoring) {
         if (syncButton) {
             event.preventDefault();
             const projectId = syncButton.dataset.syncBilling;
-            if (!window.confirm('Sync billing DRs for this project? Eligible deliveries will be marked Stock Out and Delivered, and inventory quantities will be deducted.')) {
+            if (!window.confirm('Bypass the usual Stock Out and Delivered steps for billing-eligible DRs? Their package quantities will be deducted from inventory, recorded in inventory history with a bypass remark, and their statuses and pipeline counts will be updated.')) {
                 return;
             }
 

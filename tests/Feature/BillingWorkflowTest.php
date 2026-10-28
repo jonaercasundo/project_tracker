@@ -397,9 +397,11 @@ it('repairs stale lot mappings on retry and syncs numeric package rows to the sh
     $header = array_fill(0, 99, '');
     $header[11] = 'Core Package Code Lot2';
     $header[18] = 'BIR DR';
+    $header[19] = 'BIR DR PRINTED';
     $sheetRow = array_fill(0, 99, '');
     $sheetRow[11] = 'C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6';
     $sheetRow[18] = 'NOT-35473';
+    $sheetRow[19] = '7/1/2026';
     $sheetRows = [$header, $sheetRow];
 
     $initialSheets = Mockery::mock(GoogleSheetsApiClient::class);

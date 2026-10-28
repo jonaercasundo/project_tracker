@@ -594,7 +594,9 @@ class BillingSheetSyncService
                         $packageColumns[] = $columnIndex;
                     }
                 }
-                if (str_contains($normalized, 'bir') && str_contains($normalized, 'dr')) {
+                if (str_contains($normalized, 'bir')
+                    && str_contains($normalized, 'dr')
+                    && ! str_contains($normalized, 'printed')) {
                     $birColumns[] = ['column' => $columnIndex, 'has_lot' => $hasLot];
                 }
             }

@@ -249,7 +249,47 @@ it('confirms a complete same-DR group and syncs each lot once with idempotent re
             && $recordGroups->first()->count() === 2);
 });
 
-it('does not write any batch sheet cells when one DR and package code cannot be matched uniquely', function (): void {
+it('syncs multiple delivery records with the same DR to their single sheet row', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $firstId = createBillingDelivery('BIR-ONE-ROW', 'delivered');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('project_id');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $firstId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($firstId, 'CORE-ONE');
+    $secondId = createDeliveryForBillingProject($projectId, 'BIR-ONE-ROW', 'delivered');
+    addPackageToBillingDelivery($secondId, 'CORE-TWO');
+
+    $sheetRows = array_fill(0, 2, array_fill(0, 87, ''));
+    $sheetRows[0][1] = 'BIR DR Lot 2';
+    $sheetRows[1][1] = 'BIR-ONE-ROW';
+    $transitionDate = now('Asia/Manila')->toDateString();
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->andReturn($sheetRows);
+    $sheets->shouldReceive('updateCells')->once()->with([
+        ['range' => "'Copy of SME LOT 2,9,11'!BF2", 'majorDimension' => 'ROWS', 'values' => [[$transitionDate]]],
+    ], 'test-spreadsheet-id');
+    app()->instance(GoogleSheetsApiClient::class, $sheets);
+
+    $confirmation = $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$firstId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated()
+        ->assertJsonPath('batch.delivery_count', 2)
+        ->assertJsonPath('sheet_sync.status', 'success')
+        ->assertJsonPath('sheet_sync.synced_count', 2);
+
+    expect((int) $confirmation->json('batch.id'))->toBeGreaterThan(0)
+        ->and(BillingSheetSync::query()->where('outcome', 'synced')->count())->toBe(2);
+});
+
+it('does not write batch sheet cells when a confirmed DR has no unique sheet row', function (): void {
     signInBillingUser();
     Queue::fake();
     config([
@@ -271,7 +311,7 @@ it('does not write any batch sheet cells when one DR and package code cannot be 
     $sheetRows[0][2] = 'Core Package Code Lot 2';
     $sheetRows[0][3] = 'BIR DR Lot 9';
     $sheetRows[0][4] = 'Core Package Code Lot 9';
-    $sheetRows[1][1] = 'BIR-PREFLIGHT-DR';
+    $sheetRows[1][1] = 'BIR-ANOTHER-DR';
     $sheetRows[1][2] = 'CORE-MATCHED';
     $sheets = Mockery::mock(GoogleSheetsApiClient::class);
     $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);

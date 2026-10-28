@@ -292,8 +292,12 @@
                 <h2 class="mt-1 text-lg font-extrabold text-slate-900">Confirm DR groups for Billing?</h2>
                 <p class="mt-2 text-sm leading-5 text-slate-600">This records billing confirmation only. Pending delivery statuses and proof-of-delivery records are not changed.</p>
             </div>
+            <label for="billing-confirmation-date" class="block text-sm font-semibold text-slate-700">Billing confirmation date
+                <input id="billing-confirmation-date" type="date" required value="{{ now()->toDateString() }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+            </label>
             <dl class="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2 text-sm">
                 <dt class="font-semibold text-slate-500">Projects</dt><dd id="billing-confirm-projects" class="break-words text-slate-900"></dd>
+                <dt class="font-semibold text-slate-500">Date</dt><dd id="billing-confirm-date-summary" class="text-slate-900"></dd>
                 <dt class="font-semibold text-slate-500">Selected DRs</dt><dd id="billing-confirm-count" class="text-slate-900"></dd>
                 <dt class="font-semibold text-slate-500">Eligible</dt><dd id="billing-confirm-eligible" class="text-slate-900"></dd>
                 <dt class="font-semibold text-slate-500">Excluded</dt><dd id="billing-confirm-excluded" class="text-slate-900"></dd>

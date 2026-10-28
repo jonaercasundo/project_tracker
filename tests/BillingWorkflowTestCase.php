@@ -160,6 +160,7 @@ abstract class BillingWorkflowTestCase extends TestCase
         (require database_path('migrations/2026_10_13_030108_add_project_invoice_number_unique_index.php'))->up();
         (require database_path('migrations/2026_10_13_030107_create_delivery_billing_tables.php'))->up();
         (require database_path('migrations/2026_10_23_061316_create_billing_batches_table.php'))->up();
+        (require database_path('migrations/2026_10_28_031729_add_confirmation_date_to_billing_batches_table.php'))->up();
         (require database_path('migrations/2026_10_27_051316_create_billing_sheet_syncs_table.php'))->up();
         (require database_path('migrations/2026_10_27_052646_create_google_sheets_settings_table.php'))->up();
     }

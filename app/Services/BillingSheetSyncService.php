@@ -19,12 +19,17 @@ class BillingSheetSyncService
     /**
      * Queue a sheet reconciliation row for every package in the delivery's lot.
      */
-    public function queueForTransition(Delivery $delivery, DeliveryBillingRecord $billingRecord, DeliveryBillingHistory $history): void
-    {
+    public function queueForTransition(
+        Delivery $delivery,
+        DeliveryBillingRecord $billingRecord,
+        DeliveryBillingHistory $history,
+        ?string $confirmationDate = null
+    ): void {
         $timezone = (string) config('google_sheets.billing.business_timezone', config('app.timezone', 'Asia/Manila'));
         $transitionAt = $billingRecord->submitted_for_billing_at?->timezone($timezone)
             ?? $history->created_at?->timezone($timezone)
             ?? now($timezone);
+        $transitionDate = $confirmationDate ?? $transitionAt->toDateString();
         $settings = $this->configuration->current();
         $spreadsheetId = $settings['spreadsheet_id'];
         $tab = $settings['sheet_tab'];
@@ -56,7 +61,7 @@ class BillingSheetSyncService
                 'sheet_tab' => $tab,
                 'target_cell' => null,
                 'transition_at' => $transitionAt,
-                'transition_date' => $transitionAt->toDateString(),
+                'transition_date' => $transitionDate,
                 'idempotency_key' => hash('sha256', 'billing-history:'.$history->getKey().':no-package'),
                 'outcome' => 'reconciliation_error',
                 'error_details' => 'No package status rows match the delivery lot.',
@@ -82,7 +87,7 @@ class BillingSheetSyncService
                 'sheet_tab' => $tab,
                 'target_cell' => $cell,
                 'transition_at' => $transitionAt,
-                'transition_date' => $transitionAt->toDateString(),
+                'transition_date' => $transitionDate,
                 'idempotency_key' => hash('sha256', 'billing-history:'.$history->getKey().':package-status:'.$package->package_status_id),
                 'outcome' => $supportedLot ? 'queued' : 'not_applicable',
                 'error_details' => $supportedLot ? null : 'Only Lots 2, 9, and 11 are configured for the target sheet.',
@@ -403,7 +408,7 @@ class BillingSheetSyncService
     /** @return array<int, array{delivery_id: int, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}> */
     private function ensureBatchSyncEntries(int $batchId): array
     {
-        $billingRecords = DeliveryBillingRecord::query()->where('billing_batch_id', $batchId)->get();
+        $billingRecords = DeliveryBillingRecord::query()->with('batch')->where('billing_batch_id', $batchId)->get();
         if ($billingRecords->isEmpty()) {
             return [];
         }
@@ -440,7 +445,12 @@ class BillingSheetSyncService
             }
 
             try {
-                $this->queueForTransition($delivery, $billingRecord, $history);
+                $this->queueForTransition(
+                    $delivery,
+                    $billingRecord,
+                    $history,
+                    $billingRecord->batch?->confirmation_date?->toDateString()
+                );
             } catch (Throwable $exception) {
                 Log::error('Could not prepare Google Sheets reconciliation entries for a confirmed billing batch.', [
                     'billing_batch_id' => $batchId,

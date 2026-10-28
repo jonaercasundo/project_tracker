@@ -211,11 +211,13 @@ class BillingPreparationController extends Controller
             'delivery_ids' => ['required_unless:mode,all', 'array', 'min:1', 'max:'.$this->maxBatchSize()],
             'delivery_ids.*' => ['required', 'integer', 'distinct:strict', 'exists:deliveries,delivery_id'],
             'idempotency_key' => ['required', 'uuid'],
+            'confirmation_date' => ['sometimes', 'date_format:Y-m-d'],
             'excluded_delivery_ids' => ['sometimes', 'array', 'max:'.$this->maxBatchSize()],
             'excluded_delivery_ids.*' => ['integer', 'distinct:strict', 'exists:deliveries,delivery_id'],
             'expected_delivery_ids' => ['required_if:mode,all', 'array', 'min:1', 'max:'.$this->maxBatchSize()],
             'expected_delivery_ids.*' => ['integer', 'distinct:strict', 'exists:deliveries,delivery_id'],
         ]);
+        $confirmationDate = $validated['confirmation_date'] ?? now()->toDateString();
         $actor = $request->user();
         abort_unless($actor instanceof User, 401);
         $filters = null;
@@ -246,7 +248,7 @@ class BillingPreparationController extends Controller
             }
             $groupCount = $this->eligibility->presentGroups($this->eligibility->query()->whereIn('d.delivery_id', $retryIds)->get())->count();
             try {
-                $result = $this->batches->confirm($retryIds, $validated['mode'], $validated['idempotency_key'], $actor, $selectionFilters, $groupKeys);
+                $result = $this->batches->confirm($retryIds, $validated['mode'], $validated['idempotency_key'], $actor, $confirmationDate, $selectionFilters, $groupKeys);
             } catch (BillingBatchEligibilityException $exception) {
                 return response()->json(['message' => $exception->getMessage(), 'rejected' => $exception->rejectedRecords], $exception->httpStatus);
             }
@@ -261,6 +263,7 @@ class BillingPreparationController extends Controller
                     'id' => $result['batch']->getKey(),
                     'batch_ref' => $result['batch']->batch_ref,
                     'status' => $result['batch']->status,
+                    'confirmation_date' => $result['batch']->confirmation_date?->toDateString(),
                     'delivery_count' => count($retryIds),
                     'group_count' => $groupCount,
                     'url' => route('billing.batches.show', $result['batch']),
@@ -313,6 +316,7 @@ class BillingPreparationController extends Controller
                             'id' => $existingBatch->getKey(),
                             'batch_ref' => $existingBatch->batch_ref,
                             'status' => $existingBatch->status,
+                            'confirmation_date' => $existingBatch->confirmation_date?->toDateString(),
                             'delivery_count' => count($alreadySubmittedIds),
                             'group_count' => $groupCount,
                             'url' => route('billing.batches.show', $existingBatch),
@@ -399,7 +403,7 @@ class BillingPreparationController extends Controller
         }
 
         try {
-            $result = $this->batches->confirm($deliveryIds, $validated['mode'], $validated['idempotency_key'], $actor, $selectionFilters, $groupKeys ?? null);
+            $result = $this->batches->confirm($deliveryIds, $validated['mode'], $validated['idempotency_key'], $actor, $confirmationDate, $selectionFilters, $groupKeys ?? null);
         } catch (BillingBatchEligibilityException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),
@@ -417,6 +421,7 @@ class BillingPreparationController extends Controller
                 'id' => $result['batch']->getKey(),
                 'batch_ref' => $result['batch']->batch_ref,
                 'status' => $result['batch']->status,
+                'confirmation_date' => $result['batch']->confirmation_date?->toDateString(),
                 'delivery_count' => count($deliveryIds),
                 'group_count' => $groupCount,
                 'url' => route('billing.batches.show', $result['batch']),

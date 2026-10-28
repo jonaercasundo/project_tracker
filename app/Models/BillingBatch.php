@@ -17,6 +17,7 @@ class BillingBatch extends Model
         return [
             'selection_filters' => 'array',
             'confirmed_at' => 'datetime',
+            'confirmation_date' => 'date',
         ];
     }
 

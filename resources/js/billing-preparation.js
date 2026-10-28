@@ -18,6 +18,8 @@ if (root) {
     const confirmButton = document.getElementById('billing-preparation-confirm');
     const confirmDialog = document.getElementById('billing-preparation-confirm-dialog');
     const confirmSubmit = document.getElementById('billing-preparation-confirm-submit');
+    const confirmationDateInput = document.getElementById('billing-confirmation-date');
+    const confirmationDateSummary = document.getElementById('billing-confirm-date-summary');
     const camera = document.getElementById('billing-preparation-camera');
     const cameraPlaceholder = document.getElementById('billing-preparation-camera-placeholder');
     const cameraSupport = document.getElementById('billing-preparation-camera-support');
@@ -580,14 +582,24 @@ if (root) {
     });
 
     confirmButton.addEventListener('click', () => {
+        if (!confirmationDateInput.value) {
+            showFeedback('Choose a billing confirmation date.', 'warning');
+            confirmationDateInput.focus();
+            return;
+        }
         const projectNames = [...new Set([...selected.values()].map((record) => record.project_name))];
         document.getElementById('billing-confirm-projects').textContent = projectNames.join(', ');
+        confirmationDateSummary.textContent = confirmationDateInput.value;
         document.getElementById('billing-confirm-count').textContent = `${selected.size} DR group(s)`;
         document.getElementById('billing-confirm-eligible').textContent = `${selected.size} groups · ${[...selected.values()].reduce((sum, group) => sum + group.eligible_delivery_ids.length, 0)} records`;
         const excludedGroups = visibleRecords.filter((record) => !record.eligible || record.excluded_count > 0).length;
         const excludedRecords = visibleRecords.reduce((sum, group) => sum + group.excluded_count, 0);
         document.getElementById('billing-confirm-excluded').textContent = `${excludedGroups} group(s) · ${excludedRecords} record(s)`;
         confirmDialog.showModal();
+    });
+
+    confirmationDateInput.addEventListener('input', () => {
+        confirmationDateSummary.textContent = confirmationDateInput.value;
     });
 
     confirmSubmit?.addEventListener('click', async () => {
@@ -601,6 +613,7 @@ if (root) {
             expectedIds: allExpected.filter((id) => !allExcluded.has(id)),
             idempotencyKey: createIdempotencyKey(),
         });
+        body.confirmation_date = confirmationDateInput.value;
 
         try {
             setBusy(confirmSubmit, true, 'Confirming…');

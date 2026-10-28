@@ -8,15 +8,16 @@ use App\Models\DeliveryBillingHistory;
 use App\Models\DeliveryBillingRecord;
 use App\Models\Invoice;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class DeliveryBillingService
 {
-    public function markForBilling(int $deliveryId, User $actor, ?int $billingBatchId = null): DeliveryBillingRecord
+    public function markForBilling(int $deliveryId, User $actor, ?int $billingBatchId = null, ?string $confirmationDate = null): DeliveryBillingRecord
     {
-        return DB::transaction(function () use ($deliveryId, $actor, $billingBatchId): DeliveryBillingRecord {
+        return DB::transaction(function () use ($deliveryId, $actor, $billingBatchId, $confirmationDate): DeliveryBillingRecord {
             $delivery = $this->lockEligibleDelivery($deliveryId, allowBeforeDelivery: $billingBatchId !== null);
             $billingRecord = $this->lockBillingRecord($deliveryId);
             $currentStatus = $billingRecord?->status ?? DeliveryBillingRecord::PENDING_BILLING;
@@ -29,13 +30,15 @@ class DeliveryBillingService
             $billingRecord->status = DeliveryBillingRecord::FOR_BILLING;
             $billingRecord->status_before_hold = null;
             $billingRecord->submitted_for_billing_by = $actor->getKey();
-            $billingRecord->submitted_for_billing_at = now();
+            $billingRecord->submitted_for_billing_at = $confirmationDate === null
+                ? now()
+                : Carbon::createFromFormat('!Y-m-d', $confirmationDate, (string) config('app.timezone'));
             $billingRecord->billing_batch_id = $billingBatchId;
             $billingRecord->save();
 
             $history = $this->recordTransition($billingRecord, $currentStatus, DeliveryBillingRecord::FOR_BILLING, $actor);
             try {
-                app(BillingSheetSyncService::class)->queueForTransition($delivery, $billingRecord, $history);
+                app(BillingSheetSyncService::class)->queueForTransition($delivery, $billingRecord, $history, $confirmationDate);
             } catch (Throwable $exception) {
                 Log::error('Unable to record the billing-to-Google-Sheets reconciliation event.', [
                     'delivery_id' => $delivery->delivery_id,

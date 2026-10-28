@@ -1477,7 +1477,12 @@ it('confirms a batch into the existing Billing queue idempotently without creati
     $this->postJson(route('billing.prepare.confirm'), $duplicatePayload)->assertUnprocessable();
     $this->assertDatabaseCount('delivery_billing_records', 0);
 
-    $payload = ['mode' => 'scan', 'delivery_ids' => [$deliveryId], 'idempotency_key' => $key];
+    $payload = [
+        'mode' => 'scan',
+        'delivery_ids' => [$deliveryId],
+        'idempotency_key' => $key,
+        'confirmation_date' => '2026-10-20',
+    ];
 
     $created = $this->postJson(route('billing.prepare.confirm'), $payload)
         ->assertCreated()
@@ -1506,7 +1511,9 @@ it('confirms a batch into the existing Billing queue idempotently without creati
         'batch_ref' => $batchRef,
         'created_by' => auth()->id(),
         'confirmed_by' => auth()->id(),
+        'confirmation_date' => '2026-10-20 00:00:00',
     ]);
+    expect(substr((string) DB::table('delivery_billing_records')->where('delivery_id', $deliveryId)->value('submitted_for_billing_at'), 0, 10))->toBe('2026-10-20');
     $this->assertDatabaseCount('delivery_billing_histories', 1);
     $this->assertDatabaseCount('billing_batches', 1);
     $this->assertDatabaseCount('invoices', 0);
@@ -1526,6 +1533,54 @@ it('confirms a batch into the existing Billing queue idempotently without creati
     ])->assertOk()->assertJsonPath('record.billing_status', 'billed');
     $this->assertDatabaseHas('billing_batches', ['id' => $batchId, 'status' => 'billed']);
     $this->assertDatabaseCount('invoices', 1);
+});
+
+it('applies the chosen confirmation date to every selected eligible delivery group', function (): void {
+    signInBillingUser();
+    $firstDeliveryId = createBillingDelivery('DR-CONFIRM-DATE-1', 'pending');
+    $secondDeliveryId = createBillingDelivery('DR-CONFIRM-DATE-2', 'accepted');
+    $confirmationDate = '2026-10-12';
+
+    $response = $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$firstDeliveryId, $secondDeliveryId],
+        'idempotency_key' => (string) Str::uuid(),
+        'confirmation_date' => $confirmationDate,
+    ])->assertCreated()
+        ->assertJsonPath('batch.confirmation_date', $confirmationDate);
+
+    $batchId = (int) $response->json('batch.id');
+    $submittedDates = DB::table('delivery_billing_records')
+        ->whereIn('delivery_id', [$firstDeliveryId, $secondDeliveryId])
+        ->orderBy('delivery_id')
+        ->pluck('submitted_for_billing_at')
+        ->map(fn (mixed $date): string => substr((string) $date, 0, 10))
+        ->all();
+    $sheetDates = BillingSheetSync::query()->orderBy('delivery_id')->pluck('transition_date')->map(
+        fn (mixed $date): string => $date->toDateString()
+    )->all();
+
+    expect($submittedDates)->toBe([$confirmationDate, $confirmationDate])
+        ->and($sheetDates)->toBe([$confirmationDate, $confirmationDate]);
+    $this->assertDatabaseHas('billing_batches', [
+        'id' => $batchId,
+        'confirmation_date' => $confirmationDate.' 00:00:00',
+    ]);
+});
+
+it('rejects an invalid confirmation date without creating billing records', function (): void {
+    signInBillingUser();
+    $deliveryId = createBillingDelivery('DR-CONFIRM-DATE-INVALID');
+
+    $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$deliveryId],
+        'idempotency_key' => (string) Str::uuid(),
+        'confirmation_date' => '2026-02-30',
+    ])->assertUnprocessable()->assertJsonValidationErrors('confirmation_date');
+
+    $this->assertDatabaseCount('billing_batches', 0);
+    $this->assertDatabaseCount('delivery_billing_records', 0);
 });
 
 it('keeps duplicate ledger groups in view data without rendering the warning or modifying rows', function (): void {

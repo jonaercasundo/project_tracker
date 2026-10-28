@@ -28,6 +28,7 @@ class BillingBatchService
         string $selectionMethod,
         string $idempotencyKey,
         User $actor,
+        string $confirmationDate,
         ?array $selectionFilters = null,
         ?array $selectionGroups = null
     ): array {
@@ -36,6 +37,7 @@ class BillingBatchService
         $selectionData = [
             'method' => $selectionMethod,
             'delivery_ids' => $deliveryIds,
+            'confirmation_date' => $confirmationDate,
             'filters' => $selectionFilters,
         ];
         if ($selectionGroups !== null) {
@@ -44,7 +46,7 @@ class BillingBatchService
         }
         $selectionHash = hash('sha256', json_encode($selectionData, JSON_THROW_ON_ERROR));
 
-        return DB::transaction(function () use ($deliveryIds, $selectionMethod, $idempotencyKey, $actor, $selectionFilters, $selectionHash): array {
+        return DB::transaction(function () use ($deliveryIds, $selectionMethod, $idempotencyKey, $actor, $confirmationDate, $selectionFilters, $selectionHash): array {
             $existing = BillingBatch::query()->where('idempotency_key', $idempotencyKey)->lockForUpdate()->first();
             if ($existing) {
                 return $this->existingResult($existing, $selectionHash);
@@ -136,10 +138,11 @@ class BillingBatchService
                 'confirmed_by' => $actor->getKey(),
                 'confirmed_by_name' => $actor->name,
                 'confirmed_at' => now(),
+                'confirmation_date' => $confirmationDate,
             ]);
 
             foreach ($deliveryIds as $deliveryId) {
-                $this->billing->markForBilling($deliveryId, $actor, (int) $batch->getKey());
+                $this->billing->markForBilling($deliveryId, $actor, (int) $batch->getKey(), $confirmationDate);
             }
 
             return ['batch' => $batch->refresh(), 'created' => true];

@@ -335,6 +335,22 @@ class ProjectDeliveryProgressService
             ? $this->receipts($filters)->select('receipt.project_id', 'receipt.dr_no')
             : DB::query()->fromSub($receiptRows, 'dr')->select('dr.project_id', 'dr.dr_no');
 
+        $billedReceipts = DB::query()->fromSub(clone $receipts, 'receipt')
+            ->join('billing_grouped as bg', function (JoinClause $join): void {
+                $join->on('bg.dr_no', '=', 'receipt.dr_no');
+                if ($this->usesMysql()) {
+                    $join->whereRaw('OCTET_LENGTH(bg.dr_no) = OCTET_LENGTH(receipt.dr_no)');
+                }
+            })
+            ->join('grouping as g', 'g.group_id', '=', 'bg.group_id')
+            ->where('g.status', 'billed')
+            ->select('receipt.project_id', 'receipt.dr_no');
+        $this->groupReceipts($billedReceipts, 'receipt');
+        $billedDrStats = DB::query()->fromSub($billedReceipts, 'billed_receipt')
+            ->select('billed_receipt.project_id')
+            ->selectRaw('COUNT(*) as billed_drs_count')
+            ->groupBy('billed_receipt.project_id');
+
         return DB::query()->fromSub($receipts, 'receipt')
             ->join('billing_grouped as bg', function (JoinClause $join): void {
                 $join->on('bg.dr_no', '=', 'receipt.dr_no');
@@ -343,12 +359,14 @@ class ProjectDeliveryProgressService
                 }
             })
             ->join('grouping as g', 'g.group_id', '=', 'bg.group_id')
+            ->leftJoinSub($billedDrStats, 'billed_dr_stats', 'billed_dr_stats.project_id', '=', 'receipt.project_id')
             ->select('receipt.project_id')->selectRaw('COUNT(*) as billing_groups_count')
+            ->selectRaw('COALESCE(billed_dr_stats.billed_drs_count, 0) as billed_drs_count')
             ->selectRaw('MAX(bg.created_at) as last_billing_date')
             ->selectRaw("COUNT(CASE WHEN g.status = 'for billing' THEN 1 END) as for_billing_groups_count")
             ->selectRaw("COUNT(CASE WHEN g.status = 'billed' THEN 1 END) as billed_groups_count")
             ->selectRaw("COUNT(CASE WHEN g.status = 'paid' THEN 1 END) as paid_groups_count")
-            ->groupBy('receipt.project_id');
+            ->groupBy('receipt.project_id', 'billed_dr_stats.billed_drs_count');
     }
 
     /** @param array<string, mixed> $filters */
@@ -437,7 +455,7 @@ class ProjectDeliveryProgressService
         foreach (array_merge(['total_packages_count'], array_map(fn (string $status): string => $status.'_packages_count', self::PACKAGE_STATUSES)) as $column) {
             $query->selectRaw("COALESCE(delivery_stats.{$column}, 0) as {$column}");
         }
-        foreach (['billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count'] as $column) {
+        foreach (['billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count', 'billed_drs_count'] as $column) {
             $query->selectRaw("COALESCE(billing_stats.{$column}, 0) as {$column}");
         }
         foreach (['delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count'] as $column) {
@@ -726,7 +744,7 @@ class ProjectDeliveryProgressService
                 $summary[$column] = (int) $projects->sum($column);
             }
         }
-        foreach (['total_deliveries_count', 'delivery_rows_count', 'stock_out_drs_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count', 'billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count', 'delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count'] as $column) {
+        foreach (['total_deliveries_count', 'delivery_rows_count', 'stock_out_drs_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count', 'billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count', 'billed_drs_count', 'delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count'] as $column) {
             $summary[$column] ??= 0;
         }
         $summary['progress_basis'] = $summary['total_deliveries_count'] > 0 ? 'delivery_receipts' : 'no_delivery_receipts';
@@ -778,8 +796,6 @@ class ProjectDeliveryProgressService
     /** @param array<string, mixed> $counts @return array<string, array<string, mixed>> */
     private function pipeline(array $counts, array $warehouse): array
     {
-        $billingEntered = $counts['for_billing_groups_count'] + $counts['billed_groups_count'] + $counts['paid_groups_count'];
-
         return [
             'dr' => $this->stage($counts['total_deliveries_count'], $counts['total_deliveries_count'], 'DR receipts') + ['label' => 'DR', 'context' => 'Recorded receipts; the workflow baseline', 'source' => 'deliveries grouped by exact project_id + dr_no'],
             'stock_out' => $this->stage($counts['stock_out_drs_count'], $counts['total_deliveries_count'], 'DRs') + [
@@ -790,9 +806,9 @@ class ProjectDeliveryProgressService
                 'label' => 'Delivered', 'context' => 'Valid DRs with all expected packages delivered or accepted; delivery status fallback when no packages exist',
                 'source' => 'deliveries grouped by exact project_id + dr_no; current package_status by delivery_id + package_id',
             ],
-            'billing' => $this->stage($billingEntered, $counts['billing_groups_count'], 'DR/group records') + [
-                'label' => 'Billing', 'context' => 'Entered billing: for billing + billed + paid',
-                'source' => 'billing_grouped joined to grouping and exact DR receipts',
+            'billing' => $this->stage($counts['billed_drs_count'], $counts['total_deliveries_count'], 'DRs') + [
+                'label' => 'Billing', 'context' => 'Billed DRs / total project DRs',
+                'source' => 'Distinct DR receipts with a linked billing_grouped record whose grouping status is billed',
             ],
             'billed' => $this->stage($counts['billed_groups_count'], $counts['billing_groups_count'], 'DR/group records') + [
                 'label' => 'Billed', 'context' => 'Current billed status; paid is shown separately in details',

@@ -11,9 +11,9 @@
                     <p class="mt-1 text-sm font-semibold text-slate-500">Per item unit</p>
                     <p class="mt-1 text-[11px] leading-4 text-slate-500">See details</p>
                 @else
-                    <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['completed']) }} @if($key !== 'dr')<span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['total']) }}{{ in_array($key, ['stock_out', 'delivered'], true) ? ' DRs' : '' }}</span>@endif</p>
-                    <p class="mt-1 text-xs font-semibold tabular-nums {{ ($stage['completed'] ?? 0) > 0 ? 'text-blue-700' : 'text-slate-500' }}">{{ $key === 'dr' ? ($stage['total'] ? 'Recorded' : 'No DRs') : ($stage['percent'] === null ? ($key === 'delivered' ? 'N/A' : 'No records') : number_format($stage['percent'], 1).'%') }}</p>
-                    @if($key !== 'stock_out')<p class="mt-1 text-[11px] leading-4 text-slate-500">{{ $stage['unit'] }}</p>@endif
+                    <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['completed']) }} @if($key !== 'dr')<span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['total']) }}{{ in_array($key, ['stock_out', 'delivered', 'billing'], true) ? ' DRs' : '' }}</span>@endif</p>
+                    <p class="mt-1 text-xs font-semibold tabular-nums {{ ($stage['completed'] ?? 0) > 0 ? 'text-blue-700' : 'text-slate-500' }}">{{ $key === 'dr' ? ($stage['total'] ? 'Recorded' : 'No DRs') : ($key === 'billing' ? number_format($stage['percent'] ?? 0, 1).'%' : ($stage['percent'] === null ? ($key === 'delivered' ? 'N/A' : 'No records') : number_format($stage['percent'], 1).'%')) }}</p>
+                    @if(!in_array($key, ['stock_out', 'billing'], true))<p class="mt-1 text-[11px] leading-4 text-slate-500">{{ $stage['unit'] }}</p>@endif
                 @endif
             </div>
         </li>

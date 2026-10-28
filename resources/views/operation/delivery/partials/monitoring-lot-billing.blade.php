@@ -22,9 +22,6 @@
                             <dd class="mt-1 text-sm font-semibold tabular-nums text-slate-800">{{ $lotBilling['current_cycle']['percent_billed'] === null ? 'N/A' : number_format($lotBilling['current_cycle']['percent_billed'], 2).'%' }}</dd>
                         </div>
                     </dl>
-                    @if ($lotBilling['current_cycle']['labels'] !== [])
-                        <p class="mt-3 break-words text-xs text-slate-600">Active cycle: <span class="font-semibold text-slate-700">{{ implode(', ', $lotBilling['current_cycle']['labels']) }}</span></p>
-                    @endif
                     <p class="mt-3 text-xs text-slate-600">Not billed this cycle: <span class="font-semibold tabular-nums">&#8369;{{ number_format((float) $lotBilling['current_cycle']['not_billed_amount'], 2) }}</span> · <span class="font-semibold tabular-nums">{{ number_format($lotBilling['current_cycle']['not_billed_percent'], 2) }}%</span></p>
 
                     <div class="mt-3 border-t border-slate-100 pt-3">

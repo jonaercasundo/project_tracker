@@ -87,9 +87,12 @@ class DeliveryMonitoringController extends Controller
     public function syncBilling(Request $request, int $project): JsonResponse
     {
         $validated = $request->validate([
-            'warehouse_id' => ['nullable', 'integer', 'exists:warehouse,warehouse_id'],
+            'warehouse_id' => ['required', 'integer', 'exists:warehouse,warehouse_id'],
+        ], [
+            'warehouse_id.required' => 'Select a fallback inventory warehouse before syncing.',
+            'warehouse_id.exists' => 'The selected fallback warehouse is no longer available. Choose another warehouse and try again.',
         ]);
-        $fallbackWarehouseId = isset($validated['warehouse_id']) ? (int) $validated['warehouse_id'] : null;
+        $fallbackWarehouseId = (int) $validated['warehouse_id'];
         $user = Auth::user();
         abort_unless(DB::table('projects')->where('project_id', $project)->exists(), 404, 'Project not found.');
 

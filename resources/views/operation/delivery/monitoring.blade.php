@@ -193,7 +193,7 @@
                 <div>
                     <h2 class="text-lg font-bold text-slate-900">Sync Billing</h2>
                     <p class="mt-2 text-sm text-slate-600">Billing-eligible DRs will advance through Stock Out and Delivered, and their quantities will be deducted from inventory.</p>
-                    <p class="mt-2 text-xs text-slate-500">A DR's assigned warehouse takes precedence. Use this warehouse only for DRs without an assigned warehouse.</p>
+                    <p class="mt-2 text-xs text-slate-500">Select a fallback warehouse for DRs without an assignment. Assigned warehouses take precedence. If unassigned DRs use different warehouses, assign their correct warehouses before syncing.</p>
                 </div>
                 <div>
                     <label for="sync-billing-warehouse" class="mb-1 block text-sm font-semibold text-slate-700">Fallback inventory warehouse</label>

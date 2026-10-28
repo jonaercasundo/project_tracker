@@ -122,19 +122,19 @@ class BillingSheetSyncService
             }
 
             if ($this->normalizeCell($row[$headers['bir_dr_column']] ?? '') === $this->normalizeCell($sync->bir_dr)
-                && $this->normalizeCell($row[$headers['package_code_column']] ?? '') === $this->normalizeCell($sync->package_code)) {
+                && $this->normalizeCell($row[$headers['package_code_column']] ?? '') !== '') {
                 $matches[] = ['row' => $rowIndex + 1, 'values' => $row];
             }
         }
 
         if (count($matches) === 0) {
-            $this->finish($sync, 'no_match', 'No sheet row matched BIR DR '.$sync->bir_dr.' and Core Package Code '.$sync->package_code.' for Lot '.$sync->lot_number.'.');
+            $this->finish($sync, 'no_match', 'No sheet row matched BIR DR '.$sync->bir_dr.' with a Core Package Code for Lot '.$sync->lot_number.'.');
 
             return;
         }
 
         if (count($matches) > 1) {
-            $this->finish($sync, 'duplicate_match', 'Multiple sheet rows matched BIR DR '.$sync->bir_dr.' and Core Package Code '.$sync->package_code.' for Lot '.$sync->lot_number.'.');
+            $this->finish($sync, 'duplicate_match', 'Multiple sheet rows matched BIR DR '.$sync->bir_dr.' with a Core Package Code for Lot '.$sync->lot_number.'.');
 
             return;
         }
@@ -301,7 +301,7 @@ class BillingSheetSyncService
                 }
 
                 if ($this->normalizeCell($row[$headers['bir_dr_column']] ?? '') === $this->normalizeCell($sync->bir_dr)
-                    && $this->normalizeCell($row[$headers['package_code_column']] ?? '') === $this->normalizeCell($sync->package_code)) {
+                    && $this->normalizeCell($row[$headers['package_code_column']] ?? '') !== '') {
                     $matches[] = ['row' => $rowIndex + 1, 'values' => $row];
                 }
             }
@@ -309,8 +309,8 @@ class BillingSheetSyncService
             if (count($matches) !== 1) {
                 $outcome = count($matches) === 0 ? 'no_match' : 'duplicate_match';
                 $message = count($matches) === 0
-                    ? 'No sheet row matched BIR DR '.$sync->bir_dr.' and Core Package Code '.$sync->package_code.' for Lot '.$lotNumber.'.'
-                    : 'Multiple sheet rows matched BIR DR '.$sync->bir_dr.' and Core Package Code '.$sync->package_code.' for Lot '.$lotNumber.'.';
+                    ? 'No sheet row matched BIR DR '.$sync->bir_dr.' with a Core Package Code for Lot '.$lotNumber.'.'
+                    : 'Multiple sheet rows matched BIR DR '.$sync->bir_dr.' with a Core Package Code for Lot '.$lotNumber.'.';
                 $issues[] = [$sync, $outcome, $message];
 
                 continue;
@@ -518,6 +518,18 @@ class BillingSheetSyncService
             $attributes
         );
 
+        $isUnsynced = ! in_array($sync->outcome, ['synced', 'already_synced'], true);
+        $hasPackageStatus = $attributes['package_status_id'] !== null;
+        $mappingChanged = $sync->lot_id !== $attributes['lot_id']
+            || $sync->lot_number !== $attributes['lot_number']
+            || $sync->target_cell !== $attributes['target_cell']
+            || trim((string) $sync->bir_dr) !== trim((string) $attributes['bir_dr'])
+            || trim((string) $sync->package_code) !== trim((string) $attributes['package_code']);
+
+        if (! $sync->wasRecentlyCreated && $hasPackageStatus && $isUnsynced && $mappingChanged) {
+            $sync->forceFill($attributes)->save();
+        }
+
         if (! $dispatch || ! in_array($sync->outcome, ['queued', 'dispatch_failed', 'queue_unavailable'], true)) {
             return;
         }
@@ -572,24 +584,55 @@ class BillingSheetSyncService
         for ($rowIndex = 0; $rowIndex < $maxRows; $rowIndex++) {
             $birColumns = [];
             $packageColumns = [];
+            $allPackageColumns = [];
             foreach ($rows[$rowIndex] as $columnIndex => $heading) {
                 $normalized = preg_replace('/[^a-z0-9]/u', '', $this->normalizeCell($heading)) ?? '';
                 $hasLot = str_contains($normalized, 'lot'.$lotNumber);
-                if ($hasLot && str_contains($normalized, 'bir') && str_contains($normalized, 'dr')) {
-                    $birColumns[] = $columnIndex;
+                if (str_contains($normalized, 'corepackagecode')) {
+                    $allPackageColumns[] = $columnIndex;
+                    if ($hasLot) {
+                        $packageColumns[] = $columnIndex;
+                    }
                 }
-                if ($hasLot && str_contains($normalized, 'corepackagecode')) {
-                    $packageColumns[] = $columnIndex;
+                if (str_contains($normalized, 'bir') && str_contains($normalized, 'dr')) {
+                    $birColumns[] = ['column' => $columnIndex, 'has_lot' => $hasLot];
                 }
             }
 
-            if ($birColumns !== [] || $packageColumns !== []) {
-                if (count($birColumns) !== 1 || count($packageColumns) !== 1) {
-                    return null;
-                }
-
-                $headerCandidates[] = ['header_row' => $rowIndex, 'bir_dr_column' => $birColumns[0], 'package_code_column' => $packageColumns[0]];
+            if ($packageColumns === []) {
+                continue;
             }
+
+            if (count($packageColumns) !== 1) {
+                return null;
+            }
+
+            $packageColumn = $packageColumns[0];
+            $lotBirColumns = array_values(array_filter(
+                $birColumns,
+                fn (array $column): bool => $column['has_lot']
+            ));
+
+            if ($lotBirColumns === []) {
+                $nextPackageColumn = collect($allPackageColumns)
+                    ->first(fn (int $column): bool => $column > $packageColumn) ?? PHP_INT_MAX;
+                $lotBirColumns = array_values(array_filter(
+                    $birColumns,
+                    fn (array $column): bool => ! $column['has_lot']
+                        && $column['column'] > $packageColumn
+                        && $column['column'] < $nextPackageColumn
+                ));
+            }
+
+            if (count($lotBirColumns) !== 1) {
+                return null;
+            }
+
+            $headerCandidates[] = [
+                'header_row' => $rowIndex,
+                'bir_dr_column' => $lotBirColumns[0]['column'],
+                'package_code_column' => $packageColumn,
+            ];
         }
 
         return count($headerCandidates) === 1 ? $headerCandidates[0] : null;

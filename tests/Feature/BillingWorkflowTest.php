@@ -355,7 +355,7 @@ it('reports the exact missing service account configuration before attempting sy
     ]);
 });
 
-it('matches sheet rows by the exact BIR DR and package code within that lot', function (): void {
+it('matches the unique DR row with a populated package code for that lot', function (): void {
     signInBillingUser();
     Queue::fake();
     $deliveryId = createBillingDelivery('BIR-00351');
@@ -366,7 +366,7 @@ it('matches sheet rows by the exact BIR DR and package code within that lot', fu
 
     $rows = billingSheetRows('2', 'BIR-00351', 'CP-LOT2-01');
     $wrongPackage = $rows[1];
-    $wrongPackage[2] = 'CP-LOT2-OTHER';
+    $wrongPackage[2] = '';
     $wrongDr = $rows[1];
     $wrongDr[1] = 'BIR-00352';
     $exact = $rows[1];
@@ -379,6 +379,69 @@ it('matches sheet rows by the exact BIR DR and package code within that lot', fu
     app(BillingSheetSyncService::class)->sync($sync, $sheets);
 
     expect($sync->fresh()->outcome)->toBe('synced')->and($sync->fresh()->target_cell)->toBe('BF4');
+});
+
+it('repairs stale lot mappings on retry and syncs numeric package rows to the sheet lot row', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $deliveryId = createBillingDelivery('35473', 'delivered');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => '2']);
+    addPackageToBillingDelivery($deliveryId, '2');
+    addPackageToBillingDelivery($deliveryId, '3');
+
+    $header = array_fill(0, 99, '');
+    $header[11] = 'Core Package Code Lot2';
+    $header[18] = 'BIR DR';
+    $sheetRow = array_fill(0, 99, '');
+    $sheetRow[11] = 'C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6';
+    $sheetRow[18] = 'NOT-35473';
+    $sheetRows = [$header, $sheetRow];
+
+    $initialSheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $initialSheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $initialSheets->shouldReceive('values')->once()->andReturn($sheetRows);
+    $initialSheets->shouldNotReceive('updateCells');
+    app()->instance(GoogleSheetsApiClient::class, $initialSheets);
+
+    $confirmation = $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$deliveryId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated()->assertJsonPath('sheet_sync.status', 'error');
+    $batchId = (int) $confirmation->json('batch.id');
+    $syncs = BillingSheetSync::query()->orderBy('id')->get();
+    expect($syncs)->toHaveCount(2);
+    foreach ($syncs as $sync) {
+        $sync->forceFill([
+            'lot_number' => null,
+            'target_cell' => null,
+            'outcome' => 'reconciliation_error',
+        ])->save();
+    }
+
+    $sheetRow[18] = '35473';
+    $transitionDate = $syncs->first()->transition_date->toDateString();
+    $retrySheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $retrySheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $retrySheets->shouldReceive('values')->once()->andReturn([$header, $sheetRow]);
+    $retrySheets->shouldReceive('updateCells')->once()->with([
+        ['range' => "'Copy of SME LOT 2,9,11'!BF2", 'majorDimension' => 'ROWS', 'values' => [[$transitionDate]]],
+    ], 'test-spreadsheet-id');
+    app()->instance(GoogleSheetsApiClient::class, $retrySheets);
+
+    $this->post(route('billing.batches.sheet-sync.retry', $batchId))
+        ->assertRedirect(route('billing.batches.show', $batchId))
+        ->assertSessionHas('success', 'Updated 1 Google Sheet cell(s).');
+
+    expect(BillingSheetSync::query()->where('outcome', 'synced')->count())->toBe(2)
+        ->and(BillingSheetSync::query()->where('lot_number', '2')->count())->toBe(2)
+        ->and(BillingSheetSync::query()->where('target_cell', 'BF2')->count())->toBe(2);
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
 });
 
 it('does not match a DR and package code found only in another lot', function (): void {

@@ -816,7 +816,7 @@ it('uses a fixed number of database queries for project progress regardless of p
     DB::flushQueryLog();
     DB::enableQueryLog();
     $service->report([]);
-    expect(count(DB::getQueryLog()))->toBe($firstQueryCount)->toBe(3);
+    expect(count(DB::getQueryLog()))->toBe($firstQueryCount)->toBe(4);
     DB::disableQueryLog();
 });
 
@@ -1171,6 +1171,104 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
     expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
     $this->get('/deliveries/monitoring?project_id=2&active_only=1')->assertOk()
         ->assertSee('The selected project is inactive and Active projects only is enabled.');
+});
+
+it('tracks lot billing by active cycle and retains posted cycle history', function () {
+    jarvisOperations();
+    DB::table('lot')->where('lot_id', 1)->update(['contract_price' => '1000.00']);
+    DB::table('lot')->where('lot_id', 2)->update(['contract_price' => '0.00']);
+    DB::table('deliveries')->insert([
+        ['delivery_id' => 4, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3504', 'status' => 'delivered'],
+        ['delivery_id' => 5, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3505', 'status' => 'delivered'],
+        ['delivery_id' => 6, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3506', 'status' => 'delivered'],
+    ]);
+    DB::table('billing_batches')->insert([
+        ['id' => 1, 'batch_ref' => 'BILL-OLD', 'status' => 'billed', 'confirmed_at' => '2026-01-01 00:00:00', 'created_at' => '2025-12-30 00:00:00'],
+        ['id' => 2, 'batch_ref' => 'BILL-ACTIVE', 'status' => 'under_billing_review', 'confirmed_at' => '2026-10-01 00:00:00', 'created_at' => '2026-09-30 00:00:00'],
+        ['id' => 3, 'batch_ref' => 'BILL-ZERO-PRICE', 'status' => 'billed', 'confirmed_at' => '2026-10-02 00:00:00', 'created_at' => '2026-10-01 00:00:00'],
+    ]);
+    DB::table('invoices')->insert([
+        ['invoice_id' => 1, 'project_id' => 1, 'invoice_no' => 'INV-OLD', 'amount' => '400.00'],
+        ['invoice_id' => 2, 'project_id' => 1, 'invoice_no' => 'INV-ACTIVE-1', 'amount' => '500.00'],
+        ['invoice_id' => 3, 'project_id' => 2, 'invoice_no' => 'INV-ZERO', 'amount' => '100.00'],
+    ]);
+    DB::table('delivery_billing_records')->insert([
+        ['delivery_id' => 1, 'status' => 'billed', 'invoice_id' => 1, 'billing_batch_id' => 1, 'billing_amount' => '400.00', 'confirmed_billed_at' => '2026-01-01 00:00:00'],
+        ['delivery_id' => 2, 'status' => 'for_billing', 'invoice_id' => 2, 'billing_batch_id' => 2, 'billing_amount' => '300.00', 'confirmed_billed_at' => null],
+        ['delivery_id' => 4, 'status' => 'billed', 'invoice_id' => 2, 'billing_batch_id' => 2, 'billing_amount' => '200.00', 'confirmed_billed_at' => '2026-10-03 00:00:00'],
+        ['delivery_id' => 3, 'status' => 'billed', 'invoice_id' => 3, 'billing_batch_id' => 3, 'billing_amount' => '100.00', 'confirmed_billed_at' => '2026-10-02 00:00:00'],
+    ]);
+    $user = jarvisReader(true, true, false);
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $activeCycle = $this->getJson('/deliveries/monitoring?project_id=1&active_only=0')->assertOk()
+        ->json('projects.0.lot_billing_progress.0');
+
+    expect($activeCycle['contract_price'])->toBe('1000.00')
+        ->and($activeCycle['current_cycle']['amount_billed'])->toBe('200.00')
+        ->and($activeCycle['current_cycle']['percent_billed'])->toBe(20)
+        ->and($activeCycle['current_cycle']['not_billed_amount'])->toBe('800.00')
+        ->and($activeCycle['current_cycle']['not_billed_percent'])->toBe(80)
+        ->and($activeCycle['history'])->toHaveCount(1)
+        ->and($activeCycle['history'][0]['label'])->toBe('BILL-OLD')
+        ->and($activeCycle['history'][0]['amount_billed'])->toBe('400.00')
+        ->and($activeCycle['history'][0]['not_billed_amount'])->toBe('0.00')
+        ->and($activeCycle['history'][0]['not_billed_percent'])->toBe(0);
+
+    $monitoringPage = $this->get('/deliveries/monitoring?project_id=1&active_only=0')->assertOk()
+        ->assertSee('Billing by Lot')
+        ->assertSee('BILL-OLD')
+        ->assertSee('BILL-ACTIVE')
+        ->assertSee('Current Cycle · Amount Billed');
+
+    expect($monitoringPage->getContent())->toContain('&#8369;1,000.00')->toContain('20.00%');
+
+    DB::table('delivery_billing_records')->where('delivery_id', 2)->update([
+        'status' => 'billed',
+        'billing_amount' => '300.00',
+        'confirmed_billed_at' => '2026-10-04 00:00:00',
+    ]);
+    DB::table('billing_batches')->where('id', 2)->update(['status' => 'billed']);
+
+    $completedCycles = $this->getJson('/deliveries/monitoring?project_id=1&active_only=0')->assertOk()
+        ->json('projects.0.lot_billing_progress.0');
+
+    expect($completedCycles['current_cycle']['amount_billed'])->toBe('0.00')
+        ->and($completedCycles['current_cycle']['percent_billed'])->toBe(0)
+        ->and($completedCycles['current_cycle']['not_billed_amount'])->toBe('0.00')
+        ->and($completedCycles['current_cycle']['not_billed_percent'])->toBe(0)
+        ->and($completedCycles['history'])->toHaveCount(2)
+        ->and($completedCycles['history'][0]['label'])->toBe('BILL-ACTIVE')
+        ->and($completedCycles['history'][0]['amount_billed'])->toBe('500.00')
+        ->and($completedCycles['history'][0]['percent_billed'])->toBe(50)
+        ->and($completedCycles['history'][0]['not_billed_amount'])->toBe('0.00');
+
+    DB::table('billing_batches')->insert([
+        ['id' => 4, 'batch_ref' => 'BILL-NEW', 'status' => 'under_billing_review', 'confirmed_at' => '2026-10-05 00:00:00', 'created_at' => '2026-10-05 00:00:00'],
+    ]);
+    DB::table('delivery_billing_records')->insert([
+        ['delivery_id' => 5, 'status' => 'billed', 'invoice_id' => 2, 'billing_batch_id' => 4, 'billing_amount' => '1300.00', 'confirmed_billed_at' => '2026-10-06 00:00:00'],
+        ['delivery_id' => 6, 'status' => 'for_billing', 'invoice_id' => 2, 'billing_batch_id' => 4, 'billing_amount' => '900.00', 'confirmed_billed_at' => null],
+    ]);
+
+    $newCycle = $this->getJson('/deliveries/monitoring?project_id=1&active_only=0')->assertOk()
+        ->json('projects.0.lot_billing_progress.0');
+
+    expect($newCycle['current_cycle']['amount_billed'])->toBe('1300.00')
+        ->and($newCycle['current_cycle']['percent_billed'])->toBe(100)
+        ->and($newCycle['current_cycle']['not_billed_amount'])->toBe('0.00')
+        ->and($newCycle['history'])->toHaveCount(2);
+
+    $zeroPriceLot = $this->getJson('/deliveries/monitoring?project_id=2&active_only=0')->assertOk()
+        ->json('projects.0.lot_billing_progress.0');
+
+    expect($zeroPriceLot['contract_price'])->toBe('0.00')
+        ->and($zeroPriceLot['history'][0]['percent_billed'])->toBeNull();
+
+    $this->get('/deliveries/monitoring?project_id=2&active_only=0')
+        ->assertOk()
+        ->assertSee('N/A');
 });
 
 it('renders long project names in a searchable monitoring filter without losing the selected project', function () {

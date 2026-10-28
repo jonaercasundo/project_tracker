@@ -42,6 +42,29 @@ Schema::create('delivery_billing_records', function (Blueprint $table): void {
     $table->increments('id');
     $table->integer('delivery_id')->unique();
     $table->string('status');
+    $table->integer('invoice_id')->nullable();
+    $table->integer('billing_batch_id')->nullable();
+    $table->decimal('billing_amount', 15, 2)->nullable();
+    $table->dateTime('confirmed_billed_at')->nullable();
+    $table->dateTime('created_at')->nullable();
+});
+
+Schema::create('billing_batches', function (Blueprint $table): void {
+    $table->increments('id');
+    $table->string('batch_ref')->nullable();
+    $table->string('status')->nullable();
+    $table->dateTime('confirmed_at')->nullable();
+    $table->dateTime('created_at')->nullable();
+});
+
+Schema::create('invoices', function (Blueprint $table): void {
+    $table->increments('invoice_id');
+    $table->integer('project_id')->nullable();
+    $table->string('invoice_no')->nullable();
+    $table->decimal('amount', 15, 2)->nullable();
+    $table->date('invoice_date')->nullable();
+    $table->string('status')->nullable();
+    $table->dateTime('created_at')->nullable();
 });
 
 Schema::create('school', function (Blueprint $table): void {

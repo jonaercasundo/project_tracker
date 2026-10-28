@@ -730,9 +730,12 @@ class ProjectDeliveryProgressService
     {
         $compact = (bool) ($filters['compact'] ?? false);
         $records = $this->recordsQuery($filters)->get();
+        $lotBillingProgress = $compact
+            ? collect()
+            : $this->lotBillingProgress($records->pluck('project_id')->map(fn ($projectId): int => (int) $projectId)->unique()->all());
         $warehouseRows = $compact ? collect() : $this->warehouseSummaryQuery($filters)->get()->groupBy('project_id');
         $logisticsRows = $compact ? collect() : $this->logisticsStats($filters)->get()->groupBy('project_id');
-        $projects = $records->map(function (object $record) use ($warehouseRows, $logisticsRows, $filters, $compact): array {
+        $projects = $records->map(function (object $record) use ($lotBillingProgress, $warehouseRows, $logisticsRows, $filters, $compact): array {
             $project = (array) $record;
             foreach ($project as $column => $value) {
                 if (str_ends_with($column, '_count') || $column === 'project_id') {
@@ -747,6 +750,7 @@ class ProjectDeliveryProgressService
             $project['progress_basis'] = $project['total_deliveries_count'] > 0 ? 'delivery_receipts' : 'no_delivery_receipts';
             $project['delivery_progress_percent'] = $this->deliveryProgress($project);
             $project['billing_progress_percent'] = $this->percentage($project['billed_groups_count'] + $project['paid_groups_count'], $project['billing_groups_count']);
+            $project['lot_billing_progress'] = $lotBillingProgress->get($project['project_id'], []);
             if ($compact) {
                 $project['last_activity'] = $this->lastActivity($project);
 
@@ -804,6 +808,107 @@ class ProjectDeliveryProgressService
         }
 
         return ['projects' => $projects, 'summary' => $summary, 'definitions' => $this->definitions(), 'empty_reason' => $emptyReason];
+    }
+
+    /**
+     * Summarize each lot's in-progress billing cycle and retain completed cycles
+     * from the existing batch and invoice ledger.
+     *
+     * @param  array<int, int>  $projectIds
+     * @return Collection<int, array<int, array<string, mixed>>>
+     */
+    private function lotBillingProgress(array $projectIds): Collection
+    {
+        if ($projectIds === []) {
+            return collect();
+        }
+
+        $lotRows = DB::table('lot as l')
+            ->leftJoin('deliveries as d', function (JoinClause $join): void {
+                $join->on('d.lot_id', '=', 'l.lot_id')->on('d.project_id', '=', 'l.project_id');
+            })
+            ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
+            ->leftJoin('billing_batches as batch', 'batch.id', '=', 'billing.billing_batch_id')
+            ->leftJoin('invoices as invoice', 'invoice.invoice_id', '=', 'billing.invoice_id')
+            ->whereIn('l.project_id', $projectIds)
+            ->select(['l.project_id', 'l.lot_id', 'l.lot_name', 'l.contract_price', 'billing.billing_batch_id', 'batch.batch_ref', 'batch.status as batch_status', 'batch.confirmed_at as batch_confirmed_at', 'batch.created_at as batch_created_at', 'billing.invoice_id', 'invoice.invoice_no'])
+            ->selectRaw('MAX(billing.id) as billing_record_id')
+            ->selectRaw("CASE WHEN billing.billing_batch_id IS NOT NULL THEN 'batch' WHEN billing.invoice_id IS NOT NULL THEN 'invoice' ELSE 'record' END as cycle_type")
+            ->selectRaw('COALESCE(billing.billing_batch_id, billing.invoice_id, -billing.id) as cycle_identifier')
+            ->selectRaw("SUM(CASE WHEN billing.status = 'billed' THEN COALESCE(billing.billing_amount, 0) ELSE 0 END) as amount_billed")
+            ->selectRaw("SUM(CASE WHEN billing.id IS NULL OR billing.status = 'billed' THEN 0 ELSE 1 END) as not_billed_count")
+            ->selectRaw('MAX(billing.confirmed_billed_at) as last_billed_at')
+            ->groupBy('l.project_id', 'l.lot_id', 'l.lot_name', 'l.contract_price', 'billing.billing_batch_id', 'batch.batch_ref', 'batch.status', 'batch.confirmed_at', 'batch.created_at', 'billing.invoice_id', 'invoice.invoice_no')
+            ->groupByRaw("CASE WHEN billing.billing_batch_id IS NOT NULL THEN 'batch' WHEN billing.invoice_id IS NOT NULL THEN 'invoice' ELSE 'record' END")
+            ->groupByRaw('COALESCE(billing.billing_batch_id, billing.invoice_id, -billing.id)')
+            ->orderBy('l.project_id')
+            ->orderBy('l.lot_name')
+            ->get();
+
+        return $lotRows->groupBy('project_id')->map(function (Collection $projectRows): array {
+            return $projectRows->groupBy('lot_id')->map(function (Collection $lotRows): array {
+                $lot = $lotRows->first();
+                $contractPrice = $lot->contract_price === null ? null : (float) $lot->contract_price;
+                $cycles = $lotRows->filter(fn (object $cycle): bool => $cycle->billing_record_id !== null)->map(function (object $cycle) use ($contractPrice): array {
+                    $amountBilled = (float) $cycle->amount_billed;
+                    $isComplete = $cycle->cycle_type === 'batch'
+                        ? $cycle->batch_status === 'billed'
+                        : (int) $cycle->not_billed_count === 0;
+                    $identifier = abs((int) $cycle->cycle_identifier);
+                    $label = match ($cycle->cycle_type) {
+                        'batch' => $cycle->batch_ref ?: 'Billing batch #'.$identifier,
+                        'invoice' => $cycle->invoice_no ? 'Invoice '.$cycle->invoice_no : 'Invoice #'.$identifier,
+                        default => 'Billing record #'.$identifier,
+                    };
+
+                    return [
+                        'cycle_type' => $cycle->cycle_type,
+                        'cycle_identifier' => $identifier,
+                        'label' => $label,
+                        'completed' => $isComplete,
+                        'completed_at' => $cycle->last_billed_at ?: ($cycle->batch_confirmed_at ?: $cycle->batch_created_at),
+                        'amount_billed' => number_format($amountBilled, 2, '.', ''),
+                        'percent_billed' => $this->billingPercentage($amountBilled, $contractPrice),
+                    ];
+                });
+                $currentCycles = $cycles->where('completed', false);
+                $currentAmount = (float) $currentCycles->sum(fn (array $cycle): float => (float) $cycle['amount_billed']);
+                $currentPercent = $this->billingPercentage($currentAmount, $contractPrice);
+                $hasCurrentCycle = $currentCycles->isNotEmpty();
+                $currentNotBilledAmount = $hasCurrentCycle && $contractPrice !== null
+                    ? max($contractPrice - $currentAmount, 0)
+                    : 0;
+                $currentNotBilledPercent = $hasCurrentCycle && $currentPercent !== null
+                    ? max(100 - $currentPercent, 0)
+                    : 0;
+
+                return [
+                    'lot_id' => (int) $lot->lot_id,
+                    'lot_name' => (string) ($lot->lot_name ?: 'Lot '.$lot->lot_id),
+                    'contract_price' => $contractPrice === null ? null : number_format($contractPrice, 2, '.', ''),
+                    'current_cycle' => [
+                        'amount_billed' => number_format($currentAmount, 2, '.', ''),
+                        'percent_billed' => $currentPercent,
+                        'not_billed_amount' => number_format($currentNotBilledAmount, 2, '.', ''),
+                        'not_billed_percent' => $currentNotBilledPercent,
+                        'labels' => $currentCycles->pluck('label')->values()->all(),
+                    ],
+                    'history' => $cycles->where('completed', true)->sortByDesc('completed_at')->values()->map(fn (array $cycle): array => $cycle + [
+                        'not_billed_amount' => '0.00',
+                        'not_billed_percent' => 0,
+                    ])->all(),
+                ];
+            })->values()->all();
+        });
+    }
+
+    private function billingPercentage(float $amountBilled, ?float $contractPrice): ?float
+    {
+        if ($contractPrice === null || $contractPrice <= 0) {
+            return null;
+        }
+
+        return min(round(max($amountBilled, 0) / $contractPrice * 100, 2), 100);
     }
 
     private function isActiveProjectStatus(?string $status): bool
@@ -920,6 +1025,7 @@ class ProjectDeliveryProgressService
             'delivery_progress' => 'Completed valid DR receipts / total valid DR receipts x 100. Zero receipts means unavailable. Excludes blank DR identifiers and receipts with cancelled, void, deleted or rejected delivery rows. Logistics performance uses the same receipt completion flag; unresolved or conflicting partners remain in project totals.',
             'completed_deliveries' => 'Receipts whose expected allocations are all delivered or accepted, including mixed delivered/accepted receipts. Without package definitions, all receipt delivery rows must be delivered or accepted.',
             'billing_progress' => '(Billed + paid recorded billing groups) / all recorded billing groups matching exact DR receipts x 100. Paid is a later stage than billed; no groups means unavailable.',
+            'lot_billing_progress' => 'Per-lot cycles use the existing delivery billing ledger. Only delivery_billing_records with status billed contribute billing_amount; encoding or marking a record for_billing does not. A billing batch closes when billing_batches.status is billed, and completed batch/invoice cycles remain in history. Current-cycle percentage is billed allocation / lot contract_price, capped at 100%; zero or unset contract price is N/A. Invoice totals are excluded because a shared invoice can be linked to multiple delivery records.',
             'year' => 'Scheduled delivery_date year, consistent with delivery tracking. Location and delivery-status filters restrict the receipts and their allocations counted.',
             'active_projects' => 'Excludes Delivered, For Billing, For Collection, Collected, Cancelled and Dropped projects. Completed is labelled Awarded in the existing project editor and remains active. Set active_only=0 to include all projects.',
             'last_delivery_date' => 'Latest recorded delivered_date in the filtered delivery rows; absent dates remain null.',

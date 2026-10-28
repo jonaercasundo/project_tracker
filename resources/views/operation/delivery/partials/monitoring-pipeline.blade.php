@@ -21,6 +21,7 @@
 </ol>
 @include('operation.delivery.partials.monitoring-logistics', ['performance' => $project['logistics_delivery_performance']])
 <div class="mt-4 border-t border-slate-100 pt-3">@include('operation.delivery.partials.monitoring-progress')</div>
+@include('operation.delivery.partials.monitoring-lot-billing')
 @if($project['data_integrity_flags'])
     <ul class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" aria-label="Workflow inconsistencies">
         @foreach($project['data_integrity_flags'] as $flag)<li>{{ $flag }}</li>@endforeach

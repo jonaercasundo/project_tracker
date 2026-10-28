@@ -311,7 +311,7 @@ if (monitoring) {
             syncButton.textContent = 'Syncing…';
             setFeedback('Syncing billing deliveries and inventory…');
 
-            trySyncBilling(syncButton, projectId, originalLabel, setFeedback);
+            trySyncBilling(syncButton, originalLabel, setFeedback);
             return;
         }
 
@@ -347,7 +347,7 @@ if (monitoring) {
         button.closest('[data-actions-menu]')?.removeAttribute('open');
     });
 
-    async function trySyncBilling(button, projectId, originalLabel, setFeedback) {
+    async function trySyncBilling(button, originalLabel, setFeedback) {
         try {
             const response = await fetch(button.dataset.endpoint, {
                 method: 'POST',
@@ -358,9 +358,19 @@ if (monitoring) {
                 },
                 credentials: 'same-origin',
             });
-            const result = await response.json().catch(() => ({}));
+            const contentType = response.headers.get('content-type') ?? '';
+            if (!contentType.includes('application/json')) {
+                throw new Error(`Sync Billing received an unexpected server response (HTTP ${response.status}). Check the queue worker and Laravel logs.`);
+            }
+
+            let result = await response.json();
             if (!response.ok) {
-                throw new Error(result.message ?? 'Sync Billing failed. No changes were saved.');
+                throw new Error(result.message ?? `Sync Billing could not be queued (HTTP ${response.status}).`);
+            }
+
+            if (result.status_url) {
+                setFeedback(result.message);
+                result = await waitForBillingSync(result.status_url, setFeedback);
             }
 
             const refreshed = await loadReport(new URL(window.location.href), false);
@@ -377,6 +387,40 @@ if (monitoring) {
                 button.textContent = originalLabel;
             }
         }
+    }
+
+    async function waitForBillingSync(statusUrl, setFeedback) {
+        const startedAt = Date.now();
+
+        while (Date.now() - startedAt < 35 * 60 * 1000) {
+            await new Promise(resolve => window.setTimeout(resolve, 2000));
+
+            const response = await fetch(statusUrl, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                cache: 'no-store',
+            });
+            const contentType = response.headers.get('content-type') ?? '';
+            if (!contentType.includes('application/json')) {
+                throw new Error(`Could not check Sync Billing status (HTTP ${response.status}). The job may still be running; check again before starting another sync.`);
+            }
+
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.message ?? `Could not check Sync Billing status (HTTP ${response.status}).`);
+            }
+
+            if (result.status === 'completed') {
+                return result;
+            }
+            if (result.status === 'failed') {
+                throw new Error(result.message ?? 'Sync Billing failed.');
+            }
+
+            setFeedback(result.status === 'running' ? 'Sync Billing is processing inventory and delivery stages…' : 'Sync Billing is waiting for a database queue worker…');
+        }
+
+        throw new Error('Sync Billing is still processing. Check the project again before starting another sync.');
     }
     monitoring.addEventListener('keydown', event => {
         if (event.key === 'Escape') {

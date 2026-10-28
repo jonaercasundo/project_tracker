@@ -43,6 +43,15 @@ return [
             'after_commit' => false,
         ],
 
+        'billing_sync' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION', null),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'billing_sync',
+            'retry_after' => 1860,
+            'after_commit' => true,
+        ],
+
         'logistics_webhooks' => [
             'driver' => 'database',
             'connection' => env('LOGISTICS_WEBHOOK_DB_CONNECTION'),

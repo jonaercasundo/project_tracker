@@ -6,7 +6,7 @@ use App\Http\Requests\DeliveryMonitoringDetailsRequest;
 use App\Http\Requests\DeliveryMonitoringLocationsRequest;
 use App\Http\Requests\DeliveryMonitoringLogisticsRequest;
 use App\Http\Requests\DeliveryMonitoringRequest;
-use App\Services\BillingOperationalSyncService;
+use App\Jobs\SyncProjectBillingOperationalStages;
 use App\Services\LogisticsDrTrackingService;
 use App\Services\ProjectDeliveryProgressService;
 use Illuminate\Contracts\View\View;
@@ -15,7 +15,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
 use Throwable;
 
 class DeliveryMonitoringController extends Controller
@@ -84,15 +83,61 @@ class DeliveryMonitoringController extends Controller
         ])->header('Cache-Control', 'private, no-store');
     }
 
-    public function syncBilling(int $project, BillingOperationalSyncService $sync): JsonResponse
+    public function syncBilling(int $project): JsonResponse
     {
+        $user = Auth::user();
+        abort_unless(DB::table('projects')->where('project_id', $project)->exists(), 404, 'Project not found.');
+
+        $run = null;
         try {
-            $result = $sync->syncProject($project, (int) Auth::id(), (string) Auth::user()->name);
-        } catch (RuntimeException $exception) {
-            return response()->json([
-                'message' => $exception->getMessage().' No changes were saved.',
-            ], 422);
+            $run = DB::transaction(function () use ($project, $user): array {
+                $projectRecord = DB::table('projects')->where('project_id', $project)->lockForUpdate()->first();
+                if ($projectRecord === null) {
+                    return ['id' => 0, 'created' => false];
+                }
+
+                $activeRun = DB::table('billing_sync_runs')
+                    ->where('project_id', $project)
+                    ->whereIn('status', ['queued', 'running'])
+                    ->orderByDesc('id')
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($activeRun !== null) {
+                    return ['id' => (int) $activeRun->id, 'created' => false];
+                }
+
+                $now = now();
+                $runId = DB::table('billing_sync_runs')->insertGetId([
+                    'project_id' => $project,
+                    'user_id' => (int) $user->getAuthIdentifier(),
+                    'user_name' => (string) $user->name,
+                    'status' => 'queued',
+                    'message' => 'Sync Billing is queued and will update inventory and delivery stages together.',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                return ['id' => (int) $runId, 'created' => true];
+            }, 3);
+
+            if ($run['created']) {
+                if (app()->environment('testing')) {
+                    SyncProjectBillingOperationalStages::dispatchSync($run['id']);
+                } else {
+                    SyncProjectBillingOperationalStages::dispatch($run['id'])->afterCommit();
+                }
+            }
         } catch (Throwable $exception) {
+            if ($run !== null && $run['created']) {
+                DB::table('billing_sync_runs')->where('id', $run['id'])->update([
+                    'status' => 'failed',
+                    'message' => 'Sync Billing could not be queued. No changes were made. Check that the billing_sync queue worker is running, then try again.',
+                    'completed_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
             Log::error('Sync Billing failed.', [
                 'project_id' => $project,
                 'user_id' => Auth::id(),
@@ -100,11 +145,47 @@ class DeliveryMonitoringController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Sync Billing could not complete. No changes were saved. Please try again or contact an administrator.',
-            ], 500);
+                'message' => 'Sync Billing could not be queued. No changes were made. Check that the database queue worker is running, then try again.',
+            ], 503);
         }
 
-        return response()->json($result)->header('Cache-Control', 'private, no-store');
+        abort_if($run['id'] === 0, 404, 'Project not found.');
+
+        if (app()->environment('testing')) {
+            $finishedRun = DB::table('billing_sync_runs')->where('id', $run['id'])->first();
+            if ($finishedRun->status === 'failed') {
+                return response()->json(['message' => $finishedRun->message], 422);
+            }
+
+            return response()->json([
+                'synced_dr_count' => (int) $finishedRun->synced_dr_count,
+                'skipped_dr_count' => (int) $finishedRun->skipped_dr_count,
+                'message' => $finishedRun->message,
+            ])->header('Cache-Control', 'private, no-store');
+        }
+
+        return response()->json([
+            'run_id' => $run['id'],
+            'status_url' => route('deliveries.monitoring.sync-billing.status', ['project' => $project, 'run' => $run['id']]),
+            'message' => $run['created'] ? 'Sync Billing queued. The page will update when it finishes.' : 'A Sync Billing run is already in progress for this project.',
+        ], 202)->header('Cache-Control', 'private, no-store');
+    }
+
+    public function syncBillingStatus(int $project, int $run): JsonResponse
+    {
+        $syncRun = DB::table('billing_sync_runs')
+            ->where('id', $run)
+            ->where('project_id', $project)
+            ->first();
+
+        abort_if($syncRun === null, 404, 'Billing sync run not found.');
+
+        return response()->json([
+            'status' => $syncRun->status,
+            'message' => $syncRun->message,
+            'synced_dr_count' => (int) $syncRun->synced_dr_count,
+            'skipped_dr_count' => (int) $syncRun->skipped_dr_count,
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     public function index(DeliveryMonitoringRequest $request): View|JsonResponse

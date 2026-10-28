@@ -225,3 +225,18 @@ Schema::create('items', function (Blueprint $table): void {
     $table->dateTime('created_at')->nullable();
     $table->dateTime('updated_at')->nullable();
 });
+
+Schema::create('billing_sync_runs', function (Blueprint $table): void {
+    $table->bigIncrements('id');
+    $table->unsignedInteger('project_id');
+    $table->unsignedBigInteger('user_id');
+    $table->string('user_name');
+    $table->string('status', 20)->default('queued');
+    $table->text('message')->nullable();
+    $table->unsignedInteger('synced_dr_count')->default(0);
+    $table->unsignedInteger('skipped_dr_count')->default(0);
+    $table->dateTime('started_at')->nullable();
+    $table->dateTime('completed_at')->nullable();
+    $table->timestamps();
+    $table->index(['project_id', 'status']);
+});

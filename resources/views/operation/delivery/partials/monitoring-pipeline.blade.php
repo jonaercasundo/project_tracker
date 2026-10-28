@@ -1,7 +1,7 @@
-@include('operation.delivery.partials.monitoring-warehouse')
+@php($operationalStages = collect($project['operational_pipeline'])->except('delivery_billing'))
 <p class="mb-3 text-xs font-bold uppercase tracking-wide text-slate-600">Operational Flow</p>
 <ol class="grid gap-4 md:grid-cols-5 md:gap-2" aria-label="DR through Stock Out to billed operational pipeline">
-    @foreach($project['operational_pipeline'] as $key => $stage)
+    @foreach($operationalStages as $key => $stage)
         <li class="relative pl-7 md:pl-0">
             @unless($loop->last)<span aria-hidden="true" class="absolute left-2 top-4 h-full w-px bg-slate-200 md:left-2 md:top-2 md:h-px md:w-full"></span>@endunless
             <span aria-hidden="true" class="absolute left-0 top-0.5 z-10 h-4 w-4 rounded-full border-2 {{ ($stage['percent'] ?? 0) >= 100 ? 'border-blue-600 bg-blue-600' : (($stage['completed'] ?? 0) > 0 ? 'border-blue-600 bg-blue-100' : 'border-slate-300 bg-white') }} md:relative md:top-0 md:block"></span>

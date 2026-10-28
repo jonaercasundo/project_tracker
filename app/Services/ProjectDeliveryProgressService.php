@@ -833,15 +833,15 @@ class ProjectDeliveryProgressService
             ->whereNotNull('d.dr_no')->whereRaw("TRIM(d.dr_no) <> ''")
             ->whereRaw("LOWER(TRIM(COALESCE(d.status, ''))) NOT IN ('cancelled', 'canceled', 'void', 'voided', 'deleted', 'rejected')")
             ->select(['d.project_id', 'd.lot_id'])
-            ->selectRaw($this->receiptExpression('d').' as dr_no')
             ->selectRaw('SUM(COALESCE(item.price, 0) * CASE WHEN content.qty > 0 THEN content.qty ELSE 1 END * CASE WHEN allocation.package_qty > 0 THEN allocation.package_qty ELSE 1 END) as amount')
             ->selectRaw("MAX(CASE WHEN billing.status = 'billed' THEN 1 ELSE 0 END) as has_billed")
             ->selectRaw("MAX(CASE WHEN billing.status = 'for_billing' THEN 1 ELSE 0 END) as has_for_billing")
             ->selectRaw("MAX(CASE WHEN billing.status = 'on_hold' THEN 1 ELSE 0 END) as has_on_hold")
-            ->groupBy('d.project_id', 'd.lot_id')
-            ->groupByRaw($this->receiptExpression('d'));
+            ->groupBy('d.project_id', 'd.lot_id');
         if ($this->usesMysql()) {
-            $drItemTotals->groupByRaw('OCTET_LENGTH(d.dr_no)');
+            $drItemTotals->groupByRaw('OCTET_LENGTH(d.dr_no), BINARY d.dr_no');
+        } else {
+            $drItemTotals->groupBy('d.dr_no');
         }
 
         $statusTotals = DB::query()->fromSub($drItemTotals, 'dr_items')

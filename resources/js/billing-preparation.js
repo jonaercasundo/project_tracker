@@ -533,6 +533,7 @@ if (root) {
             setRecords(payload.records, 'range', { selectEligible: true, filters: selectionFilterValues });
             showFeedback(`${payload.summary.eligible} eligible and ${payload.summary.excluded} excluded. Review the complete range before confirming. Missing DR numbers were skipped.`, payload.summary.excluded ? 'warning' : 'success');
         } catch (error) {
+            confirmDialog.close();
             showFeedback(error.message, 'error');
         } finally {
             setBusy(button, false, '');

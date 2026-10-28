@@ -10,18 +10,10 @@
                     <header class="border-b border-slate-100 pb-3">
                         <h4 class="text-sm font-bold text-slate-900">{{ $lotBilling['lot_name'] }}</h4>
                     </header>
-                    <dl class="grid grid-cols-1 gap-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <dl class="grid grid-cols-1 gap-4 py-4">
                         <div class="min-w-0">
                             <dt class="text-[11px] font-semibold uppercase leading-4 tracking-wide text-slate-500">Contract Price</dt>
                             <dd class="mt-1 whitespace-nowrap text-sm font-semibold tabular-nums text-slate-800">@if ($lotBilling['contract_price'] === null) Not set @else &#8369;{{ number_format((float) $lotBilling['contract_price'], 2) }} @endif</dd>
-                        </div>
-                        <div class="min-w-0">
-                            <dt class="text-[11px] font-semibold uppercase leading-4 tracking-wide text-slate-500">Current Cycle Amount Billed</dt>
-                            <dd class="mt-1 whitespace-nowrap text-sm font-semibold tabular-nums text-slate-800">&#8369;{{ number_format((float) $lotBilling['current_cycle']['amount_billed'], 2) }}</dd>
-                        </div>
-                        <div class="min-w-0">
-                            <dt class="text-[11px] font-semibold uppercase leading-4 tracking-wide text-slate-500">Current Cycle % Billed</dt>
-                            <dd class="mt-1 text-sm font-semibold tabular-nums text-slate-800">{{ $lotBilling['current_cycle']['percent_billed'] === null ? 'N/A' : number_format($lotBilling['current_cycle']['percent_billed'], 2).'%' }}</dd>
                         </div>
                     </dl>
                     <div class="border-t border-slate-100 pt-3">

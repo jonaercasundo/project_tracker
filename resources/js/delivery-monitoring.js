@@ -113,51 +113,8 @@ if (monitoring) {
     const error = document.getElementById('monitoring-error');
     let currentRequest;
     let locationRequest;
-    const detailRequests = new Map();
     const lotBillingRequests = new Map();
-    const projectDetails = new Map();
     const projectBillingPanels = new Map();
-    let appliedFilters = new URL(window.location.href).searchParams;
-
-    async function loadDetails(panel, page = 1) {
-        detailRequests.get(panel)?.abort();
-        const request = new AbortController();
-        detailRequests.set(panel, request);
-        const content = panel.querySelector('[data-detail-content]');
-        const url = new URL(panel.dataset.endpoint);
-        url.search = appliedFilters.toString();
-        panel.dataset.section = panel.querySelector('[data-detail-section]')?.value ?? panel.dataset.section ?? 'dr';
-        panel.dataset.perPage = panel.querySelector('[data-detail-per-page]')?.value ?? panel.dataset.perPage ?? '25';
-        panel.dataset.page = String(page);
-        panel.dataset.loaded = '';
-        url.searchParams.set('section', panel.dataset.section);
-        url.searchParams.set('per_page', panel.dataset.perPage);
-        url.searchParams.set('page', page);
-        panel.setAttribute('aria-busy', 'true');
-        content.textContent = 'Loading records…';
-        try {
-            const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal: request.signal });
-            if (!response.headers.get('content-type')?.includes('application/json')) {
-                throw new Error('Your session has expired. Sign in again to load records.');
-            }
-            const result = await response.json();
-            if (!response.ok) {
-                throw new Error(Object.values(result.errors ?? {}).flat()[0] ?? 'Records could not be loaded. Expand details again to retry.');
-            }
-            content.innerHTML = result.html;
-            panel.dataset.loaded = 'true';
-        } catch (exception) {
-            if (exception.name !== 'AbortError') {
-                panel.dataset.loaded = '';
-                content.textContent = exception.message;
-            }
-        } finally {
-            if (detailRequests.get(panel) === request) {
-                detailRequests.delete(panel);
-                panel.removeAttribute('aria-busy');
-            }
-        }
-    }
 
     async function loadLotBilling(panel) {
         lotBillingRequests.get(panel)?.abort();
@@ -269,13 +226,9 @@ if (monitoring) {
             if (!response.ok) {
                 throw new Error(Object.values(report.errors ?? {}).flat()[0] ?? 'Progress could not be refreshed. Please try again.');
             }
-            detailRequests.forEach(request => request.abort());
-            detailRequests.clear();
             lotBillingRequests.forEach(request => request.abort());
             lotBillingRequests.clear();
-            projectDetails.clear();
             projectBillingPanels.clear();
-            appliedFilters = new URL(url).searchParams;
             document.getElementById('monitoring-results').innerHTML = report.summary_html;
             document.getElementById('monitoring-table').innerHTML = report.projects_html;
             document.getElementById('monitoring-project-count').textContent = report.summary.projects_count;
@@ -362,46 +315,24 @@ if (monitoring) {
             return;
         }
 
-        const pageButton = event.target.closest('[data-detail-page]');
-        if (pageButton && !pageButton.disabled) {
-            loadDetails(pageButton.closest('[data-lazy-details]'), Number(pageButton.dataset.detailPage));
-            return;
-        }
         const button = event.target.closest('[data-expand-project]');
         if (!button) {
             return;
         }
         const details = document.getElementById(button.getAttribute('aria-controls'));
         details.hidden = !details.hidden;
-        const panel = details.querySelector('[data-lazy-details]');
-        if (!details.hidden && panel) {
-            const previous = projectDetails.get(panel.dataset.projectId);
-            const billingPanel = details.querySelector('[data-lazy-lot-billing]');
-            const previousBillingPanel = projectBillingPanels.get(panel.dataset.projectId);
-            if (previous && previous !== panel) {
-                detailRequests.get(previous)?.abort();
-                panel.querySelector('[data-detail-content]').replaceChildren(...previous.querySelector('[data-detail-content]').childNodes);
-                panel.dataset.loaded = previous.dataset.loaded;
-                panel.dataset.section = previous.dataset.section ?? 'dr';
-                panel.dataset.perPage = previous.dataset.perPage ?? '25';
-                panel.dataset.page = previous.dataset.page ?? '1';
-                previous.dataset.loaded = '';
-            }
-            if (billingPanel && previousBillingPanel && previousBillingPanel !== billingPanel) {
+        const billingPanel = details.querySelector('[data-lazy-lot-billing]');
+        if (!details.hidden && billingPanel) {
+            const previousBillingPanel = projectBillingPanels.get(billingPanel.dataset.projectId);
+            if (previousBillingPanel && previousBillingPanel !== billingPanel) {
                 lotBillingRequests.get(previousBillingPanel)?.abort();
                 billingPanel.replaceChildren(...previousBillingPanel.childNodes);
                 billingPanel.dataset.loaded = previousBillingPanel.dataset.loaded;
                 previousBillingPanel.dataset.loaded = '';
             }
-            projectDetails.set(panel.dataset.projectId, panel);
-            if (billingPanel) {
-                projectBillingPanels.set(panel.dataset.projectId, billingPanel);
-                if (!billingPanel.dataset.loaded) {
-                    loadLotBilling(billingPanel);
-                }
-            }
-            if (!panel.dataset.loaded) {
-                loadDetails(panel, Number(panel.dataset.page ?? 1));
+            projectBillingPanels.set(billingPanel.dataset.projectId, billingPanel);
+            if (!billingPanel.dataset.loaded) {
+                loadLotBilling(billingPanel);
             }
         }
         for (const control of monitoring.querySelectorAll('[data-expand-project]')) {
@@ -447,11 +378,6 @@ if (monitoring) {
             }
         }
     }
-    monitoring.addEventListener('change', event => {
-        if (event.target.matches('[data-detail-section], [data-detail-per-page]')) {
-            loadDetails(event.target.closest('[data-lazy-details]'));
-        }
-    });
     monitoring.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
             monitoring.querySelectorAll('[data-actions-menu][open]').forEach(menu => menu.removeAttribute('open'));

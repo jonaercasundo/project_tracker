@@ -48,6 +48,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectDashboardController;
 use App\Http\Controllers\ProjectFinancialPlanController;
 use App\Http\Controllers\ProjectItemController;
+use App\Http\Controllers\ProjectLotController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\RoleAccessPermissionController;
@@ -440,6 +441,15 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/projects/{project:project_id}', [ProjectController::class, 'show'])
         ->middleware(['company.context:MMC', 'role:user,finance'])
         ->name('projects.show');
+
+    Route::prefix('/projects/{project:project_id}/lots')
+        ->middleware(['company.context:MMC', 'role:user,finance'])
+        ->name('projects.lots.')
+        ->group(function (): void {
+            Route::get('/{lotId}', [ProjectLotController::class, 'show'])->whereNumber('lotId')->name('show');
+            Route::get('/{lotId}/edit', [ProjectLotController::class, 'edit'])->whereNumber('lotId')->name('edit');
+            Route::put('/{lotId}', [ProjectLotController::class, 'update'])->whereNumber('lotId')->name('update');
+        });
 
     Route::prefix('/projects/{project:project_id}/items')
         ->middleware(['company.context:MMC', 'role:user,finance'])

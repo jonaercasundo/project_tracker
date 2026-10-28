@@ -127,58 +127,10 @@
 
             </div>
             {{-- ========================================================= --}}
-            {{-- LOT MODAL HELPERS --}}
+            {{-- DELETE LOT MODAL HELPER --}}
             {{-- ========================================================= --}}
 
             <script>
-                function openEditLotModal(lotId, lotName, projectId, contractNo)
-                {
-                    /*
-                    * These IDs should match your Laravel edit-lot modal.
-                    */
-
-                    const lotIdInput =
-                        document.getElementById('editlotid');
-
-                    const lotNameInput =
-                        document.getElementById('editlotname');
-
-                    const projectIdInput =
-                        document.getElementById('editprojectid');
-
-                    const contractNoInput =
-                        document.getElementById('editcontractno');
-
-
-                    if (lotIdInput) {
-                        lotIdInput.value = lotId;
-                    }
-
-                    if (lotNameInput) {
-                        lotNameInput.value = lotName ?? '';
-                    }
-
-                    if (projectIdInput) {
-                        projectIdInput.value = projectId ?? '';
-                    }
-
-                    if (contractNoInput) {
-                        contractNoInput.value = contractNo ?? '';
-                    }
-
-
-                    /*
-                    * If your modal has a specific ID,
-                    * open it here.
-                    */
-
-                    const modal =
-                        document.getElementById('editLotModal');
-
-                    if (modal) {
-                        modal.classList.remove('hidden');
-                    }
-                }
                 function openDeleteLotModal(lotId)
                 {
                     const deleteInput =

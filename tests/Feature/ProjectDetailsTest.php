@@ -404,6 +404,143 @@ it('filters items and packages using their actual schema and project membership'
     $this->getJson('/projects/1/packages-data?package_type=Unknown')->assertJsonPath('total', 0);
 });
 
+it('opens the selected lot from the Lots list and prefills its own edit form', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    DB::table('lot')->where('lot_id', 1)->update(['lot_name' => 'Lot 2', 'contract_no' => 'CONTRACT-2', 'contract_price' => '141821425.55']);
+    DB::table('lot')->where('lot_id', 2)->update(['lot_name' => 'Lot 9', 'contract_no' => 'CONTRACT-9', 'contract_price' => '186633159.99']);
+
+    $rows = $this->getJson('/projects/1/lots-data')->json('html');
+
+    expect($rows)
+        ->toContain(route('projects.lots.show', [1, 1]))
+        ->toContain(route('projects.lots.edit', [1, 1]))
+        ->toContain(route('projects.lots.show', [1, 2]))
+        ->toContain(route('projects.lots.edit', [1, 2]));
+
+    $this->get(route('projects.lots.show', [1, 2]))
+        ->assertOk()
+        ->assertSee('Lot 9')
+        ->assertSee('CONTRACT-9')
+        ->assertSee('&#8369;186,633,159.99', false)
+        ->assertSee('Keystage 1')
+        ->assertSee('Intermediate');
+
+    $this->get(route('projects.lots.edit', [1, 2]))
+        ->assertOk()
+        ->assertSee('value="Lot 9"', false)
+        ->assertSee('value="CONTRACT-9"', false)
+        ->assertSee('value="186633159.99"', false)
+        ->assertSee('value="1" checked', false);
+});
+
+it('updates only the selected lot and moves its selected keystage assignments', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    DB::table('lot')->where('lot_id', 1)->update(['lot_name' => 'Lot 2', 'contract_no' => 'CONTRACT-2', 'contract_price' => '141821425.55']);
+    DB::table('lot')->where('lot_id', 2)->update(['lot_name' => 'Lot 9', 'contract_no' => 'CONTRACT-9', 'contract_price' => '186633159.99']);
+    DB::table('keystage')->insert(['keystage_id' => 2, 'lot_id' => 1, 'keystage_num' => 2, 'description' => 'Stage from Lot 2']);
+
+    $response = $this->put(route('projects.lots.update', [1, 2]), [
+        'lot_name' => 'Lot 9 Updated',
+        'contract_no' => 'CONTRACT-9-UPDATED',
+        'contract_price' => '200000000.25',
+        'keystage_ids' => [1, 2],
+    ]);
+
+    $response->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'lots']))
+        ->assertSessionHas('success', 'Lot updated successfully.');
+    $this->assertDatabaseHas('lot', [
+        'lot_id' => 2,
+        'project_id' => 1,
+        'lot_name' => 'Lot 9 Updated',
+        'contract_no' => 'CONTRACT-9-UPDATED',
+        'contract_price' => '200000000.25',
+    ]);
+    $this->assertDatabaseHas('lot', [
+        'lot_id' => 1,
+        'project_id' => 1,
+        'lot_name' => 'Lot 2',
+        'contract_no' => 'CONTRACT-2',
+        'contract_price' => '141821425.55',
+    ]);
+    $this->assertDatabaseHas('keystage', ['keystage_id' => 2, 'lot_id' => 2]);
+    $this->assertDatabaseHas('keystage', ['keystage_id' => 1, 'lot_id' => 2]);
+
+    $rows = $this->getJson('/projects/1/lots-data')->json('html');
+    expect($rows)->toContain('Lot 9 Updated')->toContain('200000000.25');
+});
+
+it('validates lot edits and rejects keystages from another project', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    DB::table('lot')->where('lot_id', 2)->update(['contract_price' => '186633159.99']);
+    DB::table('keystage')->insert(['keystage_id' => 3, 'lot_id' => 3, 'keystage_num' => 1, 'description' => 'Other project stage']);
+    $editUrl = route('projects.lots.edit', [1, 2]);
+
+    $this->from($editUrl)
+        ->put(route('projects.lots.update', [1, 2]), [
+            'lot_name' => '',
+            'contract_price' => '-1',
+        ])
+        ->assertRedirect($editUrl)
+        ->assertSessionHasErrors(['lot_name', 'contract_price']);
+
+    $this->from($editUrl)
+        ->put(route('projects.lots.update', [1, 2]), [
+            'lot_name' => 'Lot B',
+            'contract_price' => '100.00',
+            'keystage_ids' => [3],
+        ])
+        ->assertRedirect($editUrl)
+        ->assertSessionHasErrors('keystage_ids');
+
+    $this->assertDatabaseHas('lot', ['lot_id' => 2, 'project_id' => 1, 'lot_name' => 'Lot B', 'contract_price' => '186633159.99']);
+    $this->assertDatabaseHas('keystage', ['keystage_id' => 3, 'lot_id' => 3]);
+});
+
+it('keeps inline lot price saves scoped to the selected lot', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    DB::table('lot')->where('lot_id', 1)->update(['contract_price' => '10.00']);
+    DB::table('lot')->where('lot_id', 2)->update(['contract_price' => '20.00']);
+
+    $this->putJson(route('projects.lots.contract-price', [1, 2]), ['contract_price' => '25.50'])
+        ->assertOk()
+        ->assertJsonPath('contract_price', '25.50');
+
+    $this->assertDatabaseHas('lot', ['lot_id' => 1, 'project_id' => 1, 'contract_price' => '10.00']);
+    $this->assertDatabaseHas('lot', ['lot_id' => 2, 'project_id' => 1, 'contract_price' => '25.50']);
+});
+
+it('does not expose a lot that belongs to another project', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+
+    $this->get(route('projects.lots.show', [1, 3]))->assertNotFound();
+    $this->get(route('projects.lots.edit', [1, 3]))->assertNotFound();
+    $this->put(route('projects.lots.update', [1, 3]), [
+        'lot_name' => 'Changed',
+        'contract_price' => '10.00',
+    ])->assertNotFound();
+
+    $this->assertDatabaseHas('lot', ['lot_id' => 3, 'project_id' => 2, 'lot_name' => 'Other lot']);
+});
+
+it('denies project lot actions to users outside the Project Details roles', function () {
+    projectDetailsUser('MMC', 'Executive');
+    projectDetailsFixtures();
+
+    $this->get(route('projects.lots.show', [1, 1]))->assertForbidden();
+    $this->get(route('projects.lots.edit', [1, 1]))->assertForbidden();
+    $this->put(route('projects.lots.update', [1, 1]), [
+        'lot_name' => 'Changed',
+        'contract_price' => '10.00',
+    ])->assertForbidden();
+
+    $this->assertDatabaseHas('lot', ['lot_id' => 1, 'project_id' => 1, 'lot_name' => 'Lot A']);
+});
+
 it('links each item row to project-scoped view and edit pages', function () {
     projectDetailsUser();
     projectDetailsFixtures();

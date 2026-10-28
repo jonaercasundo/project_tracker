@@ -457,7 +457,10 @@ class ProjectController extends Controller
                 abort(404);
             }
 
-            DB::table('lot')->where('lot_id', $lotId)->update(['contract_price' => $validated['contract_price']]);
+            DB::table('lot')
+                ->where('lot_id', $lotId)
+                ->where('project_id', $project->project_id)
+                ->update(['contract_price' => $validated['contract_price']]);
             $contractAmount = DB::table('lot')->where('project_id', $project->project_id)->sum('contract_price') ?? 0;
 
             return response()->json([

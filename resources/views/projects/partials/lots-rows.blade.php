@@ -145,7 +145,7 @@
                                                     <div class="min-w-0 flex-1">
                                                         <label class="sr-only" for="lot-contract-price-{{ $lot->lot_id }}">Contract price for {{ $lot->lot_name }}</label>
                                                         <div class="flex items-center rounded-lg border border-slate-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
-                                                            <span class="pl-3 text-sm text-slate-400">₱</span>
+                                                            <span class="pl-3 text-sm text-slate-400">&#8369;</span>
                                                             <input id="lot-contract-price-{{ $lot->lot_id }}" name="contract_price" type="number" min="0" max="9999999999999.99" step="0.01" required value="{{ $lot->contract_price ?? '' }}" placeholder="0.00" class="w-full min-w-0 border-0 bg-transparent px-2 py-2 text-sm tabular-nums text-slate-700 focus:ring-0">
                                                         </div>
                                                         <p data-price-error class="mt-1 hidden text-xs text-red-600" role="alert"></p>
@@ -154,7 +154,13 @@
                                                     <span data-price-status class="sr-only" role="status"></span>
                                                 </form>
                                             @else
-                                                <span class="font-semibold tabular-nums text-slate-700">{{ $lot->contract_price === null ? 'Not set' : '₱'.number_format((float) $lot->contract_price, 2) }}</span>
+                                                <span class="font-semibold tabular-nums text-slate-700">
+                                                    @if ($lot->contract_price === null)
+                                                        Not set
+                                                    @else
+                                                        &#8369;{{ number_format((float) $lot->contract_price, 2) }}
+                                                    @endif
+                                                </span>
                                             @endif
                                         </td>
 
@@ -165,101 +171,26 @@
                                             <div class="flex items-center justify-center
                                                         gap-2">
 
-                                                {{-- KEYSTAGE / PACKAGES --}}
-                                                @if(($project->keystage ?? 0) == 1)
-
-                                                    <button
-                                                        type="button"
-                                                        onclick="openTab(event, 'keystage')"
-                                                        class="inline-flex items-center gap-1.5
-                                                            px-3 py-2 rounded-lg
-                                                            bg-blue-50 text-blue-700
-                                                            hover:bg-blue-100
-                                                            text-xs font-bold transition">
-
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="w-4 h-4"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                            stroke-width="2">
-
-                                                            <path stroke-linecap="round"
-                                                                stroke-linejoin="round"
-                                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-
-                                                            <circle cx="12"
-                                                                    cy="12"
-                                                                    r="3"/>
-
-                                                        </svg>
-
-                                                        Keystage
-
-                                                    </button>
-
-                                                @else
-
-                                                    <button
-                                                        type="button"
-                                                        onclick="openTab(event, 'packages')"
-                                                        class="inline-flex items-center gap-1.5
-                                                            px-3 py-2 rounded-lg
-                                                            bg-blue-50 text-blue-700
-                                                            hover:bg-blue-100
-                                                            text-xs font-bold transition">
-
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="w-4 h-4"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                            stroke-width="2">
-
-                                                            <path stroke-linecap="round"
-                                                                stroke-linejoin="round"
-                                                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-
-                                                        </svg>
-
-                                                        Packages
-
-                                                    </button>
-
-                                                @endif
-
+                                                {{-- VIEW --}}
+                                                <a href="{{ route('projects.lots.show', [$project, $lot->lot_id]) }}"
+                                                    class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                                                    title="View Lot {{ $lot->lot_name }}">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                        <circle cx="12" cy="12" r="3" />
+                                                    </svg>
+                                                    View
+                                                </a>
 
                                                 {{-- EDIT --}}
-                                                <button
-                                                    type="button"
-                                                    onclick="openEditLotModal(
-                                                        {{ $lot->lot_id }},
-                                                        @js($lot->lot_name),
-                                                        @js($lot->project_id),
-                                                        @js($lot->contract_no)
-                                                    )"
-                                                    class="p-2 rounded-lg
-                                                        bg-amber-50 text-amber-600
-                                                        hover:bg-amber-100
-                                                        transition"
-                                                    title="Edit Lot">
-
-                                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                                        class="w-4 h-4"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        stroke-width="2">
-
-                                                        <path stroke-linecap="round"
-                                                            stroke-linejoin="round"
-                                                            d="M16.862 4.487l1.687-1.688a2.25 2.25 0 113.182 3.182l-1.688 1.687M16.862 4.487L7.5 13.85V17h3.15l9.36-9.332M16.862 4.487L19.5 7.125"/>
-
+                                                <a href="{{ route('projects.lots.edit', [$project, $lot->lot_id]) }}"
+                                                    class="rounded-lg bg-amber-50 p-2 text-amber-600 transition hover:bg-amber-100"
+                                                    title="Edit Lot {{ $lot->lot_name }}"
+                                                    aria-label="Edit Lot {{ $lot->lot_name }}">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a2.25 2.25 0 113.182 3.182l-1.688 1.687M16.862 4.487L7.5 13.85V17h3.15l9.36-9.332M16.862 4.487L19.5 7.125" />
                                                     </svg>
-
-                                                </button>
-
-
+                                                </a>
                                                 {{-- DELETE --}}
                                                 <button
                                                     type="button"

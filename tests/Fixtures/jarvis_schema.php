@@ -112,6 +112,7 @@ Schema::create('lot', function (Blueprint $table): void {
     $table->string('lot_name')->nullable();
     $table->integer('project_id')->nullable();
     $table->string('contract_no')->nullable();
+    $table->decimal('contract_price', 15, 2)->nullable();
 });
 
 Schema::create('keystage', function (Blueprint $table): void {

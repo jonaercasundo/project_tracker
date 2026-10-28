@@ -70,8 +70,8 @@
                                     Contract Amount
                                 </p>
 
-                                <p class="text-2xl font-black text-slate-900">
-                                    &#8369;{{ number_format($project->contract_amount ?? 0, 2) }}
+                                <p id="projectContractAmount" class="text-2xl font-black text-slate-900">
+                                    ₱{{ number_format((float) $lotContractAmount, 2) }}
                                 </p>
                             </div>
 
@@ -162,4 +162,3 @@
             {{-- ========================================================= --}}
             {{-- SCHOOLS --}}
             {{-- ========================================================= --}}
-            

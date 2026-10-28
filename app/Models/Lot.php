@@ -19,7 +19,12 @@ class Lot extends Model
     protected $fillable = [
         'lot_name',
         'project_id',
-        'contract_no'
+        'contract_no',
+        'contract_price',
+    ];
+
+    protected $casts = [
+        'contract_price' => 'decimal:2',
     ];
 
     public function project()
@@ -39,6 +44,7 @@ class Lot extends Model
             'lot_id'
         );
     }
+
     public function items()
     {
         return $this->hasMany(ProjectItem::class, 'lot_id');

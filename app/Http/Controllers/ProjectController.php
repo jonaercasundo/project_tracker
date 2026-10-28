@@ -380,6 +380,9 @@ class ProjectController extends Controller
         */
 
         $summary = $details->summary($project);
+        $lotContractAmount = Schema::hasColumn('lot', 'contract_price')
+            ? (DB::table('lot')->where('project_id', $project->project_id)->sum('contract_price') ?? 0)
+            : 0;
         $biddingEvidence = $biddingEvidenceService->forProject($project, auth()->user()?->currentCompany());
         $structureIsSmall = $summary['lotCount'] <= 100 && $summary['keystageCount'] <= 100;
         $lots = $structureIsSmall ? $details->lotRecords($project)->limit(100)->get() : collect();
@@ -400,6 +403,8 @@ class ProjectController extends Controller
             'arSettings' => $arSettings,
             'logoFiles' => $logoFiles,
             'biddingEvidence' => $biddingEvidence,
+            'lotContractAmount' => $lotContractAmount,
+            'canUpdateLotContractPrice' => $this->canUpdateLotContractPrice($project),
         ] + $summary);
     }
 
@@ -431,6 +436,40 @@ class ProjectController extends Controller
         return $this->detailData($request, $project, $details, 'lots');
     }
 
+    public function updateLotContractPrice(Request $request, Project $project, int $lotId): JsonResponse
+    {
+        if (Schema::hasTable('project_information') && ($bidding = $project->bidding()->first()) !== null) {
+            Gate::authorize('update', $bidding);
+        }
+
+        $validated = $request->validate([
+            'contract_price' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999999.99'],
+        ]);
+
+        return DB::transaction(function () use ($project, $lotId, $validated): JsonResponse {
+            $lot = DB::table('lot')
+                ->where('lot_id', $lotId)
+                ->where('project_id', $project->project_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $lot) {
+                abort(404);
+            }
+
+            DB::table('lot')->where('lot_id', $lotId)->update(['contract_price' => $validated['contract_price']]);
+            $contractAmount = DB::table('lot')->where('project_id', $project->project_id)->sum('contract_price') ?? 0;
+
+            return response()->json([
+                'success' => true,
+                'contract_price' => number_format((float) $validated['contract_price'], 2, '.', ''),
+                'contract_price_display' => '₱'.number_format((float) $validated['contract_price'], 2),
+                'contract_amount' => number_format((float) $contractAmount, 2, '.', ''),
+                'contract_amount_display' => '₱'.number_format((float) $contractAmount, 2),
+            ]);
+        }, 3);
+    }
+
     public function keystagesData(Request $request, Project $project, ProjectDetailsService $details): JsonResponse
     {
         return $this->detailData($request, $project, $details, 'keystage');
@@ -460,7 +499,7 @@ class ProjectController extends Controller
         };
 
         return response()->json([
-            'html' => view('projects.partials.'.$section.'-rows', [($section === 'keystage' ? 'keystages' : $section) => $records, 'project' => $project, 'rowOffset' => ($records->currentPage() - 1) * $records->perPage()])->render(),
+            'html' => view('projects.partials.'.$section.'-rows', [($section === 'keystage' ? 'keystages' : $section) => $records, 'project' => $project, 'canUpdateLotContractPrice' => $section === 'lots' && $this->canUpdateLotContractPrice($project), 'rowOffset' => ($records->currentPage() - 1) * $records->perPage()])->render(),
             'current_page' => $records->currentPage(),
             'last_page' => $records->lastPage(),
             'per_page' => $records->perPage(),
@@ -469,6 +508,17 @@ class ProjectController extends Controller
             'from' => $records->firstItem(),
             'to' => $records->lastItem(),
         ])->header('Cache-Control', 'private, no-store');
+    }
+
+    private function canUpdateLotContractPrice(Project $project): bool
+    {
+        if (! Schema::hasTable('project_information')) {
+            return true;
+        }
+
+        $bidding = $project->bidding()->first();
+
+        return $bidding === null || Gate::allows('update', $bidding);
     }
 
     /** @return array<string, mixed> */

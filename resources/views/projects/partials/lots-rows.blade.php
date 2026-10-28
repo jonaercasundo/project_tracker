@@ -136,6 +136,29 @@
                                         </td>
 
 
+                                        {{-- CONTRACT PRICE --}}
+                                        <td class="px-4 py-4">
+                                            @if($canUpdateLotContractPrice ?? false)
+                                                <form data-lot-contract-price-form action="{{ route('projects.lots.contract-price', [$project, $lot->lot_id]) }}" class="flex min-w-64 items-start gap-2">
+                                                    @csrf
+                                                    @method('PUT')
+                                                    <div class="min-w-0 flex-1">
+                                                        <label class="sr-only" for="lot-contract-price-{{ $lot->lot_id }}">Contract price for {{ $lot->lot_name }}</label>
+                                                        <div class="flex items-center rounded-lg border border-slate-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+                                                            <span class="pl-3 text-sm text-slate-400">₱</span>
+                                                            <input id="lot-contract-price-{{ $lot->lot_id }}" name="contract_price" type="number" min="0" max="9999999999999.99" step="0.01" required value="{{ $lot->contract_price ?? '' }}" placeholder="0.00" class="w-full min-w-0 border-0 bg-transparent px-2 py-2 text-sm tabular-nums text-slate-700 focus:ring-0">
+                                                        </div>
+                                                        <p data-price-error class="mt-1 hidden text-xs text-red-600" role="alert"></p>
+                                                    </div>
+                                                    <button type="submit" class="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60">Save</button>
+                                                    <span data-price-status class="sr-only" role="status"></span>
+                                                </form>
+                                            @else
+                                                <span class="font-semibold tabular-nums text-slate-700">{{ $lot->contract_price === null ? 'Not set' : '₱'.number_format((float) $lot->contract_price, 2) }}</span>
+                                            @endif
+                                        </td>
+
+
                                         {{-- ACTIONS --}}
                                         <td class="px-4 py-4">
 
@@ -272,7 +295,7 @@
 
                                     <tr>
 
-                                        <td colspan="4"
+                                        <td colspan="5"
                                             class="px-6 py-12 text-center">
 
                                             <div class="flex flex-col items-center">

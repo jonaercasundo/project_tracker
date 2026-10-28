@@ -89,6 +89,10 @@
                                         Contract No.
                                     </th>
 
+                                    <th class="px-4 py-3 text-left text-xs font-bold whitespace-nowrap">
+                                        Contract Price
+                                    </th>
+
                                     <th class="px-4 py-3 text-center
                                             text-xs font-bold whitespace-nowrap">
                                         Actions
@@ -104,7 +108,7 @@
                                 @if($structureIsSmall)
 @include('projects.partials.lots-rows')
 @else
-<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500">Open this tab to load records.</td></tr>
+<tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">Open this tab to load records.</td></tr>
 @endif
 
                             </tbody>
@@ -196,5 +200,3 @@
             {{-- ========================================================= --}}
             {{-- KEYSTAGES --}}
             {{-- ========================================================= --}}
-
-            

@@ -19,7 +19,7 @@ function initializeProjectDetails() {
         schools: { body: 'schoolsTableBody', buttons: 'schoolsPaginationButtons', columns: 8, fields: { search: 'schoolSearch', region: 'schoolRegion', division: 'schoolDivision', municipality: 'schoolMunicipality' } },
         items: { body: 'itemsTableBody', buttons: 'itemsPaginationButtons', columns: 5, fields: { search: 'itemSearch', item_type: 'itemTypeFilter' } },
         packages: { body: 'packagesTableBody', buttons: 'packagesPaginationButtons', columns: 5, fields: { search: 'packageSearch', package_type: 'packageTypeFilter', lot: 'packageLotFilter', keystage: 'packageKeystageFilter' } },
-        lots: { body: 'lotsTableBody', buttons: 'lotsPaginationButtons', columns: 4, fields: {} },
+        lots: { body: 'lotsTableBody', buttons: 'lotsPaginationButtons', columns: 5, fields: {} },
         keystage: { body: 'keystageTableBody', buttons: 'keystagesPaginationButtons', columns: 4, fields: { search: 'keystageSearch', lot: 'keystageLotFilter' } },
     };
 
@@ -225,3 +225,50 @@ function initializeProjectDetails() {
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeProjectDetails);
 else initializeProjectDetails();
+
+document.addEventListener('submit', async (event) => {
+    const form = event.target.closest('[data-lot-contract-price-form]');
+    if (!form) return;
+
+    event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    const input = form.elements.contract_price;
+    const error = form.querySelector('[data-price-error]');
+    const status = form.querySelector('[data-price-status]');
+    const payload = new URLSearchParams(new FormData(form));
+    payload.delete('_token');
+    payload.delete('_method');
+    error.classList.add('hidden');
+    error.textContent = '';
+    status.textContent = 'Saving contract price.';
+    button.disabled = true;
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: payload,
+        });
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.errors?.contract_price?.[0] ?? result.message ?? 'Unable to save this contract price.');
+        }
+
+        input.value = result.contract_price;
+        const total = document.getElementById('projectContractAmount');
+        if (total) total.textContent = result.contract_amount_display;
+        status.textContent = 'Contract price saved.';
+    } catch (requestError) {
+        error.textContent = requestError.message;
+        error.classList.remove('hidden');
+        status.textContent = 'Contract price was not saved.';
+    } finally {
+        button.disabled = false;
+    }
+});

@@ -335,7 +335,7 @@ class ProjectDeliveryProgressService
             ? $this->receipts($filters)->select('receipt.project_id', 'receipt.dr_no')
             : DB::query()->fromSub($receiptRows, 'dr')->select('dr.project_id', 'dr.dr_no');
 
-        $billedReceipts = DB::query()->fromSub(clone $receipts, 'receipt')
+        $billingReceipts = DB::query()->fromSub(clone $receipts, 'receipt')
             ->join('billing_grouped as bg', function (JoinClause $join): void {
                 $join->on('bg.dr_no', '=', 'receipt.dr_no');
                 if ($this->usesMysql()) {
@@ -343,30 +343,22 @@ class ProjectDeliveryProgressService
                 }
             })
             ->join('grouping as g', 'g.group_id', '=', 'bg.group_id')
-            ->where('g.status', 'billed')
-            ->select('receipt.project_id', 'receipt.dr_no');
-        $this->groupReceipts($billedReceipts, 'receipt');
-        $billedDrStats = DB::query()->fromSub($billedReceipts, 'billed_receipt')
-            ->select('billed_receipt.project_id')
-            ->selectRaw('COUNT(*) as billed_drs_count')
-            ->groupBy('billed_receipt.project_id');
-
-        return DB::query()->fromSub($receipts, 'receipt')
-            ->join('billing_grouped as bg', function (JoinClause $join): void {
-                $join->on('bg.dr_no', '=', 'receipt.dr_no');
-                if ($this->usesMysql()) {
-                    $join->whereRaw('OCTET_LENGTH(bg.dr_no) = OCTET_LENGTH(receipt.dr_no)');
-                }
-            })
-            ->join('grouping as g', 'g.group_id', '=', 'bg.group_id')
-            ->leftJoinSub($billedDrStats, 'billed_dr_stats', 'billed_dr_stats.project_id', '=', 'receipt.project_id')
-            ->select('receipt.project_id')->selectRaw('COUNT(*) as billing_groups_count')
-            ->selectRaw('COALESCE(billed_dr_stats.billed_drs_count, 0) as billed_drs_count')
+            ->select('receipt.project_id', 'receipt.dr_no')
             ->selectRaw('MAX(bg.created_at) as last_billing_date')
-            ->selectRaw("COUNT(CASE WHEN g.status = 'for billing' THEN 1 END) as for_billing_groups_count")
-            ->selectRaw("COUNT(CASE WHEN g.status = 'billed' THEN 1 END) as billed_groups_count")
-            ->selectRaw("COUNT(CASE WHEN g.status = 'paid' THEN 1 END) as paid_groups_count")
-            ->groupBy('receipt.project_id', 'billed_dr_stats.billed_drs_count');
+            ->selectRaw("MAX(CASE WHEN g.status = 'for billing' THEN 1 ELSE 0 END) as has_for_billing_group")
+            ->selectRaw("MAX(CASE WHEN g.status = 'billed' THEN 1 ELSE 0 END) as has_billed_group")
+            ->selectRaw("MAX(CASE WHEN g.status = 'paid' THEN 1 ELSE 0 END) as has_paid_group");
+        $this->groupReceipts($billingReceipts, 'receipt');
+
+        return DB::query()->fromSub($billingReceipts, 'billing_receipt')
+            ->select('billing_receipt.project_id')
+            ->selectRaw('COUNT(*) as billing_groups_count')
+            ->selectRaw('SUM(billing_receipt.has_for_billing_group) as for_billing_groups_count')
+            ->selectRaw('SUM(billing_receipt.has_billed_group) as billed_groups_count')
+            ->selectRaw('SUM(billing_receipt.has_paid_group) as paid_groups_count')
+            ->selectRaw('SUM(billing_receipt.has_billed_group) as billed_drs_count')
+            ->selectRaw('MAX(billing_receipt.last_billing_date) as last_billing_date')
+            ->groupBy('billing_receipt.project_id');
     }
 
     /** @param array<string, mixed> $filters */

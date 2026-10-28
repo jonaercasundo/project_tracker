@@ -194,11 +194,11 @@
                 <section data-billing-panel="search" role="tabpanel" class="hidden space-y-3">
                     <div>
                         <h2 class="font-bold text-slate-900">Search and select DRs</h2>
-                        <p class="mt-1 text-sm text-slate-500">Search by DR number, school, project, or lot. Results are server paginated, and selected rows stay in the review when you change pages.</p>
+                        <p class="mt-1 text-sm text-slate-500">Search by DR number, School ID, school, project, or lot. Results are server paginated, and selected rows stay in the review when you change pages.</p>
                     </div>
                     <form id="billing-preparation-search-form" class="flex flex-col gap-2 sm:flex-row">
                         <label for="billing-preparation-search-input" class="sr-only">Search delivery receipts</label>
-                        <input id="billing-preparation-search-input" maxlength="100" value="{{ $filters['q'] ?? '' }}" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="DR number, school, project, or lot">
+                        <input id="billing-preparation-search-input" maxlength="100" value="{{ $filters['q'] ?? '' }}" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="DR number, School ID, school, project, or lot">
                         <button class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">Search DRs</button>
                     </form>
                 </section>

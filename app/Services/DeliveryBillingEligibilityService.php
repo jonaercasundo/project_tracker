@@ -53,6 +53,7 @@ class DeliveryBillingEligibilityService
                 $term = '%'.trim((string) $filters['q']).'%';
                 $query->where(function (Builder $search) use ($term): void {
                     $search->where('d.dr_no', 'like', $term)
+                        ->orWhere('d.school_id', 'like', $term)
                         ->orWhere('s.school_name', 'like', $term)
                         ->orWhere('p.project_name', 'like', $term)
                         ->orWhere('l.lot_name', 'like', $term);

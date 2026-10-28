@@ -37,7 +37,7 @@ class BillingSheetSyncService
             ->get([
                 'package_status.package_status_id',
                 'package_status.package_id',
-                'package.package_code',
+                'package.package_num as package_code',
                 'package.lot_id',
                 'lot.lot_name',
             ]);
@@ -121,19 +121,20 @@ class BillingSheetSyncService
                 continue;
             }
 
-            if ($this->normalizeCell($row[$headers['bir_dr_column']] ?? '') === $this->normalizeCell($sync->bir_dr)) {
+            if ($this->normalizeCell($row[$headers['bir_dr_column']] ?? '') === $this->normalizeCell($sync->bir_dr)
+                && $this->normalizeCell($row[$headers['package_code_column']] ?? '') === $this->normalizeCell($sync->package_code)) {
                 $matches[] = ['row' => $rowIndex + 1, 'values' => $row];
             }
         }
 
         if (count($matches) === 0) {
-            $this->finish($sync, 'no_match', 'No sheet row matched BIR DR '.$sync->bir_dr.' for Lot '.$sync->lot_number.'.');
+            $this->finish($sync, 'no_match', 'No sheet row matched BIR DR '.$sync->bir_dr.' and Core Package Code '.$sync->package_code.' for Lot '.$sync->lot_number.'.');
 
             return;
         }
 
         if (count($matches) > 1) {
-            $this->finish($sync, 'duplicate_match', 'Multiple sheet rows matched BIR DR '.$sync->bir_dr.' for Lot '.$sync->lot_number.'.');
+            $this->finish($sync, 'duplicate_match', 'Multiple sheet rows matched BIR DR '.$sync->bir_dr.' and Core Package Code '.$sync->package_code.' for Lot '.$sync->lot_number.'.');
 
             return;
         }
@@ -299,7 +300,8 @@ class BillingSheetSyncService
                     continue;
                 }
 
-                if ($this->normalizeCell($row[$headers['bir_dr_column']] ?? '') === $this->normalizeCell($sync->bir_dr)) {
+                if ($this->normalizeCell($row[$headers['bir_dr_column']] ?? '') === $this->normalizeCell($sync->bir_dr)
+                    && $this->normalizeCell($row[$headers['package_code_column']] ?? '') === $this->normalizeCell($sync->package_code)) {
                     $matches[] = ['row' => $rowIndex + 1, 'values' => $row];
                 }
             }
@@ -307,8 +309,8 @@ class BillingSheetSyncService
             if (count($matches) !== 1) {
                 $outcome = count($matches) === 0 ? 'no_match' : 'duplicate_match';
                 $message = count($matches) === 0
-                    ? 'No sheet row matched BIR DR '.$sync->bir_dr.' for Lot '.$lotNumber.'.'
-                    : 'Multiple sheet rows matched BIR DR '.$sync->bir_dr.' for Lot '.$lotNumber.'.';
+                    ? 'No sheet row matched BIR DR '.$sync->bir_dr.' and Core Package Code '.$sync->package_code.' for Lot '.$lotNumber.'.'
+                    : 'Multiple sheet rows matched BIR DR '.$sync->bir_dr.' and Core Package Code '.$sync->package_code.' for Lot '.$lotNumber.'.';
                 $issues[] = [$sync, $outcome, $message];
 
                 continue;
@@ -561,7 +563,7 @@ class BillingSheetSyncService
     }
 
     /** @param array<int, array<int, mixed>> $rows
-     * @return array{header_row: int, bir_dr_column: int}|null
+     * @return array{header_row: int, bir_dr_column: int, package_code_column: int}|null
      */
     private function findHeaderColumns(array $rows, string $lotNumber): ?array
     {
@@ -569,20 +571,24 @@ class BillingSheetSyncService
         $headerCandidates = [];
         for ($rowIndex = 0; $rowIndex < $maxRows; $rowIndex++) {
             $birColumns = [];
+            $packageColumns = [];
             foreach ($rows[$rowIndex] as $columnIndex => $heading) {
                 $normalized = preg_replace('/[^a-z0-9]/u', '', $this->normalizeCell($heading)) ?? '';
                 $hasLot = str_contains($normalized, 'lot'.$lotNumber);
                 if ($hasLot && str_contains($normalized, 'bir') && str_contains($normalized, 'dr')) {
                     $birColumns[] = $columnIndex;
                 }
+                if ($hasLot && str_contains($normalized, 'corepackagecode')) {
+                    $packageColumns[] = $columnIndex;
+                }
             }
 
-            if ($birColumns !== []) {
-                if (count($birColumns) !== 1) {
+            if ($birColumns !== [] || $packageColumns !== []) {
+                if (count($birColumns) !== 1 || count($packageColumns) !== 1) {
                     return null;
                 }
 
-                $headerCandidates[] = ['header_row' => $rowIndex, 'bir_dr_column' => $birColumns[0]];
+                $headerCandidates[] = ['header_row' => $rowIndex, 'bir_dr_column' => $birColumns[0], 'package_code_column' => $packageColumns[0]];
             }
         }
 
@@ -591,6 +597,12 @@ class BillingSheetSyncService
 
     private function lotNumber(string $lotName): ?string
     {
+        $lotName = trim($lotName);
+
+        if (preg_match('/^(2|9|11)$/', $lotName, $matches) === 1) {
+            return $matches[1];
+        }
+
         return preg_match('/\blot\s*[-#]?\s*(2|9|11)\b/i', $lotName, $matches) === 1 ? $matches[1] : null;
     }
 

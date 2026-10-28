@@ -92,7 +92,7 @@ abstract class BillingWorkflowTestCase extends TestCase
         Schema::create('package', function (Blueprint $table): void {
             $table->increments('package_id');
             $table->integer('lot_id');
-            $table->string('package_code');
+            $table->integer('package_num')->nullable();
         });
 
         Schema::create('invoices', function (Blueprint $table): void {

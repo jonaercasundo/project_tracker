@@ -82,7 +82,7 @@ function createGoogleSheetsSyncDelivery(string $birDr = 'BIR-DR-SETTINGS'): int
         'delivery_date' => '2026-10-27',
         'status' => 'accepted',
     ], 'delivery_id');
-    $packageId = DB::table('package')->insertGetId(['lot_id' => $lotId, 'package_code' => 'CORE-SAVED-SETTING'], 'package_id');
+    $packageId = DB::table('package')->insertGetId(['lot_id' => $lotId, 'package_num' => 'CORE-SAVED-SETTING'], 'package_id');
     DB::table('package_status')->insert(['delivery_id' => $deliveryId, 'package_id' => $packageId, 'status' => 'pending']);
 
     return $deliveryId;

@@ -122,16 +122,23 @@ class BillingPreparationController extends Controller
         $filters = $this->validatedFilters($request);
         $drSearch = trim((string) ($filters['dr_search'] ?? ''));
         $schoolIdSearch = trim((string) ($filters['school_id_search'] ?? ''));
-        if ($drSearch !== '' && $schoolIdSearch !== '') {
+        $drSearchValues = $this->splitSearchValues($drSearch);
+        $schoolIdSearchValues = $this->splitSearchValues($schoolIdSearch);
+        if ($drSearchValues !== [] && $schoolIdSearchValues !== []) {
             return response()->json(['message' => 'Search by DR number or School ID, one field at a time.'], 422);
         }
-        if ($drSearch !== '' || $schoolIdSearch !== '') {
+        unset($filters['dr_search'], $filters['school_id_search']);
+        if ($drSearchValues !== []) {
             unset($filters['q']);
+            $filters['dr_search_values'] = $drSearchValues;
+        } elseif ($schoolIdSearchValues !== []) {
+            unset($filters['q']);
+            $filters['school_id_search_values'] = $schoolIdSearchValues;
         }
         if (isset($filters['project_id']) && (! isset($filters['year']) || ! $this->projectMatchesYear($filters['project_id'], $filters['year']))) {
             return response()->json(['message' => 'Choose a Year before searching within a Project.'], 422);
         }
-        if ($drSearch === '' && $schoolIdSearch === '' && empty($filters['q'])) {
+        if ($drSearchValues === [] && $schoolIdSearchValues === [] && empty($filters['q'])) {
             return response()->json(['message' => 'Enter a DR number or School ID to search.'], 422);
         }
 
@@ -452,11 +459,19 @@ class BillingPreparationController extends Controller
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'q' => ['nullable', 'string', 'max:100'],
-            'dr_search' => ['nullable', 'string', 'max:100'],
-            'school_id_search' => ['nullable', 'string', 'max:100'],
+            'dr_search' => ['nullable', 'string', 'max:1000'],
+            'school_id_search' => ['nullable', 'string', 'max:1000'],
         ]);
 
         return array_filter($validated, static fn (mixed $value): bool => $value !== null && $value !== '');
+    }
+
+    /** @return array<int, string> */
+    private function splitSearchValues(string $value): array
+    {
+        $values = preg_split('/[\s,]+/u', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return array_values(array_unique($values));
     }
 
     /** @param array<string, mixed> $filters */

@@ -49,8 +49,22 @@ class DeliveryBillingEligibilityService
             ->when(isset($filters['school_id']), fn (Builder $query) => $query->where('d.school_id', $filters['school_id']))
             ->when(isset($filters['date_from']), fn (Builder $query) => $query->whereDate('d.delivery_date', '>=', $filters['date_from']))
             ->when(isset($filters['date_to']), fn (Builder $query) => $query->whereDate('d.delivery_date', '<=', $filters['date_to']))
-            ->when(isset($filters['dr_search']), fn (Builder $query) => $query->where('d.dr_no', 'like', '%'.trim((string) $filters['dr_search']).'%'))
-            ->when(isset($filters['school_id_search']), fn (Builder $query) => $query->where('d.school_id', 'like', '%'.trim((string) $filters['school_id_search']).'%'))
+            ->when(isset($filters['dr_search_values']), function (Builder $query) use ($filters): void {
+                $query->where(function (Builder $matches) use ($filters): void {
+                    foreach ($filters['dr_search_values'] as $index => $value) {
+                        $method = $index === 0 ? 'where' : 'orWhere';
+                        $matches->{$method}('d.dr_no', 'like', '%'.$value.'%');
+                    }
+                });
+            })
+            ->when(isset($filters['school_id_search_values']), function (Builder $query) use ($filters): void {
+                $query->where(function (Builder $matches) use ($filters): void {
+                    foreach ($filters['school_id_search_values'] as $index => $value) {
+                        $method = $index === 0 ? 'where' : 'orWhere';
+                        $matches->{$method}('d.school_id', 'like', '%'.$value.'%');
+                    }
+                });
+            })
             ->when(isset($filters['q']), function (Builder $query) use ($filters): void {
                 $term = '%'.trim((string) $filters['q']).'%';
                 $query->where(function (Builder $search) use ($term): void {

@@ -199,17 +199,17 @@
                     <div class="grid gap-3 md:grid-cols-2">
                         <form id="billing-preparation-dr-search-form" class="space-y-2">
                             <label for="billing-preparation-dr-search-input" class="block text-sm font-semibold text-slate-700">DR Number</label>
-                            <p class="text-xs text-slate-500">Find delivery receipts by DR number only.</p>
+                            <p class="text-xs text-slate-500">Find receipts by DR number only. Enter multiple numbers separated by spaces or commas.</p>
                             <div class="flex flex-col gap-2 sm:flex-row">
-                                <input id="billing-preparation-dr-search-input" maxlength="100" value="{{ $filters['dr_search'] ?? $filters['q'] ?? '' }}" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter DR number">
+                                <input id="billing-preparation-dr-search-input" maxlength="1000" value="{{ $filters['dr_search'] ?? $filters['q'] ?? '' }}" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="DR numbers, separated by spaces or commas">
                                 <button class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">Search DR Number</button>
                             </div>
                         </form>
                         <form id="billing-preparation-school-search-form" class="space-y-2">
                             <label for="billing-preparation-school-search-input" class="block text-sm font-semibold text-slate-700">School ID</label>
-                            <p class="text-xs text-slate-500">Find delivery receipts by School ID only.</p>
+                            <p class="text-xs text-slate-500">Find receipts by School ID only. Enter multiple IDs separated by spaces or commas.</p>
                             <div class="flex flex-col gap-2 sm:flex-row">
-                                <input id="billing-preparation-school-search-input" maxlength="100" value="{{ $filters['school_id_search'] ?? '' }}" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter School ID">
+                                <input id="billing-preparation-school-search-input" maxlength="1000" value="{{ $filters['school_id_search'] ?? '' }}" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="School IDs, separated by spaces or commas">
                                 <button class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">Search School ID</button>
                             </div>
                         </form>

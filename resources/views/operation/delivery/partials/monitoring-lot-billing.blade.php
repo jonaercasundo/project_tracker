@@ -36,6 +36,9 @@
                                 <div class="min-w-0 rounded-md bg-slate-50 px-3 py-2" data-billing-status="{{ $status['status'] }}">
                                     <dt class="text-xs font-medium text-slate-600">{{ $status['label'] }}</dt>
                                     <dd class="mt-1 whitespace-nowrap text-sm font-semibold tabular-nums text-slate-800">&#8369;{{ number_format((float) $status['amount'], 2) }}</dd>
+                                    @if ($status['status'] === 'for_billing')
+                                        <dd class="mt-1 text-xs tabular-nums text-slate-600">{{ $status['percent_of_contract'] === null ? 'N/A' : number_format($status['percent_of_contract'], 2).'%' }} of Contract Price</dd>
+                                    @endif
                                     <dd class="mt-1 text-xs tabular-nums text-slate-500">{{ number_format($status['dr_count']) }} {{ $status['dr_count'] === 1 ? 'DR' : 'DRs' }}</dd>
                                 </div>
                             @endforeach

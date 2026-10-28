@@ -977,9 +977,12 @@ class ProjectDeliveryProgressService
                         ['status' => 'for_billing', 'label' => 'For Billing', 'amount' => $lot->status_for_billing_amount, 'dr_count' => $lot->status_for_billing_dr_count],
                         ['status' => 'on_hold', 'label' => 'On Hold', 'amount' => $lot->status_on_hold_amount, 'dr_count' => $lot->status_on_hold_dr_count],
                         ['status' => 'pending_billing', 'label' => 'Pending Billing', 'amount' => $lot->status_pending_billing_amount, 'dr_count' => $lot->status_pending_billing_dr_count],
-                    ])->map(function (array $status): array {
+                    ])->map(function (array $status) use ($contractPrice): array {
                         $status['amount'] = number_format((float) $status['amount'], 2, '.', '');
                         $status['dr_count'] = (int) $status['dr_count'];
+                        if ($status['status'] === 'for_billing') {
+                            $status['percent_of_contract'] = $this->billingPercentage((float) $status['amount'], $contractPrice);
+                        }
 
                         return $status;
                     })->all(),

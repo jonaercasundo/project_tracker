@@ -368,9 +368,12 @@ class ProjectDeliveryProgressService
             ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
             ->select('d.project_id')
             ->selectRaw($this->receiptExpression('d').' as dr_no')
+            ->selectRaw('CASE WHEN billing.delivery_id IS NOT NULL THEN 1 ELSE 0 END as has_billing_record')
+            ->selectRaw("CASE WHEN billing.delivery_id IS NULL OR billing.status = 'pending_billing' THEN 1 ELSE 0 END as has_pending_status")
             ->selectRaw("CASE WHEN billing.status = 'for_billing' THEN 1 ELSE 0 END as has_for_billing_status")
             ->selectRaw("CASE WHEN billing.status IN ('for_billing', 'billed') THEN 1 ELSE 0 END as has_billing_stage")
             ->selectRaw("CASE WHEN billing.status = 'billed' THEN 1 ELSE 0 END as has_billed_status")
+            ->selectRaw("CASE WHEN billing.status = 'on_hold' THEN 1 ELSE 0 END as has_on_hold_status")
             ->whereNotNull('d.dr_no')
             ->whereRaw("TRIM(d.dr_no) <> ''");
         if (isset($filters['delivery_status'])) {
@@ -378,26 +381,31 @@ class ProjectDeliveryProgressService
         }
         $billingDrs = DB::query()->fromSub($billingDrRows, 'billing_dr')
             ->select('billing_dr.project_id', 'billing_dr.dr_no')
+            ->selectRaw('MAX(billing_dr.has_billing_record) as has_billing_record')
+            ->selectRaw('MAX(billing_dr.has_pending_status) as has_pending_status')
             ->selectRaw('MAX(billing_dr.has_for_billing_status) as has_for_billing_status')
             ->selectRaw('MAX(billing_dr.has_billing_stage) as has_billing_stage')
-            ->selectRaw('MAX(billing_dr.has_billed_status) as has_billed_status');
+            ->selectRaw('MAX(billing_dr.has_billed_status) as has_billed_status')
+            ->selectRaw('MAX(billing_dr.has_on_hold_status) as has_on_hold_status');
         $this->groupReceipts($billingDrs, 'billing_dr');
         $billingDrStats = DB::query()->fromSub($billingDrs, 'billing_dr')
             ->select('billing_dr.project_id')
-            ->selectRaw('SUM(billing_dr.has_for_billing_status) as for_billing_drs_count')
+            ->selectRaw('SUM(CASE WHEN billing_dr.has_for_billing_status = 1 AND billing_dr.has_billed_status = 0 THEN 1 ELSE 0 END) as for_billing_drs_count')
             ->selectRaw('SUM(billing_dr.has_billing_stage) as billing_drs_count')
             ->selectRaw('SUM(billing_dr.has_billed_status) as billed_delivery_drs_count')
+            ->selectRaw('SUM(billing_dr.has_billing_record) as delivery_billing_records_count')
+            ->selectRaw('SUM(CASE WHEN billing_dr.has_billed_status = 0 AND billing_dr.has_for_billing_status = 0 AND billing_dr.has_on_hold_status = 0 AND billing_dr.has_pending_status = 1 THEN 1 ELSE 0 END) as pending_billing_deliveries_count')
+            ->selectRaw('SUM(CASE WHEN billing_dr.has_billed_status = 0 AND billing_dr.has_for_billing_status = 0 AND billing_dr.has_on_hold_status = 1 THEN 1 ELSE 0 END) as on_hold_deliveries_count')
             ->groupBy('billing_dr.project_id');
 
         $deliveries = $this->deliveries($filters)
-            ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
             ->leftJoinSub($billingDrStats, 'billing_dr_stats', 'billing_dr_stats.project_id', '=', 'd.project_id')
             ->select('d.project_id')
-            ->selectRaw('COUNT(DISTINCT d.delivery_id) as delivery_billing_records_count')
-            ->selectRaw("COUNT(DISTINCT CASE WHEN billing.delivery_id IS NULL OR billing.status = 'pending_billing' THEN d.delivery_id END) as pending_billing_deliveries_count")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'for_billing' THEN d.delivery_id END) as for_billing_deliveries_count")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'billed' THEN d.delivery_id END) as billed_deliveries_count")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'on_hold' THEN d.delivery_id END) as on_hold_deliveries_count")
+            ->selectRaw('COALESCE(MAX(billing_dr_stats.delivery_billing_records_count), 0) as delivery_billing_records_count')
+            ->selectRaw('COALESCE(MAX(billing_dr_stats.pending_billing_deliveries_count), 0) as pending_billing_deliveries_count')
+            ->selectRaw('COALESCE(MAX(billing_dr_stats.for_billing_drs_count), 0) as for_billing_deliveries_count')
+            ->selectRaw('COALESCE(MAX(billing_dr_stats.billed_delivery_drs_count), 0) as billed_deliveries_count')
+            ->selectRaw('COALESCE(MAX(billing_dr_stats.on_hold_deliveries_count), 0) as on_hold_deliveries_count')
             ->selectRaw('COALESCE(MAX(billing_dr_stats.for_billing_drs_count), 0) as for_billing_drs_count')
             ->selectRaw('COALESCE(MAX(billing_dr_stats.billing_drs_count), 0) as billing_drs_count')
             ->selectRaw('COALESCE(MAX(billing_dr_stats.billed_delivery_drs_count), 0) as billed_delivery_drs_count')
@@ -836,9 +844,9 @@ class ProjectDeliveryProgressService
                 'source' => 'Distinct project DRs with a delivery_billing_records status of billed',
                 'milestone_percent' => $this->percentage($counts['billed_delivery_drs_count'], $counts['billing_drs_count']),
             ],
-            'delivery_billing' => $this->stage($counts['billed_deliveries_count'], $counts['delivery_billing_records_count'], 'delivery records') + [
-                'label' => 'Delivery billing', 'context' => 'Per-delivery scanner workflow; independent from shared legacy billing groups',
-                'source' => 'delivery_billing_records joined by delivery_id; missing records are pending billing',
+            'delivery_billing' => $this->stage($counts['billed_deliveries_count'], $counts['delivery_billing_records_count'], 'DRs') + [
+                'label' => 'Delivery billing', 'context' => 'Per-DR scanner workflow; independent from shared legacy billing groups',
+                'source' => 'delivery_billing_records joined by delivery_id then grouped by exact project and DR; missing records are pending billing',
                 'pending_billing' => $counts['pending_billing_deliveries_count'],
                 'for_billing' => $counts['for_billing_deliveries_count'],
                 'on_hold' => $counts['on_hold_deliveries_count'],

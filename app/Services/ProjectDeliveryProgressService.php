@@ -823,20 +823,39 @@ class ProjectDeliveryProgressService
             return collect();
         }
 
-        $drItemTotals = DB::table('deliveries as d')
-            ->leftJoinSub($this->packageAllocations(['project_ids' => $projectIds], false), 'allocation', 'allocation.delivery_id', '=', 'd.delivery_id')
+        $billingStatusByDelivery = DB::table('delivery_billing_records as billing')
+            ->select('billing.delivery_id')
+            ->selectRaw("MAX(CASE WHEN billing.status = 'billed' THEN 1 ELSE 0 END) as has_billed")
+            ->selectRaw("MAX(CASE WHEN billing.status = 'for_billing' THEN 1 ELSE 0 END) as has_for_billing")
+            ->selectRaw("MAX(CASE WHEN billing.status = 'on_hold' THEN 1 ELSE 0 END) as has_on_hold")
+            ->groupBy('billing.delivery_id');
+
+        $lotPackageAllocations = DB::table('deliveries as d')
+            ->leftJoin('package as pk', 'pk.lot_id', '=', 'd.lot_id')
+            ->whereIn('d.project_id', $projectIds)
+            ->whereNull('d.keystage_id')
+            ->select(['d.delivery_id', 'd.package_qty', 'pk.package_id']);
+        $packageAllocations = DB::table('deliveries as d')
+            ->leftJoin('package as pk', 'pk.keystage_id', '=', 'd.keystage_id')
+            ->whereIn('d.project_id', $projectIds)
+            ->whereNotNull('d.keystage_id')
+            ->select(['d.delivery_id', 'd.package_qty', 'pk.package_id'])
+            ->unionAll($lotPackageAllocations);
+
+        $drItemTotals = DB::query()->fromSub($packageAllocations, 'allocation')
+            ->join('deliveries as d', 'd.delivery_id', '=', 'allocation.delivery_id')
             ->leftJoin('package_content as content', 'content.package_id', '=', 'allocation.package_id')
             ->leftJoin('item as item', 'item.item_id', '=', 'content.item_id')
-            ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
+            ->leftJoinSub($billingStatusByDelivery, 'billing_status', 'billing_status.delivery_id', '=', 'd.delivery_id')
             ->whereIn('d.project_id', $projectIds)
             ->whereNotNull('d.lot_id')
             ->whereNotNull('d.dr_no')->whereRaw("TRIM(d.dr_no) <> ''")
             ->whereRaw("LOWER(TRIM(COALESCE(d.status, ''))) NOT IN ('cancelled', 'canceled', 'void', 'voided', 'deleted', 'rejected')")
             ->select(['d.project_id', 'd.lot_id'])
-            ->selectRaw('SUM(COALESCE(item.price, 0) * CASE WHEN content.qty > 0 THEN content.qty ELSE 1 END * CASE WHEN allocation.package_qty > 0 THEN allocation.package_qty ELSE 1 END) as amount')
-            ->selectRaw("MAX(CASE WHEN billing.status = 'billed' THEN 1 ELSE 0 END) as has_billed")
-            ->selectRaw("MAX(CASE WHEN billing.status = 'for_billing' THEN 1 ELSE 0 END) as has_for_billing")
-            ->selectRaw("MAX(CASE WHEN billing.status = 'on_hold' THEN 1 ELSE 0 END) as has_on_hold")
+            ->selectRaw('SUM(COALESCE(item.price, 0) * CASE WHEN content.qty > 0 THEN content.qty ELSE 1 END * CASE WHEN d.package_qty > 0 THEN d.package_qty ELSE 1 END) as amount')
+            ->selectRaw('MAX(COALESCE(billing_status.has_billed, 0)) as has_billed')
+            ->selectRaw('MAX(COALESCE(billing_status.has_for_billing, 0)) as has_for_billing')
+            ->selectRaw('MAX(COALESCE(billing_status.has_on_hold, 0)) as has_on_hold')
             ->groupBy('d.project_id', 'd.lot_id');
         if ($this->usesMysql()) {
             $drItemTotals->groupByRaw('OCTET_LENGTH(d.dr_no), BINARY d.dr_no');

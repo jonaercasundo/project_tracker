@@ -1246,9 +1246,10 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
     expect($monitoringPage->getContent())
         ->toContain('&#8369;1,000.00')
         ->toContain('&#8369;229,401,493.02')
-        ->toContain('&#8369;1,000.00')
         ->toContain('2 DRs')
         ->toContain('20.00%');
+
+    $this->get('/deliveries/monitoring')->assertOk()->assertSee('Billing Status Breakdown');
 
     DB::table('delivery_billing_records')->where('delivery_id', 7)->delete();
     DB::table('delivery_billing_records')->where('delivery_id', 2)->update([

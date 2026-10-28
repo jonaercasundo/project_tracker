@@ -126,7 +126,7 @@ if (monitoring) {
         const content = panel.querySelector('[data-detail-content]');
         const url = new URL(panel.dataset.endpoint);
         url.search = appliedFilters.toString();
-        panel.dataset.section = panel.querySelector('[data-detail-section]')?.value ?? panel.dataset.section ?? 'warehouse';
+        panel.dataset.section = panel.querySelector('[data-detail-section]')?.value ?? panel.dataset.section ?? 'dr';
         panel.dataset.perPage = panel.querySelector('[data-detail-per-page]')?.value ?? panel.dataset.perPage ?? '25';
         panel.dataset.page = String(page);
         panel.dataset.loaded = '';
@@ -382,7 +382,7 @@ if (monitoring) {
                 detailRequests.get(previous)?.abort();
                 panel.querySelector('[data-detail-content]').replaceChildren(...previous.querySelector('[data-detail-content]').childNodes);
                 panel.dataset.loaded = previous.dataset.loaded;
-                panel.dataset.section = previous.dataset.section ?? 'warehouse';
+                panel.dataset.section = previous.dataset.section ?? 'dr';
                 panel.dataset.perPage = previous.dataset.perPage ?? '25';
                 panel.dataset.page = previous.dataset.page ?? '1';
                 previous.dataset.loaded = '';

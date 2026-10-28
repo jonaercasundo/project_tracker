@@ -42,8 +42,13 @@
 
                     @if ($field['type'] === 'textarea')
                         <textarea id="{{ $field['name'] }}" name="{{ $field['name'] }}" rows="4" maxlength="10000" @required($field['name'] === 'item_name') class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-blue-500">{{ old($field['name'], $field['value']) }}</textarea>
+                    @elseif (in_array($field['name'], ['price', 'supplier_price'], true))
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">&#8369;</span>
+                            <input id="{{ $field['name'] }}" name="{{ $field['name'] }}" type="number" value="{{ old($field['name'], $field['value']) }}" min="0" max="9999999999999.99" step="0.01" class="w-full rounded-xl border border-slate-200 py-2.5 pl-8 pr-3 text-sm tabular-nums text-slate-800 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
                     @else
-                        <input id="{{ $field['name'] }}" name="{{ $field['name'] }}" type="{{ $field['type'] }}" value="{{ old($field['name'], $field['value']) }}" @if ($field['type'] === 'number') min="0" max="9999999999999.99" step="0.01" @endif @if ($field['name'] === 'item_name') maxlength="255" required @else maxlength="255" @endif class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-blue-500">
+                        <input id="{{ $field['name'] }}" name="{{ $field['name'] }}" type="{{ $field['type'] }}" value="{{ old($field['name'], $field['value']) }}" @if ($field['name'] === 'item_name') maxlength="255" required @else maxlength="255" @endif class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-blue-500">
                     @endif
 
                     @error($field['name'])

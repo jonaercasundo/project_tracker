@@ -21,6 +21,9 @@
                                             $item->item_id
                                             ?? $item->id
                                             ?? null;
+
+                                        $sellingPrice = $item->price ?? null;
+                                        $supplierPrice = $item->supplier_price ?? null;
                                     @endphp
 
                                     <tr
@@ -75,6 +78,26 @@
                                         </td>
 
 
+                                        {{-- SELLING PRICE --}}
+                                        <td class="whitespace-nowrap px-5 py-4 text-right tabular-nums">
+                                            @if($sellingPrice !== null)
+                                                <span class="font-semibold text-slate-700">&#8369;{{ number_format((float) $sellingPrice, 2) }}</span>
+                                            @else
+                                                <span class="text-xs text-slate-400">Not set</span>
+                                            @endif
+                                        </td>
+
+
+                                        {{-- SUPPLIER PRICE --}}
+                                        <td class="whitespace-nowrap px-5 py-4 text-right tabular-nums">
+                                            @if($supplierPrice !== null)
+                                                <span class="font-semibold text-slate-700">&#8369;{{ number_format((float) $supplierPrice, 2) }}</span>
+                                            @else
+                                                <span class="text-xs text-slate-400">Not set</span>
+                                            @endif
+                                        </td>
+
+
                                         {{-- ACTIONS --}}
                                         <td class="px-5 py-4 text-right">
 
@@ -107,7 +130,7 @@
                                 @empty
 
                                     <tr id="itemsEmptyRow">
-                                        <td colspan="5"
+                                        <td colspan="7"
                                             class="px-6 py-12 text-center">
 
                                             <div class="flex flex-col items-center">

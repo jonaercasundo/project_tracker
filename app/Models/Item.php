@@ -13,10 +13,17 @@ class Item extends Model
     public $timestamps = false; // set true if you have created_at and updated_at
 
     protected $guarded = [];
+
+    protected $casts = [
+        'price' => 'decimal:2',
+        'supplier_price' => 'decimal:2',
+    ];
+
     public function packageContent()
     {
         return $this->hasOne(PackageContent::class, 'item_id', 'item_id');
     }
+
     public function inventories()
     {
         return $this->hasMany(Inventory::class, 'item_id', 'item_id');

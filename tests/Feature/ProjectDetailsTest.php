@@ -422,17 +422,25 @@ it('links each item row to project-scoped view and edit pages', function () {
 it('shows saved project item details and prefills its edit form', function () {
     projectDetailsUser();
     projectDetailsFixtures();
+    DB::table('item')->where('item_id', 1)->update(['price' => '1250.50', 'supplier_price' => '900.00']);
 
     $this->get(route('projects.items.show', [1, 1]))
         ->assertOk()
         ->assertSee('Microscope')
         ->assertSee('Item Id')
-        ->assertSee('Supplier Price');
+        ->assertSee('Selling Price')
+        ->assertSee('Supplier Price')
+        ->assertSee("\u{20B1}1,250.50")
+        ->assertSee("\u{20B1}900.00");
 
     $this->get(route('projects.items.edit', [1, 1]))
         ->assertOk()
         ->assertSee('name="item_name"', false)
-        ->assertSee('value="Microscope"', false);
+        ->assertSee('value="Microscope"', false)
+        ->assertSee('name="price"', false)
+        ->assertSee('name="supplier_price"', false)
+        ->assertSee('value="1250.50"', false)
+        ->assertSee('value="900.00"', false);
 });
 
 it('saves a project item edit and returns to the Items tab', function () {
@@ -457,7 +465,11 @@ it('saves a project item edit and returns to the Items tab', function () {
         'supplier_price' => '900.00',
     ]);
 
-    $this->getJson('/projects/1/items-data')->assertSee('Microscope Updated');
+    $rows = $this->getJson('/projects/1/items-data')->json('html');
+    expect($rows)
+        ->toContain('Microscope Updated')
+        ->toContain('&#8369;1,250.50')
+        ->toContain('&#8369;900.00');
 });
 
 it('requires an item name and does not update a project item on invalid input', function () {

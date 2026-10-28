@@ -21,9 +21,13 @@ class ProjectItemController extends Controller
         $details = collect((array) $item)
             ->reject(fn (mixed $value, string $field): bool => in_array($field, ['project_id', 'created_at', 'updated_at'], true))
             ->map(fn (mixed $value, string $field): array => [
-                'label' => Str::headline($field),
+                'label' => match ($field) {
+                    'price' => 'Selling Price',
+                    'supplier_price' => 'Supplier Price',
+                    default => Str::headline($field),
+                },
                 'value' => in_array($field, ['price', 'supplier_price'], true) && $value !== null
-                    ? '₱'.number_format((float) $value, 2)
+                    ? "\u{20B1}".number_format((float) $value, 2)
                     : ($value === null || $value === '' ? 'Not provided' : (string) $value),
             ]);
 
@@ -88,7 +92,7 @@ class ProjectItemController extends Controller
             'item_type' => ['label' => 'Type', 'type' => 'text', 'rules' => ['nullable', 'string', 'max:255']],
             'type' => ['label' => 'Type', 'type' => 'text', 'rules' => ['nullable', 'string', 'max:255']],
             'unit' => ['label' => 'Unit', 'type' => 'text', 'rules' => ['nullable', 'string', 'max:255']],
-            'price' => ['label' => 'Price', 'type' => 'number', 'rules' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999999.99']],
+            'price' => ['label' => 'Selling Price', 'type' => 'number', 'rules' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999999.99']],
             'supplier_price' => ['label' => 'Supplier price', 'type' => 'number', 'rules' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999999.99']],
         ];
 
@@ -97,7 +101,9 @@ class ProjectItemController extends Controller
             ->map(fn (array $definition, string $field): array => [
                 'name' => $field,
                 ...$definition,
-                'value' => $item->{$field} ?? '',
+                'value' => in_array($field, ['price', 'supplier_price'], true) && $item->{$field} !== null
+                    ? number_format((float) $item->{$field}, 2, '.', '')
+                    : ($item->{$field} ?? ''),
             ])
             ->values()
             ->all();

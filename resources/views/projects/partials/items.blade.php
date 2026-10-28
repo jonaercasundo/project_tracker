@@ -102,7 +102,7 @@
 
                     <div class="overflow-x-auto">
 
-                        <table class="min-w-full text-sm">
+                        <table class="min-w-full text-sm md:min-w-[1000px]">
 
                             <thead class="border-b border-slate-100 bg-slate-50/70">
 
@@ -124,6 +124,14 @@
                                         Type
                                     </th>
 
+                                    <th class="min-w-36 whitespace-nowrap px-5 py-3 text-right">
+                                        Selling Price
+                                    </th>
+
+                                    <th class="min-w-36 whitespace-nowrap px-5 py-3 text-right">
+                                        Supplier Price
+                                    </th>
+
                                     <th class="px-5 py-3 text-right">
                                         Action
                                     </th>
@@ -136,7 +144,7 @@
                             <tbody id="itemsTableBody"
                                 class="divide-y divide-slate-100">
 
-                                <tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">Open this tab to load records.</td></tr>
+                                <tr><td colspan="7" class="px-6 py-12 text-center text-slate-500">Open this tab to load records.</td></tr>
 
                             </tbody>
 
@@ -190,5 +198,3 @@
             {{-- ========================================================= --}}
             {{-- PACKAGES --}}
             {{-- ========================================================= --}}
-
-            

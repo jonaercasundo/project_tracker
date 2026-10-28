@@ -1101,9 +1101,6 @@ class ProjectDeliveryProgressService
         if ($pipeline['billed']['completed'] > $pipeline['billing']['completed']) {
             $flags[] = 'Billed records exceed records that entered billing.';
         }
-        if ($pipeline['billing']['completed'] < $pipeline['billing']['total']) {
-            $flags[] = 'Some billing records have statuses outside for billing, billed and paid.';
-        }
 
         return $flags;
     }

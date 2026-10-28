@@ -187,5 +187,28 @@
                 @endforeach
             </dl>
         </details>
+
+        <dialog id="sync-billing-dialog" class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/50">
+            <form id="sync-billing-confirmation" class="space-y-4 p-6">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">Sync Billing</h2>
+                    <p class="mt-2 text-sm text-slate-600">Billing-eligible DRs will advance through Stock Out and Delivered, and their quantities will be deducted from inventory.</p>
+                    <p class="mt-2 text-xs text-slate-500">A DR's assigned warehouse takes precedence. Use this warehouse only for DRs without an assigned warehouse.</p>
+                </div>
+                <div>
+                    <label for="sync-billing-warehouse" class="mb-1 block text-sm font-semibold text-slate-700">Fallback inventory warehouse</label>
+                    <select id="sync-billing-warehouse" name="warehouse_id" required class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">Select a warehouse</option>
+                        @foreach($warehouses as $warehouse)
+                            <option value="{{ $warehouse->warehouse_id }}">{{ $warehouse->warehouse_name ?: 'Warehouse '.$warehouse->warehouse_id }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" data-cancel-sync-billing class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Confirm and Sync</button>
+                </div>
+            </form>
+        </dialog>
     </div>
 </x-project_app-layout>

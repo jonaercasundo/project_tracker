@@ -18,9 +18,9 @@ class BillingOperationalSyncService
      *
      * @return array{synced_dr_count: int, skipped_dr_count: int, message: string}
      */
-    public function syncProject(int $projectId, int $userId, string $userName): array
+    public function syncProject(int $projectId, int $userId, string $userName, ?int $fallbackWarehouseId = null): array
     {
-        return DB::transaction(function () use ($projectId, $userId, $userName): array {
+        return DB::transaction(function () use ($projectId, $userId, $userName, $fallbackWarehouseId): array {
             $project = DB::table('projects')->where('project_id', $projectId)->lockForUpdate()->first();
             if ($project === null) {
                 throw new RuntimeException('The selected project could not be found.');
@@ -173,7 +173,7 @@ class BillingOperationalSyncService
                                 'delivery_id' => (int) $delivery->delivery_id,
                                 'package_id' => $packageId,
                                 'item_id' => (int) $content->item_id,
-                                'warehouse_id' => $delivery->warehouse_id === null ? null : (int) $delivery->warehouse_id,
+                                'warehouse_id' => $delivery->warehouse_id === null ? $fallbackWarehouseId : (int) $delivery->warehouse_id,
                                 'dr_no' => (string) $delivery->dr_no,
                             ];
                         }
@@ -181,8 +181,9 @@ class BillingOperationalSyncService
                         continue;
                     }
 
-                    if ($delivery->warehouse_id === null) {
-                        throw new RuntimeException("Billing sync stopped because DR {$delivery->dr_no} is not assigned to a warehouse.");
+                    $warehouseId = $delivery->warehouse_id === null ? $fallbackWarehouseId : (int) $delivery->warehouse_id;
+                    if ($warehouseId === null) {
+                        throw new RuntimeException("Billing sync stopped because DR {$delivery->dr_no} has no assigned warehouse. Select a fallback warehouse and try again.");
                     }
 
                     $packageQuantity = (int) ($delivery->package_qty ?? 0);
@@ -200,7 +201,7 @@ class BillingOperationalSyncService
                             'project_id' => (int) $delivery->project_id,
                             'package_id' => $packageId,
                             'item_id' => (int) $content->item_id,
-                            'warehouse_id' => (int) $delivery->warehouse_id,
+                            'warehouse_id' => $warehouseId,
                             'quantity' => $contentQuantity * $packageQuantity,
                             'content_quantity' => $contentQuantity,
                             'package_quantity' => $packageQuantity,

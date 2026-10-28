@@ -44,7 +44,12 @@ class SyncProjectBillingOperationalStages implements ShouldQueue
         }
 
         try {
-            $result = $sync->syncProject((int) $run->project_id, (int) $run->user_id, (string) $run->user_name);
+            $result = $sync->syncProject(
+                (int) $run->project_id,
+                (int) $run->user_id,
+                (string) $run->user_name,
+                $run->fallback_warehouse_id === null ? null : (int) $run->fallback_warehouse_id
+            );
 
             DB::table('billing_sync_runs')->where('id', $this->syncRunId)->update([
                 'status' => 'completed',

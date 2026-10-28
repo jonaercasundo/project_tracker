@@ -229,6 +229,7 @@ Schema::create('items', function (Blueprint $table): void {
 Schema::create('billing_sync_runs', function (Blueprint $table): void {
     $table->bigIncrements('id');
     $table->unsignedInteger('project_id');
+    $table->unsignedInteger('fallback_warehouse_id')->nullable();
     $table->unsignedBigInteger('user_id');
     $table->string('user_name');
     $table->string('status', 20)->default('queued');

@@ -11,6 +11,7 @@ use App\Services\LogisticsDrTrackingService;
 use App\Services\ProjectDeliveryProgressService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -83,14 +84,18 @@ class DeliveryMonitoringController extends Controller
         ])->header('Cache-Control', 'private, no-store');
     }
 
-    public function syncBilling(int $project): JsonResponse
+    public function syncBilling(Request $request, int $project): JsonResponse
     {
+        $validated = $request->validate([
+            'warehouse_id' => ['nullable', 'integer', 'exists:warehouse,warehouse_id'],
+        ]);
+        $fallbackWarehouseId = isset($validated['warehouse_id']) ? (int) $validated['warehouse_id'] : null;
         $user = Auth::user();
         abort_unless(DB::table('projects')->where('project_id', $project)->exists(), 404, 'Project not found.');
 
         $run = null;
         try {
-            $run = DB::transaction(function () use ($project, $user): array {
+            $run = DB::transaction(function () use ($project, $user, $fallbackWarehouseId): array {
                 $projectRecord = DB::table('projects')->where('project_id', $project)->lockForUpdate()->first();
                 if ($projectRecord === null) {
                     return ['id' => 0, 'created' => false];
@@ -110,6 +115,7 @@ class DeliveryMonitoringController extends Controller
                 $now = now();
                 $runId = DB::table('billing_sync_runs')->insertGetId([
                     'project_id' => $project,
+                    'fallback_warehouse_id' => $fallbackWarehouseId,
                     'user_id' => (int) $user->getAuthIdentifier(),
                     'user_name' => (string) $user->name,
                     'status' => 'queued',
@@ -207,6 +213,7 @@ class DeliveryMonitoringController extends Controller
             'logistics' => $logistics,
             'filters' => $filters,
             'projects' => DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']),
+            'warehouses' => DB::table('warehouse')->orderBy('warehouse_name')->get(['warehouse_id', 'warehouse_name']),
             'logisticsIntegrations' => Schema::hasTable('logistics_integrations')
                 ? DB::table('logistics_integrations')->where('status', 'active')->orderBy('name')->get(['integration_id', 'name'])
                 : collect(),

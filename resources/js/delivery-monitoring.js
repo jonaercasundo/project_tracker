@@ -1,6 +1,10 @@
 const monitoring = document.getElementById('delivery-monitoring');
 
 if (monitoring) {
+    const syncBillingDialog = document.getElementById('sync-billing-dialog');
+    const syncBillingForm = document.getElementById('sync-billing-confirmation');
+    const syncBillingWarehouse = document.getElementById('sync-billing-warehouse');
+    let pendingSyncBillingButton;
     const logistics = document.getElementById('logistics-tracking');
     const logisticsForm = document.getElementById('logistics-filters');
     const logisticsError = document.getElementById('logistics-error');
@@ -293,25 +297,9 @@ if (monitoring) {
         const syncButton = event.target.closest('[data-sync-billing]');
         if (syncButton) {
             event.preventDefault();
-            const projectId = syncButton.dataset.syncBilling;
-            if (!window.confirm('Bypass the usual Stock Out and Delivered steps for billing-eligible DRs? Their package quantities will be deducted from inventory, recorded in inventory history with a bypass remark, and their statuses and pipeline counts will be updated.')) {
-                return;
-            }
-
-            const setFeedback = (message, isError = false) => {
-                monitoring.querySelectorAll(`[data-sync-billing-feedback="${projectId}"]`).forEach(feedback => {
-                    feedback.textContent = message;
-                    feedback.classList.toggle('text-rose-700', isError);
-                    feedback.classList.toggle('text-emerald-700', !isError);
-                });
-            };
-
-            const originalLabel = syncButton.textContent;
-            syncButton.disabled = true;
-            syncButton.textContent = 'Syncing…';
-            setFeedback('Syncing billing deliveries and inventory…');
-
-            trySyncBilling(syncButton, originalLabel, setFeedback);
+            pendingSyncBillingButton = syncButton;
+            syncBillingWarehouse.value = '';
+            syncBillingDialog.showModal();
             return;
         }
 
@@ -347,16 +335,51 @@ if (monitoring) {
         button.closest('[data-actions-menu]')?.removeAttribute('open');
     });
 
-    async function trySyncBilling(button, originalLabel, setFeedback) {
+    syncBillingForm.addEventListener('submit', event => {
+        event.preventDefault();
+        if (!syncBillingForm.reportValidity() || !pendingSyncBillingButton) {
+            return;
+        }
+
+        const button = pendingSyncBillingButton;
+        const projectId = button.dataset.syncBilling;
+        const originalLabel = button.textContent;
+        const fallbackWarehouseId = syncBillingWarehouse.value;
+        const setFeedback = (message, isError = false) => {
+            monitoring.querySelectorAll(`[data-sync-billing-feedback="${projectId}"]`).forEach(feedback => {
+                feedback.textContent = message;
+                feedback.classList.toggle('text-rose-700', isError);
+                feedback.classList.toggle('text-emerald-700', !isError);
+            });
+        };
+
+        pendingSyncBillingButton = undefined;
+        syncBillingDialog.close();
+        button.disabled = true;
+        button.textContent = 'Syncing…';
+        setFeedback('Syncing billing deliveries and inventory…');
+        trySyncBilling(button, originalLabel, setFeedback, fallbackWarehouseId);
+    });
+
+    syncBillingDialog.addEventListener('click', event => {
+        if (event.target.closest('[data-cancel-sync-billing]')) {
+            pendingSyncBillingButton = undefined;
+            syncBillingDialog.close();
+        }
+    });
+
+    async function trySyncBilling(button, originalLabel, setFeedback, fallbackWarehouseId) {
         try {
             const response = await fetch(button.dataset.endpoint, {
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 },
                 credentials: 'same-origin',
+                body: JSON.stringify({ warehouse_id: fallbackWarehouseId }),
             });
             const contentType = response.headers.get('content-type') ?? '';
             if (!contentType.includes('application/json')) {

@@ -194,13 +194,26 @@
                 <section data-billing-panel="search" role="tabpanel" class="hidden space-y-3">
                     <div>
                         <h2 class="font-bold text-slate-900">Search and select DRs</h2>
-                        <p class="mt-1 text-sm text-slate-500">Search by DR number, School ID, school, project, or lot. Results are server paginated, and selected rows stay in the review when you change pages.</p>
+                        <p class="mt-1 text-sm text-slate-500">Search by DR number or School ID independently. Each search matches only its selected field. Results are server paginated, and selected rows stay in the review when you change pages.</p>
                     </div>
-                    <form id="billing-preparation-search-form" class="flex flex-col gap-2 sm:flex-row">
-                        <label for="billing-preparation-search-input" class="sr-only">Search delivery receipts</label>
-                        <input id="billing-preparation-search-input" maxlength="100" value="{{ $filters['q'] ?? '' }}" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="DR number, School ID, school, project, or lot">
-                        <button class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">Search DRs</button>
-                    </form>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <form id="billing-preparation-dr-search-form" class="space-y-2">
+                            <label for="billing-preparation-dr-search-input" class="block text-sm font-semibold text-slate-700">DR Number</label>
+                            <p class="text-xs text-slate-500">Find delivery receipts by DR number only.</p>
+                            <div class="flex flex-col gap-2 sm:flex-row">
+                                <input id="billing-preparation-dr-search-input" maxlength="100" value="{{ $filters['dr_search'] ?? $filters['q'] ?? '' }}" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter DR number">
+                                <button class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">Search DR Number</button>
+                            </div>
+                        </form>
+                        <form id="billing-preparation-school-search-form" class="space-y-2">
+                            <label for="billing-preparation-school-search-input" class="block text-sm font-semibold text-slate-700">School ID</label>
+                            <p class="text-xs text-slate-500">Find delivery receipts by School ID only.</p>
+                            <div class="flex flex-col gap-2 sm:flex-row">
+                                <input id="billing-preparation-school-search-input" maxlength="100" value="{{ $filters['school_id_search'] ?? '' }}" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter School ID">
+                                <button class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">Search School ID</button>
+                            </div>
+                        </form>
+                    </div>
                 </section>
 
                 <section data-billing-panel="range" role="tabpanel" class="hidden space-y-3">

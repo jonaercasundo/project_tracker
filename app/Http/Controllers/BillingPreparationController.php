@@ -120,11 +120,19 @@ class BillingPreparationController extends Controller
     public function search(Request $request): JsonResponse
     {
         $filters = $this->validatedFilters($request);
+        $drSearch = trim((string) ($filters['dr_search'] ?? ''));
+        $schoolIdSearch = trim((string) ($filters['school_id_search'] ?? ''));
+        if ($drSearch !== '' && $schoolIdSearch !== '') {
+            return response()->json(['message' => 'Search by DR number or School ID, one field at a time.'], 422);
+        }
+        if ($drSearch !== '' || $schoolIdSearch !== '') {
+            unset($filters['q']);
+        }
         if (isset($filters['project_id']) && (! isset($filters['year']) || ! $this->projectMatchesYear($filters['project_id'], $filters['year']))) {
             return response()->json(['message' => 'Choose a Year before searching within a Project.'], 422);
         }
-        if (empty($filters['q'])) {
-            return response()->json(['message' => 'Enter a DR number, school, project, or lot to search.'], 422);
+        if ($drSearch === '' && $schoolIdSearch === '' && empty($filters['q'])) {
+            return response()->json(['message' => 'Enter a DR number or School ID to search.'], 422);
         }
 
         $perPage = min(max($request->integer('per_page', 25), 10), 50);
@@ -152,6 +160,8 @@ class BillingPreparationController extends Controller
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'q' => ['nullable', 'string', 'max:100'],
+            'dr_search' => ['nullable', 'string', 'max:100'],
+            'school_id_search' => ['nullable', 'string', 'max:100'],
         ]);
 
         if ($this->compareNumericStrings($validated['dr_from'], $validated['dr_to']) > 0) {

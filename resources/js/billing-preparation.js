@@ -34,6 +34,7 @@ if (root) {
     const selected = new Map();
     let visibleRecords = [];
     let selectionMode = 'scan';
+    let activeSearch = null;
     let currentPage = null;
     let allCriteria = null;
     let selectionFilters = null;
@@ -310,7 +311,7 @@ if (root) {
             button.textContent = text;
             button.disabled = page < 1 || page > currentPage.last_page;
             button.className = 'rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 disabled:opacity-40';
-            button.addEventListener('click', () => search(page));
+            button.addEventListener('click', () => activeSearch && search(activeSearch.field, page, activeSearch.term));
             controls.append(button);
         });
         pagination.append(controls);
@@ -375,13 +376,23 @@ if (root) {
         return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
     }
 
-    async function search(page = 1) {
-        const query = { ...currentFilters(), q: document.getElementById('billing-preparation-search-input').value.trim(), page, per_page: 25 };
+    async function search(field, page = 1, pageTerm = null) {
+        const inputId = field === 'dr_search' ? 'billing-preparation-dr-search-input' : 'billing-preparation-school-search-input';
+        const term = pageTerm ?? document.getElementById(inputId).value.trim();
+        if (!term) {
+            showFeedback(field === 'dr_search' ? 'Enter a DR number to search.' : 'Enter a School ID to search.', 'warning');
+            return;
+        }
+        if (page === 1) activeSearch = { field, term };
+        const filters = currentFilters();
+        delete filters.q;
+        const query = { ...filters, [field]: term, page, per_page: 25 };
         try {
             const response = await fetch(`${root.dataset.searchUrl}?${queryString(query)}`, { headers: { Accept: 'application/json' } });
             const payload = await readResponse(response);
             setRecords(payload.records, 'search', { paginationData: payload.pagination });
-            showFeedback(`${payload.pagination.total} matching delivery record(s). Select eligible rows to add them to this review.`, 'success');
+            const searchLabel = field === 'dr_search' ? 'DR number' : 'School ID';
+            showFeedback(`${payload.pagination.total} delivery record(s) match this ${searchLabel} search. Select eligible rows to add them to this review.`, 'success');
         } catch (error) {
             showFeedback(error.message, 'error');
         }
@@ -455,9 +466,14 @@ if (root) {
         }
     });
 
-    document.getElementById('billing-preparation-search-form').addEventListener('submit', (event) => {
+    document.getElementById('billing-preparation-dr-search-form').addEventListener('submit', (event) => {
         event.preventDefault();
-        search(1);
+        search('dr_search');
+    });
+
+    document.getElementById('billing-preparation-school-search-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        search('school_id_search');
     });
 
     document.getElementById('billing-preparation-range-form').addEventListener('submit', async (event) => {
@@ -693,9 +709,13 @@ if (root) {
         }, 250);
     }, true);
 
-    const initialSearch = document.getElementById('billing-preparation-search-input').value.trim();
-    if (initialSearch) {
+    const initialDrSearch = document.getElementById('billing-preparation-dr-search-input').value.trim();
+    const initialSchoolSearch = document.getElementById('billing-preparation-school-search-input').value.trim();
+    if (initialDrSearch && !initialSchoolSearch) {
         activateTab('search');
-        search(1);
+        search('dr_search');
+    } else if (initialSchoolSearch && !initialDrSearch) {
+        activateTab('search');
+        search('school_id_search');
     }
 }

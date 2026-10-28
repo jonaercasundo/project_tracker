@@ -729,8 +729,9 @@ class ProjectDeliveryProgressService
     public function report(array $filters): array
     {
         $compact = (bool) ($filters['compact'] ?? false);
+        $deferLotBilling = (bool) ($filters['defer_lot_billing'] ?? false);
         $records = $this->recordsQuery($filters)->get();
-        $lotBillingProgress = $compact
+        $lotBillingProgress = $compact || $deferLotBilling
             ? collect()
             : $this->lotBillingProgress($records->pluck('project_id')->map(fn ($projectId): int => (int) $projectId)->unique()->all());
         $warehouseRows = $compact ? collect() : $this->warehouseSummaryQuery($filters)->get()->groupBy('project_id');
@@ -970,6 +971,12 @@ class ProjectDeliveryProgressService
                 ];
             })->values()->all();
         });
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function lotBillingProgressForProject(int $projectId): array
+    {
+        return $this->lotBillingProgress([$projectId])->get($projectId, []);
     }
 
     private function billingPercentage(float $amountBilled, ?float $contractPrice): ?float

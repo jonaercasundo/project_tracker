@@ -114,7 +114,9 @@ if (monitoring) {
     let currentRequest;
     let locationRequest;
     const detailRequests = new Map();
+    const lotBillingRequests = new Map();
     const projectDetails = new Map();
+    const projectBillingPanels = new Map();
     let appliedFilters = new URL(window.location.href).searchParams;
 
     async function loadDetails(panel, page = 1) {
@@ -152,6 +154,40 @@ if (monitoring) {
         } finally {
             if (detailRequests.get(panel) === request) {
                 detailRequests.delete(panel);
+                panel.removeAttribute('aria-busy');
+            }
+        }
+    }
+
+    async function loadLotBilling(panel) {
+        lotBillingRequests.get(panel)?.abort();
+        const request = new AbortController();
+        lotBillingRequests.set(panel, request);
+        panel.dataset.loaded = '';
+        panel.setAttribute('aria-busy', 'true');
+        panel.textContent = 'Loading Billing by Lot...';
+        try {
+            const response = await fetch(panel.dataset.endpoint, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+                signal: request.signal,
+            });
+            if (!response.headers.get('content-type')?.includes('application/json')) {
+                throw new Error('Your session has expired. Sign in again to load lot billing.');
+            }
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(Object.values(result.errors ?? {}).flat()[0] ?? 'Lot billing could not be loaded. Expand details again to retry.');
+            }
+            panel.innerHTML = result.html || '<p class="text-sm text-slate-500">No lot billing records are available.</p>';
+            panel.dataset.loaded = 'true';
+        } catch (exception) {
+            if (exception.name !== 'AbortError') {
+                panel.textContent = exception.message;
+            }
+        } finally {
+            if (lotBillingRequests.get(panel) === request) {
+                lotBillingRequests.delete(panel);
                 panel.removeAttribute('aria-busy');
             }
         }
@@ -235,7 +271,10 @@ if (monitoring) {
             }
             detailRequests.forEach(request => request.abort());
             detailRequests.clear();
+            lotBillingRequests.forEach(request => request.abort());
+            lotBillingRequests.clear();
             projectDetails.clear();
+            projectBillingPanels.clear();
             appliedFilters = new URL(url).searchParams;
             document.getElementById('monitoring-results').innerHTML = report.summary_html;
             document.getElementById('monitoring-table').innerHTML = report.projects_html;
@@ -309,6 +348,8 @@ if (monitoring) {
         const panel = details.querySelector('[data-lazy-details]');
         if (!details.hidden && panel) {
             const previous = projectDetails.get(panel.dataset.projectId);
+            const billingPanel = details.querySelector('[data-lazy-lot-billing]');
+            const previousBillingPanel = projectBillingPanels.get(panel.dataset.projectId);
             if (previous && previous !== panel) {
                 detailRequests.get(previous)?.abort();
                 panel.querySelector('[data-detail-content]').replaceChildren(...previous.querySelector('[data-detail-content]').childNodes);
@@ -318,7 +359,19 @@ if (monitoring) {
                 panel.dataset.page = previous.dataset.page ?? '1';
                 previous.dataset.loaded = '';
             }
+            if (billingPanel && previousBillingPanel && previousBillingPanel !== billingPanel) {
+                lotBillingRequests.get(previousBillingPanel)?.abort();
+                billingPanel.replaceChildren(...previousBillingPanel.childNodes);
+                billingPanel.dataset.loaded = previousBillingPanel.dataset.loaded;
+                previousBillingPanel.dataset.loaded = '';
+            }
             projectDetails.set(panel.dataset.projectId, panel);
+            if (billingPanel) {
+                projectBillingPanels.set(panel.dataset.projectId, billingPanel);
+                if (!billingPanel.dataset.loaded) {
+                    loadLotBilling(billingPanel);
+                }
+            }
             if (!panel.dataset.loaded) {
                 loadDetails(panel, Number(panel.dataset.page ?? 1));
             }

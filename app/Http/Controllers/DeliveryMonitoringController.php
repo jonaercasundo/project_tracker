@@ -66,11 +66,24 @@ class DeliveryMonitoringController extends Controller
         ])->header('Cache-Control', 'private, no-store');
     }
 
+    public function lotBilling(int $project): JsonResponse
+    {
+        abort_unless(DB::table('projects')->where('project_id', $project)->exists(), 404, 'Project not found.');
+
+        $lotBillingProgress = $this->progress->lotBillingProgressForProject($project);
+        $projectData = ['lot_billing_progress' => $lotBillingProgress];
+
+        return response()->json([
+            'lot_billing_progress' => $lotBillingProgress,
+            'html' => view('operation.delivery.partials.monitoring-lot-billing', ['project' => $projectData])->render(),
+        ])->header('Cache-Control', 'private, no-store');
+    }
+
     public function index(DeliveryMonitoringRequest $request): View|JsonResponse
     {
         $filters = array_filter($request->validated(), fn (mixed $value): bool => $value !== null && $value !== '');
         $filters['active_only'] ??= 0;
-        $report = $this->progress->report($filters);
+        $report = $this->progress->report([...$filters, 'defer_lot_billing' => true]);
         if ($request->expectsJson()) {
             return response()->json($report + [
                 'summary_html' => view('operation.delivery.partials.monitoring-results', ['report' => $report])->render(),

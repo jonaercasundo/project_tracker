@@ -1212,8 +1212,9 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
     $this->withoutVite();
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
 
-    $activeCycle = $this->getJson('/deliveries/monitoring?project_id=1&active_only=0')->assertOk()
-        ->json('projects.0.lot_billing_progress.0');
+    $billingResponse = $this->getJson('/deliveries/monitoring/1/billing')->assertOk()
+        ->assertJsonPath('lot_billing_progress.0.lot_id', 1);
+    $activeCycle = $billingResponse->json('lot_billing_progress.0');
 
     expect($activeCycle['contract_price'])->toBe('1000.00')
         ->and($activeCycle['current_cycle']['amount_billed'])->toBe('200.00')
@@ -1235,21 +1236,23 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
         ->toMatchArray(['amount' => '500.00', 'dr_count' => 2]);
 
     $monitoringPage = $this->get('/deliveries/monitoring?project_id=1&active_only=0')->assertOk()
-        ->assertSee('Billing by Lot')
-        ->assertSee('BILL-OLD')
-        ->assertSee('data-lot-billing-progress="3"', false)
-        ->assertSee('lg:grid-cols-3', false)
-        ->assertSee('Current Cycle Amount Billed')
-        ->assertSee('Billing Status Breakdown')
-        ->assertSee('data-billing-status="billed"', false);
+        ->assertSee('data-lazy-lot-billing', false)
+        ->assertSee(route('deliveries.monitoring.billing', ['project' => 1]), false);
 
-    expect($monitoringPage->getContent())
+    expect($billingResponse->json('html'))
+        ->toContain('Billing by Lot')
+        ->toContain('BILL-OLD')
+        ->toContain('data-lot-billing-progress="3"')
+        ->toContain('lg:grid-cols-3')
+        ->toContain('Current Cycle Amount Billed')
+        ->toContain('Billing Status Breakdown')
+        ->toContain('data-billing-status="billed"')
         ->toContain('&#8369;1,000.00')
         ->toContain('&#8369;229,401,493.02')
         ->toContain('2 DRs')
         ->toContain('20.00%');
 
-    $this->get('/deliveries/monitoring')->assertOk()->assertSee('Billing Status Breakdown');
+    $this->get('/deliveries/monitoring')->assertOk()->assertSee('data-lazy-lot-billing', false);
 
     DB::table('delivery_billing_records')->where('delivery_id', 7)->delete();
     DB::table('delivery_billing_records')->where('delivery_id', 2)->update([
@@ -1259,8 +1262,8 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
     ]);
     DB::table('billing_batches')->where('id', 2)->update(['status' => 'billed']);
 
-    $completedCycles = $this->getJson('/deliveries/monitoring?project_id=1&active_only=0')->assertOk()
-        ->json('projects.0.lot_billing_progress.0');
+    $completedCycles = $this->getJson('/deliveries/monitoring/1/billing')->assertOk()
+        ->json('lot_billing_progress.0');
 
     expect($completedCycles['current_cycle']['amount_billed'])->toBe('0.00')
         ->and($completedCycles['current_cycle']['percent_billed'])->toBe(0)
@@ -1280,23 +1283,23 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
         ['delivery_id' => 6, 'status' => 'for_billing', 'invoice_id' => 2, 'billing_batch_id' => 4, 'billing_amount' => '900.00', 'confirmed_billed_at' => null],
     ]);
 
-    $newCycle = $this->getJson('/deliveries/monitoring?project_id=1&active_only=0')->assertOk()
-        ->json('projects.0.lot_billing_progress.0');
+    $newCycle = $this->getJson('/deliveries/monitoring/1/billing')->assertOk()
+        ->json('lot_billing_progress.0');
 
     expect($newCycle['current_cycle']['amount_billed'])->toBe('1300.00')
         ->and($newCycle['current_cycle']['percent_billed'])->toBe(100)
         ->and($newCycle['current_cycle']['not_billed_amount'])->toBe('0.00')
         ->and($newCycle['history'])->toHaveCount(2);
 
-    $zeroPriceLot = $this->getJson('/deliveries/monitoring?project_id=2&active_only=0')->assertOk()
-        ->json('projects.0.lot_billing_progress.0');
+    $zeroPriceLot = $this->getJson('/deliveries/monitoring/2/billing')->assertOk()
+        ->json('lot_billing_progress.0');
 
     expect($zeroPriceLot['contract_price'])->toBe('0.00')
         ->and($zeroPriceLot['history'][0]['percent_billed'])->toBeNull();
 
-    $this->get('/deliveries/monitoring?project_id=2&active_only=0')
+    $this->getJson('/deliveries/monitoring/2/billing')
         ->assertOk()
-        ->assertSee('N/A');
+        ->assertJsonPath('lot_billing_progress.0.contract_price', '0.00');
 });
 
 it('renders long project names in a searchable monitoring filter without losing the selected project', function () {

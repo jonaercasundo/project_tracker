@@ -124,6 +124,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         ->whereNumber('project')
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring.details');
+    Route::get('/deliveries/monitoring/{project}/billing', [DeliveryMonitoringController::class, 'lotBilling'])
+        ->whereNumber('project')
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.monitoring.billing');
     Route::get('/site-maintenance', function () {
         return view('site.maintenance');
     })->name('site.maintenance');

@@ -1177,6 +1177,13 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
     jarvisOperations();
     DB::table('lot')->where('lot_id', 1)->update(['contract_price' => '1000.00']);
     DB::table('lot')->where('lot_id', 2)->update(['contract_price' => '0.00']);
+    DB::table('lot')->insert([
+        'lot_id' => 3,
+        'project_id' => 1,
+        'lot_name' => 'Lot 3',
+        'contract_no' => 'CONTRACT-3',
+        'contract_price' => '229401493.02',
+    ]);
     DB::table('deliveries')->insert([
         ['delivery_id' => 4, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3504', 'status' => 'delivered'],
         ['delivery_id' => 5, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3505', 'status' => 'delivered'],
@@ -1219,10 +1226,14 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
     $monitoringPage = $this->get('/deliveries/monitoring?project_id=1&active_only=0')->assertOk()
         ->assertSee('Billing by Lot')
         ->assertSee('BILL-OLD')
-        ->assertSee('BILL-ACTIVE')
-        ->assertSee('Current Cycle · Amount Billed');
+        ->assertSee('data-lot-billing-progress="3"', false)
+        ->assertSee('lg:grid-cols-3', false)
+        ->assertSee('Current Cycle Amount Billed');
 
-    expect($monitoringPage->getContent())->toContain('&#8369;1,000.00')->toContain('20.00%');
+    expect($monitoringPage->getContent())
+        ->toContain('&#8369;1,000.00')
+        ->toContain('&#8369;229,401,493.02')
+        ->toContain('20.00%');
 
     DB::table('delivery_billing_records')->where('delivery_id', 2)->update([
         'status' => 'billed',

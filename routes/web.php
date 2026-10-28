@@ -47,6 +47,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectDashboardController;
 use App\Http\Controllers\ProjectFinancialPlanController;
+use App\Http\Controllers\ProjectItemController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\RoleAccessPermissionController;
@@ -439,6 +440,15 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/projects/{project:project_id}', [ProjectController::class, 'show'])
         ->middleware(['company.context:MMC', 'role:user,finance'])
         ->name('projects.show');
+
+    Route::prefix('/projects/{project:project_id}/items')
+        ->middleware(['company.context:MMC', 'role:user,finance'])
+        ->name('projects.items.')
+        ->group(function (): void {
+            Route::get('/{itemId}', [ProjectItemController::class, 'show'])->whereNumber('itemId')->name('show');
+            Route::get('/{itemId}/edit', [ProjectItemController::class, 'edit'])->whereNumber('itemId')->name('edit');
+            Route::put('/{itemId}', [ProjectItemController::class, 'update'])->whereNumber('itemId')->name('update');
+        });
 
     Route::middleware(['role:finance'])->group(function () {
         Route::get('/dashboard', [ProjectFinancialPlanController::class, 'dashboard'])

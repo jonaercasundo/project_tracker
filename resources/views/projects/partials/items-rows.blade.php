@@ -80,7 +80,8 @@
 
                                             <div class="inline-flex items-center gap-2">
 
-                                                <a href="#"
+                                                @if($itemId !== null)
+                                                <a href="{{ route('projects.items.show', [$project, $itemId]) }}"
                                                 class="px-3 py-1.5 rounded-lg
                                                         bg-blue-50 text-blue-700
                                                         hover:bg-blue-100
@@ -88,13 +89,14 @@
                                                     View
                                                 </a>
 
-                                                <a href="#"
+                                                <a href="{{ route('projects.items.edit', [$project, $itemId]) }}"
                                                 class="px-3 py-1.5 rounded-lg
                                                         bg-slate-100 text-slate-700
                                                         hover:bg-slate-200
                                                         text-xs font-bold transition">
                                                     Edit
                                                 </a>
+                                                @endif
 
                                             </div>
 

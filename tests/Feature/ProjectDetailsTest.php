@@ -404,6 +404,115 @@ it('filters items and packages using their actual schema and project membership'
     $this->getJson('/projects/1/packages-data?package_type=Unknown')->assertJsonPath('total', 0);
 });
 
+it('links each item row to project-scoped view and edit pages', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+
+    $response = $this->getJson('/projects/1/items-data');
+
+    $response->assertOk();
+
+    expect($response->json('html'))
+        ->toContain(route('projects.items.show', [1, 1]))
+        ->toContain(route('projects.items.edit', [1, 1]))
+        ->not->toContain(route('projects.items.show', [1, 2]))
+        ->not->toContain(route('projects.items.edit', [1, 2]));
+});
+
+it('shows saved project item details and prefills its edit form', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+
+    $this->get(route('projects.items.show', [1, 1]))
+        ->assertOk()
+        ->assertSee('Microscope')
+        ->assertSee('Item Id')
+        ->assertSee('Supplier Price');
+
+    $this->get(route('projects.items.edit', [1, 1]))
+        ->assertOk()
+        ->assertSee('name="item_name"', false)
+        ->assertSee('value="Microscope"', false);
+});
+
+it('saves a project item edit and returns to the Items tab', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+
+    $response = $this->put(route('projects.items.update', [1, 1]), [
+        'item_name' => 'Microscope Updated',
+        'unit' => 'piece',
+        'price' => '1250.50',
+        'supplier_price' => '900.00',
+    ]);
+
+    $response->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'items']))
+        ->assertSessionHas('success', 'Item updated successfully.');
+    $this->assertDatabaseHas('item', [
+        'item_id' => 1,
+        'project_id' => 1,
+        'item_name' => 'Microscope Updated',
+        'unit' => 'piece',
+        'price' => '1250.50',
+        'supplier_price' => '900.00',
+    ]);
+
+    $this->getJson('/projects/1/items-data')->assertSee('Microscope Updated');
+});
+
+it('requires an item name and does not update a project item on invalid input', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    $editUrl = route('projects.items.edit', [1, 1]);
+
+    $this->from($editUrl)
+        ->put(route('projects.items.update', [1, 1]), ['unit' => 'piece'])
+        ->assertRedirect($editUrl)
+        ->assertSessionHasErrors('item_name');
+
+    $this->assertDatabaseHas('item', ['item_id' => 1, 'project_id' => 1, 'item_name' => 'Microscope']);
+});
+
+it('rejects invalid project item prices without changing the saved item', function (string $price) {
+    projectDetailsUser();
+    projectDetailsFixtures();
+
+    $this->from(route('projects.items.edit', [1, 1]))
+        ->put(route('projects.items.update', [1, 1]), ['item_name' => 'Microscope', 'price' => $price])
+        ->assertSessionHasErrors('price');
+
+    $this->assertDatabaseHas('item', [
+        'item_id' => 1,
+        'project_id' => 1,
+        'item_name' => 'Microscope',
+        'price' => null,
+    ]);
+})->with([
+    'negative price' => '-1',
+    'more than two decimal places' => '1.234',
+]);
+
+it('does not expose or update an item outside its project', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+
+    $this->get(route('projects.items.show', [1, 2]))->assertNotFound();
+    $this->put(route('projects.items.update', [1, 2]), ['item_name' => 'Changed'])->assertNotFound();
+
+    $this->assertDatabaseHas('item', ['item_id' => 2, 'project_id' => 2, 'item_name' => 'Other item']);
+});
+
+it('denies project item actions to users outside the Project Details roles', function () {
+    projectDetailsUser('MMC', 'Executive');
+    projectDetailsFixtures();
+
+    $this->get(route('projects.items.show', [1, 1]))->assertForbidden();
+    $this->get(route('projects.items.edit', [1, 1]))->assertForbidden();
+    $this->put(route('projects.items.update', [1, 1]), ['item_name' => 'Changed'])->assertForbidden();
+
+    $this->assertDatabaseHas('item', ['item_id' => 1, 'project_id' => 1, 'item_name' => 'Microscope']);
+});
+
 it('uses type filters when the schema contains type columns', function () {
     projectDetailsUser();
     projectDetailsFixtures();

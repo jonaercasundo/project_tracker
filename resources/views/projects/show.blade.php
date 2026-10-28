@@ -33,6 +33,11 @@
 
     </div>
 
+    @if (session('success') || session('error'))
+        <div role="status" class="rounded-xl border {{ session('error') ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' }} px-4 py-3 text-sm font-medium">
+            {{ session('error') ?? session('success') }}
+        </div>
+    @endif
 
     {{-- QUICK STATISTICS --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

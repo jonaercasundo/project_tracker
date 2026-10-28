@@ -155,7 +155,10 @@ function openTab(event, tabName) {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    const saved = localStorage.getItem('activeProjectTab');
+    const requestedTab = new URLSearchParams(window.location.search).get('tab');
+    const requestedButton = Array.from(document.querySelectorAll('[data-tab]'))
+        .find(button => button.dataset.tab === requestedTab);
+    const saved = requestedButton ? requestedTab : localStorage.getItem('activeProjectTab');
 
     if (saved) {
 

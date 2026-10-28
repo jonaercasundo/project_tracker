@@ -823,7 +823,43 @@ class ProjectDeliveryProgressService
             return collect();
         }
 
+        $drItemTotals = DB::table('deliveries as d')
+            ->leftJoinSub($this->packageAllocations(['project_ids' => $projectIds], false), 'allocation', 'allocation.delivery_id', '=', 'd.delivery_id')
+            ->leftJoin('package_content as content', 'content.package_id', '=', 'allocation.package_id')
+            ->leftJoin('item as item', 'item.item_id', '=', 'content.item_id')
+            ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
+            ->whereIn('d.project_id', $projectIds)
+            ->whereNotNull('d.lot_id')
+            ->whereNotNull('d.dr_no')->whereRaw("TRIM(d.dr_no) <> ''")
+            ->whereRaw("LOWER(TRIM(COALESCE(d.status, ''))) NOT IN ('cancelled', 'canceled', 'void', 'voided', 'deleted', 'rejected')")
+            ->select(['d.project_id', 'd.lot_id'])
+            ->selectRaw($this->receiptExpression('d').' as dr_no')
+            ->selectRaw('SUM(COALESCE(item.price, 0) * CASE WHEN content.qty > 0 THEN content.qty ELSE 1 END * CASE WHEN allocation.package_qty > 0 THEN allocation.package_qty ELSE 1 END) as amount')
+            ->selectRaw("MAX(CASE WHEN billing.status = 'billed' THEN 1 ELSE 0 END) as has_billed")
+            ->selectRaw("MAX(CASE WHEN billing.status = 'for_billing' THEN 1 ELSE 0 END) as has_for_billing")
+            ->selectRaw("MAX(CASE WHEN billing.status = 'on_hold' THEN 1 ELSE 0 END) as has_on_hold")
+            ->groupBy('d.project_id', 'd.lot_id')
+            ->groupByRaw($this->receiptExpression('d'));
+        if ($this->usesMysql()) {
+            $drItemTotals->groupByRaw('OCTET_LENGTH(d.dr_no)');
+        }
+
+        $statusTotals = DB::query()->fromSub($drItemTotals, 'dr_items')
+            ->select(['dr_items.project_id', 'dr_items.lot_id'])
+            ->selectRaw('SUM(CASE WHEN dr_items.has_billed = 1 THEN dr_items.amount ELSE 0 END) as billed_amount')
+            ->selectRaw('SUM(CASE WHEN dr_items.has_billed = 1 THEN 1 ELSE 0 END) as billed_dr_count')
+            ->selectRaw('SUM(CASE WHEN dr_items.has_billed = 0 AND dr_items.has_for_billing = 1 THEN dr_items.amount ELSE 0 END) as for_billing_amount')
+            ->selectRaw('SUM(CASE WHEN dr_items.has_billed = 0 AND dr_items.has_for_billing = 1 THEN 1 ELSE 0 END) as for_billing_dr_count')
+            ->selectRaw('SUM(CASE WHEN dr_items.has_billed = 0 AND dr_items.has_for_billing = 0 AND dr_items.has_on_hold = 1 THEN dr_items.amount ELSE 0 END) as on_hold_amount')
+            ->selectRaw('SUM(CASE WHEN dr_items.has_billed = 0 AND dr_items.has_for_billing = 0 AND dr_items.has_on_hold = 1 THEN 1 ELSE 0 END) as on_hold_dr_count')
+            ->selectRaw('SUM(CASE WHEN dr_items.has_billed = 0 AND dr_items.has_for_billing = 0 AND dr_items.has_on_hold = 0 THEN dr_items.amount ELSE 0 END) as pending_billing_amount')
+            ->selectRaw('SUM(CASE WHEN dr_items.has_billed = 0 AND dr_items.has_for_billing = 0 AND dr_items.has_on_hold = 0 THEN 1 ELSE 0 END) as pending_billing_dr_count')
+            ->groupBy('dr_items.project_id', 'dr_items.lot_id');
+
         $lotRows = DB::table('lot as l')
+            ->leftJoinSub($statusTotals, 'status_totals', function (JoinClause $join): void {
+                $join->on('status_totals.project_id', '=', 'l.project_id')->on('status_totals.lot_id', '=', 'l.lot_id');
+            })
             ->leftJoin('deliveries as d', function (JoinClause $join): void {
                 $join->on('d.lot_id', '=', 'l.lot_id')->on('d.project_id', '=', 'l.project_id');
             })
@@ -838,6 +874,10 @@ class ProjectDeliveryProgressService
             ->selectRaw("SUM(CASE WHEN billing.status = 'billed' THEN COALESCE(billing.billing_amount, 0) ELSE 0 END) as amount_billed")
             ->selectRaw("SUM(CASE WHEN billing.id IS NULL OR billing.status = 'billed' THEN 0 ELSE 1 END) as not_billed_count")
             ->selectRaw('MAX(billing.confirmed_billed_at) as last_billed_at')
+            ->selectRaw('COALESCE(MAX(status_totals.billed_amount), 0) as status_billed_amount, COALESCE(MAX(status_totals.billed_dr_count), 0) as status_billed_dr_count')
+            ->selectRaw('COALESCE(MAX(status_totals.for_billing_amount), 0) as status_for_billing_amount, COALESCE(MAX(status_totals.for_billing_dr_count), 0) as status_for_billing_dr_count')
+            ->selectRaw('COALESCE(MAX(status_totals.on_hold_amount), 0) as status_on_hold_amount, COALESCE(MAX(status_totals.on_hold_dr_count), 0) as status_on_hold_dr_count')
+            ->selectRaw('COALESCE(MAX(status_totals.pending_billing_amount), 0) as status_pending_billing_amount, COALESCE(MAX(status_totals.pending_billing_dr_count), 0) as status_pending_billing_dr_count')
             ->groupBy('l.project_id', 'l.lot_id', 'l.lot_name', 'l.contract_price', 'billing.billing_batch_id', 'batch.batch_ref', 'batch.status', 'batch.confirmed_at', 'batch.created_at', 'billing.invoice_id', 'invoice.invoice_no')
             ->groupByRaw("CASE WHEN billing.billing_batch_id IS NOT NULL THEN 'batch' WHEN billing.invoice_id IS NOT NULL THEN 'invoice' ELSE 'record' END")
             ->groupByRaw('COALESCE(billing.billing_batch_id, billing.invoice_id, -billing.id)')
@@ -893,6 +933,17 @@ class ProjectDeliveryProgressService
                         'not_billed_percent' => $currentNotBilledPercent,
                         'labels' => $currentCycles->pluck('label')->values()->all(),
                     ],
+                    'billing_status_breakdown' => collect([
+                        ['status' => 'billed', 'label' => 'Billed', 'amount' => $lot->status_billed_amount, 'dr_count' => $lot->status_billed_dr_count],
+                        ['status' => 'for_billing', 'label' => 'For Billing', 'amount' => $lot->status_for_billing_amount, 'dr_count' => $lot->status_for_billing_dr_count],
+                        ['status' => 'on_hold', 'label' => 'On Hold', 'amount' => $lot->status_on_hold_amount, 'dr_count' => $lot->status_on_hold_dr_count],
+                        ['status' => 'pending_billing', 'label' => 'Pending Billing', 'amount' => $lot->status_pending_billing_amount, 'dr_count' => $lot->status_pending_billing_dr_count],
+                    ])->map(function (array $status): array {
+                        $status['amount'] = number_format((float) $status['amount'], 2, '.', '');
+                        $status['dr_count'] = (int) $status['dr_count'];
+
+                        return $status;
+                    })->all(),
                     'history' => $cycles->where('completed', true)->sortByDesc('completed_at')->values()->map(fn (array $cycle): array => $cycle + [
                         'not_billed_amount' => '0.00',
                         'not_billed_percent' => 0,
@@ -1025,7 +1076,7 @@ class ProjectDeliveryProgressService
             'delivery_progress' => 'Completed valid DR receipts / total valid DR receipts x 100. Zero receipts means unavailable. Excludes blank DR identifiers and receipts with cancelled, void, deleted or rejected delivery rows. Logistics performance uses the same receipt completion flag; unresolved or conflicting partners remain in project totals.',
             'completed_deliveries' => 'Receipts whose expected allocations are all delivered or accepted, including mixed delivered/accepted receipts. Without package definitions, all receipt delivery rows must be delivered or accepted.',
             'billing_progress' => '(Billed + paid recorded billing groups) / all recorded billing groups matching exact DR receipts x 100. Paid is a later stage than billed; no groups means unavailable.',
-            'lot_billing_progress' => 'Per-lot cycles use the existing delivery billing ledger. Only delivery_billing_records with status billed contribute billing_amount; encoding or marking a record for_billing does not. A billing batch closes when billing_batches.status is billed, and completed batch/invoice cycles remain in history. Current-cycle percentage is billed allocation / lot contract_price, capped at 100%; zero or unset contract price is N/A. Invoice totals are excluded because a shared invoice can be linked to multiple delivery records.',
+            'lot_billing_progress' => 'Per-lot cycles use the existing delivery billing ledger. Only delivery_billing_records with status billed contribute billing_amount; encoding or marking a record for_billing does not. A billing batch closes when billing_batches.status is billed, and completed batch/invoice cycles remain in history. Current-cycle percentage is billed allocation / lot contract_price, capped at 100%; zero or unset contract price is N/A. The status breakdown sums item.price x package_content.qty x delivery package_qty from each lot-assigned delivery allocation and groups each exact project + lot + DR once; billed, for_billing, on_hold, and pending_billing are mutually exclusive. Shared invoice totals are excluded.',
             'year' => 'Scheduled delivery_date year, consistent with delivery tracking. Location and delivery-status filters restrict the receipts and their allocations counted.',
             'active_projects' => 'Excludes Delivered, For Billing, For Collection, Collected, Cancelled and Dropped projects. Completed is labelled Awarded in the existing project editor and remains active. Set active_only=0 to include all projects.',
             'last_delivery_date' => 'Latest recorded delivered_date in the filtered delivery rows; absent dates remain null.',

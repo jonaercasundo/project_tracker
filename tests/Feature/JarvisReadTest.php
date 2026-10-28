@@ -1188,6 +1188,8 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
         ['delivery_id' => 4, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3504', 'status' => 'delivered'],
         ['delivery_id' => 5, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3505', 'status' => 'delivered'],
         ['delivery_id' => 6, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3506', 'status' => 'delivered'],
+        ['delivery_id' => 7, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3507', 'status' => 'delivered'],
+        ['delivery_id' => 8, 'project_id' => 1, 'school_id' => '001', 'lot_id' => 1, 'dr_no' => '3502', 'status' => 'delivered'],
     ]);
     DB::table('billing_batches')->insert([
         ['id' => 1, 'batch_ref' => 'BILL-OLD', 'status' => 'billed', 'confirmed_at' => '2026-01-01 00:00:00', 'created_at' => '2025-12-30 00:00:00'],
@@ -1204,6 +1206,7 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
         ['delivery_id' => 2, 'status' => 'for_billing', 'invoice_id' => 2, 'billing_batch_id' => 2, 'billing_amount' => '300.00', 'confirmed_billed_at' => null],
         ['delivery_id' => 4, 'status' => 'billed', 'invoice_id' => 2, 'billing_batch_id' => 2, 'billing_amount' => '200.00', 'confirmed_billed_at' => '2026-10-03 00:00:00'],
         ['delivery_id' => 3, 'status' => 'billed', 'invoice_id' => 3, 'billing_batch_id' => 3, 'billing_amount' => '100.00', 'confirmed_billed_at' => '2026-10-02 00:00:00'],
+        ['delivery_id' => 7, 'status' => 'on_hold', 'invoice_id' => null, 'billing_batch_id' => null, 'billing_amount' => null, 'confirmed_billed_at' => null],
     ]);
     $user = jarvisReader(true, true, false);
     $this->withoutVite();
@@ -1221,20 +1224,33 @@ it('tracks lot billing by active cycle and retains posted cycle history', functi
         ->and($activeCycle['history'][0]['label'])->toBe('BILL-OLD')
         ->and($activeCycle['history'][0]['amount_billed'])->toBe('400.00')
         ->and($activeCycle['history'][0]['not_billed_amount'])->toBe('0.00')
-        ->and($activeCycle['history'][0]['not_billed_percent'])->toBe(0);
+        ->and($activeCycle['history'][0]['not_billed_percent'])->toBe(0)
+        ->and(collect($activeCycle['billing_status_breakdown'])->keyBy('status')->get('billed'))
+        ->toMatchArray(['amount' => '1000.00', 'dr_count' => 2])
+        ->and(collect($activeCycle['billing_status_breakdown'])->keyBy('status')->get('for_billing'))
+        ->toMatchArray(['amount' => '250.00', 'dr_count' => 1])
+        ->and(collect($activeCycle['billing_status_breakdown'])->keyBy('status')->get('on_hold'))
+        ->toMatchArray(['amount' => '250.00', 'dr_count' => 1])
+        ->and(collect($activeCycle['billing_status_breakdown'])->keyBy('status')->get('pending_billing'))
+        ->toMatchArray(['amount' => '500.00', 'dr_count' => 2]);
 
     $monitoringPage = $this->get('/deliveries/monitoring?project_id=1&active_only=0')->assertOk()
         ->assertSee('Billing by Lot')
         ->assertSee('BILL-OLD')
         ->assertSee('data-lot-billing-progress="3"', false)
         ->assertSee('lg:grid-cols-3', false)
-        ->assertSee('Current Cycle Amount Billed');
+        ->assertSee('Current Cycle Amount Billed')
+        ->assertSee('Billing Status Breakdown')
+        ->assertSee('data-billing-status="billed"', false);
 
     expect($monitoringPage->getContent())
         ->toContain('&#8369;1,000.00')
         ->toContain('&#8369;229,401,493.02')
+        ->toContain('&#8369;1,000.00')
+        ->toContain('2 DRs')
         ->toContain('20.00%');
 
+    DB::table('delivery_billing_records')->where('delivery_id', 7)->delete();
     DB::table('delivery_billing_records')->where('delivery_id', 2)->update([
         'status' => 'billed',
         'billing_amount' => '300.00',

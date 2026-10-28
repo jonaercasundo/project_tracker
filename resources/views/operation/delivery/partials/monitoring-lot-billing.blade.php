@@ -29,6 +29,19 @@
                         <p class="mt-1 whitespace-nowrap text-sm tabular-nums text-slate-800">&#8369;{{ number_format((float) $lotBilling['current_cycle']['not_billed_amount'], 2) }} <span class="text-slate-500">&middot; {{ number_format($lotBilling['current_cycle']['not_billed_percent'], 2) }}%</span></p>
                     </div>
 
+                    <section class="mt-4 border-t border-slate-100 pt-3" aria-label="Billing status breakdown for {{ $lotBilling['lot_name'] }}">
+                        <h5 class="text-xs font-bold text-slate-700">Billing Status Breakdown</h5>
+                        <dl class="mt-2 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                            @foreach ($lotBilling['billing_status_breakdown'] as $status)
+                                <div class="min-w-0 rounded-md bg-slate-50 px-3 py-2" data-billing-status="{{ $status['status'] }}">
+                                    <dt class="text-xs font-medium text-slate-600">{{ $status['label'] }}</dt>
+                                    <dd class="mt-1 whitespace-nowrap text-sm font-semibold tabular-nums text-slate-800">&#8369;{{ number_format((float) $status['amount'], 2) }}</dd>
+                                    <dd class="mt-1 text-xs tabular-nums text-slate-500">{{ number_format($status['dr_count']) }} {{ $status['dr_count'] === 1 ? 'DR' : 'DRs' }}</dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                    </section>
+
                     <section class="mt-4 border-t border-slate-100 pt-3" aria-label="Completed billing cycles for {{ $lotBilling['lot_name'] }}">
                         <h5 class="text-xs font-bold text-slate-700">Completed Billing Cycles</h5>
                         @if ($lotBilling['history'] === [])

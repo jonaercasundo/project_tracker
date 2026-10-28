@@ -364,14 +364,43 @@ class ProjectDeliveryProgressService
     /** @param array<string, mixed> $filters */
     private function deliveryBillingStats(array $filters): Builder
     {
+        $billingDrRows = $this->deliveries($filters)
+            ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
+            ->select('d.project_id')
+            ->selectRaw($this->receiptExpression('d').' as dr_no')
+            ->selectRaw("CASE WHEN billing.status = 'for_billing' THEN 1 ELSE 0 END as has_for_billing_status")
+            ->selectRaw("CASE WHEN billing.status IN ('for_billing', 'billed') THEN 1 ELSE 0 END as has_billing_stage")
+            ->selectRaw("CASE WHEN billing.status = 'billed' THEN 1 ELSE 0 END as has_billed_status")
+            ->whereNotNull('d.dr_no')
+            ->whereRaw("TRIM(d.dr_no) <> ''");
+        if (isset($filters['delivery_status'])) {
+            $billingDrRows->where('d.status', $filters['delivery_status']);
+        }
+        $billingDrs = DB::query()->fromSub($billingDrRows, 'billing_dr')
+            ->select('billing_dr.project_id', 'billing_dr.dr_no')
+            ->selectRaw('MAX(billing_dr.has_for_billing_status) as has_for_billing_status')
+            ->selectRaw('MAX(billing_dr.has_billing_stage) as has_billing_stage')
+            ->selectRaw('MAX(billing_dr.has_billed_status) as has_billed_status');
+        $this->groupReceipts($billingDrs, 'billing_dr');
+        $billingDrStats = DB::query()->fromSub($billingDrs, 'billing_dr')
+            ->select('billing_dr.project_id')
+            ->selectRaw('SUM(billing_dr.has_for_billing_status) as for_billing_drs_count')
+            ->selectRaw('SUM(billing_dr.has_billing_stage) as billing_drs_count')
+            ->selectRaw('SUM(billing_dr.has_billed_status) as billed_delivery_drs_count')
+            ->groupBy('billing_dr.project_id');
+
         $deliveries = $this->deliveries($filters)
             ->leftJoin('delivery_billing_records as billing', 'billing.delivery_id', '=', 'd.delivery_id')
+            ->leftJoinSub($billingDrStats, 'billing_dr_stats', 'billing_dr_stats.project_id', '=', 'd.project_id')
             ->select('d.project_id')
             ->selectRaw('COUNT(DISTINCT d.delivery_id) as delivery_billing_records_count')
             ->selectRaw("COUNT(DISTINCT CASE WHEN billing.delivery_id IS NULL OR billing.status = 'pending_billing' THEN d.delivery_id END) as pending_billing_deliveries_count")
             ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'for_billing' THEN d.delivery_id END) as for_billing_deliveries_count")
             ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'billed' THEN d.delivery_id END) as billed_deliveries_count")
             ->selectRaw("COUNT(DISTINCT CASE WHEN billing.status = 'on_hold' THEN d.delivery_id END) as on_hold_deliveries_count")
+            ->selectRaw('COALESCE(MAX(billing_dr_stats.for_billing_drs_count), 0) as for_billing_drs_count')
+            ->selectRaw('COALESCE(MAX(billing_dr_stats.billing_drs_count), 0) as billing_drs_count')
+            ->selectRaw('COALESCE(MAX(billing_dr_stats.billed_delivery_drs_count), 0) as billed_delivery_drs_count')
             ->groupBy('d.project_id');
 
         if (isset($filters['delivery_status'])) {
@@ -450,7 +479,7 @@ class ProjectDeliveryProgressService
         foreach (['billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count', 'billed_drs_count'] as $column) {
             $query->selectRaw("COALESCE(billing_stats.{$column}, 0) as {$column}");
         }
-        foreach (['delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count'] as $column) {
+        foreach (['delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count', 'for_billing_drs_count', 'billing_drs_count', 'billed_delivery_drs_count'] as $column) {
             $query->selectRaw("COALESCE(delivery_billing_stats.{$column}, 0) as {$column}");
         }
 
@@ -736,7 +765,7 @@ class ProjectDeliveryProgressService
                 $summary[$column] = (int) $projects->sum($column);
             }
         }
-        foreach (['total_deliveries_count', 'delivery_rows_count', 'stock_out_drs_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count', 'billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count', 'billed_drs_count', 'delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count'] as $column) {
+        foreach (['total_deliveries_count', 'delivery_rows_count', 'stock_out_drs_count', 'total_packages_count', 'total_package_allocations_count', 'completed_packages_count', 'remaining_packages_count', 'pending_packages_count', 'released_packages_count', 'delivered_packages_count', 'accepted_packages_count', 'completed_deliveries_count', 'pending_deliveries_count', 'released_deliveries_count', 'delivered_deliveries_count', 'accepted_deliveries_count', 'cancelled_deliveries_count', 'billing_groups_count', 'for_billing_groups_count', 'billed_groups_count', 'paid_groups_count', 'billed_drs_count', 'delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count', 'for_billing_drs_count', 'billing_drs_count', 'billed_delivery_drs_count'] as $column) {
             $summary[$column] ??= 0;
         }
         $summary['progress_basis'] = $summary['total_deliveries_count'] > 0 ? 'delivery_receipts' : 'no_delivery_receipts';
@@ -798,14 +827,14 @@ class ProjectDeliveryProgressService
                 'label' => 'Delivered', 'context' => 'Valid DRs with all expected packages delivered or accepted; delivery status fallback when no packages exist',
                 'source' => 'deliveries grouped by exact project_id + dr_no; current package_status by delivery_id + package_id',
             ],
-            'billing' => $this->stage($counts['billed_drs_count'], $counts['total_deliveries_count'], 'DRs') + [
-                'label' => 'Billing', 'context' => 'Billed DRs / total project DRs',
-                'source' => 'Distinct DR receipts with a linked billing_grouped record whose grouping status is billed',
+            'billing' => $this->stage($counts['billing_drs_count'], $counts['total_deliveries_count'], 'DRs') + [
+                'label' => 'Billing', 'context' => 'DRs in the billing queue / total project DRs',
+                'source' => 'Distinct project DRs with a delivery_billing_records status of for_billing or billed',
             ],
-            'billed' => $this->stage($counts['billed_groups_count'], $counts['billing_groups_count'], 'DR/group records') + [
+            'billed' => $this->stage($counts['billed_delivery_drs_count'], $counts['billing_drs_count'], 'DRs') + [
                 'label' => 'Billed', 'context' => 'Current billed status; paid is shown separately in details',
-                'source' => 'grouping.status = billed for matched billing_grouped records',
-                'milestone_percent' => $this->percentage($counts['billed_groups_count'] + $counts['paid_groups_count'], $counts['billing_groups_count']),
+                'source' => 'Distinct project DRs with a delivery_billing_records status of billed',
+                'milestone_percent' => $this->percentage($counts['billed_delivery_drs_count'], $counts['billing_drs_count']),
             ],
             'delivery_billing' => $this->stage($counts['billed_deliveries_count'], $counts['delivery_billing_records_count'], 'delivery records') + [
                 'label' => 'Delivery billing', 'context' => 'Per-delivery scanner workflow; independent from shared legacy billing groups',
@@ -875,8 +904,8 @@ class ProjectDeliveryProgressService
             'stock_in' => 'SUM(new_qty - old_qty) for inventory_history.change_type = stock_in, grouped by item then project through item.project_id. Manual inventory insert deltas are reported separately as opening stock. Stock In does not require a DR link.',
             'stock_out' => 'Distinct valid project DRs with at least one current released package allocation and a stock-out history entry for a project item contained in that package. The inventory history table does not store a direct DR/package key; current package release status is recorded in the same transaction as its item stock-out history.',
             'warehouse_readiness' => 'Current stock is SUM(inventory.qty), exactly the balance used by Inventory and the scanner. History net is SUM(new_qty - old_qty), including insert/update adjustments; disagreements are flagged. Required item quantity is SUM(package_content.qty x deliveries.package_qty) over expected project DR allocations; non-positive content.qty uses 1, matching the scanner. Availability covers at most the required quantity of each item. Readiness = sum covered item quantities / sum required quantities x 100 within a single item unit; mixed units remain separate. Missing delivery package quantities make readiness unavailable. Warehouse inventory/history always use the whole project, while DR filters restrict delivery/billing.',
-            'operational_progress' => 'Normalized DR ratios, each weighted 25%: distinct stock-out DRs / total valid DRs; completed valid DR receipts / total valid DR receipts; for billing + billed + paid records / recorded DR/group records; billed + paid records / recorded DR/group records. DR creation is the baseline. Warehouse readiness is not a completion stage. Zero denominators make overall progress unavailable. Delivery filters scope the delivery-backed stages and project-item history matches.',
-            'pipeline_billed' => 'Billed stage shows exact current billed records; paid stays separate. The normalized final billing milestone includes paid because it is a later billing stage. Billing entry includes all three recorded billing statuses. Unrecorded billing is unknown.',
+            'operational_progress' => 'Normalized DR ratios, each weighted 25%: distinct stock-out DRs / total valid DRs; completed valid DR receipts / total valid DR receipts; distinct DRs with for_billing or billed delivery billing status / total valid DRs; distinct billed delivery billing DRs / DRs that entered billing. DR creation is the baseline. Warehouse readiness is not a completion stage. Zero denominators make overall progress unavailable. Delivery filters scope the delivery-backed stages and project-item history matches.',
+            'pipeline_billed' => 'Billing stage counts distinct project DRs with a delivery_billing_records status of for_billing or billed, regardless of delivery completion. Billed counts the distinct DRs with billed status among those that entered billing.',
             'last_activity' => 'Latest recorded deliveries.created_at, delivered_date, accepted_date, billing_grouped.created_at or project inventory_history.changed_at. Billing recorded is the DR/group link date, not an invented billed-status update timestamp. Inventory activity is attributed via the existing item project relationship.',
             'deliveries' => 'Distinct exact DR receipts per project, rather than delivery rows. Receipt status is uniform expected package status, otherwise mixed; delivery row status is the fallback when no packages are defined.',
             'package_allocations' => 'Each delivery_id + package_id is one DR package allocation. Use delivery keystage when present, otherwise lot. Repeated package definitions across delivery records count as separate allocations. The newest package_status_id supplies the status if duplicate status rows exist; missing/null status is pending.',

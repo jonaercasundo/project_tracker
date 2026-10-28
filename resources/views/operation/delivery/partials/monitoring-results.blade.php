@@ -4,8 +4,8 @@
         ['Total DRs', $report['summary']['total_deliveries_count'], 'receipts'],
         ['Warehouse Stock', $report['summary']['warehouse_readiness']['available'], $report['summary']['warehouse_readiness']['unit']],
         ['Delivered / Accepted', $report['summary']['completed_deliveries_count'], 'DRs'],
-        ['Entered Billing', $report['summary']['pipeline']['billing']['completed'], 'DR/group records'],
-        ['Billed', $report['summary']['billed_groups_count'], 'DRs'],
+        ['Entered Billing', $report['summary']['pipeline']['billing']['completed'], 'DRs'],
+        ['Billed', $report['summary']['billed_delivery_drs_count'], 'DRs'],
         ['Delivery-level Billed', $report['summary']['billed_deliveries_count'], 'delivery records'],
         ['Overall Operational Progress', $report['summary']['overall_progress'], '%'],
     ] as [$label, $value, $unit])

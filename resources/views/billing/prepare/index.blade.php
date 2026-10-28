@@ -257,7 +257,12 @@
                         <table class="min-w-[1050px] w-full text-left text-sm">
                             <thead class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                                 <tr>
-                                    <th class="px-3 py-3"><span class="sr-only">Select</span></th>
+                                    <th class="px-3 py-3">
+                                        <label id="billing-preparation-select-all-control" class="hidden inline-flex items-center gap-2 whitespace-nowrap normal-case text-xs font-semibold text-slate-700">
+                                            <input id="billing-preparation-select-all" type="checkbox" class="rounded border-slate-300 text-blue-700 focus:ring-blue-600 disabled:opacity-40" aria-label="Select all eligible delivery records on this page">
+                                            <span>Select all</span>
+                                        </label>
+                                    </th>
                                     <th class="px-3 py-3">DR Number</th>
                                     <th class="px-3 py-3">Project</th>
                                     <th class="px-3 py-3">Lot / School</th>

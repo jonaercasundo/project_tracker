@@ -11,6 +11,8 @@ if (root) {
     const feedback = document.getElementById('billing-preparation-feedback');
     const review = document.getElementById('billing-preparation-review');
     const results = document.getElementById('billing-preparation-results');
+    const selectAllControl = document.getElementById('billing-preparation-select-all-control');
+    const selectAllCheckbox = document.getElementById('billing-preparation-select-all');
     const summary = document.getElementById('billing-preparation-summary');
     const pagination = document.getElementById('billing-preparation-pagination');
     const confirmButton = document.getElementById('billing-preparation-confirm');
@@ -297,6 +299,17 @@ if (root) {
         return [...rows.values()];
     }
 
+    function updateSelectAll() {
+        const eligibleRecords = visibleRecords.filter((record) => record.eligible);
+        const selectedCount = eligibleRecords.filter((record) => selected.has(record.group_key)).length;
+        const isSearchResultsPage = selectionMode === 'search' && currentPage !== null;
+
+        selectAllControl.classList.toggle('hidden', !isSearchResultsPage);
+        selectAllCheckbox.disabled = !isSearchResultsPage || eligibleRecords.length === 0;
+        selectAllCheckbox.checked = eligibleRecords.length > 0 && selectedCount === eligibleRecords.length;
+        selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < eligibleRecords.length;
+    }
+
     function renderPagination() {
         pagination.replaceChildren();
         if (!currentPage || currentPage.last_page <= 1) return;
@@ -339,6 +352,7 @@ if (root) {
         summary.textContent = `${selected.size} DR group(s) selected · ${selectedDeliveries} eligible delivery record(s) · ${excludedVisible} excluded group(s) in this review${currentPage ? ` · ${currentPage.total} matching DR groups` : ''}${selectedProjects.size ? ` · ${selectedProjects.size} project(s)` : ''}`;
         confirmButton.textContent = selected.size ? `Confirm for Billing (${selected.size})` : 'Confirm for Billing';
         confirmButton.disabled = selected.size === 0 || !canConfirm;
+        updateSelectAll();
         renderPagination();
     }
 
@@ -357,6 +371,7 @@ if (root) {
             allExpected = [];
         }
         selectionMode = name;
+        updateSelectAll();
     }
 
     function queryString(values) {
@@ -474,6 +489,16 @@ if (root) {
     document.getElementById('billing-preparation-school-search-form').addEventListener('submit', (event) => {
         event.preventDefault();
         search('school_id_search');
+    });
+
+    selectAllCheckbox.addEventListener('change', () => {
+        const eligibleRecords = visibleRecords.filter((record) => record.eligible);
+        if (selectAllCheckbox.checked) {
+            eligibleRecords.forEach((record) => appendSelected(record, 'search'));
+        } else {
+            eligibleRecords.forEach((record) => selected.delete(record.group_key));
+        }
+        render();
     });
 
     document.getElementById('billing-preparation-range-form').addEventListener('submit', async (event) => {

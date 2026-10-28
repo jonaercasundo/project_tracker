@@ -160,8 +160,6 @@ class BillingPreparationController extends Controller
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'q' => ['nullable', 'string', 'max:100'],
-            'dr_search' => ['nullable', 'string', 'max:100'],
-            'school_id_search' => ['nullable', 'string', 'max:100'],
         ]);
 
         if ($this->compareNumericStrings($validated['dr_from'], $validated['dr_to']) > 0) {
@@ -454,6 +452,8 @@ class BillingPreparationController extends Controller
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'q' => ['nullable', 'string', 'max:100'],
+            'dr_search' => ['nullable', 'string', 'max:100'],
+            'school_id_search' => ['nullable', 'string', 'max:100'],
         ]);
 
         return array_filter($validated, static fn (mixed $value): bool => $value !== null && $value !== '');

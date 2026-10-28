@@ -368,6 +368,10 @@ if (monitoring) {
                 throw new Error(result.message ?? `Sync Billing could not be queued (HTTP ${response.status}).`);
             }
 
+            if (response.status === 202 && !result.status_url) {
+                throw new Error('Sync Billing was queued, but this page cannot track its completion. Reload the latest app version and check the sync status before trying again; it may still be running.');
+            }
+
             if (result.status_url) {
                 setFeedback(result.message);
                 result = await waitForBillingSync(result.status_url, setFeedback);

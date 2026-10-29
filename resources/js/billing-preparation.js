@@ -20,8 +20,8 @@ if (root) {
     const confirmSubmit = document.getElementById('billing-preparation-confirm-submit');
     const confirmationDateInput = document.getElementById('billing-confirmation-date');
     const confirmationDateSummary = document.getElementById('billing-confirm-date-summary');
-    const billingLotFields = document.getElementById('billing-confirm-lot-fields');
-    const billingLotFieldsTemplate = document.getElementById('billing-confirm-lot-fields-template');
+    const billingSharedFields = document.getElementById('billing-confirm-shared-fields');
+    const billingLotCoverage = document.getElementById('billing-confirm-lot-coverage');
     const camera = document.getElementById('billing-preparation-camera');
     const cameraPlaceholder = document.getElementById('billing-preparation-camera-placeholder');
     const cameraSupport = document.getElementById('billing-preparation-camera-support');
@@ -76,24 +76,20 @@ if (root) {
     }
 
     function renderBillingLotFields() {
-        billingLotFields.replaceChildren();
-        selectedBillingLotNumbers().forEach((lotNumber) => {
-            const fragment = billingLotFieldsTemplate.content.cloneNode(true);
-            const panel = fragment.querySelector('[data-billing-lot-panel]');
-            panel.dataset.lotNumber = lotNumber;
-            panel.querySelector('[data-billing-lot-label]').textContent = `Lot ${lotNumber}`;
-            billingLotFields.append(fragment);
-        });
+        const lotNumbers = selectedBillingLotNumbers();
+        billingSharedFields.classList.toggle('hidden', lotNumbers.length === 0);
+        billingLotCoverage.textContent = lotNumbers.length > 0
+            ? `The same entered details will be applied to Lot${lotNumbers.length === 1 ? '' : 's'} ${lotNumbers.join(', ')}.`
+            : '';
     }
 
     function billingLotFieldValues() {
-        return Object.fromEntries([...billingLotFields.querySelectorAll('[data-billing-lot-panel]')].map((panel) => [
-            panel.dataset.lotNumber,
-            Object.fromEntries([...panel.querySelectorAll('[data-billing-field]')].map((input) => [
-                input.dataset.billingField,
-                input.value.trim(),
-            ])),
+        const sharedValues = Object.fromEntries([...billingSharedFields.querySelectorAll('[data-billing-shared-field]')].map((input) => [
+            input.dataset.billingSharedField,
+            input.value.trim(),
         ]));
+
+        return Object.fromEntries(selectedBillingLotNumbers().map((lotNumber) => [lotNumber, { ...sharedValues }]));
     }
 
     function recordScan(status, record = null, message = '', displayLabel = null) {
@@ -634,7 +630,7 @@ if (root) {
     });
 
     confirmSubmit?.addEventListener('click', async () => {
-        const missingBillingStatus = billingLotFields.querySelector('[data-billing-field="status"]:invalid');
+        const missingBillingStatus = billingSharedFields.querySelector('[data-billing-shared-field="status"]:invalid');
         if (missingBillingStatus) {
             missingBillingStatus.reportValidity();
             return;

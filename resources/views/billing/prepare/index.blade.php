@@ -302,42 +302,40 @@
                 <dt class="font-semibold text-slate-500">Eligible</dt><dd id="billing-confirm-eligible" class="text-slate-900"></dd>
                 <dt class="font-semibold text-slate-500">Excluded</dt><dd id="billing-confirm-excluded" class="text-slate-900"></dd>
             </dl>
-            <section id="billing-confirm-lot-fields" class="max-h-64 space-y-3 overflow-y-auto"></section>
-            <template id="billing-confirm-lot-fields-template">
-                <fieldset data-billing-lot-panel class="rounded-lg border border-slate-200 p-3">
-                    <legend data-billing-lot-label class="px-1 text-sm font-bold text-slate-800"></legend>
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <label class="text-xs font-semibold text-slate-600">Status
-                            <select data-billing-field="status" required class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                                <option value="">Select billing</option>
-                                <option value="1st Billing">1st Billing</option>
-                                <option value="2nd Billing">2nd Billing</option>
-                                <option value="3rd Billing">3rd Billing</option>
-                            </select>
-                        </label>
-                        <div class="text-xs text-slate-600"><span class="font-semibold">Checked by</span><span data-billing-checked-by class="mt-1 block text-sm text-slate-900">{{ auth()->user()->name }}</span></div>
-                        <label class="text-xs font-semibold text-slate-600">Date received
-                            <input data-billing-field="date_received" type="date" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                        </label>
-                        <label class="text-xs font-semibold text-slate-600">Received by
-                            <input data-billing-field="received_by" type="text" maxlength="255" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                        </label>
-                        <label class="text-xs font-semibold text-slate-600">Inspection 1
-                            <input data-billing-field="inspection_1" type="text" maxlength="1000" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                        </label>
-                        <label class="text-xs font-semibold text-slate-600">Inspection 2
-                            <input data-billing-field="inspection_2" type="text" maxlength="1000" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                        </label>
-                        <label class="text-xs font-semibold text-slate-600">Date checking
-                            <input data-billing-field="date_checking" type="date" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                        </label>
-                        <label class="text-xs font-semibold text-slate-600">Date encoding
-                            <input data-billing-field="date_encoding" type="date" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                        </label>
-                    </div>
-                    <p class="mt-2 text-xs text-slate-500">Total amount is calculated from this DR’s item allocations for this Lot.</p>
-                </fieldset>
-            </template>
+            <section id="billing-confirm-shared-fields" class="hidden rounded-lg border border-slate-200 p-3">
+                <p class="text-sm font-bold text-slate-800">Billing details for selected Lots</p>
+                <p id="billing-confirm-lot-coverage" class="mt-1 text-xs text-slate-600"></p>
+                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label class="text-xs font-semibold text-slate-600">Status
+                        <select data-billing-shared-field="status" required class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Select billing</option>
+                            <option value="1st Billing">1st Billing</option>
+                            <option value="2nd Billing">2nd Billing</option>
+                            <option value="3rd Billing">3rd Billing</option>
+                        </select>
+                    </label>
+                    <div class="text-xs text-slate-600"><span class="font-semibold">Checked by</span><span class="mt-1 block text-sm text-slate-900">{{ auth()->user()->name }}</span></div>
+                    <label class="text-xs font-semibold text-slate-600">Date received
+                        <input data-billing-shared-field="date_received" type="date" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600">Received by
+                        <input data-billing-shared-field="received_by" type="text" maxlength="255" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600">Inspection 1
+                        <input data-billing-shared-field="inspection_1" type="text" maxlength="1000" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600">Inspection 2
+                        <input data-billing-shared-field="inspection_2" type="text" maxlength="1000" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600">Date checking
+                        <input data-billing-shared-field="date_checking" type="date" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600">Date encoding
+                        <input data-billing-shared-field="date_encoding" type="date" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+                </div>
+                <p class="mt-2 text-xs text-slate-500">The total amount is calculated separately from each DR’s item allocations for each Lot.</p>
+            </section>
             <div class="flex justify-end gap-2 border-t border-slate-100 pt-4">
                 <button value="cancel" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Go back</button>
                 @can('billing.for-billing.mark')

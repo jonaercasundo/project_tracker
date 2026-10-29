@@ -355,7 +355,7 @@ it('confirms a complete same-DR group and syncs each lot once with idempotent re
             && $recordGroups->first()->count() === 2);
 });
 
-it('writes Lot 2, 9, and 11 billing data once for a multi-Lot DR', function (): void {
+it('applies the same entered billing details to Lots 2, 9, and 11 and calculates each Lot amount separately', function (): void {
     [$actor] = signInBillingUser();
     Queue::fake();
     config([
@@ -432,11 +432,11 @@ it('writes Lot 2, 9, and 11 billing data once for a multi-Lot DR', function (): 
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BK2"]['values'] === [['2026-10-29']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BL2"]['values'] === [['2026-10-29']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BO2"]['values'] === [['1500.00']]
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BS2"]['values'] === [['2nd Billing']]
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BV2"]['values'] === [['2026-10-27']]
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BW2"]['values'] === [['Receiver 9']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BS2"]['values'] === [['1st Billing']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BV2"]['values'] === [['2026-10-28']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BW2"]['values'] === [['Receiver 2']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!CD2"]['values'] === [['200.50']]
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!CG2"]['values'] === [['3rd Billing']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!CG2"]['values'] === [['1st Billing']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!CR2"]['values'] === [['75.25']];
     });
     app()->instance(GoogleSheetsApiClient::class, $sheets);
@@ -446,8 +446,8 @@ it('writes Lot 2, 9, and 11 billing data once for a multi-Lot DR', function (): 
         'idempotency_key' => (string) Str::uuid(),
         'google_sheet_fields' => [
             '2' => ['status' => '1st Billing', 'date_received' => '2026-10-28', 'received_by' => 'Receiver 2', 'inspection_1' => 'Passed', 'inspection_2' => 'Passed', 'date_checking' => '2026-10-29', 'date_encoding' => '2026-10-29'],
-            '9' => ['status' => '2nd Billing', 'date_received' => '2026-10-27', 'received_by' => 'Receiver 9', 'inspection_1' => 'Passed', 'inspection_2' => 'For review', 'date_checking' => '2026-10-28', 'date_encoding' => '2026-10-29'],
-            '11' => ['status' => '3rd Billing', 'date_received' => '2026-10-26', 'received_by' => 'Receiver 11', 'inspection_1' => 'Passed', 'inspection_2' => 'Passed', 'date_checking' => '2026-10-27', 'date_encoding' => '2026-10-29'],
+            '9' => ['status' => '1st Billing', 'date_received' => '2026-10-28', 'received_by' => 'Receiver 2', 'inspection_1' => 'Passed', 'inspection_2' => 'Passed', 'date_checking' => '2026-10-29', 'date_encoding' => '2026-10-29'],
+            '11' => ['status' => '1st Billing', 'date_received' => '2026-10-28', 'received_by' => 'Receiver 2', 'inspection_1' => 'Passed', 'inspection_2' => 'Passed', 'date_checking' => '2026-10-29', 'date_encoding' => '2026-10-29'],
         ],
     ];
 
@@ -1677,7 +1677,7 @@ it('renders continuous scan feedback and preserves the other preparation methods
         ->assertSee('DR From');
 });
 
-it('shows Lot-specific billing fields in the confirmation dialog without the sync explanation', function (): void {
+it('shows one shared set of billing fields in the confirmation dialog without the sync explanation', function (): void {
     signInBillingUser();
     config([
         'google_sheets.billing.enabled' => true,
@@ -1687,7 +1687,8 @@ it('shows Lot-specific billing fields in the confirmation dialog without the syn
 
     $this->get(route('billing.prepare'))
         ->assertOk()
-        ->assertSee('billing-confirm-lot-fields-template', false)
+        ->assertSee('billing-confirm-shared-fields', false)
+        ->assertSee('Billing details for selected Lots')
         ->assertSee('1st Billing')
         ->assertSee('2nd Billing')
         ->assertSee('3rd Billing')
@@ -1697,6 +1698,7 @@ it('shows Lot-specific billing fields in the confirmation dialog without the syn
         ->assertSee('Inspection 2')
         ->assertSee('Date checking')
         ->assertSee('Date encoding')
+        ->assertSee('Checked by')
         ->assertDontSee('Sync runs after confirmation.');
 });
 

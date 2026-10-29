@@ -37,6 +37,7 @@ class BillingSheetSyncService
         $deliveries = $this->projectSpreadsheetDeliveries($projectId);
         $headersByLot = [];
         $sheetRowsByLot = [];
+        $sheetRowsByDrAndSchoolByLot = [];
         $eligibleRowsBySchool = [];
         $issues = [];
         $mappingsEncountered = [];
@@ -59,6 +60,7 @@ class BillingSheetSyncService
                 continue;
             }
             $sheetRowsByLot[$lotNumber] ??= $this->indexBillingSheetRows($rows, $headers);
+            $sheetRowsByDrAndSchoolByLot[$lotNumber] ??= $this->indexBillingSheetRowsByDrAndSchool($rows, $headers);
             $mapping = $this->schoolIdMapping((string) $delivery->school_id, (string) $settings['spreadsheet_id'], (string) $settings['sheet_tab'], $lotNumber, (string) $delivery->dr_no);
             if ($mapping !== null) {
                 $mappingsEncountered[$mapping['mapping_id']] = $mapping;
@@ -70,9 +72,18 @@ class BillingSheetSyncService
             }
             $sheetSchoolId = $mapping['sheet_school_id'] ?? (string) $delivery->school_id;
             $matchKey = $this->billingSheetMatchKey($sheetSchoolId, $delivery->package_code);
-            $matches = $sheetRowsByLot[$lotNumber][$matchKey] ?? [];
+            $matchesByPackage = $sheetRowsByLot[$lotNumber][$matchKey] ?? [];
+            $matches = $this->billingSheetRowsForDelivery(
+                $sheetRowsByLot[$lotNumber],
+                $sheetRowsByDrAndSchoolByLot[$lotNumber],
+                $headers,
+                $sheetSchoolId,
+                (string) $delivery->package_code,
+                (string) $delivery->dr_no
+            );
             if (count($matches) > 1) {
-                $issues[] = 'DR '.$delivery->dr_no.' / package '.$delivery->package_code.' / Lot '.$lotNumber.': multiple exact school and package rows matched.';
+                $matchIdentifier = $matchesByPackage === [] ? 'School ID and Lot-specific BIR DR' : 'school and package';
+                $issues[] = 'DR '.$delivery->dr_no.' / package '.$delivery->package_code.' / Lot '.$lotNumber.': multiple exact '.$matchIdentifier.' rows matched.';
 
                 continue;
             }
@@ -175,6 +186,7 @@ class BillingSheetSyncService
 
         $headersByLot = [];
         $sheetRowsByLot = [];
+        $sheetRowsByDrAndSchoolByLot = [];
         $plansByRow = [];
         $issues = [];
         $mappingsEncountered = [];
@@ -200,6 +212,7 @@ class BillingSheetSyncService
             }
 
             $sheetRowsByLot[$lotNumber] ??= $this->indexBillingSheetRows($rows, $headers);
+            $sheetRowsByDrAndSchoolByLot[$lotNumber] ??= $this->indexBillingSheetRowsByDrAndSchool($rows, $headers);
             $mapping = $this->schoolIdMapping((string) $delivery->school_id, $spreadsheetId, $tab, $lotNumber, (string) $delivery->dr_no);
             if ($mapping !== null) {
                 $mappingsEncountered[$mapping['mapping_id']] = $mapping;
@@ -210,10 +223,19 @@ class BillingSheetSyncService
                 }
             }
             $sheetSchoolId = $mapping['sheet_school_id'] ?? (string) $delivery->school_id;
-            $matches = $sheetRowsByLot[$lotNumber][$this->billingSheetMatchKey($sheetSchoolId, $delivery->package_code)] ?? [];
+            $matchesByPackage = $sheetRowsByLot[$lotNumber][$this->billingSheetMatchKey($sheetSchoolId, $delivery->package_code)] ?? [];
+            $matches = $this->billingSheetRowsForDelivery(
+                $sheetRowsByLot[$lotNumber],
+                $sheetRowsByDrAndSchoolByLot[$lotNumber],
+                $headers,
+                $sheetSchoolId,
+                (string) $delivery->package_code,
+                (string) $delivery->dr_no
+            );
 
             if (count($matches) > 1) {
-                $issues[] = $identifier.': multiple exact School ID and package-code rows matched.';
+                $matchIdentifier = $matchesByPackage === [] ? 'School ID and Lot-specific BIR DR' : 'School ID and package-code';
+                $issues[] = $identifier.': multiple exact '.$matchIdentifier.' rows matched.';
 
                 continue;
             }
@@ -245,6 +267,7 @@ class BillingSheetSyncService
                 'lot_number' => $lotNumber,
                 'row' => $match['row'],
                 'row_values' => $match['values'],
+                'sheet_package_code' => $this->exactCell($match['values'][$headers['package_code_column']] ?? ''),
                 'headers' => $headers,
                 'mapping' => $mapping,
                 'delivery_ids' => [],
@@ -313,6 +336,7 @@ class BillingSheetSyncService
             'dr' => implode(', ', array_values($plan['dr_numbers'])),
             'school_name' => $plan['school_name'],
             'package_code' => $plan['package_code'],
+            'sheet_package_code' => $plan['sheet_package_code'],
             'lot' => $plan['lot_number'],
             'sheet_row' => $plan['row'],
             'mapping' => $plan['mapping'] === null ? null : [
@@ -515,6 +539,68 @@ class BillingSheetSyncService
             $this->exactCell($schoolId),
             $this->exactCell($packageCode),
         ], JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * Resolve the exact package row first. Numeric tracker package numbers can
+     * represent split package records while the worksheet stores one composite
+     * Core Package Code per school, DR, and Lot; those may fall back only to a
+     * unique row with the same exact School ID and Lot-specific BIR DR.
+     *
+     * @param  array<string, array<int, array{row: int, values: array<int, mixed>}>>  $rowsByPackage
+     * @param  array<string, array<int, array{row: int, values: array<int, mixed>}>>  $rowsByDrAndSchool
+     * @param  array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, destination_columns: array<string, int>}  $headers
+     * @return array<int, array{row: int, values: array<int, mixed>}>
+     */
+    private function billingSheetRowsForDelivery(
+        array $rowsByPackage,
+        array $rowsByDrAndSchool,
+        array $headers,
+        string $schoolId,
+        string $packageCode,
+        string $drNumber
+    ): array {
+        $exactMatches = $rowsByPackage[$this->billingSheetMatchKey($schoolId, $packageCode)] ?? [];
+        if ($exactMatches !== []) {
+            return $exactMatches;
+        }
+
+        if (preg_match('/^\\d+$/', $this->exactCell($packageCode)) !== 1 || $headers['bir_dr_column'] === null) {
+            return [];
+        }
+
+        return $rowsByDrAndSchool[$this->billingSheetMatchKey($schoolId, $drNumber)] ?? [];
+    }
+
+    /** @param array<int, array<int, mixed>> $rows
+     * @param  array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, destination_columns: array<string, int>}  $headers
+     * @return array<string, array<int, array{row: int, values: array<int, mixed>}>>
+     */
+    private function indexBillingSheetRowsByDrAndSchool(array $rows, array $headers): array
+    {
+        if ($headers['bir_dr_column'] === null) {
+            return [];
+        }
+
+        $indexedRows = [];
+        foreach ($rows as $rowIndex => $row) {
+            if ($rowIndex <= $headers['header_row']
+                || $this->exactCell($row[$headers['package_code_column']] ?? '') === '') {
+                continue;
+            }
+
+            $key = $this->billingSheetMatchKey(
+                $row[$headers['school_id_column']] ?? '',
+                $row[$headers['bir_dr_column']] ?? ''
+            );
+            if ($key === $this->billingSheetMatchKey('', '')) {
+                continue;
+            }
+
+            $indexedRows[$key][] = ['row' => $rowIndex + 1, 'values' => $row];
+        }
+
+        return $indexedRows;
     }
 
     /**

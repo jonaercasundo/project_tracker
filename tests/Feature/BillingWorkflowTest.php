@@ -641,6 +641,103 @@ it('does not partially sync spreadsheet rows when a DR package match is missing 
         ->and($result['issues'][0])->toContain('CORE-MISSING');
 });
 
+it('matches split numeric tracker packages to one exact school and lot-specific DR spreadsheet row', function (): void {
+    signInBillingUser();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $deliveryId = createBillingDelivery('56308');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('project_id');
+    $lotId = (int) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id');
+    $trackerSchoolId = (string) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('school_id');
+    DB::table('lot')->where('lot_id', $lotId)->update(['lot_name' => 'Lot 2']);
+    DB::table('school')->where('school_id', $trackerSchoolId)->update(['school_id' => '120066', 'school_name' => 'Sacsac ES']);
+    DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['school_id' => '120066']);
+    addPackageToBillingDelivery($deliveryId, '2', '10.00');
+    addPackageToBillingDelivery($deliveryId, '3', '15.00');
+    addPackageToBillingDelivery($deliveryId, '4', '20.00');
+
+    $rows = billingConfirmationSheetRows([[
+        'school_id' => '120066',
+        'package_codes' => ['2' => 'C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6'],
+    ]]);
+    $rows[0][billingSheetColumnIndex('S')] = 'BIR DR';
+    $rows[1][billingSheetColumnIndex('S')] = '56308';
+    $rows[1][billingSheetColumnIndex('BF')] = '2026-10-27';
+
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->andReturn($rows);
+    $sheets->shouldReceive('updateCells')->once()->withArgs(function (array $updates, string $spreadsheetId): bool {
+        $ranges = collect($updates)->pluck('range')->all();
+
+        return $spreadsheetId === 'test-spreadsheet-id'
+            && in_array("'Copy of SME LOT 2,9,11'!BE2", $ranges, true)
+            && in_array("'Copy of SME LOT 2,9,11'!BO2", $ranges, true);
+    });
+
+    $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, '120066', 'Billing Tester', [
+        'date_received' => '2026-10-28',
+        'received_by' => 'Receiver',
+        'inspection_1' => 'Passed',
+        'inspection_2' => 'Passed',
+        'date_checking' => '2026-10-29',
+        'date_encoding' => '2026-10-29',
+    ], $sheets);
+
+    expect($result['status'])->toBe('success')
+        ->and($result['synced_count'])->toBe(1)
+        ->and($result['preview'])->toHaveCount(1)
+        ->and($result['preview'][0]['dr'])->toBe('56308')
+        ->and($result['preview'][0]['sheet_row'])->toBe(2)
+        ->and($result['preview'][0]['sheet_package_code'])->toBe('C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6')
+        ->and($result['preview'][0]['amount'])->toBe('45.00');
+});
+
+it('rejects ambiguous split-package DR matches without writing spreadsheet cells', function (): void {
+    signInBillingUser();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $deliveryId = createBillingDelivery('DR-SHEET-SPLIT-AMBIGUOUS');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('project_id');
+    $lotId = (int) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id');
+    $schoolId = (string) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('school_id');
+    DB::table('lot')->where('lot_id', $lotId)->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($deliveryId, '2');
+
+    $rows = billingConfirmationSheetRows([[
+        'school_id' => $schoolId,
+        'package_codes' => ['2' => 'CORE-COMPOSITE-ONE'],
+    ]]);
+    $rows[0][billingSheetColumnIndex('S')] = 'BIR DR';
+    $rows[1][billingSheetColumnIndex('S')] = 'DR-SHEET-SPLIT-AMBIGUOUS';
+    $rows[] = $rows[1];
+
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->andReturn($rows);
+    $sheets->shouldNotReceive('updateCells');
+
+    $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, 'Billing Tester', [
+        'date_received' => '2026-10-28',
+        'received_by' => 'Receiver',
+        'inspection_1' => 'Passed',
+        'inspection_2' => 'Passed',
+        'date_checking' => '2026-10-29',
+        'date_encoding' => '2026-10-29',
+    ], $sheets);
+
+    expect($result['status'])->toBe('error')
+        ->and($result['synced_count'])->toBe(0)
+        ->and($result['issues'])->toHaveCount(1)
+        ->and($result['issues'][0])->toContain('multiple exact School ID and Lot-specific BIR DR rows matched');
+});
+
 it('uses an explicit school ID mapping only for a verified DR and exact package row and previews before writing', function (): void {
     [$actor] = signInBillingUser();
     config([

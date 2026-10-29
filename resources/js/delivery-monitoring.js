@@ -363,7 +363,7 @@ if (monitoring) {
         const selectedOption = spreadsheetSchoolSelect.selectedOptions[0];
         spreadsheetSchoolRowCount.textContent = hasSchool
             ? `${selectedOption.dataset.rowCount} matching DR/package row(s) need details; ${selectedOption.dataset.missingFieldCount} required cell(s) are blank.`
-            : 'Choose a school with a filled 3PL received date and missing billing details.';
+            : 'Choose a school with billing status, Checked by, and 3PL received date already filled.';
         spreadsheetModalFeedback.textContent = '';
     });
 
@@ -409,8 +409,8 @@ if (monitoring) {
             spreadsheetSchoolSelect.replaceChildren(...options);
             spreadsheetSchoolSelect.disabled = options.length === 1;
             spreadsheetSchoolRowCount.textContent = options.length > 1
-                ? 'Choose a school with a filled DATE RECEIVED (FROM 3PL) and at least one missing billing detail.'
-                : 'No schools currently have a filled 3PL received date and missing billing details.';
+                ? 'Choose a school whose rows have billing status, Checked by, and DATE RECEIVED (FROM 3PL) filled, with other billing details still missing.'
+                : 'No schools currently have rows with billing status, Checked by, and 3PL received date filled while other billing details are missing.';
             document.getElementById('spreadsheet-preview-issues').textContent = (result.issues ?? []).join(' ');
         } catch (exception) {
             spreadsheetSchoolSelect.replaceChildren(new Option('Could not load project schools', ''));

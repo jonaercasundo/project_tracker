@@ -121,9 +121,8 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
                     <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
-                    <p class="mt-2 text-sm text-slate-600">The school list is checked against the spreadsheet. It includes schools with a filled 3PL received date and missing billing details. Choose a school, enter its details, and sync only its matching Lots 2, 9, and 11 rows. Checked by comes from your account; each Lot total is calculated from its DR.</p>
+                    <p class="mt-2 text-sm text-slate-600">The school list is checked against the spreadsheet. It includes rows where STATUS (BILLING#), Checked by, and DATE RECEIVED (FROM 3PL) are already filled, but other billing details are missing. Choose a school and enter its details. The existing trigger values are preserved; each Lot total is calculated from its DR.</p>
                 </div>
-                <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"><span class="font-semibold">Checked by:</span> {{ auth()->user()->name }}</div>
                 <div>
                     <label for="spreadsheet-school" class="mb-1 block text-xs font-semibold text-slate-600">School</label>
                     <select id="spreadsheet-school" name="school_id" required disabled class="w-full rounded-lg border-slate-200 text-sm">

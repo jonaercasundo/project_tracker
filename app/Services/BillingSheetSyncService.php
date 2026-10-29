@@ -71,13 +71,14 @@ class BillingSheetSyncService
 
             $match = $matches[0];
             if ($this->exactCell($match['values'][$headers['destination_columns']['status']] ?? '') === ''
+                || $this->exactCell($match['values'][$headers['destination_columns']['checked_by']] ?? '') === ''
                 || $this->exactCell($match['values'][$headers['three_pl_date_column']] ?? '') === '') {
                 continue;
             }
 
             $missingFields = 0;
             foreach ($headers['destination_columns'] as $field => $column) {
-                if ($field !== 'status' && $this->exactCell($match['values'][$column] ?? '') === '') {
+                if (! in_array($field, ['status', 'checked_by'], true) && $this->exactCell($match['values'][$column] ?? '') === '') {
                     $missingFields++;
                 }
             }
@@ -118,7 +119,6 @@ class BillingSheetSyncService
     public function syncProjectSpreadsheet(
         int $projectId,
         string $schoolId,
-        string $checkedBy,
         array $fields,
         GoogleSheetsApiClient $sheets
     ): array {
@@ -182,6 +182,7 @@ class BillingSheetSyncService
 
             $match = $matches[0];
             if ($this->exactCell($match['values'][$headers['destination_columns']['status']] ?? '') === ''
+                || $this->exactCell($match['values'][$headers['destination_columns']['checked_by']] ?? '') === ''
                 || $this->exactCell($match['values'][$headers['three_pl_date_column']] ?? '') === '') {
                 $skippedCount++;
 
@@ -218,7 +219,6 @@ class BillingSheetSyncService
         $updatesByCell = [];
         foreach ($plansByRow as $plan) {
             $fieldsForRow = [
-                'checked_by' => $checkedBy,
                 'date_received' => $fields['date_received'],
                 'received_by' => $fields['received_by'],
                 'inspection_1' => $fields['inspection_1'],

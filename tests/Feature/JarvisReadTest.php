@@ -1476,7 +1476,7 @@ it('syncs spreadsheet details using the authenticated account name', function ()
         ]);
     $syncService->shouldReceive('syncProjectSpreadsheet')
         ->once()
-        ->with(1, $schoolId, $user->name, array_diff_key($fields, ['school_id' => true]), Mockery::type(GoogleSheetsApiClient::class))
+        ->with(1, $schoolId, array_diff_key($fields, ['school_id' => true]), Mockery::type(GoogleSheetsApiClient::class))
         ->andReturn([
             'status' => 'success',
             'message' => 'Spreadsheet details synchronized for 1 DR/package row(s).',

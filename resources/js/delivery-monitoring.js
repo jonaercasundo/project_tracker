@@ -399,9 +399,15 @@ if (monitoring) {
 
     function resetSpreadsheetFields(enabled) {
         const today = localTodayDate();
+        const defaultValues = {
+            billing_status: '1st Billing',
+            compliance_status: 'COMPLIANT',
+            date_checking: today,
+            date_encoding: today,
+        };
         spreadsheetSchoolFields.querySelectorAll('input, select').forEach(control => {
             control.disabled = !enabled;
-            control.value = ['date_checking', 'date_encoding'].includes(control.name) ? today : '';
+            control.value = defaultValues[control.name] ?? '';
         });
     }
 

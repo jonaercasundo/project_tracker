@@ -133,7 +133,7 @@
                         <label for="spreadsheet-billing-status" class="mb-1 block text-xs font-semibold text-slate-600">Billing status (Lot X)</label>
                         <select id="spreadsheet-billing-status" name="billing_status" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                             <option value="">Choose a billing status</option>
-                            <option value="1st Billing">1st Billing</option>
+                            <option value="1st Billing" selected>1st Billing</option>
                             <option value="2nd Billing">2nd Billing</option>
                             <option value="3rd Billing">3rd Billing</option>
                         </select>
@@ -142,7 +142,7 @@
                         <label for="spreadsheet-compliance-status" class="mb-1 block text-xs font-semibold text-slate-600">Status (Compliant / Non-Compliant) (Lot X)</label>
                         <select id="spreadsheet-compliance-status" name="compliance_status" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                             <option value="">Choose a compliance status</option>
-                            <option value="COMPLIANT">COMPLIANT</option>
+                            <option value="COMPLIANT" selected>COMPLIANT</option>
                             <option value="NON-COMPLIANT">NON-COMPLIANT</option>
                         </select>
                     </div>

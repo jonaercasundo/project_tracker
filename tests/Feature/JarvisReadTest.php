@@ -1205,8 +1205,8 @@ it('serves the Operations page immediately and loads AJAX filters using the same
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
 
     $this->get('/deliveries/monitoring')->assertOk()->assertSee('Project Delivery Monitoring')
-        ->assertSee('Delivery Monitoring')->assertSee('Loading operational progress…')
-        ->assertSee('id="monitoring-project-count">Loading…', false)
+        ->assertSee('Delivery Monitoring')->assertSee('Choose a project above to load operational progress.')
+        ->assertSee('id="monitoring-project-count">Choose a project', false)
         ->assertSee('id="monitoring-project-trigger"', false)->assertSee('role="listbox"', false)
         ->assertSee('Search projects by name or code...', false)
         ->assertDontSee('data-detail-section')->assertDontSee('deliveryMonitoringLocations')

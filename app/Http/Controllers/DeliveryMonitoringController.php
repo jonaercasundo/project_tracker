@@ -218,7 +218,7 @@ class DeliveryMonitoringController extends Controller
             'projects' => collect(),
             'summary' => ['projects_count' => 0],
             'definitions' => $this->progress->definitions(),
-            'empty_reason' => 'loading',
+            'empty_reason' => isset($filters['project_id']) ? 'loading' : 'choose_project',
         ];
         $logistics = [
             'summary' => [

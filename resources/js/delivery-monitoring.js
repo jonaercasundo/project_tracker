@@ -213,6 +213,23 @@ if (monitoring) {
     updateLocations();
 
     async function loadReport(url, updateHistory = true) {
+        if (!url.searchParams.get('project_id')) {
+            currentRequest?.abort();
+            currentRequest = undefined;
+            apply.disabled = Boolean(locationRequest);
+            apply.textContent = 'Apply Filters';
+            monitoring.removeAttribute('aria-busy');
+            error.classList.add('hidden');
+            document.getElementById('monitoring-results').replaceChildren();
+            document.getElementById('monitoring-table').innerHTML = '<p class="p-8 text-center text-slate-500">Choose a project above to load operational progress.</p>';
+            document.getElementById('monitoring-project-count').textContent = 'Choose a project';
+            if (updateHistory) {
+                window.history.pushState({}, '', url);
+            }
+
+            return false;
+        }
+
         currentRequest?.abort();
         const request = new AbortController();
         currentRequest = request;

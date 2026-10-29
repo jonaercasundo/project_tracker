@@ -193,16 +193,7 @@
                 <div>
                     <h2 class="text-lg font-bold text-slate-900">Sync Billing</h2>
                     <p class="mt-2 text-sm text-slate-600">Billing-eligible DRs will advance through Stock Out and Delivered, and their quantities will be deducted from inventory.</p>
-                    <p class="mt-2 text-xs text-slate-500">Select a fallback warehouse for DRs without an assignment. Assigned warehouses take precedence. If unassigned DRs use different warehouses, assign their correct warehouses before syncing.</p>
-                </div>
-                <div>
-                    <label for="sync-billing-warehouse" class="mb-1 block text-sm font-semibold text-slate-700">Fallback inventory warehouse</label>
-                    <select id="sync-billing-warehouse" name="warehouse_id" required class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                        <option value="">Select a warehouse</option>
-                        @foreach($warehouses as $warehouse)
-                            <option value="{{ $warehouse->warehouse_id }}">{{ $warehouse->warehouse_name ?: 'Warehouse '.$warehouse->warehouse_id }}</option>
-                        @endforeach
-                    </select>
+                    <p class="mt-2 text-xs text-slate-500">Each DR will use its assigned logistics warehouse. If no warehouse is assigned, Sync Billing will use the unique warehouse mapped to the school’s region. DRs without a clear warehouse mapping will be left unchanged and reported.</p>
                 </div>
                 <div class="flex justify-end gap-2">
                     <button type="button" data-cancel-sync-billing class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>

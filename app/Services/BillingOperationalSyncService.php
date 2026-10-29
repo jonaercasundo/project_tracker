@@ -18,9 +18,9 @@ class BillingOperationalSyncService
      *
      * @return array{synced_dr_count: int, skipped_dr_count: int, message: string}
      */
-    public function syncProject(int $projectId, int $userId, string $userName, ?int $fallbackWarehouseId = null): array
+    public function syncProject(int $projectId, int $userId, string $userName): array
     {
-        return DB::transaction(function () use ($projectId, $userId, $userName, $fallbackWarehouseId): array {
+        return DB::transaction(function () use ($projectId, $userId, $userName): array {
             $project = DB::table('projects')->where('project_id', $projectId)->lockForUpdate()->first();
             if ($project === null) {
                 throw new RuntimeException('The selected project could not be found.');
@@ -67,7 +67,8 @@ class BillingOperationalSyncService
                         });
                 })
                 ->whereRaw("LOWER(TRIM(COALESCE(d.status, ''))) NOT IN ('cancelled', 'canceled', 'void', 'voided', 'deleted', 'rejected')")
-                ->select(['d.delivery_id', 'd.project_id', 'd.dr_no', 'd.package_qty', 'location.warehouse_id'])
+                ->leftJoin('school as school', 'school.school_id', '=', 'd.school_id')
+                ->select(['d.delivery_id', 'd.project_id', 'd.dr_no', 'd.package_qty', 'd.keystage_id', 'd.lot_id', 'd.logistics_location_id', 'location.warehouse_id', 'school.region as school_region'])
                 ->orderBy('d.delivery_id')
                 ->lockForUpdate()
                 ->get()
@@ -167,23 +168,20 @@ class BillingOperationalSyncService
                     ];
                     $hasPendingPackage = true;
 
+                    $warehouseId = $this->warehouseForDelivery($delivery);
+
                     if ($currentStatus === 'released') {
                         foreach ($contents as $content) {
                             $verificationLines[] = [
                                 'delivery_id' => (int) $delivery->delivery_id,
                                 'package_id' => $packageId,
                                 'item_id' => (int) $content->item_id,
-                                'warehouse_id' => $delivery->warehouse_id === null ? $fallbackWarehouseId : (int) $delivery->warehouse_id,
+                                'warehouse_id' => $warehouseId,
                                 'dr_no' => (string) $delivery->dr_no,
                             ];
                         }
 
                         continue;
-                    }
-
-                    $warehouseId = $delivery->warehouse_id === null ? $fallbackWarehouseId : (int) $delivery->warehouse_id;
-                    if ($warehouseId === null) {
-                        throw new RuntimeException("Billing sync stopped because DR {$delivery->dr_no} has no assigned warehouse. Select a fallback warehouse and try again.");
                     }
 
                     $packageQuantity = (int) ($delivery->package_qty ?? 0);
@@ -262,6 +260,37 @@ class BillingOperationalSyncService
                 'message' => $message,
             ];
         }, 3);
+    }
+
+    private function warehouseForDelivery(object $delivery): int
+    {
+        if ($delivery->warehouse_id !== null) {
+            return (int) $delivery->warehouse_id;
+        }
+
+        $region = trim((string) ($delivery->school_region ?? ''));
+        if ($region === '') {
+            throw new RuntimeException("Billing sync stopped because DR {$delivery->dr_no} has no warehouse assignment or school region.");
+        }
+
+        $warehouseIds = DB::table('logistics_location')
+            ->where('region', $region)
+            ->whereNotNull('warehouse_id')
+            ->distinct()
+            ->pluck('warehouse_id')
+            ->map(fn ($warehouseId): int => (int) $warehouseId)
+            ->unique()
+            ->values();
+
+        if ($warehouseIds->isEmpty()) {
+            throw new RuntimeException("Billing sync stopped because school region {$region} for DR {$delivery->dr_no} has no warehouse mapping.");
+        }
+
+        if ($warehouseIds->count() > 1) {
+            throw new RuntimeException("Billing sync stopped because school region {$region} for DR {$delivery->dr_no} maps to multiple warehouses.");
+        }
+
+        return $warehouseIds->sole();
     }
 
     /** @param array<int, array<string, int|string>> $stockOutLines */

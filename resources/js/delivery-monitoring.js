@@ -3,7 +3,6 @@ const monitoring = document.getElementById('delivery-monitoring');
 if (monitoring) {
     const syncBillingDialog = document.getElementById('sync-billing-dialog');
     const syncBillingForm = document.getElementById('sync-billing-confirmation');
-    const syncBillingWarehouse = document.getElementById('sync-billing-warehouse');
     let pendingSyncBillingButton;
     const logistics = document.getElementById('logistics-tracking');
     const logisticsForm = document.getElementById('logistics-filters');
@@ -298,7 +297,6 @@ if (monitoring) {
         if (syncButton) {
             event.preventDefault();
             pendingSyncBillingButton = syncButton;
-            syncBillingWarehouse.value = '';
             syncBillingDialog.showModal();
             return;
         }
@@ -337,14 +335,13 @@ if (monitoring) {
 
     syncBillingForm.addEventListener('submit', event => {
         event.preventDefault();
-        if (!syncBillingForm.reportValidity() || !pendingSyncBillingButton) {
+        if (!pendingSyncBillingButton) {
             return;
         }
 
         const button = pendingSyncBillingButton;
         const projectId = button.dataset.syncBilling;
         const originalLabel = button.textContent;
-        const fallbackWarehouseId = syncBillingWarehouse.value;
         const setFeedback = (message, isError = false) => {
             monitoring.querySelectorAll(`[data-sync-billing-feedback="${projectId}"]`).forEach(feedback => {
                 feedback.textContent = message;
@@ -358,7 +355,7 @@ if (monitoring) {
         button.disabled = true;
         button.textContent = 'Syncing…';
         setFeedback('Syncing billing deliveries and inventory…');
-        trySyncBilling(button, originalLabel, setFeedback, fallbackWarehouseId);
+        trySyncBilling(button, originalLabel, setFeedback);
     });
 
     syncBillingDialog.addEventListener('click', event => {
@@ -368,7 +365,7 @@ if (monitoring) {
         }
     });
 
-    async function trySyncBilling(button, originalLabel, setFeedback, fallbackWarehouseId) {
+    async function trySyncBilling(button, originalLabel, setFeedback) {
         try {
             const response = await fetch(button.dataset.endpoint, {
                 method: 'POST',
@@ -379,7 +376,7 @@ if (monitoring) {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 },
                 credentials: 'same-origin',
-                body: JSON.stringify({ warehouse_id: fallbackWarehouseId }),
+                body: JSON.stringify({}),
             });
             const contentType = response.headers.get('content-type') ?? '';
             if (!contentType.includes('application/json')) {

@@ -1213,9 +1213,12 @@ it('serves the Operations page immediately and loads AJAX filters using the same
         ->assertSee('Operational Progress')->assertSee('Stock Out')->assertSee('Last Activity')
         ->assertDontSee('DR link missing');
     $this->get('/deliveries/monitoring?project_id=1')->assertOk()->assertSee('name="project_id" value="1"', false);
-    $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()
+    $progressResponse = $this->getJson('/deliveries/monitoring?project_id=1');
+    $progressResponse->assertOk()
         ->assertJsonPath('projects.0.delivery_progress_percent', 50)
+        ->assertJsonPath('projects.0.completed_deliveries_count', 1)
         ->assertJsonPath('summary.total_packages_count', 4)->assertJsonStructure(['summary_html', 'projects_html']);
+    expect($progressResponse->json('projects_html'))->toContain('1 delivered / accepted DRs');
     $token = $user->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
     $user->assignRole(Role::findOrCreate('Administrator', 'web'));
     jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])

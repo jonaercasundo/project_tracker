@@ -1104,16 +1104,25 @@ it('keeps different inventory units separate instead of summing incompatible qua
         ->assertJsonPath('data.projects.0.overall_progress', 62.5);
 });
 
-it('keeps project-wide inventory unchanged by DR filters and suppresses a mixed-scope overall percentage', function () {
+it('calculates operational progress for a year-filtered report while keeping inventory project-wide', function () {
     jarvisOperations();
-    $token = jarvisReader()->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+    DB::table('delivery_billing_records')->insert(['delivery_id' => 1, 'status' => 'for_billing']);
+    $user = jarvisReader();
+    $token = $user->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
 
-    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1, 'delivery_status' => 'mixed', 'year' => 2026])
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1, 'year' => 2026])
         ->assertOk()->assertJsonPath('data.projects.0.warehouse_readiness.available', 10)
         ->assertJsonPath('data.projects.0.warehouse_readiness.required', 15)
         ->assertJsonPath('data.projects.0.warehouse_readiness.percent', 66.67)
-        ->assertJsonPath('data.projects.0.overall_progress', null)
-        ->assertJsonPath('data.summary.overall_progress', null);
+        ->assertJsonPath('data.projects.0.pipeline.dr.total', 2)
+        ->assertJsonPath('data.projects.0.overall_progress', 25)
+        ->assertJsonPath('data.summary.overall_progress', 25);
+
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    $this->get('/deliveries/monitoring?project_id=1&year=2026')->assertOk()
+        ->assertSee('25.0%')
+        ->assertDontSee('Overall progress is unavailable because');
 });
 
 it('uses recorded DR timestamps for last activity rather than scheduled dates', function () {

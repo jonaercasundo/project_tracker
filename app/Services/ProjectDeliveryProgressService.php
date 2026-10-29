@@ -756,7 +756,7 @@ class ProjectDeliveryProgressService
             : $this->lotBillingProgress($records->pluck('project_id')->map(fn ($projectId): int => (int) $projectId)->unique()->all());
         $warehouseRows = $compact ? collect() : $this->warehouseSummaryQuery($filters)->get()->groupBy('project_id');
         $logisticsRows = $compact ? collect() : $this->logisticsStats($filters)->get()->groupBy('project_id');
-        $projects = $records->map(function (object $record) use ($lotBillingProgress, $warehouseRows, $logisticsRows, $filters, $compact): array {
+        $projects = $records->map(function (object $record) use ($lotBillingProgress, $warehouseRows, $logisticsRows, $compact): array {
             $project = (array) $record;
             foreach ($project as $column => $value) {
                 if (str_ends_with($column, '_count') || $column === 'project_id') {
@@ -784,9 +784,6 @@ class ProjectDeliveryProgressService
             $project['operational_pipeline'] = $this->pipeline($project, $project['warehouse_readiness']);
             $project['pipeline'] = $project['operational_pipeline'];
             $project['overall_progress'] = $this->operationalProgress($project['pipeline']);
-            if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status', 'lot_id'])) {
-                $project['overall_progress'] = null;
-            }
             $project['last_activity'] = $this->lastActivity($project);
             $project['data_integrity_flags'] = array_merge($this->integrityFlags($project['pipeline']), $project['warehouse_readiness']['integrity_flags']);
 
@@ -813,9 +810,6 @@ class ProjectDeliveryProgressService
         $summary['pipeline'] = $this->pipeline($summary, $summary['warehouse_readiness']);
         $summary['operational_pipeline'] = $summary['pipeline'];
         $summary['overall_progress'] = $this->operationalProgress($summary['pipeline']);
-        if (array_intersect(array_keys($filters), ['year', 'region', 'division', 'municipality', 'delivery_status', 'lot_id'])) {
-            $summary['overall_progress'] = null;
-        }
 
         $emptyReason = null;
         if ($projects->isEmpty()) {

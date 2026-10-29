@@ -321,6 +321,8 @@ if (monitoring) {
         const modeInput = syncSpreadsheetForm.elements.mode;
         const previewTokenInput = syncSpreadsheetForm.elements.preview_token;
         const isPreview = modeInput.value !== 'confirm';
+        const payload = Object.fromEntries(new FormData(syncSpreadsheetForm).entries());
+        payload.school_id = spreadsheetSchoolIdInput.value.trim();
 
         spreadsheetSubmitButton.disabled = true;
         spreadsheetSchoolIdInput.disabled = true;
@@ -336,7 +338,7 @@ if (monitoring) {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 },
                 credentials: 'same-origin',
-                body: JSON.stringify(Object.fromEntries(new FormData(syncSpreadsheetForm).entries())),
+                body: JSON.stringify(payload),
             });
             const result = await response.json();
             const issueDetails = Array.isArray(result.issues) && result.issues.length ? ` ${result.issues.join(' ')}` : '';

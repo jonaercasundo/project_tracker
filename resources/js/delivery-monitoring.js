@@ -7,6 +7,9 @@ if (monitoring) {
     const syncSpreadsheetForm = document.getElementById('sync-spreadsheet-form');
     const spreadsheetSchoolIdInput = document.getElementById('spreadsheet-school-id');
     const spreadsheetSchoolFields = document.getElementById('spreadsheet-school-fields');
+    const spreadsheetPositionSelect = document.getElementById('spreadsheet-position');
+    const spreadsheetPositionOtherField = document.getElementById('spreadsheet-position-other-field');
+    const spreadsheetPositionOtherInput = document.getElementById('spreadsheet-position-other');
     const spreadsheetSchoolRowCount = document.getElementById('spreadsheet-school-row-count');
     const spreadsheetModalFeedback = syncSpreadsheetForm.querySelector('[data-spreadsheet-modal-feedback]');
     const spreadsheetSubmitButton = syncSpreadsheetForm.querySelector('[data-submit-spreadsheet]');
@@ -436,6 +439,17 @@ if (monitoring) {
             control.disabled = !enabled;
             control.value = defaultValues[control.name] ?? '';
         });
+        updatePositionOtherField(enabled);
+    }
+
+    function updatePositionOtherField(enabled = !spreadsheetSchoolFields.hidden) {
+        const isOther = spreadsheetPositionSelect.value === '__other__';
+        spreadsheetPositionOtherField.hidden = !isOther;
+        spreadsheetPositionOtherInput.disabled = !enabled || !isOther;
+        spreadsheetPositionOtherInput.required = isOther;
+        if (!isOther) {
+            spreadsheetPositionOtherInput.value = '';
+        }
     }
 
     spreadsheetSchoolIdInput.addEventListener('input', () => {
@@ -467,7 +481,9 @@ if (monitoring) {
         });
     });
 
-    ['received_by', 'position', 'telephone_1', 'inspection_1', 'inspection_2'].forEach(name => {
+    spreadsheetPositionSelect.addEventListener('change', () => updatePositionOtherField());
+
+    ['received_by', 'position_other', 'telephone_1', 'inspection_1', 'inspection_2'].forEach(name => {
         const control = syncSpreadsheetForm.elements[name];
         control.addEventListener('input', () => {
             const cursorStart = control.selectionStart;

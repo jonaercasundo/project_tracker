@@ -156,7 +156,20 @@
                     </div>
                     <div>
                         <label for="spreadsheet-position" class="mb-1 block text-xs font-semibold text-slate-600">Position</label>
-                        <input id="spreadsheet-position" name="position" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
+                        <select id="spreadsheet-position" name="position" required disabled class="w-full rounded-lg border-slate-200 text-sm">
+                            <option value="" selected disabled>Choose a position</option>
+                            <option value="Administrative Officer">Administrative Officer</option>
+                            <option value="Administrative Officer I">Administrative Officer I</option>
+                            <option value="Administrative Officer II">Administrative Officer II</option>
+                            <option value="Administrative Officer III">Administrative Officer III</option>
+                            <option value="Property Custodian">Property Custodian</option>
+                            <option value="School Property Custodian">School Property Custodian</option>
+                            <option value="__other__">Other (type position)</option>
+                        </select>
+                    </div>
+                    <div id="spreadsheet-position-other-field" hidden>
+                        <label for="spreadsheet-position-other" class="mb-1 block text-xs font-semibold text-slate-600">Type position</label>
+                        <input id="spreadsheet-position-other" name="position_other" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                     </div>
                     <div>
                         <label for="spreadsheet-telephone-1" class="mb-1 block text-xs font-semibold text-slate-600">Telephone 1</label>

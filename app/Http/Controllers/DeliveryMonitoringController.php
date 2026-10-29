@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Throwable;
 
 class DeliveryMonitoringController extends Controller
@@ -198,13 +199,26 @@ class DeliveryMonitoringController extends Controller
             'compliance_status' => ['required', 'in:COMPLIANT,NON-COMPLIANT'],
             'date_received' => ['required', 'date_format:Y-m-d'],
             'received_by' => ['required', 'string', 'max:255'],
-            'position' => ['required', 'string', 'max:255'],
+            'position' => ['required', Rule::in([
+                'Administrative Officer',
+                'Administrative Officer I',
+                'Administrative Officer II',
+                'Administrative Officer III',
+                'Property Custodian',
+                'School Property Custodian',
+                '__other__',
+            ])],
+            'position_other' => ['required_if:position,__other__', 'nullable', 'string', 'max:255'],
             'telephone_1' => ['required', 'string', 'max:255'],
             'inspection_1' => ['required', 'string', 'max:255'],
             'inspection_2' => ['required', 'string', 'max:255'],
             'date_checking' => ['required', 'date_format:Y-m-d'],
             'date_encoding' => ['required', 'date_format:Y-m-d'],
         ]);
+        if ($fields['position'] === '__other__') {
+            $fields['position'] = trim((string) $fields['position_other']);
+        }
+        unset($fields['position_other']);
         $projectExists = DB::table('projects')->where('project_id', $project)->exists();
         abort_unless($projectExists, 404, 'Project not found.');
 

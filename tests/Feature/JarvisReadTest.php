@@ -1421,6 +1421,8 @@ it('syncs eligible billing DRs through stock out and delivery exactly once', fun
         ->assertSee('name="billing_status"', false)
         ->assertSee('name="position"', false)
         ->assertSee('name="telephone_1"', false)
+        ->assertSee('Administrative Officer III')
+        ->assertSee('Other (type position)')
         ->assertSee('Contact Person is copied from Received by')
         ->assertSee('2nd Billing')
         ->assertSee('3rd Billing')
@@ -1472,7 +1474,7 @@ it('syncs spreadsheet details using the authenticated account name', function ()
         'compliance_status' => 'COMPLIANT',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
-        'position' => 'School Administrator',
+        'position' => 'Administrative Officer II',
         'telephone_1' => '5551234567',
         'inspection_1' => 'Passed',
         'inspection_2' => 'Passed',
@@ -1532,7 +1534,7 @@ it('does not write a spreadsheet sync without a valid prior preview token', func
         'compliance_status' => 'COMPLIANT',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
-        'position' => 'School Administrator',
+        'position' => 'Administrative Officer II',
         'telephone_1' => '5551234567',
         'inspection_1' => 'Passed',
         'inspection_2' => 'Passed',
@@ -1556,7 +1558,7 @@ it('rejects an unsupported billing status before starting spreadsheet sync', fun
         'mode' => 'preview',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
-        'position' => 'School Administrator',
+        'position' => 'Administrative Officer II',
         'telephone_1' => '5551234567',
         'inspection_1' => 'Passed',
         'inspection_2' => 'Passed',
@@ -1580,7 +1582,7 @@ it('rejects an unsupported compliance status before starting spreadsheet sync', 
         'mode' => 'preview',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
-        'position' => 'School Administrator',
+        'position' => 'Administrative Officer II',
         'telephone_1' => '5551234567',
         'inspection_1' => 'Passed',
         'inspection_2' => 'Passed',
@@ -1609,6 +1611,70 @@ it('requires Position and Telephone 1 before syncing spreadsheet details', funct
         'date_checking' => '2026-10-29',
         'date_encoding' => '2026-10-29',
     ])->assertUnprocessable()->assertJsonValidationErrors(['position', 'telephone_1']);
+});
+
+it('accepts a typed position when Other is selected', function (): void {
+    jarvisOperations();
+    $user = jarvisReader(true, true, true);
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    $fields = [
+        'school_id' => '001',
+        'billing_status' => '1st Billing',
+        'compliance_status' => 'COMPLIANT',
+        'mode' => 'preview',
+        'date_received' => '2026-10-28',
+        'received_by' => 'School Receiver',
+        'position' => '__other__',
+        'position_other' => 'Registrar II',
+        'telephone_1' => '5551234567',
+        'inspection_1' => 'Passed',
+        'inspection_2' => 'Passed',
+        'date_checking' => '2026-10-29',
+        'date_encoding' => '2026-10-29',
+    ];
+    $expectedFields = [...$fields, 'position' => 'Registrar II'];
+    unset($expectedFields['school_id'], $expectedFields['mode'], $expectedFields['position_other']);
+    $syncService = Mockery::mock(BillingSheetSyncService::class);
+    $syncService->shouldReceive('syncProjectSpreadsheet')
+        ->once()
+        ->with(1, '001', $user->name, $expectedFields, Mockery::type(GoogleSheetsApiClient::class), $user->getKey(), true, null)
+        ->andReturn([
+            'status' => 'success',
+            'message' => 'Dry run ready.',
+            'synced_count' => 1,
+            'skipped_count' => 0,
+            'issues' => [],
+            'preview' => [['dr' => 'DR-001', 'position' => 'REGISTRAR II']],
+        ]);
+    app()->instance(BillingSheetSyncService::class, $syncService);
+
+    $this->postJson('/deliveries/monitoring/1/sync-spreadsheet', $fields)
+        ->assertOk()
+        ->assertJsonPath('preview.0.position', 'REGISTRAR II');
+});
+
+it('requires a typed position when Other is selected', function (): void {
+    jarvisOperations();
+    $user = jarvisReader(true, true, true);
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    $syncService = Mockery::mock(BillingSheetSyncService::class);
+    $syncService->shouldNotReceive('syncProjectSpreadsheet');
+    app()->instance(BillingSheetSyncService::class, $syncService);
+
+    $this->postJson('/deliveries/monitoring/1/sync-spreadsheet', [
+        'school_id' => '001',
+        'billing_status' => '1st Billing',
+        'compliance_status' => 'COMPLIANT',
+        'mode' => 'preview',
+        'date_received' => '2026-10-28',
+        'received_by' => 'School Receiver',
+        'position' => '__other__',
+        'telephone_1' => '5551234567',
+        'inspection_1' => 'Passed',
+        'inspection_2' => 'Passed',
+        'date_checking' => '2026-10-29',
+        'date_encoding' => '2026-10-29',
+    ])->assertUnprocessable()->assertJsonValidationErrors('position_other');
 });
 
 it('rolls back billing sync when inventory cannot cover a DR', function () {

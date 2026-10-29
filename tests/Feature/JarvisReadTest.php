@@ -2047,12 +2047,11 @@ it('shows each repeated DR as its own project and school Logistics scope', funct
         ->assertJsonPath('summary.logistics_delivered', 1)
         ->assertJsonPath('summary.pending_updates', 2)
         ->assertJsonPath('summary.reconciliation_required', 1);
-    expect(substr_count($response->json('html'), '3502'))->toBe(3)
-        ->and($response->json('html'))->toContain('Science Kits')
-        ->and($response->json('html'))->toContain('Furniture')
-        ->and($response->json('html'))->toContain('West School')
-        ->and($response->json('html'))->toContain('Logistics Received')
-        ->and($response->json('html'))->toContain('Logistics Delivered');
+    expect($response->json('html'))->toContain('Distinct verified DR scopes')
+        ->and($response->json('html'))->not->toContain('DR# / integration')
+        ->and($response->json('html'))->not->toContain('3502')
+        ->and($response->json('html'))->not->toContain('Science Kits')
+        ->and($response->json('html'))->not->toContain('West School');
 });
 
 it('filters and paginates the Logistics section on the server', function () {
@@ -2099,7 +2098,7 @@ it('shows a changed Logistics status on the next section refresh', function () {
         ->assertOk()
         ->assertJsonPath('summary.logistics_delivered', 1)
         ->assertJsonPath('summary.logistics_received', 0)
-        ->assertSee('Logistics Delivered');
+        ->assertDontSee('DR# / integration');
 });
 
 it('does not invent a Logistics status when a DR has no webhook tracking row', function () {
@@ -2110,8 +2109,9 @@ it('does not invent a Logistics status when a DR has no webhook tracking row', f
 
     $this->get('/deliveries/monitoring')
         ->assertOk()
-        ->assertSee('No Logistics events match these filters')
         ->assertSee('Pending Logistics updates')
+        ->assertDontSee('DR# / integration')
+        ->assertDontSee('No Logistics events match these filters')
         ->assertDontSee('Logistics Received</span>');
 });
 

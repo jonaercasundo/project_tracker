@@ -195,6 +195,7 @@ class DeliveryMonitoringController extends Controller
             'mode' => ['required', 'in:preview,confirm'],
             'preview_token' => ['nullable', 'string', 'max:80'],
             'billing_status' => ['required', 'in:1st Billing,2nd Billing,3rd Billing'],
+            'compliance_status' => ['required', 'in:COMPLIANT,NON-COMPLIANT'],
             'date_received' => ['required', 'date_format:Y-m-d'],
             'received_by' => ['required', 'string', 'max:255'],
             'inspection_1' => ['required', 'string', 'max:255'],

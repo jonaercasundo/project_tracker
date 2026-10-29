@@ -145,7 +145,7 @@ class BillingSheetSyncService
     /**
      * Fill missing billing details for project rows with a recorded 3PL received date.
      *
-     * @param  array{billing_status: string, date_received: string, received_by: string, inspection_1: string, inspection_2: string, date_checking: string, date_encoding: string}  $fields
+     * @param  array{billing_status: string, compliance_status: string, date_received: string, received_by: string, inspection_1: string, inspection_2: string, date_checking: string, date_encoding: string}  $fields
      * @return array{status: string, message: string, synced_count: int, skipped_count: int, issues: array<int, string>}
      */
     public function syncProjectSpreadsheet(
@@ -297,6 +297,7 @@ class BillingSheetSyncService
         foreach ($plansByRow as $plan) {
             $fieldsForRow = [
                 'status' => $fields['billing_status'],
+                'compliance_status' => $fields['compliance_status'],
                 'checked_by' => $checkedBy,
                 'date_received' => $fields['date_received'],
                 'received_by' => $fields['received_by'],
@@ -315,7 +316,7 @@ class BillingSheetSyncService
                 if ($this->cellValueMatches($field, $existingValue, $value)) {
                     continue;
                 }
-                if (in_array($field, ['checked_by', 'status'], true) && $this->exactCell($existingValue) !== '') {
+                if (in_array($field, ['checked_by', 'status', 'compliance_status'], true) && $this->exactCell($existingValue) !== '') {
                     continue;
                 }
                 if ($this->exactCell($existingValue) !== '') {
@@ -339,6 +340,7 @@ class BillingSheetSyncService
             'package_code' => $plan['package_code'],
             'sheet_package_code' => $plan['sheet_package_code'],
             'billing_status' => $fields['billing_status'],
+            'compliance_status' => $fields['compliance_status'],
             'lot' => $plan['lot_number'],
             'sheet_row' => $plan['row'],
             'mapping' => $plan['mapping'] === null ? null : [
@@ -1523,6 +1525,7 @@ class BillingSheetSyncService
                 'date_checking' => fn (string $header): bool => in_array($header, ['datechecking'.$lotSuffix, 'datecheking'.$lotSuffix], true),
                 'date_encoding' => fn (string $header): bool => $header === 'dateencoding'.$lotSuffix,
                 'total_amount' => fn (string $header): bool => $header === 'totalamount'.$lotSuffix,
+                'compliance_status' => fn (string $header): bool => $header === 'statuscompliantornoncompliant'.$lotSuffix,
             ];
             $destinationColumns = [];
             foreach ($requestedHeaders as $field => $matchesHeader) {

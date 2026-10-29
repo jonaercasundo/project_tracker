@@ -384,7 +384,7 @@ if (monitoring) {
             const mapping = row.mapping
                 ? ` · ID mapping ${row.mapping.tracker_school_id} → ${row.mapping.sheet_school_id} (${row.mapping.mapping_id})`
                 : '';
-            entry.textContent = `${row.school_name || 'School'} · DR ${row.dr} · ${row.package_code} · Lot ${row.lot} · ${row.billing_status} · Sheet row ${row.sheet_row} · Cells: ${(row.target_cells ?? []).join(', ') || 'no changes'} · Total ${row.amount}${mapping}`;
+            entry.textContent = `${row.school_name || 'School'} · DR ${row.dr} · ${row.package_code} · Lot ${row.lot} · ${row.billing_status} · ${row.compliance_status} · Sheet row ${row.sheet_row} · Cells: ${(row.target_cells ?? []).join(', ') || 'no changes'} · Total ${row.amount}${mapping}`;
             spreadsheetDryRun.append(entry);
         }
     }

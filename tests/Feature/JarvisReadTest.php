@@ -1419,8 +1419,11 @@ it('syncs eligible billing DRs through stock out and delivery exactly once', fun
         ->assertSee('sync-spreadsheet-form', false)
         ->assertSee('spreadsheet-school-id', false)
         ->assertSee('name="billing_status"', false)
-        ->assertSee('Second Billing')
-        ->assertSee('Third Billing')
+        ->assertSee('2nd Billing')
+        ->assertSee('3rd Billing')
+        ->assertSee('name="compliance_status"', false)
+        ->assertSee('COMPLIANT')
+        ->assertSee('NON-COMPLIANT')
         ->assertSee('mapped spreadsheet ID');
     $projectMarkup = $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()->json('projects_html');
     expect($projectMarkup)->toContain('data-sync-billing="1"')
@@ -1463,6 +1466,7 @@ it('syncs spreadsheet details using the authenticated account name', function ()
     $fields = [
         'school_id' => $schoolId,
         'billing_status' => '1st Billing',
+        'compliance_status' => 'COMPLIANT',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
         'inspection_1' => 'Passed',
@@ -1520,6 +1524,7 @@ it('does not write a spreadsheet sync without a valid prior preview token', func
         'mode' => 'confirm',
         'preview_token' => 'invalid',
         'billing_status' => '1st Billing',
+        'compliance_status' => 'COMPLIANT',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
         'inspection_1' => 'Passed',
@@ -1540,6 +1545,7 @@ it('rejects an unsupported billing status before starting spreadsheet sync', fun
     $this->postJson('/deliveries/monitoring/1/sync-spreadsheet', [
         'school_id' => '001',
         'billing_status' => 'Fourth Billing',
+        'compliance_status' => 'COMPLIANT',
         'mode' => 'preview',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
@@ -1548,6 +1554,28 @@ it('rejects an unsupported billing status before starting spreadsheet sync', fun
         'date_checking' => '2026-10-29',
         'date_encoding' => '2026-10-29',
     ])->assertUnprocessable()->assertJsonValidationErrors('billing_status');
+});
+
+it('rejects an unsupported compliance status before starting spreadsheet sync', function (): void {
+    jarvisOperations();
+    $user = jarvisReader(true, true, true);
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    $syncService = Mockery::mock(BillingSheetSyncService::class);
+    $syncService->shouldNotReceive('syncProjectSpreadsheet');
+    app()->instance(BillingSheetSyncService::class, $syncService);
+
+    $this->postJson('/deliveries/monitoring/1/sync-spreadsheet', [
+        'school_id' => '001',
+        'billing_status' => '1st Billing',
+        'compliance_status' => 'UNKNOWN',
+        'mode' => 'preview',
+        'date_received' => '2026-10-28',
+        'received_by' => 'School Receiver',
+        'inspection_1' => 'Passed',
+        'inspection_2' => 'Passed',
+        'date_checking' => '2026-10-29',
+        'date_encoding' => '2026-10-29',
+    ])->assertUnprocessable()->assertJsonValidationErrors('compliance_status');
 });
 
 it('rolls back billing sync when inventory cannot cover a DR', function () {

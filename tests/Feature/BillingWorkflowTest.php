@@ -177,6 +177,7 @@ function billingConfirmationSheetRows(array $schoolRows): array
         'BK' => 'DATE CHEKING ( LOT 2 )',
         'BL' => 'DATE ENCODING ( LOT 2 )',
         'BO' => 'TOTAL AMOUNT ( LOT 2 )',
+        'BP' => 'STATUS ( COMPLIANT or NON-COMPLIANT ) ( LOT 2 )',
         'BS' => 'STATUS ( BILLING# ) LOT 9',
         'BT' => 'Checked by',
         'BU' => 'DATE RECEIVED (FROM 3PL) LOT 9',
@@ -187,6 +188,7 @@ function billingConfirmationSheetRows(array $schoolRows): array
         'BZ' => 'DATE CHEKING ( LOT 9 )',
         'CA' => 'DATE ENCODING ( LOT 9 )',
         'CD' => 'TOTAL AMOUNT ( LOT 9 )',
+        'CE' => 'STATUS ( COMPLIANT or NON-COMPLIANT ) ( LOT 9 )',
         'CG' => 'STATUS ( BILLING# ) LOT 11',
         'CH' => 'Checked by',
         'CI' => 'DATE RECEIVED (FROM 3PL) LOT 11',
@@ -197,6 +199,7 @@ function billingConfirmationSheetRows(array $schoolRows): array
         'CN' => 'DATE CHEKING ( LOT 11 )',
         'CO' => 'DATE ENCODING ( LOT 11 )',
         'CR' => 'TOTAL AMOUNT ( LOT 11 )',
+        'CS' => 'STATUS ( COMPLIANT or NON-COMPLIANT ) ( LOT 11 )',
     ];
     foreach ($columnHeaders as $column => $heading) {
         $headers[billingSheetColumnIndex($column)] = $heading;
@@ -528,12 +531,13 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
     $billingStatusColumns = ['2' => 'BD', '9' => 'BS', '11' => 'CG'];
     $threePlDateColumns = ['2' => 'BF', '9' => 'BU', '11' => 'CI'];
     $destinationColumns = [
-        '2' => ['checked_by' => 'BE', 'date_received' => 'BG', 'received_by' => 'BH', 'inspection_1' => 'BI', 'inspection_2' => 'BJ', 'date_checking' => 'BK', 'date_encoding' => 'BL', 'total_amount' => 'BO'],
-        '9' => ['checked_by' => 'BT', 'date_received' => 'BV', 'received_by' => 'BW', 'inspection_1' => 'BX', 'inspection_2' => 'BY', 'date_checking' => 'BZ', 'date_encoding' => 'CA', 'total_amount' => 'CD'],
-        '11' => ['checked_by' => 'CH', 'date_received' => 'CJ', 'received_by' => 'CK', 'inspection_1' => 'CL', 'inspection_2' => 'CM', 'date_checking' => 'CN', 'date_encoding' => 'CO', 'total_amount' => 'CR'],
+        '2' => ['checked_by' => 'BE', 'date_received' => 'BG', 'received_by' => 'BH', 'inspection_1' => 'BI', 'inspection_2' => 'BJ', 'date_checking' => 'BK', 'date_encoding' => 'BL', 'total_amount' => 'BO', 'compliance_status' => 'BP'],
+        '9' => ['checked_by' => 'BT', 'date_received' => 'BV', 'received_by' => 'BW', 'inspection_1' => 'BX', 'inspection_2' => 'BY', 'date_checking' => 'BZ', 'date_encoding' => 'CA', 'total_amount' => 'CD', 'compliance_status' => 'CE'],
+        '11' => ['checked_by' => 'CH', 'date_received' => 'CJ', 'received_by' => 'CK', 'inspection_1' => 'CL', 'inspection_2' => 'CM', 'date_checking' => 'CN', 'date_encoding' => 'CO', 'total_amount' => 'CR', 'compliance_status' => 'CS'],
     ];
     $fields = [
         'billing_status' => '1st Billing',
+        'compliance_status' => 'COMPLIANT',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
         'inspection_1' => 'Passed',
@@ -577,8 +581,12 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
         $updatesByRange = collect($updates)->keyBy('range');
 
         return $spreadsheetId === 'test-spreadsheet-id'
-            && count($updates) === 30
+            && count($updates) === 34
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BD4"]['values'] === [['1st Billing']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BP2"]['values'] === [['COMPLIANT']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!CE2"]['values'] === [['COMPLIANT']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!CS2"]['values'] === [['COMPLIANT']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BP4"]['values'] === [['COMPLIANT']]
             && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BF|BU|CI)\d+$/', $range) === 1)
             && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BD|BS|CG)(?:2|3)$/', $range) === 1)
             && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BE|BT|CH)2$/', $range) === 1)
@@ -597,7 +605,7 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
         ->and($preview['schools'])->toHaveCount(1)
         ->and($preview['schools'][0]['school_id'])->toBe($schoolId)
         ->and($preview['schools'][0]['row_count'])->toBe(4)
-        ->and($preview['schools'][0]['missing_field_count'])->toBe(29)
+        ->and($preview['schools'][0]['missing_field_count'])->toBe(33)
         ->and($first['status'])->toBe('success')
         ->and($first['synced_count'])->toBe(4)
         ->and($retry['status'])->toBe('success')
@@ -632,6 +640,7 @@ it('does not partially sync spreadsheet rows when a DR package match is missing 
 
     $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, 'Billing Tester', [
         'billing_status' => '1st Billing',
+        'compliance_status' => 'COMPLIANT',
         'date_received' => '2026-10-28',
         'received_by' => 'Receiver',
         'inspection_1' => 'Passed',
@@ -681,11 +690,13 @@ it('matches split numeric tracker packages to one exact school and lot-specific 
         return $spreadsheetId === 'test-spreadsheet-id'
             && isset($updatesByRange["'Copy of SME LOT 2,9,11'!BE2"])
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [['2nd Billing']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BP2"]['values'] === [['NON-COMPLIANT']]
             && isset($updatesByRange["'Copy of SME LOT 2,9,11'!BO2"]);
     });
 
     $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, '120066', 'Billing Tester', [
         'billing_status' => '2nd Billing',
+        'compliance_status' => 'NON-COMPLIANT',
         'date_received' => '2026-10-28',
         'received_by' => 'Receiver',
         'inspection_1' => 'Passed',
@@ -701,6 +712,7 @@ it('matches split numeric tracker packages to one exact school and lot-specific 
         ->and($result['preview'][0]['sheet_row'])->toBe(2)
         ->and($result['preview'][0]['sheet_package_code'])->toBe('C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6')
         ->and($result['preview'][0]['billing_status'])->toBe('2nd Billing')
+        ->and($result['preview'][0]['compliance_status'])->toBe('NON-COMPLIANT')
         ->and($result['preview'][0]['amount'])->toBe('45.00');
 });
 
@@ -733,6 +745,7 @@ it('rejects ambiguous split-package DR matches without writing spreadsheet cells
 
     $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, 'Billing Tester', [
         'billing_status' => '1st Billing',
+        'compliance_status' => 'COMPLIANT',
         'date_received' => '2026-10-28',
         'received_by' => 'Receiver',
         'inspection_1' => 'Passed',
@@ -801,6 +814,7 @@ it('uses an explicit school ID mapping only for a verified DR and exact package 
 
     $fields = [
         'billing_status' => '1st Billing',
+        'compliance_status' => 'COMPLIANT',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
         'inspection_1' => 'Passed',
@@ -853,6 +867,7 @@ it('does not write spreadsheet rows when an exact school and package match is am
 
     $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, 'Billing Tester', [
         'billing_status' => '1st Billing',
+        'compliance_status' => 'COMPLIANT',
         'date_received' => '2026-10-28',
         'received_by' => 'Receiver',
         'inspection_1' => 'Passed',

@@ -7,10 +7,13 @@ use App\Http\Requests\DeliveryMonitoringLocationsRequest;
 use App\Http\Requests\DeliveryMonitoringLogisticsRequest;
 use App\Http\Requests\DeliveryMonitoringRequest;
 use App\Jobs\SyncProjectBillingOperationalStages;
+use App\Services\BillingSheetSyncService;
+use App\Services\GoogleSheetsApiClient;
 use App\Services\LogisticsDrTrackingService;
 use App\Services\ProjectDeliveryProgressService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -181,6 +184,25 @@ class DeliveryMonitoringController extends Controller
             'status_url' => route('deliveries.monitoring.sync-billing.status', ['project' => $project, 'run' => $run['id']]),
             'message' => $run['created'] ? 'Sync Billing queued. The page will update when it finishes.' : 'A Sync Billing run is already in progress for this project.',
         ], 202)->header('Cache-Control', 'private, no-store');
+    }
+
+    public function syncSpreadsheet(Request $request, int $project, BillingSheetSyncService $billingSheetSync, GoogleSheetsApiClient $sheets): JsonResponse
+    {
+        $fields = $request->validate([
+            'date_received' => ['required', 'date_format:Y-m-d'],
+            'received_by' => ['required', 'string', 'max:255'],
+            'inspection_1' => ['required', 'string', 'max:255'],
+            'inspection_2' => ['required', 'string', 'max:255'],
+            'date_checking' => ['required', 'date_format:Y-m-d'],
+            'date_encoding' => ['required', 'date_format:Y-m-d'],
+        ]);
+        $projectExists = DB::table('projects')->where('project_id', $project)->exists();
+        abort_unless($projectExists, 404, 'Project not found.');
+
+        $result = $billingSheetSync->syncProjectSpreadsheet($project, (string) Auth::user()->name, $fields, $sheets);
+
+        return response()->json($result, $result['status'] === 'success' ? 200 : 422)
+            ->header('Cache-Control', 'private, no-store');
     }
 
     public function syncBillingStatus(int $project, int $run): JsonResponse

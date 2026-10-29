@@ -115,5 +115,47 @@
                 </div>
             </form>
         </dialog>
+
+        <dialog id="sync-spreadsheet-dialog" class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/50">
+            <form id="sync-spreadsheet-form" class="max-h-[90vh] space-y-5 overflow-y-auto p-6">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
+                    <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
+                    <p class="mt-2 text-sm text-slate-600">Enter the missing billing details. The update applies to matching Lots 2, 9, and 11 rows that already have a billing status. Checked by comes from your account; each Lot total is calculated from its DR. Existing billing statuses and 3PL received dates are preserved.</p>
+                </div>
+                <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"><span class="font-semibold">Checked by:</span> {{ auth()->user()->name }}</div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="spreadsheet-date-received" class="mb-1 block text-xs font-semibold text-slate-600">Date received (Lot X)</label>
+                        <input id="spreadsheet-date-received" name="date_received" type="date" required class="w-full rounded-lg border-slate-200 text-sm">
+                    </div>
+                    <div>
+                        <label for="spreadsheet-received-by" class="mb-1 block text-xs font-semibold text-slate-600">Received by (Lot X)</label>
+                        <input id="spreadsheet-received-by" name="received_by" type="text" maxlength="255" required class="w-full rounded-lg border-slate-200 text-sm">
+                    </div>
+                    <div>
+                        <label for="spreadsheet-inspection-1" class="mb-1 block text-xs font-semibold text-slate-600">Inspection 1 (Lot X)</label>
+                        <input id="spreadsheet-inspection-1" name="inspection_1" type="text" maxlength="255" required class="w-full rounded-lg border-slate-200 text-sm">
+                    </div>
+                    <div>
+                        <label for="spreadsheet-inspection-2" class="mb-1 block text-xs font-semibold text-slate-600">Inspection 2 (Lot X)</label>
+                        <input id="spreadsheet-inspection-2" name="inspection_2" type="text" maxlength="255" required class="w-full rounded-lg border-slate-200 text-sm">
+                    </div>
+                    <div>
+                        <label for="spreadsheet-date-checking" class="mb-1 block text-xs font-semibold text-slate-600">Date checking (Lot X)</label>
+                        <input id="spreadsheet-date-checking" name="date_checking" type="date" required class="w-full rounded-lg border-slate-200 text-sm">
+                    </div>
+                    <div>
+                        <label for="spreadsheet-date-encoding" class="mb-1 block text-xs font-semibold text-slate-600">Date encoding (Lot X)</label>
+                        <input id="spreadsheet-date-encoding" name="date_encoding" type="date" required class="w-full rounded-lg border-slate-200 text-sm">
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500">Rows without a filled STATUS (BILLING#) are skipped. A missing or duplicate school/package match or a conflicting filled cell stops the entire sync before any write.</p>
+                <div class="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                    <button type="button" data-cancel-sync-spreadsheet class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">Sync Spreadsheet</button>
+                </div>
+            </form>
+        </dialog>
     </div>
 </x-project_app-layout>

@@ -18,6 +18,192 @@ class BillingSheetSyncService
     public function __construct(private GoogleSheetsBillingConfiguration $configuration) {}
 
     /**
+     * Fill missing billing details for project rows whose billing cycle is already recorded in the sheet.
+     *
+     * @param  array{date_received: string, received_by: string, inspection_1: string, inspection_2: string, date_checking: string, date_encoding: string}  $fields
+     * @return array{status: string, message: string, synced_count: int, skipped_count: int, issues: array<int, string>}
+     */
+    public function syncProjectSpreadsheet(
+        int $projectId,
+        string $checkedBy,
+        array $fields,
+        GoogleSheetsApiClient $sheets
+    ): array {
+        $configuration = $sheets->configurationStatus();
+        if (! $configuration['configured']) {
+            return $this->projectSpreadsheetFailure($configuration['reason'] ?? 'Google Sheets is not configured.');
+        }
+
+        $settings = $this->configuration->current();
+        $spreadsheetId = $settings['spreadsheet_id'];
+        $tab = $settings['sheet_tab'];
+
+        try {
+            $rows = $sheets->values($this->quotedTab($tab).'!'.config('google_sheets.billing.batch_read_range', 'A:CT'), $spreadsheetId);
+        } catch (Throwable $exception) {
+            Log::error('Google Sheets project sync read failed.', ['project_id' => $projectId, 'exception' => $exception]);
+
+            return $this->projectSpreadsheetFailure('Google Sheets could not be read. No cells were changed; check the connection and retry.');
+        }
+
+        $deliveries = DB::table('deliveries as delivery')
+            ->join('package_status as package_status', 'package_status.delivery_id', '=', 'delivery.delivery_id')
+            ->join('package as package', 'package.package_id', '=', 'package_status.package_id')
+            ->leftJoin('lot as lot', 'lot.lot_id', '=', 'package.lot_id')
+            ->where('delivery.project_id', $projectId)
+            ->whereNotNull('package.package_num')
+            ->select([
+                'delivery.delivery_id',
+                'delivery.school_id',
+                'delivery.dr_no',
+                'package.package_num as package_code',
+                'lot.lot_name',
+            ])
+            ->distinct()
+            ->orderBy('delivery.delivery_id')
+            ->get();
+
+        $headersByLot = [];
+        $plansByRow = [];
+        $issues = [];
+        $skippedCount = 0;
+        foreach ($deliveries as $delivery) {
+            $lotNumber = $this->lotNumber((string) $delivery->lot_name);
+            if (! in_array($lotNumber, ['2', '9', '11'], true)) {
+                continue;
+            }
+
+            $headersByLot[$lotNumber] ??= $this->findBillingHeaderColumns($rows, $lotNumber);
+            $headers = $headersByLot[$lotNumber];
+            $identifier = 'DR '.$delivery->dr_no.' / package '.$delivery->package_code.' / Lot '.$lotNumber;
+            if ($headers === null) {
+                $issues[] = $identifier.': worksheet headers could not be identified uniquely.';
+
+                continue;
+            }
+
+            $matches = [];
+            foreach ($rows as $rowIndex => $row) {
+                if ($rowIndex <= $headers['header_row']) {
+                    continue;
+                }
+                if ($this->exactCell($row[$headers['school_id_column']] ?? '') === $this->exactCell($delivery->school_id)
+                    && $this->exactCell($row[$headers['package_code_column']] ?? '') === $this->exactCell($delivery->package_code)) {
+                    $matches[] = ['row' => $rowIndex + 1, 'values' => $row];
+                }
+            }
+
+            if (count($matches) !== 1) {
+                $issues[] = $identifier.': '.(count($matches) === 0 ? 'no exact School ID and package-code row matched.' : 'multiple exact School ID and package-code rows matched.');
+
+                continue;
+            }
+
+            $match = $matches[0];
+            if ($this->exactCell($match['values'][$headers['destination_columns']['status']] ?? '') === '') {
+                $skippedCount++;
+
+                continue;
+            }
+
+            $rowKey = $lotNumber.'|'.$match['row'];
+            $plansByRow[$rowKey] ??= [
+                'identifier' => $identifier,
+                'lot_number' => $lotNumber,
+                'row' => $match['row'],
+                'row_values' => $match['values'],
+                'headers' => $headers,
+                'delivery_ids' => [],
+            ];
+            $plansByRow[$rowKey]['delivery_ids'][(int) $delivery->delivery_id] = (int) $delivery->delivery_id;
+        }
+
+        if ($issues !== []) {
+            return $this->projectSpreadsheetFailure('Spreadsheet sync stopped because one or more DR/package rows need reconciliation. No cells were changed.', $issues, $skippedCount);
+        }
+
+        if ($plansByRow === []) {
+            return [
+                'status' => 'success',
+                'message' => 'No rows with an existing Lot billing status were found to sync.',
+                'synced_count' => 0,
+                'skipped_count' => $skippedCount,
+                'issues' => [],
+            ];
+        }
+
+        $amountsByDelivery = $this->deliveryTotals(collect($plansByRow)->flatMap(fn (array $plan): array => array_values($plan['delivery_ids']))->unique()->values()->all());
+        $updatesByCell = [];
+        foreach ($plansByRow as $plan) {
+            $fieldsForRow = [
+                'checked_by' => $checkedBy,
+                'date_received' => $fields['date_received'],
+                'received_by' => $fields['received_by'],
+                'inspection_1' => $fields['inspection_1'],
+                'inspection_2' => $fields['inspection_2'],
+                'date_checking' => $fields['date_checking'],
+                'date_encoding' => $fields['date_encoding'],
+                'total_amount' => $this->formatCents(collect($plan['delivery_ids'])
+                    ->sum(fn (int $deliveryId): int => $this->amountToCents($amountsByDelivery[$deliveryId] ?? '0.00'))),
+            ];
+
+            foreach ($fieldsForRow as $field => $value) {
+                $columnIndex = $plan['headers']['destination_columns'][$field];
+                $cell = $this->columnName($columnIndex).$plan['row'];
+                $existingValue = $plan['row_values'][$columnIndex] ?? '';
+                if ($this->cellValueMatches($field, $existingValue, $value)) {
+                    continue;
+                }
+                if ($this->exactCell($existingValue) !== '') {
+                    $issues[] = $plan['identifier'].': '.$cell.' already has a different value; it was left unchanged.';
+
+                    continue;
+                }
+                $updatesByCell[$cell] = $value;
+            }
+        }
+
+        if ($issues !== []) {
+            return $this->projectSpreadsheetFailure('Spreadsheet sync stopped because existing cell values conflict with the entered details. No cells were changed.', $issues, $skippedCount);
+        }
+
+        $updates = [];
+        foreach ($updatesByCell as $cell => $value) {
+            $updates[] = [
+                'range' => $this->quotedTab($tab).'!'.$cell,
+                'majorDimension' => 'ROWS',
+                'values' => [[$value]],
+            ];
+        }
+
+        try {
+            if ($updates !== []) {
+                $sheets->updateCells($updates, $spreadsheetId);
+            }
+        } catch (Throwable $exception) {
+            Log::error('Google Sheets project sync write failed.', ['project_id' => $projectId, 'exception' => $exception]);
+
+            return $this->projectSpreadsheetFailure('Google Sheets could not apply the spreadsheet update. No tracker workflow data was changed; check the sheet and retry.', [], $skippedCount);
+        }
+
+        return [
+            'status' => 'success',
+            'message' => 'Spreadsheet details synchronized for '.count($plansByRow).' DR/package row(s); existing billing status and 3PL received dates were preserved.',
+            'synced_count' => count($plansByRow),
+            'skipped_count' => $skippedCount,
+            'issues' => [],
+        ];
+    }
+
+    /** @param array<int, string> $issues
+     * @return array{status: string, message: string, synced_count: int, skipped_count: int, issues: array<int, string>}
+     */
+    private function projectSpreadsheetFailure(string $message, array $issues = [], int $skippedCount = 0): array
+    {
+        return ['status' => 'error', 'message' => $message, 'synced_count' => 0, 'skipped_count' => $skippedCount, 'issues' => $issues];
+    }
+
+    /**
      * Queue a sheet reconciliation row for every package in the delivery's lot.
      */
     public function queueForTransition(

@@ -3,7 +3,10 @@ const monitoring = document.getElementById('delivery-monitoring');
 if (monitoring) {
     const syncBillingDialog = document.getElementById('sync-billing-dialog');
     const syncBillingForm = document.getElementById('sync-billing-confirmation');
+    const syncSpreadsheetDialog = document.getElementById('sync-spreadsheet-dialog');
+    const syncSpreadsheetForm = document.getElementById('sync-spreadsheet-form');
     let pendingSyncBillingButton;
+    let pendingSyncSpreadsheetButton;
     const form = document.getElementById('monitoring-filters');
     const region = form.elements.region;
     const division = form.elements.division;
@@ -209,6 +212,14 @@ if (monitoring) {
     });
     loadReport(new URL(window.location.href), false);
     monitoring.addEventListener('click', event => {
+        const spreadsheetButton = event.target.closest('[data-sync-spreadsheet]');
+        if (spreadsheetButton) {
+            event.preventDefault();
+            pendingSyncSpreadsheetButton = spreadsheetButton;
+            syncSpreadsheetDialog.showModal();
+            return;
+        }
+
         const syncButton = event.target.closest('[data-sync-billing]');
         if (syncButton) {
             event.preventDefault();
@@ -278,6 +289,69 @@ if (monitoring) {
         if (event.target.closest('[data-cancel-sync-billing]')) {
             pendingSyncBillingButton = undefined;
             syncBillingDialog.close();
+        }
+    });
+
+    syncSpreadsheetForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (!pendingSyncSpreadsheetButton) {
+            return;
+        }
+
+        const button = pendingSyncSpreadsheetButton;
+        const projectId = button.dataset.syncSpreadsheet;
+        const originalLabel = button.textContent;
+        const feedback = [...monitoring.querySelectorAll(`[data-sync-spreadsheet-feedback="${projectId}"]`)];
+        const setFeedback = (message, isError = false) => {
+            feedback.forEach(element => {
+                element.textContent = message;
+                element.classList.toggle('text-rose-700', isError);
+                element.classList.toggle('text-emerald-700', !isError);
+            });
+        };
+        const formData = new FormData(syncSpreadsheetForm);
+
+        pendingSyncSpreadsheetButton = undefined;
+        syncSpreadsheetDialog.close();
+        button.disabled = true;
+        button.textContent = 'Syncing…';
+        setFeedback('Syncing spreadsheet rows…');
+
+        try {
+            const response = await fetch(button.dataset.endpoint, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(Object.fromEntries(formData.entries())),
+            });
+            const result = await response.json();
+            const issueDetails = Array.isArray(result.issues) && result.issues.length
+                ? ` ${result.issues.join(' ')}`
+                : '';
+            if (!response.ok) {
+                throw new Error(`${result.message ?? `Spreadsheet sync failed (HTTP ${response.status}).`}${issueDetails}`);
+            }
+
+            setFeedback(`${result.message}${result.skipped_count ? ` ${result.skipped_count} row(s) without a billing status were skipped.` : ''}`);
+        } catch (exception) {
+            setFeedback(exception.message, true);
+        } finally {
+            if (button.isConnected) {
+                button.disabled = false;
+                button.textContent = originalLabel;
+            }
+        }
+    });
+
+    syncSpreadsheetDialog.addEventListener('click', event => {
+        if (event.target.closest('[data-cancel-sync-spreadsheet]')) {
+            pendingSyncSpreadsheetButton = undefined;
+            syncSpreadsheetDialog.close();
         }
     });
 

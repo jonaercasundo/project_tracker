@@ -2,6 +2,8 @@
 
 use App\Models\Company;
 use App\Models\User;
+use App\Services\BillingSheetSyncService;
+use App\Services\GoogleSheetsApiClient;
 use App\Services\MmcProjectIntelligence;
 use App\Services\ProjectDeliveryProgressService;
 use Illuminate\Contracts\Console\Kernel;
@@ -1413,8 +1415,12 @@ it('syncs eligible billing DRs through stock out and delivery exactly once', fun
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
 
     $this->get('/deliveries/monitoring')->assertOk()
-        ->assertSee('Sync Billing')
-        ->assertSee('data-sync-billing="1"', false);
+        ->assertSee('Sync Spreadsheet')
+        ->assertSee('sync-spreadsheet-form', false);
+    $projectMarkup = $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()->json('projects_html');
+    expect($projectMarkup)->toContain('data-sync-billing="1"')
+        ->toContain('data-sync-spreadsheet="1"')
+        ->toContain('Sync Spreadsheet');
 
     $firstSync = $this->postJson('/deliveries/monitoring/1/sync-billing')
         ->assertOk()
@@ -1442,6 +1448,37 @@ it('syncs eligible billing DRs through stock out and delivery exactly once', fun
         ->and(DB::table('inventory_history')->where('batch_no', 'like', 'BILLING-SYNC-%')->count())->toBe(2)
         ->and(DB::table('package_status')->where('delivery_id', 1)->count())->toBe(4)
         ->and($secondSync->json('message'))->toContain('No eligible billing DRs needed syncing');
+});
+
+it('syncs spreadsheet details using the authenticated account name', function (): void {
+    jarvisOperations();
+    $user = jarvisReader(true, true, true);
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    $fields = [
+        'date_received' => '2026-10-28',
+        'received_by' => 'School Receiver',
+        'inspection_1' => 'Passed',
+        'inspection_2' => 'Passed',
+        'date_checking' => '2026-10-29',
+        'date_encoding' => '2026-10-29',
+    ];
+    $syncService = Mockery::mock(BillingSheetSyncService::class);
+    $syncService->shouldReceive('syncProjectSpreadsheet')
+        ->once()
+        ->with(1, $user->name, $fields, Mockery::type(GoogleSheetsApiClient::class))
+        ->andReturn([
+            'status' => 'success',
+            'message' => 'Spreadsheet details synchronized for 1 DR/package row(s).',
+            'synced_count' => 1,
+            'skipped_count' => 0,
+            'issues' => [],
+        ]);
+    app()->instance(BillingSheetSyncService::class, $syncService);
+
+    $this->postJson('/deliveries/monitoring/1/sync-spreadsheet', $fields)
+        ->assertOk()
+        ->assertJsonPath('status', 'success')
+        ->assertJsonPath('synced_count', 1);
 });
 
 it('rolls back billing sync when inventory cannot cover a DR', function () {

@@ -440,6 +440,19 @@ if (monitoring) {
         });
     });
 
+    ['received_by', 'inspection_1', 'inspection_2'].forEach(name => {
+        const control = syncSpreadsheetForm.elements[name];
+        control.addEventListener('input', () => {
+            const cursorStart = control.selectionStart;
+            const cursorEnd = control.selectionEnd;
+            const uppercaseValue = control.value.toLocaleUpperCase();
+            if (control.value !== uppercaseValue) {
+                control.value = uppercaseValue;
+                control.setSelectionRange(cursorStart, cursorEnd);
+            }
+        });
+    });
+
     syncSpreadsheetDialog.addEventListener('click', event => {
         if (event.target.closest('[data-cancel-sync-spreadsheet]')) {
             pendingSyncSpreadsheetButton = undefined;

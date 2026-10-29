@@ -164,6 +164,8 @@ function billingConfirmationSheetRows(array $schoolRows): array
     $headers = array_fill(0, 98, '');
     $columnHeaders = [
         'B' => 'SchoolID',
+        'F' => 'Contact Person',
+        'G' => 'Contact/Email',
         'L' => 'Core Package Code Lot2',
         'X' => 'Core Package Code Lot 9',
         'AJ' => 'Core Package Code Lot 11',
@@ -209,6 +211,7 @@ function billingConfirmationSheetRows(array $schoolRows): array
     foreach ($schoolRows as $schoolRow) {
         $row = array_fill(0, 98, '');
         $row[1] = $schoolRow['school_id'];
+        $row[billingSheetColumnIndex('G')] = $schoolRow['contact_email'] ?? 'school@example.test';
         foreach ($schoolRow['package_codes'] as $lotNumber => $packageCode) {
             $column = ['2' => 'L', '9' => 'X', '11' => 'AJ'][$lotNumber];
             $row[billingSheetColumnIndex($column)] = $packageCode;
@@ -554,23 +557,34 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
     $sheetRows[2][billingSheetColumnIndex($billingStatusColumns['2'])] = '2nd Billing';
     $sheetRows[2][billingSheetColumnIndex($destinationColumns['2']['checked_by'])] = 'LYN';
     $sheetRows[3][billingSheetColumnIndex($threePlDateColumns['2'])] = '2026-10-27';
+    $sheetRows[1][billingSheetColumnIndex('F')] = 'OLD CONTACT';
 
     $alreadySyncedRows = $sheetRows;
     $expectedAmounts = ['2' => '12.50', '9' => '23.00', '11' => '7.25'];
     foreach (['2', '9', '11'] as $lotNumber) {
+        $alreadySyncedRows[1][billingSheetColumnIndex($billingStatusColumns[$lotNumber])] = '1ST BILLING';
         foreach ($destinationColumns[$lotNumber] as $field => $column) {
             if ($field !== 'checked_by') {
                 $value = $field === 'total_amount' ? $expectedAmounts[$lotNumber] : $fields[$field];
+                if (in_array($field, ['received_by', 'inspection_1', 'inspection_2'], true)) {
+                    $value = mb_strtoupper($value);
+                }
                 $alreadySyncedRows[1][billingSheetColumnIndex($column)] = $value;
             }
         }
+        $alreadySyncedRows[1][billingSheetColumnIndex($destinationColumns[$lotNumber]['checked_by'])] = mb_strtoupper($actor->name);
     }
     foreach ($destinationColumns['2'] as $field => $column) {
-        $alreadySyncedRows[3][billingSheetColumnIndex($column)] = $field === 'checked_by'
-            ? $actor->name
+        $value = $field === 'checked_by'
+            ? mb_strtoupper($actor->name)
             : ($field === 'total_amount' ? $expectedAmounts['2'] : $fields[$field]);
+        $alreadySyncedRows[3][billingSheetColumnIndex($column)] = in_array($field, ['received_by', 'inspection_1', 'inspection_2'], true)
+            ? mb_strtoupper($value)
+            : $value;
     }
-    $alreadySyncedRows[3][billingSheetColumnIndex('BD')] = $fields['billing_status'];
+    $alreadySyncedRows[3][billingSheetColumnIndex('BD')] = mb_strtoupper($fields['billing_status']);
+    $alreadySyncedRows[1][billingSheetColumnIndex('F')] = mb_strtoupper($fields['received_by']);
+    $alreadySyncedRows[3][billingSheetColumnIndex('F')] = mb_strtoupper($fields['received_by']);
 
     $sheets = Mockery::mock(GoogleSheetsApiClient::class);
     $sheets->shouldReceive('configurationStatus')->times(3)->andReturn(['configured' => true, 'reason' => null]);
@@ -581,16 +595,23 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
         $updatesByRange = collect($updates)->keyBy('range');
 
         return $spreadsheetId === 'test-spreadsheet-id'
-            && count($updates) === 34
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD4"]['values'] === [['1st Billing']]
+            && count($updates) === 42
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD4"]['values'] === [['1ST BILLING']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!F2"]['values'] === [['SCHOOL RECEIVER']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!F4"]['values'] === [['SCHOOL RECEIVER']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BP2"]['values'] === [['COMPLIANT']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!CE2"]['values'] === [['COMPLIANT']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!CS2"]['values'] === [['COMPLIANT']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BP4"]['values'] === [['COMPLIANT']]
             && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BF|BU|CI)\d+$/', $range) === 1)
-            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BD|BS|CG)(?:2|3)$/', $range) === 1)
-            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BE|BT|CH)2$/', $range) === 1)
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BE4"]['values'] === [[$actor->name]]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [['1ST BILLING']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BS2"]['values'] === [['1ST BILLING']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!CG2"]['values'] === [['1ST BILLING']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BE2"]['values'] === [[mb_strtoupper($actor->name)]]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BT2"]['values'] === [[mb_strtoupper($actor->name)]]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!CH2"]['values'] === [[mb_strtoupper($actor->name)]]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BE4"]['values'] === [[mb_strtoupper($actor->name)]]
+            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!G\d+$/', $range) === 1)
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BG2"]['values'] === [[$fields['date_received']]]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BO2"]['values'] === [['12.50']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!CD2"]['values'] === [['23.00']]
@@ -605,7 +626,7 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
         ->and($preview['schools'])->toHaveCount(1)
         ->and($preview['schools'][0]['school_id'])->toBe($schoolId)
         ->and($preview['schools'][0]['row_count'])->toBe(4)
-        ->and($preview['schools'][0]['missing_field_count'])->toBe(33)
+        ->and($preview['schools'][0]['missing_field_count'])->toBe(34)
         ->and($first['status'])->toBe('success')
         ->and($first['synced_count'])->toBe(4)
         ->and($retry['status'])->toBe('success')
@@ -680,6 +701,22 @@ it('matches split numeric tracker packages to one exact school and lot-specific 
     $rows[0][billingSheetColumnIndex('S')] = 'BIR DR';
     $rows[1][billingSheetColumnIndex('S')] = '56308';
     $rows[1][billingSheetColumnIndex('BF')] = '2026-10-27';
+    foreach ([
+        'F' => 'OLD CONTACT',
+        'G' => 'preserve@example.test',
+        'BD' => '1ST BILLING',
+        'BE' => 'OLD USER',
+        'BG' => '2026-01-01',
+        'BH' => 'OLD RECEIVER',
+        'BI' => 'OLD INSPECTOR 1',
+        'BJ' => 'OLD INSPECTOR 2',
+        'BK' => '2026-01-02',
+        'BL' => '2026-01-03',
+        'BO' => '1.00',
+        'BP' => 'COMPLIANT',
+    ] as $column => $value) {
+        $rows[1][billingSheetColumnIndex($column)] = $value;
+    }
 
     $sheets = Mockery::mock(GoogleSheetsApiClient::class);
     $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
@@ -689,9 +726,18 @@ it('matches split numeric tracker packages to one exact school and lot-specific 
 
         return $spreadsheetId === 'test-spreadsheet-id'
             && isset($updatesByRange["'Copy of SME LOT 2,9,11'!BE2"])
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [['2nd Billing']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!F2"]['values'] === [['RECEIVER']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BE2"]['values'] === [['BILLING TESTER']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [['2ND BILLING']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BP2"]['values'] === [['NON-COMPLIANT']]
-            && isset($updatesByRange["'Copy of SME LOT 2,9,11'!BO2"]);
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BG2"]['values'] === [['2026-10-28']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BH2"]['values'] === [['RECEIVER']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BI2"]['values'] === [['PASSED']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BJ2"]['values'] === [['PASSED']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BK2"]['values'] === [['2026-10-29']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BL2"]['values'] === [['2026-10-29']]
+            && isset($updatesByRange["'Copy of SME LOT 2,9,11'!BO2"])
+            && ! $updatesByRange->keys()->contains(fn (string $range): bool => in_array($range, ["'Copy of SME LOT 2,9,11'!BF2", "'Copy of SME LOT 2,9,11'!G2"], true));
     });
 
     $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, '120066', 'Billing Tester', [
@@ -711,7 +757,8 @@ it('matches split numeric tracker packages to one exact school and lot-specific 
         ->and($result['preview'][0]['dr'])->toBe('56308')
         ->and($result['preview'][0]['sheet_row'])->toBe(2)
         ->and($result['preview'][0]['sheet_package_code'])->toBe('C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6')
-        ->and($result['preview'][0]['billing_status'])->toBe('2nd Billing')
+        ->and($result['preview'][0]['target_cells'])->toContain('F2')
+        ->and($result['preview'][0]['billing_status'])->toBe('2ND BILLING')
         ->and($result['preview'][0]['compliance_status'])->toBe('NON-COMPLIANT')
         ->and($result['preview'][0]['amount'])->toBe('45.00');
 });

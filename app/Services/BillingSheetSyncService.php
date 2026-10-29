@@ -47,7 +47,7 @@ class BillingSheetSyncService
                 continue;
             }
 
-            $headersByLot[$lotNumber] ??= $this->findBillingHeaderColumns($rows, $lotNumber);
+            $headersByLot[$lotNumber] ??= $this->findBillingHeaderColumns($rows, $lotNumber, true);
             $headers = $headersByLot[$lotNumber];
             if ($headers === null) {
                 $issues[] = 'Lot '.$lotNumber.': SchoolID, package, or billing detail headers could not be identified uniquely.';
@@ -197,7 +197,7 @@ class BillingSheetSyncService
                 continue;
             }
 
-            $headersByLot[$lotNumber] ??= $this->findBillingHeaderColumns($rows, $lotNumber);
+            $headersByLot[$lotNumber] ??= $this->findBillingHeaderColumns($rows, $lotNumber, true);
             $headers = $headersByLot[$lotNumber];
             $identifier = 'DR '.$delivery->dr_no.' / package '.$delivery->package_code.' / Lot '.$lotNumber;
             if ($headers === null) {
@@ -294,15 +294,17 @@ class BillingSheetSyncService
 
         $amountsByDelivery = $this->deliveryTotals(collect($plansByRow)->flatMap(fn (array $plan): array => array_values($plan['delivery_ids']))->unique()->values()->all());
         $updatesByCell = [];
+        $checkedByForSheet = mb_strtoupper(trim($checkedBy));
         foreach ($plansByRow as $plan) {
             $fieldsForRow = [
-                'status' => $fields['billing_status'],
-                'compliance_status' => $fields['compliance_status'],
-                'checked_by' => $checkedBy,
+                'status' => mb_strtoupper(trim($fields['billing_status'])),
+                'compliance_status' => mb_strtoupper(trim($fields['compliance_status'])),
+                'checked_by' => $checkedByForSheet,
                 'date_received' => $fields['date_received'],
-                'received_by' => $fields['received_by'],
-                'inspection_1' => $fields['inspection_1'],
-                'inspection_2' => $fields['inspection_2'],
+                'received_by' => mb_strtoupper(trim($fields['received_by'])),
+                'contact_person' => mb_strtoupper(trim($fields['received_by'])),
+                'inspection_1' => mb_strtoupper(trim($fields['inspection_1'])),
+                'inspection_2' => mb_strtoupper(trim($fields['inspection_2'])),
                 'date_checking' => $fields['date_checking'],
                 'date_encoding' => $fields['date_encoding'],
                 'total_amount' => $this->formatCents(collect($plan['delivery_ids'])
@@ -314,14 +316,6 @@ class BillingSheetSyncService
                 $cell = $this->columnName($columnIndex).$plan['row'];
                 $existingValue = $plan['row_values'][$columnIndex] ?? '';
                 if ($this->cellValueMatches($field, $existingValue, $value)) {
-                    continue;
-                }
-                if (in_array($field, ['checked_by', 'status', 'compliance_status'], true) && $this->exactCell($existingValue) !== '') {
-                    continue;
-                }
-                if ($this->exactCell($existingValue) !== '') {
-                    $issues[] = $plan['identifier'].': '.$cell.' already has a different value; it was left unchanged.';
-
                     continue;
                 }
                 $updatesByCell[$cell] = $value;
@@ -339,8 +333,8 @@ class BillingSheetSyncService
             'school_name' => $plan['school_name'],
             'package_code' => $plan['package_code'],
             'sheet_package_code' => $plan['sheet_package_code'],
-            'billing_status' => $fields['billing_status'],
-            'compliance_status' => $fields['compliance_status'],
+            'billing_status' => mb_strtoupper(trim($fields['billing_status'])),
+            'compliance_status' => mb_strtoupper(trim($fields['compliance_status'])),
             'lot' => $plan['lot_number'],
             'sheet_row' => $plan['row'],
             'mapping' => $plan['mapping'] === null ? null : [
@@ -411,7 +405,7 @@ class BillingSheetSyncService
 
         return [
             'status' => 'success',
-            'message' => 'Spreadsheet details synchronized for '.count($plansByRow).' DR/package row(s); existing billing statuses and 3PL received dates were preserved, and blank Checked by cells were filled from your account.',
+            'message' => 'Spreadsheet details synchronized for '.count($plansByRow).' DR/package row(s). The selected encode updated mapped billing fields, Contact Person was copied from Received by, and DATE RECEIVED (FROM 3PL) and Contact/Email were left unchanged.',
             'synced_count' => count($plansByRow),
             'skipped_count' => $skippedCount,
             'issues' => [],
@@ -512,7 +506,7 @@ class BillingSheetSyncService
     }
 
     /** @param array<int, array<int, mixed>> $rows
-     * @param  array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, destination_columns: array<string, int>}  $headers
+     * @param  array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, contact_person_column?: int, destination_columns: array<string, int>}  $headers
      * @return array<string, array<int, array{row: int, values: array<int, mixed>}>>
      */
     private function indexBillingSheetRows(array $rows, array $headers): array
@@ -553,7 +547,7 @@ class BillingSheetSyncService
      *
      * @param  array<string, array<int, array{row: int, values: array<int, mixed>}>>  $rowsByPackage
      * @param  array<string, array<int, array{row: int, values: array<int, mixed>}>>  $rowsByDrAndSchool
-     * @param  array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, destination_columns: array<string, int>}  $headers
+     * @param  array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, contact_person_column?: int, destination_columns: array<string, int>}  $headers
      * @return array<int, array{row: int, values: array<int, mixed>}>
      */
     private function billingSheetRowsForDelivery(
@@ -577,7 +571,7 @@ class BillingSheetSyncService
     }
 
     /** @param array<int, array<int, mixed>> $rows
-     * @param  array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, destination_columns: array<string, int>}  $headers
+     * @param  array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, contact_person_column?: int, destination_columns: array<string, int>}  $headers
      * @return array<string, array<int, array{row: int, values: array<int, mixed>}>>
      */
     private function indexBillingSheetRowsByDrAndSchool(array $rows, array $headers): array
@@ -1451,9 +1445,9 @@ class BillingSheetSyncService
     }
 
     /** @param array<int, array<int, mixed>> $rows
-     * @return array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, destination_columns: array<string, int>}|null
+     * @return array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, contact_person_column?: int, destination_columns: array<string, int>}|null
      */
-    private function findBillingHeaderColumns(array $rows, string $lotNumber): ?array
+    private function findBillingHeaderColumns(array $rows, string $lotNumber, bool $requireContactPerson = false): ?array
     {
         $lotSuffix = 'lot'.$lotNumber;
         $maxRows = min(count($rows), (int) config('google_sheets.billing.header_scan_rows', 20));
@@ -1464,10 +1458,14 @@ class BillingSheetSyncService
             $schoolColumns = [];
             $packageColumns = [];
             $billingSectionStarts = [];
+            $contactPersonColumns = [];
             foreach ($headers as $columnIndex => $heading) {
                 $normalized = $this->normalizedHeader($heading);
                 if ($normalized === 'schoolid') {
                     $schoolColumns[] = $columnIndex;
+                }
+                if ($normalized === 'contactperson') {
+                    $contactPersonColumns[] = $columnIndex;
                 }
                 if ($normalized === 'corepackagecode'.$lotSuffix) {
                     $packageColumns[] = $columnIndex;
@@ -1477,7 +1475,8 @@ class BillingSheetSyncService
                 }
             }
 
-            if (count($schoolColumns) !== 1 || count($packageColumns) !== 1 || count($billingSectionStarts) !== 1) {
+            if (count($schoolColumns) !== 1 || count($packageColumns) !== 1 || count($billingSectionStarts) !== 1
+                || count($contactPersonColumns) > 1 || ($requireContactPerson && count($contactPersonColumns) !== 1)) {
                 continue;
             }
 
@@ -1542,9 +1541,12 @@ class BillingSheetSyncService
                 }
                 $destinationColumns[$field] = $matchedColumns[0];
             }
+            if ($destinationColumns !== [] && $requireContactPerson && count($contactPersonColumns) === 1) {
+                $destinationColumns['contact_person'] = $contactPersonColumns[0];
+            }
 
-            if (count($destinationColumns) === count($requestedHeaders)) {
-                $candidates[] = [
+            if (count($destinationColumns) === count($requestedHeaders) + ($requireContactPerson ? 1 : 0)) {
+                $candidate = [
                     'header_row' => $rowIndex,
                     'school_id_column' => $schoolColumns[0],
                     'package_code_column' => $packageColumns[0],
@@ -1552,6 +1554,10 @@ class BillingSheetSyncService
                     'three_pl_date_column' => count($threePlDateColumns) === 1 ? $threePlDateColumns[0] : null,
                     'destination_columns' => $destinationColumns,
                 ];
+                if (count($contactPersonColumns) === 1) {
+                    $candidate['contact_person_column'] = $contactPersonColumns[0];
+                }
+                $candidates[] = $candidate;
             }
         }
 

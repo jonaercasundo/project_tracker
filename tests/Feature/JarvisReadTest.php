@@ -1031,6 +1031,41 @@ it('exposes the operational pipeline with compatible denominators and exact bill
         ->assertJsonPath('data.summary.pipeline.billing.percent', 75);
 });
 
+it('shows distinct DR gaps between delivered billing stages in the monitoring flow', function () {
+    jarvisOperations();
+    DB::table('inventory_history')->insert([
+        ['inventory_id' => 1, 'item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 10, 'new_qty' => 9, 'change_type' => 'stock_out', 'batch_no' => 'DR-3502'],
+        ['inventory_id' => 1, 'item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 9, 'new_qty' => 8, 'change_type' => 'stock_out', 'batch_no' => 'DR-3502-REPLAY'],
+    ]);
+    DB::table('inventory_history')->insert([
+        'inventory_id' => null, 'item_id' => 1, 'warehouse_id' => 1, 'old_qty' => null, 'new_qty' => null,
+        'change_type' => 'stock_out', 'batch_no' => 'DR-3502-X', 'project_id' => 1, 'delivery_id' => 2,
+        'package_id' => 1, 'dr_no' => '3502-X', 'quantity' => 0,
+    ]);
+    DB::table('delivery_billing_records')->insert(['delivery_id' => 2, 'status' => 'for_billing']);
+    $user = jarvisReader();
+    $token = $user->createToken('JARVIS', ['jarvis:read'])->plainTextToken;
+
+    jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
+        ->assertOk()
+        ->assertJsonPath('data.projects.0.pipeline.stock_out.completed', 2)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.completed', 1)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.pending_count', 1)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.pending_total', 2)
+        ->assertJsonPath('data.projects.0.pipeline.billing.completed', 1)
+        ->assertJsonPath('data.projects.0.pipeline.billing.pending_count', 0)
+        ->assertJsonPath('data.projects.0.pipeline.billing.pending_total', 1)
+        ->assertJsonPath('data.projects.0.pipeline.billed.pending_count', 1)
+        ->assertJsonPath('data.projects.0.pipeline.billed.pending_total', 1);
+
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    $this->get('/deliveries/monitoring?project_id=1')->assertOk()
+        ->assertSee('Pending 1 / 2 DRs')
+        ->assertSee('Pending 0 / 1 DRs')
+        ->assertSee('Pending 1 / 1 DRs');
+});
+
 it('keeps warehouse inventory and stock transactions separate from package status', function () {
     jarvisOperations();
     DB::table('package_status')->where('delivery_id', 1)->update(['status' => 'warehouse']);

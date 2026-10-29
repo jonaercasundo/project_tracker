@@ -126,7 +126,7 @@ class LogisticsDeliveryCompletionService
                 'warehouse_id' => $line['warehouse_id'], 'old_qty' => $line['status'] === 'released' ? null : $oldQty,
                 'new_qty' => $line['status'] === 'released' ? null : $newQty, 'changed_by' => 'Logistics Integration',
                 'remarks' => 'Stock Out via Logistics integration; content quantity '.$line['content_qty'].' x package quantity '.$line['package_qty'].'.',
-                'change_type' => $line['status'] === 'released' ? 'stock_out_verified' : 'stock_out', 'changed_at' => $now,
+                'change_type' => 'stock_out', 'changed_at' => $now,
                 'project_id' => $line['project_id'], 'delivery_id' => $line['delivery_id'], 'package_id' => $line['package_id'],
                 'dr_no' => $line['dr_no'], 'quantity' => $line['status'] === 'released' ? 0 : $line['quantity'],
                 'integration_id' => $event->integration_id, 'webhook_event_id' => $event->external_event_id,

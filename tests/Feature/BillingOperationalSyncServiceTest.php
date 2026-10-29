@@ -174,6 +174,23 @@ it('prefers the warehouse assigned directly to the DR logistics location', funct
         ->and(DB::table('inventory_history')->value('warehouse_id'))->toBe(9);
 });
 
+it('records an already released package as stock out without deducting inventory again', function () {
+    $fixture = billingOperationalFixture(region: 'Region I');
+    DB::table('warehouse')->insert(['warehouse_id' => 2, 'warehouse_name' => 'Pampanga']);
+    DB::table('inventory')->insert(['item_id' => 91, 'warehouse_id' => 2, 'qty' => 20, 'inventory_status' => 'Approved']);
+    DB::table('package_status')->where('delivery_id', $fixture['delivery_id'])->update(['status' => 'released']);
+
+    app(BillingOperationalSyncService::class)->syncProject($fixture['project_id'], 12, 'Billing User');
+
+    $history = DB::table('inventory_history')->first();
+    expect(DB::table('inventory')->where('warehouse_id', 2)->value('qty'))->toBe(20)
+        ->and($history->change_type)->toBe('stock_out')
+        ->and($history->old_qty)->toBeNull()
+        ->and($history->new_qty)->toBeNull()
+        ->and($history->quantity)->toBe(0)
+        ->and(DB::table('package_status')->where('status', 'delivered')->exists())->toBeTrue();
+});
+
 it('stops without changing inventory when a school region maps to multiple warehouses', function () {
     $fixture = billingOperationalFixture();
     DB::table('logistics_location')->insert([

@@ -387,7 +387,7 @@ class BillingOperationalSyncService
                 'new_qty' => null,
                 'changed_by' => $changedBy,
                 'remarks' => 'Stock Out was bypassed during the billing process by Sync Billing; prior deduction verified and no additional inventory was deducted.',
-                'change_type' => 'stock_out_verified',
+                'change_type' => 'stock_out',
                 'changed_at' => $changedAt,
                 'project_id' => $projectId,
                 'delivery_id' => $line['delivery_id'],

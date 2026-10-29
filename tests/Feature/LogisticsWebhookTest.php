@@ -703,6 +703,30 @@ it('completes a matched delivery and records the integration stock out atomicall
         ->and(DB::table('delivery_history')->where('status', 'delivered')->count())->toBe(1);
 });
 
+it('records a previously released logistics package without deducting inventory again', function () {
+    $deliveryId = insertDeliveryFixture(10, 'school-A', 'DR-LOG-RELEASED', 'warehouse');
+    prepareLogisticsStockOut($deliveryId);
+    DB::table('package_status')->where('delivery_id', $deliveryId)->update(['status' => 'released']);
+    $received = logisticsWebhookPayload(['dr_reference' => 'DR-LOG-RELEASED', 'sequence' => 1]);
+    logisticsWebhookRequest($this, json_encode($received, JSON_THROW_ON_ERROR))->assertAccepted();
+    processLogisticsWebhookEvent($received['event_id']);
+    $delivered = logisticsWebhookPayload([
+        'event_id' => 'logistics-delivered-released', 'event_type' => 'delivery.delivered',
+        'dr_reference' => 'DR-LOG-RELEASED', 'sequence' => 2, 'occurred_at' => '2026-10-13T14:31:00+08:00',
+    ]);
+    logisticsWebhookRequest($this, json_encode($delivered, JSON_THROW_ON_ERROR))->assertAccepted();
+
+    $event = processLogisticsWebhookEvent($delivered['event_id']);
+    $history = DB::table('inventory_history')->first();
+    expect($event->reconciliation_status)->toBe('accepted')
+        ->and(DB::table('inventory')->value('qty'))->toBe(20)
+        ->and($history->change_type)->toBe('stock_out')
+        ->and($history->quantity)->toBe(0)
+        ->and($history->old_qty)->toBeNull()
+        ->and($history->new_qty)->toBeNull()
+        ->and(DB::table('package_status')->where('status', 'delivered')->exists())->toBeTrue();
+});
+
 it('does not deduct inventory again when a processed delivery event is replayed', function () {
     $deliveryId = insertDeliveryFixture(10, 'school-A', 'DR-LOG-2', 'warehouse');
     prepareLogisticsStockOut($deliveryId);

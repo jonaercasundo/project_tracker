@@ -1628,6 +1628,22 @@ it('renders continuous scan feedback and preserves the other preparation methods
         ->assertSee('DR From');
 });
 
+it('shows the configured Google Sheets destination in billing confirmation', function (): void {
+    signInBillingUser();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'configured-billing-sheet',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+
+    $this->get(route('billing.prepare'))
+        ->assertOk()
+        ->assertSee('Google Sheets')
+        ->assertSee('Copy of SME LOT 2,9,11')
+        ->assertSee('https://docs.google.com/spreadsheets/d/configured-billing-sheet/edit', false)
+        ->assertSee('Sync runs after confirmation. Rows match by School ID and exact Lot/package code; any unmatched or conflicting rows are reported without partial sheet writes.');
+});
+
 it('allows read-only preparation access without allowing billing confirmation', function (): void {
     [$user] = signInBillingUser('user');
     $user->removeRole('user');

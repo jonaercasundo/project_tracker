@@ -71,8 +71,14 @@ class BillingPreparationController extends Controller
             ->get(['lot_id', 'project_id', 'lot_name']);
         $divisions = DB::table('school')->whereNotNull('division')->distinct()->orderBy('division')->pluck('division');
         $schools = DB::table('school')->orderBy('school_name')->get(['school_id', 'school_name']);
+        $billingSheetId = (string) config('google_sheets.billing.spreadsheet_id', '');
+        $billingSheet = [
+            'enabled' => (bool) config('google_sheets.billing.enabled') && $billingSheetId !== '',
+            'tab' => (string) config('google_sheets.billing.sheet_tab', ''),
+            'url' => $billingSheetId !== '' ? 'https://docs.google.com/spreadsheets/d/'.$billingSheetId.'/edit' : null,
+        ];
 
-        return view('billing.prepare.index', compact('filters', 'years', 'projects', 'lots', 'divisions', 'schools'));
+        return view('billing.prepare.index', compact('filters', 'years', 'projects', 'lots', 'divisions', 'schools', 'billingSheet'));
     }
 
     public function scanLookup(Request $request): JsonResponse

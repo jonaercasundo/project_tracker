@@ -301,7 +301,16 @@
                 <dt class="font-semibold text-slate-500">Selected DRs</dt><dd id="billing-confirm-count" class="text-slate-900"></dd>
                 <dt class="font-semibold text-slate-500">Eligible</dt><dd id="billing-confirm-eligible" class="text-slate-900"></dd>
                 <dt class="font-semibold text-slate-500">Excluded</dt><dd id="billing-confirm-excluded" class="text-slate-900"></dd>
-                <dt class="font-semibold text-slate-500">Destination</dt><dd class="text-slate-900">Existing Billing queue · no invoice will be created</dd>
+                <dt class="font-semibold text-slate-500">Billing record</dt><dd class="text-slate-900">Existing Billing queue · no invoice will be created</dd>
+                <dt class="font-semibold text-slate-500">Google Sheets</dt>
+                <dd class="min-w-0 text-slate-900">
+                    @if ($billingSheet['enabled'])
+                        <a href="{{ $billingSheet['url'] }}" target="_blank" rel="noopener noreferrer" class="font-semibold text-blue-700 underline">{{ $billingSheet['tab'] }}</a>
+                        <span class="block text-xs leading-5 text-slate-600">Sync runs after confirmation. Rows match by School ID and exact Lot/package code; any unmatched or conflicting rows are reported without partial sheet writes.</span>
+                    @else
+                        <span class="text-amber-800">Sync is not enabled or configured.</span>
+                    @endif
+                </dd>
             </dl>
             <div class="flex justify-end gap-2 border-t border-slate-100 pt-4">
                 <button value="cancel" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Go back</button>

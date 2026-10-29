@@ -5,7 +5,7 @@ if (monitoring) {
     const syncBillingForm = document.getElementById('sync-billing-confirmation');
     const syncSpreadsheetDialog = document.getElementById('sync-spreadsheet-dialog');
     const syncSpreadsheetForm = document.getElementById('sync-spreadsheet-form');
-    const spreadsheetSchoolSelect = document.getElementById('spreadsheet-school');
+    const spreadsheetSchoolIdInput = document.getElementById('spreadsheet-school-id');
     const spreadsheetSchoolFields = document.getElementById('spreadsheet-school-fields');
     const spreadsheetSchoolRowCount = document.getElementById('spreadsheet-school-row-count');
     const spreadsheetModalFeedback = syncSpreadsheetForm.querySelector('[data-spreadsheet-modal-feedback]');
@@ -223,7 +223,7 @@ if (monitoring) {
             event.preventDefault();
             pendingSyncSpreadsheetButton = spreadsheetButton;
             syncSpreadsheetDialog.showModal();
-            loadSpreadsheetSchools(spreadsheetButton);
+            prepareSpreadsheetSync();
             return;
         }
 
@@ -323,8 +323,8 @@ if (monitoring) {
         const isPreview = modeInput.value !== 'confirm';
 
         spreadsheetSubmitButton.disabled = true;
-        spreadsheetSchoolSelect.disabled = true;
-        setFeedback(`${isPreview ? 'Preparing a read-only preview for' : 'Syncing'} ${spreadsheetSchoolSelect.selectedOptions[0]?.textContent ?? 'the selected school'}...`);
+        spreadsheetSchoolIdInput.disabled = true;
+        setFeedback(`${isPreview ? 'Preparing a read-only preview for' : 'Syncing'} ${spreadsheetSchoolIdInput.value.trim()}...`);
 
         try {
             const response = await fetch(button.dataset.endpoint, {
@@ -365,8 +365,8 @@ if (monitoring) {
             }
             setFeedback(exception.message, true);
         } finally {
-            spreadsheetSubmitButton.disabled = !spreadsheetSchoolSelect.value;
-            spreadsheetSchoolSelect.disabled = false;
+            spreadsheetSubmitButton.disabled = !spreadsheetSchoolIdInput.value;
+            spreadsheetSchoolIdInput.disabled = false;
         }
     });
 
@@ -386,8 +386,8 @@ if (monitoring) {
             spreadsheetDryRun.append(entry);
         }
     }
-    spreadsheetSchoolSelect.addEventListener('change', () => {
-        const hasSchool = spreadsheetSchoolSelect.value !== '';
+    spreadsheetSchoolIdInput.addEventListener('input', () => {
+        const hasSchool = spreadsheetSchoolIdInput.value.trim() !== '';
         spreadsheetSchoolFields.hidden = !hasSchool;
         spreadsheetSchoolFields.querySelectorAll('input').forEach(input => {
             input.disabled = !hasSchool;
@@ -399,10 +399,9 @@ if (monitoring) {
         spreadsheetSubmitButton.textContent = 'Preview Changes';
         spreadsheetDryRun.replaceChildren();
         spreadsheetDryRun.hidden = true;
-        const selectedOption = spreadsheetSchoolSelect.selectedOptions[0];
         spreadsheetSchoolRowCount.textContent = hasSchool
-            ? `${selectedOption.dataset.rowCount} matching DR/package row(s) need details; ${selectedOption.dataset.missingFieldCount} required cell(s) are blank.`
-            : 'Choose a school with a filled 3PL received date and missing billing details.';
+            ? 'Enter the Lot details. Preview will verify the tracker DR and exact package against the spreadsheet.'
+            : 'Enter a School ID to prepare a preview of matching DR/package rows.';
         spreadsheetModalFeedback.textContent = '';
     });
 
@@ -426,9 +425,9 @@ if (monitoring) {
         }
     });
 
-    async function loadSpreadsheetSchools(button) {
-        spreadsheetSchoolSelect.disabled = true;
-        spreadsheetSchoolSelect.replaceChildren(new Option('Loading project schools…', ''));
+    function prepareSpreadsheetSync() {
+        spreadsheetSchoolIdInput.value = '';
+        spreadsheetSchoolIdInput.disabled = false;
         spreadsheetSchoolFields.hidden = true;
         spreadsheetSchoolFields.querySelectorAll('input').forEach(input => {
             input.disabled = true;
@@ -440,41 +439,9 @@ if (monitoring) {
         spreadsheetSubmitButton.textContent = 'Preview Changes';
         spreadsheetDryRun.replaceChildren();
         spreadsheetDryRun.hidden = true;
-        spreadsheetSchoolRowCount.textContent = 'Loading schools…';
+        spreadsheetSchoolRowCount.textContent = 'Enter a School ID to prepare a preview of matching DR/package rows.';
         spreadsheetModalFeedback.textContent = '';
         document.getElementById('spreadsheet-preview-issues').textContent = '';
-
-        try {
-            const response = await fetch(button.dataset.schoolsEndpoint, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                credentials: 'same-origin',
-                cache: 'no-store',
-            });
-            const result = await response.json();
-            if (!response.ok) {
-                throw new Error(result.message ?? `Could not load project schools (HTTP ${response.status}).`);
-            }
-
-            const options = [new Option('Choose a school', '')];
-            for (const school of result.schools ?? []) {
-                const mappingLabel = school.id_mapping ? " (sheet ID " + school.id_mapping.sheet_school_id + " mapped from tracker ID " + school.id_mapping.tracker_school_id + ")" : "";
-                const label = (school.school_name || "School") + " (" + school.school_id + ")" + mappingLabel + " · " + school.row_count + " row(s) need details";
-                option.dataset.rowCount = String(school.row_count);
-                option.dataset.missingFieldCount = String(school.missing_field_count);
-                options.push(option);
-            }
-            spreadsheetSchoolSelect.replaceChildren(...options);
-            spreadsheetSchoolSelect.disabled = options.length === 1;
-            spreadsheetSchoolRowCount.textContent = options.length > 1
-                ? 'Choose a school whose rows have DATE RECEIVED (FROM 3PL) filled and at least one other billing detail missing.'
-                : 'No schools currently have a filled 3PL received date and other billing details missing.';
-            document.getElementById('spreadsheet-preview-issues').textContent = (result.issues ?? []).join(' ');
-        } catch (exception) {
-            spreadsheetSchoolSelect.replaceChildren(new Option('Could not load project schools', ''));
-            spreadsheetSchoolSelect.disabled = true;
-            spreadsheetSchoolRowCount.textContent = exception.message;
-            spreadsheetSchoolRowCount.classList.add('text-rose-700');
-        }
     }
 
     async function trySyncBilling(button, originalLabel, setFeedback) {

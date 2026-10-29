@@ -121,13 +121,12 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
                     <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
-                    <p class="mt-2 text-sm text-slate-600">The school list is checked against the spreadsheet. It includes rows with a filled DATE RECEIVED (FROM 3PL) and missing billing details. Choose a school and enter its details, then preview the DR/package matches and destination cells before syncing. Existing nonblank values and billing statuses are preserved. Each Lot total is calculated from its DR.</p>
+                    <p class="mt-2 text-sm text-slate-600">Enter the School ID and billing details, then preview the DR/package matches and target cells before syncing. You can enter a tracker School ID or a configured mapped sheet SchoolID. Existing nonblank values and billing statuses are preserved. Each Lot total is calculated from its DR.</p>
                 </div>
                 <div>
-                    <label for="spreadsheet-school" class="mb-1 block text-xs font-semibold text-slate-600">School</label>
-                    <select id="spreadsheet-school" name="school_id" required disabled class="w-full rounded-lg border-slate-200 text-sm">
-                        <option value="">Loading project schools…</option>
-                    </select>
+                    <label for="spreadsheet-school-id" class="mb-1 block text-xs font-semibold text-slate-600">School ID</label>
+                    <input id="spreadsheet-school-id" name="school_id" type="text" autocomplete="off" maxlength="255" required placeholder="Enter tracker School ID or mapped sheet SchoolID" class="w-full rounded-lg border-slate-200 text-sm">
+                    <p class="mt-1 text-xs text-slate-500">For Bacsil Elementary School, enter 102205 (tracker) or 134967 (mapped spreadsheet ID).</p>
                 </div>
                 <div id="spreadsheet-school-fields" class="grid grid-cols-1 gap-4 sm:grid-cols-2" hidden>
                     <div>
@@ -155,7 +154,7 @@
                         <input id="spreadsheet-date-encoding" name="date_encoding" type="date" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                     </div>
                 </div>
-                <p id="spreadsheet-school-row-count" class="text-xs text-slate-500" aria-live="polite">Checking the spreadsheet for schools that need details…</p>
+                <p id="spreadsheet-school-row-count" class="text-xs text-slate-500" aria-live="polite">Enter a School ID to prepare a preview of matching DR/package rows.</p>
                 <p id="spreadsheet-preview-issues" class="text-xs text-amber-700" role="status" aria-live="polite"></p>
                 <div id="spreadsheet-dry-run" class="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700" hidden aria-live="polite"></div>
                 <input type="hidden" name="mode" value="preview">

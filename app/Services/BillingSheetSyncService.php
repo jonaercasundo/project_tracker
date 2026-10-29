@@ -155,6 +155,8 @@ class BillingSheetSyncService
         $settings = $this->configuration->current();
         $spreadsheetId = $settings['spreadsheet_id'];
         $tab = $settings['sheet_tab'];
+        $requestedSchoolId = $schoolId;
+        $schoolId = $this->trackerSchoolIdFromInput($schoolId, $spreadsheetId, $tab);
 
         try {
             $rows = $sheets->values($this->quotedTab($tab).'!'.config('google_sheets.billing.batch_read_range', 'A:CT'), $spreadsheetId);
@@ -165,6 +167,11 @@ class BillingSheetSyncService
         }
 
         $deliveries = $this->projectSpreadsheetDeliveries($projectId, $schoolId);
+        if ($deliveries->isEmpty()) {
+            $message = 'No DR/package records were found for School ID '.$requestedSchoolId.' in project '.$projectId.'. Check the tracker School ID or a configured mapped sheet SchoolID.';
+
+            return $this->projectSpreadsheetFailure($message, [$message]);
+        }
 
         $headersByLot = [];
         $sheetRowsByLot = [];
@@ -428,6 +435,20 @@ class BillingSheetSyncService
         }
 
         return null;
+    }
+
+    private function trackerSchoolIdFromInput(string $schoolId, string $spreadsheetId, string $tab): string
+    {
+        foreach ((array) config('google_sheets.billing.school_id_mappings', []) as $mapping) {
+            if (($mapping['verified'] ?? false)
+                && (string) ($mapping['spreadsheet_id'] ?? '') === $spreadsheetId
+                && (string) ($mapping['sheet_tab'] ?? '') === $tab
+                && (string) ($mapping['sheet_school_id'] ?? '') === $schoolId) {
+                return (string) $mapping['tracker_school_id'];
+            }
+        }
+
+        return $schoolId;
     }
 
     /** @param array<int, string> $issues

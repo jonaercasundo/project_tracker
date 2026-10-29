@@ -1416,7 +1416,9 @@ it('syncs eligible billing DRs through stock out and delivery exactly once', fun
 
     $this->get('/deliveries/monitoring')->assertOk()
         ->assertSee('Sync Spreadsheet')
-        ->assertSee('sync-spreadsheet-form', false);
+        ->assertSee('sync-spreadsheet-form', false)
+        ->assertSee('spreadsheet-school-id', false)
+        ->assertSee('mapped spreadsheet ID');
     $projectMarkup = $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()->json('projects_html');
     expect($projectMarkup)->toContain('data-sync-billing="1"')
         ->toContain('data-sync-spreadsheet="1"')

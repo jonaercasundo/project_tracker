@@ -704,7 +704,7 @@ it('uses an explicit school ID mapping only for a verified DR and exact package 
     $service = app(BillingSheetSyncService::class);
     $conflictingPreview = $service->spreadsheetSyncSchools($projectId, $sheets);
     $preview = $service->spreadsheetSyncSchools($projectId, $sheets);
-    $dryRun = $service->syncProjectSpreadsheet($projectId, '102205', $actor->name, $fields, $sheets, (int) $actor->getKey(), true);
+    $dryRun = $service->syncProjectSpreadsheet($projectId, '134967', $actor->name, $fields, $sheets, (int) $actor->getKey(), true);
     $staleSync = $service->syncProjectSpreadsheet($projectId, '102205', $actor->name, $fields, $sheets, (int) $actor->getKey(), false, 'stale-preview-hash');
     $sync = $service->syncProjectSpreadsheet($projectId, '102205', $actor->name, $fields, $sheets, (int) $actor->getKey());
 

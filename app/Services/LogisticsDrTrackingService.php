@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Schema;
 
 class LogisticsDrTrackingService
 {
+    public function __construct(private LogisticsDeliveryCompletionService $deliveryCompletion) {}
+
     /**
      * Synchronize one already resolved and sequence-validated event within its caller's transaction.
      *
@@ -80,6 +82,11 @@ class LogisticsDrTrackingService
                 'status' => 'out_of_order',
                 'details' => 'Only logistics_received may progress to delivered.',
             ];
+        }
+
+        $completion = $this->deliveryCompletion->complete($event, $projectId, $schoolId);
+        if ($completion['status'] !== 'accepted') {
+            return $completion;
         }
 
         DB::table('logistics_dr_tracking')
@@ -291,7 +298,7 @@ class LogisticsDrTrackingService
         if (Schema::hasTable('logistics_webhook_events')) {
             $reconciliationQuery = DB::table('logistics_webhook_events')
                 ->where('processing_status', 'processed')
-                ->whereIn('reconciliation_status', ['ambiguous', 'unknown', 'out_of_scope', 'out_of_order', 'stale', 'duplicate_sequence'])
+                ->whereIn('reconciliation_status', ['ambiguous', 'unknown', 'out_of_scope', 'out_of_order', 'stale', 'duplicate_sequence', 'insufficient_stock'])
                 ->when(isset($filters['project_id']) && $filters['project_id'] !== '', fn ($query) => $query->where('resolved_project_id', (int) $filters['project_id']))
                 ->when(isset($filters['integration_id']) && $filters['integration_id'] !== '', fn ($query) => $query->where('integration_id', (string) $filters['integration_id']))
                 ->when(isset($filters['school']) && $filters['school'] !== '', fn ($query) => $query->where('resolved_school_id', 'like', '%'.$filters['school'].'%'))

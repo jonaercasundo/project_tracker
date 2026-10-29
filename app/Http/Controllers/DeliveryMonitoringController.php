@@ -15,8 +15,10 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 class DeliveryMonitoringController extends Controller
@@ -190,6 +192,8 @@ class DeliveryMonitoringController extends Controller
     {
         $fields = $request->validate([
             'school_id' => ['required', 'string', 'max:255'],
+            'mode' => ['required', 'in:preview,confirm'],
+            'preview_token' => ['nullable', 'string', 'max:80'],
             'date_received' => ['required', 'date_format:Y-m-d'],
             'received_by' => ['required', 'string', 'max:255'],
             'inspection_1' => ['required', 'string', 'max:255'],
@@ -201,8 +205,47 @@ class DeliveryMonitoringController extends Controller
         abort_unless($projectExists, 404, 'Project not found.');
 
         $schoolId = $fields['school_id'];
+        $mode = $fields['mode'];
+        $previewToken = $fields['preview_token'] ?? null;
         unset($fields['school_id']);
-        $result = $billingSheetSync->syncProjectSpreadsheet($project, $schoolId, (string) Auth::user()->name, $fields, $sheets);
+        unset($fields['mode'], $fields['preview_token']);
+        $authenticatedUserId = (int) Auth::id();
+        $authenticatedUserName = (string) Auth::user()->name;
+        $previewFingerprint = hash('sha256', json_encode([$project, $schoolId, $authenticatedUserId, $fields], JSON_THROW_ON_ERROR));
+
+        if ($mode === 'confirm') {
+            $cachedPreview = $previewToken === null ? null : Cache::get('billing-spreadsheet-preview:'.$previewToken);
+            if (! is_array($cachedPreview)
+                || ! is_string($cachedPreview['request_fingerprint'] ?? null)
+                || ! hash_equals($cachedPreview['request_fingerprint'], $previewFingerprint)
+                || ! is_string($cachedPreview['preview_hash'] ?? null)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This spreadsheet preview is missing or expired. Run Preview Changes again before syncing.',
+                    'synced_count' => 0,
+                    'issues' => [],
+                ], 422)->header('Cache-Control', 'private, no-store');
+            }
+        }
+
+        $result = $billingSheetSync->syncProjectSpreadsheet(
+            $project,
+            $schoolId,
+            $authenticatedUserName,
+            $fields,
+            $sheets,
+            $authenticatedUserId,
+            $mode === 'preview',
+            $mode === 'confirm' ? $cachedPreview['preview_hash'] : null
+        );
+        if ($mode === 'preview' && $result['status'] === 'success') {
+            $previewToken = (string) Str::uuid();
+            Cache::put('billing-spreadsheet-preview:'.$previewToken, [
+                'request_fingerprint' => $previewFingerprint,
+                'preview_hash' => hash('sha256', json_encode($result['preview'] ?? [], JSON_THROW_ON_ERROR)),
+            ], now()->addMinutes(10));
+            $result['preview_token'] = $previewToken;
+        }
 
         return response()->json($result, $result['status'] === 'success' ? 200 : 422)
             ->header('Cache-Control', 'private, no-store');

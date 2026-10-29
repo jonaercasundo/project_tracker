@@ -121,7 +121,7 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
                     <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
-                    <p class="mt-2 text-sm text-slate-600">The school list is checked against the spreadsheet. It includes rows with a filled DATE RECEIVED (FROM 3PL) and missing billing details. Choose a school and enter its details. A blank Checked by cell is filled with your account name; existing values and billing status are preserved. Each Lot total is calculated from its DR.</p>
+                    <p class="mt-2 text-sm text-slate-600">The school list is checked against the spreadsheet. It includes rows with a filled DATE RECEIVED (FROM 3PL) and missing billing details. Choose a school and enter its details, then preview the DR/package matches and destination cells before syncing. Existing nonblank values and billing statuses are preserved. Each Lot total is calculated from its DR.</p>
                 </div>
                 <div>
                     <label for="spreadsheet-school" class="mb-1 block text-xs font-semibold text-slate-600">School</label>
@@ -157,10 +157,13 @@
                 </div>
                 <p id="spreadsheet-school-row-count" class="text-xs text-slate-500" aria-live="polite">Checking the spreadsheet for schools that need details…</p>
                 <p id="spreadsheet-preview-issues" class="text-xs text-amber-700" role="status" aria-live="polite"></p>
+                <div id="spreadsheet-dry-run" class="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700" hidden aria-live="polite"></div>
+                <input type="hidden" name="mode" value="preview">
+                <input type="hidden" name="preview_token" value="">
                 <p data-spreadsheet-modal-feedback class="text-sm text-slate-600" role="status" aria-live="polite"></p>
                 <div class="flex justify-end gap-2 border-t border-slate-100 pt-4">
                     <button type="button" data-cancel-sync-spreadsheet class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
-                    <button type="submit" data-submit-spreadsheet disabled class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">Sync This School</button>
+                    <button type="submit" data-submit-spreadsheet disabled class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">Preview Changes</button>
                 </div>
             </form>
         </dialog>

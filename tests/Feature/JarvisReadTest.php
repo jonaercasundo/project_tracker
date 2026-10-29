@@ -1475,24 +1475,51 @@ it('syncs spreadsheet details using the authenticated account name', function ()
             'issues' => [],
         ]);
     $syncService->shouldReceive('syncProjectSpreadsheet')
-        ->once()
-        ->with(1, $schoolId, $user->name, array_diff_key($fields, ['school_id' => true]), Mockery::type(GoogleSheetsApiClient::class))
+        ->twice()
+        ->with(1, $schoolId, $user->name, array_diff_key($fields, ['school_id' => true]), Mockery::type(GoogleSheetsApiClient::class), $user->getKey(), Mockery::type('bool'), Mockery::any())
         ->andReturn([
             'status' => 'success',
-            'message' => 'Spreadsheet details synchronized for 1 DR/package row(s).',
+            'message' => 'Dry run ready.',
             'synced_count' => 1,
             'skipped_count' => 0,
             'issues' => [],
+            'preview' => [['dr' => 'DR-001', 'package_code' => 'CORE-LOT2', 'lot' => '2', 'sheet_row' => 2, 'target_cells' => ['BE2'], 'amount' => '12.50', 'mapping' => null]],
         ]);
     app()->instance(BillingSheetSyncService::class, $syncService);
 
     $this->getJson('/deliveries/monitoring/1/sync-spreadsheet/schools')
         ->assertOk()
         ->assertJsonPath('schools.0.school_name', 'Central School');
-    $this->postJson('/deliveries/monitoring/1/sync-spreadsheet', $fields)
+    $previewResponse = $this->postJson('/deliveries/monitoring/1/sync-spreadsheet', [...$fields, 'mode' => 'preview'])
         ->assertOk()
         ->assertJsonPath('status', 'success')
-        ->assertJsonPath('synced_count', 1);
+        ->assertJsonPath('synced_count', 1)
+        ->assertJsonPath('preview.0.sheet_row', 2);
+
+    $this->postJson('/deliveries/monitoring/1/sync-spreadsheet', [...$fields, 'mode' => 'confirm', 'preview_token' => $previewResponse->json('preview_token')])
+        ->assertOk()
+        ->assertJsonPath('status', 'success');
+});
+
+it('does not write a spreadsheet sync without a valid prior preview token', function (): void {
+    jarvisOperations();
+    $user = jarvisReader(true, true, true);
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    $syncService = Mockery::mock(BillingSheetSyncService::class);
+    $syncService->shouldNotReceive('syncProjectSpreadsheet');
+    app()->instance(BillingSheetSyncService::class, $syncService);
+
+    $this->postJson('/deliveries/monitoring/1/sync-spreadsheet', [
+        'school_id' => '001',
+        'mode' => 'confirm',
+        'preview_token' => 'invalid',
+        'date_received' => '2026-10-28',
+        'received_by' => 'School Receiver',
+        'inspection_1' => 'Passed',
+        'inspection_2' => 'Passed',
+        'date_checking' => '2026-10-29',
+        'date_encoding' => '2026-10-29',
+    ])->assertUnprocessable()->assertJsonPath('message', 'This spreadsheet preview is missing or expired. Run Preview Changes again before syncing.');
 });
 
 it('rolls back billing sync when inventory cannot cover a DR', function () {

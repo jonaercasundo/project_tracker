@@ -10,6 +10,7 @@ if (monitoring) {
     const spreadsheetSchoolRowCount = document.getElementById('spreadsheet-school-row-count');
     const spreadsheetModalFeedback = syncSpreadsheetForm.querySelector('[data-spreadsheet-modal-feedback]');
     const spreadsheetSubmitButton = syncSpreadsheetForm.querySelector('[data-submit-spreadsheet]');
+    const spreadsheetDryRun = document.getElementById('spreadsheet-dry-run');
     let pendingSyncBillingButton;
     let pendingSyncSpreadsheetButton;
     const form = document.getElementById('monitoring-filters');
@@ -317,11 +318,13 @@ if (monitoring) {
                 element.classList.toggle('text-emerald-700', !isError);
             });
         };
-        const formData = new FormData(syncSpreadsheetForm);
+        const modeInput = syncSpreadsheetForm.elements.mode;
+        const previewTokenInput = syncSpreadsheetForm.elements.preview_token;
+        const isPreview = modeInput.value !== 'confirm';
 
         spreadsheetSubmitButton.disabled = true;
         spreadsheetSchoolSelect.disabled = true;
-        setFeedback(`Syncing spreadsheet rows for ${spreadsheetSchoolSelect.selectedOptions[0]?.textContent ?? 'the selected school'}…`);
+        setFeedback(`${isPreview ? 'Preparing a read-only preview for' : 'Syncing'} ${spreadsheetSchoolSelect.selectedOptions[0]?.textContent ?? 'the selected school'}...`);
 
         try {
             const response = await fetch(button.dataset.endpoint, {
@@ -333,25 +336,56 @@ if (monitoring) {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 },
                 credentials: 'same-origin',
-                body: JSON.stringify(Object.fromEntries(formData.entries())),
+                body: JSON.stringify(Object.fromEntries(new FormData(syncSpreadsheetForm).entries())),
             });
             const result = await response.json();
-            const issueDetails = Array.isArray(result.issues) && result.issues.length
-                ? ` ${result.issues.join(' ')}`
-                : '';
+            const issueDetails = Array.isArray(result.issues) && result.issues.length ? ` ${result.issues.join(' ')}` : '';
             if (!response.ok) {
                 throw new Error(`${result.message ?? `Spreadsheet sync failed (HTTP ${response.status}).`}${issueDetails}`);
             }
 
-            setFeedback(`${result.message}${result.skipped_count ? ` ${result.skipped_count} row(s) without a 3PL received date were skipped.` : ''}`);
+            if (isPreview) {
+                renderSpreadsheetDryRun(result.preview ?? []);
+                previewTokenInput.value = result.preview_token ?? '';
+                modeInput.value = 'confirm';
+                spreadsheetSubmitButton.textContent = 'Confirm Spreadsheet Sync';
+                setFeedback(`${result.message} No spreadsheet cells have been changed.`);
+            } else {
+                setFeedback(`${result.message}${result.skipped_count ? ` ${result.skipped_count} row(s) without a 3PL received date were skipped.` : ''}`);
+                syncSpreadsheetDialog.close();
+                pendingSyncSpreadsheetButton = undefined;
+            }
         } catch (exception) {
+            if (!isPreview) {
+                modeInput.value = 'preview';
+                previewTokenInput.value = '';
+                spreadsheetSubmitButton.textContent = 'Preview Changes';
+                spreadsheetDryRun.replaceChildren();
+                spreadsheetDryRun.hidden = true;
+            }
             setFeedback(exception.message, true);
         } finally {
-            spreadsheetSubmitButton.disabled = false;
+            spreadsheetSubmitButton.disabled = !spreadsheetSchoolSelect.value;
             spreadsheetSchoolSelect.disabled = false;
         }
     });
 
+    function renderSpreadsheetDryRun(rows) {
+        spreadsheetDryRun.replaceChildren();
+        spreadsheetDryRun.hidden = rows.length === 0;
+        const heading = document.createElement('p');
+        heading.className = 'font-semibold text-slate-900';
+        heading.textContent = 'Preview — no cells changed';
+        spreadsheetDryRun.append(heading);
+        for (const row of rows) {
+            const entry = document.createElement('p');
+            const mapping = row.mapping
+                ? ` · ID mapping ${row.mapping.tracker_school_id} → ${row.mapping.sheet_school_id} (${row.mapping.mapping_id})`
+                : '';
+            entry.textContent = `${row.school_name || 'School'} · DR ${row.dr} · ${row.package_code} · Lot ${row.lot} · Sheet row ${row.sheet_row} · Cells: ${(row.target_cells ?? []).join(', ') || 'no changes'} · Total ${row.amount}${mapping}`;
+            spreadsheetDryRun.append(entry);
+        }
+    }
     spreadsheetSchoolSelect.addEventListener('change', () => {
         const hasSchool = spreadsheetSchoolSelect.value !== '';
         spreadsheetSchoolFields.hidden = !hasSchool;
@@ -360,11 +394,29 @@ if (monitoring) {
             input.value = '';
         });
         spreadsheetSubmitButton.disabled = !hasSchool;
+        syncSpreadsheetForm.elements.mode.value = 'preview';
+        syncSpreadsheetForm.elements.preview_token.value = '';
+        spreadsheetSubmitButton.textContent = 'Preview Changes';
+        spreadsheetDryRun.replaceChildren();
+        spreadsheetDryRun.hidden = true;
         const selectedOption = spreadsheetSchoolSelect.selectedOptions[0];
         spreadsheetSchoolRowCount.textContent = hasSchool
             ? `${selectedOption.dataset.rowCount} matching DR/package row(s) need details; ${selectedOption.dataset.missingFieldCount} required cell(s) are blank.`
             : 'Choose a school with a filled 3PL received date and missing billing details.';
         spreadsheetModalFeedback.textContent = '';
+    });
+
+    syncSpreadsheetForm.querySelectorAll('input:not([type="hidden"])').forEach(input => {
+        input.addEventListener('input', () => {
+            if (syncSpreadsheetForm.elements.mode.value === 'confirm') {
+                syncSpreadsheetForm.elements.mode.value = 'preview';
+                syncSpreadsheetForm.elements.preview_token.value = '';
+                spreadsheetSubmitButton.textContent = 'Preview Changes';
+                spreadsheetDryRun.replaceChildren();
+                spreadsheetDryRun.hidden = true;
+                spreadsheetModalFeedback.textContent = 'Details changed. Run a new preview before syncing.';
+            }
+        });
     });
 
     syncSpreadsheetDialog.addEventListener('click', event => {
@@ -383,6 +435,11 @@ if (monitoring) {
             input.value = '';
         });
         spreadsheetSubmitButton.disabled = true;
+        syncSpreadsheetForm.elements.mode.value = 'preview';
+        syncSpreadsheetForm.elements.preview_token.value = '';
+        spreadsheetSubmitButton.textContent = 'Preview Changes';
+        spreadsheetDryRun.replaceChildren();
+        spreadsheetDryRun.hidden = true;
         spreadsheetSchoolRowCount.textContent = 'Loading schools…';
         spreadsheetModalFeedback.textContent = '';
         document.getElementById('spreadsheet-preview-issues').textContent = '';
@@ -400,8 +457,8 @@ if (monitoring) {
 
             const options = [new Option('Choose a school', '')];
             for (const school of result.schools ?? []) {
-                const label = `${school.school_name || 'School'} (${school.school_id}) · ${school.row_count} row(s) need details`;
-                const option = new Option(label, school.school_id);
+                const mappingLabel = school.id_mapping ? " (sheet ID " + school.id_mapping.sheet_school_id + " mapped from tracker ID " + school.id_mapping.tracker_school_id + ")" : "";
+                const label = (school.school_name || "School") + " (" + school.school_id + ")" + mappingLabel + " · " + school.row_count + " row(s) need details";
                 option.dataset.rowCount = String(school.row_count);
                 option.dataset.missingFieldCount = String(school.missing_field_count);
                 options.push(option);

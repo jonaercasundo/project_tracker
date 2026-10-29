@@ -641,6 +641,90 @@ it('does not partially sync spreadsheet rows when a DR package match is missing 
         ->and($result['issues'][0])->toContain('CORE-MISSING');
 });
 
+it('uses an explicit school ID mapping only for a verified DR and exact package row and previews before writing', function (): void {
+    [$actor] = signInBillingUser();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+        'google_sheets.billing.school_id_mappings' => [[
+            'mapping_id' => 'bacsil-test-map',
+            'spreadsheet_id' => 'test-spreadsheet-id',
+            'sheet_tab' => 'Copy of SME LOT 2,9,11',
+            'tracker_school_id' => '102205',
+            'sheet_school_id' => '134967',
+            'school_name' => 'Bacsil Elementary School',
+            'dr_no' => '35470',
+            'lot_number' => '2',
+            'package_code' => 'C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6',
+            'evidence' => 'Verified against exact school record, address, region, and BIR DR.',
+            'verified' => true,
+        ]],
+    ]);
+
+    $deliveryId = createBillingDelivery('35470');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('project_id');
+    $lotId = (int) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id');
+    DB::table('lot')->where('lot_id', $lotId)->update(['lot_name' => 'Lot 2']);
+    DB::table('school')->insert(['school_id' => '102205', 'school_name' => 'Bacsil Elementary School']);
+    DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['school_id' => '102205']);
+    addPackageToBillingDelivery($deliveryId, 'C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6', '12.50');
+
+    $rows = billingConfirmationSheetRows([[
+        'school_id' => '134967',
+        'package_codes' => ['2' => 'C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6'],
+    ]]);
+    $rows[0][billingSheetColumnIndex('S')] = 'BIR DR';
+    $rows[1][billingSheetColumnIndex('S')] = '35470';
+    $rows[1][billingSheetColumnIndex('BF')] = '2026-10-27';
+
+    $incorrectDrRows = $rows;
+    $incorrectDrRows[1][billingSheetColumnIndex('S')] = '99999';
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->times(5)->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->times(5)->andReturn($incorrectDrRows, $rows, $rows, $rows, $rows);
+    $sheets->shouldReceive('updateCells')->once()->withArgs(function (array $updates, string $spreadsheetId): bool {
+        $ranges = collect($updates)->pluck('range')->all();
+
+        return $spreadsheetId === 'test-spreadsheet-id'
+            && in_array("'Copy of SME LOT 2,9,11'!BE2", $ranges, true)
+            && in_array("'Copy of SME LOT 2,9,11'!BO2", $ranges, true)
+            && ! in_array("'Copy of SME LOT 2,9,11'!BD2", $ranges, true)
+            && ! in_array("'Copy of SME LOT 2,9,11'!BF2", $ranges, true);
+    });
+
+    $fields = [
+        'date_received' => '2026-10-28',
+        'received_by' => 'School Receiver',
+        'inspection_1' => 'Passed',
+        'inspection_2' => 'Passed',
+        'date_checking' => '2026-10-29',
+        'date_encoding' => '2026-10-29',
+    ];
+    $service = app(BillingSheetSyncService::class);
+    $conflictingPreview = $service->spreadsheetSyncSchools($projectId, $sheets);
+    $preview = $service->spreadsheetSyncSchools($projectId, $sheets);
+    $dryRun = $service->syncProjectSpreadsheet($projectId, '102205', $actor->name, $fields, $sheets, (int) $actor->getKey(), true);
+    $staleSync = $service->syncProjectSpreadsheet($projectId, '102205', $actor->name, $fields, $sheets, (int) $actor->getKey(), false, 'stale-preview-hash');
+    $sync = $service->syncProjectSpreadsheet($projectId, '102205', $actor->name, $fields, $sheets, (int) $actor->getKey());
+
+    expect($conflictingPreview['schools'])->toBeEmpty()
+        ->and($conflictingPreview['issues'][0])->toContain('ID mapping bacsil-test-map', '35470')
+        ->and($preview['schools'])->toHaveCount(1)
+        ->and($preview['schools'][0]['school_id'])->toBe('102205')
+        ->and($preview['schools'][0]['id_mapping']['sheet_school_id'])->toBe('134967')
+        ->and($dryRun['status'])->toBe('success')
+        ->and($dryRun['preview'][0]['dr'])->toBe('35470')
+        ->and($dryRun['preview'][0]['package_code'])->toBe('C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6')
+        ->and($dryRun['preview'][0]['sheet_row'])->toBe(2)
+        ->and($dryRun['preview'][0]['mapping']['mapping_id'])->toBe('bacsil-test-map')
+        ->and($staleSync['status'])->toBe('error')
+        ->and($staleSync['message'])->toContain('changed after preview')
+        ->and($sync['status'])->toBe('success')
+        ->and(DB::table('billing_spreadsheet_sync_audits')->where('status', 'previewed')->exists())->toBeTrue()
+        ->and(DB::table('billing_spreadsheet_sync_audits')->where('status', 'synced')->exists())->toBeTrue();
+});
+
 it('does not write spreadsheet rows when an exact school and package match is ambiguous', function (): void {
     signInBillingUser();
     config([

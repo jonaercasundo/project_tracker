@@ -17,7 +17,7 @@ class BillingSheetSyncService
 {
     public function __construct(private GoogleSheetsBillingConfiguration $configuration) {}
 
-    /** @return array{status: string, message: ?string, schools: array<int, array{school_id: string, school_name: string, row_count: int, missing_field_count: int}>, issues: array<int, string>} */
+    /** @return array{status: string, message: ?string, schools: array<int, array{school_id: string, school_name: string, row_count: int, missing_field_count: int, id_mapping: ?array<string, string>}>, issues: array<int, string>} */
     public function spreadsheetSyncSchools(int $projectId, GoogleSheetsApiClient $sheets): array
     {
         $configuration = $sheets->configurationStatus();
@@ -39,6 +39,7 @@ class BillingSheetSyncService
         $sheetRowsByLot = [];
         $eligibleRowsBySchool = [];
         $issues = [];
+        $mappingsEncountered = [];
         foreach ($deliveries as $delivery) {
             $lotNumber = $this->lotNumber((string) $delivery->lot_name);
             if (! in_array($lotNumber, ['2', '9', '11'], true)) {
@@ -58,7 +59,17 @@ class BillingSheetSyncService
                 continue;
             }
             $sheetRowsByLot[$lotNumber] ??= $this->indexBillingSheetRows($rows, $headers);
-            $matchKey = $this->billingSheetMatchKey($delivery->school_id, $delivery->package_code);
+            $mapping = $this->schoolIdMapping((string) $delivery->school_id, (string) $settings['spreadsheet_id'], (string) $settings['sheet_tab'], $lotNumber, (string) $delivery->dr_no);
+            if ($mapping !== null) {
+                $mappingsEncountered[$mapping['mapping_id']] = $mapping;
+                if ((string) $mapping['package_code'] !== (string) $delivery->package_code) {
+                    $issues[] = 'ID mapping '.$mapping['mapping_id'].' requires exact package '.$mapping['package_code'].' for Lot '.$lotNumber.' / DR '.$delivery->dr_no.'; tracker package '.$delivery->package_code.' does not match.';
+
+                    continue;
+                }
+            }
+            $sheetSchoolId = $mapping['sheet_school_id'] ?? (string) $delivery->school_id;
+            $matchKey = $this->billingSheetMatchKey($sheetSchoolId, $delivery->package_code);
             $matches = $sheetRowsByLot[$lotNumber][$matchKey] ?? [];
             if (count($matches) > 1) {
                 $issues[] = 'DR '.$delivery->dr_no.' / package '.$delivery->package_code.' / Lot '.$lotNumber.': multiple exact school and package rows matched.';
@@ -70,6 +81,11 @@ class BillingSheetSyncService
             }
 
             $match = $matches[0];
+            if ($mapping !== null && $this->exactCell($match['values'][$headers['bir_dr_column']] ?? '') !== $this->exactCell($delivery->dr_no)) {
+                $issues[] = 'ID mapping '.$mapping['mapping_id'].' does not match the tracker DR: expected '.$delivery->dr_no.' in the worksheet BIR DR cell for row '.$match['row'].'.';
+
+                continue;
+            }
             if ($this->exactCell($match['values'][$headers['three_pl_date_column']] ?? '') === '') {
                 continue;
             }
@@ -89,6 +105,12 @@ class BillingSheetSyncService
             $eligibleRowsBySchool[$schoolId] ??= [
                 'school_id' => $schoolId,
                 'school_name' => (string) ($delivery->school_name ?? ''),
+                'id_mapping' => $mapping === null ? null : [
+                    'mapping_id' => $mapping['mapping_id'],
+                    'tracker_school_id' => $mapping['tracker_school_id'],
+                    'sheet_school_id' => $mapping['sheet_school_id'],
+                    'evidence' => $mapping['evidence'],
+                ],
                 'rows' => [],
             ];
             $eligibleRowsBySchool[$schoolId]['rows'][$rowKey] = $missingFields;
@@ -100,6 +122,7 @@ class BillingSheetSyncService
                 'school_name' => $school['school_name'],
                 'row_count' => count($school['rows']),
                 'missing_field_count' => array_sum($school['rows']),
+                'id_mapping' => $school['id_mapping'],
             ])
             ->sortBy('school_name')
             ->values()
@@ -119,7 +142,10 @@ class BillingSheetSyncService
         string $schoolId,
         string $checkedBy,
         array $fields,
-        GoogleSheetsApiClient $sheets
+        GoogleSheetsApiClient $sheets,
+        ?int $authenticatedUserId = null,
+        bool $dryRun = false,
+        ?string $expectedPreviewHash = null
     ): array {
         $configuration = $sheets->configurationStatus();
         if (! $configuration['configured']) {
@@ -144,6 +170,7 @@ class BillingSheetSyncService
         $sheetRowsByLot = [];
         $plansByRow = [];
         $issues = [];
+        $mappingsEncountered = [];
         $skippedCount = 0;
         foreach ($deliveries as $delivery) {
             $lotNumber = $this->lotNumber((string) $delivery->lot_name);
@@ -166,7 +193,17 @@ class BillingSheetSyncService
             }
 
             $sheetRowsByLot[$lotNumber] ??= $this->indexBillingSheetRows($rows, $headers);
-            $matches = $sheetRowsByLot[$lotNumber][$this->billingSheetMatchKey($delivery->school_id, $delivery->package_code)] ?? [];
+            $mapping = $this->schoolIdMapping((string) $delivery->school_id, $spreadsheetId, $tab, $lotNumber, (string) $delivery->dr_no);
+            if ($mapping !== null) {
+                $mappingsEncountered[$mapping['mapping_id']] = $mapping;
+                if ((string) $mapping['package_code'] !== (string) $delivery->package_code) {
+                    $issues[] = $identifier.': ID mapping '.$mapping['mapping_id'].' requires exact package '.$mapping['package_code'].'; tracker package '.$delivery->package_code.' does not match.';
+
+                    continue;
+                }
+            }
+            $sheetSchoolId = $mapping['sheet_school_id'] ?? (string) $delivery->school_id;
+            $matches = $sheetRowsByLot[$lotNumber][$this->billingSheetMatchKey($sheetSchoolId, $delivery->package_code)] ?? [];
 
             if (count($matches) > 1) {
                 $issues[] = $identifier.': multiple exact School ID and package-code rows matched.';
@@ -186,19 +223,32 @@ class BillingSheetSyncService
                 continue;
             }
 
+            if ($mapping !== null && $this->exactCell($match['values'][$headers['bir_dr_column']] ?? '') !== $this->exactCell($delivery->dr_no)) {
+                $issues[] = $identifier.': ID mapping '.$mapping['mapping_id'].' failed DR verification on worksheet row '.$match['row'].'; the BIR DR must exactly match '.$delivery->dr_no.'.';
+
+                continue;
+            }
+
             $rowKey = $lotNumber.'|'.$match['row'];
             $plansByRow[$rowKey] ??= [
                 'identifier' => $identifier,
+                'package_code' => (string) $delivery->package_code,
+                'school_name' => (string) ($delivery->school_name ?? ''),
+                'dr_numbers' => [],
                 'lot_number' => $lotNumber,
                 'row' => $match['row'],
                 'row_values' => $match['values'],
                 'headers' => $headers,
+                'mapping' => $mapping,
                 'delivery_ids' => [],
             ];
             $plansByRow[$rowKey]['delivery_ids'][(int) $delivery->delivery_id] = (int) $delivery->delivery_id;
+            $plansByRow[$rowKey]['dr_numbers'][(string) $delivery->dr_no] = (string) $delivery->dr_no;
         }
 
         if ($issues !== []) {
+            $this->auditManualSync($projectId, $spreadsheetId, $tab, $schoolId, $authenticatedUserId, $checkedBy, $dryRun ? 'preview_failed' : 'failed', [], [], $issues, array_values($mappingsEncountered));
+
             return $this->projectSpreadsheetFailure('Spreadsheet sync stopped because one or more DR/package rows need reconciliation. No cells were changed.', $issues, $skippedCount);
         }
 
@@ -247,7 +297,46 @@ class BillingSheetSyncService
         }
 
         if ($issues !== []) {
+            $this->auditManualSync($projectId, $spreadsheetId, $tab, $schoolId, $authenticatedUserId, $checkedBy, $dryRun ? 'preview_failed' : 'failed', [], [], $issues, array_values($mappingsEncountered));
+
             return $this->projectSpreadsheetFailure('Spreadsheet sync stopped because existing cell values conflict with the entered details. No cells were changed.', $issues, $skippedCount);
+        }
+
+        $previewRows = collect($plansByRow)->map(fn (array $plan): array => [
+            'dr' => implode(', ', array_values($plan['dr_numbers'])),
+            'school_name' => $plan['school_name'],
+            'package_code' => $plan['package_code'],
+            'lot' => $plan['lot_number'],
+            'sheet_row' => $plan['row'],
+            'mapping' => $plan['mapping'] === null ? null : [
+                'mapping_id' => $plan['mapping']['mapping_id'],
+                'tracker_school_id' => $plan['mapping']['tracker_school_id'],
+                'sheet_school_id' => $plan['mapping']['sheet_school_id'],
+            ],
+            'target_cells' => collect($updatesByCell)->keys()->filter(fn (string $cell): bool => preg_match('/^[A-Z]+'.$plan['row'].'$/', $cell) === 1)->values()->all(),
+            'amount' => $this->formatCents(collect($plan['delivery_ids'])->sum(fn (int $deliveryId): int => $this->amountToCents($amountsByDelivery[$deliveryId] ?? '0.00'))),
+        ])->values()->all();
+
+        if ($dryRun) {
+            $mapping = collect($plansByRow)->pluck('mapping')->filter()->unique('mapping_id')->values()->all();
+            $this->auditManualSync($projectId, $spreadsheetId, $tab, $schoolId, $authenticatedUserId, $checkedBy, 'previewed', $previewRows, $updatesByCell, [], $mapping);
+
+            return [
+                'status' => 'success',
+                'message' => 'Dry run ready. Review the matched DR/package rows and target cells before confirming the spreadsheet write.',
+                'synced_count' => count($plansByRow),
+                'skipped_count' => $skippedCount,
+                'issues' => [],
+                'preview' => $previewRows,
+            ];
+        }
+
+        $currentPreviewHash = hash('sha256', json_encode($previewRows, JSON_THROW_ON_ERROR));
+        if ($expectedPreviewHash !== null && ! hash_equals($expectedPreviewHash, $currentPreviewHash)) {
+            $issues = ['The worksheet rows or target cells changed after preview. Run Preview Changes again; no cells were changed.'];
+            $this->auditManualSync($projectId, $spreadsheetId, $tab, $schoolId, $authenticatedUserId, $checkedBy, 'preview_stale', $previewRows, [], $issues);
+
+            return $this->projectSpreadsheetFailure($issues[0], $issues, $skippedCount);
         }
 
         $updates = [];
@@ -265,9 +354,25 @@ class BillingSheetSyncService
             }
         } catch (Throwable $exception) {
             Log::error('Google Sheets project sync write failed.', ['project_id' => $projectId, 'exception' => $exception]);
+            $this->auditManualSync($projectId, $spreadsheetId, $tab, $schoolId, $authenticatedUserId, $checkedBy, 'failed', $previewRows, $updatesByCell, ['Google Sheets write failed.']);
 
             return $this->projectSpreadsheetFailure('Google Sheets could not apply the spreadsheet update. No tracker workflow data was changed; check the sheet and retry.', [], $skippedCount);
         }
+
+        $mapping = collect($plansByRow)->pluck('mapping')->filter()->unique('mapping_id')->values()->all();
+        $this->auditManualSync($projectId, $spreadsheetId, $tab, $schoolId, $authenticatedUserId, $checkedBy, 'synced', $previewRows, $updatesByCell, [], $mapping);
+        Log::info('Manual billing spreadsheet sync completed.', [
+            'project_id' => $projectId,
+            'spreadsheet_id' => $spreadsheetId,
+            'sheet_tab' => $tab,
+            'tracker_school_id' => $schoolId,
+            'authenticated_user_id' => $authenticatedUserId,
+            'authenticated_user_name' => $checkedBy,
+            'mappings' => $mapping,
+            'preview_rows' => $previewRows,
+            'written_cells' => array_keys($updatesByCell),
+            'status' => 'synced',
+        ]);
 
         return [
             'status' => 'success',
@@ -275,7 +380,54 @@ class BillingSheetSyncService
             'synced_count' => count($plansByRow),
             'skipped_count' => $skippedCount,
             'issues' => [],
+            'preview' => $previewRows,
         ];
+    }
+
+    /** @param array<int, array<string, mixed>> $previewRows
+     * @param  array<string, string>  $writtenCells
+     * @param  array<int, string>  $issues
+     * @param  array<int, array<string, string>>  $mappings
+     */
+    private function auditManualSync(int $projectId, string $spreadsheetId, string $tab, string $schoolId, ?int $userId, string $userName, string $status, array $previewRows, array $writtenCells, array $issues, array $mappings = []): void
+    {
+        $idempotencyKey = hash('sha256', json_encode([$projectId, $spreadsheetId, $tab, $schoolId, $userId, $userName, $status, $previewRows, $writtenCells], JSON_THROW_ON_ERROR));
+        DB::table('billing_spreadsheet_sync_audits')->updateOrInsert(
+            ['idempotency_key' => $idempotencyKey],
+            [
+                'project_id' => $projectId,
+                'spreadsheet_id' => $spreadsheetId,
+                'sheet_tab' => $tab,
+                'tracker_school_id' => $schoolId,
+                'authenticated_user_id' => $userId,
+                'authenticated_user_name' => $userName,
+                'status' => $status,
+                'mappings' => json_encode($mappings, JSON_THROW_ON_ERROR),
+                'preview_rows' => json_encode($previewRows, JSON_THROW_ON_ERROR),
+                'written_cells' => json_encode($writtenCells, JSON_THROW_ON_ERROR),
+                'validation_errors' => json_encode($issues, JSON_THROW_ON_ERROR),
+                'idempotency_key' => $idempotencyKey,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+    }
+
+    /** @return array{mapping_id: string, spreadsheet_id: string, sheet_tab: string, tracker_school_id: string, sheet_school_id: string, school_name: string, dr_no: string, lot_number: string, package_code: string, evidence: string, verified: bool}|null */
+    private function schoolIdMapping(string $trackerSchoolId, string $spreadsheetId, string $tab, string $lotNumber, string $drNumber): ?array
+    {
+        foreach ((array) config('google_sheets.billing.school_id_mappings', []) as $mapping) {
+            if (($mapping['verified'] ?? false)
+                && (string) ($mapping['tracker_school_id'] ?? '') === $trackerSchoolId
+                && (string) ($mapping['spreadsheet_id'] ?? '') === $spreadsheetId
+                && (string) ($mapping['sheet_tab'] ?? '') === $tab
+                && (string) ($mapping['lot_number'] ?? '') === $lotNumber
+                && (string) ($mapping['dr_no'] ?? '') === $drNumber) {
+                return $mapping;
+            }
+        }
+
+        return null;
     }
 
     /** @param array<int, string> $issues
@@ -311,7 +463,7 @@ class BillingSheetSyncService
     }
 
     /** @param array<int, array<int, mixed>> $rows
-     * @param  array{header_row: int, school_id_column: int, package_code_column: int, three_pl_date_column: ?int, destination_columns: array<string, int>}  $headers
+     * @param  array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, destination_columns: array<string, int>}  $headers
      * @return array<string, array<int, array{row: int, values: array<int, mixed>}>>
      */
     private function indexBillingSheetRows(array $rows, array $headers): array
@@ -1188,7 +1340,7 @@ class BillingSheetSyncService
     }
 
     /** @param array<int, array<int, mixed>> $rows
-     * @return array{header_row: int, school_id_column: int, package_code_column: int, three_pl_date_column: ?int, destination_columns: array<string, int>}|null
+     * @return array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, destination_columns: array<string, int>}|null
      */
     private function findBillingHeaderColumns(array $rows, string $lotNumber): ?array
     {
@@ -1216,6 +1368,18 @@ class BillingSheetSyncService
 
             if (count($schoolColumns) !== 1 || count($packageColumns) !== 1 || count($billingSectionStarts) !== 1) {
                 continue;
+            }
+
+            $nextPackageColumn = collect($headers)
+                ->keys()
+                ->filter(fn (int $column): bool => $column > $packageColumns[0]
+                    && str_starts_with($this->normalizedHeader($headers[$column] ?? ''), 'corepackagecode'))
+                ->min() ?? count($headers);
+            $birDrColumns = [];
+            foreach ($headers as $columnIndex => $heading) {
+                if ($columnIndex > $packageColumns[0] && $columnIndex < $nextPackageColumn && $this->normalizedHeader($heading) === 'birdr') {
+                    $birDrColumns[] = $columnIndex;
+                }
             }
 
             $statusColumn = $billingSectionStarts[0];
@@ -1272,6 +1436,7 @@ class BillingSheetSyncService
                     'header_row' => $rowIndex,
                     'school_id_column' => $schoolColumns[0],
                     'package_code_column' => $packageColumns[0],
+                    'bir_dr_column' => count($birDrColumns) === 1 ? $birDrColumns[0] : null,
                     'three_pl_date_column' => count($threePlDateColumns) === 1 ? $threePlDateColumns[0] : null,
                     'destination_columns' => $destinationColumns,
                 ];

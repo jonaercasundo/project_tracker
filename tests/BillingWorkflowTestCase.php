@@ -179,6 +179,7 @@ abstract class BillingWorkflowTestCase extends TestCase
         (require database_path('migrations/2026_10_29_060921_add_google_sheet_fields_to_billing_batches_table.php'))->up();
         (require database_path('migrations/2026_10_27_051316_create_billing_sheet_syncs_table.php'))->up();
         (require database_path('migrations/2026_10_29_054612_add_billing_sheet_sync_result_details.php'))->up();
+        (require database_path('migrations/2026_10_29_073347_create_billing_spreadsheet_sync_audits_table.php'))->up();
         (require database_path('migrations/2026_10_27_052646_create_google_sheets_settings_table.php'))->up();
     }
 }

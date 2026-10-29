@@ -121,7 +121,7 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
                     <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
-                    <p class="mt-2 text-sm text-slate-600">Enter the School ID and billing details, then preview the DR/package matches and target cells before syncing. You can enter a tracker School ID or a configured mapped sheet SchoolID. Existing nonblank values and billing statuses are preserved. Each Lot total is calculated from its DR.</p>
+                    <p class="mt-2 text-sm text-slate-600">Enter the School ID and billing details, then preview the DR/package matches and target cells before syncing. You can enter a tracker School ID or a configured mapped sheet SchoolID. The selected billing status fills blank status cells; existing nonblank values are preserved. Each Lot total is calculated from its DR.</p>
                 </div>
                 <div>
                     <label for="spreadsheet-school-id" class="mb-1 block text-xs font-semibold text-slate-600">School ID</label>
@@ -129,6 +129,15 @@
                     <p class="mt-1 text-xs text-slate-500">For Bacsil Elementary School, enter 102205 (tracker) or 134967 (mapped spreadsheet ID).</p>
                 </div>
                 <div id="spreadsheet-school-fields" class="grid grid-cols-1 gap-4 sm:grid-cols-2" hidden>
+                    <div class="sm:col-span-2">
+                        <label for="spreadsheet-billing-status" class="mb-1 block text-xs font-semibold text-slate-600">Billing status (Lot X)</label>
+                        <select id="spreadsheet-billing-status" name="billing_status" required disabled class="w-full rounded-lg border-slate-200 text-sm">
+                            <option value="">Choose a billing status</option>
+                            <option value="1st Billing">1st Billing</option>
+                            <option value="2nd Billing">Second Billing</option>
+                            <option value="3rd Billing">Third Billing</option>
+                        </select>
+                    </div>
                     <div>
                         <label for="spreadsheet-date-received" class="mb-1 block text-xs font-semibold text-slate-600">Date received (Lot X)</label>
                         <input id="spreadsheet-date-received" name="date_received" type="date" required disabled class="w-full rounded-lg border-slate-200 text-sm">

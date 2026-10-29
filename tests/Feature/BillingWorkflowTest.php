@@ -533,6 +533,7 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
         '11' => ['checked_by' => 'CH', 'date_received' => 'CJ', 'received_by' => 'CK', 'inspection_1' => 'CL', 'inspection_2' => 'CM', 'date_checking' => 'CN', 'date_encoding' => 'CO', 'total_amount' => 'CR'],
     ];
     $fields = [
+        'billing_status' => '1st Billing',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
         'inspection_1' => 'Passed',
@@ -565,6 +566,7 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
             ? $actor->name
             : ($field === 'total_amount' ? $expectedAmounts['2'] : $fields[$field]);
     }
+    $alreadySyncedRows[3][billingSheetColumnIndex('BD')] = $fields['billing_status'];
 
     $sheets = Mockery::mock(GoogleSheetsApiClient::class);
     $sheets->shouldReceive('configurationStatus')->times(3)->andReturn(['configured' => true, 'reason' => null]);
@@ -575,8 +577,10 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
         $updatesByRange = collect($updates)->keyBy('range');
 
         return $spreadsheetId === 'test-spreadsheet-id'
-            && count($updates) === 29
-            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BD|BF|BS|BU|CG|CI)\d+$/', $range) === 1)
+            && count($updates) === 30
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD4"]['values'] === [['1st Billing']]
+            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BF|BU|CI)\d+$/', $range) === 1)
+            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BD|BS|CG)(?:2|3)$/', $range) === 1)
             && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BE|BT|CH)2$/', $range) === 1)
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BE4"]['values'] === [[$actor->name]]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BG2"]['values'] === [[$fields['date_received']]]
@@ -627,6 +631,7 @@ it('does not partially sync spreadsheet rows when a DR package match is missing 
     $sheets->shouldNotReceive('updateCells');
 
     $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, 'Billing Tester', [
+        'billing_status' => '1st Billing',
         'date_received' => '2026-10-28',
         'received_by' => 'Receiver',
         'inspection_1' => 'Passed',
@@ -671,14 +676,16 @@ it('matches split numeric tracker packages to one exact school and lot-specific 
     $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
     $sheets->shouldReceive('values')->once()->andReturn($rows);
     $sheets->shouldReceive('updateCells')->once()->withArgs(function (array $updates, string $spreadsheetId): bool {
-        $ranges = collect($updates)->pluck('range')->all();
+        $updatesByRange = collect($updates)->keyBy('range');
 
         return $spreadsheetId === 'test-spreadsheet-id'
-            && in_array("'Copy of SME LOT 2,9,11'!BE2", $ranges, true)
-            && in_array("'Copy of SME LOT 2,9,11'!BO2", $ranges, true);
+            && isset($updatesByRange["'Copy of SME LOT 2,9,11'!BE2"])
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [['2nd Billing']]
+            && isset($updatesByRange["'Copy of SME LOT 2,9,11'!BO2"]);
     });
 
     $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, '120066', 'Billing Tester', [
+        'billing_status' => '2nd Billing',
         'date_received' => '2026-10-28',
         'received_by' => 'Receiver',
         'inspection_1' => 'Passed',
@@ -693,6 +700,7 @@ it('matches split numeric tracker packages to one exact school and lot-specific 
         ->and($result['preview'][0]['dr'])->toBe('56308')
         ->and($result['preview'][0]['sheet_row'])->toBe(2)
         ->and($result['preview'][0]['sheet_package_code'])->toBe('C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6')
+        ->and($result['preview'][0]['billing_status'])->toBe('2nd Billing')
         ->and($result['preview'][0]['amount'])->toBe('45.00');
 });
 
@@ -724,6 +732,7 @@ it('rejects ambiguous split-package DR matches without writing spreadsheet cells
     $sheets->shouldNotReceive('updateCells');
 
     $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, 'Billing Tester', [
+        'billing_status' => '1st Billing',
         'date_received' => '2026-10-28',
         'received_by' => 'Receiver',
         'inspection_1' => 'Passed',
@@ -786,11 +795,12 @@ it('uses an explicit school ID mapping only for a verified DR and exact package 
         return $spreadsheetId === 'test-spreadsheet-id'
             && in_array("'Copy of SME LOT 2,9,11'!BE2", $ranges, true)
             && in_array("'Copy of SME LOT 2,9,11'!BO2", $ranges, true)
-            && ! in_array("'Copy of SME LOT 2,9,11'!BD2", $ranges, true)
+            && in_array("'Copy of SME LOT 2,9,11'!BD2", $ranges, true)
             && ! in_array("'Copy of SME LOT 2,9,11'!BF2", $ranges, true);
     });
 
     $fields = [
+        'billing_status' => '1st Billing',
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
         'inspection_1' => 'Passed',
@@ -842,6 +852,7 @@ it('does not write spreadsheet rows when an exact school and package match is am
     $sheets->shouldNotReceive('updateCells');
 
     $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, 'Billing Tester', [
+        'billing_status' => '1st Billing',
         'date_received' => '2026-10-28',
         'received_by' => 'Receiver',
         'inspection_1' => 'Passed',

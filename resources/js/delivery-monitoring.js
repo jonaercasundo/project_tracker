@@ -384,17 +384,31 @@ if (monitoring) {
             const mapping = row.mapping
                 ? ` · ID mapping ${row.mapping.tracker_school_id} → ${row.mapping.sheet_school_id} (${row.mapping.mapping_id})`
                 : '';
-            entry.textContent = `${row.school_name || 'School'} · DR ${row.dr} · ${row.package_code} · Lot ${row.lot} · Sheet row ${row.sheet_row} · Cells: ${(row.target_cells ?? []).join(', ') || 'no changes'} · Total ${row.amount}${mapping}`;
+            entry.textContent = `${row.school_name || 'School'} · DR ${row.dr} · ${row.package_code} · Lot ${row.lot} · ${row.billing_status} · Sheet row ${row.sheet_row} · Cells: ${(row.target_cells ?? []).join(', ') || 'no changes'} · Total ${row.amount}${mapping}`;
             spreadsheetDryRun.append(entry);
         }
     }
+
+    function localTodayDate() {
+        const today = new Date();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+
+        return `${today.getFullYear()}-${month}-${day}`;
+    }
+
+    function resetSpreadsheetFields(enabled) {
+        const today = localTodayDate();
+        spreadsheetSchoolFields.querySelectorAll('input, select').forEach(control => {
+            control.disabled = !enabled;
+            control.value = ['date_checking', 'date_encoding'].includes(control.name) ? today : '';
+        });
+    }
+
     spreadsheetSchoolIdInput.addEventListener('input', () => {
         const hasSchool = spreadsheetSchoolIdInput.value.trim() !== '';
         spreadsheetSchoolFields.hidden = !hasSchool;
-        spreadsheetSchoolFields.querySelectorAll('input').forEach(input => {
-            input.disabled = !hasSchool;
-            input.value = '';
-        });
+        resetSpreadsheetFields(hasSchool);
         spreadsheetSubmitButton.disabled = !hasSchool;
         syncSpreadsheetForm.elements.mode.value = 'preview';
         syncSpreadsheetForm.elements.preview_token.value = '';
@@ -407,8 +421,8 @@ if (monitoring) {
         spreadsheetModalFeedback.textContent = '';
     });
 
-    syncSpreadsheetForm.querySelectorAll('input:not([type="hidden"])').forEach(input => {
-        input.addEventListener('input', () => {
+    syncSpreadsheetForm.querySelectorAll('input:not([type="hidden"]), select').forEach(control => {
+        control.addEventListener(control.tagName === 'SELECT' ? 'change' : 'input', () => {
             if (syncSpreadsheetForm.elements.mode.value === 'confirm') {
                 syncSpreadsheetForm.elements.mode.value = 'preview';
                 syncSpreadsheetForm.elements.preview_token.value = '';
@@ -431,10 +445,7 @@ if (monitoring) {
         spreadsheetSchoolIdInput.value = '';
         spreadsheetSchoolIdInput.disabled = false;
         spreadsheetSchoolFields.hidden = true;
-        spreadsheetSchoolFields.querySelectorAll('input').forEach(input => {
-            input.disabled = true;
-            input.value = '';
-        });
+        resetSpreadsheetFields(false);
         spreadsheetSubmitButton.disabled = true;
         syncSpreadsheetForm.elements.mode.value = 'preview';
         syncSpreadsheetForm.elements.preview_token.value = '';

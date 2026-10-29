@@ -71,14 +71,8 @@ class BillingPreparationController extends Controller
             ->get(['lot_id', 'project_id', 'lot_name']);
         $divisions = DB::table('school')->whereNotNull('division')->distinct()->orderBy('division')->pluck('division');
         $schools = DB::table('school')->orderBy('school_name')->get(['school_id', 'school_name']);
-        $billingSheetId = (string) config('google_sheets.billing.spreadsheet_id', '');
-        $billingSheet = [
-            'enabled' => (bool) config('google_sheets.billing.enabled') && $billingSheetId !== '',
-            'tab' => (string) config('google_sheets.billing.sheet_tab', ''),
-            'url' => $billingSheetId !== '' ? 'https://docs.google.com/spreadsheets/d/'.$billingSheetId.'/edit' : null,
-        ];
 
-        return view('billing.prepare.index', compact('filters', 'years', 'projects', 'lots', 'divisions', 'schools', 'billingSheet'));
+        return view('billing.prepare.index', compact('filters', 'years', 'projects', 'lots', 'divisions', 'schools'));
     }
 
     public function scanLookup(Request $request): JsonResponse
@@ -218,6 +212,15 @@ class BillingPreparationController extends Controller
             'delivery_ids.*' => ['required', 'integer', 'distinct:strict', 'exists:deliveries,delivery_id'],
             'idempotency_key' => ['required', 'uuid'],
             'confirmation_date' => ['sometimes', 'date_format:Y-m-d'],
+            'google_sheet_fields' => ['sometimes', 'array'],
+            'google_sheet_fields.*' => ['array:status,date_received,received_by,inspection_1,inspection_2,date_checking,date_encoding'],
+            'google_sheet_fields.*.status' => ['required', 'in:1st Billing,2nd Billing,3rd Billing'],
+            'google_sheet_fields.*.date_received' => ['nullable', 'date_format:Y-m-d'],
+            'google_sheet_fields.*.received_by' => ['nullable', 'string', 'max:255'],
+            'google_sheet_fields.*.inspection_1' => ['nullable', 'string', 'max:1000'],
+            'google_sheet_fields.*.inspection_2' => ['nullable', 'string', 'max:1000'],
+            'google_sheet_fields.*.date_checking' => ['nullable', 'date_format:Y-m-d'],
+            'google_sheet_fields.*.date_encoding' => ['nullable', 'date_format:Y-m-d'],
             'excluded_delivery_ids' => ['sometimes', 'array', 'max:'.$this->maxBatchSize()],
             'excluded_delivery_ids.*' => ['integer', 'distinct:strict', 'exists:deliveries,delivery_id'],
             'expected_delivery_ids' => ['required_if:mode,all', 'array', 'min:1', 'max:'.$this->maxBatchSize()],
@@ -237,6 +240,7 @@ class BillingPreparationController extends Controller
         // original records are already For Billing by the time a client retries.
         $priorBatch = BillingBatch::query()->where('idempotency_key', $validated['idempotency_key'])->first();
         if ($priorBatch) {
+            $googleSheetFields = $validated['google_sheet_fields'] ?? $priorBatch->google_sheet_fields ?? [];
             $selectionFilters = $validated['mode'] === 'all'
                 ? $this->validatedFilters($request)
                 : ($validated['mode'] === 'range' ? $request->input('selection_filters') : null);
@@ -248,13 +252,19 @@ class BillingPreparationController extends Controller
                 ->pluck('delivery_id')
                 ->map(fn (mixed $id): int => (int) $id)
                 ->all();
+            $missingLots = $this->missingBillingSheetStatuses($retryIds, $googleSheetFields);
+            if ($missingLots !== []) {
+                return response()->json([
+                    'message' => 'Choose a billing status for every selected Lot before confirming: Lot '.implode(', Lot ', $missingLots).'.',
+                ], 422);
+            }
             if ($validated['mode'] !== 'all' && $submittedIds !== []) {
                 $retryRows = $this->eligibility->query()->whereIn('d.delivery_id', $submittedIds)->get();
                 $groupKeys = $this->groupsForRows($retryRows)->pluck('group_key')->all();
             }
             $groupCount = $this->eligibility->presentGroups($this->eligibility->query()->whereIn('d.delivery_id', $retryIds)->get())->count();
             try {
-                $result = $this->batches->confirm($retryIds, $validated['mode'], $validated['idempotency_key'], $actor, $confirmationDate, $selectionFilters, $groupKeys);
+                $result = $this->batches->confirm($retryIds, $validated['mode'], $validated['idempotency_key'], $actor, $confirmationDate, $selectionFilters, $groupKeys, $googleSheetFields);
             } catch (BillingBatchEligibilityException $exception) {
                 return response()->json(['message' => $exception->getMessage(), 'rejected' => $exception->rejectedRecords], $exception->httpStatus);
             }
@@ -408,8 +418,16 @@ class BillingPreparationController extends Controller
             }
         }
 
+        $googleSheetFields = $validated['google_sheet_fields'] ?? [];
+        $missingLots = $this->missingBillingSheetStatuses($deliveryIds, $googleSheetFields);
+        if ($missingLots !== []) {
+            return response()->json([
+                'message' => 'Choose a billing status for every selected Lot before confirming: Lot '.implode(', Lot ', $missingLots).'.',
+            ], 422);
+        }
+
         try {
-            $result = $this->batches->confirm($deliveryIds, $validated['mode'], $validated['idempotency_key'], $actor, $confirmationDate, $selectionFilters, $groupKeys ?? null);
+            $result = $this->batches->confirm($deliveryIds, $validated['mode'], $validated['idempotency_key'], $actor, $confirmationDate, $selectionFilters, $groupKeys ?? null, $googleSheetFields);
         } catch (BillingBatchEligibilityException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),
@@ -640,6 +658,32 @@ class BillingPreparationController extends Controller
             ->values();
 
         return $orderedKeys->map(fn (string $key): ?array => $groups->get($key))->filter()->values();
+    }
+
+    /** @param array<int, int> $deliveryIds
+     * @param  array<string, array<string, mixed>>  $googleSheetFields
+     * @return array<int, string>
+     */
+    private function missingBillingSheetStatuses(array $deliveryIds, array $googleSheetFields): array
+    {
+        if ($deliveryIds === []) {
+            return [];
+        }
+
+        $lotNumbers = DB::table('deliveries as d')
+            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
+            ->whereIn('d.delivery_id', $deliveryIds)
+            ->pluck('l.lot_name')
+            ->map(fn (mixed $name): ?string => preg_match('/^\s*(?:lot\s*)?(2|9|11)\s*$/i', (string) $name, $matches) === 1 ? $matches[1] : null)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        return $lotNumbers
+            ->filter(fn (string $lotNumber): bool => ! in_array($googleSheetFields[$lotNumber]['status'] ?? null, ['1st Billing', '2nd Billing', '3rd Billing'], true))
+            ->values()
+            ->all();
     }
 
     private function maxBatchSize(): int

@@ -84,6 +84,8 @@ abstract class BillingWorkflowTestCase extends TestCase
             $table->integer('project_id');
             $table->string('school_id');
             $table->integer('lot_id')->nullable();
+            $table->integer('keystage_id')->nullable();
+            $table->integer('package_qty')->default(1);
             $table->string('dr_no');
             $table->date('delivery_date');
             $table->string('status');
@@ -92,7 +94,20 @@ abstract class BillingWorkflowTestCase extends TestCase
         Schema::create('package', function (Blueprint $table): void {
             $table->increments('package_id');
             $table->integer('lot_id');
+            $table->integer('keystage_id')->nullable();
             $table->integer('package_num')->nullable();
+        });
+
+        Schema::create('item', function (Blueprint $table): void {
+            $table->increments('item_id');
+            $table->decimal('price', 15, 2)->nullable();
+        });
+
+        Schema::create('package_content', function (Blueprint $table): void {
+            $table->increments('id');
+            $table->integer('package_id');
+            $table->integer('item_id');
+            $table->decimal('qty', 15, 2)->default(1);
         });
 
         Schema::create('invoices', function (Blueprint $table): void {
@@ -161,6 +176,7 @@ abstract class BillingWorkflowTestCase extends TestCase
         (require database_path('migrations/2026_10_13_030107_create_delivery_billing_tables.php'))->up();
         (require database_path('migrations/2026_10_23_061316_create_billing_batches_table.php'))->up();
         (require database_path('migrations/2026_10_28_031729_add_confirmation_date_to_billing_batches_table.php'))->up();
+        (require database_path('migrations/2026_10_29_060921_add_google_sheet_fields_to_billing_batches_table.php'))->up();
         (require database_path('migrations/2026_10_27_051316_create_billing_sheet_syncs_table.php'))->up();
         (require database_path('migrations/2026_10_29_054612_add_billing_sheet_sync_result_details.php'))->up();
         (require database_path('migrations/2026_10_27_052646_create_google_sheets_settings_table.php'))->up();

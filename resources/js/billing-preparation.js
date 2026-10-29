@@ -20,6 +20,8 @@ if (root) {
     const confirmSubmit = document.getElementById('billing-preparation-confirm-submit');
     const confirmationDateInput = document.getElementById('billing-confirmation-date');
     const confirmationDateSummary = document.getElementById('billing-confirm-date-summary');
+    const billingLotFields = document.getElementById('billing-confirm-lot-fields');
+    const billingLotFieldsTemplate = document.getElementById('billing-confirm-lot-fields-template');
     const camera = document.getElementById('billing-preparation-camera');
     const cameraPlaceholder = document.getElementById('billing-preparation-camera-placeholder');
     const cameraSupport = document.getElementById('billing-preparation-camera-support');
@@ -65,6 +67,33 @@ if (root) {
             error: ['border-rose-200', 'bg-rose-50', 'text-rose-900'],
         }[tone] || ['border-slate-200', 'bg-slate-50', 'text-slate-800']));
         feedback.classList.remove('hidden');
+    }
+
+    function selectedBillingLotNumbers() {
+        return [...new Set([...selected.values()].flatMap((group) => group.lots || [])
+            .map((lotName) => String(lotName).match(/^\s*(?:lot\s*)?(2|9|11)\s*$/i)?.[1])
+            .filter(Boolean))].sort((first, second) => Number(first) - Number(second));
+    }
+
+    function renderBillingLotFields() {
+        billingLotFields.replaceChildren();
+        selectedBillingLotNumbers().forEach((lotNumber) => {
+            const fragment = billingLotFieldsTemplate.content.cloneNode(true);
+            const panel = fragment.querySelector('[data-billing-lot-panel]');
+            panel.dataset.lotNumber = lotNumber;
+            panel.querySelector('[data-billing-lot-label]').textContent = `Lot ${lotNumber}`;
+            billingLotFields.append(fragment);
+        });
+    }
+
+    function billingLotFieldValues() {
+        return Object.fromEntries([...billingLotFields.querySelectorAll('[data-billing-lot-panel]')].map((panel) => [
+            panel.dataset.lotNumber,
+            Object.fromEntries([...panel.querySelectorAll('[data-billing-field]')].map((input) => [
+                input.dataset.billingField,
+                input.value.trim(),
+            ])),
+        ]));
     }
 
     function recordScan(status, record = null, message = '', displayLabel = null) {
@@ -596,6 +625,7 @@ if (root) {
         const excludedGroups = visibleRecords.filter((record) => !record.eligible || record.excluded_count > 0).length;
         const excludedRecords = visibleRecords.reduce((sum, group) => sum + group.excluded_count, 0);
         document.getElementById('billing-confirm-excluded').textContent = `${excludedGroups} group(s) · ${excludedRecords} record(s)`;
+        renderBillingLotFields();
         confirmDialog.showModal();
     });
 
@@ -604,6 +634,11 @@ if (root) {
     });
 
     confirmSubmit?.addEventListener('click', async () => {
+        const missingBillingStatus = billingLotFields.querySelector('[data-billing-field="status"]:invalid');
+        if (missingBillingStatus) {
+            missingBillingStatus.reportValidity();
+            return;
+        }
         const body = buildConfirmationPayload({
             selectionMode,
             selectedIds: [...selected.values()].flatMap((group) => group.eligible_delivery_ids),
@@ -615,6 +650,7 @@ if (root) {
             idempotencyKey: createIdempotencyKey(),
         });
         body.confirmation_date = confirmationDateInput.value;
+        body.google_sheet_fields = billingLotFieldValues();
 
         try {
             setBusy(confirmSubmit, true, 'Confirming…');

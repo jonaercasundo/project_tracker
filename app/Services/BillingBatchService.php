@@ -21,6 +21,7 @@ class BillingBatchService
      * @param  array<int, int>  $deliveryIds
      * @param  array<string, mixed>|null  $selectionFilters
      * @param  array<int, string>|null  $selectionGroups
+     * @param  array<string, array<string, mixed>>|null  $googleSheetFields
      * @return array{batch: BillingBatch, created: bool}
      */
     public function confirm(
@@ -30,7 +31,8 @@ class BillingBatchService
         User $actor,
         string $confirmationDate,
         ?array $selectionFilters = null,
-        ?array $selectionGroups = null
+        ?array $selectionGroups = null,
+        ?array $googleSheetFields = null
     ): array {
         $deliveryIds = array_values(array_unique(array_map('intval', $deliveryIds)));
         sort($deliveryIds);
@@ -39,6 +41,7 @@ class BillingBatchService
             'delivery_ids' => $deliveryIds,
             'confirmation_date' => $confirmationDate,
             'filters' => $selectionFilters,
+            'google_sheet_fields' => $googleSheetFields,
         ];
         if ($selectionGroups !== null) {
             sort($selectionGroups);
@@ -46,7 +49,7 @@ class BillingBatchService
         }
         $selectionHash = hash('sha256', json_encode($selectionData, JSON_THROW_ON_ERROR));
 
-        return DB::transaction(function () use ($deliveryIds, $selectionMethod, $idempotencyKey, $actor, $confirmationDate, $selectionFilters, $selectionHash): array {
+        return DB::transaction(function () use ($deliveryIds, $selectionMethod, $idempotencyKey, $actor, $confirmationDate, $selectionFilters, $selectionHash, $googleSheetFields): array {
             $existing = BillingBatch::query()->where('idempotency_key', $idempotencyKey)->lockForUpdate()->first();
             if ($existing) {
                 return $this->existingResult($existing, $selectionHash);
@@ -139,6 +142,7 @@ class BillingBatchService
                 'confirmed_by_name' => $actor->name,
                 'confirmed_at' => now(),
                 'confirmation_date' => $confirmationDate,
+                'google_sheet_fields' => $googleSheetFields,
             ]);
 
             foreach ($deliveryIds as $deliveryId) {

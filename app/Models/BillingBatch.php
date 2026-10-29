@@ -16,6 +16,7 @@ class BillingBatch extends Model
     {
         return [
             'selection_filters' => 'array',
+            'google_sheet_fields' => 'array',
             'confirmed_at' => 'datetime',
             'confirmation_date' => 'date',
         ];

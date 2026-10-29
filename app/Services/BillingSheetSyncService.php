@@ -326,6 +326,17 @@ class BillingSheetSyncService
 
         $confirmedByName = trim((string) ($batch->confirmed_by_name ?: $firstSync->authenticated_user_name));
         $confirmedById = $batch->confirmed_by ?: $firstSync->authenticated_user_id;
+        $missingStatusSyncs = $pendingSyncs->filter(function (BillingSheetSync $sync) use ($batch): bool {
+            return ! in_array($batch->google_sheet_fields[$sync->lot_number]['status'] ?? null, ['1st Billing', '2nd Billing', '3rd Billing'], true);
+        });
+        if ($missingStatusSyncs->isNotEmpty()) {
+            $this->markBatchFailure($missingStatusSyncs, 'reconciliation_error', 'Select a valid billing cycle (1st, 2nd, or 3rd Billing) for every Lot before syncing.');
+            $blockedSyncs = $pendingSyncs->reject(fn (BillingSheetSync $sync): bool => $missingStatusSyncs->contains('id', $sync->getKey()));
+            $this->markBatchFailure($blockedSyncs, 'batch_blocked', 'No sheet cells were written because a selected Lot has no billing cycle.');
+
+            return $this->batchSyncFailure($syncs, 'A billing cycle is missing for one or more Lots; no sheet cells were written.');
+        }
+
         $headersByLot = [];
         $plansByRow = [];
         $issues = [];
@@ -394,30 +405,27 @@ class BillingSheetSyncService
             $plansByRow[$rowKey]['syncs'][] = $sync;
         }
 
-        $billingRecordsByDelivery = DB::table('delivery_billing_records')
-            ->whereIn('delivery_id', $pendingSyncs->pluck('delivery_id')->unique())
-            ->where('status', '!=', DeliveryBillingRecord::REVOKED)
-            ->get(['delivery_id', 'billing_amount'])
-            ->keyBy('delivery_id');
+        $deliveryAmountsById = $this->deliveryTotals($pendingSyncs->pluck('delivery_id')->unique()->map(fn (mixed $id): int => (int) $id)->all());
         $updatesByCell = [];
         $writtenAmounts = [];
         foreach ($plansByRow as $plan) {
+            $lotFields = $batch->google_sheet_fields[$plan['lot_number']] ?? [];
             $values = [
-                'status' => (string) $batch->batch_ref,
+                'status' => $lotFields['status'] ?? null,
                 'checked_by' => $confirmedByName,
-                'date_received' => null,
-                'received_by' => null,
-                'inspection_1' => null,
-                'inspection_2' => null,
-                'date_checking' => null,
-                'date_encoding' => null,
+                'date_received' => $lotFields['date_received'] ?? null,
+                'received_by' => $lotFields['received_by'] ?? null,
+                'inspection_1' => $lotFields['inspection_1'] ?? null,
+                'inspection_2' => $lotFields['inspection_2'] ?? null,
+                'date_checking' => $lotFields['date_checking'] ?? null,
+                'date_encoding' => $lotFields['date_encoding'] ?? null,
                 'total_amount' => null,
             ];
             $amountCents = 0;
             $hasAmount = false;
             $lineAmountsByDelivery = [];
             foreach ($plan['delivery_ids'] as $deliveryId) {
-                $amount = $billingRecordsByDelivery->get($deliveryId)?->billing_amount;
+                $amount = $deliveryAmountsById[$deliveryId] ?? null;
                 if ($amount !== null) {
                     $lineAmountCents = $this->amountToCents($amount);
                     $lineAmountsByDelivery[$deliveryId] = $this->formatCents($lineAmountCents);
@@ -525,6 +533,38 @@ class BillingSheetSyncService
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->values()
+            ->all();
+    }
+
+    /** @param array<int, int> $deliveryIds
+     * @return array<int, string>
+     */
+    private function deliveryTotals(array $deliveryIds): array
+    {
+        if ($deliveryIds === []) {
+            return [];
+        }
+
+        $lotAllocations = DB::table('deliveries as d')
+            ->leftJoin('package as package', 'package.lot_id', '=', 'd.lot_id')
+            ->whereIn('d.delivery_id', $deliveryIds)
+            ->whereNull('d.keystage_id')
+            ->select(['d.delivery_id', 'd.package_qty', 'package.package_id']);
+        $keystageAllocations = DB::table('deliveries as d')
+            ->leftJoin('package as package', 'package.keystage_id', '=', 'd.keystage_id')
+            ->whereIn('d.delivery_id', $deliveryIds)
+            ->whereNotNull('d.keystage_id')
+            ->select(['d.delivery_id', 'd.package_qty', 'package.package_id']);
+        $allocations = $lotAllocations->unionAll($keystageAllocations);
+
+        return DB::query()->fromSub($allocations, 'allocation')
+            ->leftJoin('package_content as content', 'content.package_id', '=', 'allocation.package_id')
+            ->leftJoin('item as item', 'item.item_id', '=', 'content.item_id')
+            ->select('allocation.delivery_id')
+            ->selectRaw('SUM(COALESCE(item.price, 0) * CASE WHEN content.qty > 0 THEN content.qty ELSE 1 END * CASE WHEN allocation.package_qty > 0 THEN allocation.package_qty ELSE 1 END) as amount')
+            ->groupBy('allocation.delivery_id')
+            ->get()
+            ->mapWithKeys(fn (object $row): array => [(int) $row->delivery_id => $this->formatCents($this->amountToCents($row->amount))])
             ->all();
     }
 

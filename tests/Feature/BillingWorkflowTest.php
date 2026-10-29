@@ -103,13 +103,25 @@ function confirmDeliveryForBilling(int $deliveryId): void
     test()->postJson(route('billing.for-billing', $deliveryId))->assertOk();
 }
 
-function addPackageToBillingDelivery(int $deliveryId, string $packageCode): int
+function addPackageToBillingDelivery(int $deliveryId, string $packageCode, string $itemPrice = '0.00'): int
 {
     $delivery = DB::table('deliveries')->where('delivery_id', $deliveryId)->first();
-    $packageId = (int) DB::table('package')->insertGetId([
-        'lot_id' => $delivery->lot_id,
-        'package_num' => $packageCode,
-    ], 'package_id');
+    $packageId = (int) (DB::table('package')
+        ->where('lot_id', $delivery->lot_id)
+        ->where('package_num', $packageCode)
+        ->value('package_id') ?? 0);
+    if ($packageId === 0) {
+        $packageId = (int) DB::table('package')->insertGetId([
+            'lot_id' => $delivery->lot_id,
+            'package_num' => $packageCode,
+        ], 'package_id');
+        $itemId = (int) DB::table('item')->insertGetId(['price' => $itemPrice], 'item_id');
+        DB::table('package_content')->insert([
+            'package_id' => $packageId,
+            'item_id' => $itemId,
+            'qty' => 1,
+        ]);
+    }
     DB::table('package_status')->insert([
         'delivery_id' => $deliveryId,
         'package_id' => $packageId,
@@ -242,7 +254,7 @@ it('confirms a complete same-DR group and syncs each lot once with idempotent re
     $firstId = createBillingDelivery('BIR-SHARED-DR', 'delivered');
     $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('project_id');
     DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $firstId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
-    addPackageToBillingDelivery($firstId, 'CORE-LOT2');
+    addPackageToBillingDelivery($firstId, 'CORE-LOT2', '500.00');
     $secondLotId = (int) DB::table('lot')->insertGetId(['project_id' => $projectId, 'lot_name' => 'Lot 9', 'contract_no' => 'CONTRACT-'.$projectId.'-9']);
     $secondId = createDeliveryForBillingProject($projectId, 'BIR-SHARED-DR', 'pending');
     DB::table('deliveries')->where('delivery_id', $secondId)->update(['lot_id' => $secondLotId]);
@@ -264,10 +276,12 @@ it('confirms a complete same-DR group and syncs each lot once with idempotent re
             && $updatesByRange->keys()->all() === [
                 "'Copy of SME LOT 2,9,11'!BD2",
                 "'Copy of SME LOT 2,9,11'!BE2",
+                "'Copy of SME LOT 2,9,11'!BO2",
                 "'Copy of SME LOT 2,9,11'!BS2",
                 "'Copy of SME LOT 2,9,11'!BT2",
+                "'Copy of SME LOT 2,9,11'!CD2",
             ]
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [[$batchRef]]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [['1st Billing']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BE2"]['values'] === [['Billing Tester']];
     });
     app()->instance(GoogleSheetsApiClient::class, $sheets);
@@ -278,6 +292,10 @@ it('confirms a complete same-DR group and syncs each lot once with idempotent re
         'mode' => 'search',
         'delivery_ids' => [$firstId],
         'idempotency_key' => (string) Str::uuid(),
+        'google_sheet_fields' => [
+            '2' => ['status' => '1st Billing'],
+            '9' => ['status' => '2nd Billing'],
+        ],
     ];
     $confirmation = $this->postJson(route('billing.prepare.confirm'), $payload)
         ->assertCreated()
@@ -350,12 +368,13 @@ it('writes Lot 2, 9, and 11 billing data once for a multi-Lot DR', function (): 
     $schoolId = (string) DB::table('deliveries')->where('delivery_id', $firstId)->value('school_id');
     $lot2Id = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('lot_id');
     DB::table('lot')->where('lot_id', $lot2Id)->update(['lot_name' => 'Lot 2']);
-    addPackageToBillingDelivery($firstId, 'CORE-LOT2');
+    DB::table('deliveries')->where('delivery_id', $firstId)->update(['package_qty' => 2]);
+    addPackageToBillingDelivery($firstId, 'CORE-LOT2', '500.00');
     $deliveryIds = [$firstId];
     $billingAmountsByDelivery = [$firstId => '1000.25'];
     $secondLot2DeliveryId = createDeliveryForBillingProject($projectId, 'DR-MULTI-LOT', 'pending');
     DB::table('deliveries')->where('delivery_id', $secondLot2DeliveryId)->update(['lot_id' => $lot2Id, 'school_id' => $schoolId]);
-    addPackageToBillingDelivery($secondLot2DeliveryId, 'CORE-LOT2');
+    addPackageToBillingDelivery($secondLot2DeliveryId, 'CORE-LOT2', '500.00');
     $deliveryIds[] = $secondLot2DeliveryId;
     $billingAmountsByDelivery[$secondLot2DeliveryId] = '500.00';
     foreach (['9' => 'CORE-LOT9', '11' => 'CORE-LOT11'] as $lotNumber => $packageCode) {
@@ -366,7 +385,7 @@ it('writes Lot 2, 9, and 11 billing data once for a multi-Lot DR', function (): 
         ]);
         $deliveryId = createDeliveryForBillingProject($projectId, 'DR-MULTI-LOT', 'pending');
         DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['lot_id' => $lotId, 'school_id' => $schoolId]);
-        addPackageToBillingDelivery($deliveryId, $packageCode);
+        addPackageToBillingDelivery($deliveryId, $packageCode, ['9' => '200.50', '11' => '75.25'][$lotNumber]);
         $deliveryIds[] = $deliveryId;
         $billingAmountsByDelivery[$deliveryId] = ['9' => '200.50', '11' => '75.25'][$lotNumber];
     }
@@ -391,17 +410,33 @@ it('writes Lot 2, 9, and 11 billing data once for a multi-Lot DR', function (): 
         $updatesByRange = collect($updates)->keyBy('range');
         $batchRef = (string) DB::table('billing_batches')->value('batch_ref');
         $expectedRanges = [
-            "'Copy of SME LOT 2,9,11'!BD2", "'Copy of SME LOT 2,9,11'!BE2", "'Copy of SME LOT 2,9,11'!BO2",
-            "'Copy of SME LOT 2,9,11'!BS2", "'Copy of SME LOT 2,9,11'!BT2", "'Copy of SME LOT 2,9,11'!CD2",
-            "'Copy of SME LOT 2,9,11'!CG2", "'Copy of SME LOT 2,9,11'!CH2", "'Copy of SME LOT 2,9,11'!CR2",
+            "'Copy of SME LOT 2,9,11'!BD2", "'Copy of SME LOT 2,9,11'!BE2", "'Copy of SME LOT 2,9,11'!BG2",
+            "'Copy of SME LOT 2,9,11'!BH2", "'Copy of SME LOT 2,9,11'!BI2", "'Copy of SME LOT 2,9,11'!BJ2",
+            "'Copy of SME LOT 2,9,11'!BK2", "'Copy of SME LOT 2,9,11'!BL2", "'Copy of SME LOT 2,9,11'!BO2",
+            "'Copy of SME LOT 2,9,11'!BS2", "'Copy of SME LOT 2,9,11'!BT2", "'Copy of SME LOT 2,9,11'!BV2",
+            "'Copy of SME LOT 2,9,11'!BW2", "'Copy of SME LOT 2,9,11'!BX2", "'Copy of SME LOT 2,9,11'!BY2",
+            "'Copy of SME LOT 2,9,11'!BZ2", "'Copy of SME LOT 2,9,11'!CA2", "'Copy of SME LOT 2,9,11'!CD2",
+            "'Copy of SME LOT 2,9,11'!CG2", "'Copy of SME LOT 2,9,11'!CH2", "'Copy of SME LOT 2,9,11'!CJ2",
+            "'Copy of SME LOT 2,9,11'!CK2", "'Copy of SME LOT 2,9,11'!CL2", "'Copy of SME LOT 2,9,11'!CM2",
+            "'Copy of SME LOT 2,9,11'!CN2", "'Copy of SME LOT 2,9,11'!CO2", "'Copy of SME LOT 2,9,11'!CR2",
         ];
 
         return $spreadsheetId === 'test-spreadsheet-id'
             && $updatesByRange->keys()->all() === $expectedRanges
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [[$batchRef]]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [['1st Billing']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BE2"]['values'] === [['Billing Tester']]
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BO2"]['values'] === [['1500.25']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BG2"]['values'] === [['2026-10-28']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BH2"]['values'] === [['Receiver 2']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BI2"]['values'] === [['Passed']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BJ2"]['values'] === [['Passed']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BK2"]['values'] === [['2026-10-29']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BL2"]['values'] === [['2026-10-29']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BO2"]['values'] === [['1500.00']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BS2"]['values'] === [['2nd Billing']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BV2"]['values'] === [['2026-10-27']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BW2"]['values'] === [['Receiver 9']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!CD2"]['values'] === [['200.50']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!CG2"]['values'] === [['3rd Billing']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!CR2"]['values'] === [['75.25']];
     });
     app()->instance(GoogleSheetsApiClient::class, $sheets);
@@ -409,6 +444,11 @@ it('writes Lot 2, 9, and 11 billing data once for a multi-Lot DR', function (): 
         'mode' => 'search',
         'delivery_ids' => [$firstId],
         'idempotency_key' => (string) Str::uuid(),
+        'google_sheet_fields' => [
+            '2' => ['status' => '1st Billing', 'date_received' => '2026-10-28', 'received_by' => 'Receiver 2', 'inspection_1' => 'Passed', 'inspection_2' => 'Passed', 'date_checking' => '2026-10-29', 'date_encoding' => '2026-10-29'],
+            '9' => ['status' => '2nd Billing', 'date_received' => '2026-10-27', 'received_by' => 'Receiver 9', 'inspection_1' => 'Passed', 'inspection_2' => 'For review', 'date_checking' => '2026-10-28', 'date_encoding' => '2026-10-29'],
+            '11' => ['status' => '3rd Billing', 'date_received' => '2026-10-26', 'received_by' => 'Receiver 11', 'inspection_1' => 'Passed', 'inspection_2' => 'Passed', 'date_checking' => '2026-10-27', 'date_encoding' => '2026-10-29'],
+        ],
     ];
 
     $response = $this->postJson(route('billing.prepare.confirm'), $payload)
@@ -426,7 +466,7 @@ it('writes Lot 2, 9, and 11 billing data once for a multi-Lot DR', function (): 
             ->and($sync->synced_at)->not->toBeNull()
             ->and($sync->validation_errors)->toBe([]);
     }
-    expect(BillingSheetSync::query()->where('lot_number', '2')->pluck('written_amount')->sort()->values()->all())->toBe(['500.00', '1000.25'])
+    expect(BillingSheetSync::query()->where('lot_number', '2')->pluck('written_amount')->sort()->values()->all())->toBe(['500.00', '1000.00'])
         ->and(BillingSheetSync::query()->where('lot_number', '9')->value('written_amount'))->toBe('200.50')
         ->and(BillingSheetSync::query()->where('lot_number', '11')->value('written_amount'))->toBe('75.25');
     foreach ($deliveryIds as $deliveryId) {
@@ -476,6 +516,10 @@ it('does not write batch sheet cells when a confirmed DR has no unique sheet row
         'mode' => 'search',
         'delivery_ids' => [$firstId],
         'idempotency_key' => (string) Str::uuid(),
+        'google_sheet_fields' => [
+            '2' => ['status' => '1st Billing'],
+            '9' => ['status' => '2nd Billing'],
+        ],
     ])->assertCreated()
         ->assertJsonPath('sheet_sync.status', 'error')
         ->assertJsonPath('sheet_sync.issues.0.dr_no', 'BIR-PREFLIGHT-DR')
@@ -514,6 +558,7 @@ it('does not write any batch cells when the school and exact package code match 
         'mode' => 'search',
         'delivery_ids' => [$deliveryId],
         'idempotency_key' => (string) Str::uuid(),
+        'google_sheet_fields' => ['2' => ['status' => '1st Billing']],
     ])->assertCreated()
         ->assertJsonPath('sheet_sync.status', 'error')
         ->assertJsonPath('sheet_sync.issues.0.school_id', $schoolId)
@@ -549,6 +594,7 @@ it('keeps billing confirmation only when the atomic Google Sheets batch update f
         'mode' => 'search',
         'delivery_ids' => [$deliveryId],
         'idempotency_key' => (string) Str::uuid(),
+        'google_sheet_fields' => ['9' => ['status' => '1st Billing']],
     ])->assertCreated()
         ->assertJsonPath('sheet_sync.status', 'error')
         ->assertJsonPath('sheet_sync.issues.0.dr_no', 'DR-SHEETS-FAILURE');
@@ -586,12 +632,13 @@ it('rebuilds missing batch reconciliation entries and verifies existing sheet va
         'mode' => 'search',
         'delivery_ids' => [$deliveryId],
         'idempotency_key' => (string) Str::uuid(),
+        'google_sheet_fields' => ['2' => ['status' => '1st Billing']],
     ])->assertCreated()->assertJsonPath('sheet_sync.status', 'success');
     $batchId = (int) $confirmation->json('batch.id');
     $sync = BillingSheetSync::query()->sole();
-    $batchReference = (string) DB::table('billing_batches')->where('id', $batchId)->value('batch_ref');
-    $sheetRows[1][billingSheetColumnIndex('BD')] = $batchReference;
+    $sheetRows[1][billingSheetColumnIndex('BD')] = '1st Billing';
     $sheetRows[1][billingSheetColumnIndex('BE')] = 'Billing Tester';
+    $sheetRows[1][billingSheetColumnIndex('BO')] = '0.00';
     BillingSheetSync::query()->delete();
 
     $retrySheets = Mockery::mock(GoogleSheetsApiClient::class);
@@ -681,6 +728,7 @@ it('matches multiple package rows by exact school ID and package code during rec
         'mode' => 'search',
         'delivery_ids' => [$deliveryId],
         'idempotency_key' => (string) Str::uuid(),
+        'google_sheet_fields' => ['2' => ['status' => '1st Billing']],
     ])->assertCreated()->assertJsonPath('sheet_sync.status', 'error');
     $batchId = (int) $confirmation->json('batch.id');
     $syncs = BillingSheetSync::query()->orderBy('id')->get();
@@ -700,23 +748,24 @@ it('matches multiple package rows by exact school ID and package code during rec
     $retrySheets->shouldReceive('updateCells')->once()->withArgs(function (array $updates, string $spreadsheetId): bool {
         $ranges = collect($updates)->pluck('range')->all();
         $updatesByRange = collect($updates)->keyBy('range');
-        $batchRef = (string) DB::table('billing_batches')->value('batch_ref');
 
         return $spreadsheetId === 'test-spreadsheet-id'
             && $ranges === [
                 "'Copy of SME LOT 2,9,11'!BD2",
                 "'Copy of SME LOT 2,9,11'!BE2",
+                "'Copy of SME LOT 2,9,11'!BO2",
                 "'Copy of SME LOT 2,9,11'!BD3",
                 "'Copy of SME LOT 2,9,11'!BE3",
+                "'Copy of SME LOT 2,9,11'!BO3",
             ]
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [[$batchRef]]
-            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD3"]['values'] === [[$batchRef]];
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [['1st Billing']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD3"]['values'] === [['1st Billing']];
     });
     app()->instance(GoogleSheetsApiClient::class, $retrySheets);
 
     $this->post(route('billing.batches.sheet-sync.retry', $batchId))
         ->assertRedirect(route('billing.batches.show', $batchId))
-        ->assertSessionHas('success', 'Billing confirmation was synchronized to 4 Google Sheet cell(s); delivery and inventory states were not changed.');
+        ->assertSessionHas('success', 'Billing confirmation was synchronized to 6 Google Sheet cell(s); delivery and inventory states were not changed.');
 
     expect(BillingSheetSync::query()->where('outcome', 'synced')->count())->toBe(2)
         ->and(BillingSheetSync::query()->where('lot_number', '2')->count())->toBe(2)
@@ -1628,7 +1677,7 @@ it('renders continuous scan feedback and preserves the other preparation methods
         ->assertSee('DR From');
 });
 
-it('shows the configured Google Sheets destination in billing confirmation', function (): void {
+it('shows Lot-specific billing fields in the confirmation dialog without the sync explanation', function (): void {
     signInBillingUser();
     config([
         'google_sheets.billing.enabled' => true,
@@ -1638,10 +1687,34 @@ it('shows the configured Google Sheets destination in billing confirmation', fun
 
     $this->get(route('billing.prepare'))
         ->assertOk()
-        ->assertSee('Google Sheets')
-        ->assertSee('Copy of SME LOT 2,9,11')
-        ->assertSee('https://docs.google.com/spreadsheets/d/configured-billing-sheet/edit', false)
-        ->assertSee('Sync runs after confirmation. Rows match by School ID and exact Lot/package code; any unmatched or conflicting rows are reported without partial sheet writes.');
+        ->assertSee('billing-confirm-lot-fields-template', false)
+        ->assertSee('1st Billing')
+        ->assertSee('2nd Billing')
+        ->assertSee('3rd Billing')
+        ->assertSee('Date received')
+        ->assertSee('Received by')
+        ->assertSee('Inspection 1')
+        ->assertSee('Inspection 2')
+        ->assertSee('Date checking')
+        ->assertSee('Date encoding')
+        ->assertDontSee('Sync runs after confirmation.');
+});
+
+it('requires a billing cycle for each target Lot before changing billing records', function (): void {
+    signInBillingUser();
+    $deliveryId = createBillingDelivery('DR-REQUIRES-BILLING-CYCLE');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($deliveryId, 'CORE-REQUIRED');
+
+    $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$deliveryId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertUnprocessable()
+        ->assertJsonPath('message', 'Choose a billing status for every selected Lot before confirming: Lot 2.');
+
+    $this->assertDatabaseCount('billing_batches', 0);
+    $this->assertDatabaseCount('delivery_billing_records', 0);
 });
 
 it('allows read-only preparation access without allowing billing confirmation', function (): void {

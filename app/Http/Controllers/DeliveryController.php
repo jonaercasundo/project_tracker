@@ -6,6 +6,7 @@ use App\Models\ARSetting;
 use App\Models\Delivery;
 use App\Models\PackageStatus;
 use App\Services\DeliveryBillingQrCodeService;
+use App\Services\ProjectDeliveryProgressService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -22,6 +23,8 @@ use setasign\Fpdi\Fpdi;
 
 class DeliveryController extends Controller
 {
+    public function __construct(private ProjectDeliveryProgressService $deliveryProgress) {}
+
     public function entry(Request $request, $id)
     {
         $delivery_id = $request->query('delivery_id');
@@ -461,73 +464,24 @@ class DeliveryController extends Controller
         }
         unset($g);
 
-        // =========================
-        // SUMMARY CARDS
-        // scoped to the SAME filters as $baseQuery (project/lot/region/etc),
-        // but NOT paginated — these are DR-level totals across the full filtered set.
-        //
-        // Pending / Released / Delivered now reflect DR#s where ALL packages
-        // across ALL of that DR's deliveries (every lot/keystage) share the
-        // same status. A DR with mixed package statuses is not counted in
-        // any of the three buckets (it's "in progress").
-        // =========================
-        $packageStatusQuery = (clone $baseQuery)
-            ->join('package as pk', function ($join) {
-                $join->where(function ($j) {
-                    $j->whereNotNull('d.keystage_id')
-                        ->whereColumn('pk.keystage_id', '=', 'd.keystage_id');
-                })->orWhere(function ($j) {
-                    $j->whereNull('d.keystage_id')
-                        ->whereColumn('pk.lot_id', '=', 'd.lot_id');
-                });
-            })
-            ->leftJoin('package_status as ps', function ($join) {
-                $join->on('ps.delivery_id', '=', 'd.delivery_id')
-                    ->on('ps.package_id', '=', 'pk.package_id');
-            })
-            ->select('d.project_id', 'd.school_id', 'd.dr_no', 'pk.package_id', 'd.delivery_id', DB::raw('COALESCE(ps.status, "pending") as pkg_status'))
-            ->distinct()
-            ->get();
-
-        $drStatusMap = [];
-        foreach ($packageStatusQuery as $row) {
-            $scopeKey = $this->deliveryScopeKey((int) $row->project_id, (string) $row->school_id, (string) $row->dr_no);
-            $drStatusMap[$scopeKey][] = strtolower($row->pkg_status);
-        }
-
-        $dr_status_counts = [
-            'pending' => 0,
-            'released' => 0,
-            'delivered' => 0,
-            'warehouse' => 0,
-            'mixed' => 0,
+        // Project totals use the same DR status and billing rules as Operational Progress.
+        $progressFilters = [
+            'project_id' => (int) $request->input('project'),
+            'active_only' => false,
+            'compact' => true,
         ];
-
-        foreach ($drStatusMap as $scopeKey => $statuses) {
-            $unique = array_unique($statuses);
-
-            if (count($unique) === 1) {
-                $status = $unique[0];
-                if (array_key_exists($status, $dr_status_counts)) {
-                    $dr_status_counts[$status]++;
-                }
-            } else {
-                $dr_status_counts['mixed']++;
+        foreach (['lot' => 'lot_id', 'region' => 'region', 'division' => 'division', 'municipality' => 'municipality'] as $filter => $metricFilter) {
+            if ($request->filled($filter)) {
+                $progressFilters[$metricFilter] = $request->input($filter);
             }
         }
-
+        $progressSummary = $this->deliveryProgress->report($progressFilters)['summary'];
         $stats = [
-            'total_pending' => $dr_status_counts['pending'],
-            'total_released' => $dr_status_counts['released'],
-            'total_delivered' => $dr_status_counts['delivered'],
-            'total_warehouse' => $dr_status_counts['warehouse'],
-            'total_mixed' => $dr_status_counts['mixed'],
-
-            // TODO: no collection/billing columns exist in the schema you shared.
-            // Swap this in once you point me at the right table/columns —
-            // e.g. a `billing` table keyed by delivery_id, or a `unit_price`
-            // on `item` multiplied by qty. Placeholder below assumes columns
-            // `d.collection_amount` / `d.billed_amount` on `deliveries`.
+            'total_pending' => (int) $progressSummary['pending_deliveries_count'],
+            'total_released' => (int) $progressSummary['released_deliveries_count'],
+            'total_delivered' => (int) $progressSummary['completed_deliveries_count'],
+            'total_collection' => (int) $progressSummary['billing_drs_count'],
+            'total_billed' => (int) $progressSummary['billed_delivery_drs_count'],
         ];
 
         // =========================

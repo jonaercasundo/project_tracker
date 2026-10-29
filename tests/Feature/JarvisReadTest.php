@@ -1243,6 +1243,26 @@ it('waits for a project before loading delivery tracking records', function () {
     $this->get('/deliveries/tracking?project=2')->assertOk()
         ->assertSee('DR #3503')
         ->assertDontSee('DR #3502');
+
+    DB::table('delivery_billing_records')->insert([
+        ['delivery_id' => 1, 'status' => 'for_billing'],
+        ['delivery_id' => 2, 'status' => 'billed'],
+    ]);
+    $trackingPage = $this->get('/deliveries/tracking?project=1')->assertOk();
+    $progressSummary = app(ProjectDeliveryProgressService::class)->report([
+        'project_id' => 1,
+        'active_only' => false,
+        'compact' => true,
+    ])['summary'];
+    $trackingStats = $trackingPage->viewData('stats');
+    expect($trackingStats['total_pending'])->toBe($progressSummary['pending_deliveries_count'])
+        ->and($trackingStats['total_released'])->toBe($progressSummary['released_deliveries_count'])
+        ->and($trackingStats['total_delivered'])->toBe($progressSummary['completed_deliveries_count'])
+        ->and($trackingStats['total_collection'])->toBe($progressSummary['billing_drs_count'])
+        ->and($trackingStats['total_billed'])->toBe($progressSummary['billed_delivery_drs_count']);
+    expect($trackingStats['total_delivered'])->toBeGreaterThan(0)
+        ->and($trackingStats['total_collection'])->toBe(2)
+        ->and($trackingStats['total_billed'])->toBe(1);
 });
 
 it('tracks lot billing by active cycle and retains posted cycle history', function () {

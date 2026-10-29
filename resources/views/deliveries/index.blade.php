@@ -93,7 +93,7 @@
             <span class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_delivered'] ?? 0 }}">
                 {{ number_format($stats['total_delivered'] ?? 0) }}
             </span>
-            <span class="relative text-[11px] text-slate-400">DRs fully delivered to school</span>
+            <span class="relative text-[11px] text-slate-400">DRs delivered or accepted</span>
         </div>
 
         {{-- TOTAL COLLECTION --}}
@@ -109,7 +109,7 @@
             <span class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_collection'] ?? 0 }}">
                 {{ number_format($stats['total_collection'] ?? 0) }}
             </span>
-            <span class="relative text-[11px] text-slate-400">For billing</span>
+            <span class="relative text-[11px] text-slate-400">DRs in the billing stage</span>
         </div>
 
         {{-- TOTAL BILLED --}}

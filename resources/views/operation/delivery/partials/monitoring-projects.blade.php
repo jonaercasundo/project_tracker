@@ -21,7 +21,9 @@
             <tr id="project-details-{{ $project['project_id'] }}" hidden class="bg-slate-50"><td colspan="4" class="px-5 py-5"><div data-lazy-lot-billing data-project-id="{{ $project['project_id'] }}" data-endpoint="{{ route('deliveries.monitoring.billing', ['project' => $project['project_id']]) }}" aria-live="polite"></div></td></tr>
         @empty
             <tr><td colspan="4" class="px-5 py-12 text-center text-slate-500">
-                @if(($report['empty_reason'] ?? null) === 'inactive_project')
+                @if(($report['empty_reason'] ?? null) === 'loading')
+                    Loading operational progress…
+                @elseif(($report['empty_reason'] ?? null) === 'inactive_project')
                     The selected project is inactive and Active projects only is enabled. Turn off the active-only filter to view it.
                 @else
                     No projects match these filters. Adjust or reset the filters to see results.
@@ -46,7 +48,9 @@
         </article>
     @empty
         <p class="p-6 text-center text-sm text-slate-500">
-            @if(($report['empty_reason'] ?? null) === 'inactive_project')
+            @if(($report['empty_reason'] ?? null) === 'loading')
+                Loading operational progress…
+            @elseif(($report['empty_reason'] ?? null) === 'inactive_project')
                 The selected project is inactive and Active projects only is enabled. Turn off the active-only filter to view it.
             @else
                 No projects match these filters. Adjust or reset the filters to see results.

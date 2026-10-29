@@ -34,6 +34,7 @@ class DeliveryMonitoringLogisticsRequest extends FormRequest
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'per_page' => ['nullable', Rule::in([10, 25, 50])],
             'page' => ['nullable', 'integer', 'min:1'],
+            'summary_only' => ['nullable', 'boolean'],
         ];
     }
 }

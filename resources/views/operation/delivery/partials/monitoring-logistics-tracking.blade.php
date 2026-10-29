@@ -9,7 +9,7 @@
     ] as $card)
         <article class="rounded-xl border p-4 {{ $card['tone'] }}">
             <p class="text-xs font-semibold">{{ $card['label'] }}</p>
-            <p class="mt-2 text-2xl font-extrabold tabular-nums">{{ number_format((float) $card['value'], isset($card['suffix']) ? 1 : 0) }}{{ $card['suffix'] ?? '' }}</p>
+            <p class="mt-2 text-2xl font-extrabold tabular-nums">{{ ($logistics['loading'] ?? false) ? 'Loading…' : number_format((float) $card['value'], isset($card['suffix']) ? 1 : 0).($card['suffix'] ?? '') }}</p>
             @if($card['label'] === 'Pending Logistics updates')
                 <p class="mt-1 text-[11px]">Distinct project/school/DR scopes without a current milestone</p>
             @elseif($card['label'] === 'Reconciliation required')

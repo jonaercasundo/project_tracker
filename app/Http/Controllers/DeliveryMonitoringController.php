@@ -26,7 +26,20 @@ class DeliveryMonitoringController extends Controller
 
     public function logistics(DeliveryMonitoringLogisticsRequest $request): JsonResponse
     {
-        $result = $this->logisticsTracking->dashboardPage($request->validated());
+        $filters = $request->validated();
+        $summaryOnly = (bool) ($filters['summary_only'] ?? false);
+        unset($filters['summary_only']);
+
+        if ($summaryOnly) {
+            $result = ['summary' => $this->logisticsTracking->dashboardSummary($filters)];
+
+            return response()->json([
+                'html' => view('operation.delivery.partials.monitoring-logistics-tracking', ['logistics' => $result])->render(),
+                'summary' => $result['summary'],
+            ])->header('Cache-Control', 'private, no-store');
+        }
+
+        $result = $this->logisticsTracking->dashboardPage($filters);
 
         return response()->json([
             'html' => view('operation.delivery.partials.monitoring-logistics-tracking', ['logistics' => $result])->render(),
@@ -192,15 +205,33 @@ class DeliveryMonitoringController extends Controller
     {
         $filters = array_filter($request->validated(), fn (mixed $value): bool => $value !== null && $value !== '');
         $filters['active_only'] ??= 0;
-        $report = $this->progress->report([...$filters, 'defer_lot_billing' => true]);
         if ($request->expectsJson()) {
+            $report = $this->progress->report([...$filters, 'defer_lot_billing' => true]);
+
             return response()->json($report + [
                 'summary_html' => view('operation.delivery.partials.monitoring-results', ['report' => $report])->render(),
                 'projects_html' => view('operation.delivery.partials.monitoring-projects', ['report' => $report])->render(),
             ])->header('Cache-Control', 'private, no-store');
         }
 
-        $logistics = $this->logisticsTracking->dashboardPage(['per_page' => 25, 'page' => 1]);
+        $report = [
+            'projects' => collect(),
+            'summary' => ['projects_count' => 0],
+            'definitions' => $this->progress->definitions(),
+            'empty_reason' => 'loading',
+        ];
+        $logistics = [
+            'summary' => [
+                'total_scoped_drs' => 0,
+                'logistics_received' => 0,
+                'logistics_delivered' => 0,
+                'pending_updates' => 0,
+                'reconciliation_required' => 0,
+                'delivery_performance_percentage' => 0,
+                'partner_performance' => [],
+            ],
+            'loading' => true,
+        ];
 
         return view('operation.delivery.monitoring', [
             'report' => $report,

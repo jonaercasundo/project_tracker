@@ -13,6 +13,7 @@ if (monitoring) {
 
     function logisticsUrl() {
         const url = new URL(logistics.dataset.endpoint);
+        url.searchParams.set('summary_only', '1');
         for (const [name, value] of new FormData(logisticsForm)) {
             if (value !== '') {
                 url.searchParams.set(name, value);
@@ -40,7 +41,9 @@ if (monitoring) {
                 signal: request.signal,
             });
             if (!response.headers.get('content-type')?.includes('application/json')) {
-                throw new Error('Your session has expired. Sign in again to refresh Logistics tracking.');
+                throw new Error(response.status === 504
+                    ? 'Logistics summary timed out. Try refreshing the section in a moment.'
+                    : 'Your session has expired. Sign in again to refresh Logistics tracking.');
             }
             const result = await response.json();
             if (!response.ok) {
@@ -105,6 +108,7 @@ if (monitoring) {
             }
         });
         window.addEventListener('pagehide', stopLogisticsPolling, { once: true });
+        refreshLogistics();
         startLogisticsPolling();
     }
 
@@ -223,7 +227,9 @@ if (monitoring) {
                 signal: request.signal,
             });
             if (!response.headers.get('content-type')?.includes('application/json')) {
-                throw new Error('Your session has expired. Sign in again to refresh progress.');
+                throw new Error(response.status === 504
+                    ? 'Operational progress refresh timed out. Try applying the filters again in a moment.'
+                    : 'Your session has expired. Sign in again to refresh progress.');
             }
             const report = await response.json();
             if (!response.ok) {
@@ -234,7 +240,7 @@ if (monitoring) {
             projectBillingPanels.clear();
             document.getElementById('monitoring-results').innerHTML = report.summary_html;
             document.getElementById('monitoring-table').innerHTML = report.projects_html;
-            document.getElementById('monitoring-project-count').textContent = report.summary.projects_count;
+            document.getElementById('monitoring-project-count').textContent = `${report.summary.projects_count} projects`;
             if (updateHistory) {
                 window.history.pushState({}, '', url);
             }
@@ -292,6 +298,7 @@ if (monitoring) {
         restoreFilters(window.location.href);
         loadReport(new URL(window.location.href), false);
     });
+    loadReport(new URL(window.location.href), false);
     monitoring.addEventListener('click', event => {
         const syncButton = event.target.closest('[data-sync-billing]');
         if (syncButton) {

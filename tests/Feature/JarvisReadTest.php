@@ -1198,18 +1198,19 @@ it('keeps empty pipeline denominators unavailable and does not invent activity d
         ->assertJsonPath('data.summary.overall_progress', null);
 });
 
-it('serves the Operations page and AJAX filters using the same report as JARVIS', function () {
+it('serves the Operations page immediately and loads AJAX filters using the same report as JARVIS', function () {
     jarvisOperations();
     $user = jarvisReader(true, true, false);
     $this->withoutVite();
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
 
     $this->get('/deliveries/monitoring')->assertOk()->assertSee('Project Delivery Monitoring')
-        ->assertSee('Delivery Monitoring')->assertSee('Science Kits')->assertSee('Oct 03, 2026')
+        ->assertSee('Delivery Monitoring')->assertSee('Loading operational progress…')
+        ->assertSee('id="monitoring-project-count">Loading…', false)
         ->assertSee('id="monitoring-project-trigger"', false)->assertSee('role="listbox"', false)
         ->assertSee('Search projects by name or code...', false)
         ->assertDontSee('data-detail-section')->assertDontSee('deliveryMonitoringLocations')
-        ->assertSee('Operational Progress')->assertSee('Warehouse Readiness')->assertSee('Stock Out')->assertSee('Last Activity')
+        ->assertSee('Operational Progress')->assertSee('Stock Out')->assertSee('Last Activity')
         ->assertDontSee('DR link missing');
     $this->get('/deliveries/monitoring?project_id=1')->assertOk()->assertSee('name="project_id" value="1"', false);
     $this->getJson('/deliveries/monitoring?project_id=1')->assertOk()
@@ -1222,9 +1223,10 @@ it('serves the Operations page and AJAX filters using the same report as JARVIS'
     $dashboard = $this->getJson('/deliveries/monitoring?search=REF-001&sort=progress&direction=desc');
     $api = jarvisRead('projects/delivery-progress', $token, ['search' => 'REF-001', 'sort' => 'progress', 'direction' => 'desc', 'compact' => 0]);
     expect($dashboard->json('summary'))->toBe($api->json('data.summary'));
-    expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
+    expect($dashboard->json('projects.0.delivery_progress_percent'))->toBe($api->json('data.projects.0.delivery_progress_percent'));
+    expect($dashboard->json('projects.0.operational_pipeline'))->toBe($api->json('data.projects.0.operational_pipeline'));
     $this->get('/deliveries/monitoring?project_id=2&active_only=1')->assertOk()
-        ->assertSee('The selected project is inactive and Active projects only is enabled.');
+        ->assertSee('Loading operational progress…');
 });
 
 it('tracks lot billing by active cycle and retains posted cycle history', function () {
@@ -2056,6 +2058,10 @@ it('shows each repeated DR as its own project and school Logistics scope', funct
         ->and($response->json('html'))->not->toContain('3502')
         ->and($response->json('html'))->not->toContain('Science Kits')
         ->and($response->json('html'))->not->toContain('West School');
+
+    $this->getJson('/deliveries/monitoring/logistics?summary_only=1')
+        ->assertOk()->assertJsonPath('summary.total_scoped_drs', 5)
+        ->assertJsonMissingPath('pagination');
 });
 
 it('filters and paginates the Logistics section on the server', function () {

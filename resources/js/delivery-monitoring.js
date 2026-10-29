@@ -467,7 +467,7 @@ if (monitoring) {
         });
     });
 
-    ['received_by', 'inspection_1', 'inspection_2'].forEach(name => {
+    ['received_by', 'position', 'telephone_1', 'inspection_1', 'inspection_2'].forEach(name => {
         const control = syncSpreadsheetForm.elements[name];
         control.addEventListener('input', () => {
             const cursorStart = control.selectionStart;

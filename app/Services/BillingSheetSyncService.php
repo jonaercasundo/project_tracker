@@ -303,6 +303,8 @@ class BillingSheetSyncService
                 'date_received' => $fields['date_received'],
                 'received_by' => mb_strtoupper(trim($fields['received_by'])),
                 'contact_person' => mb_strtoupper(trim($fields['received_by'])),
+                'position' => mb_strtoupper(trim($fields['position'])),
+                'telephone_1' => mb_strtoupper(trim($fields['telephone_1'])),
                 'inspection_1' => mb_strtoupper(trim($fields['inspection_1'])),
                 'inspection_2' => mb_strtoupper(trim($fields['inspection_2'])),
                 'date_checking' => $fields['date_checking'],
@@ -334,12 +336,8 @@ class BillingSheetSyncService
             'package_code' => $plan['package_code'],
             'sheet_package_code' => $plan['sheet_package_code'],
             'contact_person' => mb_strtoupper(trim($fields['received_by'])),
-            'position' => isset($plan['headers']['position_column'])
-                ? $this->exactCell($plan['row_values'][$plan['headers']['position_column']] ?? '')
-                : null,
-            'telephone_1' => isset($plan['headers']['telephone_1_column'])
-                ? $this->exactCell($plan['row_values'][$plan['headers']['telephone_1_column']] ?? '')
-                : null,
+            'position' => mb_strtoupper(trim($fields['position'])),
+            'telephone_1' => mb_strtoupper(trim($fields['telephone_1'])),
             'billing_status' => mb_strtoupper(trim($fields['billing_status'])),
             'compliance_status' => mb_strtoupper(trim($fields['compliance_status'])),
             'lot' => $plan['lot_number'],
@@ -1491,7 +1489,9 @@ class BillingSheetSyncService
             }
 
             if (count($schoolColumns) !== 1 || count($packageColumns) !== 1 || count($billingSectionStarts) !== 1
-                || count($contactPersonColumns) > 1 || ($requireContactPerson && count($contactPersonColumns) !== 1)) {
+                || count($contactPersonColumns) > 1 || ($requireContactPerson && count($contactPersonColumns) !== 1)
+                || ($requireContactPerson && count($positionColumns) !== 1)
+                || ($requireContactPerson && count($telephoneOneColumns) !== 1)) {
                 continue;
             }
 
@@ -1556,11 +1556,14 @@ class BillingSheetSyncService
                 }
                 $destinationColumns[$field] = $matchedColumns[0];
             }
-            if ($destinationColumns !== [] && $requireContactPerson && count($contactPersonColumns) === 1) {
+            if ($destinationColumns !== [] && $requireContactPerson && count($contactPersonColumns) === 1
+                && count($positionColumns) === 1 && count($telephoneOneColumns) === 1) {
                 $destinationColumns['contact_person'] = $contactPersonColumns[0];
+                $destinationColumns['position'] = $positionColumns[0];
+                $destinationColumns['telephone_1'] = $telephoneOneColumns[0];
             }
 
-            if (count($destinationColumns) === count($requestedHeaders) + ($requireContactPerson ? 1 : 0)) {
+            if (count($destinationColumns) === count($requestedHeaders) + ($requireContactPerson ? 3 : 0)) {
                 $candidate = [
                     'header_row' => $rowIndex,
                     'school_id_column' => $schoolColumns[0],

@@ -121,7 +121,7 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
                     <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
-                    <p class="mt-2 text-sm text-slate-600">Enter the School ID and billing details, then preview the DR/package matches and target cells before syncing. You can enter a tracker School ID or a configured mapped sheet SchoolID. The selected encode updates mapped billing fields. Contact Person is copied from Received by; Position and Telephone 1 are shown in the preview and left unchanged. Contact/Email and DATE RECEIVED (FROM 3PL) are also left unchanged. Each Lot total is calculated from its DR.</p>
+                    <p class="mt-2 text-sm text-slate-600">Enter the School ID and billing details, including Position and Telephone 1, then preview the DR/package matches and target cells before syncing. You can enter a tracker School ID or a configured mapped sheet SchoolID. The selected encode updates mapped billing fields. Contact Person is copied from Received by. Contact/Email and DATE RECEIVED (FROM 3PL) are left unchanged. Each Lot total is calculated from its DR.</p>
                 </div>
                 <div>
                     <label for="spreadsheet-school-id" class="mb-1 block text-xs font-semibold text-slate-600">School ID</label>
@@ -153,6 +153,14 @@
                     <div>
                         <label for="spreadsheet-received-by" class="mb-1 block text-xs font-semibold text-slate-600">Received by (Lot X)</label>
                         <input id="spreadsheet-received-by" name="received_by" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
+                    </div>
+                    <div>
+                        <label for="spreadsheet-position" class="mb-1 block text-xs font-semibold text-slate-600">Position</label>
+                        <input id="spreadsheet-position" name="position" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
+                    </div>
+                    <div>
+                        <label for="spreadsheet-telephone-1" class="mb-1 block text-xs font-semibold text-slate-600">Telephone 1</label>
+                        <input id="spreadsheet-telephone-1" name="telephone_1" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                     </div>
                     <div>
                         <label for="spreadsheet-inspection-1" class="mb-1 block text-xs font-semibold text-slate-600">Inspection 1 (Lot X)</label>

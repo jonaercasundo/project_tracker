@@ -198,6 +198,8 @@ class DeliveryMonitoringController extends Controller
             'compliance_status' => ['required', 'in:COMPLIANT,NON-COMPLIANT'],
             'date_received' => ['required', 'date_format:Y-m-d'],
             'received_by' => ['required', 'string', 'max:255'],
+            'position' => ['required', 'string', 'max:255'],
+            'telephone_1' => ['required', 'string', 'max:255'],
             'inspection_1' => ['required', 'string', 'max:255'],
             'inspection_2' => ['required', 'string', 'max:255'],
             'date_checking' => ['required', 'date_format:Y-m-d'],

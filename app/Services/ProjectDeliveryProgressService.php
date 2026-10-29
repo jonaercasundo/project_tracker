@@ -1038,22 +1038,22 @@ class ProjectDeliveryProgressService
             'stock_out' => $this->stage($stockOutDrs, $counts['total_deliveries_count'], 'DRs') + [
                 'label' => 'Stock Out', 'context' => 'Distinct valid DRs with a released package and matching project-item stock-out history',
                 'source' => 'Latest released package status joined to package contents and stock-out history, plus billing-sync inventory history keyed by exact project_id + DR number',
+                'pending_count' => max(0, $stockOutDrs - $deliveredDrs), 'pending_total' => $stockOutDrs,
             ],
             'delivered' => $this->stage($deliveredDrs, $counts['total_deliveries_count'], 'Delivery Receipts') + [
                 'label' => 'Delivered', 'context' => 'Valid DRs with all expected packages delivered or accepted; delivery status fallback when no packages exist',
                 'source' => 'deliveries grouped by exact project_id + dr_no; current package_status by delivery_id + package_id',
-                'pending_count' => max(0, $stockOutDrs - $deliveredDrs), 'pending_total' => $stockOutDrs,
+                'pending_count' => max(0, $deliveredDrs - $billingDrs), 'pending_total' => $deliveredDrs,
             ],
             'billing' => $this->stage($billingDrs, $counts['total_deliveries_count'], 'DRs') + [
                 'label' => 'Billing', 'context' => 'DRs in the billing queue / total project DRs',
                 'source' => 'Distinct project DRs with a delivery_billing_records status of for_billing or billed',
-                'pending_count' => max(0, $deliveredDrs - $billingDrs), 'pending_total' => $deliveredDrs,
+                'pending_count' => max(0, $billingDrs - $billedDrs), 'pending_total' => $billingDrs,
             ],
             'billed' => $this->stage($billedDrs, $billingDrs, 'DRs') + [
                 'label' => 'Billed', 'context' => 'Current billed status; paid is shown separately in details',
                 'source' => 'Distinct project DRs with a delivery_billing_records status of billed',
                 'milestone_percent' => $this->percentage($counts['billed_delivery_drs_count'], $counts['billing_drs_count']),
-                'pending_count' => max(0, $billingDrs - $billedDrs), 'pending_total' => $billingDrs,
             ],
             'delivery_billing' => $this->stage($counts['billed_deliveries_count'], $counts['delivery_billing_records_count'], 'DRs') + [
                 'label' => 'Delivery billing', 'context' => 'Per-DR scanner workflow; independent from shared legacy billing groups',

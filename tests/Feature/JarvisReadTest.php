@@ -1049,14 +1049,14 @@ it('shows distinct DR gaps between delivered billing stages in the monitoring fl
     jarvisRead('projects/delivery-progress', $token, ['project_id' => 1])
         ->assertOk()
         ->assertJsonPath('data.projects.0.pipeline.stock_out.completed', 2)
+        ->assertJsonPath('data.projects.0.pipeline.stock_out.pending_count', 1)
+        ->assertJsonPath('data.projects.0.pipeline.stock_out.pending_total', 2)
         ->assertJsonPath('data.projects.0.pipeline.delivered.completed', 1)
-        ->assertJsonPath('data.projects.0.pipeline.delivered.pending_count', 1)
-        ->assertJsonPath('data.projects.0.pipeline.delivered.pending_total', 2)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.pending_count', 0)
+        ->assertJsonPath('data.projects.0.pipeline.delivered.pending_total', 1)
         ->assertJsonPath('data.projects.0.pipeline.billing.completed', 1)
-        ->assertJsonPath('data.projects.0.pipeline.billing.pending_count', 0)
-        ->assertJsonPath('data.projects.0.pipeline.billing.pending_total', 1)
-        ->assertJsonPath('data.projects.0.pipeline.billed.pending_count', 1)
-        ->assertJsonPath('data.projects.0.pipeline.billed.pending_total', 1);
+        ->assertJsonPath('data.projects.0.pipeline.billing.pending_count', 1)
+        ->assertJsonPath('data.projects.0.pipeline.billing.pending_total', 1);
 
     $this->withoutVite();
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);

@@ -9,6 +9,7 @@ return [
         'business_timezone' => env('PROJECT_BILLING_SHEETS_TIMEZONE', env('APP_TIMEZONE', 'Asia/Manila')),
         'header_scan_rows' => 20,
         'read_range' => 'A:CI',
+        'batch_read_range' => 'A:CT',
         'scope' => 'https://www.googleapis.com/auth/spreadsheets',
         'oauth_token_url' => 'https://oauth2.googleapis.com/token',
         'api_base_url' => 'https://sheets.googleapis.com/v4/spreadsheets',

@@ -81,7 +81,8 @@ class BillingBatchController extends Controller
             ? false
             : ($activeSheetSyncs->isEmpty()
             ? $revokedSheetSyncCount === 0
-            : $activeSheetSyncs->contains(fn (BillingSheetSync $sync): bool => ! in_array($sync->outcome, ['synced', 'already_synced'], true)));
+            : $activeSheetSyncs->contains(fn (BillingSheetSync $sync): bool => ! in_array($sync->outcome, ['synced', 'already_synced'], true)
+                || (int) $sync->sync_version < 2));
         $activeDrCount = $records->where('billing_status', '!=', DeliveryBillingRecord::REVOKED)
             ->pluck('dr_no')->filter()->unique()->count();
         $revocationHistories = DB::table('delivery_billing_histories')

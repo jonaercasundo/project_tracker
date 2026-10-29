@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\SyncBillingSheetDate;
+use App\Models\BillingBatch;
 use App\Models\BillingSheetSync;
 use App\Models\Delivery;
 use App\Models\DeliveryBillingHistory;
@@ -51,6 +52,11 @@ class BillingSheetSyncService
             $this->createAndDispatch([
                 'delivery_billing_history_id' => $history->getKey(),
                 'delivery_id' => $delivery->delivery_id,
+                'school_id' => $delivery->school_id,
+                'billing_batch_id' => $billingRecord->billing_batch_id,
+                'authenticated_user_id' => $history->changed_by,
+                'authenticated_user_name' => $history->changed_by_name,
+                'sync_version' => $billingRecord->billing_batch_id === null ? 1 : 2,
                 'package_status_id' => null,
                 'package_id' => null,
                 'lot_id' => $delivery->lot_id,
@@ -77,6 +83,11 @@ class BillingSheetSyncService
             $this->createAndDispatch([
                 'delivery_billing_history_id' => $history->getKey(),
                 'delivery_id' => $delivery->delivery_id,
+                'school_id' => $delivery->school_id,
+                'billing_batch_id' => $billingRecord->billing_batch_id,
+                'authenticated_user_id' => $history->changed_by,
+                'authenticated_user_name' => $history->changed_by_name,
+                'sync_version' => $billingRecord->billing_batch_id === null ? 1 : 2,
                 'package_status_id' => $package->package_status_id,
                 'package_id' => $package->package_id,
                 'lot_id' => $package->lot_id,
@@ -223,7 +234,7 @@ class BillingSheetSyncService
             return $result;
         }
 
-        $pendingSyncs = $syncs->reject(fn (BillingSheetSync $sync): bool => in_array($sync->outcome, ['synced', 'already_synced'], true))->values();
+        $pendingSyncs = $syncs->reject(fn (BillingSheetSync $sync): bool => $this->isBatchSyncComplete($sync))->values();
         if ($pendingSyncs->isEmpty()) {
             return $this->batchSyncSuccess($syncs, 0);
         }
@@ -270,16 +281,16 @@ class BillingSheetSyncService
                 continue;
             }
 
-            $expectedColumn = $sync->lot_number === null ? null : $this->targetColumn($sync->lot_number);
             if ($sync->lot_number === null || $sync->bir_dr === null || trim($sync->bir_dr) === ''
+                || $sync->school_id === null || trim($sync->school_id) === ''
                 || $sync->package_code === null || trim($sync->package_code) === ''
-                || $expectedColumn === null || $sync->target_cell !== $expectedColumn) {
-                $invalidSyncs->push([$sync, 'reconciliation_error', 'The BIR DR, Core Package Code, lot, or unique target column could not be validated.']);
+                || ! in_array($sync->lot_number, ['2', '9', '11'], true)) {
+                $invalidSyncs->push([$sync, 'reconciliation_error', 'The DR, school ID, exact package code, or supported Lot number could not be validated.']);
             }
         }
 
         if ($invalidSyncs->isNotEmpty()) {
-            $invalidSyncs->each(fn (array $failure) => $this->finish($failure[0], $failure[1], $failure[2]));
+            $invalidSyncs->each(fn (array $failure) => $this->finish($failure[0], $failure[1], $failure[2], validationErrors: [$failure[2]]));
             $invalidIds = $invalidSyncs->map(fn (array $failure): int => (int) $failure[0]->getKey())->all();
             $blockedSyncs = $pendingSyncs->reject(fn (BillingSheetSync $sync): bool => in_array((int) $sync->getKey(), $invalidIds, true));
             $this->markBatchFailure($blockedSyncs, 'batch_blocked', 'No sheet cells were written because another DR/package code in this batch failed validation.');
@@ -290,7 +301,7 @@ class BillingSheetSyncService
         $pendingSyncs->each(fn (BillingSheetSync $sync) => $sync->forceFill(['outcome' => 'syncing'])->save());
 
         $firstSync = $pendingSyncs->first();
-        $range = $this->quotedTab($firstSync->sheet_tab).'!'.config('google_sheets.billing.read_range', 'A:CI');
+        $range = $this->quotedTab($firstSync->sheet_tab).'!'.config('google_sheets.billing.batch_read_range', 'A:CT');
         try {
             $rows = $sheets->values($range, $firstSync->spreadsheet_id);
         } catch (Throwable $exception) {
@@ -305,15 +316,25 @@ class BillingSheetSyncService
             return $this->batchSyncFailure($syncs, $issue);
         }
 
+        $batch = BillingBatch::query()->find($batchId);
+        if ($batch === null) {
+            $issue = 'The billing batch could not be loaded. No sheet cells were written.';
+            $this->markBatchFailure($pendingSyncs, 'reconciliation_error', $issue);
+
+            return $this->batchSyncFailure($syncs, $issue);
+        }
+
+        $confirmedByName = trim((string) ($batch->confirmed_by_name ?: $firstSync->authenticated_user_name));
+        $confirmedById = $batch->confirmed_by ?: $firstSync->authenticated_user_id;
         $headersByLot = [];
-        $plans = [];
+        $plansByRow = [];
         $issues = [];
         foreach ($pendingSyncs as $sync) {
             $lotNumber = (string) $sync->lot_number;
-            $headersByLot[$lotNumber] ??= $this->findHeaderColumns($rows, $lotNumber);
+            $headersByLot[$lotNumber] ??= $this->findBillingHeaderColumns($rows, $lotNumber);
             $headers = $headersByLot[$lotNumber];
             if ($headers === null) {
-                $issues[] = [$sync, 'reconciliation_error', 'Could not identify one unique BIR DR header for Lot '.$lotNumber.'.'];
+                $issues[] = [$sync, 'reconciliation_error', 'Could not identify a unique SchoolID, Core Package Code, or required billing header for Lot '.$lotNumber.'.'];
 
                 continue;
             }
@@ -324,8 +345,8 @@ class BillingSheetSyncService
                     continue;
                 }
 
-                if ($this->normalizeCell($row[$headers['bir_dr_column']] ?? '') === $this->normalizeCell($sync->bir_dr)
-                    && $this->normalizeCell($row[$headers['package_code_column']] ?? '') !== '') {
+                if ($this->exactCell($row[$headers['school_id_column']] ?? '') === $this->exactCell($sync->school_id)
+                    && $this->exactCell($row[$headers['package_code_column']] ?? '') === $this->exactCell($sync->package_code)) {
                     $matches[] = ['row' => $rowIndex + 1, 'values' => $row];
                 }
             }
@@ -333,53 +354,131 @@ class BillingSheetSyncService
             if (count($matches) !== 1) {
                 $outcome = count($matches) === 0 ? 'no_match' : 'duplicate_match';
                 $message = count($matches) === 0
-                    ? 'No sheet row matched BIR DR '.$sync->bir_dr.' with a Core Package Code for Lot '.$lotNumber.'.'
-                    : 'Multiple sheet rows matched BIR DR '.$sync->bir_dr.' with a Core Package Code for Lot '.$lotNumber.'.';
+                    ? 'No sheet row matched School ID '.$sync->school_id.' and exact package code '.$sync->package_code.' for Lot '.$lotNumber.'.'
+                    : 'Multiple sheet rows matched School ID '.$sync->school_id.' and exact package code '.$sync->package_code.' for Lot '.$lotNumber.'.';
                 $issues[] = [$sync, $outcome, $message];
 
                 continue;
             }
 
-            $cell = $sync->target_cell.$matches[0]['row'];
-            $existingValue = trim((string) ($matches[0]['values'][$this->columnIndex($sync->target_cell)] ?? ''));
-            if ($existingValue !== '' && $existingValue !== $sync->transition_date->toDateString()) {
-                $issues[] = [$sync, 'conflict', 'Target cell '.$cell.' already contains another value; it was left unchanged.'];
+            $match = $matches[0];
+            if ($confirmedByName === '') {
+                $issues[] = [$sync, 'reconciliation_error', 'The authenticated confirmer name was not recorded in the billing batch.'];
 
                 continue;
             }
 
-            $plans[] = ['sync' => $sync, 'cell' => $cell, 'value' => $sync->transition_date->toDateString(), 'already_synced' => $existingValue !== ''];
+            $destinationCells = [];
+            foreach ($headers['destination_columns'] as $field => $columnIndex) {
+                $destinationCells[$field] = $this->columnName($columnIndex).$match['row'];
+            }
+
+            $sync->forceFill([
+                'billing_batch_id' => $batchId,
+                'school_id' => $sync->school_id,
+                'authenticated_user_id' => $confirmedById,
+                'authenticated_user_name' => $confirmedByName,
+                'destination_cells' => $destinationCells,
+            ])->save();
+
+            $rowKey = $lotNumber.'|'.$match['row'];
+            $plansByRow[$rowKey] ??= [
+                'lot_number' => $lotNumber,
+                'row' => $match['row'],
+                'row_values' => $match['values'],
+                'destination_columns' => $headers['destination_columns'],
+                'delivery_ids' => [],
+                'syncs' => [],
+            ];
+            $plansByRow[$rowKey]['delivery_ids'][(int) $sync->delivery_id] = (int) $sync->delivery_id;
+            $plansByRow[$rowKey]['syncs'][] = $sync;
         }
 
-        $plansByCell = collect($plans)->groupBy('cell');
-        foreach ($plansByCell as $cell => $cellPlans) {
-            if ($cellPlans->pluck('value')->unique()->count() > 1) {
-                foreach ($cellPlans as $plan) {
-                    $issues[] = [$plan['sync'], 'ambiguous_write', 'Multiple confirmed records map to '.$cell.' with different values.'];
+        $billingRecordsByDelivery = DB::table('delivery_billing_records')
+            ->whereIn('delivery_id', $pendingSyncs->pluck('delivery_id')->unique())
+            ->where('status', '!=', DeliveryBillingRecord::REVOKED)
+            ->get(['delivery_id', 'billing_amount'])
+            ->keyBy('delivery_id');
+        $updatesByCell = [];
+        $writtenAmounts = [];
+        foreach ($plansByRow as $plan) {
+            $values = [
+                'status' => (string) $batch->batch_ref,
+                'checked_by' => $confirmedByName,
+                'date_received' => null,
+                'received_by' => null,
+                'inspection_1' => null,
+                'inspection_2' => null,
+                'date_checking' => null,
+                'date_encoding' => null,
+                'total_amount' => null,
+            ];
+            $amountCents = 0;
+            $hasAmount = false;
+            $lineAmountsByDelivery = [];
+            foreach ($plan['delivery_ids'] as $deliveryId) {
+                $amount = $billingRecordsByDelivery->get($deliveryId)?->billing_amount;
+                if ($amount !== null) {
+                    $lineAmountCents = $this->amountToCents($amount);
+                    $lineAmountsByDelivery[$deliveryId] = $this->formatCents($lineAmountCents);
+                    $amountCents += $lineAmountCents;
+                    $hasAmount = true;
                 }
+            }
+            if ($hasAmount) {
+                $values['total_amount'] = $this->formatCents($amountCents);
+            }
+
+            $writtenDeliveryIds = [];
+            foreach ($plan['syncs'] as $sync) {
+                $deliveryId = (int) $sync->delivery_id;
+                $writtenAmounts[(int) $sync->getKey()] = isset($writtenDeliveryIds[$deliveryId])
+                    ? null
+                    : ($lineAmountsByDelivery[$deliveryId] ?? null);
+                $writtenDeliveryIds[$deliveryId] = true;
+            }
+
+            foreach ($values as $field => $value) {
+                if ($value === null) {
+                    continue;
+                }
+
+                $columnIndex = $plan['destination_columns'][$field];
+                $cell = $this->columnName($columnIndex).$plan['row'];
+                $existingValue = $plan['row_values'][$columnIndex] ?? '';
+                if ($this->cellValueMatches($field, $existingValue, $value)) {
+                    continue;
+                }
+                if ($this->exactCell($existingValue) !== '') {
+                    foreach ($plan['syncs'] as $sync) {
+                        $issues[] = [$sync, 'conflict', 'Target cell '.$cell.' for '.$field.' already contains another value; it was left unchanged.'];
+                    }
+
+                    continue;
+                }
+
+                $updatesByCell[$cell] = $value;
             }
         }
 
         if ($issues !== []) {
             foreach ($issues as [$sync, $outcome, $message]) {
-                $this->finish($sync, $outcome, $message);
+                $this->finish($sync, $outcome, $message, validationErrors: [$message]);
             }
             $issueIds = collect($issues)->map(fn (array $issue): int => (int) $issue[0]->getKey())->all();
             $blockedSyncs = $pendingSyncs->reject(fn (BillingSheetSync $sync): bool => in_array((int) $sync->getKey(), $issueIds, true));
-            $this->markBatchFailure($blockedSyncs, 'batch_blocked', 'No sheet cells were written because another DR/package code in this batch needs correction.');
+            $this->markBatchFailure($blockedSyncs, 'batch_blocked', 'No sheet cells were written because another DR/package mapping or destination cell needs correction.');
 
-            return $this->batchSyncFailure($syncs, 'One or more DR/package codes were unmatched, ambiguous, or conflicted; no sheet cells were written.');
+            return $this->batchSyncFailure($syncs, 'One or more DR/package mappings or destination cells need correction; no sheet cells were written.');
         }
 
         $updates = [];
-        foreach ($plansByCell as $cell => $cellPlans) {
-            if (! $cellPlans->first()['already_synced']) {
-                $updates[] = [
-                    'range' => $this->quotedTab($firstSync->sheet_tab).'!'.$cell,
-                    'majorDimension' => 'ROWS',
-                    'values' => [[$cellPlans->first()['value']]],
-                ];
-            }
+        foreach ($updatesByCell as $cell => $value) {
+            $updates[] = [
+                'range' => $this->quotedTab($firstSync->sheet_tab).'!'.$cell,
+                'majorDimension' => 'ROWS',
+                'values' => [[$value]],
+            ];
         }
 
         try {
@@ -396,8 +495,12 @@ class BillingSheetSyncService
             return $this->batchSyncFailure($syncs, $issue);
         }
 
-        foreach ($plans as $plan) {
-            $this->finish($plan['sync'], $plan['already_synced'] ? 'already_synced' : 'synced', null, $plan['cell']);
+        foreach ($plansByRow as $plan) {
+            foreach ($plan['syncs'] as $sync) {
+                $sync->forceFill(['written_amount' => $writtenAmounts[(int) $sync->getKey()] ?? null])->save();
+                $sync->forceFill(['sync_version' => 2])->save();
+                $this->finish($sync, $updates === [] ? 'already_synced' : 'synced', null, validationErrors: []);
+            }
         }
 
         $updatedSyncs = BillingSheetSync::query()->whereIn('id', $syncs->pluck('id'))->orderBy('id')->get();
@@ -425,7 +528,7 @@ class BillingSheetSyncService
             ->all();
     }
 
-    /** @return array<int, array{delivery_id: int, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}> */
+    /** @return array<int, array{delivery_id: int, package_id: ?int, school_id: ?string, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}> */
     private function ensureBatchSyncEntries(int $batchId): array
     {
         $billingRecords = DeliveryBillingRecord::query()
@@ -457,6 +560,8 @@ class BillingSheetSyncService
             if ($delivery === null || $history === null) {
                 $issues[] = [
                     'delivery_id' => (int) $billingRecord->delivery_id,
+                    'package_id' => null,
+                    'school_id' => $delivery?->school_id,
                     'dr_no' => $delivery?->dr_no,
                     'package_code' => null,
                     'lot_number' => null,
@@ -484,6 +589,8 @@ class BillingSheetSyncService
                 ]);
                 $issues[] = [
                     'delivery_id' => (int) $delivery->delivery_id,
+                    'package_id' => null,
+                    'school_id' => $delivery->school_id,
                     'dr_no' => $delivery->dr_no,
                     'package_code' => null,
                     'lot_number' => null,
@@ -496,30 +603,32 @@ class BillingSheetSyncService
     }
 
     /** @param Collection<int, BillingSheetSync> $syncs
-     * @return array{status: string, message: string, synced_count: int, issues: array<int, array{delivery_id: int, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}>}
+     * @return array{status: string, message: string, synced_count: int, issues: array<int, array{delivery_id: int, package_id: ?int, school_id: ?string, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}>}
      */
     private function batchSyncSuccess(Collection $syncs, int $updatedCellCount): array
     {
         return [
             'status' => 'success',
             'message' => $updatedCellCount > 0
-                ? 'Updated '.$updatedCellCount.' Google Sheet cell(s).'
+                ? 'Billing confirmation was synchronized to '.$updatedCellCount.' Google Sheet cell(s); delivery and inventory states were not changed.'
                 : 'All matching Google Sheet values were already synchronized; no duplicate writes were made.',
-            'synced_count' => $syncs->whereIn('outcome', ['synced', 'already_synced'])->count(),
+            'synced_count' => $syncs->filter(fn (BillingSheetSync $sync): bool => $this->isBatchSyncComplete($sync))->count(),
             'issues' => [],
         ];
     }
 
     /** @param Collection<int, BillingSheetSync> $allSyncs
-     * @return array{status: string, message: string, synced_count: int, issues: array<int, array{delivery_id: int, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}>}
+     * @return array{status: string, message: string, synced_count: int, issues: array<int, array{delivery_id: int, package_id: ?int, school_id: ?string, dr_no: ?string, package_code: ?string, lot_number: ?string, reason: string}>}
      */
     private function batchSyncFailure(Collection $allSyncs, string $message): array
     {
         $updatedSyncs = BillingSheetSync::query()->whereIn('id', $allSyncs->pluck('id'))->orderBy('id')->get();
         $issues = $updatedSyncs
-            ->filter(fn (BillingSheetSync $sync): bool => ! in_array($sync->outcome, ['synced', 'already_synced'], true))
+            ->filter(fn (BillingSheetSync $sync): bool => ! $this->isBatchSyncComplete($sync))
             ->map(fn (BillingSheetSync $sync): array => [
                 'delivery_id' => (int) $sync->delivery_id,
+                'package_id' => $sync->package_id === null ? null : (int) $sync->package_id,
+                'school_id' => $sync->school_id,
                 'dr_no' => $sync->bir_dr,
                 'package_code' => $sync->package_code,
                 'lot_number' => $sync->lot_number,
@@ -531,7 +640,7 @@ class BillingSheetSyncService
         return [
             'status' => 'error',
             'message' => $message,
-            'synced_count' => $updatedSyncs->whereIn('outcome', ['synced', 'already_synced'])->count(),
+            'synced_count' => $updatedSyncs->filter(fn (BillingSheetSync $sync): bool => $this->isBatchSyncComplete($sync))->count(),
             'issues' => $issues,
         ];
     }
@@ -540,8 +649,14 @@ class BillingSheetSyncService
     private function markBatchFailure(Collection $syncs, string $outcome, string $message): void
     {
         foreach ($syncs as $sync) {
-            $this->finish($sync, $outcome, $message);
+            $this->finish($sync, $outcome, $message, validationErrors: [$message]);
         }
+    }
+
+    private function isBatchSyncComplete(BillingSheetSync $sync): bool
+    {
+        return in_array($sync->outcome, ['synced', 'already_synced'], true)
+            && (int) $sync->sync_version >= 2;
     }
 
     /** @param array<string, mixed> $attributes */
@@ -552,13 +667,19 @@ class BillingSheetSyncService
             $attributes
         );
 
-        $isUnsynced = ! in_array($sync->outcome, ['synced', 'already_synced'], true);
+        $isUnsynced = ! in_array($sync->outcome, ['synced', 'already_synced'], true)
+            || (int) $sync->sync_version < (int) ($attributes['sync_version'] ?? 1);
         $hasPackageStatus = $attributes['package_status_id'] !== null;
         $mappingChanged = $sync->lot_id !== $attributes['lot_id']
             || $sync->lot_number !== $attributes['lot_number']
             || $sync->target_cell !== $attributes['target_cell']
             || trim((string) $sync->bir_dr) !== trim((string) $attributes['bir_dr'])
-            || trim((string) $sync->package_code) !== trim((string) $attributes['package_code']);
+            || trim((string) $sync->package_code) !== trim((string) $attributes['package_code'])
+            || $sync->school_id !== ($attributes['school_id'] ?? null)
+            || (int) $sync->sync_version !== (int) ($attributes['sync_version'] ?? 1)
+            || $sync->billing_batch_id !== ($attributes['billing_batch_id'] ?? null)
+            || $sync->authenticated_user_id !== ($attributes['authenticated_user_id'] ?? null)
+            || $sync->authenticated_user_name !== ($attributes['authenticated_user_name'] ?? null);
 
         if (! $sync->wasRecentlyCreated && $hasPackageStatus && $isUnsynced && $mappingChanged) {
             $sync->forceFill($attributes)->save();
@@ -598,14 +719,23 @@ class BillingSheetSyncService
         }
     }
 
-    private function finish(BillingSheetSync $sync, string $outcome, ?string $error, ?string $targetCell = null): void
-    {
-        $sync->forceFill([
+    private function finish(
+        BillingSheetSync $sync,
+        string $outcome,
+        ?string $error,
+        ?string $targetCell = null,
+        ?array $validationErrors = null
+    ): void {
+        $attributes = [
             'outcome' => $outcome,
             'target_cell' => $targetCell ?? $sync->target_cell,
             'error_details' => $error,
             'synced_at' => in_array($outcome, ['synced', 'already_synced'], true) ? now() : $sync->synced_at,
-        ])->save();
+        ];
+        if ($validationErrors !== null) {
+            $attributes['validation_errors'] = $validationErrors;
+        }
+        $sync->forceFill($attributes)->save();
     }
 
     /** @param array<int, array<int, mixed>> $rows
@@ -688,6 +818,144 @@ class BillingSheetSyncService
     private function targetColumn(string $lotNumber): ?string
     {
         return ['2' => 'BF', '9' => 'BU', '11' => 'CI'][$lotNumber] ?? null;
+    }
+
+    /** @param array<int, array<int, mixed>> $rows
+     * @return array{header_row: int, school_id_column: int, package_code_column: int, destination_columns: array<string, int>}|null
+     */
+    private function findBillingHeaderColumns(array $rows, string $lotNumber): ?array
+    {
+        $lotSuffix = 'lot'.$lotNumber;
+        $maxRows = min(count($rows), (int) config('google_sheets.billing.header_scan_rows', 20));
+        $candidates = [];
+
+        for ($rowIndex = 0; $rowIndex < $maxRows; $rowIndex++) {
+            $headers = $rows[$rowIndex] ?? [];
+            $schoolColumns = [];
+            $packageColumns = [];
+            $billingSectionStarts = [];
+            foreach ($headers as $columnIndex => $heading) {
+                $normalized = $this->normalizedHeader($heading);
+                if ($normalized === 'schoolid') {
+                    $schoolColumns[] = $columnIndex;
+                }
+                if ($normalized === 'corepackagecode'.$lotSuffix) {
+                    $packageColumns[] = $columnIndex;
+                }
+                if (str_contains($normalized, 'status') && str_contains($normalized, 'billing') && str_contains($normalized, $lotSuffix)) {
+                    $billingSectionStarts[] = $columnIndex;
+                }
+            }
+
+            if (count($schoolColumns) !== 1 || count($packageColumns) !== 1 || count($billingSectionStarts) !== 1) {
+                continue;
+            }
+
+            $statusColumn = $billingSectionStarts[0];
+            $nextSectionColumn = collect($headers)
+                ->keys()
+                ->filter(fn (int $column): bool => $column > $statusColumn
+                    && str_contains($this->normalizedHeader($headers[$column] ?? ''), 'status')
+                    && str_contains($this->normalizedHeader($headers[$column] ?? ''), 'billing')
+                    && preg_match('/lot(?:2|9|11)/', $this->normalizedHeader($headers[$column] ?? '')) === 1)
+                ->min() ?? count($headers);
+            $sectionEnd = $nextSectionColumn;
+            $sectionHeaders = [];
+            foreach ($headers as $columnIndex => $heading) {
+                if ($columnIndex >= $statusColumn && $columnIndex < $sectionEnd) {
+                    $sectionHeaders[$columnIndex] = $this->normalizedHeader($heading);
+                }
+            }
+
+            $requestedHeaders = [
+                'status' => fn (string $header): bool => str_contains($header, 'status')
+                    && str_contains($header, 'billing') && str_contains($header, $lotSuffix),
+                'checked_by' => fn (string $header): bool => $header === 'checkedby',
+                'date_received' => fn (string $header): bool => $header === 'datereceived'.$lotSuffix,
+                'received_by' => fn (string $header): bool => $header === 'receivedby'.$lotSuffix,
+                'inspection_1' => fn (string $header): bool => $header === 'inspection1'.$lotSuffix,
+                'inspection_2' => fn (string $header): bool => $header === 'inspection2'.$lotSuffix,
+                'date_checking' => fn (string $header): bool => in_array($header, ['datechecking'.$lotSuffix, 'datecheking'.$lotSuffix], true),
+                'date_encoding' => fn (string $header): bool => $header === 'dateencoding'.$lotSuffix,
+                'total_amount' => fn (string $header): bool => $header === 'totalamount'.$lotSuffix,
+            ];
+            $destinationColumns = [];
+            foreach ($requestedHeaders as $field => $matchesHeader) {
+                $matchedColumns = [];
+                foreach ($sectionHeaders as $columnIndex => $normalized) {
+                    if ($matchesHeader($normalized)) {
+                        $matchedColumns[] = $columnIndex;
+                    }
+                }
+                if (count($matchedColumns) !== 1) {
+                    $destinationColumns = [];
+
+                    break;
+                }
+                $destinationColumns[$field] = $matchedColumns[0];
+            }
+
+            if (count($destinationColumns) === count($requestedHeaders)) {
+                $candidates[] = [
+                    'header_row' => $rowIndex,
+                    'school_id_column' => $schoolColumns[0],
+                    'package_code_column' => $packageColumns[0],
+                    'destination_columns' => $destinationColumns,
+                ];
+            }
+        }
+
+        return count($candidates) === 1 ? $candidates[0] : null;
+    }
+
+    private function normalizedHeader(mixed $value): string
+    {
+        return preg_replace('/[^a-z0-9]/u', '', mb_strtolower(trim((string) $value))) ?? '';
+    }
+
+    private function exactCell(mixed $value): string
+    {
+        return trim((string) $value);
+    }
+
+    private function columnName(int $columnIndex): string
+    {
+        $column = '';
+        for ($number = $columnIndex + 1; $number > 0; $number = intdiv($number - 1, 26)) {
+            $column = chr(65 + (($number - 1) % 26)).$column;
+        }
+
+        return $column;
+    }
+
+    private function amountToCents(mixed $amount): int
+    {
+        $normalized = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', trim((string) $amount))) ?? '';
+        if (! is_numeric($normalized)) {
+            return 0;
+        }
+
+        return (int) round((float) $normalized * 100);
+    }
+
+    private function formatCents(int $amountCents): string
+    {
+        $negative = $amountCents < 0;
+        $absolute = abs($amountCents);
+
+        return ($negative ? '-' : '').intdiv($absolute, 100).'.'.str_pad((string) ($absolute % 100), 2, '0', STR_PAD_LEFT);
+    }
+
+    private function cellValueMatches(string $field, mixed $existingValue, string $expectedValue): bool
+    {
+        if ($field !== 'total_amount') {
+            return $this->exactCell($existingValue) === $expectedValue;
+        }
+
+        $normalized = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', trim((string) $existingValue))) ?? '';
+
+        return $normalized !== '' && is_numeric($normalized)
+            && $this->amountToCents($normalized) === $this->amountToCents($expectedValue);
     }
 
     private function normalizeCell(mixed $value): string

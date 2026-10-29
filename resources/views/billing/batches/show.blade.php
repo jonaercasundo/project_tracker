@@ -34,9 +34,9 @@
                     @elseif ($activeSheetSyncs->isEmpty())
                         <p class="mt-1 text-sm text-amber-800">No reconciliation entries were recorded yet. Retry to prepare them from this batch’s confirmed delivery records.</p>
                     @elseif ($sheetSyncNeedsRetry)
-                        <p class="mt-1 text-sm text-rose-700">Some DR/package rows need correction. Billing records remain confirmed.</p>
+                        <p class="mt-1 text-sm text-rose-700">Some DR/package rows need correction. Billing confirmations remain saved; this attempt made no Google Sheets updates.</p>
                     @else
-                        <p class="mt-1 text-sm text-emerald-700">All {{ $activeSheetSyncs->count() }} active package row(s) are synchronized. {{ $revokedSheetSyncCount }} revoked row(s) are excluded.</p>
+                        <p class="mt-1 text-sm text-emerald-700">Billing batch synchronized to Google Sheets for all {{ $activeSheetSyncs->count() }} active DR/package row(s). Delivery, proof of delivery, and inventory were not changed. {{ $revokedSheetSyncCount }} revoked row(s) are excluded.</p>
                     @endif
                 </div>
                 @if ($sheetSyncNeedsRetry)
@@ -51,9 +51,24 @@
             @if ($sheetSyncNeedsRetry && $sheetSyncs->isNotEmpty())
                 <ul class="mt-4 space-y-2 border-t border-slate-100 pt-4 text-sm">
                     @foreach ($activeSheetSyncs->whereNotIn('outcome', ['synced', 'already_synced']) as $sync)
-                        <li class="text-rose-800">DR {{ $sync->bir_dr ?? 'not available' }} · Core Package Code {{ $sync->package_code ?? 'not available' }} · Lot {{ $sync->lot_number ?? 'not identified' }}: {{ $sync->error_details ?? str($sync->outcome)->replace('_', ' ')->title() }}</li>
+                        <li class="text-rose-800">DR {{ $sync->bir_dr ?? 'not available' }} · School ID {{ $sync->school_id ?? 'not available' }} · Package {{ $sync->package_code ?? 'not available' }} (ID {{ $sync->package_id ?? 'not available' }}) · Lot {{ $sync->lot_number ?? 'not identified' }}: {{ $sync->error_details ?? str($sync->outcome)->replace('_', ' ')->title() }}</li>
                     @endforeach
                 </ul>
+            @endif
+            @if (! $sheetSyncNeedsRetry && $activeSheetSyncs->isNotEmpty())
+                <details class="mt-4 border-t border-slate-100 pt-3">
+                    <summary class="cursor-pointer text-sm font-semibold text-slate-700">View synchronized cells and audit details</summary>
+                    <ul class="mt-3 space-y-2 text-xs text-slate-600">
+                        @foreach ($activeSheetSyncs as $sync)
+                            <li>
+                                DR {{ $sync->bir_dr ?? 'not available' }} · School ID {{ $sync->school_id ?? 'not available' }} · Package {{ $sync->package_code ?? 'not available' }} (ID {{ $sync->package_id ?? 'not available' }}) · Lot {{ $sync->lot_number ?? 'not identified' }}.
+                                Amount written: {{ $sync->written_amount === null ? 'No billing amount was recorded' : number_format((float) $sync->written_amount, 2) }}.
+                                Checked by {{ $sync->authenticated_user_name ?? 'not recorded' }} at {{ $sync->synced_at?->format('Y-m-d H:i:s') ?? 'time unavailable' }}.
+                                Cells: {{ collect($sync->destination_cells ?? [])->map(fn ($cell, $field) => str($field)->replace('_', ' ')->title().' '.$sync->sheet_tab.'!'.$cell)->implode(', ') ?: 'not recorded' }}.
+                            </li>
+                        @endforeach
+                    </ul>
+                </details>
             @endif
         </section>
 

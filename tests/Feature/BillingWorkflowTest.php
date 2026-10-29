@@ -134,6 +134,73 @@ function billingSheetRows(string $lotNumber, string $birDr, string $packageCode,
     return [$header, $record];
 }
 
+function billingSheetColumnIndex(string $column): int
+{
+    $index = 0;
+    foreach (str_split(strtoupper($column)) as $character) {
+        $index = ($index * 26) + ord($character) - 64;
+    }
+
+    return $index - 1;
+}
+
+/** @param array<int, array{school_id: string, package_codes: array<string, string>}> $schoolRows
+ * @return array<int, array<int, string>>
+ */
+function billingConfirmationSheetRows(array $schoolRows): array
+{
+    $headers = array_fill(0, 98, '');
+    $columnHeaders = [
+        'B' => 'SchoolID',
+        'L' => 'Core Package Code Lot2',
+        'X' => 'Core Package Code Lot 9',
+        'AJ' => 'Core Package Code Lot 11',
+        'BD' => 'STATUS ( BILLING# ) LOT 2',
+        'BE' => 'Checked by',
+        'BG' => 'DATE RECEIVED ( LOT 2 )',
+        'BH' => 'RECEIVED BY ( LOT 2 )',
+        'BI' => 'INSPECTION 1 ( LOT 2 )',
+        'BJ' => 'INSPECTION 2 ( LOT 2 )',
+        'BK' => 'DATE CHEKING ( LOT 2 )',
+        'BL' => 'DATE ENCODING ( LOT 2 )',
+        'BO' => 'TOTAL AMOUNT ( LOT 2 )',
+        'BS' => 'STATUS ( BILLING# ) LOT 9',
+        'BT' => 'Checked by',
+        'BV' => 'DATE RECEIVED ( LOT 9 )',
+        'BW' => 'RECEIVED BY ( LOT 9 )',
+        'BX' => 'INSPECTION 1 ( LOT 9 )',
+        'BY' => 'INSPECTION 2 ( LOT 9 )',
+        'BZ' => 'DATE CHEKING ( LOT 9 )',
+        'CA' => 'DATE ENCODING ( LOT 9 )',
+        'CD' => 'TOTAL AMOUNT ( LOT 9 )',
+        'CG' => 'STATUS ( BILLING# ) LOT 11',
+        'CH' => 'Checked by',
+        'CJ' => 'DATE RECEIVED ( LOT 11 )',
+        'CK' => 'RECEIVED BY ( LOT 11 )',
+        'CL' => 'INSPECTION 1 ( LOT 11 )',
+        'CM' => 'INSPECTION 2 ( LOT 11 )',
+        'CN' => 'DATE CHEKING ( LOT 11 )',
+        'CO' => 'DATE ENCODING ( LOT 11 )',
+        'CR' => 'TOTAL AMOUNT ( LOT 11 )',
+    ];
+    foreach ($columnHeaders as $column => $heading) {
+        $headers[billingSheetColumnIndex($column)] = $heading;
+    }
+
+    $rows = [$headers];
+    foreach ($schoolRows as $schoolRow) {
+        $row = array_fill(0, 98, '');
+        $row[1] = $schoolRow['school_id'];
+        foreach ($schoolRow['package_codes'] as $lotNumber => $packageCode) {
+            $column = ['2' => 'L', '9' => 'X', '11' => 'AJ'][$lotNumber];
+            $row[billingSheetColumnIndex($column)] = $packageCode;
+        }
+        $rows[] = $row;
+    }
+
+    return $rows;
+}
+
 it('queues auditable syncs for Lots 2, 9, and 11 with their configured target columns', function (): void {
     signInBillingUser();
     Queue::fake();
@@ -180,24 +247,29 @@ it('confirms a complete same-DR group and syncs each lot once with idempotent re
     $secondId = createDeliveryForBillingProject($projectId, 'BIR-SHARED-DR', 'pending');
     DB::table('deliveries')->where('delivery_id', $secondId)->update(['lot_id' => $secondLotId]);
     addPackageToBillingDelivery($secondId, 'CORE-LOT9');
-
-    $sheetRows = array_fill(0, 3, array_fill(0, 87, ''));
-    $sheetRows[0][1] = 'BIR DR Lot 2';
-    $sheetRows[0][2] = 'Core Package Code Lot 2';
-    $sheetRows[0][3] = 'BIR DR Lot 9';
-    $sheetRows[0][4] = 'Core Package Code Lot 9';
-    $sheetRows[1][1] = 'BIR-SHARED-DR';
-    $sheetRows[1][2] = 'CORE-LOT2';
-    $sheetRows[2][3] = 'BIR-SHARED-DR';
-    $sheetRows[2][4] = 'CORE-LOT9';
-    $transitionDate = now('Asia/Manila')->toDateString();
+    $schoolId = (string) DB::table('deliveries')->where('delivery_id', $firstId)->value('school_id');
+    DB::table('deliveries')->where('delivery_id', $secondId)->update(['school_id' => $schoolId]);
+    $sheetRows = billingConfirmationSheetRows([[
+        'school_id' => $schoolId,
+        'package_codes' => ['2' => 'CORE-LOT2', '9' => 'CORE-LOT9'],
+    ]]);
     $sheets = Mockery::mock(GoogleSheetsApiClient::class);
     $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
-    $sheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CI", 'test-spreadsheet-id')->andReturn($sheetRows);
-    $sheets->shouldReceive('updateCells')->once()->with([
-        ['range' => "'Copy of SME LOT 2,9,11'!BF2", 'majorDimension' => 'ROWS', 'values' => [[$transitionDate]]],
-        ['range' => "'Copy of SME LOT 2,9,11'!BU3", 'majorDimension' => 'ROWS', 'values' => [[$transitionDate]]],
-    ], 'test-spreadsheet-id');
+    $sheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CT", 'test-spreadsheet-id')->andReturn($sheetRows);
+    $sheets->shouldReceive('updateCells')->once()->withArgs(function (array $updates, string $spreadsheetId): bool {
+        $updatesByRange = collect($updates)->keyBy('range');
+        $batchRef = (string) DB::table('billing_batches')->value('batch_ref');
+
+        return $spreadsheetId === 'test-spreadsheet-id'
+            && $updatesByRange->keys()->all() === [
+                "'Copy of SME LOT 2,9,11'!BD2",
+                "'Copy of SME LOT 2,9,11'!BE2",
+                "'Copy of SME LOT 2,9,11'!BS2",
+                "'Copy of SME LOT 2,9,11'!BT2",
+            ]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [[$batchRef]]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BE2"]['values'] === [['Billing Tester']];
+    });
     app()->instance(GoogleSheetsApiClient::class, $sheets);
 
     $preview = $this->getJson(route('billing.prepare.search', ['q' => 'BIR-SHARED-DR']))
@@ -220,6 +292,22 @@ it('confirms a complete same-DR group and syncs each lot once with idempotent re
     expect(BillingSheetSync::query()->where('outcome', 'synced')->count())->toBe(2);
     Queue::assertNotPushed(SyncBillingSheetDate::class);
     $this->assertDatabaseHas('deliveries', ['delivery_id' => $secondId, 'status' => 'pending']);
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $firstId, 'status' => 'delivered']);
+    $this->assertDatabaseHas('package_status', ['delivery_id' => $firstId, 'status' => 'pending']);
+    $this->assertDatabaseHas('package_status', ['delivery_id' => $secondId, 'status' => 'pending']);
+    $firstSync = BillingSheetSync::query()->where('delivery_id', $firstId)->sole();
+    expect($firstSync->authenticated_user_name)->toBe('Billing Tester')
+        ->and($firstSync->destination_cells)->toMatchArray([
+            'status' => 'BD2',
+            'checked_by' => 'BE2',
+            'date_received' => 'BG2',
+            'received_by' => 'BH2',
+            'inspection_1' => 'BI2',
+            'inspection_2' => 'BJ2',
+            'date_checking' => 'BK2',
+            'date_encoding' => 'BL2',
+            'total_amount' => 'BO2',
+        ]);
 
     $this->postJson(route('billing.prepare.confirm'), $payload)
         ->assertOk()
@@ -249,6 +337,112 @@ it('confirms a complete same-DR group and syncs each lot once with idempotent re
             && $recordGroups->first()->count() === 2);
 });
 
+it('writes Lot 2, 9, and 11 billing data once for a multi-Lot DR', function (): void {
+    [$actor] = signInBillingUser();
+    Queue::fake();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $firstId = createBillingDelivery('DR-MULTI-LOT', 'accepted');
+    $projectId = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('project_id');
+    $schoolId = (string) DB::table('deliveries')->where('delivery_id', $firstId)->value('school_id');
+    $lot2Id = (int) DB::table('deliveries')->where('delivery_id', $firstId)->value('lot_id');
+    DB::table('lot')->where('lot_id', $lot2Id)->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($firstId, 'CORE-LOT2');
+    $deliveryIds = [$firstId];
+    $billingAmountsByDelivery = [$firstId => '1000.25'];
+    $secondLot2DeliveryId = createDeliveryForBillingProject($projectId, 'DR-MULTI-LOT', 'pending');
+    DB::table('deliveries')->where('delivery_id', $secondLot2DeliveryId)->update(['lot_id' => $lot2Id, 'school_id' => $schoolId]);
+    addPackageToBillingDelivery($secondLot2DeliveryId, 'CORE-LOT2');
+    $deliveryIds[] = $secondLot2DeliveryId;
+    $billingAmountsByDelivery[$secondLot2DeliveryId] = '500.00';
+    foreach (['9' => 'CORE-LOT9', '11' => 'CORE-LOT11'] as $lotNumber => $packageCode) {
+        $lotId = (int) DB::table('lot')->insertGetId([
+            'project_id' => $projectId,
+            'lot_name' => 'Lot '.$lotNumber,
+            'contract_no' => 'CONTRACT-'.$projectId.'-'.$lotNumber,
+        ]);
+        $deliveryId = createDeliveryForBillingProject($projectId, 'DR-MULTI-LOT', 'pending');
+        DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['lot_id' => $lotId, 'school_id' => $schoolId]);
+        addPackageToBillingDelivery($deliveryId, $packageCode);
+        $deliveryIds[] = $deliveryId;
+        $billingAmountsByDelivery[$deliveryId] = ['9' => '200.50', '11' => '75.25'][$lotNumber];
+    }
+    foreach ($billingAmountsByDelivery as $deliveryId => $amount) {
+        DB::table('delivery_billing_records')->insert([
+            'delivery_id' => $deliveryId,
+            'status' => 'pending_billing',
+            'billing_amount' => $amount,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    $sheetRows = billingConfirmationSheetRows([[
+        'school_id' => $schoolId,
+        'package_codes' => ['2' => 'CORE-LOT2', '9' => 'CORE-LOT9', '11' => 'CORE-LOT11'],
+    ]]);
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CT", 'test-spreadsheet-id')->andReturn($sheetRows);
+    $sheets->shouldReceive('updateCells')->once()->withArgs(function (array $updates, string $spreadsheetId): bool {
+        $updatesByRange = collect($updates)->keyBy('range');
+        $batchRef = (string) DB::table('billing_batches')->value('batch_ref');
+        $expectedRanges = [
+            "'Copy of SME LOT 2,9,11'!BD2", "'Copy of SME LOT 2,9,11'!BE2", "'Copy of SME LOT 2,9,11'!BO2",
+            "'Copy of SME LOT 2,9,11'!BS2", "'Copy of SME LOT 2,9,11'!BT2", "'Copy of SME LOT 2,9,11'!CD2",
+            "'Copy of SME LOT 2,9,11'!CG2", "'Copy of SME LOT 2,9,11'!CH2", "'Copy of SME LOT 2,9,11'!CR2",
+        ];
+
+        return $spreadsheetId === 'test-spreadsheet-id'
+            && $updatesByRange->keys()->all() === $expectedRanges
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [[$batchRef]]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BE2"]['values'] === [['Billing Tester']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BO2"]['values'] === [['1500.25']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!CD2"]['values'] === [['200.50']]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!CR2"]['values'] === [['75.25']];
+    });
+    app()->instance(GoogleSheetsApiClient::class, $sheets);
+    $payload = [
+        'mode' => 'search',
+        'delivery_ids' => [$firstId],
+        'idempotency_key' => (string) Str::uuid(),
+    ];
+
+    $response = $this->postJson(route('billing.prepare.confirm'), $payload)
+        ->assertCreated()
+        ->assertJsonPath('sheet_sync.status', 'success')
+        ->assertJsonPath('sheet_sync.synced_count', 4);
+    $batchId = (int) $response->json('batch.id');
+    $syncs = BillingSheetSync::query()->orderBy('lot_number')->get();
+
+    expect($syncs->pluck('lot_number')->sort()->values()->all())->toBe(['2', '2', '9', '11']);
+    foreach ($syncs as $sync) {
+        expect($sync->billing_batch_id)->toBe($batchId)
+            ->and($sync->authenticated_user_id)->toBe((int) $actor->getKey())
+            ->and($sync->authenticated_user_name)->toBe('Billing Tester')
+            ->and($sync->synced_at)->not->toBeNull()
+            ->and($sync->validation_errors)->toBe([]);
+    }
+    expect(BillingSheetSync::query()->where('lot_number', '2')->pluck('written_amount')->sort()->values()->all())->toBe(['500.00', '1000.25'])
+        ->and(BillingSheetSync::query()->where('lot_number', '9')->value('written_amount'))->toBe('200.50')
+        ->and(BillingSheetSync::query()->where('lot_number', '11')->value('written_amount'))->toBe('75.25');
+    foreach ($deliveryIds as $deliveryId) {
+        $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
+        $this->assertDatabaseHas('package_status', ['delivery_id' => $deliveryId, 'status' => 'pending']);
+    }
+    $this->assertDatabaseCount('delivery_proofs', 0);
+    $this->postJson(route('billing.prepare.confirm'), $payload)
+        ->assertOk()
+        ->assertJsonPath('sheet_sync.status', 'success')
+        ->assertJsonPath('sheet_sync.message', 'All matching Google Sheet values were already synchronized; no duplicate writes were made.');
+
+    expect(BillingSheetSync::query()->count())->toBe(4)
+        ->and(BillingSheetSync::query()->sum('attempts'))->toBe(4);
+});
+
 it('does not write batch sheet cells when a confirmed DR has no unique sheet row', function (): void {
     signInBillingUser();
     Queue::fake();
@@ -264,15 +458,14 @@ it('does not write batch sheet cells when a confirmed DR has no unique sheet row
     $secondLotId = (int) DB::table('lot')->insertGetId(['project_id' => $projectId, 'lot_name' => 'Lot 9', 'contract_no' => 'CONTRACT-'.$projectId.'-9']);
     $secondId = createDeliveryForBillingProject($projectId, 'BIR-PREFLIGHT-DR', 'delivered');
     DB::table('deliveries')->where('delivery_id', $secondId)->update(['lot_id' => $secondLotId]);
+    DB::table('deliveries')->where('delivery_id', $secondId)->update([
+        'school_id' => DB::table('deliveries')->where('delivery_id', $firstId)->value('school_id'),
+    ]);
     addPackageToBillingDelivery($secondId, 'CORE-MISSING');
-
-    $sheetRows = array_fill(0, 2, array_fill(0, 87, ''));
-    $sheetRows[0][1] = 'BIR DR Lot 2';
-    $sheetRows[0][2] = 'Core Package Code Lot 2';
-    $sheetRows[0][3] = 'BIR DR Lot 9';
-    $sheetRows[0][4] = 'Core Package Code Lot 9';
-    $sheetRows[1][1] = 'BIR-PREFLIGHT-DR';
-    $sheetRows[1][2] = 'CORE-MATCHED';
+    $sheetRows = billingConfirmationSheetRows([[
+        'school_id' => (string) DB::table('deliveries')->where('delivery_id', $firstId)->value('school_id'),
+        'package_codes' => ['2' => 'CORE-MATCHED'],
+    ]]);
     $sheets = Mockery::mock(GoogleSheetsApiClient::class);
     $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
     $sheets->shouldReceive('values')->once()->andReturn($sheetRows);
@@ -295,6 +488,81 @@ it('does not write batch sheet cells when a confirmed DR has no unique sheet row
     $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $secondId, 'status' => 'for_billing']);
 });
 
+it('does not write any batch cells when the school and exact package code match multiple sheet rows', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $deliveryId = createBillingDelivery('DR-AMBIGUOUS-SHEET', 'delivered');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
+    addPackageToBillingDelivery($deliveryId, 'CORE-DUPLICATE');
+    $schoolId = (string) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('school_id');
+    $sheetRows = billingConfirmationSheetRows([
+        ['school_id' => $schoolId, 'package_codes' => ['2' => 'CORE-DUPLICATE']],
+        ['school_id' => $schoolId, 'package_codes' => ['2' => 'CORE-DUPLICATE']],
+    ]);
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CT", 'test-spreadsheet-id')->andReturn($sheetRows);
+    $sheets->shouldNotReceive('updateCells');
+    app()->instance(GoogleSheetsApiClient::class, $sheets);
+
+    $response = $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$deliveryId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated()
+        ->assertJsonPath('sheet_sync.status', 'error')
+        ->assertJsonPath('sheet_sync.issues.0.school_id', $schoolId)
+        ->assertJsonPath('sheet_sync.issues.0.package_code', 'CORE-DUPLICATE');
+
+    expect(BillingSheetSync::query()->sole()->outcome)->toBe('duplicate_match')
+        ->and($response->json('sheet_sync.issues.0.reason'))->toContain('Multiple sheet rows matched School ID '.$schoolId);
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $deliveryId, 'status' => 'delivered']);
+});
+
+it('keeps billing confirmation only when the atomic Google Sheets batch update fails', function (): void {
+    signInBillingUser();
+    Queue::fake();
+    config([
+        'google_sheets.billing.enabled' => true,
+        'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
+        'google_sheets.billing.sheet_tab' => 'Copy of SME LOT 2,9,11',
+    ]);
+    $deliveryId = createBillingDelivery('DR-SHEETS-FAILURE', 'accepted');
+    DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 9']);
+    addPackageToBillingDelivery($deliveryId, 'CORE-FAILURE');
+    $schoolId = (string) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('school_id');
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CT", 'test-spreadsheet-id')->andReturn(
+        billingConfirmationSheetRows([['school_id' => $schoolId, 'package_codes' => ['9' => 'CORE-FAILURE']]])
+    );
+    $sheets->shouldReceive('updateCells')->once()->andThrow(new GoogleSheetsApiException('Simulated atomic batch failure.', 503));
+    app()->instance(GoogleSheetsApiClient::class, $sheets);
+
+    $this->postJson(route('billing.prepare.confirm'), [
+        'mode' => 'search',
+        'delivery_ids' => [$deliveryId],
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated()
+        ->assertJsonPath('sheet_sync.status', 'error')
+        ->assertJsonPath('sheet_sync.issues.0.dr_no', 'DR-SHEETS-FAILURE');
+
+    $sync = BillingSheetSync::query()->sole();
+    expect($sync->outcome)->toBe('api_failed')
+        ->and($sync->written_amount)->toBeNull()
+        ->and($sync->validation_errors)->toBe(['Google Sheets could not apply the validated batch update. Retry reconciliation; billing records remain confirmed.']);
+    $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $deliveryId, 'status' => 'accepted']);
+    $this->assertDatabaseHas('package_status', ['delivery_id' => $deliveryId, 'status' => 'pending']);
+    $this->assertDatabaseCount('delivery_proofs', 0);
+});
+
 it('rebuilds missing batch reconciliation entries and verifies existing sheet values before retrying', function (): void {
     signInBillingUser();
     Queue::fake();
@@ -306,7 +574,8 @@ it('rebuilds missing batch reconciliation entries and verifies existing sheet va
     $deliveryId = createBillingDelivery('BIR-REBUILD-AUDIT', 'delivered');
     DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => 'Lot 2']);
     addPackageToBillingDelivery($deliveryId, 'CORE-REBUILD');
-    $sheetRows = billingSheetRows('2', 'BIR-REBUILD-AUDIT', 'CORE-REBUILD');
+    $schoolId = (string) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('school_id');
+    $sheetRows = billingConfirmationSheetRows([['school_id' => $schoolId, 'package_codes' => ['2' => 'CORE-REBUILD']]]);
     $initialSheets = Mockery::mock(GoogleSheetsApiClient::class);
     $initialSheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
     $initialSheets->shouldReceive('values')->once()->andReturn($sheetRows);
@@ -320,12 +589,14 @@ it('rebuilds missing batch reconciliation entries and verifies existing sheet va
     ])->assertCreated()->assertJsonPath('sheet_sync.status', 'success');
     $batchId = (int) $confirmation->json('batch.id');
     $sync = BillingSheetSync::query()->sole();
-    $sheetRows[1][57] = $sync->transition_date->toDateString();
+    $batchReference = (string) DB::table('billing_batches')->where('id', $batchId)->value('batch_ref');
+    $sheetRows[1][billingSheetColumnIndex('BD')] = $batchReference;
+    $sheetRows[1][billingSheetColumnIndex('BE')] = 'Billing Tester';
     BillingSheetSync::query()->delete();
 
     $retrySheets = Mockery::mock(GoogleSheetsApiClient::class);
     $retrySheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
-    $retrySheets->shouldReceive('values')->once()->andReturn($sheetRows);
+    $retrySheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CT", 'test-spreadsheet-id')->andReturn($sheetRows);
     $retrySheets->shouldReceive('updateCells')->once()->with([], 'test-spreadsheet-id');
     app()->instance(GoogleSheetsApiClient::class, $retrySheets);
 
@@ -336,7 +607,9 @@ it('rebuilds missing batch reconciliation entries and verifies existing sheet va
         ->assertRedirect(route('billing.batches.show', $batchId))
         ->assertSessionHas('success', 'All matching Google Sheet values were already synchronized; no duplicate writes were made.');
     $this->get(route('billing.batches.show', $batchId))
-        ->assertSee('All 1 package row(s) are synchronized.');
+        ->assertSee('Billing batch synchronized to Google Sheets for all 1 active DR/package row(s).')
+        ->assertSee('View synchronized cells and audit details')
+        ->assertSee('School ID '.$schoolId);
 
     expect(BillingSheetSync::query()->sole()->outcome)->toBe('already_synced');
     $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
@@ -381,7 +654,7 @@ it('matches the unique DR row with a populated package code for that lot', funct
     expect($sync->fresh()->outcome)->toBe('synced')->and($sync->fresh()->target_cell)->toBe('BF4');
 });
 
-it('repairs stale lot mappings on retry and syncs numeric package rows to the sheet lot row', function (): void {
+it('matches multiple package rows by exact school ID and package code during reconciliation retry', function (): void {
     signInBillingUser();
     Queue::fake();
     config([
@@ -393,20 +666,14 @@ it('repairs stale lot mappings on retry and syncs numeric package rows to the sh
     DB::table('lot')->where('lot_id', DB::table('deliveries')->where('delivery_id', $deliveryId)->value('lot_id'))->update(['lot_name' => '2']);
     addPackageToBillingDelivery($deliveryId, '2');
     addPackageToBillingDelivery($deliveryId, '3');
-
-    $header = array_fill(0, 99, '');
-    $header[11] = 'Core Package Code Lot2';
-    $header[18] = 'BIR DR';
-    $header[19] = 'BIR DR PRINTED';
-    $sheetRow = array_fill(0, 99, '');
-    $sheetRow[11] = 'C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6';
-    $sheetRow[18] = 'NOT-35473';
-    $sheetRow[19] = '7/1/2026';
-    $sheetRows = [$header, $sheetRow];
+    $schoolId = (string) DB::table('deliveries')->where('delivery_id', $deliveryId)->value('school_id');
 
     $initialSheets = Mockery::mock(GoogleSheetsApiClient::class);
     $initialSheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
-    $initialSheets->shouldReceive('values')->once()->andReturn($sheetRows);
+    $initialSheets->shouldReceive('values')->once()->andReturn(billingConfirmationSheetRows([[
+        'school_id' => 'WRONG-SCHOOL',
+        'package_codes' => ['2' => '2'],
+    ]]));
     $initialSheets->shouldNotReceive('updateCells');
     app()->instance(GoogleSheetsApiClient::class, $initialSheets);
 
@@ -417,32 +684,45 @@ it('repairs stale lot mappings on retry and syncs numeric package rows to the sh
     ])->assertCreated()->assertJsonPath('sheet_sync.status', 'error');
     $batchId = (int) $confirmation->json('batch.id');
     $syncs = BillingSheetSync::query()->orderBy('id')->get();
-    expect($syncs)->toHaveCount(2);
+    expect($syncs)->toHaveCount(2)
+        ->and($syncs->where('outcome', 'no_match'))->toHaveCount(2);
     foreach ($syncs as $sync) {
-        $sync->forceFill([
-            'lot_number' => null,
-            'target_cell' => null,
-            'outcome' => 'reconciliation_error',
-        ])->save();
+        $sync->forceFill(['outcome' => 'reconciliation_error'])->save();
     }
 
-    $sheetRow[18] = '35473';
-    $transitionDate = $syncs->first()->transition_date->toDateString();
+    $sheetRows = billingConfirmationSheetRows([
+        ['school_id' => $schoolId, 'package_codes' => ['2' => '2']],
+        ['school_id' => $schoolId, 'package_codes' => ['2' => '3']],
+    ]);
     $retrySheets = Mockery::mock(GoogleSheetsApiClient::class);
     $retrySheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
-    $retrySheets->shouldReceive('values')->once()->andReturn([$header, $sheetRow]);
-    $retrySheets->shouldReceive('updateCells')->once()->with([
-        ['range' => "'Copy of SME LOT 2,9,11'!BF2", 'majorDimension' => 'ROWS', 'values' => [[$transitionDate]]],
-    ], 'test-spreadsheet-id');
+    $retrySheets->shouldReceive('values')->once()->with("'Copy of SME LOT 2,9,11'!A:CT", 'test-spreadsheet-id')->andReturn($sheetRows);
+    $retrySheets->shouldReceive('updateCells')->once()->withArgs(function (array $updates, string $spreadsheetId): bool {
+        $ranges = collect($updates)->pluck('range')->all();
+        $updatesByRange = collect($updates)->keyBy('range');
+        $batchRef = (string) DB::table('billing_batches')->value('batch_ref');
+
+        return $spreadsheetId === 'test-spreadsheet-id'
+            && $ranges === [
+                "'Copy of SME LOT 2,9,11'!BD2",
+                "'Copy of SME LOT 2,9,11'!BE2",
+                "'Copy of SME LOT 2,9,11'!BD3",
+                "'Copy of SME LOT 2,9,11'!BE3",
+            ]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD2"]['values'] === [[$batchRef]]
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BD3"]['values'] === [[$batchRef]];
+    });
     app()->instance(GoogleSheetsApiClient::class, $retrySheets);
 
     $this->post(route('billing.batches.sheet-sync.retry', $batchId))
         ->assertRedirect(route('billing.batches.show', $batchId))
-        ->assertSessionHas('success', 'Updated 1 Google Sheet cell(s).');
+        ->assertSessionHas('success', 'Billing confirmation was synchronized to 4 Google Sheet cell(s); delivery and inventory states were not changed.');
 
     expect(BillingSheetSync::query()->where('outcome', 'synced')->count())->toBe(2)
         ->and(BillingSheetSync::query()->where('lot_number', '2')->count())->toBe(2)
-        ->and(BillingSheetSync::query()->where('target_cell', 'BF2')->count())->toBe(2);
+        ->and(BillingSheetSync::query()->where('school_id', $schoolId)->count())->toBe(2)
+        ->and(BillingSheetSync::query()->orderBy('id')->first()->destination_cells['status'])->toBe('BD2')
+        ->and(BillingSheetSync::query()->orderByDesc('id')->first()->destination_cells['status'])->toBe('BD3');
     $this->assertDatabaseHas('delivery_billing_records', ['delivery_id' => $deliveryId, 'status' => 'for_billing']);
 });
 

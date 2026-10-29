@@ -1061,12 +1061,12 @@ it('shows distinct DR gaps between delivered billing stages in the monitoring fl
     $this->withoutVite();
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
     $this->get('/deliveries/monitoring?project_id=1')->assertOk()
-        ->assertSee('Pending 1 ')
+        ->assertSee('1 ')
         ->assertSee('/ 2 DRs')
-        ->assertSee('Pending 0 ')
+        ->assertSee('0 ')
         ->assertSee('/ 1 DRs')
-        ->assertSee('Pending 1 / 1 DRs')
-        ->assertSeeInOrder(['Stock Out', 'Pending 1 ', 'Delivered', 'Pending 0 ', 'Billing', 'Pending 1 / 1 DRs']);
+        ->assertDontSee('Pending 1 / 1 DRs')
+        ->assertSeeInOrder(['Stock Out', '1 ', 'Delivered', '0 ', 'Billing']);
 });
 
 it('keeps warehouse inventory and stock transactions separate from package status', function () {

@@ -189,6 +189,7 @@ class DeliveryMonitoringController extends Controller
     public function syncSpreadsheet(Request $request, int $project, BillingSheetSyncService $billingSheetSync, GoogleSheetsApiClient $sheets): JsonResponse
     {
         $fields = $request->validate([
+            'school_id' => ['required', 'string', 'max:255'],
             'date_received' => ['required', 'date_format:Y-m-d'],
             'received_by' => ['required', 'string', 'max:255'],
             'inspection_1' => ['required', 'string', 'max:255'],
@@ -199,9 +200,20 @@ class DeliveryMonitoringController extends Controller
         $projectExists = DB::table('projects')->where('project_id', $project)->exists();
         abort_unless($projectExists, 404, 'Project not found.');
 
-        $result = $billingSheetSync->syncProjectSpreadsheet($project, (string) Auth::user()->name, $fields, $sheets);
+        $schoolId = $fields['school_id'];
+        unset($fields['school_id']);
+        $result = $billingSheetSync->syncProjectSpreadsheet($project, $schoolId, (string) Auth::user()->name, $fields, $sheets);
 
         return response()->json($result, $result['status'] === 'success' ? 200 : 422)
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function spreadsheetSyncSchools(int $project, BillingSheetSyncService $billingSheetSync, GoogleSheetsApiClient $sheets): JsonResponse
+    {
+        abort_unless(DB::table('projects')->where('project_id', $project)->exists(), 404, 'Project not found.');
+        $result = $billingSheetSync->spreadsheetSyncSchools($project, $sheets);
+
+        return response()->json($result, $result['status'] === 'success' ? 200 : 503)
             ->header('Cache-Control', 'private, no-store');
     }
 

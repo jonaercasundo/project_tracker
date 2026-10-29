@@ -5,6 +5,11 @@ if (monitoring) {
     const syncBillingForm = document.getElementById('sync-billing-confirmation');
     const syncSpreadsheetDialog = document.getElementById('sync-spreadsheet-dialog');
     const syncSpreadsheetForm = document.getElementById('sync-spreadsheet-form');
+    const spreadsheetSchoolSelect = document.getElementById('spreadsheet-school');
+    const spreadsheetSchoolFields = document.getElementById('spreadsheet-school-fields');
+    const spreadsheetSchoolRowCount = document.getElementById('spreadsheet-school-row-count');
+    const spreadsheetModalFeedback = syncSpreadsheetForm.querySelector('[data-spreadsheet-modal-feedback]');
+    const spreadsheetSubmitButton = syncSpreadsheetForm.querySelector('[data-submit-spreadsheet]');
     let pendingSyncBillingButton;
     let pendingSyncSpreadsheetButton;
     const form = document.getElementById('monitoring-filters');
@@ -217,6 +222,7 @@ if (monitoring) {
             event.preventDefault();
             pendingSyncSpreadsheetButton = spreadsheetButton;
             syncSpreadsheetDialog.showModal();
+            loadSpreadsheetSchools(spreadsheetButton);
             return;
         }
 
@@ -300,9 +306,11 @@ if (monitoring) {
 
         const button = pendingSyncSpreadsheetButton;
         const projectId = button.dataset.syncSpreadsheet;
-        const originalLabel = button.textContent;
         const feedback = [...monitoring.querySelectorAll(`[data-sync-spreadsheet-feedback="${projectId}"]`)];
         const setFeedback = (message, isError = false) => {
+            spreadsheetModalFeedback.textContent = message;
+            spreadsheetModalFeedback.classList.toggle('text-rose-700', isError);
+            spreadsheetModalFeedback.classList.toggle('text-emerald-700', !isError);
             feedback.forEach(element => {
                 element.textContent = message;
                 element.classList.toggle('text-rose-700', isError);
@@ -311,11 +319,9 @@ if (monitoring) {
         };
         const formData = new FormData(syncSpreadsheetForm);
 
-        pendingSyncSpreadsheetButton = undefined;
-        syncSpreadsheetDialog.close();
-        button.disabled = true;
-        button.textContent = 'Syncing…';
-        setFeedback('Syncing spreadsheet rows…');
+        spreadsheetSubmitButton.disabled = true;
+        spreadsheetSchoolSelect.disabled = true;
+        setFeedback(`Syncing spreadsheet rows for ${spreadsheetSchoolSelect.selectedOptions[0]?.textContent ?? 'the selected school'}…`);
 
         try {
             const response = await fetch(button.dataset.endpoint, {
@@ -341,11 +347,24 @@ if (monitoring) {
         } catch (exception) {
             setFeedback(exception.message, true);
         } finally {
-            if (button.isConnected) {
-                button.disabled = false;
-                button.textContent = originalLabel;
-            }
+            spreadsheetSubmitButton.disabled = false;
+            spreadsheetSchoolSelect.disabled = false;
         }
+    });
+
+    spreadsheetSchoolSelect.addEventListener('change', () => {
+        const hasSchool = spreadsheetSchoolSelect.value !== '';
+        spreadsheetSchoolFields.hidden = !hasSchool;
+        spreadsheetSchoolFields.querySelectorAll('input').forEach(input => {
+            input.disabled = !hasSchool;
+            input.value = '';
+        });
+        spreadsheetSubmitButton.disabled = !hasSchool;
+        const selectedOption = spreadsheetSchoolSelect.selectedOptions[0];
+        spreadsheetSchoolRowCount.textContent = hasSchool
+            ? `${selectedOption.dataset.rowCount} matching DR/package row(s) need details; ${selectedOption.dataset.missingFieldCount} required cell(s) are blank.`
+            : 'Choose a school with a filled 3PL received date and missing billing details.';
+        spreadsheetModalFeedback.textContent = '';
     });
 
     syncSpreadsheetDialog.addEventListener('click', event => {
@@ -354,6 +373,52 @@ if (monitoring) {
             syncSpreadsheetDialog.close();
         }
     });
+
+    async function loadSpreadsheetSchools(button) {
+        spreadsheetSchoolSelect.disabled = true;
+        spreadsheetSchoolSelect.replaceChildren(new Option('Loading project schools…', ''));
+        spreadsheetSchoolFields.hidden = true;
+        spreadsheetSchoolFields.querySelectorAll('input').forEach(input => {
+            input.disabled = true;
+            input.value = '';
+        });
+        spreadsheetSubmitButton.disabled = true;
+        spreadsheetSchoolRowCount.textContent = 'Loading schools…';
+        spreadsheetModalFeedback.textContent = '';
+        document.getElementById('spreadsheet-preview-issues').textContent = '';
+
+        try {
+            const response = await fetch(button.dataset.schoolsEndpoint, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                cache: 'no-store',
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.message ?? `Could not load project schools (HTTP ${response.status}).`);
+            }
+
+            const options = [new Option('Choose a school', '')];
+            for (const school of result.schools ?? []) {
+                const label = `${school.school_name || 'School'} (${school.school_id}) · ${school.row_count} row(s) need details`;
+                const option = new Option(label, school.school_id);
+                option.dataset.rowCount = String(school.row_count);
+                option.dataset.missingFieldCount = String(school.missing_field_count);
+                options.push(option);
+            }
+            spreadsheetSchoolSelect.replaceChildren(...options);
+            spreadsheetSchoolSelect.disabled = options.length === 1;
+            spreadsheetSchoolRowCount.textContent = options.length > 1
+                ? 'Choose a school with a filled DATE RECEIVED (FROM 3PL) and at least one missing billing detail.'
+                : 'No schools currently have a filled 3PL received date and missing billing details.';
+            document.getElementById('spreadsheet-preview-issues').textContent = (result.issues ?? []).join(' ');
+        } catch (exception) {
+            spreadsheetSchoolSelect.replaceChildren(new Option('Could not load project schools', ''));
+            spreadsheetSchoolSelect.disabled = true;
+            spreadsheetSchoolRowCount.textContent = exception.message;
+            spreadsheetSchoolRowCount.classList.add('text-rose-700');
+        }
+    }
 
     async function trySyncBilling(button, originalLabel, setFeedback) {
         try {

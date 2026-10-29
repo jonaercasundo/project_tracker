@@ -121,39 +121,47 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
                     <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
-                    <p class="mt-2 text-sm text-slate-600">Enter the missing billing details. The update applies to matching Lots 2, 9, and 11 rows that already have a billing status. Checked by comes from your account; each Lot total is calculated from its DR. Existing billing statuses and 3PL received dates are preserved.</p>
+                    <p class="mt-2 text-sm text-slate-600">The school list is checked against the spreadsheet. It includes schools with a filled 3PL received date and missing billing details. Choose a school, enter its details, and sync only its matching Lots 2, 9, and 11 rows. Checked by comes from your account; each Lot total is calculated from its DR.</p>
                 </div>
                 <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"><span class="font-semibold">Checked by:</span> {{ auth()->user()->name }}</div>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="spreadsheet-school" class="mb-1 block text-xs font-semibold text-slate-600">School</label>
+                    <select id="spreadsheet-school" name="school_id" required disabled class="w-full rounded-lg border-slate-200 text-sm">
+                        <option value="">Loading project schools…</option>
+                    </select>
+                </div>
+                <div id="spreadsheet-school-fields" class="grid grid-cols-1 gap-4 sm:grid-cols-2" hidden>
                     <div>
                         <label for="spreadsheet-date-received" class="mb-1 block text-xs font-semibold text-slate-600">Date received (Lot X)</label>
-                        <input id="spreadsheet-date-received" name="date_received" type="date" required class="w-full rounded-lg border-slate-200 text-sm">
+                        <input id="spreadsheet-date-received" name="date_received" type="date" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                     </div>
                     <div>
                         <label for="spreadsheet-received-by" class="mb-1 block text-xs font-semibold text-slate-600">Received by (Lot X)</label>
-                        <input id="spreadsheet-received-by" name="received_by" type="text" maxlength="255" required class="w-full rounded-lg border-slate-200 text-sm">
+                        <input id="spreadsheet-received-by" name="received_by" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                     </div>
                     <div>
                         <label for="spreadsheet-inspection-1" class="mb-1 block text-xs font-semibold text-slate-600">Inspection 1 (Lot X)</label>
-                        <input id="spreadsheet-inspection-1" name="inspection_1" type="text" maxlength="255" required class="w-full rounded-lg border-slate-200 text-sm">
+                        <input id="spreadsheet-inspection-1" name="inspection_1" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                     </div>
                     <div>
                         <label for="spreadsheet-inspection-2" class="mb-1 block text-xs font-semibold text-slate-600">Inspection 2 (Lot X)</label>
-                        <input id="spreadsheet-inspection-2" name="inspection_2" type="text" maxlength="255" required class="w-full rounded-lg border-slate-200 text-sm">
+                        <input id="spreadsheet-inspection-2" name="inspection_2" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                     </div>
                     <div>
                         <label for="spreadsheet-date-checking" class="mb-1 block text-xs font-semibold text-slate-600">Date checking (Lot X)</label>
-                        <input id="spreadsheet-date-checking" name="date_checking" type="date" required class="w-full rounded-lg border-slate-200 text-sm">
+                        <input id="spreadsheet-date-checking" name="date_checking" type="date" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                     </div>
                     <div>
                         <label for="spreadsheet-date-encoding" class="mb-1 block text-xs font-semibold text-slate-600">Date encoding (Lot X)</label>
-                        <input id="spreadsheet-date-encoding" name="date_encoding" type="date" required class="w-full rounded-lg border-slate-200 text-sm">
+                        <input id="spreadsheet-date-encoding" name="date_encoding" type="date" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                     </div>
                 </div>
-                <p class="text-xs text-slate-500">Rows without a filled STATUS (BILLING#) are skipped. A missing or duplicate school/package match or a conflicting filled cell stops the entire sync before any write.</p>
+                <p id="spreadsheet-school-row-count" class="text-xs text-slate-500" aria-live="polite">Checking the spreadsheet for schools that need details…</p>
+                <p id="spreadsheet-preview-issues" class="text-xs text-amber-700" role="status" aria-live="polite"></p>
+                <p data-spreadsheet-modal-feedback class="text-sm text-slate-600" role="status" aria-live="polite"></p>
                 <div class="flex justify-end gap-2 border-t border-slate-100 pt-4">
                     <button type="button" data-cancel-sync-spreadsheet class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
-                    <button type="submit" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">Sync Spreadsheet</button>
+                    <button type="submit" data-submit-spreadsheet disabled class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">Sync This School</button>
                 </div>
             </form>
         </dialog>

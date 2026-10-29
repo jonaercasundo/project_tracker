@@ -1454,7 +1454,9 @@ it('syncs spreadsheet details using the authenticated account name', function ()
     jarvisOperations();
     $user = jarvisReader(true, true, true);
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    $schoolId = '001';
     $fields = [
+        'school_id' => $schoolId,
         'date_received' => '2026-10-28',
         'received_by' => 'School Receiver',
         'inspection_1' => 'Passed',
@@ -1463,9 +1465,18 @@ it('syncs spreadsheet details using the authenticated account name', function ()
         'date_encoding' => '2026-10-29',
     ];
     $syncService = Mockery::mock(BillingSheetSyncService::class);
+    $syncService->shouldReceive('spreadsheetSyncSchools')
+        ->once()
+        ->with(1, Mockery::type(GoogleSheetsApiClient::class))
+        ->andReturn([
+            'status' => 'success',
+            'message' => null,
+            'schools' => [['school_id' => $schoolId, 'school_name' => 'Central School', 'row_count' => 1, 'missing_field_count' => 8]],
+            'issues' => [],
+        ]);
     $syncService->shouldReceive('syncProjectSpreadsheet')
         ->once()
-        ->with(1, $user->name, $fields, Mockery::type(GoogleSheetsApiClient::class))
+        ->with(1, $schoolId, $user->name, array_diff_key($fields, ['school_id' => true]), Mockery::type(GoogleSheetsApiClient::class))
         ->andReturn([
             'status' => 'success',
             'message' => 'Spreadsheet details synchronized for 1 DR/package row(s).',
@@ -1475,6 +1486,9 @@ it('syncs spreadsheet details using the authenticated account name', function ()
         ]);
     app()->instance(BillingSheetSyncService::class, $syncService);
 
+    $this->getJson('/deliveries/monitoring/1/sync-spreadsheet/schools')
+        ->assertOk()
+        ->assertJsonPath('schools.0.school_name', 'Central School');
     $this->postJson('/deliveries/monitoring/1/sync-spreadsheet', $fields)
         ->assertOk()
         ->assertJsonPath('status', 'success')

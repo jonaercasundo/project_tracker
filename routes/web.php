@@ -136,6 +136,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         ->whereNumber('project')
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring.sync-spreadsheet');
+    Route::get('/deliveries/monitoring/{project}/sync-spreadsheet/schools', [DeliveryMonitoringController::class, 'spreadsheetSyncSchools'])
+        ->whereNumber('project')
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.monitoring.sync-spreadsheet.schools');
     Route::get('/deliveries/monitoring/{project}/sync-billing/{run}', [DeliveryMonitoringController::class, 'syncBillingStatus'])
         ->whereNumber('project')
         ->whereNumber('run')

@@ -17,6 +17,98 @@ class BillingSheetSyncService
 {
     public function __construct(private GoogleSheetsBillingConfiguration $configuration) {}
 
+    /** @return array{status: string, message: ?string, schools: array<int, array{school_id: string, school_name: string, row_count: int, missing_field_count: int}>, issues: array<int, string>} */
+    public function spreadsheetSyncSchools(int $projectId, GoogleSheetsApiClient $sheets): array
+    {
+        $configuration = $sheets->configurationStatus();
+        if (! $configuration['configured']) {
+            return ['status' => 'error', 'message' => $configuration['reason'], 'schools' => [], 'issues' => []];
+        }
+
+        $settings = $this->configuration->current();
+        try {
+            $rows = $sheets->values($this->quotedTab($settings['sheet_tab']).'!'.config('google_sheets.billing.batch_read_range', 'A:CT'), $settings['spreadsheet_id']);
+        } catch (Throwable $exception) {
+            Log::error('Google Sheets project school preview failed.', ['project_id' => $projectId, 'exception' => $exception]);
+
+            return ['status' => 'error', 'message' => 'Google Sheets could not be checked. Try again after checking the connection.', 'schools' => [], 'issues' => []];
+        }
+
+        $deliveries = $this->projectSpreadsheetDeliveries($projectId);
+        $headersByLot = [];
+        $sheetRowsByLot = [];
+        $eligibleRowsBySchool = [];
+        $issues = [];
+        foreach ($deliveries as $delivery) {
+            $lotNumber = $this->lotNumber((string) $delivery->lot_name);
+            if (! in_array($lotNumber, ['2', '9', '11'], true)) {
+                continue;
+            }
+
+            $headersByLot[$lotNumber] ??= $this->findBillingHeaderColumns($rows, $lotNumber);
+            $headers = $headersByLot[$lotNumber];
+            if ($headers === null) {
+                $issues[] = 'Lot '.$lotNumber.': SchoolID, package, or billing detail headers could not be identified uniquely.';
+
+                continue;
+            }
+            if ($headers['three_pl_date_column'] === null) {
+                $issues[] = 'Lot '.$lotNumber.': the DATE RECEIVED (FROM 3PL) header could not be identified uniquely.';
+
+                continue;
+            }
+            $sheetRowsByLot[$lotNumber] ??= $this->indexBillingSheetRows($rows, $headers);
+            $matchKey = $this->billingSheetMatchKey($delivery->school_id, $delivery->package_code);
+            $matches = $sheetRowsByLot[$lotNumber][$matchKey] ?? [];
+            if (count($matches) > 1) {
+                $issues[] = 'DR '.$delivery->dr_no.' / package '.$delivery->package_code.' / Lot '.$lotNumber.': multiple exact school and package rows matched.';
+
+                continue;
+            }
+            if ($matches === []) {
+                continue;
+            }
+
+            $match = $matches[0];
+            if ($this->exactCell($match['values'][$headers['destination_columns']['status']] ?? '') === ''
+                || $this->exactCell($match['values'][$headers['three_pl_date_column']] ?? '') === '') {
+                continue;
+            }
+
+            $missingFields = 0;
+            foreach ($headers['destination_columns'] as $field => $column) {
+                if ($field !== 'status' && $this->exactCell($match['values'][$column] ?? '') === '') {
+                    $missingFields++;
+                }
+            }
+            if ($missingFields === 0) {
+                continue;
+            }
+
+            $schoolId = (string) $delivery->school_id;
+            $rowKey = $lotNumber.'|'.$match['row'];
+            $eligibleRowsBySchool[$schoolId] ??= [
+                'school_id' => $schoolId,
+                'school_name' => (string) ($delivery->school_name ?? ''),
+                'rows' => [],
+            ];
+            $eligibleRowsBySchool[$schoolId]['rows'][$rowKey] = $missingFields;
+        }
+
+        $schools = collect($eligibleRowsBySchool)
+            ->map(fn (array $school): array => [
+                'school_id' => $school['school_id'],
+                'school_name' => $school['school_name'],
+                'row_count' => count($school['rows']),
+                'missing_field_count' => array_sum($school['rows']),
+            ])
+            ->sortBy('school_name')
+            ->values()
+            ->all();
+
+        return ['status' => 'success', 'message' => null, 'schools' => $schools, 'issues' => array_values(array_unique($issues))];
+    }
+
     /**
      * Fill missing billing details for project rows whose billing cycle is already recorded in the sheet.
      *
@@ -25,6 +117,7 @@ class BillingSheetSyncService
      */
     public function syncProjectSpreadsheet(
         int $projectId,
+        string $schoolId,
         string $checkedBy,
         array $fields,
         GoogleSheetsApiClient $sheets
@@ -46,24 +139,10 @@ class BillingSheetSyncService
             return $this->projectSpreadsheetFailure('Google Sheets could not be read. No cells were changed; check the connection and retry.');
         }
 
-        $deliveries = DB::table('deliveries as delivery')
-            ->join('package_status as package_status', 'package_status.delivery_id', '=', 'delivery.delivery_id')
-            ->join('package as package', 'package.package_id', '=', 'package_status.package_id')
-            ->leftJoin('lot as lot', 'lot.lot_id', '=', 'package.lot_id')
-            ->where('delivery.project_id', $projectId)
-            ->whereNotNull('package.package_num')
-            ->select([
-                'delivery.delivery_id',
-                'delivery.school_id',
-                'delivery.dr_no',
-                'package.package_num as package_code',
-                'lot.lot_name',
-            ])
-            ->distinct()
-            ->orderBy('delivery.delivery_id')
-            ->get();
+        $deliveries = $this->projectSpreadsheetDeliveries($projectId, $schoolId);
 
         $headersByLot = [];
+        $sheetRowsByLot = [];
         $plansByRow = [];
         $issues = [];
         $skippedCount = 0;
@@ -81,26 +160,29 @@ class BillingSheetSyncService
 
                 continue;
             }
+            if ($headers['three_pl_date_column'] === null) {
+                $issues[] = $identifier.': the DATE RECEIVED (FROM 3PL) column could not be identified uniquely.';
 
-            $matches = [];
-            foreach ($rows as $rowIndex => $row) {
-                if ($rowIndex <= $headers['header_row']) {
-                    continue;
-                }
-                if ($this->exactCell($row[$headers['school_id_column']] ?? '') === $this->exactCell($delivery->school_id)
-                    && $this->exactCell($row[$headers['package_code_column']] ?? '') === $this->exactCell($delivery->package_code)) {
-                    $matches[] = ['row' => $rowIndex + 1, 'values' => $row];
-                }
+                continue;
             }
 
-            if (count($matches) !== 1) {
-                $issues[] = $identifier.': '.(count($matches) === 0 ? 'no exact School ID and package-code row matched.' : 'multiple exact School ID and package-code rows matched.');
+            $sheetRowsByLot[$lotNumber] ??= $this->indexBillingSheetRows($rows, $headers);
+            $matches = $sheetRowsByLot[$lotNumber][$this->billingSheetMatchKey($delivery->school_id, $delivery->package_code)] ?? [];
+
+            if (count($matches) > 1) {
+                $issues[] = $identifier.': multiple exact School ID and package-code rows matched.';
+
+                continue;
+            }
+            if ($matches === []) {
+                $issues[] = $identifier.': no exact School ID and package-code row matched.';
 
                 continue;
             }
 
             $match = $matches[0];
-            if ($this->exactCell($match['values'][$headers['destination_columns']['status']] ?? '') === '') {
+            if ($this->exactCell($match['values'][$headers['destination_columns']['status']] ?? '') === ''
+                || $this->exactCell($match['values'][$headers['three_pl_date_column']] ?? '') === '') {
                 $skippedCount++;
 
                 continue;
@@ -201,6 +283,64 @@ class BillingSheetSyncService
     private function projectSpreadsheetFailure(string $message, array $issues = [], int $skippedCount = 0): array
     {
         return ['status' => 'error', 'message' => $message, 'synced_count' => 0, 'skipped_count' => $skippedCount, 'issues' => $issues];
+    }
+
+    /** @return Collection<int, object> */
+    private function projectSpreadsheetDeliveries(int $projectId, ?string $schoolId = null): Collection
+    {
+        return DB::table('deliveries as delivery')
+            ->join('package_status as package_status', 'package_status.delivery_id', '=', 'delivery.delivery_id')
+            ->join('package as package', 'package.package_id', '=', 'package_status.package_id')
+            ->leftJoin('lot as lot', 'lot.lot_id', '=', 'package.lot_id')
+            ->leftJoin('school as school', 'school.school_id', '=', 'delivery.school_id')
+            ->where('delivery.project_id', $projectId)
+            ->when($schoolId !== null, fn ($query) => $query->where('delivery.school_id', $schoolId))
+            ->whereNotNull('package.package_num')
+            ->select([
+                'delivery.delivery_id',
+                'delivery.school_id',
+                'delivery.dr_no',
+                'package.package_num as package_code',
+                'lot.lot_name',
+                'school.school_name',
+            ])
+            ->distinct()
+            ->orderBy('delivery.delivery_id')
+            ->get();
+    }
+
+    /** @param array<int, array<int, mixed>> $rows
+     * @param  array{header_row: int, school_id_column: int, package_code_column: int, three_pl_date_column: ?int, destination_columns: array<string, int>}  $headers
+     * @return array<string, array<int, array{row: int, values: array<int, mixed>}>>
+     */
+    private function indexBillingSheetRows(array $rows, array $headers): array
+    {
+        $indexedRows = [];
+        foreach ($rows as $rowIndex => $row) {
+            if ($rowIndex <= $headers['header_row']) {
+                continue;
+            }
+
+            $key = $this->billingSheetMatchKey(
+                $row[$headers['school_id_column']] ?? '',
+                $row[$headers['package_code_column']] ?? ''
+            );
+            if ($key === $this->billingSheetMatchKey('', '')) {
+                continue;
+            }
+
+            $indexedRows[$key][] = ['row' => $rowIndex + 1, 'values' => $row];
+        }
+
+        return $indexedRows;
+    }
+
+    private function billingSheetMatchKey(mixed $schoolId, mixed $packageCode): string
+    {
+        return hash('sha256', json_encode([
+            $this->exactCell($schoolId),
+            $this->exactCell($packageCode),
+        ], JSON_THROW_ON_ERROR));
     }
 
     /**
@@ -1047,7 +1187,7 @@ class BillingSheetSyncService
     }
 
     /** @param array<int, array<int, mixed>> $rows
-     * @return array{header_row: int, school_id_column: int, package_code_column: int, destination_columns: array<string, int>}|null
+     * @return array{header_row: int, school_id_column: int, package_code_column: int, three_pl_date_column: ?int, destination_columns: array<string, int>}|null
      */
     private function findBillingHeaderColumns(array $rows, string $lotNumber): ?array
     {
@@ -1093,6 +1233,11 @@ class BillingSheetSyncService
                 }
             }
 
+            $threePlDateColumns = array_keys(array_filter(
+                $sectionHeaders,
+                fn (string $header): bool => $header === 'datereceivedfrom3pl'.$lotSuffix
+            ));
+
             $requestedHeaders = [
                 'status' => fn (string $header): bool => str_contains($header, 'status')
                     && str_contains($header, 'billing') && str_contains($header, $lotSuffix),
@@ -1126,6 +1271,7 @@ class BillingSheetSyncService
                     'header_row' => $rowIndex,
                     'school_id_column' => $schoolColumns[0],
                     'package_code_column' => $packageColumns[0],
+                    'three_pl_date_column' => count($threePlDateColumns) === 1 ? $threePlDateColumns[0] : null,
                     'destination_columns' => $destinationColumns,
                 ];
             }

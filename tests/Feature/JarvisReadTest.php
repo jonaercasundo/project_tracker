@@ -1051,6 +1051,8 @@ it('shows distinct DR gaps between delivered billing stages in the monitoring fl
         ->assertJsonPath('data.projects.0.pipeline.stock_out.completed', 2)
         ->assertJsonPath('data.projects.0.pipeline.stock_out.pending_count', 1)
         ->assertJsonPath('data.projects.0.pipeline.stock_out.pending_total', 2)
+        ->assertJsonPath('data.projects.0.pipeline.dr.remaining_count', 0)
+        ->assertJsonPath('data.projects.0.pipeline.dr.remaining_total', 2)
         ->assertJsonPath('data.projects.0.pipeline.delivered.completed', 1)
         ->assertJsonPath('data.projects.0.pipeline.delivered.pending_count', 0)
         ->assertJsonPath('data.projects.0.pipeline.delivered.pending_total', 1)
@@ -1065,6 +1067,7 @@ it('shows distinct DR gaps between delivered billing stages in the monitoring fl
         ->assertSee('/ 2 DRs')
         ->assertSee('0 ')
         ->assertSee('/ 1 DRs')
+        ->assertSee('/ 2 DRs')
         ->assertDontSee('Pending 1 / 1 DRs')
         ->assertSeeInOrder(['Stock Out', '1 ', 'Delivered', '0 ', 'Billing']);
 });

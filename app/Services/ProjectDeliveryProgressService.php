@@ -1034,7 +1034,12 @@ class ProjectDeliveryProgressService
         $billedDrs = (int) $counts['billed_delivery_drs_count'];
 
         return [
-            'dr' => $this->stage($counts['total_deliveries_count'], $counts['total_deliveries_count'], 'DR receipts') + ['label' => 'DR', 'context' => 'Recorded receipts; the workflow baseline', 'source' => 'deliveries grouped by exact project_id + dr_no'],
+            'dr' => $this->stage($counts['total_deliveries_count'], $counts['total_deliveries_count'], 'DR receipts') + [
+                'label' => 'DR', 'context' => 'Recorded receipts; the workflow baseline',
+                'source' => 'deliveries grouped by exact project_id + dr_no',
+                'remaining_count' => max(0, (int) $counts['total_deliveries_count'] - $stockOutDrs),
+                'remaining_total' => (int) $counts['total_deliveries_count'],
+            ],
             'stock_out' => $this->stage($stockOutDrs, $counts['total_deliveries_count'], 'DRs') + [
                 'label' => 'Stock Out', 'context' => 'Distinct valid DRs with a released package and matching project-item stock-out history',
                 'source' => 'Latest released package status joined to package contents and stock-out history, plus billing-sync inventory history keyed by exact project_id + DR number',

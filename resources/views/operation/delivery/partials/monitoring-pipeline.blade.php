@@ -10,6 +10,9 @@
                 @if(!$stage['available'])
                     <p class="mt-1 text-sm font-semibold text-slate-500">Per item unit</p>
                     <p class="mt-1 text-[11px] leading-4 text-slate-500">See details</p>
+                @elseif($key === 'dr')
+                    <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['remaining_count']) }} <span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['remaining_total']) }} DRs</span></p>
+                    <p class="mt-1 text-xs font-semibold tabular-nums text-blue-700">{{ $stage['total'] ? 'Recorded' : 'No DRs' }}</p>
                 @else
                     @if(in_array($key, ['stock_out', 'delivered'], true))
                         <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['pending_count']) }} <span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['pending_total']) }} DRs</span></p>

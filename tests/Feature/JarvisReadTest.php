@@ -2147,7 +2147,7 @@ it('shows a changed Logistics status on the next section refresh', function () {
         ->assertDontSee('DR# / integration');
 });
 
-it('does not invent a Logistics status when a DR has no webhook tracking row', function () {
+it('omits the external carrier tracking section from delivery monitoring', function () {
     jarvisOperations();
     $user = jarvisReader();
     $this->withoutVite();
@@ -2155,10 +2155,11 @@ it('does not invent a Logistics status when a DR has no webhook tracking row', f
 
     $this->get('/deliveries/monitoring')
         ->assertOk()
-        ->assertSee('Pending Logistics updates')
-        ->assertDontSee('DR# / integration')
-        ->assertDontSee('No Logistics events match these filters')
-        ->assertDontSee('Logistics Received</span>');
+        ->assertDontSee('External carrier updates')
+        ->assertDontSee('Logistics DR Tracking')
+        ->assertDontSee('id="logistics-filters"', false)
+        ->assertDontSee('How progress is calculated')
+        ->assertSee('Operational pipeline');
 });
 
 it('protects the Logistics feed with the same MMC company and dashboard role boundary', function (string $condition) {

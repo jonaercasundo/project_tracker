@@ -14,7 +14,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class DeliveryMonitoringController extends Controller
@@ -217,31 +216,13 @@ class DeliveryMonitoringController extends Controller
         $report = [
             'projects' => collect(),
             'summary' => ['projects_count' => 0],
-            'definitions' => $this->progress->definitions(),
             'empty_reason' => isset($filters['project_id']) ? 'loading' : 'choose_project',
-        ];
-        $logistics = [
-            'summary' => [
-                'total_scoped_drs' => 0,
-                'logistics_received' => 0,
-                'logistics_delivered' => 0,
-                'pending_updates' => 0,
-                'reconciliation_required' => 0,
-                'delivery_performance_percentage' => 0,
-                'partner_performance' => [],
-            ],
-            'loading' => true,
         ];
 
         return view('operation.delivery.monitoring', [
             'report' => $report,
-            'logistics' => $logistics,
             'filters' => $filters,
             'projects' => DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']),
-            'logisticsIntegrations' => Schema::hasTable('logistics_integrations')
-                ? DB::table('logistics_integrations')->where('status', 'active')->orderBy('name')->get(['integration_id', 'name'])
-                : collect(),
-            'lots' => DB::table('lot')->orderBy('lot_name')->get(['lot_id', 'lot_name']),
             'locations' => DB::table('school')->whereNotNull('region')->where('region', '<>', '')->distinct()->orderBy('region')->pluck('region'),
             'years' => DB::table('deliveries')->whereNotNull('delivery_date')->selectRaw(DB::connection()->getDriverName() === 'sqlite' ? "CAST(strftime('%Y', delivery_date) AS INTEGER) as year" : 'YEAR(delivery_date) as year')->distinct()->orderByDesc('year')->pluck('year'),
         ]);

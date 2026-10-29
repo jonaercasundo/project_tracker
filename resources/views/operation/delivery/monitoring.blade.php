@@ -121,7 +121,7 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
                     <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
-                    <p class="mt-2 text-sm text-slate-600">The school list is checked against the spreadsheet. It includes rows where STATUS (BILLING#), Checked by, and DATE RECEIVED (FROM 3PL) are already filled, but other billing details are missing. Choose a school and enter its details. The existing trigger values are preserved; each Lot total is calculated from its DR.</p>
+                    <p class="mt-2 text-sm text-slate-600">The school list is checked against the spreadsheet. It includes rows with a filled DATE RECEIVED (FROM 3PL) and missing billing details. Choose a school and enter its details. A blank Checked by cell is filled with your account name; existing values and billing status are preserved. Each Lot total is calculated from its DR.</p>
                 </div>
                 <div>
                     <label for="spreadsheet-school" class="mb-1 block text-xs font-semibold text-slate-600">School</label>

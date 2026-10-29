@@ -70,15 +70,13 @@ class BillingSheetSyncService
             }
 
             $match = $matches[0];
-            if ($this->exactCell($match['values'][$headers['destination_columns']['status']] ?? '') === ''
-                || $this->exactCell($match['values'][$headers['destination_columns']['checked_by']] ?? '') === ''
-                || $this->exactCell($match['values'][$headers['three_pl_date_column']] ?? '') === '') {
+            if ($this->exactCell($match['values'][$headers['three_pl_date_column']] ?? '') === '') {
                 continue;
             }
 
             $missingFields = 0;
             foreach ($headers['destination_columns'] as $field => $column) {
-                if (! in_array($field, ['status', 'checked_by'], true) && $this->exactCell($match['values'][$column] ?? '') === '') {
+                if ($field !== 'status' && $this->exactCell($match['values'][$column] ?? '') === '') {
                     $missingFields++;
                 }
             }
@@ -111,7 +109,7 @@ class BillingSheetSyncService
     }
 
     /**
-     * Fill missing billing details for project rows whose billing cycle is already recorded in the sheet.
+     * Fill missing billing details for project rows with a recorded 3PL received date.
      *
      * @param  array{date_received: string, received_by: string, inspection_1: string, inspection_2: string, date_checking: string, date_encoding: string}  $fields
      * @return array{status: string, message: string, synced_count: int, skipped_count: int, issues: array<int, string>}
@@ -119,6 +117,7 @@ class BillingSheetSyncService
     public function syncProjectSpreadsheet(
         int $projectId,
         string $schoolId,
+        string $checkedBy,
         array $fields,
         GoogleSheetsApiClient $sheets
     ): array {
@@ -181,9 +180,7 @@ class BillingSheetSyncService
             }
 
             $match = $matches[0];
-            if ($this->exactCell($match['values'][$headers['destination_columns']['status']] ?? '') === ''
-                || $this->exactCell($match['values'][$headers['destination_columns']['checked_by']] ?? '') === ''
-                || $this->exactCell($match['values'][$headers['three_pl_date_column']] ?? '') === '') {
+            if ($this->exactCell($match['values'][$headers['three_pl_date_column']] ?? '') === '') {
                 $skippedCount++;
 
                 continue;
@@ -208,7 +205,7 @@ class BillingSheetSyncService
         if ($plansByRow === []) {
             return [
                 'status' => 'success',
-                'message' => 'No rows with an existing Lot billing status were found to sync.',
+                'message' => 'No matching rows with a filled 3PL received date were found to sync.',
                 'synced_count' => 0,
                 'skipped_count' => $skippedCount,
                 'issues' => [],
@@ -219,6 +216,7 @@ class BillingSheetSyncService
         $updatesByCell = [];
         foreach ($plansByRow as $plan) {
             $fieldsForRow = [
+                'checked_by' => $checkedBy,
                 'date_received' => $fields['date_received'],
                 'received_by' => $fields['received_by'],
                 'inspection_1' => $fields['inspection_1'],
@@ -234,6 +232,9 @@ class BillingSheetSyncService
                 $cell = $this->columnName($columnIndex).$plan['row'];
                 $existingValue = $plan['row_values'][$columnIndex] ?? '';
                 if ($this->cellValueMatches($field, $existingValue, $value)) {
+                    continue;
+                }
+                if ($field === 'checked_by' && $this->exactCell($existingValue) !== '') {
                     continue;
                 }
                 if ($this->exactCell($existingValue) !== '') {
@@ -270,7 +271,7 @@ class BillingSheetSyncService
 
         return [
             'status' => 'success',
-            'message' => 'Spreadsheet details synchronized for '.count($plansByRow).' DR/package row(s); existing billing status and 3PL received dates were preserved.',
+            'message' => 'Spreadsheet details synchronized for '.count($plansByRow).' DR/package row(s); existing billing statuses and 3PL received dates were preserved, and blank Checked by cells were filled from your account.',
             'synced_count' => count($plansByRow),
             'skipped_count' => $skippedCount,
             'issues' => [],

@@ -202,7 +202,7 @@ class DeliveryMonitoringController extends Controller
 
         $schoolId = $fields['school_id'];
         unset($fields['school_id']);
-        $result = $billingSheetSync->syncProjectSpreadsheet($project, $schoolId, $fields, $sheets);
+        $result = $billingSheetSync->syncProjectSpreadsheet($project, $schoolId, (string) Auth::user()->name, $fields, $sheets);
 
         return response()->json($result, $result['status'] === 'success' ? 200 : 422)
             ->header('Cache-Control', 'private, no-store');

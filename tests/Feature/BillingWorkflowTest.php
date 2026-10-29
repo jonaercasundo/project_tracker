@@ -487,7 +487,7 @@ it('applies the same entered billing details to Lots 2, 9, and 11 and calculates
 });
 
 it('syncs missing spreadsheet details for billed Lot rows using DR amounts and keeps retries idempotent', function (): void {
-    signInBillingUser();
+    [$actor] = signInBillingUser();
     config([
         'google_sheets.billing.enabled' => true,
         'google_sheets.billing.spreadsheet_id' => 'test-spreadsheet-id',
@@ -548,7 +548,6 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
     }
     $sheetRows[2][billingSheetColumnIndex($billingStatusColumns['2'])] = '2nd Billing';
     $sheetRows[2][billingSheetColumnIndex($destinationColumns['2']['checked_by'])] = 'LYN';
-    $sheetRows[3][billingSheetColumnIndex($billingStatusColumns['2'])] = '2nd Billing';
     $sheetRows[3][billingSheetColumnIndex($threePlDateColumns['2'])] = '2026-10-27';
 
     $alreadySyncedRows = $sheetRows;
@@ -561,18 +560,25 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
             }
         }
     }
+    foreach ($destinationColumns['2'] as $field => $column) {
+        $alreadySyncedRows[3][billingSheetColumnIndex($column)] = $field === 'checked_by'
+            ? $actor->name
+            : ($field === 'total_amount' ? $expectedAmounts['2'] : $fields[$field]);
+    }
 
     $sheets = Mockery::mock(GoogleSheetsApiClient::class);
     $sheets->shouldReceive('configurationStatus')->times(3)->andReturn(['configured' => true, 'reason' => null]);
     $sheets->shouldReceive('values')->times(3)->with("'Copy of SME LOT 2,9,11'!A:CT", 'test-spreadsheet-id')->andReturn($sheetRows, $sheetRows, $alreadySyncedRows);
     $writeCalls = [];
-    $sheets->shouldReceive('updateCells')->once()->withArgs(function (array $updates, string $spreadsheetId) use (&$writeCalls, $fields): bool {
+    $sheets->shouldReceive('updateCells')->once()->withArgs(function (array $updates, string $spreadsheetId) use (&$writeCalls, $fields, $actor): bool {
         $writeCalls[] = $updates;
         $updatesByRange = collect($updates)->keyBy('range');
 
         return $spreadsheetId === 'test-spreadsheet-id'
-            && count($updates) === 21
-            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BD|BE|BF|BS|BT|BU|CG|CH|CI)\d+$/', $range) === 1)
+            && count($updates) === 29
+            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BD|BF|BS|BU|CG|CI)\d+$/', $range) === 1)
+            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:BE|BT|CH)2$/', $range) === 1)
+            && $updatesByRange["'Copy of SME LOT 2,9,11'!BE4"]['values'] === [[$actor->name]]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BG2"]['values'] === [[$fields['date_received']]]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BO2"]['values'] === [['12.50']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!CD2"]['values'] === [['23.00']]
@@ -581,17 +587,17 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
 
     $service = app(BillingSheetSyncService::class);
     $preview = $service->spreadsheetSyncSchools($projectId, $sheets);
-    $first = $service->syncProjectSpreadsheet($projectId, $schoolId, $fields, $sheets);
-    $retry = $service->syncProjectSpreadsheet($projectId, $schoolId, $fields, $sheets);
+    $first = $service->syncProjectSpreadsheet($projectId, $schoolId, $actor->name, $fields, $sheets);
+    $retry = $service->syncProjectSpreadsheet($projectId, $schoolId, $actor->name, $fields, $sheets);
     expect($preview['status'])->toBe('success')
         ->and($preview['schools'])->toHaveCount(1)
         ->and($preview['schools'][0]['school_id'])->toBe($schoolId)
-        ->and($preview['schools'][0]['row_count'])->toBe(3)
-        ->and($preview['schools'][0]['missing_field_count'])->toBe(21)
+        ->and($preview['schools'][0]['row_count'])->toBe(4)
+        ->and($preview['schools'][0]['missing_field_count'])->toBe(29)
         ->and($first['status'])->toBe('success')
-        ->and($first['synced_count'])->toBe(3)
+        ->and($first['synced_count'])->toBe(4)
         ->and($retry['status'])->toBe('success')
-        ->and($retry['synced_count'])->toBe(3)
+        ->and($retry['synced_count'])->toBe(4)
         ->and(DB::table('deliveries')->whereIn('delivery_id', array_values($deliveryIds))->pluck('status')->unique()->all())->toBe(['accepted'])
         ->and(count($writeCalls))->toBe(1)
         ->and(DB::table('deliveries')->where('delivery_id', $otherSchoolDeliveryId)->value('status'))->toBe('accepted');
@@ -620,7 +626,7 @@ it('does not partially sync spreadsheet rows when a DR package match is missing 
     $sheets->shouldReceive('values')->once()->andReturn($rows);
     $sheets->shouldNotReceive('updateCells');
 
-    $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, [
+    $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, 'Billing Tester', [
         'date_received' => '2026-10-28',
         'received_by' => 'Receiver',
         'inspection_1' => 'Passed',
@@ -654,7 +660,7 @@ it('does not write spreadsheet rows when an exact school and package match is am
     $sheets->shouldReceive('values')->once()->andReturn($rows);
     $sheets->shouldNotReceive('updateCells');
 
-    $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, [
+    $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, $schoolId, 'Billing Tester', [
         'date_received' => '2026-10-28',
         'received_by' => 'Receiver',
         'inspection_1' => 'Passed',

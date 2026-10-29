@@ -121,7 +121,7 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
                     <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
-                    <p class="mt-2 text-sm text-slate-600">Enter the School ID and billing details, then preview the DR/package matches and target cells before syncing. You can enter a tracker School ID or a configured mapped sheet SchoolID. Selected billing and compliance statuses fill blank cells; existing nonblank values are preserved. Each Lot total is calculated from its DR.</p>
+                    <p class="mt-2 text-sm text-slate-600">Enter the School ID and billing details, then preview the DR/package matches and target cells before syncing. You can enter a tracker School ID or a configured mapped sheet SchoolID. The selected encode updates mapped billing fields. Contact Person is copied from Received by; Position and Telephone 1 are shown in the preview and left unchanged. Contact/Email and DATE RECEIVED (FROM 3PL) are also left unchanged. Each Lot total is calculated from its DR.</p>
                 </div>
                 <div>
                     <label for="spreadsheet-school-id" class="mb-1 block text-xs font-semibold text-slate-600">School ID</label>

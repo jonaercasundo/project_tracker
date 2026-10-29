@@ -333,6 +333,13 @@ class BillingSheetSyncService
             'school_name' => $plan['school_name'],
             'package_code' => $plan['package_code'],
             'sheet_package_code' => $plan['sheet_package_code'],
+            'contact_person' => mb_strtoupper(trim($fields['received_by'])),
+            'position' => isset($plan['headers']['position_column'])
+                ? $this->exactCell($plan['row_values'][$plan['headers']['position_column']] ?? '')
+                : null,
+            'telephone_1' => isset($plan['headers']['telephone_1_column'])
+                ? $this->exactCell($plan['row_values'][$plan['headers']['telephone_1_column']] ?? '')
+                : null,
             'billing_status' => mb_strtoupper(trim($fields['billing_status'])),
             'compliance_status' => mb_strtoupper(trim($fields['compliance_status'])),
             'lot' => $plan['lot_number'],
@@ -1445,7 +1452,7 @@ class BillingSheetSyncService
     }
 
     /** @param array<int, array<int, mixed>> $rows
-     * @return array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, contact_person_column?: int, destination_columns: array<string, int>}|null
+     * @return array{header_row: int, school_id_column: int, package_code_column: int, bir_dr_column: ?int, three_pl_date_column: ?int, contact_person_column?: int, position_column?: int, telephone_1_column?: int, destination_columns: array<string, int>}|null
      */
     private function findBillingHeaderColumns(array $rows, string $lotNumber, bool $requireContactPerson = false): ?array
     {
@@ -1459,6 +1466,8 @@ class BillingSheetSyncService
             $packageColumns = [];
             $billingSectionStarts = [];
             $contactPersonColumns = [];
+            $positionColumns = [];
+            $telephoneOneColumns = [];
             foreach ($headers as $columnIndex => $heading) {
                 $normalized = $this->normalizedHeader($heading);
                 if ($normalized === 'schoolid') {
@@ -1466,6 +1475,12 @@ class BillingSheetSyncService
                 }
                 if ($normalized === 'contactperson') {
                     $contactPersonColumns[] = $columnIndex;
+                }
+                if ($normalized === 'position') {
+                    $positionColumns[] = $columnIndex;
+                }
+                if ($normalized === 'telephone1') {
+                    $telephoneOneColumns[] = $columnIndex;
                 }
                 if ($normalized === 'corepackagecode'.$lotSuffix) {
                     $packageColumns[] = $columnIndex;
@@ -1556,6 +1571,12 @@ class BillingSheetSyncService
                 ];
                 if (count($contactPersonColumns) === 1) {
                     $candidate['contact_person_column'] = $contactPersonColumns[0];
+                }
+                if (count($positionColumns) === 1) {
+                    $candidate['position_column'] = $positionColumns[0];
+                }
+                if (count($telephoneOneColumns) === 1) {
+                    $candidate['telephone_1_column'] = $telephoneOneColumns[0];
                 }
                 $candidates[] = $candidate;
             }

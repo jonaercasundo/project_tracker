@@ -386,6 +386,33 @@ if (monitoring) {
                 : '';
             entry.textContent = `${row.school_name || 'School'} · DR ${row.dr} · ${row.package_code} · Lot ${row.lot} · ${row.billing_status} · ${row.compliance_status} · Sheet row ${row.sheet_row} · Cells: ${(row.target_cells ?? []).join(', ') || 'no changes'} · Total ${row.amount}${mapping}`;
             spreadsheetDryRun.append(entry);
+
+            const detailsTable = document.createElement('table');
+            detailsTable.className = 'mt-2 w-full table-fixed border-collapse text-left';
+            const headerRow = document.createElement('tr');
+            const valueRow = document.createElement('tr');
+            [
+                ['Contact Person', row.contact_person],
+                ['Position', row.position],
+                ['Telephone 1', row.telephone_1],
+            ].forEach(([label, value]) => {
+                const heading = document.createElement('th');
+                heading.className = 'border border-slate-200 bg-white px-2 py-1 font-semibold';
+                heading.textContent = label;
+                headerRow.append(heading);
+
+                const cell = document.createElement('td');
+                cell.className = 'break-words border border-slate-200 px-2 py-1';
+                cell.textContent = value || '—';
+                valueRow.append(cell);
+            });
+
+            const tableHead = document.createElement('thead');
+            tableHead.append(headerRow);
+            const tableBody = document.createElement('tbody');
+            tableBody.append(valueRow);
+            detailsTable.append(tableHead, tableBody);
+            spreadsheetDryRun.append(detailsTable);
         }
     }
 

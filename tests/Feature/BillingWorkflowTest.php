@@ -165,7 +165,9 @@ function billingConfirmationSheetRows(array $schoolRows): array
     $columnHeaders = [
         'B' => 'SchoolID',
         'F' => 'Contact Person',
-        'G' => 'Contact/Email',
+        'G' => 'Position',
+        'H' => 'Telephone 1',
+        'I' => 'Contact/Email',
         'L' => 'Core Package Code Lot2',
         'X' => 'Core Package Code Lot 9',
         'AJ' => 'Core Package Code Lot 11',
@@ -211,7 +213,9 @@ function billingConfirmationSheetRows(array $schoolRows): array
     foreach ($schoolRows as $schoolRow) {
         $row = array_fill(0, 98, '');
         $row[1] = $schoolRow['school_id'];
-        $row[billingSheetColumnIndex('G')] = $schoolRow['contact_email'] ?? 'school@example.test';
+        $row[billingSheetColumnIndex('G')] = $schoolRow['position'] ?? 'ADMINISTRATIVE OFFICER II';
+        $row[billingSheetColumnIndex('H')] = $schoolRow['telephone_1'] ?? '9759300283';
+        $row[billingSheetColumnIndex('I')] = $schoolRow['contact_email'] ?? 'school@example.test';
         foreach ($schoolRow['package_codes'] as $lotNumber => $packageCode) {
             $column = ['2' => 'L', '9' => 'X', '11' => 'AJ'][$lotNumber];
             $row[billingSheetColumnIndex($column)] = $packageCode;
@@ -611,7 +615,7 @@ it('syncs missing spreadsheet details for billed Lot rows using DR amounts and k
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BT2"]['values'] === [[mb_strtoupper($actor->name)]]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!CH2"]['values'] === [[mb_strtoupper($actor->name)]]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BE4"]['values'] === [[mb_strtoupper($actor->name)]]
-            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!G\d+$/', $range) === 1)
+            && ! $updatesByRange->keys()->contains(fn (string $range): bool => preg_match('/!(?:G|H|I)\d+$/', $range) === 1)
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BG2"]['values'] === [[$fields['date_received']]]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BO2"]['values'] === [['12.50']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!CD2"]['values'] === [['23.00']]
@@ -703,7 +707,7 @@ it('matches split numeric tracker packages to one exact school and lot-specific 
     $rows[1][billingSheetColumnIndex('BF')] = '2026-10-27';
     foreach ([
         'F' => 'OLD CONTACT',
-        'G' => 'preserve@example.test',
+        'I' => 'preserve@example.test',
         'BD' => '1ST BILLING',
         'BE' => 'OLD USER',
         'BG' => '2026-01-01',
@@ -737,7 +741,7 @@ it('matches split numeric tracker packages to one exact school and lot-specific 
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BK2"]['values'] === [['2026-10-29']]
             && $updatesByRange["'Copy of SME LOT 2,9,11'!BL2"]['values'] === [['2026-10-29']]
             && isset($updatesByRange["'Copy of SME LOT 2,9,11'!BO2"])
-            && ! $updatesByRange->keys()->contains(fn (string $range): bool => in_array($range, ["'Copy of SME LOT 2,9,11'!BF2", "'Copy of SME LOT 2,9,11'!G2"], true));
+            && ! $updatesByRange->keys()->contains(fn (string $range): bool => in_array($range, ["'Copy of SME LOT 2,9,11'!BF2", "'Copy of SME LOT 2,9,11'!G2", "'Copy of SME LOT 2,9,11'!H2", "'Copy of SME LOT 2,9,11'!I2"], true));
     });
 
     $result = app(BillingSheetSyncService::class)->syncProjectSpreadsheet($projectId, '120066', 'Billing Tester', [
@@ -758,6 +762,9 @@ it('matches split numeric tracker packages to one exact school and lot-specific 
         ->and($result['preview'][0]['sheet_row'])->toBe(2)
         ->and($result['preview'][0]['sheet_package_code'])->toBe('C1 LOT 2 KS1 G1-G3 & C1 LOT 2 KS2 G4-G6')
         ->and($result['preview'][0]['target_cells'])->toContain('F2')
+        ->and($result['preview'][0]['contact_person'])->toBe('RECEIVER')
+        ->and($result['preview'][0]['position'])->toBe('ADMINISTRATIVE OFFICER II')
+        ->and($result['preview'][0]['telephone_1'])->toBe('9759300283')
         ->and($result['preview'][0]['billing_status'])->toBe('2ND BILLING')
         ->and($result['preview'][0]['compliance_status'])->toBe('NON-COMPLIANT')
         ->and($result['preview'][0]['amount'])->toBe('45.00');

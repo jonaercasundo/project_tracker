@@ -1163,6 +1163,10 @@ it('calculates operational progress for a year-filtered report while keeping inv
     $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
     $this->get('/deliveries/monitoring?project_id=1&year=2026')->assertOk()
         ->assertSee('25.0%')
+        ->assertSee('Filter progress')
+        ->assertDontSee('Active Projects')
+        ->assertDontSee('Warehouse Stock')
+        ->assertDontSee('Delivery-level Billed')
         ->assertDontSee('Overall progress is unavailable because');
 });
 

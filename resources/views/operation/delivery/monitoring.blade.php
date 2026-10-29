@@ -193,7 +193,7 @@
                 <div>
                     <h2 class="text-lg font-bold text-slate-900">Sync Billing</h2>
                     <p class="mt-2 text-sm text-slate-600">Billing-eligible DRs will advance through Stock Out and Delivered, and their quantities will be deducted from inventory.</p>
-                    <p class="mt-2 text-xs text-slate-500">Each DR will use its assigned logistics warehouse. If no warehouse is assigned, Sync Billing will use the unique warehouse mapped to the school’s region. DRs without a clear warehouse mapping will be left unchanged and reported.</p>
+                    <p class="mt-2 text-xs text-slate-500">Each DR uses its assigned logistics warehouse when available. Otherwise, its school region selects the configured regional hub: Luzon to Pampanga, Visayas to Cebu, and Mindanao to Davao. DRs without a clear warehouse will be left unchanged and reported.</p>
                 </div>
                 <div class="flex justify-end gap-2">
                     <button type="button" data-cancel-sync-billing class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>

@@ -282,15 +282,31 @@ class BillingOperationalSyncService
             ->unique()
             ->values();
 
-        if ($warehouseIds->isEmpty()) {
-            throw new RuntimeException("Billing sync stopped because school region {$region} for DR {$delivery->dr_no} has no warehouse mapping.");
-        }
-
         if ($warehouseIds->count() > 1) {
             throw new RuntimeException("Billing sync stopped because school region {$region} for DR {$delivery->dr_no} maps to multiple warehouses.");
         }
 
-        return $warehouseIds->sole();
+        if ($warehouseIds->isNotEmpty()) {
+            return $warehouseIds->sole();
+        }
+
+        $hubName = config('warehouse-routing.region_hubs')[mb_strtolower($region)] ?? null;
+        if ($hubName === null) {
+            throw new RuntimeException("Billing sync stopped because school region {$region} for DR {$delivery->dr_no} has no configured warehouse hub.");
+        }
+
+        $hubWarehouseIds = DB::table('warehouse')
+            ->whereRaw('LOWER(TRIM(warehouse_name)) = ?', [mb_strtolower($hubName)])
+            ->pluck('warehouse_id')
+            ->map(fn ($warehouseId): int => (int) $warehouseId)
+            ->unique()
+            ->values();
+
+        if ($hubWarehouseIds->count() !== 1) {
+            throw new RuntimeException("Billing sync stopped because the configured {$hubName} hub for school region {$region} does not identify exactly one warehouse.");
+        }
+
+        return $hubWarehouseIds->sole();
     }
 
     /** @param array<int, array<string, int|string>> $stockOutLines */

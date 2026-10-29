@@ -32,6 +32,10 @@ class BillingOperationalSyncServiceTestCase extends TestCase
             $table->unsignedInteger('warehouse_id')->nullable();
             $table->string('region')->nullable();
         });
+        Schema::create('warehouse', function (Blueprint $table): void {
+            $table->increments('warehouse_id');
+            $table->string('warehouse_name');
+        });
         Schema::create('deliveries', function (Blueprint $table): void {
             $table->increments('delivery_id');
             $table->unsignedInteger('project_id');
@@ -136,15 +140,15 @@ function billingOperationalFixture(?int $logisticsLocationId = null, string $reg
 }
 
 it('uses the warehouse mapped to the school region when the DR has no direct location assignment', function () {
-    $fixture = billingOperationalFixture();
-    DB::table('logistics_location')->insert(['region' => 'Region IV-A', 'warehouse_id' => 4]);
-    DB::table('inventory')->insert(['item_id' => 91, 'warehouse_id' => 4, 'qty' => 20, 'inventory_status' => 'Approved']);
+    $fixture = billingOperationalFixture(region: 'Region I');
+    DB::table('warehouse')->insert(['warehouse_id' => 2, 'warehouse_name' => 'Pampanga']);
+    DB::table('inventory')->insert(['item_id' => 91, 'warehouse_id' => 2, 'qty' => 20, 'inventory_status' => 'Approved']);
 
     $result = app(BillingOperationalSyncService::class)->syncProject($fixture['project_id'], 12, 'Billing User');
 
     expect($result['synced_dr_count'])->toBe(1)
-        ->and(DB::table('inventory')->where('warehouse_id', 4)->value('qty'))->toBe(14)
-        ->and(DB::table('inventory_history')->value('warehouse_id'))->toBe(4)
+        ->and(DB::table('inventory')->where('warehouse_id', 2)->value('qty'))->toBe(14)
+        ->and(DB::table('inventory_history')->value('warehouse_id'))->toBe(2)
         ->and(DB::table('package_status')->where('status', 'delivered')->exists())->toBeTrue();
 });
 
@@ -153,6 +157,10 @@ it('prefers the warehouse assigned directly to the DR logistics location', funct
     DB::table('logistics_location')->insert([
         ['logistics_location_id' => 1, 'region' => 'Region IV-A', 'warehouse_id' => 4],
         ['logistics_location_id' => 2, 'region' => 'Other Region', 'warehouse_id' => 9],
+    ]);
+    DB::table('warehouse')->insert([
+        ['warehouse_id' => 4, 'warehouse_name' => 'Pampanga'],
+        ['warehouse_id' => 9, 'warehouse_name' => 'Other Region'],
     ]);
     DB::table('inventory')->insert([
         ['item_id' => 91, 'warehouse_id' => 4, 'qty' => 30, 'inventory_status' => 'Approved'],
@@ -184,13 +192,13 @@ it('stops without changing inventory when a school region maps to multiple wareh
         ->and(DB::table('package_status')->where('status', 'delivered')->exists())->toBeFalse();
 });
 
-it('stops with a clear error when no warehouse matches the school region', function () {
-    $fixture = billingOperationalFixture();
+it('stops with a clear error when a school region has no configured warehouse hub', function () {
+    $fixture = billingOperationalFixture(region: 'Unknown Region');
     DB::table('logistics_location')->insert(['region' => 'Region VI', 'warehouse_id' => 4]);
     DB::table('inventory')->insert(['item_id' => 91, 'warehouse_id' => 4, 'qty' => 20, 'inventory_status' => 'Approved']);
 
     expect(fn () => app(BillingOperationalSyncService::class)->syncProject($fixture['project_id'], 12, 'Billing User'))
-        ->toThrow(RuntimeException::class, 'school region Region IV-A for DR DR-7001 has no warehouse mapping')
+        ->toThrow(RuntimeException::class, 'school region Unknown Region for DR DR-7001 has no configured warehouse hub')
         ->and(DB::table('inventory')->value('qty'))->toBe(20)
         ->and(DB::table('inventory_history')->count())->toBe(0);
 });

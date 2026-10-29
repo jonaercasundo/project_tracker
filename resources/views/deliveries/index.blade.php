@@ -42,12 +42,13 @@
 
     {{-- FILTERS --}}
     @include('deliveries.partials._filters')
+    @if(request()->filled('project'))
     <label class="flex items-center gap-2 px-3 py-2 bg-white border rounded-xl text-xs font-semibold">
         <input type="checkbox" id="select-all-drs">
         Select All
     </label>
 
-    {{-- SUMMARY CARDS (scoped to project / year / lot / region filters) --}}
+    {{-- SUMMARY CARDS (scoped to the selected project and delivery filters) --}}
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
 
         {{-- TOTAL PENDING (DR-level) --}}
@@ -127,9 +128,15 @@
         </div>
 
     </div>
+    @endif
 
     {{-- CONTENT STATE HANDLERS --}}
-    @if(empty($grouped_deliveries))
+    @if(!request()->filled('project'))
+        <div class="text-center py-16 text-slate-500 bg-white rounded-2xl border border-slate-200 shadow-sm">
+            <p class="text-sm font-semibold text-slate-700">Choose a project to load delivery records.</p>
+            <p class="mt-1 text-xs text-slate-400">DRs, status totals, and package details will appear after you select a project.</p>
+        </div>
+    @elseif(empty($grouped_deliveries))
         <div class="text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200 shadow-sm">
             <svg class="mx-auto h-10 w-10 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />

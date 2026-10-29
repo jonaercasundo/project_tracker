@@ -158,7 +158,6 @@ pest()->extend(DeliveryTrackingFilterTestCase::class)->in(__FILE__);
 it('filters delivery results by project and preserves the query on pagination', function (): void {
     $response = $this->get('/deliveries/tracking?'.http_build_query([
         'project' => 1,
-        'year' => 2026,
         'status' => 'pending',
         'search' => 'DR-A',
         'per_page' => 10,
@@ -176,7 +175,7 @@ it('filters delivery results by project and preserves the query on pagination', 
 it('renders the complete project name in the searchable dropdown and keeps the project selection after reload', function (): void {
     $projectName = '2026 School Nutrition and Learning Materials Distribution Program — Northern Division';
 
-    $response = $this->get('/deliveries/tracking?project=1&lot=1&year=2026');
+    $response = $this->get('/deliveries/tracking?project=1&lot=1');
 
     $response->assertOk()
         ->assertSee('role="combobox"', false)
@@ -186,49 +185,50 @@ it('renders the complete project name in the searchable dropdown and keeps the p
         ->assertSee('whitespace-normal break-words', false)
         ->assertDontSee('<select id="project"', false)
         ->assertSee('Search projects...', false)
-        ->assertSee('All Projects')
         ->assertSee('Furniture Project')
         ->assertSee($projectName)
         ->assertSee('name="project" value="1"', false)
         ->assertSee('value="1" selected', false);
 });
 
-it('keeps the selected lot available when All Projects is selected', function (): void {
-    $response = $this->get('/deliveries/tracking?project=&lot=1&year=2026&status=pending&search=DR-A');
+it('does not load delivery records before a project is selected', function (): void {
+    $response = $this->get('/deliveries/tracking?lot=1&status=pending&search=DR-A');
 
     $response->assertOk()
         ->assertSee('name="project" value=""', false)
-        ->assertSee('value="1" selected', false)
-        ->assertSee('DR #DR-A-01')
-        ->assertDontSee('DR #DR-B-01');
+        ->assertSee('Choose a project to load delivery records.')
+        ->assertDontSee('DR #DR-A-01');
 });
 
-it('disables Project until a delivery year is selected', function (): void {
+it('offers all projects immediately without a Year filter', function (): void {
     $response = $this->get('/deliveries/tracking');
 
     $response->assertOk()
-        ->assertSee('All Years')
-        ->assertSee('Select Year First')
+        ->assertDontSee('All Years')
+        ->assertDontSee('Select Year First')
+        ->assertSee('Select Project')
+        ->assertSee('Furniture Project')
         ->assertSee('id="project"', false)
-        ->assertSee('disabled', false)
-        ->assertSee('name="project" value=""', false);
+        ->assertDontSee('name="year"', false)
+        ->assertSee('Choose a project to load delivery records.');
 });
 
-it('offers only projects with deliveries in the selected year', function (): void {
+it('loads a selected project across all delivery years', function (): void {
     $longProjectName = '2026 School Nutrition and Learning Materials Distribution Program — Northern Division';
 
-    $response = $this->get('/deliveries/tracking?year=2025');
+    $response = $this->get('/deliveries/tracking?project=2');
 
     $response->assertOk()
         ->assertSee('Furniture Project')
+        ->assertSee('DR #DR-B-01')
+        ->assertSee('DR #DR-B-2025')
         ->assertDontSee($longProjectName)
-        ->assertSee('value="2025"', false)
-        ->assertSee('All Projects');
+        ->assertDontSee('All Projects')
+        ->assertDontSee('name="year"', false);
 });
 
-it('filters year and project together with lot, division, and search', function (): void {
+it('filters a project with lot, division, and search without a year filter', function (): void {
     $response = $this->get('/deliveries/tracking?'.http_build_query([
-        'year' => 2025,
         'project' => 2,
         'lot' => 2,
         'division' => 'South Division',
@@ -240,17 +240,19 @@ it('filters year and project together with lot, division, and search', function 
         ->assertSee('DR #DR-B-2025')
         ->assertDontSee('DR #DR-A-01')
         ->assertSee('name="project" value="2"', false)
-        ->assertSee('name="year"', false);
+        ->assertDontSee('name="year"', false);
 });
 
-it('clears an incompatible project from the query while retaining other filters', function (): void {
+it('removes a legacy year query while preserving the selected project and other filters', function (): void {
     $response = $this->get('/deliveries/tracking?year=2025&project=1&search=DR-A&status=pending');
 
-    $response->assertRedirect(route('deliveries.tracking', ['year' => 2025, 'search' => 'DR-A', 'status' => 'pending']));
+    $response->assertRedirect(route('deliveries.tracking', ['project' => 1, 'search' => 'DR-A', 'status' => 'pending']));
 });
 
-it('clears a project supplied without a year from the query', function (): void {
+it('accepts a project without a year', function (): void {
     $response = $this->get('/deliveries/tracking?project=1&search=DR-A');
 
-    $response->assertRedirect(route('deliveries.tracking', ['search' => 'DR-A']));
+    $response->assertOk()
+        ->assertSee('DR #DR-A-01')
+        ->assertDontSee('DR #DR-B-01');
 });

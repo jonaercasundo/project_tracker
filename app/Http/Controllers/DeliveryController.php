@@ -147,14 +147,9 @@ class DeliveryController extends Controller
 
     public function index(Request $request)
     {
-        $yearValue = $request->input('year');
-        $year = $request->filled('year') && is_scalar($yearValue)
-            ? filter_var($yearValue, FILTER_VALIDATE_INT)
-            : null;
-
-        if ($request->filled('year') && (! is_scalar($yearValue) || $year === false || ! DB::table('deliveries')->whereYear('delivery_date', $year)->exists())) {
+        if ($request->query->has('year')) {
             $query = $request->query();
-            unset($query['year'], $query['project']);
+            unset($query['year']);
 
             return redirect()->route('deliveries.tracking', $query);
         }
@@ -162,19 +157,27 @@ class DeliveryController extends Controller
         if ($request->filled('project')) {
             $projectValue = $request->input('project');
             $projectId = is_scalar($projectValue) ? filter_var($projectValue, FILTER_VALIDATE_INT) : false;
+            $projectExists = $projectId !== false && DB::table('projects')->where('project_id', $projectId)->exists();
 
-            $projectMatchesYear = $projectId !== false && $year !== null
-                && DB::table('deliveries')
-                    ->where('project_id', $projectId)
-                    ->whereYear('delivery_date', $year)
-                    ->exists();
-
-            if (! $projectMatchesYear) {
+            if (! $projectExists) {
                 $query = $request->query();
-                unset($query['project']);
+                unset($query['project'], $query['year']);
 
                 return redirect()->route('deliveries.tracking', $query);
             }
+        }
+
+        $projects = DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']);
+        if (! $request->filled('project')) {
+            return view('deliveries.index', [
+                'grouped_deliveries' => [],
+                'projects' => $projects,
+                'lots' => collect(),
+                'page' => 1,
+                'total_pages' => 0,
+                'total_rows' => 0,
+                'stats' => [],
+            ]);
         }
 
         $limit = (int) $request->input('per_page', 10);
@@ -227,9 +230,6 @@ class DeliveryController extends Controller
         }
         if ($request->filled('municipality')) {
             $baseQuery->where('s.municipality', $request->municipality);
-        }
-        if ($request->filled('year')) {
-            $baseQuery->whereYear('d.delivery_date', $request->year);
         }
         if (in_array($request->input('logistics_status'), ['pending', 'logistics_received', 'delivered'], true)) {
             $status = $request->input('logistics_status');
@@ -463,7 +463,7 @@ class DeliveryController extends Controller
 
         // =========================
         // SUMMARY CARDS
-        // scoped to the SAME filters as $baseQuery (project/year/lot/region/etc),
+        // scoped to the SAME filters as $baseQuery (project/lot/region/etc),
         // but NOT paginated — these are DR-level totals across the full filtered set.
         //
         // Pending / Released / Delivered now reflect DR#s where ALL packages
@@ -533,24 +533,6 @@ class DeliveryController extends Controller
         // =========================
         // DROPDOWNS
         // =========================
-        $years = DB::table('deliveries')
-            ->selectRaw('YEAR(delivery_date) as year')
-            ->distinct()
-            ->orderBy('year', 'desc')
-            ->pluck('year');
-
-        $projects = $request->filled('year')
-            ? DB::table('projects as p')
-                ->whereExists(function (Builder $projectDeliveries) use ($request): void {
-                    $projectDeliveries->selectRaw('1')
-                        ->from('deliveries as project_delivery')
-                        ->whereColumn('project_delivery.project_id', 'p.project_id')
-                        ->whereYear('project_delivery.delivery_date', $request->input('year'));
-                })
-                ->orderBy('p.project_name')
-                ->get(['p.project_id', 'p.project_name'])
-            : collect();
-
         $lots = DB::table('lot')
             ->when($request->filled('project'), fn ($query) => $query->where('project_id', $request->project))
             ->when(! $request->filled('project') && $request->filled('lot'), fn ($query) => $query->where('lot_id', $request->lot))
@@ -562,7 +544,6 @@ class DeliveryController extends Controller
             'grouped_deliveries' => $grouped,
             'projects' => $projects,
             'lots' => $lots,
-            'years' => $years,
             'page' => $page,
             'total_pages' => $total_pages,
             'total_rows' => $total_rows,

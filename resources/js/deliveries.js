@@ -1,5 +1,3 @@
-import { resetProjectForYearChange } from './delivery-filter-state.js';
-
 (() => {
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -15,17 +13,10 @@ import { resetProjectForYearChange } from './delivery-filter-state.js';
         const region       = container.querySelector('#region');
         const division     = container.querySelector('#division');
         const municipality = container.querySelector('#municipality');
-        const year         = container.querySelector('#year');
-        const filterForm   = document.querySelector('#filter-form');
         let previousProjectValue = project?.value || '';
         
         // This checkbox is OUTSIDE #filter-container
         const selectAll = document.getElementById('select-all-drs');
-
-        year?.addEventListener('change', () => {
-            resetProjectForYearChange(year, project, () => filterForm?.requestSubmit());
-            previousProjectValue = '';
-        });
 
         function fillSelect(select, data, valueField, textField, placeholder) {
             if (!select) return;

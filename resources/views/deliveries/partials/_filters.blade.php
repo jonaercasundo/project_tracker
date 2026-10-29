@@ -56,28 +56,6 @@
     {{-- FILTERS --}}
     <div id="filter-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
 
-        {{-- Year --}}
-        <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">
-                Year
-            </label>
-
-            <select id="year"
-                    name="year"
-                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
-
-                <option value="">All Years</option>
-
-                @foreach($years as $y)
-                    <option value="{{ $y }}"
-                        @selected(request('year')==$y)>
-                        {{ $y }}
-                    </option>
-                @endforeach
-
-            </select>
-        </div>
-
         {{-- Project --}}
         <div class="xl:col-span-2 min-w-0">
             <label class="block text-xs font-semibold text-slate-600 mb-1">
@@ -87,14 +65,13 @@
             <div
                 x-data="{
                     options: @js($projects->map(fn ($project) => ['id' => (string) $project->project_id, 'name' => (string) $project->project_name])->values()),
-                    yearId: @js((string) request('year', '')),
                     selectedId: @js((string) request('project', '')),
                     search: '',
                     open: false,
                     activeIndex: 0,
                     dropdownStyle: {},
                     get availableOptions() {
-                        return this.yearId ? [{ id: '', name: 'All Projects' }, ...this.options] : [];
+                        return this.options;
                     },
                     get filteredOptions() {
                         const term = this.search.trim().toLocaleLowerCase();
@@ -102,7 +79,7 @@
                         return this.availableOptions.filter(option => option.name.toLocaleLowerCase().includes(term));
                     },
                     get selectedName() {
-                        return this.availableOptions.find(option => option.id === this.selectedId)?.name ?? (this.yearId ? 'All Projects' : 'Select Year First');
+                        return this.availableOptions.find(option => option.id === this.selectedId)?.name ?? 'Select Project';
                     },
                     positionDropdown() {
                         const trigger = this.$refs.trigger.getBoundingClientRect();
@@ -119,8 +96,6 @@
                         this.dropdownStyle = { top: `${top}px`, left: `${left}px`, width: `${width}px`, maxHeight: `${maxHeight}px` };
                     },
                     openDropdown() {
-                        if (!this.yearId) return;
-
                         this.open = true;
                         const selectedIndex = this.filteredOptions.findIndex(option => option.id === this.selectedId);
                         this.activeIndex = Math.max(0, selectedIndex);
@@ -159,7 +134,7 @@
                 @resize.window="open && positionDropdown()"
                 @scroll.window.capture="open && positionDropdown()"
                 class="relative">
-                <input type="hidden" id="project" name="project" value="{{ request('project', '') }}" x-ref="project" :disabled="!yearId" @disabled(!request()->filled('year'))>
+                <input type="hidden" id="project" name="project" value="{{ request('project', '') }}" x-ref="project">
 
                 <button
                     type="button"
@@ -170,13 +145,11 @@
                     @keydown.enter.prevent="open ? selectActive() : openDropdown()"
                     @keydown.space.prevent="open ? selectActive() : openDropdown()"
                     @keydown.escape.stop="open && closeDropdown()"
-                    :disabled="!yearId"
-                    @disabled(!request()->filled('year'))
                     :aria-expanded="open.toString()"
                     aria-haspopup="listbox"
                     aria-controls="project-options"
                     class="flex min-h-[42px] w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm text-slate-700 shadow-sm transition hover:border-slate-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:border-slate-200">
-                    <span class="min-w-0 whitespace-normal break-words" x-text="selectedName">{{ $projects->firstWhere('project_id', request('project'))?->project_name ?? (request()->filled('year') ? 'All Projects' : 'Select Year First') }}</span>
+                    <span class="min-w-0 whitespace-normal break-words" x-text="selectedName">{{ $projects->firstWhere('project_id', request('project'))?->project_name ?? 'Select Project' }}</span>
                     <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
                     </svg>

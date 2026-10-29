@@ -1229,6 +1229,22 @@ it('serves the Operations page immediately and loads AJAX filters using the same
         ->assertSee('Loading operational progress…');
 });
 
+it('waits for a project before loading delivery tracking records', function () {
+    jarvisOperations();
+    $user = jarvisReader(true, true, false);
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->get('/deliveries/tracking')->assertOk()
+        ->assertSee('Choose a project to load delivery records.')
+        ->assertDontSee('DR #3502')
+        ->assertDontSee('Year');
+
+    $this->get('/deliveries/tracking?project=2')->assertOk()
+        ->assertSee('DR #3503')
+        ->assertDontSee('DR #3502');
+});
+
 it('tracks lot billing by active cycle and retains posted cycle history', function () {
     jarvisOperations();
     DB::table('lot')->where('lot_id', 1)->update(['contract_price' => '1000.00']);

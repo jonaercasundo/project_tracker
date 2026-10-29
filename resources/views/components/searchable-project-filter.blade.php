@@ -7,6 +7,10 @@
     'enabled' => true,
     'rounded' => 'rounded-lg',
     'id' => 'project-filter',
+    'inputId' => null,
+    'wrapperClass' => 'min-w-0 space-y-1 text-xs font-semibold text-slate-600',
+    'labelClass' => 'text-xs font-semibold text-slate-600',
+    'required' => false,
 ])
 
 @php
@@ -21,8 +25,10 @@
     ])->values();
 @endphp
 
-<div class="min-w-0 space-y-1 text-xs font-semibold text-slate-600">
-    <label id="{{ $labelId }}" for="{{ $triggerId }}">Project</label>
+<div class="{{ $wrapperClass }}">
+    <label id="{{ $labelId }}" for="{{ $triggerId }}" class="{{ $labelClass }}">
+        Project @if($required)<span class="text-red-500">*</span>@endif
+    </label>
     <div x-data="searchableProjectDropdown({
         options: @js($projectOptions),
         selectedId: @js((string) $selected),
@@ -37,7 +43,7 @@
          @resize.window="open && positionDropdown()"
          @scroll.window.capture="open && positionDropdown()"
          class="relative">
-        <input type="hidden" name="{{ $name }}" value="{{ $selected }}" x-ref="project" :disabled="!enabled">
+        <input @if($inputId !== null) id="{{ $inputId }}" @endif type="hidden" name="{{ $name }}" value="{{ $selected }}" x-ref="project" :disabled="!enabled">
         <button id="{{ $triggerId }}" type="button" x-ref="trigger"
             @click="open ? dismiss() : openDropdown()"
             @keydown.arrow-down.prevent="open ? moveActive(1) : openDropdown()"

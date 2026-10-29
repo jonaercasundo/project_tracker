@@ -27,36 +27,36 @@
                 <p class="mt-1 text-sm text-slate-500">Select the project, lot, and receiving warehouse to begin.</p>
             </div>
 
-            <div class="grid gap-6 p-6 md:grid-cols-3">
-                <div>
-                    <label class="mb-2 block text-sm font-semibold text-slate-700">
-                        Project <span class="text-red-500">*</span>
-                    </label>
-                    <select id="project_id"
-                            class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
-                        <option value="">-- Select Project --</option>
-                        @foreach($projects as $project)
-                            <option value="{{ $project->project_id }}">{{ $project->project_name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+            <div class="grid min-w-0 gap-6 p-6 md:grid-cols-3">
+                <x-searchable-project-filter
+                    :projects="$projects"
+                    name="project_id"
+                    input-id="project_id"
+                    id="stock-in-project-filter"
+                    all-label="-- Select Project --"
+                    :truncate-selected="true"
+                    :required="true"
+                    rounded="rounded-2xl"
+                    wrapper-class="min-w-0"
+                    label-class="mb-2 block text-sm font-semibold text-slate-700"
+                />
 
-                <div>
+                <div class="min-w-0">
                     <label class="mb-2 block text-sm font-semibold text-slate-700">
                         Lot <span class="text-red-500">*</span>
                     </label>
                     <select id="lot_id" disabled
-                            class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
+                            class="w-full min-w-0 max-w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
                         <option value="">-- Select Lot --</option>
                     </select>
                 </div>
 
-                <div>
+                <div class="min-w-0">
                     <label class="mb-2 block text-sm font-semibold text-slate-700">
                         Receiving Warehouse <span class="text-red-500">*</span>
                     </label>
                     <select id="warehouse_id"
-                            class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
+                            class="w-full min-w-0 max-w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
                         <option value="">-- Select Warehouse --</option>
                         @foreach($warehouses as $warehouse)
                             <option value="{{ $warehouse->warehouse_id }}">{{ $warehouse->warehouse_name }}</option>

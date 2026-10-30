@@ -148,7 +148,8 @@
                     </div>
                     <div>
                         <label for="spreadsheet-date-received" class="mb-1 block text-xs font-semibold text-slate-600">Date received (Lot X)</label>
-                        <input id="spreadsheet-date-received" name="date_received" type="date" required disabled class="w-full rounded-lg border-slate-200 text-sm">
+                        <div class="relative flex gap-2"><input id="spreadsheet-date-received" name="date_received" type="text" inputmode="numeric" autocomplete="off" placeholder="DD/MM/YYYY" pattern="(?:0[1-9]|[12][0-9]|3[01])/(?:0[1-9]|1[0-2])/[0-9]{4}" required disabled class="w-full rounded-lg border-slate-200 text-sm" aria-describedby="spreadsheet-date-received-error"><button type="button" data-open-date-picker="spreadsheet-date-received" aria-label="Select date received" disabled class="rounded-lg border border-slate-200 px-3 text-sm">📅</button><input type="date" data-date-picker-for="spreadsheet-date-received" aria-label="Select date received" disabled class="pointer-events-none absolute right-0 top-0 h-px w-px opacity-0"></div>
+                        <p id="spreadsheet-date-received-error" class="mt-1 text-xs text-rose-700" hidden></p>
                     </div>
                     <div>
                         <label for="spreadsheet-received-by" class="mb-1 block text-xs font-semibold text-slate-600">Received by (Lot X)</label>
@@ -185,11 +186,13 @@
                     </div>
                     <div>
                         <label for="spreadsheet-date-checking" class="mb-1 block text-xs font-semibold text-slate-600">Date checking (Lot X)</label>
-                        <input id="spreadsheet-date-checking" name="date_checking" type="date" required disabled class="w-full rounded-lg border-slate-200 text-sm">
+                        <div class="relative flex gap-2"><input id="spreadsheet-date-checking" name="date_checking" type="text" inputmode="numeric" autocomplete="off" placeholder="DD/MM/YYYY" pattern="(?:0[1-9]|[12][0-9]|3[01])/(?:0[1-9]|1[0-2])/[0-9]{4}" required disabled class="w-full rounded-lg border-slate-200 text-sm" aria-describedby="spreadsheet-date-checking-error"><button type="button" data-open-date-picker="spreadsheet-date-checking" aria-label="Select date checking" disabled class="rounded-lg border border-slate-200 px-3 text-sm">📅</button><input type="date" data-date-picker-for="spreadsheet-date-checking" aria-label="Select date checking" disabled class="pointer-events-none absolute right-0 top-0 h-px w-px opacity-0"></div>
+                        <p id="spreadsheet-date-checking-error" class="mt-1 text-xs text-rose-700" hidden></p>
                     </div>
                     <div>
                         <label for="spreadsheet-date-encoding" class="mb-1 block text-xs font-semibold text-slate-600">Date encoding (Lot X)</label>
-                        <input id="spreadsheet-date-encoding" name="date_encoding" type="date" required disabled class="w-full rounded-lg border-slate-200 text-sm">
+                        <div class="relative flex gap-2"><input id="spreadsheet-date-encoding" name="date_encoding" type="text" inputmode="numeric" autocomplete="off" placeholder="DD/MM/YYYY" pattern="(?:0[1-9]|[12][0-9]|3[01])/(?:0[1-9]|1[0-2])/[0-9]{4}" required disabled class="w-full rounded-lg border-slate-200 text-sm" aria-describedby="spreadsheet-date-encoding-error"><button type="button" data-open-date-picker="spreadsheet-date-encoding" aria-label="Select date encoding" disabled class="rounded-lg border border-slate-200 px-3 text-sm">📅</button><input type="date" data-date-picker-for="spreadsheet-date-encoding" aria-label="Select date encoding" disabled class="pointer-events-none absolute right-0 top-0 h-px w-px opacity-0"></div>
+                        <p id="spreadsheet-date-encoding-error" class="mt-1 text-xs text-rose-700" hidden></p>
                     </div>
                 </div>
                 <p id="spreadsheet-school-row-count" class="text-xs text-slate-500" aria-live="polite">Enter a School ID to prepare a preview of matching DR/package rows.</p>

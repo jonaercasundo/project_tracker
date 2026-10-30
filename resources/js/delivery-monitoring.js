@@ -324,8 +324,15 @@ if (monitoring) {
         const modeInput = syncSpreadsheetForm.elements.mode;
         const previewTokenInput = syncSpreadsheetForm.elements.preview_token;
         const isPreview = modeInput.value !== 'confirm';
+        if (!validateSpreadsheetDates()) {
+            syncSpreadsheetForm.reportValidity();
+            return;
+        }
         const payload = Object.fromEntries(new FormData(syncSpreadsheetForm).entries());
         payload.school_id = spreadsheetSchoolIdInput.value.trim();
+        ['date_received', 'date_checking', 'date_encoding'].forEach(name => {
+            payload[name] = parseDisplayDate(payload[name]);
+        });
 
         spreadsheetSubmitButton.disabled = true;
         spreadsheetSchoolIdInput.disabled = true;
@@ -427,17 +434,63 @@ if (monitoring) {
         return `${today.getFullYear()}-${month}-${day}`;
     }
 
+    function displayDate(dateValue) {
+        const [year, month, day] = dateValue.split('-');
+
+        return `${day}/${month}/${year}`;
+    }
+
+    function parseDisplayDate(dateValue) {
+        const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dateValue.trim());
+        if (!match) {
+            return null;
+        }
+
+        const [, day, month, year] = match;
+        const date = new Date(Number(year), Number(month) - 1, Number(day));
+        if (date.getFullYear() !== Number(year) || date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) {
+            return null;
+        }
+
+        return `${year}-${month}-${day}`;
+    }
+
+    function validateSpreadsheetDates() {
+        let isValid = true;
+        ['date_received', 'date_checking', 'date_encoding'].forEach(name => {
+            const input = syncSpreadsheetForm.elements[name];
+            const error = document.getElementById(`${input.id}-error`);
+            const parsedDate = parseDisplayDate(input.value);
+            const message = input.value.trim() === ''
+                ? 'Enter a date in DD/MM/YYYY format.'
+                : parsedDate === null
+                    ? 'Enter a valid date in DD/MM/YYYY format.'
+                    : '';
+
+            input.setCustomValidity(message);
+            input.setAttribute('aria-invalid', message ? 'true' : 'false');
+            error.textContent = message;
+            error.hidden = !message;
+            isValid = isValid && message === '';
+        });
+
+        return isValid;
+    }
+
     function resetSpreadsheetFields(enabled) {
         const today = localTodayDate();
         const defaultValues = {
             billing_status: '1st Billing',
             compliance_status: 'COMPLIANT',
-            date_checking: today,
-            date_encoding: today,
+            date_checking: displayDate(today),
+            date_encoding: displayDate(today),
         };
         spreadsheetSchoolFields.querySelectorAll('input, select').forEach(control => {
             control.disabled = !enabled;
             control.value = defaultValues[control.name] ?? '';
+        });
+        spreadsheetSchoolFields.querySelectorAll('[data-open-date-picker]').forEach(button => {
+            button.disabled = !enabled;
         });
         updatePositionOtherField(enabled);
     }
@@ -478,6 +531,25 @@ if (monitoring) {
                 spreadsheetDryRun.hidden = true;
                 spreadsheetModalFeedback.textContent = 'Details changed. Run a new preview before syncing.';
             }
+        });
+    });
+
+    ['date_received', 'date_checking', 'date_encoding'].forEach(name => {
+        const input = syncSpreadsheetForm.elements[name];
+        input.addEventListener('input', validateSpreadsheetDates);
+        input.addEventListener('change', validateSpreadsheetDates);
+        const picker = syncSpreadsheetForm.querySelector(`[data-date-picker-for="${input.id}"]`);
+        picker.addEventListener('change', () => {
+            if (picker.value) {
+                input.value = displayDate(picker.value);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
+        syncSpreadsheetForm.querySelector(`[data-open-date-picker="${input.id}"]`).addEventListener('click', () => {
+            if (!picker.value) {
+                picker.value = parseDisplayDate(input.value) ?? localTodayDate();
+            }
+            picker.showPicker?.();
         });
     });
 

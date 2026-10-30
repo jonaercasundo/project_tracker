@@ -4,7 +4,9 @@
             <div>
                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Project Module / Reports &amp; Analytics</p>
                 <h1 class="mt-1 text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">Billing Document Status</h1>
-                <p class="mt-1 text-sm font-medium text-slate-500">Project-wide billing document processing across LOT 2, LOT 9, and LOT 11.</p>
+                <p class="mt-1 text-sm font-medium text-slate-500">
+                    Billing document processing for {{ $selectedProject?->project_name ?? 'the selected project' }}, across LOT 2, LOT 9, and LOT 11.
+                </p>
             </div>
             <p class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold text-slate-600">
                 <span class="h-1.5 w-1.5 rounded-full bg-blue-600" aria-hidden="true"></span>

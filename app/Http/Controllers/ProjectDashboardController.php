@@ -16,12 +16,14 @@ class ProjectDashboardController extends Controller
         $selectedProjectId = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,project_id'],
         ])['project_id'] ?? $projects->firstWhere('project_name', 'Billing Documentation')?->project_id ?? $projects->first()?->project_id;
+        $selectedProject = $projects->firstWhere('project_id', $selectedProjectId);
         $summary = $selectedProjectId !== null
             ? $billingDocumentStatus->summarize((int) $selectedProjectId)
             : ['total' => 0, 'processed' => 0, 'remaining' => 0, 'processed_today' => 0, 'source_error' => null];
 
         return view('projects.reports-analytics', [
             'projects' => $projects,
+            'selectedProject' => $selectedProject,
             'selectedProjectId' => $selectedProjectId,
             'summary' => $summary,
             'snapshotAt' => now(),

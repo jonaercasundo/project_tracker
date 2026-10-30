@@ -34,7 +34,7 @@
         </div>
 
         {{-- MAIN LAYOUT ENGINE CONTAINER --}}
-        @php($hasMobileNavigation = request()->routeIs('deliveries.monitoring', 'delivery-audit-trail.*', 'project.bidding.*', 'schools.*', 'billing.dashboard'))
+        @php($hasMobileNavigation = request()->routeIs('deliveries.monitoring', 'deliveries.return-monitoring', 'delivery-audit-trail.*', 'project.bidding.*', 'schools.*', 'billing.dashboard'))
         <div class="min-h-screen flex flex-col relative {{ request()->routeIs('project.bidding.*', 'schools.*') ? 'overflow-x-clip' : '' }}" @if($hasMobileNavigation) x-data="{ monitoringNavOpen: false }" @keydown.escape.window="monitoringNavOpen = false" @endif>
             
             @if($hasMobileNavigation)

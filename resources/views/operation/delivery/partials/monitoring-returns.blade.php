@@ -2,7 +2,7 @@
     <div class="rounded-xl border border-slate-200 bg-white p-4">
         <h3 class="font-bold text-slate-900">Record a return</h3>
         <p class="mt-1 text-xs text-slate-500">Item Returns affect stock only after staff confirm physical receipt. Document Returns never change inventory.</p>
-        <form data-return-create class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <form data-return-create method="POST" action="{{ route('deliveries.monitoring.returns.store', ['project' => $project]) }}" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             @csrf
             <label class="text-xs font-semibold text-slate-600">Return type
                 <select name="return_type" required class="mt-1 w-full rounded-lg border-slate-200 text-sm">
@@ -54,15 +54,16 @@
     <div class="rounded-xl border border-slate-200 bg-white p-4">
         <div class="flex flex-wrap items-end justify-between gap-3">
             <h3 class="font-bold text-slate-900">Return monitoring</h3>
-            <form data-return-filter class="flex flex-wrap gap-2">
-                <select name="return_type" aria-label="Filter by return type" class="rounded-lg border-slate-200 text-xs"><option value="">All return types</option><option>Item Return</option><option>Document Return</option></select>
-                <select name="return_status" aria-label="Filter by return status" class="rounded-lg border-slate-200 text-xs"><option value="">All return statuses</option><option>Reported</option><option>In Transit</option><option>Received</option><option>Rejected</option></select>
-                <input name="return_date_from" type="date" aria-label="Monitoring date from" title="Monitoring date from" class="rounded-lg border-slate-200 text-xs">
-                <input name="return_date_to" type="date" aria-label="Monitoring date to" title="Monitoring date to" class="rounded-lg border-slate-200 text-xs">
-                <input name="received_date_from" type="date" aria-label="Received date from" title="Received date from" class="rounded-lg border-slate-200 text-xs">
-                <input name="received_date_to" type="date" aria-label="Received date to" title="Received date to" class="rounded-lg border-slate-200 text-xs">
-                <input name="quantity_from" type="number" min="1" placeholder="Min quantity" aria-label="Minimum quantity returned" class="w-28 rounded-lg border-slate-200 text-xs">
-                <input name="quantity_to" type="number" min="1" placeholder="Max quantity" aria-label="Maximum quantity returned" class="w-28 rounded-lg border-slate-200 text-xs">
+            <form data-return-filter method="GET" action="{{ route('deliveries.return-monitoring') }}" class="flex flex-wrap gap-2">
+                <input type="hidden" name="project_id" value="{{ $project }}">
+                <select name="return_type" aria-label="Filter by return type" class="rounded-lg border-slate-200 text-xs"><option value="">All return types</option><option value="Item Return" @selected(($filters['return_type'] ?? '') === 'Item Return')>Item Return</option><option value="Document Return" @selected(($filters['return_type'] ?? '') === 'Document Return')>Document Return</option></select>
+                <select name="return_status" aria-label="Filter by return status" class="rounded-lg border-slate-200 text-xs"><option value="">All return statuses</option>@foreach(['Reported', 'In Transit', 'Received', 'Rejected'] as $status)<option value="{{ $status }}" @selected(($filters['return_status'] ?? '') === $status)>{{ $status }}</option>@endforeach</select>
+                <input name="return_date_from" type="date" value="{{ $filters['return_date_from'] ?? '' }}" aria-label="Monitoring date from" title="Monitoring date from" class="rounded-lg border-slate-200 text-xs">
+                <input name="return_date_to" type="date" value="{{ $filters['return_date_to'] ?? '' }}" aria-label="Monitoring date to" title="Monitoring date to" class="rounded-lg border-slate-200 text-xs">
+                <input name="received_date_from" type="date" value="{{ $filters['received_date_from'] ?? '' }}" aria-label="Received date from" title="Received date from" class="rounded-lg border-slate-200 text-xs">
+                <input name="received_date_to" type="date" value="{{ $filters['received_date_to'] ?? '' }}" aria-label="Received date to" title="Received date to" class="rounded-lg border-slate-200 text-xs">
+                <input name="quantity_from" type="number" min="1" value="{{ $filters['quantity_from'] ?? '' }}" placeholder="Min quantity" aria-label="Minimum quantity returned" class="w-28 rounded-lg border-slate-200 text-xs">
+                <input name="quantity_to" type="number" min="1" value="{{ $filters['quantity_to'] ?? '' }}" placeholder="Max quantity" aria-label="Maximum quantity returned" class="w-28 rounded-lg border-slate-200 text-xs">
                 <button class="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Filter</button>
             </form>
         </div>
@@ -80,11 +81,12 @@
                             <td class="p-2">{{ $record->received_date?->format('M d, Y') ?? 'Not received' }}<br><span class="text-slate-500">{{ $record->received_by ?: '—' }}{{ $record->warehouse?->warehouse_name ? ' · '.$record->warehouse->warehouse_name : '' }}</span></td>
                             <td class="p-2">
                                 @if($record->status !== 'Received')
-                                    <form data-return-update data-url="{{ route('deliveries.monitoring.returns.update', ['project' => $project, 'return' => $record->return_id]) }}" class="space-y-2">
+                                    <form data-return-update method="POST" action="{{ route('deliveries.monitoring.returns.update', ['project' => $project, 'return' => $record->return_id]) }}" data-url="{{ route('deliveries.monitoring.returns.update', ['project' => $project, 'return' => $record->return_id]) }}" class="space-y-2">
                                         @csrf
+                                        @method('PATCH')
                                         <select name="status" class="w-full rounded border-slate-200 text-xs"><option @selected($record->status === 'Reported')>Reported</option><option @selected($record->status === 'In Transit')>In Transit</option><option>Received</option><option>Rejected</option></select>
                                         <input name="monitoring_date" type="date" required value="{{ now()->toDateString() }}" title="Monitoring date" class="w-full rounded border-slate-200 text-xs">
-                                        <div data-return-receipt-fields class="space-y-2" hidden>
+                                        <div data-return-receipt-fields class="space-y-2">
                                             <input name="received_date" type="date" title="Date physically received" class="w-full rounded border-slate-200 text-xs">
                                             <input name="received_by" maxlength="255" placeholder="Received by" class="w-full rounded border-slate-200 text-xs">
                                             @if($record->return_type === 'Item Return')

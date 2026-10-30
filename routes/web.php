@@ -108,6 +108,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/deliveries/monitoring', [DeliveryMonitoringController::class, 'index'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring');
+    Route::get('/deliveries/returns', [DeliveryReturnController::class, 'page'])
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.return-monitoring');
     Route::get('/deliveries/audit-trail', [DeliveryAuditTrailController::class, 'index'])
         ->middleware(['company.context:MMC', 'permission:delivery.audit.view'])
         ->name('delivery-audit-trail.index');

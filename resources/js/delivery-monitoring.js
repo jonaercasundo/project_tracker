@@ -81,10 +81,7 @@ if (monitoring) {
             }
             panel.innerHTML = result.html;
             panel.dataset.loaded = 'true';
-            const createForm = panel.querySelector('[data-return-create]');
-            createForm?.querySelectorAll('[data-return-item-field]').forEach(field => {
-                field.querySelector('select, input').required = createForm.elements.return_type.value === 'Item Return';
-            });
+            initializeReturnPanel(panel);
             const filter = panel.querySelector('[data-return-filter]');
             for (const [name, value] of new URLSearchParams(panel.dataset.filters ?? '')) {
                 if (filter.elements[name]) filter.elements[name].value = value;
@@ -378,28 +375,6 @@ if (monitoring) {
             return;
         }
         submitReturnForm(updateForm, 'PATCH', updateForm.dataset.url, panel);
-    });
-
-    monitoring.addEventListener('change', event => {
-        const panel = event.target.closest('[data-return-panel]');
-        if (event.target.matches('[data-return-create] [name="return_type"]')) {
-            const isItemReturn = event.target.value === 'Item Return';
-            event.target.closest('[data-return-create]').querySelectorAll('[data-return-item-field]').forEach(field => {
-                field.hidden = !isItemReturn;
-                field.querySelector('select, input').required = isItemReturn;
-            });
-        }
-        if (event.target.matches('[data-return-update] [name="status"]')) {
-            const fields = event.target.closest('[data-return-update]').querySelector('[data-return-receipt-fields]');
-            fields.hidden = event.target.value !== 'Received';
-            fields.querySelectorAll('input, select').forEach(input => {
-                input.required = event.target.value === 'Received' && input.name !== 'received_warehouse_id';
-                if (input.name === 'received_warehouse_id') input.required = event.target.value === 'Received';
-            });
-        }
-        if (panel && event.target.matches('[data-return-update] [name="status"]')) {
-            event.target.closest('[data-return-update]').querySelector('[name="received_date"]').value = localTodayDate();
-        }
     });
 
     syncBillingForm.addEventListener('submit', event => {
@@ -832,3 +807,44 @@ if (monitoring) {
         }
     });
 }
+
+function initializeReturnPanel(panel) {
+    const createForm = panel.querySelector('[data-return-create]');
+    if (createForm) {
+        const isItemReturn = createForm.elements.return_type.value === 'Item Return';
+        createForm.querySelectorAll('[data-return-item-field]').forEach(field => {
+            field.hidden = !isItemReturn;
+            field.querySelector('select, input').required = isItemReturn;
+        });
+    }
+
+    panel.querySelectorAll('[data-return-update]').forEach(form => {
+        const status = form.elements.status.value;
+        const fields = form.querySelector('[data-return-receipt-fields]');
+        fields.hidden = status !== 'Received';
+        fields.querySelectorAll('input, select').forEach(input => {
+            input.required = status === 'Received';
+        });
+    });
+}
+
+document.querySelectorAll('[data-return-panel]').forEach(initializeReturnPanel);
+document.addEventListener('change', event => {
+    if (event.target.matches('[data-return-create] [name="return_type"]')) {
+        initializeReturnPanel(event.target.closest('[data-return-panel]'));
+    }
+    if (event.target.matches('[data-return-update] [name="status"]')) {
+        const form = event.target.closest('[data-return-update]');
+        const fields = form.querySelector('[data-return-receipt-fields]');
+        const isReceived = event.target.value === 'Received';
+        fields.hidden = !isReceived;
+        fields.querySelectorAll('input, select').forEach(input => {
+            input.required = isReceived;
+        });
+        if (isReceived) {
+            const today = new Date();
+            const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+            form.querySelector('[name="received_date"]').value = localToday;
+        }
+    }
+});

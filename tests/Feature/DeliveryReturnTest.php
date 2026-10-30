@@ -95,6 +95,25 @@ function prepareDeliveryReturnRecords(): void
     DB::table('inventory')->insert(['inventory_id' => 1, 'item_id' => 1, 'warehouse_id' => 1, 'qty' => 8, 'inventory_status' => 'Approved']);
 }
 
+it('shows return monitoring in the MMC sidebar and opens its project workspace', function (): void {
+    prepareDeliveryReturnRecords();
+    $user = deliveryReturnUser();
+    $this->actingAs($user);
+    $this->withSession(['company_id' => $user->companies()->first()->getKey()]);
+
+    $this->get(route('deliveries.return-monitoring'))
+        ->assertOk()
+        ->assertSee('Return Monitoring')
+        ->assertSee('href="'.route('deliveries.return-monitoring').'"', false)
+        ->assertSee('Choose a project to view or record returns.');
+
+    $this->get(route('deliveries.return-monitoring', ['project_id' => 1]))
+        ->assertOk()
+        ->assertSee('Record a return')
+        ->assertSee('Return monitoring')
+        ->assertSee('Related delivery / DR');
+});
+
 it('credits only confirmed item returns through inventory history and keeps document returns inventory neutral', function (): void {
     prepareDeliveryReturnRecords();
     $user = deliveryReturnUser();

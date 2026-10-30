@@ -159,6 +159,17 @@
                 </svg>
                 <span>Delivery Monitoring</span>
             </a>
+            <a href="{{ route('deliveries.return-monitoring') }}"
+               @if(request()->routeIs('deliveries.return-monitoring')) aria-current="page" @endif
+               class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('deliveries.return-monitoring') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
+                @if(request()->routeIs('deliveries.return-monitoring'))
+                    <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
+                @endif
+                <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('deliveries.return-monitoring') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 14 4 9l5-5M4 9h11a5 5 0 0 1 5 5v1M15 10l5 5-5 5" />
+                </svg>
+                <span>Return Monitoring</span>
+            </a>
         @endif
 
         @if($currentCompany?->code === 'MMC' && $currentCompany?->is_active)

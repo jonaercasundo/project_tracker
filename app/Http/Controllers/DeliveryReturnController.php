@@ -9,7 +9,9 @@ use App\Models\Inventory;
 use App\Models\InventoryHistory;
 use App\Models\Item;
 use App\Models\Warehouse;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -17,10 +19,10 @@ use Illuminate\Validation\Rule;
 
 class DeliveryReturnController extends Controller
 {
-    public function index(Request $request, int $project): JsonResponse
+    public function page(Request $request): View
     {
-        abort_unless(DB::table('projects')->where('project_id', $project)->exists(), 404);
-        $filters = $request->validate([
+        $validated = $request->validate([
+            'project_id' => ['nullable', 'integer', 'min:1', Rule::exists('projects', 'project_id')],
             'return_type' => ['nullable', Rule::in(['Item Return', 'Document Return'])],
             'return_status' => ['nullable', Rule::in(['Reported', 'In Transit', 'Received', 'Rejected'])],
             'return_date_from' => ['nullable', 'date_format:Y-m-d'],
@@ -30,26 +32,29 @@ class DeliveryReturnController extends Controller
             'quantity_from' => ['nullable', 'integer', 'min:1'],
             'quantity_to' => ['nullable', 'integer', 'min:1', 'gte:quantity_from'],
         ]);
-        $records = DeliveryReturn::query()->with(['item', 'warehouse'])->where('project_id', $project)
-            ->when($filters['return_type'] ?? null, fn ($query, string $value) => $query->where('return_type', $value))
-            ->when($filters['return_status'] ?? null, fn ($query, string $value) => $query->where('status', $value))
-            ->when($filters['return_date_from'] ?? null, fn ($query, string $value) => $query->whereDate('monitoring_date', '>=', $value))
-            ->when($filters['return_date_to'] ?? null, fn ($query, string $value) => $query->whereDate('monitoring_date', '<=', $value))
-            ->when($filters['received_date_from'] ?? null, fn ($query, string $value) => $query->whereDate('received_date', '>=', $value))
-            ->when($filters['received_date_to'] ?? null, fn ($query, string $value) => $query->whereDate('received_date', '<=', $value))
-            ->when($filters['quantity_from'] ?? null, fn ($query, int $value) => $query->where('quantity_returned', '>=', $value))
-            ->when($filters['quantity_to'] ?? null, fn ($query, int $value) => $query->where('quantity_returned', '<=', $value))
-            ->orderByDesc('monitoring_date')->orderByDesc('return_id')->paginate(25)->withQueryString();
-        $deliveries = Delivery::query()->where('project_id', $project)->orderByDesc('delivery_date')->get(['delivery_id', 'dr_no', 'lot_id', 'school_id']);
-        $items = Item::query()->where('project_id', $project)->orderBy('item_name')->get(['item_id', 'item_name', 'unit']);
-        $warehouses = Warehouse::query()->orderBy('warehouse_name')->get(['warehouse_id', 'warehouse_name']);
+        $projects = DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']);
+        $project = isset($validated['project_id']) ? (int) $validated['project_id'] : null;
+        $panel = $project === null ? [] : $this->panelData($project, $validated);
+
+        return view('operation.delivery.returns', [
+            'projects' => $projects,
+            'selectedProject' => $project,
+            'filters' => $validated,
+            ...$panel,
+        ]);
+    }
+
+    public function index(Request $request, int $project): JsonResponse
+    {
+        abort_unless(DB::table('projects')->where('project_id', $project)->exists(), 404);
+        $panel = $this->panelData($project, $request->validate($this->filterRules()));
 
         return response()->json([
-            'html' => view('operation.delivery.partials.monitoring-returns', compact('records', 'deliveries', 'items', 'warehouses', 'project'))->render(),
+            'html' => view('operation.delivery.partials.monitoring-returns', $panel)->render(),
         ])->header('Cache-Control', 'private, no-store');
     }
 
-    public function store(StoreDeliveryReturnRequest $request, int $project): JsonResponse
+    public function store(StoreDeliveryReturnRequest $request, int $project): JsonResponse|RedirectResponse
     {
         $fields = $request->validated();
         $delivery = Delivery::query()->where('project_id', $project)->findOrFail($fields['delivery_id']);
@@ -71,10 +76,15 @@ class DeliveryReturnController extends Controller
             'reported_by_user_id' => Auth::id(),
         ]);
 
-        return response()->json(['message' => 'Return recorded. Stock changes only when an Item Return is marked Received.']);
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Return recorded. Stock changes only when an Item Return is marked Received.']);
+        }
+
+        return redirect()->route('deliveries.return-monitoring', ['project_id' => $project])
+            ->with('success', 'Return recorded. Stock changes only when an Item Return is marked Received.');
     }
 
-    public function update(Request $request, int $project, int $return): JsonResponse
+    public function update(Request $request, int $project, int $return): JsonResponse|RedirectResponse
     {
         $fields = $request->validate([
             'status' => ['required', Rule::in(['Reported', 'In Transit', 'Received', 'Rejected'])],
@@ -136,6 +146,50 @@ class DeliveryReturnController extends Controller
             $record->fill($fields)->save();
         }, 3);
 
-        return response()->json(['message' => 'Return tracking updated.']);
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Return tracking updated.']);
+        }
+
+        return redirect()->route('deliveries.return-monitoring', ['project_id' => $project])
+            ->with('success', 'Return tracking updated.');
+    }
+
+    /** @return array<string, mixed> */
+    private function panelData(int $project, array $filters): array
+    {
+        $records = DeliveryReturn::query()->with(['item', 'warehouse'])->where('project_id', $project)
+            ->when($filters['return_type'] ?? null, fn ($query, string $value) => $query->where('return_type', $value))
+            ->when($filters['return_status'] ?? null, fn ($query, string $value) => $query->where('status', $value))
+            ->when($filters['return_date_from'] ?? null, fn ($query, string $value) => $query->whereDate('monitoring_date', '>=', $value))
+            ->when($filters['return_date_to'] ?? null, fn ($query, string $value) => $query->whereDate('monitoring_date', '<=', $value))
+            ->when($filters['received_date_from'] ?? null, fn ($query, string $value) => $query->whereDate('received_date', '>=', $value))
+            ->when($filters['received_date_to'] ?? null, fn ($query, string $value) => $query->whereDate('received_date', '<=', $value))
+            ->when($filters['quantity_from'] ?? null, fn ($query, int $value) => $query->where('quantity_returned', '>=', $value))
+            ->when($filters['quantity_to'] ?? null, fn ($query, int $value) => $query->where('quantity_returned', '<=', $value))
+            ->orderByDesc('monitoring_date')->orderByDesc('return_id')->paginate(25)->withQueryString();
+
+        return [
+            'records' => $records,
+            'deliveries' => Delivery::query()->where('project_id', $project)->orderByDesc('delivery_date')->get(['delivery_id', 'dr_no', 'lot_id', 'school_id']),
+            'items' => Item::query()->where('project_id', $project)->orderBy('item_name')->get(['item_id', 'item_name', 'unit']),
+            'warehouses' => Warehouse::query()->orderBy('warehouse_name')->get(['warehouse_id', 'warehouse_name']),
+            'project' => $project,
+            'filters' => $filters,
+        ];
+    }
+
+    /** @return array<string, array<int, mixed>> */
+    private function filterRules(): array
+    {
+        return [
+            'return_type' => ['nullable', Rule::in(['Item Return', 'Document Return'])],
+            'return_status' => ['nullable', Rule::in(['Reported', 'In Transit', 'Received', 'Rejected'])],
+            'return_date_from' => ['nullable', 'date_format:Y-m-d'],
+            'return_date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:return_date_from'],
+            'received_date_from' => ['nullable', 'date_format:Y-m-d'],
+            'received_date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:received_date_from'],
+            'quantity_from' => ['nullable', 'integer', 'min:1'],
+            'quantity_to' => ['nullable', 'integer', 'min:1', 'gte:quantity_from'],
+        ];
     }
 }

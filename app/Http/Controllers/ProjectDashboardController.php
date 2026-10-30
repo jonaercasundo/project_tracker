@@ -15,17 +15,14 @@ class ProjectDashboardController extends Controller
         $projects = Project::query()->orderBy('project_name')->get(['project_id', 'project_name']);
         $selectedProjectId = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,project_id'],
-            'lot' => ['nullable', 'in:2,9,11'],
         ])['project_id'] ?? $projects->firstWhere('project_name', 'Billing Documentation')?->project_id ?? $projects->first()?->project_id;
-        $selectedLot = (string) $request->input('lot', '2');
         $summary = $selectedProjectId !== null
-            ? $billingDocumentStatus->summarize((int) $selectedProjectId, $selectedLot)
+            ? $billingDocumentStatus->summarize((int) $selectedProjectId)
             : ['total' => 0, 'processed' => 0, 'remaining' => 0, 'processed_today' => 0, 'source_error' => null];
 
         return view('projects.reports-analytics', [
             'projects' => $projects,
             'selectedProjectId' => $selectedProjectId,
-            'selectedLot' => $selectedLot,
             'summary' => $summary,
             'snapshotAt' => now(),
         ]);

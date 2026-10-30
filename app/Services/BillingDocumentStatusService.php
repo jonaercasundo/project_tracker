@@ -16,13 +16,9 @@ class BillingDocumentStatusService
 
     public function __construct(private GoogleSheetsBillingConfiguration $configuration, private GoogleSheetsApiClient $sheets) {}
 
-    /** @return array{total: int, processed: int, remaining: int, processed_today: int, source_error: ?string} */
-    public function summarize(int $projectId, string $lotNumber): array
+    /** @return array{total: ?int, processed: ?int, remaining: ?int, processed_today: ?int, source_error: ?string} */
+    public function summarize(int $projectId): array
     {
-        if (! in_array($lotNumber, self::LOTS, true)) {
-            throw new RuntimeException('Choose LOT 2, LOT 9, or LOT 11.');
-        }
-
         $deliveries = DB::table('deliveries as d')
             ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
             ->where('d.project_id', $projectId)
@@ -30,42 +26,48 @@ class BillingDocumentStatusService
             ->select(['d.dr_no', 'd.status', 'l.lot_name'])
             ->get();
 
-        $projectDrs = [];
+        $projectDrsByLot = array_fill_keys(self::LOTS, []);
         foreach ($deliveries as $delivery) {
             if (in_array(mb_strtolower(trim((string) $delivery->status)), self::EXCLUDED_DELIVERY_STATUSES, true)) {
                 continue;
             }
 
-            if ($this->lotNumber((string) $delivery->lot_name) !== $lotNumber) {
+            $lotNumber = $this->lotNumber((string) $delivery->lot_name);
+            if ($lotNumber === null || ! isset($projectDrsByLot[$lotNumber])) {
                 continue;
             }
 
             $drNumber = $this->normalizeDrNumber((string) $delivery->dr_no);
             if ($drNumber !== '') {
-                $projectDrs[$drNumber] = true;
+                $projectDrsByLot[$lotNumber][$drNumber] = true;
             }
         }
 
         try {
-            $rows = $this->lotSheetRows($lotNumber);
             $applicableDrs = [];
             $processedDrs = [];
-            $processedToday = 0;
+            $processedTodayDrs = [];
 
-            foreach ($rows as $row) {
-                $drNumber = $this->normalizeDrNumber((string) ($row['dr'] ?? ''));
-                if ($drNumber !== '' && isset($projectDrs[$drNumber])) {
+            foreach (self::LOTS as $lotNumber) {
+                $rows = $this->lotSheetRows($lotNumber);
+                $projectDrs = $projectDrsByLot[$lotNumber];
+
+                foreach ($rows as $row) {
+                    $drNumber = $this->normalizeDrNumber((string) ($row['dr'] ?? ''));
+                    if ($drNumber === '' || ! isset($projectDrs[$drNumber])) {
+                        continue;
+                    }
+
                     $applicableDrs[$drNumber] = true;
-                }
+                    $receivedDate = trim((string) ($row['received'] ?? ''));
+                    if ($receivedDate === '') {
+                        continue;
+                    }
 
-                $receivedDate = trim((string) ($row['received'] ?? ''));
-                if ($drNumber === '' || $receivedDate === '' || ! isset($projectDrs[$drNumber]) || isset($processedDrs[$drNumber])) {
-                    continue;
-                }
-
-                $processedDrs[$drNumber] = true;
-                if ($this->dateInApplicationTimezone($receivedDate) === now(config('app.timezone'))->toDateString()) {
-                    $processedToday++;
+                    $processedDrs[$drNumber] = true;
+                    if ($this->dateInApplicationTimezone($receivedDate) === now(config('app.timezone'))->toDateString()) {
+                        $processedTodayDrs[$drNumber] = true;
+                    }
                 }
             }
 
@@ -76,17 +78,15 @@ class BillingDocumentStatusService
                 'total' => $total,
                 'processed' => $processed,
                 'remaining' => max(0, $total - $processed),
-                'processed_today' => $processedToday,
+                'processed_today' => count($processedTodayDrs),
                 'source_error' => null,
             ];
         } catch (GoogleSheetsApiException|RuntimeException $exception) {
-            $total = count($projectDrs);
-
             return [
-                'total' => $total,
-                'processed' => 0,
-                'remaining' => $total,
-                'processed_today' => 0,
+                'total' => null,
+                'processed' => null,
+                'remaining' => null,
+                'processed_today' => null,
                 'source_error' => $exception->getMessage(),
             ];
         }
@@ -143,7 +143,7 @@ class BillingDocumentStatusService
             }
         }
 
-        throw new RuntimeException('The selected lot’s BIR DR and DATE RECEIVED columns could not be found in the configured billing sheet.');
+        throw new RuntimeException('The BIR DR and DATE RECEIVED columns for a supported lot could not be found in the configured billing sheet.');
     }
 
     private function dateInApplicationTimezone(string $value): ?string

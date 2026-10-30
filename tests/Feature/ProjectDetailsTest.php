@@ -561,6 +561,55 @@ it('validates keystage edits and prevents deletion while a package or delivery u
     $this->assertDatabaseMissing('keystage', ['keystage_id' => 1]);
 });
 
+it('shows a package key stage label and retains the project-scoped key stage filter', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+
+    $allPackages = $this->getJson('/projects/1/packages-data')->assertOk();
+    $allPackages->assertSee('Key Stage 1')->assertSee('No Key Stage assigned');
+
+    $filteredPackages = $this->getJson('/projects/1/packages-data?keystage=1')->assertOk();
+    $filteredPackages->assertJsonPath('total', 1)->assertSee('Key Stage 1')->assertDontSee('No Key Stage assigned');
+});
+
+it('edits package item quantities and rejects decimals or quantities with delivery history', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    DB::table('package_content')->insert(['package_id' => 1, 'item_id' => 1, 'qty' => 4]);
+    $editUrl = route('projects.items.edit', [1, 1]);
+
+    $this->get($editUrl)->assertOk()->assertSee('Per-package item quantities')->assertSee('package_contents[1]', false);
+    $this->put(route('projects.items.update', [1, 1]), [
+        'item_name' => 'Direct updated',
+        'package_contents' => [1 => 7],
+    ])->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'items']))
+        ->assertSessionHas('success', 'Item updated successfully.');
+    $this->assertDatabaseHas('package_content', ['package_id' => 1, 'item_id' => 1, 'qty' => 7]);
+
+    $this->from($editUrl)->put(route('projects.items.update', [1, 1]), [
+        'item_name' => 'Direct updated',
+        'package_contents' => [1 => '2.5'],
+    ])->assertRedirect($editUrl)->assertSessionHasErrors('package_contents.1');
+    $this->assertDatabaseHas('package_content', ['package_id' => 1, 'item_id' => 1, 'qty' => 7]);
+
+    $deliveryId = DB::table('deliveries')->where('project_id', 1)->value('delivery_id');
+    DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['lot_id' => 1]);
+    $this->from($editUrl)->put(route('projects.items.update', [1, 1]), [
+        'item_name' => 'Should roll back after delivery assignment',
+        'package_contents' => [1 => 8],
+    ])->assertRedirect($editUrl)->assertSessionHasErrors('package_contents.1');
+
+    DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['lot_id' => null]);
+    DB::table('package_status')->insert(['delivery_id' => $deliveryId, 'package_id' => 1, 'status' => 'pending']);
+    $this->from($editUrl)->put(route('projects.items.update', [1, 1]), [
+        'item_name' => 'Should roll back after package status',
+        'package_contents' => [1 => 8],
+    ])->assertRedirect($editUrl)->assertSessionHasErrors('package_contents.1');
+
+    $this->assertDatabaseHas('package_content', ['package_id' => 1, 'item_id' => 1, 'qty' => 7]);
+    $this->assertDatabaseHas('item', ['item_id' => 1, 'item_name' => 'Direct updated']);
+});
+
 it('keeps inline lot price saves scoped to the selected lot', function () {
     projectDetailsUser();
     projectDetailsFixtures();

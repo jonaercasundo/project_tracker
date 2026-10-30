@@ -57,6 +57,37 @@
                 </div>
             @endforeach
 
+            <section id="package-quantities" class="space-y-4 rounded-xl border border-slate-200 p-4 sm:p-5">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-900">Per-package item quantities</h2>
+                    <p class="mt-1 text-xs leading-5 text-slate-500">These integer quantities are multiplied by each delivery's package count for delivery requirements, billing, and inventory calculations. Stored zero or blank quantities are treated as 1 by those calculations. Changes are blocked after delivery or inventory history exists.</p>
+                </div>
+
+                @forelse ($quantityPackages as $packageContent)
+                    @php
+                        $packageQuantityLabel = filled($packageContent->keystage_num)
+                            && (int) $packageContent->keystage_project_id === (int) $project->project_id
+                            && ($packageContent->lot_id === null || (int) $packageContent->lot_id === (int) $packageContent->keystage_lot_id)
+                            ? 'Key Stage '.$packageContent->keystage_num
+                            : 'No Key Stage assigned';
+                    @endphp
+                    <div class="grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-end">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-800">{{ $packageQuantityLabel }} · {{ $packageContent->lot_name ?: 'Lot not assigned' }}</p>
+                            <p class="mt-1 text-xs text-slate-500">Package {{ $packageContent->package_num ?? $packageContent->package_id }}</p>
+                        </div>
+                        <label for="package-quantity-{{ $packageContent->package_id }}" class="text-xs font-semibold text-slate-600">Quantity per package
+                            <input id="package-quantity-{{ $packageContent->package_id }}" name="package_contents[{{ $packageContent->package_id }}]" type="number" min="0" max="2147483647" step="1" required value="{{ old('package_contents.'.$packageContent->package_id, $packageContent->qty ?? 0) }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm tabular-nums text-slate-800 focus:border-blue-500 focus:ring-blue-500">
+                            @error('package_contents.'.$packageContent->package_id)
+                                <span class="mt-1 block text-xs font-medium text-red-600">{{ $message }}</span>
+                            @enderror
+                        </label>
+                    </div>
+                @empty
+                    <p class="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">This item is not currently included in any package for this project.</p>
+                @endforelse
+            </section>
+
             <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
                 <a href="{{ route('projects.show', ['project' => $project->project_id, 'tab' => 'items']) }}" class="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</a>
                 <button type="submit" class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Save changes</button>

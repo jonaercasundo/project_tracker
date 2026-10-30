@@ -38,6 +38,31 @@ class ProjectDetailsService
         return DB::table('item')->where('project_id', $project->project_id);
     }
 
+    /** @param Collection<int, object> $items
+     * @return Collection<int, Collection<int, object>>
+     */
+    public function itemPackageQuantities(Project $project, Collection $items): Collection
+    {
+        if ($items->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('package_content as pc')
+            ->join('package as p', 'p.package_id', '=', 'pc.package_id')
+            ->leftJoin('lot as l', 'l.lot_id', '=', 'p.lot_id')
+            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'p.keystage_id')
+            ->leftJoin('lot as kl', 'kl.lot_id', '=', 'k.lot_id')
+            ->whereIn('pc.item_id', $items->pluck('item_id'))
+            ->where(function (Builder $query) use ($project): void {
+                $query->where('l.project_id', $project->project_id)
+                    ->orWhere('kl.project_id', $project->project_id);
+            })
+            ->select('pc.item_id', 'pc.qty', 'p.package_id', 'p.package_num', 'p.lot_id', 'k.keystage_num', 'k.lot_id as keystage_lot_id', 'kl.project_id as keystage_project_id', 'l.lot_name', 'kl.lot_name as keystage_lot_name')
+            ->orderBy('p.package_num')->orderBy('p.package_id')
+            ->get()
+            ->groupBy('item_id');
+    }
+
     public function packages(Project $project): Builder
     {
         return DB::table('package as p')
@@ -98,7 +123,7 @@ class ProjectDetailsService
         $query = match ($section) {
             'schools' => $this->schools($project)->orderBy('s.school_name')->orderBy('s.school_id'),
             'items' => $this->items($project)->orderBy('item_name')->orderBy('item_id'),
-            'packages' => $this->packages($project)->select('p.*', 'l.lot_name', 'k.keystage_num', 'k.description as keystage_description')->orderBy('p.package_num')->orderBy('p.package_id'),
+            'packages' => $this->packages($project)->select('p.*', 'l.lot_name', 'k.keystage_num', 'k.description as keystage_description', 'k.lot_id as keystage_lot_id', 'keystage_lot.project_id as keystage_project_id')->orderBy('p.package_num')->orderBy('p.package_id'),
             'lots' => $this->lotRecords($project),
             'keystage' => $this->keystageRecords($project),
         };
@@ -106,7 +131,7 @@ class ProjectDetailsService
         $columns = match ($section) {
             'schools' => ['s.school_id', 's.school_name', 's.address', 's.municipality', 's.division', 's.region'],
             'items' => $this->searchColumns('item', ['item_id', 'item_name', 'description', 'item_description', 'item_type', 'type']),
-            'packages' => $this->searchColumns('package', ['package_id', 'package_num', 'package_code', 'code', 'package_type', 'type'], 'p.'),
+            'packages' => array_merge($this->searchColumns('package', ['package_id', 'package_num', 'package_code', 'code', 'package_type', 'type'], 'p.'), ['k.keystage_num', 'k.description', 'l.lot_name', 'keystage_lot.lot_name']),
             'lots' => ['l.lot_name', 'l.contract_no'],
             'keystage' => ['k.keystage_num', 'k.description', 'l.lot_name'],
         };
@@ -149,11 +174,6 @@ class ProjectDetailsService
         }
 
         $records = $query->paginate((int) ($filters['per_page'] ?? 25), ['*'], 'page', (int) ($filters['page'] ?? 1));
-        if ($section === 'packages') {
-            $records->getCollection()->each(function (object $package): void {
-                $package->package_name = 'Package '.$package->package_num;
-            });
-        }
         if ($section === 'lots') {
             $keystages = $this->keystages($project)->count() <= 100
                 ? $this->keystageRecords($project)->whereIn('k.lot_id', $records->pluck('lot_id'))->limit(100)->get() : collect();

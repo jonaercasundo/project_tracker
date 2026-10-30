@@ -4,13 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ProjectItemController extends Controller
 {
@@ -38,11 +41,13 @@ class ProjectItemController extends Controller
     {
         $this->authorizeProjectAccess($project, 'update');
         $item = $this->findProjectItem($project, $itemId);
+        $quantityPackages = $this->packageQuantityRows($project, $itemId);
 
         return view('projects.items.edit', [
             'project' => $project,
             'item' => $item,
             'fields' => $this->editableFields($item),
+            'quantityPackages' => $quantityPackages,
         ]);
     }
 
@@ -52,10 +57,14 @@ class ProjectItemController extends Controller
         $item = $this->findProjectItem($project, $itemId);
         $fields = $this->editableFields($item);
         $rules = collect($fields)->mapWithKeys(fn (array $field): array => [$field['name'] => $field['rules']])->all();
+        $rules['package_contents'] = ['sometimes', 'array'];
+        $rules['package_contents.*'] = ['required', 'integer', 'min:0', 'max:2147483647'];
         $validated = $request->validate($rules);
+        $packageContents = $validated['package_contents'] ?? [];
+        unset($validated['package_contents']);
 
         try {
-            DB::transaction(function () use ($project, $itemId, $validated): void {
+            DB::transaction(function () use ($project, $itemId, $validated, $packageContents): void {
                 $item = DB::table('item')
                     ->where('project_id', $project->project_id)
                     ->where('item_id', $itemId)
@@ -68,6 +77,29 @@ class ProjectItemController extends Controller
                     ->where('project_id', $project->project_id)
                     ->where('item_id', $itemId)
                     ->update($validated);
+
+                foreach ($packageContents as $packageId => $quantity) {
+                    if (! ctype_digit((string) $packageId)) {
+                        throw ValidationException::withMessages(['package_contents' => 'A selected package is invalid.']);
+                    }
+
+                    $package = $this->projectPackageQuery($project, (int) $packageId)->lockForUpdate()->first();
+                    abort_if($package === null, 404);
+
+                    $content = DB::table('package_content')
+                        ->where('package_id', $packageId)
+                        ->where('item_id', $itemId)
+                        ->lockForUpdate();
+                    $contentCount = (clone $content)->count();
+                    if ($contentCount !== 1) {
+                        throw ValidationException::withMessages([
+                            'package_contents.'.$packageId => 'This package has duplicate or missing quantity rows for the item. Resolve the package contents before editing this quantity.',
+                        ]);
+                    }
+
+                    $this->ensurePackageQuantityIsEditable((int) $packageId);
+                    $content->update(['qty' => $quantity]);
+                }
             }, 3);
         } catch (QueryException $exception) {
             report($exception);
@@ -115,6 +147,68 @@ class ProjectItemController extends Controller
             ->where('project_id', $project->project_id)
             ->where('item_id', $itemId)
             ->firstOrFail();
+    }
+
+    private function packageQuantityRows(Project $project, int $itemId): Collection
+    {
+        return DB::table('package_content as pc')
+            ->join('package as p', 'p.package_id', '=', 'pc.package_id')
+            ->leftJoin('lot as l', 'l.lot_id', '=', 'p.lot_id')
+            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'p.keystage_id')
+            ->leftJoin('lot as kl', 'kl.lot_id', '=', 'k.lot_id')
+            ->where('pc.item_id', $itemId)
+            ->where(function ($query) use ($project): void {
+                $query->where('l.project_id', $project->project_id)
+                    ->orWhere('kl.project_id', $project->project_id);
+            })
+            ->select('p.package_id', 'p.package_num', 'p.lot_id', 'k.lot_id as keystage_lot_id', 'pc.qty', 'l.lot_name', 'k.keystage_num', 'kl.project_id as keystage_project_id')
+            ->orderBy('p.package_num')
+            ->orderBy('p.package_id')
+            ->get();
+    }
+
+    private function projectPackageQuery(Project $project, int $packageId): Builder
+    {
+        return DB::table('package as p')
+            ->leftJoin('lot as l', 'l.lot_id', '=', 'p.lot_id')
+            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'p.keystage_id')
+            ->leftJoin('lot as kl', 'kl.lot_id', '=', 'k.lot_id')
+            ->where('p.package_id', $packageId)
+            ->where(function ($query) use ($project): void {
+                $query->where('l.project_id', $project->project_id)
+                    ->orWhere('kl.project_id', $project->project_id);
+            });
+    }
+
+    private function ensurePackageQuantityIsEditable(int $packageId): void
+    {
+        $package = DB::table('package')->where('package_id', $packageId)->first(['lot_id', 'keystage_id']);
+        if ($package !== null && DB::table('deliveries')->where(function ($query) use ($package): void {
+            if ($package->keystage_id !== null) {
+                $query->where('keystage_id', $package->keystage_id);
+            }
+            if ($package->lot_id !== null) {
+                $query->orWhere(function ($lotDeliveries) use ($package): void {
+                    $lotDeliveries->whereNull('keystage_id')->where('lot_id', $package->lot_id);
+                });
+            }
+        })->exists()) {
+            throw ValidationException::withMessages([
+                'package_contents.'.$packageId => 'This package is assigned to a delivery. Its quantity cannot be changed because that would alter delivery, billing, or inventory requirements.',
+            ]);
+        }
+
+        if (Schema::hasTable('package_status') && DB::table('package_status')->where('package_id', $packageId)->exists()) {
+            throw ValidationException::withMessages([
+                'package_contents.'.$packageId => 'This package already has delivery status records. Its quantity cannot be changed because that would alter recorded delivery and billing requirements.',
+            ]);
+        }
+
+        if (Schema::hasTable('inventory_history') && Schema::hasColumn('inventory_history', 'package_id') && DB::table('inventory_history')->where('package_id', $packageId)->exists()) {
+            throw ValidationException::withMessages([
+                'package_contents.'.$packageId => 'This package has inventory history. Its quantity cannot be changed because that would make the recorded stock movements inconsistent.',
+            ]);
+        }
     }
 
     private function authorizeProjectAccess(Project $project, string $ability): void

@@ -24,6 +24,7 @@
 
                                         $sellingPrice = $item->price ?? null;
                                         $supplierPrice = $item->supplier_price ?? null;
+                                        $packageQuantities = $itemPackageQuantities[$itemId] ?? collect();
                                     @endphp
 
                                     <tr
@@ -47,6 +48,19 @@
                                             @if($itemId)
                                                 <div class="text-[11px] text-slate-400 mt-1">
                                                     ID: {{ $itemId }}
+                                                </div>
+                                            @endif
+
+                                            @if($packageQuantities->isNotEmpty())
+                                                <div class="mt-1 space-y-0.5 text-[11px] text-slate-500">
+                                                    @foreach ($packageQuantities as $packageQuantity)
+                                                        @php
+                                                            $quantityKeyStage = filled($packageQuantity->keystage_num)
+                                                                && (int) $packageQuantity->keystage_project_id === (int) $project->project_id
+                                                                && ($packageQuantity->lot_id === null || (int) $packageQuantity->lot_id === (int) $packageQuantity->keystage_lot_id);
+                                                        @endphp
+                                                        <p>{{ $quantityKeyStage ? 'Key Stage '.$packageQuantity->keystage_num : 'No Key Stage assigned' }} · Package {{ $packageQuantity->package_num ?? $packageQuantity->package_id }}: {{ $packageQuantity->qty ?? 0 }}</p>
+                                                    @endforeach
                                                 </div>
                                             @endif
 
@@ -118,6 +132,10 @@
                                                         hover:bg-slate-200
                                                         text-xs font-bold transition">
                                                     Edit
+                                                </a>
+                                                <a href="{{ route('projects.items.edit', [$project, $itemId]) }}#package-quantities"
+                                                class="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition">
+                                                    Edit quantity
                                                 </a>
                                                 @endif
 

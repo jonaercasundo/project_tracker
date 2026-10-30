@@ -551,6 +551,7 @@ class ProjectController extends Controller
     private function detailData(Request $request, Project $project, ProjectDetailsService $details, string $section): JsonResponse
     {
         $records = $details->records($project, $section, $this->detailFilters($request));
+        $itemPackageQuantities = $section === 'items' ? $details->itemPackageQuantities($project, $records->getCollection()) : collect();
         $totalCount = match ($section) {
             'schools' => $details->schools($project)->count(),
             'items' => $details->items($project)->count(),
@@ -560,7 +561,7 @@ class ProjectController extends Controller
         };
 
         return response()->json([
-            'html' => view('projects.partials.'.$section.'-rows', [($section === 'keystage' ? 'keystages' : $section) => $records, 'project' => $project, 'canUpdateLotContractPrice' => $section === 'lots' && $this->canUpdateLotContractPrice($project), 'rowOffset' => ($records->currentPage() - 1) * $records->perPage()])->render(),
+            'html' => view('projects.partials.'.$section.'-rows', [($section === 'keystage' ? 'keystages' : $section) => $records, 'project' => $project, 'itemPackageQuantities' => $itemPackageQuantities, 'canUpdateLotContractPrice' => $section === 'lots' && $this->canUpdateLotContractPrice($project), 'rowOffset' => ($records->currentPage() - 1) * $records->perPage()])->render(),
             'current_page' => $records->currentPage(),
             'last_page' => $records->lastPage(),
             'per_page' => $records->perPage(),

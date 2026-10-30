@@ -2,11 +2,11 @@
 
                                     @php
 
-                                        $packageName =
-                                            $package->package_name
-                                            ?? $package->name
-                                            ?? $package->package
-                                            ?? 'Unnamed Package';
+                                        $packageName = filled($package->keystage_num ?? null)
+                                            && (int) ($package->keystage_project_id ?? 0) === (int) $project->project_id
+                                            && ($package->lot_id === null || (int) $package->lot_id === (int) ($package->keystage_lot_id ?? 0))
+                                                ? 'Key Stage '.$package->keystage_num
+                                                : 'No Key Stage assigned';
 
                                         $packageCode =
                                             $package->package_code
@@ -59,14 +59,7 @@
                                             </div>
 
                                             @if($packageId)
-
-                                                <div class="text-[11px]
-                                                            text-slate-400 mt-1">
-
-                                                    ID: {{ $packageId }}
-
-                                                </div>
-
+                                                <div class="text-[11px] text-slate-400 mt-1">Package {{ $package->package_num ?? $packageId }} · ID: {{ $packageId }}</div>
                                             @endif
 
                                         </td>

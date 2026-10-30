@@ -2,15 +2,34 @@
 
                                     @php
 
-                                        $packageName = filled($package->keystage_num ?? null)
+                                        $packageId =
+                                            $package->package_id
+                                            ?? $package->id
+                                            ?? null;
+
+                                        $packageName = 'Package '.($package->package_num ?? $packageId ?? '');
+
+                                        $keystageIsInProject = filled($package->keystage_num ?? null)
                                             && (int) ($package->keystage_project_id ?? 0) === (int) $project->project_id
-                                            && ($package->lot_id === null || (int) $package->lot_id === (int) ($package->keystage_lot_id ?? 0))
-                                                ? 'Key Stage '.$package->keystage_num
-                                                : 'No Key Stage assigned';
+                                            && ($package->lot_id === null || (int) $package->lot_id === (int) ($package->keystage_lot_id ?? 0));
+
+                                        $directLotIsInProject = filled($package->lot_name ?? null)
+                                            && (int) ($package->lot_project_id ?? 0) === (int) $project->project_id;
+
+                                        $packageLot = $directLotIsInProject
+                                            ? $package->lot_name
+                                            : ($keystageIsInProject ? $package->keystage_lot_name : null);
+
+                                        $packageDescription = filled($package->description ?? null)
+                                            ? $package->description
+                                            : (filled($package->package_description ?? null)
+                                                ? $package->package_description
+                                                : ($keystageIsInProject ? $package->keystage_description : null));
 
                                         $packageCode =
                                             $package->package_code
                                             ?? $package->code
+                                            ?? $package->package_num
                                             ?? $package->package_id
                                             ?? '—';
 
@@ -18,11 +37,6 @@
                                             $package->package_type
                                             ?? $package->type
                                             ?? '—';
-
-                                        $packageId =
-                                            $package->package_id
-                                            ?? $package->id
-                                            ?? null;
 
                                     @endphp
 
@@ -59,10 +73,14 @@
                                             </div>
 
                                             @if($packageId)
-                                                <div class="text-[11px] text-slate-400 mt-1">Package {{ $package->package_num ?? $packageId }} · ID: {{ $packageId }}</div>
+                                                <div class="text-[11px] text-slate-400 mt-1">ID: {{ $packageId }}</div>
                                             @endif
 
                                         </td>
+
+                                        <td class="px-5 py-4">{{ $packageLot ?: 'No Lot assigned' }}</td>
+                                        <td class="px-5 py-4">{{ $keystageIsInProject ? 'Key Stage '.$package->keystage_num : 'No Key Stage assigned' }}</td>
+                                        <td class="max-w-sm px-5 py-4 text-slate-600">{{ filled($packageDescription) ? $packageDescription : '—' }}</td>
 
 
                                         {{-- CODE --}}
@@ -103,7 +121,7 @@
                                             <div class="inline-flex
                                                         items-center gap-2">
 
-                                                <a href="#"
+                                                <a href="{{ route('projects.packages.show', [$project, $packageId]) }}"
                                                 class="px-3 py-1.5
                                                         rounded-lg
                                                         bg-blue-50
@@ -117,7 +135,7 @@
 
                                                 </a>
 
-                                                <a href="#"
+                                                <a href="{{ route('projects.packages.edit', [$project, $packageId]) }}"
                                                 class="px-3 py-1.5
                                                         rounded-lg
                                                         bg-slate-100
@@ -142,7 +160,7 @@
 
                                     <tr>
 
-                                        <td colspan="5"
+                                        <td colspan="8"
                                             class="px-6 py-12 text-center">
 
                                             <div class="flex flex-col

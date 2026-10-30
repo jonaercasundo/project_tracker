@@ -572,6 +572,57 @@ it('shows a package key stage label and retains the project-scoped key stage fil
     $filteredPackages->assertJsonPath('total', 1)->assertSee('Key Stage 1')->assertDontSee('No Key Stage assigned');
 });
 
+it('views and edits quantities for the selected package item assignments', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    DB::table('package_content')->insert([
+        ['package_id' => 1, 'item_id' => 1, 'qty' => 4],
+        ['package_id' => 2, 'item_id' => 1, 'qty' => 2],
+    ]);
+
+    $showUrl = route('projects.packages.show', [1, 2]);
+    $editUrl = route('projects.packages.edit', [1, 2]);
+
+    $this->get($showUrl)->assertOk()
+        ->assertSee('Lot B')->assertSee('Key Stage 1')->assertSee('Intermediate')
+        ->assertSee('Microscope')->assertSee('2');
+    $this->get($editUrl)->assertOk()
+        ->assertSee('items[1]', false)->assertSee('value="2"', false);
+
+    $this->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 6]])
+        ->assertRedirect($showUrl)->assertSessionHas('success');
+
+    $this->assertDatabaseHas('package_content', ['package_id' => 2, 'item_id' => 1, 'qty' => 6]);
+    $this->assertDatabaseHas('package_content', ['package_id' => 1, 'item_id' => 1, 'qty' => 4]);
+    $this->get($showUrl)->assertOk()->assertSee('>6</td>', false);
+});
+
+it('validates package item quantities and locks changes after a related delivery', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    DB::table('package_content')->insert(['package_id' => 2, 'item_id' => 1, 'qty' => 2]);
+    $editUrl = route('projects.packages.edit', [1, 2]);
+
+    $this->from($editUrl)->put(route('projects.packages.update', [1, 2]), ['items' => [1 => '2.5']])
+        ->assertRedirect($editUrl)->assertSessionHasErrors('items.1');
+    $this->assertDatabaseHas('package_content', ['package_id' => 2, 'item_id' => 1, 'qty' => 2]);
+
+    $deliveryId = DB::table('deliveries')->where('project_id', 1)->value('delivery_id');
+    DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['keystage_id' => 1]);
+    $this->from($editUrl)->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 5]])
+        ->assertRedirect($editUrl)->assertSessionHasErrors('items');
+    $this->assertDatabaseHas('package_content', ['package_id' => 2, 'item_id' => 1, 'qty' => 2]);
+});
+
+it('does not expose a package through another project route', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+
+    $this->get(route('projects.packages.show', [1, 3]))->assertNotFound();
+    $this->get(route('projects.packages.edit', [1, 3]))->assertNotFound();
+    $this->put(route('projects.packages.update', [1, 3]), ['items' => []])->assertNotFound();
+});
+
 it('edits package item quantities and rejects decimals or quantities with delivery history', function () {
     projectDetailsUser();
     projectDetailsFixtures();

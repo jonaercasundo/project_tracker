@@ -50,6 +50,7 @@ use App\Http\Controllers\ProjectDashboardController;
 use App\Http\Controllers\ProjectFinancialPlanController;
 use App\Http\Controllers\ProjectItemController;
 use App\Http\Controllers\ProjectLotController;
+use App\Http\Controllers\ProjectPackageController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\RoleAccessPermissionController;
@@ -494,6 +495,15 @@ Route::middleware(['auth', 'active.user'])->group(function () {
             Route::get('/{itemId}', [ProjectItemController::class, 'show'])->whereNumber('itemId')->name('show');
             Route::get('/{itemId}/edit', [ProjectItemController::class, 'edit'])->whereNumber('itemId')->name('edit');
             Route::put('/{itemId}', [ProjectItemController::class, 'update'])->whereNumber('itemId')->name('update');
+        });
+
+    Route::prefix('/projects/{project:project_id}/packages')
+        ->middleware(['company.context:MMC', 'role:user,finance'])
+        ->name('projects.packages.')
+        ->group(function (): void {
+            Route::get('/{packageId}', [ProjectPackageController::class, 'show'])->whereNumber('packageId')->name('show');
+            Route::get('/{packageId}/edit', [ProjectPackageController::class, 'edit'])->whereNumber('packageId')->name('edit');
+            Route::put('/{packageId}', [ProjectPackageController::class, 'update'])->whereNumber('packageId')->name('update');
         });
 
     Route::middleware(['role:finance'])->group(function () {

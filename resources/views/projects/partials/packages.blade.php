@@ -95,7 +95,7 @@
                                 All Packages
                             </option>
 
-                            
+
 
                         </select>
 
@@ -127,6 +127,10 @@
                                         Package
                                     </th>
 
+                                    <th class="px-5 py-3">Lot</th>
+                                    <th class="px-5 py-3">Key Stage</th>
+                                    <th class="px-5 py-3">Description</th>
+
                                     <th class="px-5 py-3">
                                         Code
                                     </th>
@@ -147,7 +151,7 @@
                             <tbody id="packagesTableBody"
                                 class="divide-y divide-slate-100">
 
-                                <tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">Open this tab to load records.</td></tr>
+                                <tr><td colspan="8" class="px-6 py-12 text-center text-slate-500">Open this tab to load records.</td></tr>
 
                             </tbody>
 
@@ -212,9 +216,9 @@
             {{-- PACKAGES SEARCH / FILTER / PAGINATION --}}
             {{-- ========================================================= --}}
 
-            
+
             {{-- ========================================================= --}}
             {{-- PROJECT SETTINGS --}}
             {{-- ========================================================= --}}
 
-            
+

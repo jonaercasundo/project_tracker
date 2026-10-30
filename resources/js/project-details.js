@@ -18,7 +18,7 @@ function initializeProjectDetails() {
     const definitions = {
         schools: { body: 'schoolsTableBody', buttons: 'schoolsPaginationButtons', columns: 8, fields: { search: 'schoolSearch', region: 'schoolRegion', division: 'schoolDivision', municipality: 'schoolMunicipality' } },
         items: { body: 'itemsTableBody', buttons: 'itemsPaginationButtons', columns: 7, fields: { search: 'itemSearch', item_type: 'itemTypeFilter' } },
-        packages: { body: 'packagesTableBody', buttons: 'packagesPaginationButtons', columns: 5, fields: { search: 'packageSearch', package_type: 'packageTypeFilter', lot: 'packageLotFilter', keystage: 'packageKeystageFilter' } },
+        packages: { body: 'packagesTableBody', buttons: 'packagesPaginationButtons', columns: 8, fields: { search: 'packageSearch', package_type: 'packageTypeFilter', lot: 'packageLotFilter', keystage: 'packageKeystageFilter' } },
         lots: { body: 'lotsTableBody', buttons: 'lotsPaginationButtons', columns: 5, fields: {} },
         keystage: { body: 'keystageTableBody', buttons: 'keystagesPaginationButtons', columns: 4, fields: { search: 'keystageSearch', lot: 'keystageLotFilter' } },
     };

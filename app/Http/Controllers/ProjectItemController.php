@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Services\PackageContentsService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
@@ -51,7 +52,7 @@ class ProjectItemController extends Controller
         ]);
     }
 
-    public function update(Request $request, Project $project, int $itemId): RedirectResponse
+    public function update(Request $request, Project $project, int $itemId, PackageContentsService $packageContentsService): RedirectResponse
     {
         $this->authorizeProjectAccess($project, 'update');
         $item = $this->findProjectItem($project, $itemId);
@@ -64,7 +65,7 @@ class ProjectItemController extends Controller
         unset($validated['package_contents']);
 
         try {
-            DB::transaction(function () use ($project, $itemId, $validated, $packageContents): void {
+            DB::transaction(function () use ($project, $itemId, $validated, $packageContents, $packageContentsService): void {
                 $item = DB::table('item')
                     ->where('project_id', $project->project_id)
                     ->where('item_id', $itemId)
@@ -97,7 +98,12 @@ class ProjectItemController extends Controller
                         ]);
                     }
 
-                    $this->ensurePackageQuantityIsEditable((int) $packageId);
+                    if ((int) $content->value('qty') !== (int) $quantity) {
+                        $reason = $packageContentsService->quantityChangeBlockReason((int) $packageId);
+                        if ($reason !== null) {
+                            throw ValidationException::withMessages(['package_contents.'.$packageId => $reason]);
+                        }
+                    }
                     $content->update(['qty' => $quantity]);
                 }
             }, 3);
@@ -178,37 +184,6 @@ class ProjectItemController extends Controller
                 $query->where('l.project_id', $project->project_id)
                     ->orWhere('kl.project_id', $project->project_id);
             });
-    }
-
-    private function ensurePackageQuantityIsEditable(int $packageId): void
-    {
-        $package = DB::table('package')->where('package_id', $packageId)->first(['lot_id', 'keystage_id']);
-        if ($package !== null && DB::table('deliveries')->where(function ($query) use ($package): void {
-            if ($package->keystage_id !== null) {
-                $query->where('keystage_id', $package->keystage_id);
-            }
-            if ($package->lot_id !== null) {
-                $query->orWhere(function ($lotDeliveries) use ($package): void {
-                    $lotDeliveries->whereNull('keystage_id')->where('lot_id', $package->lot_id);
-                });
-            }
-        })->exists()) {
-            throw ValidationException::withMessages([
-                'package_contents.'.$packageId => 'This package is assigned to a delivery. Its quantity cannot be changed because that would alter delivery, billing, or inventory requirements.',
-            ]);
-        }
-
-        if (Schema::hasTable('package_status') && DB::table('package_status')->where('package_id', $packageId)->exists()) {
-            throw ValidationException::withMessages([
-                'package_contents.'.$packageId => 'This package already has delivery status records. Its quantity cannot be changed because that would alter recorded delivery and billing requirements.',
-            ]);
-        }
-
-        if (Schema::hasTable('inventory_history') && Schema::hasColumn('inventory_history', 'package_id') && DB::table('inventory_history')->where('package_id', $packageId)->exists()) {
-            throw ValidationException::withMessages([
-                'package_contents.'.$packageId => 'This package has inventory history. Its quantity cannot be changed because that would make the recorded stock movements inconsistent.',
-            ]);
-        }
     }
 
     private function authorizeProjectAccess(Project $project, string $ability): void

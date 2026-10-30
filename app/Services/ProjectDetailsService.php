@@ -123,7 +123,7 @@ class ProjectDetailsService
         $query = match ($section) {
             'schools' => $this->schools($project)->orderBy('s.school_name')->orderBy('s.school_id'),
             'items' => $this->items($project)->orderBy('item_name')->orderBy('item_id'),
-            'packages' => $this->packages($project)->select('p.*', 'l.lot_name', 'k.keystage_num', 'k.description as keystage_description', 'k.lot_id as keystage_lot_id', 'keystage_lot.project_id as keystage_project_id')->orderBy('p.package_num')->orderBy('p.package_id'),
+            'packages' => $this->packages($project)->select('p.*', 'l.lot_name', 'l.project_id as lot_project_id', 'k.keystage_num', 'k.description as keystage_description', 'k.lot_id as keystage_lot_id', 'keystage_lot.project_id as keystage_project_id', 'keystage_lot.lot_name as keystage_lot_name')->orderBy('p.package_num')->orderBy('p.package_id'),
             'lots' => $this->lotRecords($project),
             'keystage' => $this->keystageRecords($project),
         };

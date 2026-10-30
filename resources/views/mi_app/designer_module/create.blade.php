@@ -132,7 +132,7 @@
 
                 @if($saveError)
 
-                    <div class="tx-alert">
+                    <div role="alert" class="tx-alert">
 
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -169,7 +169,7 @@
 
                 @if($errors->any() && !$saveError)
 
-                    <div class="tx-alert">
+                    <div role="alert" class="tx-alert">
 
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -1669,10 +1669,10 @@
                             persist: false,
                             dropdownParent: 'body',
                             createFilter: (input, callback) => {
-                                const normalizedInput = input.trim().toLocaleLowerCase();
-                                return normalizedInput.length > 0 && !Array.from(colorSelect.options).some((option) => option.value.trim().toLocaleLowerCase() === normalizedInput);
+                                const normalizedInput = input.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+                                return normalizedInput.length > 0 && !Array.from(colorSelect.options).some((option) => option.value.trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedInput);
                             },
-                            create: (input) => input.trim(),
+                            create: (input) => input.trim().replace(/\s+/g, ' '),
 
                             closeAfterSelect: false,
 
@@ -1680,8 +1680,8 @@
 
                             placeholder: 'Select or add colors...',
                             render: {
-                                option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim())}"</div>`,
-                                no_results: () => '<div class="no-results">No color found</div>',
+                                option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim().replace(/\s+/g, ' '))}" to this product</div>`,
+                                no_results: () => '<div class="no-results">No color found. Type a new value to add it.</div>',
                             },
                         }
                     );
@@ -1707,10 +1707,10 @@
                             persist: false,
                             dropdownParent: 'body',
                             createFilter: (input, callback) => {
-                                const normalizedInput = input.trim().toLocaleLowerCase();
-                                return normalizedInput.length > 0 && !Array.from(materialsSelect.options).some((option) => option.value.trim().toLocaleLowerCase() === normalizedInput);
+                                const normalizedInput = input.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+                                return normalizedInput.length > 0 && !Array.from(materialsSelect.options).some((option) => option.value.trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedInput);
                             },
-                            create: (input) => input.trim(),
+                            create: (input) => input.trim().replace(/\s+/g, ' '),
 
                             maxItems: 100,
 
@@ -1725,7 +1725,7 @@
                             render: {
 
                                 option_create: function (data, escape) {
-                                    return `<div class="create">+ Add "${escape(data.input.trim())}"</div>`;
+                                    return `<div class="create">+ Add "${escape(data.input.trim().replace(/\s+/g, ' '))}" to this product</div>`;
                                 },
 
                                 no_results:
@@ -1733,7 +1733,7 @@
 
                                         return `
                                             <div class="no-results">
-                                                No material found
+                                                No material found. Type a new value to add it.
                                             </div>
                                         `;
 

@@ -63,17 +63,26 @@ if (form) {
         const selectionError = wrapper.querySelector('[data-multi-error]');
 
         if (typeof window.TomSelect === 'function') {
+            const normalizeOption = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
             new window.TomSelect(select, {
                 plugins: ['remove_button'],
-                create: false,
+                create: (input) => {
+                    const value = input.trim().replace(/\s+/g, ' ');
+                    return value ? { value, text: value } : false;
+                },
                 maxItems: 100,
                 hideSelected: true,
                 closeAfterSelect: false,
                 copyClassesToDropdown: false,
                 placeholder: `Select one or more ${select.id === 'materials' ? 'materials' : 'colors'}...`,
                 searchField: ['text'],
+                createFilter: (input) => {
+                    const normalizedInput = normalizeOption(input);
+                    return normalizedInput.length > 0 && ![...select.options].some((option) => normalizeOption(option.value) === normalizedInput);
+                },
                 render: {
-                    no_results: () => `<div class="no-results">No ${select.id === 'materials' ? 'material' : 'color'} found</div>`,
+                    option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim().replace(/\s+/g, ' '))}" to this product</div>`,
+                    no_results: () => `<div class="no-results">No ${select.id === 'materials' ? 'material' : 'color'} found. Type a new value to add it.</div>`,
                 },
             });
             wrapper.querySelector('[data-native-multi-hint]').hidden = true;

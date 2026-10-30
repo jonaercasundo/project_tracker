@@ -30,18 +30,21 @@ class MIProductAttributeOptionService
     private function persist(array $values, string $modelClass, string $nameColumn): array
     {
         $canonicalNames = [];
+        $existingOptions = $modelClass::query()->get(['id', $nameColumn, 'normalized_name']);
         foreach ($values as $value) {
-            $name = trim($value);
+            $name = $this->normalizeSpacing($value);
             if ($name === '') {
                 continue;
             }
 
             $normalizedName = mb_strtolower($name);
-            $option = $modelClass::query()
-                ->where('normalized_name', $normalizedName)
-                ->orWhereRaw('LOWER(TRIM('.$nameColumn.')) = ?', [$normalizedName])
-                ->orderBy('id')
-                ->first();
+            $option = $existingOptions->first(function (Model $candidate) use ($nameColumn, $normalizedName): bool {
+                $candidateName = $candidate->getAttribute('normalized_name')
+                    ?: $candidate->getAttribute($nameColumn);
+                $candidateName = mb_strtolower($this->normalizeSpacing((string) $candidateName));
+
+                return $candidateName === $normalizedName;
+            });
 
             if (! $option instanceof Model) {
                 $option = $modelClass::firstOrCreate(
@@ -54,5 +57,10 @@ class MIProductAttributeOptionService
         }
 
         return array_values($canonicalNames);
+    }
+
+    private function normalizeSpacing(string $value): string
+    {
+        return preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
     }
 }

@@ -434,7 +434,10 @@ it('creates a product with prices factory costs and media then loads its shared 
         'product_images' => [UploadedFile::fake()->image('created.png')],
     ]);
 
-    $this->post(route('mi_app.store_1'), $payload)->assertRedirect(route('mi_app.index'))->assertSessionHasNoErrors();
+    $this->post(route('mi_app.store_1'), $payload)
+        ->assertRedirect(route('mi_app.index'))
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('success', 'Product saved successfully!');
 
     $created = MI_Product::where('item_name', 'New create fixture')->sole();
     $createdFactoryCost = $created->factoryCosts()->sole();
@@ -460,8 +463,8 @@ it('persists normalized custom materials and colors for reuse across products an
     $this->signInMI($this->miUser());
     $payload = array_replace(miProductEditPayload($fixture), [
         'item_name' => 'Custom option first product',
-        'materials' => [' Bamboo Composite ', 'bAMboo composite', 'Oak Wood'],
-        'color' => [' Sea Glass ', 'sea glass', 'Blue'],
+        'materials' => [' Bamboo   Composite ', "bAMboo\tcomposite", 'Oak Wood'],
+        'color' => [' Sea   Glass ', "sea\tglass", 'Blue'],
     ]);
 
     $this->post(route('mi_app.store_1'), $payload)->assertRedirect(route('mi_app.index'))->assertSessionHasNoErrors();
@@ -473,6 +476,7 @@ it('persists normalized custom materials and colors for reuse across products an
     $color = DB::table('mi_colors')->where('normalized_name', 'sea glass')->sole();
     expect(DB::table('mi_materials')->where('normalized_name', 'bamboo composite')->count())->toBe(1);
     expect(DB::table('mi_colors')->where('normalized_name', 'sea glass')->count())->toBe(1);
+    $this->get(route('mi_app.index'))->assertSee('Product saved successfully!');
     $this->get(route('mi_app.create'))->assertSee('Bamboo Composite')->assertSee('Sea Glass');
 
     $secondPayload = array_replace(miProductEditPayload($fixture), [

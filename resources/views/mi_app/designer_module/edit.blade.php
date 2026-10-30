@@ -328,30 +328,4 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('select.tx-multi-select').forEach((select) => {
-                const label = select.id === 'materials' ? 'Material' : 'Color';
-                new TomSelect(select, {
-                    plugins: ['remove_button'],
-                    maxItems: 100,
-                    createOnBlur: false,
-                    persist: false,
-                    closeAfterSelect: false,
-                    hideSelected: true,
-                    dropdownParent: 'body',
-                    placeholder: `Select or add ${label.toLowerCase()}s...`,
-                    createFilter: (input) => {
-                        const normalizedInput = input.trim().toLocaleLowerCase();
-                        return normalizedInput.length > 0 && !Array.from(select.options).some((option) => option.value.trim().toLocaleLowerCase() === normalizedInput);
-                    },
-                    create: (input) => input.trim(),
-                    render: {
-                        option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim())}"</div>`,
-                        no_results: () => '<div class="no-results">No matching option</div>',
-                    },
-                });
-            });
-        });
-    </script>
 </x-mi_app>

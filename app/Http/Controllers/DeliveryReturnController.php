@@ -58,6 +58,7 @@ class DeliveryReturnController extends Controller
     {
         $fields = $request->validated();
         $delivery = Delivery::query()->where('project_id', $project)->findOrFail($fields['delivery_id']);
+        abort_unless($delivery->school_id === $fields['school_id'], 422, 'Choose a delivery associated with the selected School ID.');
         if ($fields['return_type'] === 'Item Return') {
             abort_unless(Item::query()->where('project_id', $project)->whereKey($fields['item_id'])->exists(), 422, 'Choose an item from this project.');
         } else {
@@ -170,7 +171,9 @@ class DeliveryReturnController extends Controller
 
         return [
             'records' => $records,
-            'deliveries' => Delivery::query()->where('project_id', $project)->orderByDesc('delivery_date')->get(['delivery_id', 'dr_no', 'lot_id', 'school_id']),
+            'deliveries' => Delivery::query()->leftJoin('school', 'school.school_id', '=', 'deliveries.school_id')
+                ->where('deliveries.project_id', $project)->orderByDesc('deliveries.delivery_date')
+                ->get(['deliveries.delivery_id', 'deliveries.dr_no', 'deliveries.lot_id', 'deliveries.school_id', 'school.school_name']),
             'items' => Item::query()->where('project_id', $project)->orderBy('item_name')->get(['item_id', 'item_name', 'unit']),
             'warehouses' => Warehouse::query()->orderBy('warehouse_name')->get(['warehouse_id', 'warehouse_name']),
             'project' => $project,

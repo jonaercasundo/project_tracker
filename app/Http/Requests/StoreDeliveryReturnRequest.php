@@ -26,6 +26,7 @@ class StoreDeliveryReturnRequest extends FormRequest
     {
         return [
             'return_type' => ['required', Rule::in(['Item Return', 'Document Return'])],
+            'school_id' => ['required', 'string', 'max:100'],
             'delivery_id' => ['required', 'integer', Rule::exists(Delivery::class, 'delivery_id')->where('project_id', $this->route('project'))],
             'package_id' => ['nullable', 'integer', Rule::exists('package', 'package_id')],
             'item_id' => ['required_if:return_type,Item Return', 'nullable', 'integer', Rule::exists('item', 'item_id')],

@@ -111,6 +111,7 @@ it('shows return monitoring in the MMC sidebar and opens its project workspace',
         ->assertOk()
         ->assertSee('Record a return')
         ->assertSee('Return monitoring')
+        ->assertSee('School ID')
         ->assertSee('Related delivery / DR');
 });
 
@@ -122,6 +123,7 @@ it('credits only confirmed item returns through inventory history and keeps docu
 
     $itemReturn = $this->postJson(route('deliveries.monitoring.returns.store', ['project' => 1]), [
         'return_type' => 'Item Return',
+        'school_id' => 'SCH-1',
         'delivery_id' => 1,
         'item_id' => 1,
         'quantity_returned' => 3,
@@ -167,6 +169,7 @@ it('credits only confirmed item returns through inventory history and keeps docu
 
     $documentReturn = $this->postJson(route('deliveries.monitoring.returns.store', ['project' => 1]), [
         'return_type' => 'Document Return',
+        'school_id' => 'SCH-1',
         'delivery_id' => 1,
         'reason' => 'Signed delivery receipt returned',
         'monitoring_date' => '2026-10-22',

@@ -23,10 +23,11 @@ class BillingDocumentStatusService
             ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
             ->where('d.project_id', $projectId)
             ->whereNotNull('d.dr_no')
-            ->select(['d.dr_no', 'd.status', 'l.lot_name'])
+            ->select(['d.dr_no', 'd.school_id', 'd.status', 'l.lot_name'])
             ->get();
 
         $projectDrsByLot = array_fill_keys(self::LOTS, []);
+        $projectSchoolsByLot = array_fill_keys(self::LOTS, []);
         foreach ($deliveries as $delivery) {
             if (in_array(mb_strtolower(trim((string) $delivery->status)), self::EXCLUDED_DELIVERY_STATUSES, true)) {
                 continue;
@@ -38,68 +39,59 @@ class BillingDocumentStatusService
             }
 
             $drNumber = $this->normalizeDrNumber((string) $delivery->dr_no);
-            if ($drNumber !== '') {
-                $projectDrsByLot[$lotNumber][$drNumber] = true;
+            $schoolId = $this->normalizeSchoolId((string) $delivery->school_id);
+            if ($drNumber !== '' && $schoolId !== '') {
+                $projectDrsByLot[$lotNumber][$drNumber][$schoolId] = true;
+                $projectSchoolsByLot[$lotNumber][$schoolId] = true;
             }
         }
 
         try {
-            $applicableDrs = [];
-            $processedDrs = [];
-            $processedTodayDrs = [];
             $rowsByLot = [];
 
             foreach (self::LOTS as $lotNumber) {
                 $rowsByLot[$lotNumber] = $this->lotSheetRows($lotNumber);
-                foreach ($rowsByLot[$lotNumber] as $row) {
-                    $drNumber = $this->normalizeDrNumber($row['dr']);
-                    if ($drNumber !== '' && isset($projectDrsByLot[$lotNumber][$drNumber])) {
-                        $applicableDrs[$drNumber] = true;
-                    }
-                }
             }
 
             $schoolRows = [];
-            $rowCount = max(array_map('count', $rowsByLot));
-            for ($rowIndex = 0; $rowIndex < $rowCount; $rowIndex++) {
-                $schoolId = '';
-                foreach (self::LOTS as $lotNumber) {
-                    $schoolId = trim((string) ($rowsByLot[$lotNumber][$rowIndex]['school_id'] ?? ''));
-                    if ($schoolId !== '') {
-                        break;
-                    }
-                }
-
-                $schoolKey = $schoolId !== '' ? 'school:'.$schoolId : 'row:'.$rowIndex;
-                $schoolRows[$schoolKey] ??= ['lots' => [], 'dates' => [], 'drs' => []];
-
-                foreach (self::LOTS as $lotNumber) {
-                    $row = $rowsByLot[$lotNumber][$rowIndex] ?? null;
-                    if ($row === null) {
+            foreach (self::LOTS as $lotNumber) {
+                foreach ($rowsByLot[$lotNumber] as $row) {
+                    $schoolId = $this->normalizeSchoolId($row['school_id']);
+                    if ($schoolId === '' || ! isset($projectSchoolsByLot[$lotNumber][$schoolId])) {
                         continue;
                     }
 
-                    if (trim($row['package']) !== '') {
-                        $schoolRows[$schoolKey]['lots'][$lotNumber] = true;
-                    }
+                    $schoolRows[$schoolId] ??= ['lots' => [], 'dates' => [], 'has_project_dr' => false];
 
-                    $encodedDate = trim($row['encoded_date']);
-                    if ($encodedDate !== '') {
-                        $schoolRows[$schoolKey]['dates'][$lotNumber] ??= $encodedDate;
+                    if (trim($row['package']) !== '') {
+                        $schoolRows[$schoolId]['lots'][$lotNumber] = true;
+                        $encodedDate = trim($row['encoded_date']);
+                        if ($encodedDate !== '') {
+                            $schoolRows[$schoolId]['dates'][$lotNumber] ??= $encodedDate;
+                        }
                     }
 
                     $drNumber = $this->normalizeDrNumber($row['dr']);
-                    if ($drNumber !== '' && isset($projectDrsByLot[$lotNumber][$drNumber])) {
-                        $schoolRows[$schoolKey]['drs'][$lotNumber][$drNumber] = true;
+                    if ($drNumber !== '' && isset($projectDrsByLot[$lotNumber][$drNumber][$schoolId])) {
+                        $schoolRows[$schoolId]['has_project_dr'] = true;
                     }
                 }
             }
 
-            foreach ($schoolRows as $schoolRow) {
+            $applicableSchools = [];
+            $processedSchools = [];
+            $processedTodaySchools = [];
+            foreach ($schoolRows as $schoolId => $schoolRow) {
+                if (! $schoolRow['has_project_dr']) {
+                    continue;
+                }
+
                 $applicableLots = array_keys($schoolRow['lots']);
                 if ($applicableLots === []) {
                     continue;
                 }
+
+                $applicableSchools[$schoolId] = true;
 
                 $isFullyEncoded = true;
                 $wereAllDatesEnteredToday = true;
@@ -121,24 +113,20 @@ class BillingDocumentStatusService
                     continue;
                 }
 
-                foreach ($schoolRow['drs'] as $lotDrs) {
-                    foreach ($lotDrs as $drNumber => $_) {
-                        $processedDrs[$drNumber] = true;
-                        if ($wereAllDatesEnteredToday) {
-                            $processedTodayDrs[$drNumber] = true;
-                        }
-                    }
+                $processedSchools[$schoolId] = true;
+                if ($wereAllDatesEnteredToday) {
+                    $processedTodaySchools[$schoolId] = true;
                 }
             }
 
-            $processed = count($processedDrs);
-            $total = count($applicableDrs);
+            $total = count($applicableSchools);
+            $processed = count($processedSchools);
 
             return [
                 'total' => $total,
                 'processed' => $processed,
                 'remaining' => max(0, $total - $processed),
-                'processed_today' => count($processedTodayDrs),
+                'processed_today' => count($processedTodaySchools),
                 'source_error' => null,
             ];
         } catch (GoogleSheetsApiException|RuntimeException $exception) {
@@ -246,6 +234,11 @@ class BillingDocumentStatusService
     private function normalizeDrNumber(string $drNumber): string
     {
         return mb_strtolower(trim($drNumber));
+    }
+
+    private function normalizeSchoolId(string $schoolId): string
+    {
+        return mb_strtolower(trim($schoolId));
     }
 
     private function columnLetters(int $columnNumber): string

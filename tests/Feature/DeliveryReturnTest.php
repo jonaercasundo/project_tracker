@@ -115,6 +115,8 @@ it('shows return monitoring in the MMC sidebar and opens its project workspace',
         ->assertSee('Record a return')
         ->assertSee('Return monitoring')
         ->assertSee('School ID')
+        ->assertSee('name="school_id" data-return-school type="text"', false)
+        ->assertDontSee('<select name="school_id"', false)
         ->assertSee('Related delivery / DR');
 });
 

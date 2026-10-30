@@ -831,9 +831,6 @@ function initializeReturnPanel(panel) {
 
 document.querySelectorAll('[data-return-panel]').forEach(initializeReturnPanel);
 document.addEventListener('change', event => {
-    if (event.target.matches('[data-return-school]')) {
-        filterReturnDeliveries(event.target.closest('[data-return-create]'));
-    }
     if (event.target.matches('[data-return-create] [name="return_type"]')) {
         initializeReturnPanel(event.target.closest('[data-return-panel]'));
     }
@@ -853,8 +850,14 @@ document.addEventListener('change', event => {
     }
 });
 
+document.addEventListener('input', event => {
+    if (event.target.matches('[data-return-school]')) {
+        filterReturnDeliveries(event.target.closest('[data-return-create]'));
+    }
+});
+
 function filterReturnDeliveries(form) {
-    const schoolId = form.elements.school_id.value;
+    const schoolId = form.elements.school_id.value.trim();
     const deliverySelect = form.elements.delivery_id;
     for (const option of deliverySelect.options) {
         option.hidden = option.value !== '' && option.dataset.schoolId !== schoolId;

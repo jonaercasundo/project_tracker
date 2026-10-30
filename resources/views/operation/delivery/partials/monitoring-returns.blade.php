@@ -11,12 +11,7 @@
                 </select>
             </label>
             <label class="text-xs font-semibold text-slate-600 sm:col-span-2">School ID
-                <select name="school_id" data-return-school required class="mt-1 w-full rounded-lg border-slate-200 text-sm">
-                    <option value="">Choose a School ID</option>
-                    @foreach($deliveries->unique('school_id')->filter(fn ($delivery) => filled($delivery->school_id)) as $delivery)
-                        <option value="{{ $delivery->school_id }}">{{ $delivery->school_id }}{{ $delivery->school_name ? ' · '.$delivery->school_name : '' }}</option>
-                    @endforeach
-                </select>
+                <input name="school_id" data-return-school type="text" required maxlength="100" autocomplete="off" placeholder="Enter School ID" class="mt-1 w-full rounded-lg border-slate-200 text-sm">
             </label>
             <label class="text-xs font-semibold text-slate-600 sm:col-span-2">Related delivery / DR
                 <select name="delivery_id" required class="mt-1 w-full rounded-lg border-slate-200 text-sm">

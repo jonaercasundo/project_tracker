@@ -1,7 +1,7 @@
 <section class="space-y-4" data-return-panel data-project="{{ $project }}" data-store-url="{{ route('deliveries.monitoring.returns.store', ['project' => $project]) }}">
     <div class="rounded-xl border border-slate-200 bg-white p-4">
         <h3 class="font-bold text-slate-900">Record a return</h3>
-        <p class="mt-1 text-xs text-slate-500">Item Returns affect stock only after staff confirm physical receipt. Document Returns never change inventory.</p>
+        <p class="mt-1 text-xs text-slate-500">Item Returns affect stock only after staff confirm physical receipt. Document Returns never change inventory. School ID links to the most recent delivery in this project; item and quantity are recorded when an Item Return is received.</p>
         <form data-return-create method="POST" action="{{ route('deliveries.monitoring.returns.store', ['project' => $project]) }}" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             @csrf
             <label class="text-xs font-semibold text-slate-600">Return type
@@ -13,41 +13,8 @@
             <label class="text-xs font-semibold text-slate-600 sm:col-span-2">School ID
                 <input name="school_id" data-return-school type="text" required maxlength="100" autocomplete="off" placeholder="Enter School ID" class="mt-1 w-full rounded-lg border-slate-200 text-sm">
             </label>
-            <label class="text-xs font-semibold text-slate-600 sm:col-span-2">Related delivery / DR
-                <select name="delivery_id" required class="mt-1 w-full rounded-lg border-slate-200 text-sm">
-                    <option value="">Choose a delivery</option>
-                    @foreach($deliveries as $delivery)
-                        <option value="{{ $delivery->delivery_id }}" data-school-id="{{ $delivery->school_id }}">{{ $delivery->dr_no ?: 'Delivery '.$delivery->delivery_id }}{{ $delivery->school_name ? ' · '.$delivery->school_name : '' }}</option>
-                    @endforeach
-                </select>
-            </label>
-            <label class="text-xs font-semibold text-slate-600">Package ID (optional)
-                <input name="package_id" type="number" min="1" class="mt-1 w-full rounded-lg border-slate-200 text-sm">
-            </label>
-            <label data-return-item-field class="text-xs font-semibold text-slate-600 sm:col-span-2">Item
-                <select name="item_id" class="mt-1 w-full rounded-lg border-slate-200 text-sm">
-                    <option value="">Choose an item</option>
-                    @foreach($items as $item)
-                        <option value="{{ $item->item_id }}">{{ $item->item_name }}{{ $item->unit ? ' ('.$item->unit.')' : '' }}</option>
-                    @endforeach
-                </select>
-            </label>
-            <label data-return-item-field class="text-xs font-semibold text-slate-600">Quantity returned
-                <input name="quantity_returned" type="number" min="1" class="mt-1 w-full rounded-lg border-slate-200 text-sm">
-            </label>
             <label class="text-xs font-semibold text-slate-600">Reason
                 <input name="reason" required maxlength="2000" class="mt-1 w-full rounded-lg border-slate-200 text-sm">
-            </label>
-            <label class="text-xs font-semibold text-slate-600">Remarks
-                <input name="remarks" maxlength="5000" class="mt-1 w-full rounded-lg border-slate-200 text-sm">
-            </label>
-            <label class="text-xs font-semibold text-slate-600">Monitoring date
-                <input name="monitoring_date" type="date" required value="{{ now()->toDateString() }}" class="mt-1 w-full rounded-lg border-slate-200 text-sm">
-            </label>
-            <label class="text-xs font-semibold text-slate-600">Status
-                <select name="status" required class="mt-1 w-full rounded-lg border-slate-200 text-sm">
-                    <option>Reported</option><option>In Transit</option>
-                </select>
             </label>
             <div class="flex items-end"><button type="submit" class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">Record return</button></div>
             <p data-return-feedback role="status" aria-live="polite" class="sm:col-span-2 xl:col-span-4 text-sm text-slate-600"></p>
@@ -77,7 +44,7 @@
                     @forelse($records as $record)
                         <tr class="align-top">
                             <td class="p-2">{{ $record->return_type }}<br><span class="text-slate-500">{{ $record->dr_no ?: 'Delivery '.$record->delivery_id }} · Lot {{ $record->lot_id ?? '—' }} · School {{ $record->school_id ?? '—' }} · Package {{ $record->package_id ?? '—' }}</span></td>
-                            <td class="p-2">{{ $record->item?->item_name ?? 'Document' }}<br>{{ $record->quantity_returned ?? '—' }}</td>
+                            <td class="p-2">{{ $record->return_type === 'Document Return' ? 'Document' : ($record->item?->item_name ?? 'Item not recorded') }}<br>{{ $record->quantity_returned ?? '—' }}</td>
                             <td class="p-2">{{ $record->reason }}<br><span class="text-slate-500">{{ $record->remarks ?: '—' }}</span></td>
                             <td class="p-2">{{ $record->status }}</td>
                             <td class="p-2">{{ $record->monitoring_date?->format('M d, Y') }}</td>
@@ -93,6 +60,8 @@
                                             <input name="received_date" type="date" title="Date physically received" class="w-full rounded border-slate-200 text-xs">
                                             <input name="received_by" maxlength="255" placeholder="Received by" class="w-full rounded border-slate-200 text-xs">
                                             @if($record->return_type === 'Item Return')
+                                                <select name="item_id" class="w-full rounded border-slate-200 text-xs"><option value="">Choose returned item</option>@foreach($items as $item)<option value="{{ $item->item_id }}" @selected($record->item_id === $item->item_id)>{{ $item->item_name }}{{ $item->unit ? ' ('.$item->unit.')' : '' }}</option>@endforeach</select>
+                                                <input name="quantity_returned" type="number" min="1" value="{{ $record->quantity_returned }}" placeholder="Quantity returned" class="w-full rounded border-slate-200 text-xs">
                                                 <select name="received_warehouse_id" class="w-full rounded border-slate-200 text-xs"><option value="">Choose receiving warehouse</option>@foreach($warehouses as $warehouse)<option value="{{ $warehouse->warehouse_id }}">{{ $warehouse->warehouse_name }}</option>@endforeach</select>
                                             @endif
                                         </div>

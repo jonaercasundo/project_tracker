@@ -117,7 +117,14 @@ it('shows return monitoring in the MMC sidebar and opens its project workspace',
         ->assertSee('School ID')
         ->assertSee('name="school_id" data-return-school type="text"', false)
         ->assertDontSee('<select name="school_id"', false)
-        ->assertSee('Related delivery / DR');
+        ->assertSee('Reason')
+        ->assertDontSee('name="delivery_id"', false)
+        ->assertDontSee('name="package_id"', false)
+        ->assertDontSee('name="item_id"', false)
+        ->assertDontSee('name="quantity_returned"', false)
+        ->assertDontSee('name="remarks"', false)
+        ->assertDontSee('name="monitoring_date"', false)
+        ->assertDontSee('name="status"', false);
 });
 
 it('credits only confirmed item returns through inventory history and keeps document returns inventory neutral', function (): void {
@@ -125,21 +132,24 @@ it('credits only confirmed item returns through inventory history and keeps docu
     $user = deliveryReturnUser();
     $this->actingAs($user);
     $this->withSession(['company_id' => $user->companies()->first()->getKey()]);
+    $monitoringDate = now()->toDateString();
 
     $itemReturn = $this->postJson(route('deliveries.monitoring.returns.store', ['project' => 1]), [
         'return_type' => 'Item Return',
         'school_id' => 'SCH-1',
-        'delivery_id' => 1,
-        'item_id' => 1,
-        'quantity_returned' => 3,
         'reason' => 'Wrong size delivered',
-        'remarks' => 'Two cartons',
-        'monitoring_date' => '2026-10-20',
-        'status' => 'Reported',
     ]);
     $itemReturn->assertOk()->assertJsonPath('message', 'Return recorded. Stock changes only when an Item Return is marked Received.');
     $returnId = (int) DB::table('delivery_returns')->where('return_type', 'Item Return')->value('return_id');
-    $this->assertDatabaseHas('delivery_returns', ['return_id' => $returnId, 'dr_no' => 'DR-100', 'monitoring_date' => '2026-10-20 00:00:00', 'received_date' => null]);
+    $this->assertDatabaseHas('delivery_returns', [
+        'return_id' => $returnId,
+        'dr_no' => 'DR-100',
+        'monitoring_date' => $monitoringDate.' 00:00:00',
+        'status' => 'Reported',
+        'item_id' => null,
+        'quantity_returned' => null,
+        'received_date' => null,
+    ]);
     $this->assertDatabaseHas('inventory', ['inventory_id' => 1, 'qty' => 8]);
 
     $this->patchJson(route('deliveries.monitoring.returns.update', ['project' => 1, 'return' => $returnId]), [
@@ -148,6 +158,8 @@ it('credits only confirmed item returns through inventory history and keeps docu
         'received_date' => '2026-10-22',
         'received_by' => 'Warehouse Clerk',
         'received_warehouse_id' => 1,
+        'item_id' => 1,
+        'quantity_returned' => 3,
     ])->assertOk();
     $this->assertDatabaseHas('inventory', ['inventory_id' => 1, 'qty' => 11]);
     $this->assertDatabaseHas('inventory_history', [
@@ -170,15 +182,14 @@ it('credits only confirmed item returns through inventory history and keeps docu
         'received_date' => '2026-10-22',
         'received_by' => 'Warehouse Clerk',
         'received_warehouse_id' => 1,
+        'item_id' => 1,
+        'quantity_returned' => 3,
     ])->assertConflict();
 
     $documentReturn = $this->postJson(route('deliveries.monitoring.returns.store', ['project' => 1]), [
         'return_type' => 'Document Return',
         'school_id' => 'SCH-1',
-        'delivery_id' => 1,
         'reason' => 'Signed delivery receipt returned',
-        'monitoring_date' => '2026-10-22',
-        'status' => 'In Transit',
     ])->assertOk();
     $documentId = (int) DB::table('delivery_returns')->where('return_type', 'Document Return')->value('return_id');
     $this->patchJson(route('deliveries.monitoring.returns.update', ['project' => 1, 'return' => $documentId]), [

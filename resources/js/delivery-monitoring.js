@@ -816,7 +816,6 @@ function initializeReturnPanel(panel) {
             field.hidden = !isItemReturn;
             field.querySelector('select, input').required = isItemReturn;
         });
-        filterReturnDeliveries(createForm);
     }
 
     panel.querySelectorAll('[data-return-update]').forEach(form => {
@@ -849,20 +848,3 @@ document.addEventListener('change', event => {
         }
     }
 });
-
-document.addEventListener('input', event => {
-    if (event.target.matches('[data-return-school]')) {
-        filterReturnDeliveries(event.target.closest('[data-return-create]'));
-    }
-});
-
-function filterReturnDeliveries(form) {
-    const schoolId = form.elements.school_id.value.trim();
-    const deliverySelect = form.elements.delivery_id;
-    for (const option of deliverySelect.options) {
-        option.hidden = option.value !== '' && option.dataset.schoolId !== schoolId;
-    }
-    if (deliverySelect.selectedOptions[0]?.dataset.schoolId !== schoolId) {
-        deliverySelect.value = '';
-    }
-}

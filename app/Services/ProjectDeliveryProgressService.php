@@ -484,10 +484,8 @@ class ProjectDeliveryProgressService
             ->leftJoinSub($this->billingStats($filters), 'billing_stats', 'billing_stats.project_id', '=', 'p.project_id')
             ->leftJoinSub($this->deliveryBillingStats($filters), 'delivery_billing_stats', 'delivery_billing_stats.project_id', '=', 'p.project_id')
             ->select(['p.project_id', 'p.project_name', 'p.ref_no', 'p.status as project_status', 'p.start_date', 'p.end_date', 'delivery_stats.last_delivery_date', 'delivery_stats.last_accepted_date', 'delivery_stats.last_dr_date', 'billing_stats.last_billing_date']);
-        if (! (bool) ($filters['compact'] ?? false)) {
-            $query->leftJoinSub($this->stockOutDrStats($filters), 'stock_out_stats', 'stock_out_stats.project_id', '=', 'p.project_id')
-                ->selectRaw('COALESCE(stock_out_stats.stock_out_drs_count, 0) as stock_out_drs_count');
-        }
+        $query->leftJoinSub($this->stockOutDrStats($filters), 'stock_out_stats', 'stock_out_stats.project_id', '=', 'p.project_id')
+            ->selectRaw('COALESCE(stock_out_stats.stock_out_drs_count, 0) as stock_out_drs_count');
         if (! (bool) ($filters['compact'] ?? false)) {
             $lotNames = $this->deliveries($filters)
                 ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')

@@ -66,19 +66,19 @@
             <span class="relative text-[11px] text-slate-400">DRs fully pending</span>
         </div>
 
-        {{-- TOTAL RELEASED (DR-level) --}}
+        {{-- TOTAL STOCK OUT (distinct DR-level) --}}
         <div class="group relative bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 p-4 flex flex-col gap-1 overflow-hidden">
             <svg xmlns="http://www.w3.org/2000/svg" class="absolute -right-2 -bottom-2 w-16 h-16 text-blue-50 group-hover:text-blue-100 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path d="M5 12h14M13 6l6 6-6 6"/>
             </svg>
             <div class="relative flex items-center justify-between">
-                <span class="text-[11px] font-bold uppercase tracking-wide text-blue-600">Released</span>
+                <span class="text-[11px] font-bold uppercase tracking-wide text-blue-600">Stock Out</span>
                 <span class="w-2 h-2 rounded-full bg-blue-400 shrink-0"></span>
             </div>
-            <span class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_released'] ?? 0 }}">
-                {{ number_format($stats['total_released'] ?? 0) }}
+            <span class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_stock_out'] ?? 0 }}">
+                {{ number_format($stats['total_stock_out'] ?? 0) }}
             </span>
-            <span class="relative text-[11px] text-slate-400">DRs fully released</span>
+            <span class="relative text-[11px] text-slate-400">Unique DRs with stock-out history</span>
         </div>
 
         {{-- TOTAL DELIVERED (DR-level) --}}

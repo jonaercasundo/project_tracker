@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\DeliveryAuditTrailService;
 use Illuminate\Database\Eloquent\Model;
 
 class InventoryHistory extends Model
@@ -17,6 +18,11 @@ class InventoryHistory extends Model
     protected $casts = [
         'changed_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::created(fn (self $history) => app(DeliveryAuditTrailService::class)->recordInventoryHistoryById((int) $history->getKey()));
+    }
 
     public function inventory()
     {

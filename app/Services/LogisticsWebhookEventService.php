@@ -46,11 +46,17 @@ class LogisticsWebhookEventService
                 'updated_at' => now(),
             ]);
 
-            return DB::table('logistics_webhook_events')
+            $event = DB::table('logistics_webhook_events')
                 ->where('integration_id', $integrationId)
                 ->where('external_event_id', $payload['event_id'])
                 ->lockForUpdate()
                 ->first();
+
+            if (hash_equals($event->payload_hash, $payloadHash)) {
+                app(DeliveryAuditTrailService::class)->recordWebhookEventByRowId((int) $event->id);
+            }
+
+            return $event;
         }, 3);
 
         if (! hash_equals($event->payload_hash, $payloadHash)) {

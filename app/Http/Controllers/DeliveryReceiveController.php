@@ -2,17 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\PackageStatus;
+use App\Models\DeliveryHistory;
 use App\Models\Inventory;
 use App\Models\InventoryHistory;
+use App\Models\PackageStatus;
 use Illuminate\Http\Request;
-use App\Models\DeliveryProof;
-use App\Models\DeliveryHistory;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Auth\AuthManager;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
 class DeliveryReceiveController extends Controller
 {
     public function show(Request $request, $packageStatusId)
@@ -33,10 +31,10 @@ class DeliveryReceiveController extends Controller
 
         $multiplier = 1;
 
-        if (!empty($delivery->package_type)) {
+        if (! empty($delivery->package_type)) {
             preg_match('/\d+/', $delivery->package_type, $matches);
 
-            if (!empty($matches)) {
+            if (! empty($matches)) {
                 $multiplier = (int) $matches[0];
             }
         }
@@ -127,12 +125,12 @@ class DeliveryReceiveController extends Controller
 
         if ($packageStatus->status === 'delivered') {
             return back()->withErrors([
-                'delivery' => 'This package has already been delivered.'
+                'delivery' => 'This package has already been delivered.',
             ]);
         }
         if ($packageStatus->status === 'pending') {
             return back()->withErrors([
-                'delivery' => 'This package is still pending and cannot be marked as delivered.'
+                'delivery' => 'This package is still pending and cannot be marked as delivered.',
             ]);
         }
         $request->validate([
@@ -143,6 +141,7 @@ class DeliveryReceiveController extends Controller
 
         try {
 
+            $previousStatus = $packageStatus->status;
             $packageStatus->status = 'delivered';
             $packageStatus->remarks = $request->remarks;
             $packageStatus->delivered_at = now();
@@ -159,58 +158,59 @@ class DeliveryReceiveController extends Controller
                 $inventory = Inventory::where('item_id', $content->item_id)
                     ->first();
 
-                if (!$inventory) {
+                if (! $inventory) {
                     continue;
                 }
 
                 InventoryHistory::create([
-                    'batch_no'     => 'DELIVERED-' . now()->format('YmdHis'),
+                    'batch_no' => 'DELIVERED-'.now()->format('YmdHis'),
 
                     'inventory_id' => $inventory->inventory_id,
-                    'item_id'      => $inventory->item_id,
+                    'item_id' => $inventory->item_id,
                     'warehouse_id' => $inventory->warehouse_id,
 
                     // Delivery does not change warehouse quantity because
                     // stock was already deducted during Stock Out.
-                    'old_qty'      => $inventory->qty,
-                    'new_qty'      => $inventory->qty,
+                    'old_qty' => $inventory->qty,
+                    'new_qty' => $inventory->qty,
 
-                    'changed_by'   => 'Receiver',
+                    'changed_by' => Auth::user()?->name ?? 'Receiver',
+                    'changed_by_user_id' => Auth::id(),
+                    'changed_at' => now(),
 
-                    'remarks'      => 'Package delivered'
-                        . ($request->remarks ? ' - ' . $request->remarks : ''),
+                    'remarks' => 'Package delivered'
+                        .($request->remarks ? ' - '.$request->remarks : ''),
 
-                    'change_type'  => 'delivered',
+                    'change_type' => 'delivered',
                 ]);
             }
 
             DeliveryHistory::create([
                 'package_status_id' => $packageStatus->package_status_id,
-                'user_id'           => null,
-                'status'            => 'delivered',
-                'remarks'           => $request->remarks,
+                'user_id' => Auth::id(),
+                'status' => 'delivered',
+                'previous_status' => $previousStatus,
+                'remarks' => $request->remarks,
             ]);
-
 
             DB::commit();
 
             return redirect()
                 ->route('delivery.success')
-                ->with('success','Package delivered successfully.');
-
+                ->with('success', 'Package delivered successfully.');
 
         } catch (\Exception $e) {
 
             DB::rollBack();
 
             Log::error('Delivery Receive Failed', [
-                'message'=>$e->getMessage(),
-                'line'=>$e->getLine(),
-                'file'=>$e->getFile(),
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
             ]);
 
             return back()->withErrors([
-                'error'=>$e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }

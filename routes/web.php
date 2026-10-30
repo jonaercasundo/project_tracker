@@ -22,6 +22,7 @@ use App\Http\Controllers\BillingScannerController;
 use App\Http\Controllers\BudgetRequestController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardLaunchController;
+use App\Http\Controllers\DeliveryAuditTrailController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryMonitoringController;
 use App\Http\Controllers\DeliveryReceiveController;
@@ -105,6 +106,16 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/deliveries/monitoring', [DeliveryMonitoringController::class, 'index'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring');
+    Route::get('/deliveries/audit-trail', [DeliveryAuditTrailController::class, 'index'])
+        ->middleware(['company.context:MMC', 'permission:delivery.audit.view'])
+        ->name('delivery-audit-trail.index');
+    Route::get('/deliveries/audit-trail/{event}', [DeliveryAuditTrailController::class, 'show'])
+        ->whereNumber('event')
+        ->middleware(['company.context:MMC', 'permission:delivery.audit.view'])
+        ->name('delivery-audit-trail.show');
+    Route::post('/deliveries/audit-trail/corrections', [DeliveryAuditTrailController::class, 'correction'])
+        ->middleware(['company.context:MMC', 'permission:delivery.audit.correct'])
+        ->name('delivery-audit-trail.corrections.store');
     Route::get('/deliveries/duplicate-cleanup', [DuplicateDrCleanupController::class, 'index'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.duplicate-cleanup');
@@ -305,6 +316,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         Route::put('/projects/{project:project_id}/lots/{lotId}/contract-price', [ProjectController::class, 'updateLotContractPrice'])
             ->whereNumber('lotId')->name('projects.lots.contract-price');
         Route::get('/projects/{project:project_id}/keystages-data', [ProjectController::class, 'keystagesData'])->name('projects.keystages-data');
+        Route::put('/projects/{project:project_id}/keystages/{keystage}', [ProjectController::class, 'updateKeystage'])
+            ->whereNumber('keystage')->name('projects.keystages.update');
+        Route::delete('/projects/{project:project_id}/keystages/{keystage}', [ProjectController::class, 'destroyKeystage'])
+            ->whereNumber('keystage')->name('projects.keystages.destroy');
         Route::get('/projects/{project:project_id}/detail-options', [ProjectController::class, 'detailOptions'])->name('projects.detail-options');
         /*
             |--------------------------------------------------------------------------

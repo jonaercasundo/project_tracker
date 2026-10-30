@@ -215,8 +215,8 @@ class BillingOperationalSyncService
 
             $batchNo = 'BILLING-SYNC-'.Str::uuid();
             $now = now();
-            $this->deductInventory($stockOutLines, $batchNo, $now, $userName);
-            $this->recordVerifiedStockOut($verificationLines, (int) $project->project_id, $batchNo, $now, $userName);
+            $this->deductInventory($stockOutLines, $batchNo, $now, $userName, $userId);
+            $this->recordVerifiedStockOut($verificationLines, (int) $project->project_id, $batchNo, $now, $userName, $userId);
 
             foreach ($packagesToAdvance as $package) {
                 if ($package['current_status'] !== 'released') {
@@ -238,14 +238,16 @@ class BillingOperationalSyncService
                     'receiver_name' => $userName,
                 ], 'package_status_id');
 
-                DB::table('delivery_history')->insert([
+                $deliveryHistoryId = DB::table('delivery_history')->insertGetId([
                     'package_status_id' => $packageStatusId,
                     'user_id' => $userId,
                     'status' => 'delivered',
+                    'previous_status' => $package['current_status'],
                     'remarks' => 'Delivery bypassed during the billing process by Sync Billing.',
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
+                app(DeliveryAuditTrailService::class)->recordDeliveryHistoryById((int) $deliveryHistoryId);
             }
 
             $syncedCount = count($syncedDrKeys);
@@ -310,7 +312,7 @@ class BillingOperationalSyncService
     }
 
     /** @param array<int, array<string, int|string>> $stockOutLines */
-    private function deductInventory(array $stockOutLines, string $batchNo, mixed $changedAt, string $changedBy): void
+    private function deductInventory(array $stockOutLines, string $batchNo, mixed $changedAt, string $changedBy, int $userId): void
     {
         $requiredByStock = [];
         foreach ($stockOutLines as $line) {
@@ -347,7 +349,7 @@ class BillingOperationalSyncService
             $runningQuantity = $available;
             foreach ($requirement['lines'] as $line) {
                 $nextQuantity = $runningQuantity - $line['quantity'];
-                DB::table('inventory_history')->insert([
+                $historyId = DB::table('inventory_history')->insertGetId([
                     'batch_no' => $batchNo,
                     'inventory_id' => $inventory->inventory_id,
                     'item_id' => $line['item_id'],
@@ -355,6 +357,7 @@ class BillingOperationalSyncService
                     'old_qty' => $runningQuantity,
                     'new_qty' => $nextQuantity,
                     'changed_by' => $changedBy,
+                    'changed_by_user_id' => $userId,
                     'remarks' => "Stock Out bypassed during the billing process by Sync Billing: content quantity {$line['content_quantity']} x package quantity {$line['package_quantity']}.",
                     'change_type' => 'stock_out',
                     'changed_at' => $changedAt,
@@ -364,6 +367,7 @@ class BillingOperationalSyncService
                     'dr_no' => $line['dr_no'],
                     'quantity' => $line['quantity'],
                 ]);
+                app(DeliveryAuditTrailService::class)->recordInventoryHistoryById((int) $historyId);
                 $runningQuantity = $nextQuantity;
             }
 
@@ -375,10 +379,10 @@ class BillingOperationalSyncService
     }
 
     /** @param array<int, array<string, int|string|null>> $lines */
-    private function recordVerifiedStockOut(array $lines, int $projectId, string $batchNo, mixed $changedAt, string $changedBy): void
+    private function recordVerifiedStockOut(array $lines, int $projectId, string $batchNo, mixed $changedAt, string $changedBy, int $userId): void
     {
         foreach ($lines as $line) {
-            DB::table('inventory_history')->insert([
+            $historyId = DB::table('inventory_history')->insertGetId([
                 'batch_no' => $batchNo,
                 'inventory_id' => null,
                 'item_id' => $line['item_id'],
@@ -386,6 +390,7 @@ class BillingOperationalSyncService
                 'old_qty' => null,
                 'new_qty' => null,
                 'changed_by' => $changedBy,
+                'changed_by_user_id' => $userId,
                 'remarks' => 'Stock Out was bypassed during the billing process by Sync Billing; prior deduction verified and no additional inventory was deducted.',
                 'change_type' => 'stock_out',
                 'changed_at' => $changedAt,
@@ -395,6 +400,7 @@ class BillingOperationalSyncService
                 'dr_no' => $line['dr_no'],
                 'quantity' => 0,
             ]);
+            app(DeliveryAuditTrailService::class)->recordInventoryHistoryById((int) $historyId);
         }
     }
 

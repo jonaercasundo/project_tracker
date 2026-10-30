@@ -3,23 +3,24 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Models\Delivery;
 use App\Models\Inventory;
 use App\Models\InventoryHistory;
+use App\Models\Lot;
 use App\Models\PackageStatus;
 use App\Models\Project;
-use App\Models\Lot;
-use App\Models\Delivery;
+use App\Models\Warehouse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use App\Models\Warehouse;
 
 class WarehouseInventoryController extends Controller
 {
     public function scanner()
     {
         $warehouses = Warehouse::orderBy('warehouse_name')->get();
+
         return view('operation.warehouse.stock_out', [
             'warehouses' => $warehouses,
         ]);
@@ -91,20 +92,20 @@ class WarehouseInventoryController extends Controller
                 'project',
                 'lot',
                 'school',
-                'packageStatuses.package.packageContent.item'
+                'packageStatuses.package.packageContent.item',
             ])
-            ->where('lot_id', $request->lot_id)
-            ->where('status', 'pending')
-            ->get();
+                ->where('lot_id', $request->lot_id)
+                ->where('status', 'pending')
+                ->get();
 
             if ($deliveries->isEmpty()) {
                 return response()->json([
-                    'delivery_id'   => null,
-                    'project'       => '',
-                    'lot'           => '',
-                    'school'        => '',
+                    'delivery_id' => null,
+                    'project' => '',
+                    'lot' => '',
+                    'school' => '',
                     'delivery_date' => '',
-                    'items'         => [],
+                    'items' => [],
                 ]);
             }
 
@@ -128,36 +129,36 @@ class WarehouseInventoryController extends Controller
                         }
 
                         $items[$itemId] = [
-                            'item_id'   => $itemId,
+                            'item_id' => $itemId,
                             'item_name' => $content->item?->item_name ?? 'Unnamed Item',
-                            'unit'      => $content->item?->unit ?? '',
-                            'qty'       => (int) $totalPackageQty,
+                            'unit' => $content->item?->unit ?? '',
+                            'qty' => (int) $totalPackageQty,
                         ];
                     }
                 }
             }
 
             return response()->json([
-                'delivery_id'   => null, // Per LOT, not per DR
-                'project'       => $firstDelivery->project->project_name ?? '',
-                'lot'           => $firstDelivery->lot->lot_name ?? '',
-                'school'        => '',
+                'delivery_id' => null, // Per LOT, not per DR
+                'project' => $firstDelivery->project->project_name ?? '',
+                'lot' => $firstDelivery->lot->lot_name ?? '',
+                'school' => '',
                 'delivery_date' => '',
-                'items'         => array_values($items),
+                'items' => array_values($items),
             ]);
 
         } catch (\Throwable $e) {
 
             Log::error('getDeliveryItems failed', [
                 'message' => $e->getMessage(),
-                'line'    => $e->getLine(),
-                'file'    => $e->getFile(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
             ]);
 
             return response()->json([
                 'error' => $e->getMessage(),
-                'line'  => $e->getLine(),
-                'file'  => $e->getFile(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
             ], 500);
         }
     }
@@ -166,201 +167,201 @@ class WarehouseInventoryController extends Controller
     // NEW: validate a single QR — lookup only, NO writes.
     // Used while the user is scanning, before they hit "Save".
     // ==========================================================
-public function validateScan(Request $request)
-{
-    try {
+    public function validateScan(Request $request)
+    {
+        try {
 
-        $request->validate([
-            'qr'           => 'required|string',
-            'warehouse_id' => 'required|integer',
-        ]);
-
-        $packageStatusId = $this->extractPackageStatusId($request->qr);
-
-        if (!$packageStatusId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid QR code.'
+            $request->validate([
+                'qr' => 'required|string',
+                'warehouse_id' => 'required|integer',
             ]);
-        }
 
-        $status = PackageStatus::with([
-            'package.contents.item',
-            'delivery'
-        ])->find($packageStatusId);
+            $packageStatusId = $this->extractPackageStatusId($request->qr);
 
-        if (!$status) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Package status not found.'
-            ]);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | PACKAGE
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$status->package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Package information not found.'
-            ]);
-        }
-
-        $contents = $status->package->contents;
-
-        if (!$contents || $contents->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Package has no item contents.'
-            ]);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | DELIVERY
-        |--------------------------------------------------------------------------
-        */
-
-        $delivery = $status->delivery;
-
-        if (!$delivery) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Delivery record not found.'
-            ]);
-        }
-
-        $packageQty = (int) ($delivery->package_qty ?? 0);
-
-        if ($packageQty <= 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Package quantity is missing.'
-            ]);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | CHECK ALL ITEMS IN PACKAGE
-        |--------------------------------------------------------------------------
-        */
-
-        $items = [];
-
-        foreach ($contents as $content) {
-
-            if (!$content->item) {
+            if (! $packageStatusId) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Item information not found for item ID {$content->item_id}."
+                    'message' => 'Invalid QR code.',
                 ]);
             }
 
-            $contentQty = (int) ($content->qty ?? 0);
+            $status = PackageStatus::with([
+                'package.contents.item',
+                'delivery',
+            ])->find($packageStatusId);
 
-            if ($contentQty <= 0) {
+            if (! $status) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Content quantity is missing for item {$content->item_id}."
+                    'message' => 'Package status not found.',
                 ]);
             }
 
             /*
             |--------------------------------------------------------------------------
-            | REQUIRED QUANTITY
-            |--------------------------------------------------------------------------
-            |
-            | package_content.qty × deliveries.package_qty
-            |
-            */
-
-            $requiredQty = $contentQty * $packageQty;
-
-            /*
-            |--------------------------------------------------------------------------
-            | GET INVENTORY
+            | PACKAGE
             |--------------------------------------------------------------------------
             */
 
-            $inventory = Inventory::where('warehouse_id', $request->warehouse_id)
-                ->where('item_id', $content->item_id)
-                ->first();
-
-            $availableQty = $inventory
-                ? (int) $inventory->qty
-                : 0;
-
-            /*
-            |--------------------------------------------------------------------------
-            | CHECK STOCK
-            |--------------------------------------------------------------------------
-            */
-
-            if ($availableQty < $requiredQty) {
-
+            if (! $status->package) {
                 return response()->json([
-                    'success'           => false,
-                    'message'           => "Insufficient stock for item {$content->item_id}. Available: {$availableQty}",
-                    'package_status_id' => $status->package_status_id,
-                    'item_id'           => $content->item_id,
-                    'item'              => $content->item->item_name,
-                    'available_qty'     => $availableQty,
-                    'required_qty'      => $requiredQty,
+                    'success' => false,
+                    'message' => 'Package information not found.',
+                ]);
+            }
+
+            $contents = $status->package->contents;
+
+            if (! $contents || $contents->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Package has no item contents.',
                 ]);
             }
 
             /*
             |--------------------------------------------------------------------------
-            | ITEM IS AVAILABLE
+            | DELIVERY
             |--------------------------------------------------------------------------
             */
 
-            $items[] = [
-                'item_id'       => $content->item_id,
-                'item'          => $content->item->item_name,
-                'content_qty'   => $contentQty,
-                'package_qty'   => $packageQty,
-                'required_qty'  => $requiredQty,
-                'available_qty' => $availableQty,
-            ];
+            $delivery = $status->delivery;
+
+            if (! $delivery) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Delivery record not found.',
+                ]);
+            }
+
+            $packageQty = (int) ($delivery->package_qty ?? 0);
+
+            if ($packageQty <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Package quantity is missing.',
+                ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | CHECK ALL ITEMS IN PACKAGE
+            |--------------------------------------------------------------------------
+            */
+
+            $items = [];
+
+            foreach ($contents as $content) {
+
+                if (! $content->item) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Item information not found for item ID {$content->item_id}.",
+                    ]);
+                }
+
+                $contentQty = (int) ($content->qty ?? 0);
+
+                if ($contentQty <= 0) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Content quantity is missing for item {$content->item_id}.",
+                    ]);
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | REQUIRED QUANTITY
+                |--------------------------------------------------------------------------
+                |
+                | package_content.qty × deliveries.package_qty
+                |
+                */
+
+                $requiredQty = $contentQty * $packageQty;
+
+                /*
+                |--------------------------------------------------------------------------
+                | GET INVENTORY
+                |--------------------------------------------------------------------------
+                */
+
+                $inventory = Inventory::where('warehouse_id', $request->warehouse_id)
+                    ->where('item_id', $content->item_id)
+                    ->first();
+
+                $availableQty = $inventory
+                    ? (int) $inventory->qty
+                    : 0;
+
+                /*
+                |--------------------------------------------------------------------------
+                | CHECK STOCK
+                |--------------------------------------------------------------------------
+                */
+
+                if ($availableQty < $requiredQty) {
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Insufficient stock for item {$content->item_id}. Available: {$availableQty}",
+                        'package_status_id' => $status->package_status_id,
+                        'item_id' => $content->item_id,
+                        'item' => $content->item->item_name,
+                        'available_qty' => $availableQty,
+                        'required_qty' => $requiredQty,
+                    ]);
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | ITEM IS AVAILABLE
+                |--------------------------------------------------------------------------
+                */
+
+                $items[] = [
+                    'item_id' => $content->item_id,
+                    'item' => $content->item->item_name,
+                    'content_qty' => $contentQty,
+                    'package_qty' => $packageQty,
+                    'required_qty' => $requiredQty,
+                    'available_qty' => $availableQty,
+                ];
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | ALL ITEMS HAVE ENOUGH STOCK
+            |--------------------------------------------------------------------------
+            */
+
+            return response()->json([
+                'success' => true,
+                'package_status_id' => $status->package_status_id,
+                'package_id' => $status->package_id,
+                'delivery_id' => $status->delivery_id,
+                'dr_no' => $delivery->dr_no ?? null,
+                'package_name' => 'Package #'.$status->package->package_num,
+                'package_qty' => $packageQty,
+                'items' => $items,
+            ]);
+
+        } catch (\Throwable $e) {
+
+            Log::error('validateScan failed', [
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unexpected error validating scan.',
+                'debug' => $e->getMessage(),
+                'debug_line' => $e->getLine(),
+            ], 500);
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | ALL ITEMS HAVE ENOUGH STOCK
-        |--------------------------------------------------------------------------
-        */
-
-        return response()->json([
-            'success'           => true,
-            'package_status_id' => $status->package_status_id,
-            'package_id'        => $status->package_id,
-            'delivery_id'       => $status->delivery_id,
-            'dr_no'             => $delivery->dr_no ?? null,
-            'package_name'      => 'Package #' . $status->package->package_num,
-            'package_qty'       => $packageQty,
-            'items'             => $items,
-        ]);
-
-    } catch (\Throwable $e) {
-
-        Log::error('validateScan failed', [
-            'message' => $e->getMessage(),
-            'line'    => $e->getLine(),
-            'file'    => $e->getFile(),
-        ]);
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Unexpected error validating scan.',
-            'debug'   => $e->getMessage(),
-            'debug_line' => $e->getLine(),
-        ], 500);
     }
-}
 
     // ==========================================================
     // NEW: batch save — persists everything staged in the browser.
@@ -372,15 +373,15 @@ public function validateScan(Request $request)
         Log::info('SAVE REQUEST', $request->all());
 
         $request->validate([
-            'warehouse_id'               => 'required|exists:warehouse,warehouse_id',
-            'items'                      => 'required|array|min:1',
+            'warehouse_id' => 'required|exists:warehouse,warehouse_id',
+            'items' => 'required|array|min:1',
             'items.*.package_status_id' => 'required|integer',
         ]);
 
-        $batchNo = 'BATCH-' . now()->format('YmdHis');
+        $batchNo = 'BATCH-'.now()->format('YmdHis');
 
         $results = [
-            'saved'  => [],
+            'saved' => [],
             'failed' => [],
         ];
 
@@ -403,7 +404,7 @@ public function validateScan(Request $request)
 
                     $status = PackageStatus::with([
                         'package.contents.item',
-                        'delivery'
+                        'delivery',
                     ])->findOrFail($item['package_status_id']);
 
                     /*
@@ -412,7 +413,7 @@ public function validateScan(Request $request)
                     |--------------------------------------------------------------------------
                     */
 
-                    if (!$status->package) {
+                    if (! $status->package) {
                         throw new \RuntimeException(
                             'Package not found.'
                         );
@@ -438,7 +439,7 @@ public function validateScan(Request $request)
 
                     $delivery = $status->delivery;
 
-                    if (!$delivery) {
+                    if (! $delivery) {
                         throw new \RuntimeException(
                             'Delivery record not found.'
                         );
@@ -506,12 +507,12 @@ public function validateScan(Request $request)
 
                         Log::info('PACKAGE CONTENT STOCK OUT', [
                             'package_status_id' => $item['package_status_id'],
-                            'delivery_id'       => $delivery->delivery_id,
-                            'dr_no'             => $delivery->dr_no,
-                            'item_id'           => $content->item_id,
-                            'content_qty'       => $contentQty,
-                            'package_qty'       => $packageQty,
-                            'stock_out_qty'     => $stockOutQty,
+                            'delivery_id' => $delivery->delivery_id,
+                            'dr_no' => $delivery->dr_no,
+                            'item_id' => $content->item_id,
+                            'content_qty' => $contentQty,
+                            'package_qty' => $packageQty,
+                            'stock_out_qty' => $stockOutQty,
                         ]);
 
                         /*
@@ -522,7 +523,7 @@ public function validateScan(Request $request)
 
                         $inventory = Inventory::firstOrNew([
                             'warehouse_id' => $request->warehouse_id,
-                            'item_id'      => $content->item_id,
+                            'item_id' => $content->item_id,
                         ]);
 
                         $oldQty = $inventory->exists
@@ -538,7 +539,7 @@ public function validateScan(Request $request)
                         if ($oldQty < $stockOutQty) {
 
                             throw new \RuntimeException(
-                                "Insufficient stock for item {$content->item_id}. " .
+                                "Insufficient stock for item {$content->item_id}. ".
                                 "Available: {$oldQty}"
                             );
                         }
@@ -567,18 +568,24 @@ public function validateScan(Request $request)
                         */
 
                         InventoryHistory::create([
-                            'batch_no'     => $batchNo,
+                            'batch_no' => $batchNo,
                             'inventory_id' => $inventory->inventory_id,
-                            'item_id'      => $content->item_id,
+                            'item_id' => $content->item_id,
                             'warehouse_id' => $request->warehouse_id,
-                            'old_qty'      => $oldQty,
-                            'new_qty'      => $newQty,
-                            'changed_by'   => Auth::user()->name,
-                            'remarks'      =>
-                                'Stock Out via QR Scanner - ' .
-                                'Content Qty: ' . $contentQty .
-                                ' × Package Qty: ' . $packageQty,
-                            'change_type'  => 'stock_out',
+                            'old_qty' => $oldQty,
+                            'new_qty' => $newQty,
+                            'changed_by' => Auth::user()->name,
+                            'changed_by_user_id' => Auth::id(),
+                            'changed_at' => now(),
+                            'project_id' => $delivery->project_id,
+                            'delivery_id' => $delivery->delivery_id,
+                            'package_id' => $status->package_id,
+                            'dr_no' => $delivery->dr_no,
+                            'quantity' => $stockOutQty,
+                            'remarks' => 'Stock Out via QR Scanner - '.
+                                'Content Qty: '.$contentQty.
+                                ' × Package Qty: '.$packageQty,
+                            'change_type' => 'stock_out',
                         ]);
                     }
 
@@ -605,13 +612,13 @@ public function validateScan(Request $request)
 
                 Log::error('Warehouse Scan Error', [
                     'package_status_id' => $item['package_status_id'],
-                    'message'           => $e->getMessage(),
-                    'line'              => $e->getLine(),
+                    'message' => $e->getMessage(),
+                    'line' => $e->getLine(),
                 ]);
 
                 $results['failed'][] = [
                     'package_status_id' => $item['package_status_id'],
-                    'message'           => $e->getMessage(),
+                    'message' => $e->getMessage(),
                 ];
             }
         }
@@ -625,9 +632,8 @@ public function validateScan(Request $request)
         return response()->json([
             'success' => count($results['failed']) === 0,
 
-            'message' =>
-                count($results['saved']) . ' saved, ' .
-                count($results['failed']) . ' failed.',
+            'message' => count($results['saved']).' saved, '.
+                count($results['failed']).' failed.',
 
             'batch_no' => $batchNo,
 
@@ -659,12 +665,12 @@ public function validateScan(Request $request)
         Log::info('STOCK IN SAVE REQUEST', $request->all());
 
         $request->validate([
-            'lot_id'       => 'required|integer|exists:lot,lot_id',
+            'lot_id' => 'required|integer|exists:lot,lot_id',
             'warehouse_id' => 'required|exists:warehouse,warehouse_id',
-            'items'        => 'required|array|min:1',
-            'items.*.item_id'      => 'required|integer|exists:item,item_id',
+            'items' => 'required|array|min:1',
+            'items.*.item_id' => 'required|integer|exists:item,item_id',
             'items.*.received_qty' => 'required|integer|min:0',
-            'items.*.remarks'      => 'nullable|string',
+            'items.*.remarks' => 'nullable|string',
         ]);
 
         $deliveries = Delivery::where('lot_id', $request->lot_id)
@@ -674,21 +680,21 @@ public function validateScan(Request $request)
         if ($deliveries->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'No pending deliveries found for this lot.'
+                'message' => 'No pending deliveries found for this lot.',
             ], 404);
         }
 
         $totalPackageQty = $deliveries->sum('package_qty');
 
-        $batchNo = 'STOCKIN-' . now()->format('YmdHis');
+        $batchNo = 'STOCKIN-'.now()->format('YmdHis');
         $results = ['saved' => [], 'failed' => []];
 
         foreach ($request->items as $item) {
 
-            $itemId      = $item['item_id'];
+            $itemId = $item['item_id'];
             $receivedQty = (int) $item['received_qty'];
-            $delivered   = $totalPackageQty;
-            $remarks     = trim($item['remarks'] ?? '');
+            $delivered = $totalPackageQty;
+            $remarks = trim($item['remarks'] ?? '');
 
             try {
 
@@ -705,12 +711,13 @@ public function validateScan(Request $request)
                     if ($receivedQty === 0) {
                         // Nothing to credit — skip inventory write but still record the entry.
                         $results['saved'][] = $itemId;
+
                         return;
                     }
 
                     $inventory = Inventory::firstOrNew([
                         'warehouse_id' => $request->warehouse_id,
-                        'item_id'      => $itemId,
+                        'item_id' => $itemId,
                     ]);
 
                     $oldQty = $inventory->exists ? $inventory->qty : 0;
@@ -727,15 +734,17 @@ public function validateScan(Request $request)
                         : '';
 
                     InventoryHistory::create([
-                        'batch_no'     => $batchNo,
+                        'batch_no' => $batchNo,
                         'inventory_id' => $inventory->inventory_id,
-                        'item_id'      => $itemId,
+                        'item_id' => $itemId,
                         'warehouse_id' => $request->warehouse_id,
-                        'old_qty'      => $oldQty,
-                        'new_qty'      => $newQty,
-                        'changed_by'   => Auth::user()->name,
-                        'remarks'      => trim('Stock In via Delivery Receipt' . $shortfallNote . ($remarks ? " — {$remarks}" : '')),
-                        'change_type'  => 'stock_in',
+                        'old_qty' => $oldQty,
+                        'new_qty' => $newQty,
+                        'changed_by' => Auth::user()->name,
+                        'changed_by_user_id' => Auth::id(),
+                        'changed_at' => now(),
+                        'remarks' => trim('Stock In via Delivery Receipt'.$shortfallNote.($remarks ? " — {$remarks}" : '')),
+                        'change_type' => 'stock_in',
                     ]);
 
                     $results['saved'][] = $itemId;
@@ -746,7 +755,7 @@ public function validateScan(Request $request)
                 Log::error('Stock In Save Error', [
                     'item_id' => $itemId,
                     'message' => $e->getMessage(),
-                    'line'    => $e->getLine(),
+                    'line' => $e->getLine(),
                 ]);
 
                 $results['failed'][] = [
@@ -755,13 +764,14 @@ public function validateScan(Request $request)
                 ];
             }
         }
+
         return response()->json([
             'success' => count($results['failed']) === 0,
-            'message' => count($results['saved']) . ' item(s) saved, ' .
-                         count($results['failed']) . ' failed.',
+            'message' => count($results['saved']).' item(s) saved, '.
+                         count($results['failed']).' failed.',
             'batch_no' => $batchNo,
-            'saved'    => $results['saved'],
-            'failed'   => $results['failed'],
+            'saved' => $results['saved'],
+            'failed' => $results['failed'],
         ]);
     }
 
@@ -776,7 +786,7 @@ public function validateScan(Request $request)
         }
 
         $parts = parse_url($qr);
-        if (!isset($parts['query'])) {
+        if (! isset($parts['query'])) {
             return null;
         }
 

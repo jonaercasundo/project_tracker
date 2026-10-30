@@ -134,7 +134,7 @@
                                                     onclick="openEditKeystageModal(
                                                         {{ $keystage->keystage_id ?? $keystage->id ?? 0 }},
                                                         @js($keystageNumber),
-                                                        @js($description),
+                                                        @js($keystage->description ?? $keystage->keystage_name ?? ''),
                                                         @js($keystage->lot_id ?? '')
                                                     )"
                                                     class="p-2 rounded-lg

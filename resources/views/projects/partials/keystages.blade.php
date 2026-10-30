@@ -206,6 +206,52 @@
 
             </div>
 
+            <div id="editKeystageModal" class="{{ $errors->any() ? '' : 'hidden' }} fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-labelledby="editKeystageTitle">
+                <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+                    <h2 id="editKeystageTitle" class="text-lg font-bold text-slate-900">Edit Key Stage</h2>
+                    @if ($errors->any())
+                        <div role="alert" class="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
+                    @endif
+                    <form id="editKeystageForm" method="POST" action="{{ route('projects.keystages.update', [$project, '__KEYSTAGE__']) }}" class="mt-4 space-y-4">
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="keystage_id" id="editkeystageid" value="{{ old('keystage_id') }}">
+                        <label class="block text-sm font-medium text-slate-700">Lot
+                            <select id="editkeystagelotid" name="lot_id" required class="mt-1 w-full rounded-lg border-slate-300">
+                                @foreach ($keystageLots as $lotOption)
+                                    <option value="{{ $lotOption->lot_id }}" @selected((string) old('lot_id') === (string) $lotOption->lot_id)>{{ $lotOption->lot_name }}</option>
+                                @endforeach
+                            </select>
+                            @error('lot_id')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                        </label>
+                        <label class="block text-sm font-medium text-slate-700">Key Stage
+                            <input id="editkeystagenum" name="keystage_num" type="number" min="1" step="1" required value="{{ old('keystage_num') }}" class="mt-1 w-full rounded-lg border-slate-300">
+                            @error('keystage_num')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                        </label>
+                        <label class="block text-sm font-medium text-slate-700">Description
+                            <input id="editkeystagedescription" name="description" maxlength="255" value="{{ old('description') }}" class="mt-1 w-full rounded-lg border-slate-300">
+                            @error('description')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                        </label>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" onclick="closeKeystageModal('editKeystageModal')" class="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
+                            <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Save changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="deleteKeystageModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-labelledby="deleteKeystageTitle">
+                <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                    <h2 id="deleteKeystageTitle" class="text-lg font-bold text-slate-900">Delete Key Stage?</h2>
+                    <p class="mt-2 text-sm text-slate-600">This permanently deletes the selected Key Stage. Stages with related records cannot be deleted.</p>
+                    <form id="deleteKeystageForm" method="POST" action="{{ route('projects.keystages.destroy', [$project, '__KEYSTAGE__']) }}" class="mt-5 flex justify-end gap-2">
+                        @csrf
+                        @method('DELETE')
+                        <button type="button" onclick="closeKeystageModal('deleteKeystageModal')" class="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
+                        <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
+                    </form>
+                </div>
+            </div>
 
             {{-- ========================================================= --}}
             {{-- KEYSTAGE FILTER SCRIPT --}}
@@ -343,9 +389,9 @@
                         );
 
 
-                    if (id) {
-                        id.value = keystageId;
-                    }
+                    const form = document.getElementById('editKeystageForm');
+                    if (id) { id.value = keystageId; }
+                    if (form) { form.action = form.action.replace('__KEYSTAGE__', encodeURIComponent(keystageId)); }
 
                     if (number) {
                         number.value = keystageNumber ?? '';
@@ -379,14 +425,8 @@
                     keystageId
                 ) {
 
-                    const input =
-                        document.getElementById(
-                            'delete_keystage'
-                        );
-
-                    if (input) {
-                        input.value = keystageId;
-                    }
+                    const form = document.getElementById('deleteKeystageForm');
+                    if (form) { form.action = form.action.replace('__KEYSTAGE__', encodeURIComponent(keystageId)); }
 
 
                     const modal =
@@ -400,10 +440,22 @@
 
                 }
 
+                function closeKeystageModal(modalId) {
+                    document.getElementById(modalId)?.classList.add('hidden');
+                }
+
+                document.addEventListener('DOMContentLoaded', function () {
+                    const invalidKeystageId = document.getElementById('editkeystageid')?.value;
+                    const editForm = document.getElementById('editKeystageForm');
+                    if (invalidKeystageId && editForm) {
+                        editForm.action = editForm.action.replace('__KEYSTAGE__', encodeURIComponent(invalidKeystageId));
+                    }
+                });
+
             </script>
 
             {{-- ========================================================= --}}
             {{-- ITEMS --}}
             {{-- ========================================================= --}}
 
-            
+

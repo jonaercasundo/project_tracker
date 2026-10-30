@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Keystage;
 use App\Models\Project;
 use App\Services\ProjectAwardSynchronizationService;
 use App\Services\ProjectBiddingEvidenceService;
@@ -399,6 +400,7 @@ class ProjectController extends Controller
             'project' => $project,
             'structureIsSmall' => $structureIsSmall,
             'lots' => $lots,
+            'keystageLots' => DB::table('lot')->where('project_id', $project->project_id)->orderBy('lot_name')->get(['lot_id', 'lot_name']),
             'keystages' => $keystages,
             'arSettings' => $arSettings,
             'logoFiles' => $logoFiles,
@@ -476,6 +478,62 @@ class ProjectController extends Controller
     public function keystagesData(Request $request, Project $project, ProjectDetailsService $details): JsonResponse
     {
         return $this->detailData($request, $project, $details, 'keystage');
+    }
+
+    public function updateKeystage(Request $request, Project $project, Keystage $keystage): RedirectResponse
+    {
+        $this->authorizeKeystageProject($project, $keystage);
+
+        $validated = $request->validate([
+            'keystage_id' => ['sometimes', 'required', 'integer'],
+            'lot_id' => ['sometimes', 'required', 'integer', 'exists:lot,lot_id'],
+            'keystage_num' => ['sometimes', 'required', 'integer', 'min:1'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        if (isset($validated['lot_id']) && ! DB::table('lot')->where('lot_id', $validated['lot_id'])->where('project_id', $project->project_id)->exists()) {
+            return back()->withInput()->withErrors(['lot_id' => 'Choose a lot in this project.']);
+        }
+
+        unset($validated['keystage_id']);
+
+        $keystage->fill($validated)->save();
+
+        return redirect()->route('projects.show', ['project' => $project, 'tab' => 'keystage'])->with('success', 'Key Stage updated successfully.');
+    }
+
+    public function destroyKeystage(Project $project, Keystage $keystage): RedirectResponse
+    {
+        $this->authorizeKeystageProject($project, $keystage);
+
+        $dependentRecords = [];
+        if (Schema::hasTable('deliveries') && DB::table('deliveries')->where('keystage_id', $keystage->keystage_id)->exists()) {
+            $dependentRecords[] = 'deliveries';
+        }
+        if (Schema::hasTable('package') && Schema::hasColumn('package', 'keystage_id') && DB::table('package')->where('keystage_id', $keystage->keystage_id)->exists()) {
+            $dependentRecords[] = 'packages';
+        }
+
+        if ($dependentRecords !== []) {
+            return redirect()->route('projects.show', ['project' => $project, 'tab' => 'keystage'])->with('error', 'This Key Stage is linked to existing '.implode(' and ', $dependentRecords).'. Remove or reassign those records before deleting it.');
+        }
+
+        try {
+            $keystage->delete();
+        } catch (QueryException) {
+            return redirect()->route('projects.show', ['project' => $project, 'tab' => 'keystage'])->with('error', 'This Key Stage is still used by another record and cannot be deleted.');
+        }
+
+        return redirect()->route('projects.show', ['project' => $project, 'tab' => 'keystage'])->with('success', 'Key Stage deleted successfully.');
+    }
+
+    private function authorizeKeystageProject(Project $project, Keystage $keystage): void
+    {
+        abort_unless(DB::table('lot')->where('lot_id', $keystage->lot_id)->where('project_id', $project->project_id)->exists(), 404);
+
+        if (Schema::hasTable('project_information') && ($bidding = $project->bidding()->first()) !== null) {
+            Gate::authorize('update', $bidding);
+        }
     }
 
     public function detailOptions(Request $request, Project $project, ProjectDetailsService $details): JsonResponse

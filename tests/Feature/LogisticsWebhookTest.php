@@ -127,6 +127,7 @@ class LogisticsWebhookTestCase extends TestCase
             $table->unsignedInteger('package_status_id');
             $table->unsignedInteger('user_id')->nullable();
             $table->string('status');
+            $table->string('previous_status')->nullable();
             $table->text('remarks')->nullable();
             $table->dateTime('created_at')->nullable();
             $table->dateTime('updated_at')->nullable();

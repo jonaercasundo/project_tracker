@@ -221,6 +221,8 @@ class InventoryController extends Controller
                 'new_qty' => $request->qty,
 
                 'changed_by' => Auth::user()->name ?? 'System',
+                'changed_by_user_id' => Auth::id(),
+                'changed_at' => now(),
 
                 'remarks' => $request->remarks,
 

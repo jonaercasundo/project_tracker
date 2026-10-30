@@ -95,6 +95,7 @@ class BillingOperationalSyncServiceTestCase extends TestCase
             $table->string('batch_no')->nullable();
             $table->dateTime('changed_at')->nullable();
             $table->string('changed_by')->nullable();
+            $table->unsignedInteger('changed_by_user_id')->nullable();
             $table->text('remarks')->nullable();
             $table->unsignedInteger('project_id')->nullable();
             $table->unsignedInteger('delivery_id')->nullable();
@@ -107,6 +108,7 @@ class BillingOperationalSyncServiceTestCase extends TestCase
             $table->unsignedInteger('package_status_id');
             $table->unsignedInteger('user_id')->nullable();
             $table->string('status');
+            $table->string('previous_status')->nullable();
             $table->text('remarks')->nullable();
             $table->dateTime('created_at')->nullable();
             $table->dateTime('updated_at')->nullable();

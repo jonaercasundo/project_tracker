@@ -499,6 +499,68 @@ it('validates lot edits and rejects keystages from another project', function ()
     $this->assertDatabaseHas('keystage', ['keystage_id' => 3, 'lot_id' => 3]);
 });
 
+it('updates only the selected project keystage and preserves fields omitted from the request', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    DB::table('keystage')->insert(['keystage_id' => 3, 'lot_id' => 3, 'keystage_num' => 1, 'description' => 'Other project stage']);
+
+    $this->put(route('projects.keystages.update', [1, 1]), [
+        'keystage_num' => 3,
+        'lot_id' => 1,
+    ])->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'keystage']))
+        ->assertSessionHas('success', 'Key Stage updated successfully.');
+
+    $this->assertDatabaseHas('keystage', [
+        'keystage_id' => 1,
+        'lot_id' => 1,
+        'keystage_num' => 3,
+        'description' => 'Intermediate',
+    ]);
+
+    $this->put(route('projects.keystages.update', [1, 3]), [
+        'keystage_num' => 5,
+        'lot_id' => 1,
+    ])->assertNotFound();
+
+    $this->assertDatabaseHas('keystage', ['keystage_id' => 3, 'lot_id' => 3, 'keystage_num' => 1]);
+});
+
+it('validates keystage edits and prevents deletion while a package or delivery uses the stage', function () {
+    projectDetailsUser();
+    projectDetailsFixtures();
+    DB::table('keystage')->insert(['keystage_id' => 3, 'lot_id' => 3, 'keystage_num' => 1, 'description' => 'Other project stage']);
+    $deliveryId = DB::table('deliveries')->where('project_id', 1)->value('delivery_id');
+    DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['keystage_id' => 1]);
+
+    $this->from(route('projects.show', ['project' => 1, 'tab' => 'keystage']))
+        ->put(route('projects.keystages.update', [1, 1]), ['keystage_num' => 0, 'lot_id' => 3])
+        ->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'keystage']))
+        ->assertSessionHasErrors('keystage_num');
+
+    $this->from(route('projects.show', ['project' => 1, 'tab' => 'keystage']))
+        ->put(route('projects.keystages.update', [1, 1]), ['keystage_num' => 2, 'lot_id' => 3])
+        ->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'keystage']))
+        ->assertSessionHasErrors('lot_id');
+
+    $this->delete(route('projects.keystages.destroy', [1, 1]))
+        ->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'keystage']))
+        ->assertSessionHas('error');
+
+    $this->assertDatabaseHas('keystage', ['keystage_id' => 1]);
+
+    DB::table('package')->where('keystage_id', 1)->update(['keystage_id' => null]);
+    $this->delete(route('projects.keystages.destroy', [1, 1]))
+        ->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'keystage']))
+        ->assertSessionHas('error');
+
+    DB::table('deliveries')->where('keystage_id', 1)->update(['keystage_id' => null]);
+    $this->delete(route('projects.keystages.destroy', [1, 1]))
+        ->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'keystage']))
+        ->assertSessionHas('success', 'Key Stage deleted successfully.');
+
+    $this->assertDatabaseMissing('keystage', ['keystage_id' => 1]);
+});
+
 it('keeps inline lot price saves scoped to the selected lot', function () {
     projectDetailsUser();
     projectDetailsFixtures();

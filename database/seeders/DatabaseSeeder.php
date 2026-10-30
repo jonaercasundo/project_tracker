@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
             AiBusinessDataPermissionSeeder::class,
             AdminUserSeeder::class,
             BillingPermissionSeeder::class,
+            DeliveryAuditPermissionSeeder::class,
         ]);
     }
 }

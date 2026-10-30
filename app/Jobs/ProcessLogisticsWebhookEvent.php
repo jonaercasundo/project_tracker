@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\DeliveryAuditTrailService;
 use App\Services\LogisticsDrResolver;
 use App\Services\LogisticsDrTrackingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -51,6 +52,8 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
                     'error_details' => null,
                     'updated_at' => now(),
                 ]);
+
+            app(DeliveryAuditTrailService::class)->recordWebhookProcessingAttempt($this->eventRowId);
 
             return $event;
         }, 3);
@@ -153,6 +156,7 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
                         'processed_at' => now(),
                         'updated_at' => now(),
                     ]);
+                app(DeliveryAuditTrailService::class)->recordWebhookEventByRowId($this->eventRowId);
             }, 3);
         } catch (Throwable $exception) {
             DB::table('logistics_webhook_events')
@@ -163,6 +167,8 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
                     'error_details' => $exception::class,
                     'updated_at' => now(),
                 ]);
+
+            app(DeliveryAuditTrailService::class)->recordWebhookEventByRowId($this->eventRowId);
 
             Log::warning('Logistics webhook event reconciliation failed.', [
                 'event_row_id' => $this->eventRowId,
@@ -204,6 +210,8 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
                 'error_details' => $exception === null ? null : $exception::class,
                 'updated_at' => now(),
             ]);
+
+        app(DeliveryAuditTrailService::class)->recordWebhookEventByRowId($this->eventRowId);
 
         Log::warning('Logistics webhook event exhausted its queue retries.', [
             'event_row_id' => $this->eventRowId,

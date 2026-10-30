@@ -121,7 +121,7 @@ class LogisticsDeliveryCompletionService
                 ->where('item_id', $line['item_id'])->orderBy('inventory_id')->lockForUpdate()->first();
             $oldQty = $line['status'] === 'released' ? null : $running[$key];
             $newQty = $line['status'] === 'released' ? null : $oldQty - $line['quantity'];
-            DB::table('inventory_history')->insert([
+            $historyId = DB::table('inventory_history')->insertGetId([
                 'batch_no' => $batchNo, 'inventory_id' => $row?->inventory_id, 'item_id' => $line['item_id'],
                 'warehouse_id' => $line['warehouse_id'], 'old_qty' => $line['status'] === 'released' ? null : $oldQty,
                 'new_qty' => $line['status'] === 'released' ? null : $newQty, 'changed_by' => 'Logistics Integration',
@@ -131,6 +131,7 @@ class LogisticsDeliveryCompletionService
                 'dr_no' => $line['dr_no'], 'quantity' => $line['status'] === 'released' ? 0 : $line['quantity'],
                 'integration_id' => $event->integration_id, 'webhook_event_id' => $event->external_event_id,
             ]);
+            app(DeliveryAuditTrailService::class)->recordInventoryHistoryById((int) $historyId);
             if ($line['status'] !== 'released') {
                 $running[$key] = $newQty;
             }
@@ -154,11 +155,13 @@ class LogisticsDeliveryCompletionService
                 'status' => 'delivered', 'remarks' => 'Delivered via authorized Logistics integration.',
                 'delivered_at' => $now, 'delivered_by' => null, 'receiver_name' => 'Logistics Integration',
             ], 'package_status_id');
-            DB::table('delivery_history')->insert([
+            $deliveryHistoryId = DB::table('delivery_history')->insertGetId([
                 'package_status_id' => $newStatusId, 'user_id' => null, 'status' => 'delivered',
+                'previous_status' => $packageStatus['status'],
                 'remarks' => 'Delivered via authorized Logistics integration; event '.$event->external_event_id,
                 'created_at' => $now, 'updated_at' => $now,
             ]);
+            app(DeliveryAuditTrailService::class)->recordDeliveryHistoryById((int) $deliveryHistoryId);
             DB::table('deliveries')->where('delivery_id', $packageStatus['delivery']->delivery_id)->update([
                 'status' => 'delivered', 'delivered_date' => Carbon::parse($now)->toDateString(),
             ]);

@@ -48,7 +48,7 @@
                 ];
             @endphp
             @foreach ($summaryCards as $card)
-                <article class="flex min-h-[168px] flex-col justify-between rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm shadow-slate-100/50 {{ $card['label'] === 'Processed' ? 'border-slate-800 bg-slate-950 text-white shadow-slate-900/10' : '' }}">
+                <article class="flex min-h-[168px] flex-col justify-between rounded-2xl border border-slate-200/70 p-5 shadow-sm shadow-slate-100/50 {{ $card['label'] === 'Processed' ? 'border-slate-800 bg-slate-950 text-white shadow-slate-900/10' : 'bg-white' }}">
                     <div class="flex items-start justify-between gap-4">
                         <div class="min-w-0">
                             <p class="text-xs font-bold uppercase tracking-[0.12em] {{ $card['label'] === 'Processed' ? 'text-slate-300' : 'text-slate-500' }}">{{ $card['label'] }}</p>

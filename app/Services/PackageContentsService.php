@@ -93,9 +93,9 @@ class PackageContentsService
     }
 
     /** @param array<int|string, int|string> $quantities */
-    public function updateQuantities(int $packageId, array $quantities): void
+    public function updateQuantities(int $packageId, array $quantities, ?string $remarks, ?int $changedByUserId): void
     {
-        DB::transaction(function () use ($packageId, $quantities): void {
+        DB::transaction(function () use ($packageId, $quantities, $remarks, $changedByUserId): void {
             $lockedPackage = DB::table('package')->where('package_id', $packageId)->lockForUpdate()->first();
             abort_if($lockedPackage === null, 404);
             $updates = [];
@@ -117,8 +117,12 @@ class PackageContentsService
                     ]);
                 }
 
-                if ((int) $rows->first()->qty !== (int) $quantity) {
-                    $updates[$itemId] = $quantity;
+                $currentQuantity = $rows->first()->qty === null ? null : (int) $rows->first()->qty;
+                if ($currentQuantity !== (int) $quantity) {
+                    $updates[$itemId] = [
+                        'old_qty' => $currentQuantity,
+                        'new_qty' => (int) $quantity,
+                    ];
                 }
             }
 
@@ -127,15 +131,29 @@ class PackageContentsService
             }
 
             $reason = $this->quantityChangeBlockReason($packageId);
-            if ($reason !== null) {
-                throw ValidationException::withMessages(['items' => $reason]);
+            if ($reason !== null && blank($remarks)) {
+                throw ValidationException::withMessages(['remarks' => 'Explain why this quantity change is needed because this package has related delivery, billing, or inventory records.']);
             }
 
-            foreach ($updates as $itemId => $quantity) {
+            if (! Schema::hasTable('package_content_quantity_changes')) {
+                throw ValidationException::withMessages(['remarks' => 'Quantity change auditing is unavailable until the package quantity audit migration has been applied.']);
+            }
+
+            foreach ($updates as $itemId => $change) {
                 DB::table('package_content')
                     ->where('package_id', $packageId)
                     ->where('item_id', $itemId)
-                    ->update(['qty' => $quantity]);
+                    ->update(['qty' => $change['new_qty']]);
+
+                DB::table('package_content_quantity_changes')->insert([
+                    'package_id' => $packageId,
+                    'item_id' => (int) $itemId,
+                    'old_qty' => $change['old_qty'],
+                    'new_qty' => $change['new_qty'],
+                    'remarks' => filled($remarks) ? trim($remarks) : 'Routine quantity adjustment; no related transaction history was present.',
+                    'changed_by_user_id' => $changedByUserId,
+                    'changed_at' => now(),
+                ]);
             }
         }, 3);
     }

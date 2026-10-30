@@ -10,7 +10,7 @@
         @endif
 
         @if ($quantityChangeBlockReason)
-            <div role="alert" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><p class="font-bold">Quantity changes are locked</p><p class="mt-1">{{ $quantityChangeBlockReason }}</p></div>
+            <div role="alert" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><p class="font-bold">This package has transaction history</p><p class="mt-1">{{ $quantityChangeBlockReason }} You can proceed by entering a reason below. Existing delivery, billing, and inventory history will remain unchanged; current calculations will use the new quantity.</p></div>
         @endif
 
         @if ($duplicateItemIds !== [])
@@ -31,12 +31,17 @@
         <form method="POST" action="{{ route('projects.packages.update', [$project, $package->package_id]) }}" class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             @csrf
             @method('PUT')
-            <div><h2 class="font-bold text-slate-900">Individual item quantities</h2><p class="mt-1 text-xs leading-5 text-slate-500">Edit the quantity of each item assigned to this package. Quantities must be whole numbers from 0 to 2,147,483,647. Existing delivery or inventory records lock changes to preserve transaction history. The current delivery, billing, and inventory calculations treat zero or blank package quantities as one.</p></div>
+            <div><h2 class="font-bold text-slate-900">Individual item quantities</h2><p class="mt-1 text-xs leading-5 text-slate-500">Edit the quantity of each item assigned to this package. Quantities must be whole numbers from 0 to 2,147,483,647. Changes are recorded with your remarks. The current delivery, billing, and inventory calculations treat zero or blank package quantities as one.</p></div>
+            <div>
+                <label for="remarks" class="mb-1.5 block text-sm font-semibold text-slate-700">Reason for change @if ($quantityChangeBlockReason)<span class="text-red-600">*</span>@else <span class="text-xs font-normal text-slate-500">(optional)</span>@endif</label>
+                <textarea id="remarks" name="remarks" rows="3" maxlength="1000" @required($quantityChangeBlockReason) class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-blue-500" placeholder="Explain why these package item quantities need to change.">{{ old('remarks') }}</textarea>
+                @error('remarks')<p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>@enderror
+            </div>
             @forelse ($items as $item)
                 <div class="grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-end">
                     <div><p class="text-sm font-semibold text-slate-800">{{ $item->item_name ?? 'Item '.$item->item_id }}</p><p class="mt-1 text-xs text-slate-500">{{ $item->description ?? $item->item_description ?? 'No description' }} @if (filled($item->unit ?? null)) &middot; {{ $item->unit }} @endif</p></div>
                     <label for="item-quantity-{{ $item->item_id }}" class="text-xs font-semibold text-slate-600">Quantity per package
-                        <input id="item-quantity-{{ $item->item_id }}" name="items[{{ $item->item_id }}]" type="number" min="0" max="2147483647" step="1" required value="{{ old('items.'.$item->item_id, $item->qty ?? 0) }}" @disabled($quantityChangeBlockReason || in_array((int) $item->item_id, $duplicateItemIds, true)) class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm tabular-nums text-slate-800 focus:border-blue-500 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100">
+                        <input id="item-quantity-{{ $item->item_id }}" name="items[{{ $item->item_id }}]" type="number" min="0" max="2147483647" step="1" required value="{{ old('items.'.$item->item_id, $item->qty ?? 0) }}" @disabled(in_array((int) $item->item_id, $duplicateItemIds, true)) class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm tabular-nums text-slate-800 focus:border-blue-500 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100">
                         @error('items.'.$item->item_id)<span class="mt-1 block text-xs font-medium text-red-600">{{ $message }}</span>@enderror
                     </label>
                 </div>
@@ -45,7 +50,7 @@
             @endforelse
             <div class="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4">
                 <a href="{{ route('projects.packages.show', [$project, $package->package_id]) }}" class="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</a>
-                <button type="submit" @disabled($quantityChangeBlockReason || $duplicateItemIds !== [] || $items->isEmpty()) class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400">Save quantities</button>
+                <button type="submit" @disabled($duplicateItemIds !== [] || $items->isEmpty()) class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400">Save quantities</button>
             </div>
         </form>
     </div>

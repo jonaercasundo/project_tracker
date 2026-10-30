@@ -44,12 +44,14 @@ class ProjectPackageController extends Controller
     {
         $this->authorizeProjectAccess($project, 'update');
         $package = $this->findProjectPackage($project, $packageId);
+        $quantityChangeBlockReason = $packageContents->quantityChangeBlockReason($packageId);
         $validated = $request->validate([
             'items' => ['sometimes', 'array'],
             'items.*' => ['required', 'integer', 'min:0', 'max:2147483647'],
+            'remarks' => [$quantityChangeBlockReason !== null ? 'required' : 'nullable', 'string', 'max:1000'],
         ]);
 
-        $packageContents->updateQuantities($packageId, $validated['items'] ?? []);
+        $packageContents->updateQuantities($packageId, $validated['items'] ?? [], $validated['remarks'] ?? null, auth()->id());
 
         return to_route('projects.packages.show', [$project, $packageId])
             ->with('success', 'Package item quantities updated successfully.');

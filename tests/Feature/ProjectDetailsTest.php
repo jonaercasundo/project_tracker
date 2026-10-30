@@ -54,6 +54,16 @@ class ProjectDetailsTestCase extends TestCase
                 $table->integer($column)->nullable();
             }
         });
+        Schema::create('package_content_quantity_changes', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedInteger('package_id');
+            $table->unsignedInteger('item_id');
+            $table->integer('old_qty')->nullable();
+            $table->integer('new_qty');
+            $table->text('remarks');
+            $table->unsignedInteger('changed_by_user_id')->nullable();
+            $table->timestamp('changed_at')->useCurrent();
+        });
         $this->withoutVite();
     }
 
@@ -597,7 +607,7 @@ it('views and edits quantities for the selected package item assignments', funct
     $this->get($showUrl)->assertOk()->assertSee('>6</td>', false);
 });
 
-it('validates package item quantities and locks changes after a related delivery is processed or billed', function () {
+it('validates package item quantities and records a reason when overriding delivery or billing history', function () {
     projectDetailsUser();
     projectDetailsFixtures();
     DB::table('package_content')->insert(['package_id' => 2, 'item_id' => 1, 'qty' => 2]);
@@ -619,20 +629,42 @@ it('validates package item quantities and locks changes after a related delivery
         ->assertSessionHas('success');
 
     DB::table('package_status')->where('package_id', 2)->update(['status' => 'released']);
+    $this->get($editUrl)->assertOk()
+        ->assertSee('This package has transaction history')
+        ->assertSee('name="remarks"', false)
+        ->assertSee('name="items[1]"', false)
+        ->assertDontSee('name="items[1]" type="number" min="0" max="2147483647" step="1" required value="6" disabled', false);
     $this->from($editUrl)->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 7]])
-        ->assertRedirect($editUrl)->assertSessionHasErrors('items');
-    $this->assertDatabaseHas('package_content', ['package_id' => 2, 'item_id' => 1, 'qty' => 6]);
+        ->assertRedirect($editUrl)->assertSessionHasErrors('remarks');
+    $this->put(route('projects.packages.update', [1, 2]), [
+        'items' => [1 => 7],
+        'remarks' => 'Approved change to match the revised package contents.',
+    ])->assertRedirect(route('projects.packages.show', [1, 2]))
+        ->assertSessionHas('success');
 
     DB::table('package_status')->where('package_id', 2)->update(['status' => 'pending']);
     DB::table('delivery_billing_records')->insert(['delivery_id' => $deliveryId, 'status' => 'pending_billing']);
-    $this->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 7]])
+    $this->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 8]])
         ->assertRedirect(route('projects.packages.show', [1, 2]))
         ->assertSessionHas('success');
 
     DB::table('delivery_billing_records')->where('delivery_id', $deliveryId)->update(['status' => 'for_billing']);
-    $this->from($editUrl)->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 8]])
-        ->assertRedirect($editUrl)->assertSessionHasErrors('items');
-    $this->assertDatabaseHas('package_content', ['package_id' => 2, 'item_id' => 1, 'qty' => 7]);
+    $this->from($editUrl)->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 9]])
+        ->assertRedirect($editUrl)->assertSessionHasErrors('remarks');
+    $this->put(route('projects.packages.update', [1, 2]), [
+        'items' => [1 => 9],
+        'remarks' => 'Authorized correction; prior billing records must remain unchanged.',
+    ])->assertRedirect(route('projects.packages.show', [1, 2]))
+        ->assertSessionHas('success');
+
+    $this->assertDatabaseHas('package_content', ['package_id' => 2, 'item_id' => 1, 'qty' => 9]);
+    $this->assertDatabaseHas('package_content_quantity_changes', [
+        'package_id' => 2,
+        'item_id' => 1,
+        'old_qty' => 6,
+        'new_qty' => 7,
+        'remarks' => 'Approved change to match the revised package contents.',
+    ]);
 });
 
 it('does not expose a package through another project route', function () {

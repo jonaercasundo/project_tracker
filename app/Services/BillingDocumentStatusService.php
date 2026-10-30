@@ -60,12 +60,12 @@ class BillingDocumentStatusService
 
                     $applicableDrs[$drNumber] = true;
                     $receivedDate = trim((string) ($row['received'] ?? ''));
-                    if ($receivedDate === '') {
-                        continue;
+                    if ($receivedDate !== '') {
+                        $processedDrs[$drNumber] = true;
                     }
 
-                    $processedDrs[$drNumber] = true;
-                    if ($this->dateInApplicationTimezone($receivedDate) === now(config('app.timezone'))->toDateString()) {
+                    $checkingDate = trim((string) ($row['checking'] ?? ''));
+                    if ($checkingDate !== '' && $this->dateInApplicationTimezone($checkingDate) === now(config('app.timezone'))->toDateString()) {
                         $processedTodayDrs[$drNumber] = true;
                     }
                 }
@@ -92,11 +92,11 @@ class BillingDocumentStatusService
         }
     }
 
-    /** @return array<int, array{dr: string, received: string}> */
+    /** @return array<int, array{dr: string, received: string, checking: string}> */
     private function lotSheetRows(string $lotNumber): array
     {
         $settings = $this->configuration->current();
-        $cacheKey = 'billing-document-status:'.hash('sha256', $settings['spreadsheet_id'].'|'.$settings['sheet_tab'].'|'.$lotNumber);
+        $cacheKey = 'billing-document-status:v2:'.hash('sha256', $settings['spreadsheet_id'].'|'.$settings['sheet_tab'].'|'.$lotNumber);
 
         return Cache::remember($cacheKey, now()->addMinutes(2), function () use ($settings, $lotNumber): array {
             $tab = "'".str_replace("'", "''", $settings['sheet_tab'])."'!";
@@ -104,13 +104,15 @@ class BillingDocumentStatusService
             $headerMap = $this->findLotColumns($headers, $lotNumber);
             $drValues = $this->sheets->values($tab.$headerMap['dr_column'].'2:'.$headerMap['dr_column'], $settings['spreadsheet_id']);
             $receivedValues = $this->sheets->values($tab.$headerMap['received_column'].'2:'.$headerMap['received_column'], $settings['spreadsheet_id']);
+            $checkingValues = $this->sheets->values($tab.$headerMap['checking_column'].'2:'.$headerMap['checking_column'], $settings['spreadsheet_id']);
             $rows = [];
-            $rowCount = max(count($drValues), count($receivedValues));
+            $rowCount = max(count($drValues), count($receivedValues), count($checkingValues));
 
             for ($index = 0; $index < $rowCount; $index++) {
                 $rows[] = [
                     'dr' => (string) ($drValues[$index][0] ?? ''),
                     'received' => (string) ($receivedValues[$index][0] ?? ''),
+                    'checking' => (string) ($checkingValues[$index][0] ?? ''),
                 ];
             }
 
@@ -119,13 +121,14 @@ class BillingDocumentStatusService
     }
 
     /** @param array<int, array<int, mixed>> $headerRows
-     * @return array{dr_column: string, received_column: string}
+     * @return array{dr_column: string, received_column: string, checking_column: string}
      */
     private function findLotColumns(array $headerRows, string $lotNumber): array
     {
         foreach ($headerRows as $headerRow) {
             $drColumns = [];
             $receivedColumn = null;
+            $checkingColumn = null;
 
             foreach ($headerRow as $index => $value) {
                 $header = mb_strtolower(preg_replace('/\s+/', ' ', trim((string) $value)) ?? '');
@@ -135,15 +138,19 @@ class BillingDocumentStatusService
                 if (str_contains($header, 'date received') && str_contains($header, 'lot '.$lotNumber) && ! str_contains($header, 'from 3pl')) {
                     $receivedColumn = $this->columnLetters($index + 1);
                 }
+                $normalizedHeader = str_replace('cheking', 'checking', $header);
+                if (str_contains($normalizedHeader, 'date checking') && str_contains($normalizedHeader, 'lot '.$lotNumber)) {
+                    $checkingColumn = $this->columnLetters($index + 1);
+                }
             }
 
             $lotIndex = array_search($lotNumber, self::LOTS, true);
-            if ($lotIndex !== false && isset($drColumns[$lotIndex]) && $receivedColumn !== null) {
-                return ['dr_column' => $drColumns[$lotIndex], 'received_column' => $receivedColumn];
+            if ($lotIndex !== false && isset($drColumns[$lotIndex]) && $receivedColumn !== null && $checkingColumn !== null) {
+                return ['dr_column' => $drColumns[$lotIndex], 'received_column' => $receivedColumn, 'checking_column' => $checkingColumn];
             }
         }
 
-        throw new RuntimeException('The BIR DR and DATE RECEIVED columns for a supported lot could not be found in the configured billing sheet.');
+        throw new RuntimeException('The BIR DR, DATE RECEIVED, and DATE CHECKING columns for a supported lot could not be found in the configured billing sheet.');
     }
 
     private function dateInApplicationTimezone(string $value): ?string

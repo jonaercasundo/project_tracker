@@ -98,7 +98,7 @@ class BillingDocumentStatusService
         $settings = $this->configuration->current();
         $cacheKey = 'billing-document-status:v2:'.hash('sha256', $settings['spreadsheet_id'].'|'.$settings['sheet_tab'].'|'.$lotNumber);
 
-        return Cache::remember($cacheKey, now()->addMinutes(2), function () use ($settings, $lotNumber): array {
+        return Cache::remember($cacheKey, now()->addSeconds(10), function () use ($settings, $lotNumber): array {
             $tab = "'".str_replace("'", "''", $settings['sheet_tab'])."'!";
             $headers = $this->sheets->values($tab.'A1:CU20', $settings['spreadsheet_id']);
             $headerMap = $this->findLotColumns($headers, $lotNumber);

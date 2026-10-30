@@ -287,6 +287,8 @@ Route::middleware(['auth', 'active.user'])->group(function () {
 
         Route::get('/projects/reports-analytics', [ProjectDashboardController::class, 'reportsAnalytics'])
             ->name('projects.reports.analytics');
+        Route::get('/projects/reports-analytics/data', [ProjectDashboardController::class, 'reportsAnalyticsData'])
+            ->name('projects.reports.analytics.data');
 
         Route::get('/operations/lifecycle', [OperationsLifecycleController::class, 'index'])
             ->name('operations.lifecycle.index');

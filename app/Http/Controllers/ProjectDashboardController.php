@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Services\BillingDocumentStatusService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -28,6 +29,18 @@ class ProjectDashboardController extends Controller
             'summary' => $summary,
             'snapshotAt' => now(),
         ]);
+    }
+
+    public function reportsAnalyticsData(Request $request, BillingDocumentStatusService $billingDocumentStatus): JsonResponse
+    {
+        $validated = $request->validate([
+            'project_id' => ['required', 'integer', 'exists:projects,project_id'],
+        ]);
+
+        return response()->json([
+            'summary' => $billingDocumentStatus->summarize((int) $validated['project_id']),
+            'updated_at' => now()->format('M d, Y · g:i A'),
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     public function index()

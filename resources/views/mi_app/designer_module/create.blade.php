@@ -1673,6 +1673,16 @@
                                 return normalizedInput.length > 0 && !Array.from(colorSelect.options).some((option) => option.value.trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedInput);
                             },
                             create: (input) => input.trim().replace(/\s+/g, ' '),
+                            onInitialize: function () {
+                                const selectControl = this;
+                                this.dropdown_content.addEventListener('click', (event) => {
+                                    const target = event.target;
+                                    if (!(target instanceof Element) || !target.closest('.create')) return;
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    selectControl.createItem();
+                                });
+                            },
 
                             closeAfterSelect: false,
 
@@ -1711,6 +1721,16 @@
                                 return normalizedInput.length > 0 && !Array.from(materialsSelect.options).some((option) => option.value.trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedInput);
                             },
                             create: (input) => input.trim().replace(/\s+/g, ' '),
+                            onInitialize: function () {
+                                const selectControl = this;
+                                this.dropdown_content.addEventListener('click', (event) => {
+                                    const target = event.target;
+                                    if (!(target instanceof Element) || !target.closest('.create')) return;
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    selectControl.createItem();
+                                });
+                            },
 
                             maxItems: 100,
 

@@ -80,6 +80,16 @@ if (form) {
                     const normalizedInput = normalizeOption(input);
                     return normalizedInput.length > 0 && ![...select.options].some((option) => normalizeOption(option.value) === normalizedInput);
                 },
+                onInitialize: function () {
+                    const selectControl = this;
+                    this.dropdown_content.addEventListener('click', (event) => {
+                        const target = event.target;
+                        if (!(target instanceof Element) || !target.closest('.create')) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        selectControl.createItem();
+                    });
+                },
                 render: {
                     option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim().replace(/\s+/g, ' '))}" to this product</div>`,
                     no_results: () => `<div class="no-results">No ${select.id === 'materials' ? 'material' : 'color'} found. Type a new value to add it.</div>`,

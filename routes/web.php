@@ -285,6 +285,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         Route::get('/projects/dashboard', [ProjectDashboardController::class, 'index'])
             ->name('projects.dashboard');
 
+        Route::get('/projects/reports-analytics', [ProjectDashboardController::class, 'reportsAnalytics'])
+            ->name('projects.reports.analytics');
+
         Route::get('/operations/lifecycle', [OperationsLifecycleController::class, 'index'])
             ->name('operations.lifecycle.index');
         Route::get('/operations/lifecycle/reconcile', [OperationsLifecycleController::class, 'reconcile'])

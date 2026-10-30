@@ -133,6 +133,47 @@ it('shows return monitoring in the MMC sidebar and opens its project workspace',
         ->assertDontSee('name="quantity_to"', false);
 });
 
+it('shows delivery and separate item and document return analytics', function (): void {
+    prepareDeliveryReturnRecords();
+    DB::table('delivery_returns')->insert([
+        'return_type' => 'Item Return',
+        'project_id' => 1,
+        'lot_id' => 1,
+        'school_id' => 'SCH-1',
+        'delivery_id' => 1,
+        'dr_no' => 'DR-100',
+        'item_id' => 1,
+        'quantity_returned' => 3,
+        'status' => 'Received',
+        'reason' => 'Damaged packaging',
+        'monitoring_date' => '2026-10-05',
+        'received_date' => '2026-10-06',
+    ]);
+    DB::table('delivery_returns')->insert([
+        'return_type' => 'Document Return',
+        'project_id' => 1,
+        'lot_id' => 1,
+        'school_id' => 'SCH-1',
+        'delivery_id' => 1,
+        'dr_no' => 'DR-100',
+        'status' => 'In Transit',
+        'reason' => 'Original delivery receipt',
+        'monitoring_date' => '2026-10-07',
+    ]);
+    $user = deliveryReturnUser();
+    $user->assignRole(Role::findOrCreate('user', 'web'));
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->getKey()]);
+
+    $this->get(route('projects.reports.analytics'))
+        ->assertSee('Reports & Analytics')
+        ->assertSee('Delivery completion')
+        ->assertSee('Returns by type')
+        ->assertSee('2 returns logged')
+        ->assertSee('3 items added after receipt confirmation')
+        ->assertSee('Document returns are tracked separately from inventory.')
+        ->assertSee('DR-100');
+});
+
 it('credits only confirmed item returns through inventory history and keeps document returns inventory neutral', function (): void {
     prepareDeliveryReturnRecords();
     $user = deliveryReturnUser();

@@ -96,6 +96,19 @@
             <span>Dashboard Overview</span>
         </a>
 
+        <!-- Reports & Analytics -->
+        <a href="{{ route('projects.reports.analytics') }}"
+           @if(request()->routeIs('projects.reports.analytics')) aria-current="page" @endif
+           class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('projects.reports.analytics') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+            @if(request()->routeIs('projects.reports.analytics'))
+                <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
+            @endif
+            <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('projects.reports.analytics') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5h15M6.75 16.5V12m5.25 4.5V7.5m5.25 9V10.5" />
+            </svg>
+            <span>Reports &amp; Analytics</span>
+        </a>
+
         <!-- Bidding Docs -->
         <a href="{{ route('project.bidding.index') }}"
            class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden

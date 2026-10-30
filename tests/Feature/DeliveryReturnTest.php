@@ -104,6 +104,9 @@ it('shows return monitoring in the MMC sidebar and opens its project workspace',
     $this->get(route('deliveries.return-monitoring'))
         ->assertOk()
         ->assertSee('Return Monitoring')
+        ->assertSee('role="combobox"', false)
+        ->assertSee('Search projects by name or code...', false)
+        ->assertSee('truncate whitespace-nowrap', false)
         ->assertSee('href="'.route('deliveries.return-monitoring').'"', false)
         ->assertSee('Choose a project to view or record returns.');
 

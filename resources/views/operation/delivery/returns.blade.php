@@ -14,15 +14,16 @@
         @endif
 
         <form method="GET" action="{{ route('deliveries.return-monitoring') }}" class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
-            <div class="w-full sm:max-w-xl">
-                <label for="return-project" class="mb-1 block text-xs font-semibold text-slate-600">Project</label>
-                <select id="return-project" name="project_id" required class="w-full rounded-xl border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
-                    <option value="">Choose a project</option>
-                    @foreach($projects as $projectOption)
-                        <option value="{{ $projectOption->project_id }}" @selected($selectedProject === (int) $projectOption->project_id)>{{ $projectOption->project_name }}</option>
-                    @endforeach
-                </select>
-            </div>
+            <x-searchable-project-filter
+                :projects="$projects"
+                name="project_id"
+                :selected="$selectedProject ?? ''"
+                all-label="Choose a project"
+                id="return-monitoring-project"
+                :truncate-selected="true"
+                required
+                wrapper-class="w-full sm:max-w-xl space-y-1 text-xs font-semibold text-slate-600"
+            />
             <button type="submit" class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700">Open returns</button>
             @if($selectedProject)
                 <a href="{{ route('deliveries.return-monitoring', ['project_id' => $selectedProject]) }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-center text-sm font-semibold text-slate-600 hover:bg-slate-50">Clear filters</a>

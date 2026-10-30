@@ -26,6 +26,7 @@ use App\Http\Controllers\DeliveryAuditTrailController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryMonitoringController;
 use App\Http\Controllers\DeliveryReceiveController;
+use App\Http\Controllers\DeliveryReturnController;
 use App\Http\Controllers\DuplicateDrCleanupController;
 use App\Http\Controllers\EntryController;
 use App\Http\Controllers\Finance_Item;
@@ -136,6 +137,19 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         ->whereNumber('project')
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring.details');
+    Route::get('/deliveries/monitoring/{project}/returns', [DeliveryReturnController::class, 'index'])
+        ->whereNumber('project')
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.monitoring.returns');
+    Route::post('/deliveries/monitoring/{project}/returns', [DeliveryReturnController::class, 'store'])
+        ->whereNumber('project')
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.monitoring.returns.store');
+    Route::patch('/deliveries/monitoring/{project}/returns/{return}', [DeliveryReturnController::class, 'update'])
+        ->whereNumber('project')
+        ->whereNumber('return')
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.monitoring.returns.update');
     Route::get('/deliveries/monitoring/{project}/billing', [DeliveryMonitoringController::class, 'lotBilling'])
         ->whereNumber('project')
         ->middleware(['company.context:MMC', 'role:user,Administrator'])

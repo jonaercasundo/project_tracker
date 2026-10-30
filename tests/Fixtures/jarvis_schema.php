@@ -129,6 +129,7 @@ Schema::create('inventory_history', function (Blueprint $table): void {
     $table->string('batch_no')->nullable();
     $table->dateTime('changed_at')->nullable();
     $table->string('changed_by')->nullable();
+    $table->integer('changed_by_user_id')->nullable();
     $table->text('remarks')->nullable();
     $table->integer('project_id')->nullable();
     $table->integer('delivery_id')->nullable();

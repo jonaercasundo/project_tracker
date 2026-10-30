@@ -25,6 +25,7 @@ if (monitoring) {
     let currentRequest;
     let locationRequest;
     const lotBillingRequests = new Map();
+    const returnRequests = new Map();
     const projectBillingPanels = new Map();
 
     async function loadLotBilling(panel) {
@@ -58,6 +59,68 @@ if (monitoring) {
                 lotBillingRequests.delete(panel);
                 panel.removeAttribute('aria-busy');
             }
+        }
+    }
+
+    async function loadReturns(panel) {
+        returnRequests.get(panel)?.abort();
+        const request = new AbortController();
+        returnRequests.set(panel, request);
+        panel.setAttribute('aria-busy', 'true');
+        panel.textContent = 'Loading return monitoring...';
+        try {
+            const filters = panel.dataset.filters ?? '';
+            const response = await fetch(`${panel.dataset.endpoint}${filters ? `?${filters}` : ''}`, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+                signal: request.signal,
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(Object.values(result.errors ?? {}).flat()[0] ?? 'Return monitoring could not be loaded.');
+            }
+            panel.innerHTML = result.html;
+            panel.dataset.loaded = 'true';
+            const createForm = panel.querySelector('[data-return-create]');
+            createForm?.querySelectorAll('[data-return-item-field]').forEach(field => {
+                field.querySelector('select, input').required = createForm.elements.return_type.value === 'Item Return';
+            });
+            const filter = panel.querySelector('[data-return-filter]');
+            for (const [name, value] of new URLSearchParams(panel.dataset.filters ?? '')) {
+                if (filter.elements[name]) filter.elements[name].value = value;
+            }
+        } catch (exception) {
+            if (exception.name !== 'AbortError') panel.textContent = exception.message;
+        } finally {
+            if (returnRequests.get(panel) === request) {
+                returnRequests.delete(panel);
+                panel.removeAttribute('aria-busy');
+            }
+        }
+    }
+
+    async function submitReturnForm(form, method, url, panel) {
+        const feedback = form.closest('[data-return-panel]')?.querySelector('[data-return-feedback]');
+        const fields = Object.fromEntries(new FormData(form));
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(fields),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message ?? Object.values(result.errors ?? {}).flat()[0] ?? 'Return could not be saved.');
+            if (feedback) feedback.textContent = result.message;
+            panel.dataset.loaded = '';
+            await loadReturns(panel);
+        } catch (exception) {
+            if (feedback) feedback.textContent = exception.message;
         }
     }
 
@@ -159,6 +222,8 @@ if (monitoring) {
             lotBillingRequests.forEach(request => request.abort());
             lotBillingRequests.clear();
             projectBillingPanels.clear();
+            returnRequests.forEach(request => request.abort());
+            returnRequests.clear();
             document.getElementById('monitoring-results').innerHTML = report.summary_html;
             document.getElementById('monitoring-table').innerHTML = report.projects_html;
             document.getElementById('monitoring-project-count').textContent = `${report.summary.projects_count} projects`;
@@ -221,6 +286,18 @@ if (monitoring) {
     });
     loadReport(new URL(window.location.href), false);
     monitoring.addEventListener('click', event => {
+        const returnPageLink = event.target.closest('[data-return-records] a');
+        if (returnPageLink) {
+            event.preventDefault();
+            const panel = event.target.closest('[data-return-panel]');
+            const params = new URL(returnPageLink.href).searchParams;
+            const filters = new URLSearchParams(panel.dataset.filters ?? '');
+            if (params.has('page')) filters.set('page', params.get('page'));
+            panel.dataset.filters = filters.toString();
+            panel.dataset.loaded = '';
+            loadReturns(panel);
+            return;
+        }
         const spreadsheetButton = event.target.closest('[data-sync-spreadsheet]');
         if (spreadsheetButton) {
             event.preventDefault();
@@ -258,6 +335,10 @@ if (monitoring) {
                 loadLotBilling(billingPanel);
             }
         }
+        const returnsPanel = details.querySelector('[data-lazy-returns]');
+        if (!details.hidden && returnsPanel && !returnsPanel.dataset.loaded) {
+            loadReturns(returnsPanel);
+        }
         for (const control of monitoring.querySelectorAll('[data-expand-project]')) {
             if (control.getAttribute('aria-controls') === details.id) {
                 control.setAttribute('aria-expanded', String(!details.hidden));
@@ -268,6 +349,57 @@ if (monitoring) {
             }
         }
         button.closest('[data-actions-menu]')?.removeAttribute('open');
+    });
+
+    monitoring.addEventListener('submit', event => {
+        const createForm = event.target.closest('[data-return-create]');
+        const updateForm = event.target.closest('[data-return-update]');
+        const filterForm = event.target.closest('[data-return-filter]');
+        if (!createForm && !updateForm && !filterForm) return;
+        event.preventDefault();
+        const panel = event.target.closest('[data-return-panel]') ?? event.target.closest('[data-lazy-returns]');
+        if (filterForm) {
+            const params = new URLSearchParams(new FormData(filterForm));
+            for (const [name, value] of [...params.entries()]) if (!value) params.delete(name);
+            panel.dataset.filters = params.toString();
+            panel.dataset.loaded = '';
+            loadReturns(panel);
+            return;
+        }
+        if (createForm) {
+            const fields = createForm.querySelectorAll('[data-return-item-field]');
+            const isItemReturn = createForm.elements.return_type.value === 'Item Return';
+            fields.forEach(field => {
+                field.hidden = !isItemReturn;
+                field.querySelector('select, input').required = isItemReturn;
+            });
+            const url = panel.dataset.storeUrl;
+            submitReturnForm(createForm, 'POST', url, panel);
+            return;
+        }
+        submitReturnForm(updateForm, 'PATCH', updateForm.dataset.url, panel);
+    });
+
+    monitoring.addEventListener('change', event => {
+        const panel = event.target.closest('[data-return-panel]');
+        if (event.target.matches('[data-return-create] [name="return_type"]')) {
+            const isItemReturn = event.target.value === 'Item Return';
+            event.target.closest('[data-return-create]').querySelectorAll('[data-return-item-field]').forEach(field => {
+                field.hidden = !isItemReturn;
+                field.querySelector('select, input').required = isItemReturn;
+            });
+        }
+        if (event.target.matches('[data-return-update] [name="status"]')) {
+            const fields = event.target.closest('[data-return-update]').querySelector('[data-return-receipt-fields]');
+            fields.hidden = event.target.value !== 'Received';
+            fields.querySelectorAll('input, select').forEach(input => {
+                input.required = event.target.value === 'Received' && input.name !== 'received_warehouse_id';
+                if (input.name === 'received_warehouse_id') input.required = event.target.value === 'Received';
+            });
+        }
+        if (panel && event.target.matches('[data-return-update] [name="status"]')) {
+            event.target.closest('[data-return-update]').querySelector('[name="received_date"]').value = localTodayDate();
+        }
     });
 
     syncBillingForm.addEventListener('submit', event => {

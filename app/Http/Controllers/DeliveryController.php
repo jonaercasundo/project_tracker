@@ -478,7 +478,7 @@ class DeliveryController extends Controller
         $progressSummary = $this->deliveryProgress->report($progressFilters)['summary'];
         $stats = [
             'total_pending' => (int) $progressSummary['pending_deliveries_count'],
-            'total_stock_out' => (int) $progressSummary['stock_out_drs_count'],
+            'total_stock_out' => max(0, (int) $progressSummary['stock_out_drs_count'] - (int) $progressSummary['completed_deliveries_count']),
             'total_delivered' => (int) $progressSummary['completed_deliveries_count'],
             'total_collection' => (int) $progressSummary['billing_drs_count'],
             'total_billed' => (int) $progressSummary['billed_delivery_drs_count'],

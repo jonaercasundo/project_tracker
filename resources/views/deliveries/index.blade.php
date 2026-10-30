@@ -78,7 +78,7 @@
             <span class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_stock_out'] ?? 0 }}">
                 {{ number_format($stats['total_stock_out'] ?? 0) }}
             </span>
-            <span class="relative text-[11px] text-slate-400">Unique DRs with stock-out history</span>
+            <span class="relative text-[11px] text-slate-400">Stock-out DRs not yet delivered</span>
         </div>
 
         {{-- TOTAL DELIVERED (DR-level) --}}

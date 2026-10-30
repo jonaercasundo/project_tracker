@@ -13,7 +13,7 @@
                     <span class="h-1.5 w-1.5 rounded-full bg-blue-600" aria-hidden="true"></span>
                     <time id="billing-status-updated">Updated {{ $snapshotAt->format('M d, Y · g:i A') }}</time>
                 </p>
-                <p class="mt-0.5 text-[10px] font-medium text-slate-400">Auto-refreshes every 30 seconds</p>
+                <p class="mt-0.5 text-[10px] font-medium text-slate-400">Updates live when billing data changes</p>
             </div>
         </header>
 
@@ -37,13 +37,13 @@
             <p id="billing-status-refresh-error-message" class="mt-1">{{ $summary['source_error'] }}</p>
         </div>
 
-        <section data-billing-refresh-url="{{ $selectedProjectId !== null ? route('projects.reports.analytics.data', ['project_id' => $selectedProjectId]) : '' }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Billing document processing metrics">
+        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Billing document processing metrics">
             @php
                 $summaryCards = [
                     ['key' => 'total', 'label' => 'Total DRs', 'value' => $summary['total'], 'description' => 'Unique DRs across all supported lots', 'color' => 'blue', 'icon' => 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01'],
-                    ['key' => 'processed', 'label' => 'Processed', 'value' => $summary['processed'], 'description' => 'Unique DRs with a received date', 'color' => 'cyan', 'icon' => 'M9 12l2 2 4-4m5-3v6a8 8 0 1 1-3-6'],
-                    ['key' => 'remaining', 'label' => 'Remaining', 'value' => $summary['remaining'], 'description' => 'Unique DRs still without a date', 'color' => 'amber', 'icon' => 'M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
-                    ['key' => 'processed_today', 'label' => 'Processed Today', 'value' => $summary['processed_today'], 'description' => 'Unique DRs checked today · '.config('app.timezone'), 'color' => 'blue', 'icon' => 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Zm3 11 2 2 4-4'],
+                    ['key' => 'processed', 'label' => 'Processed', 'value' => $summary['processed'], 'description' => 'All applicable lots have SAP encoding dates', 'color' => 'cyan', 'icon' => 'M9 12l2 2 4-4m5-3v6a8 8 0 1 1-3-6'],
+                    ['key' => 'remaining', 'label' => 'Remaining', 'value' => $summary['remaining'], 'description' => 'At least one applicable SAP date is missing', 'color' => 'amber', 'icon' => 'M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
+                    ['key' => 'processed_today', 'label' => 'Processed Today', 'value' => $summary['processed_today'], 'description' => 'All applicable SAP dates entered today · '.config('app.timezone'), 'color' => 'blue', 'icon' => 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Zm3 11 2 2 4-4'],
                 ];
                 $toneClasses = [
                     'blue' => 'bg-blue-50 text-blue-700 ring-blue-100',
@@ -71,65 +71,4 @@
             <p class="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">No projects are available for this report.</p>
         @endif
     </div>
-    @push('scripts')
-        <script>
-            (() => {
-                const dashboard = document.querySelector('[data-billing-refresh-url]');
-                const refreshUrl = dashboard?.dataset.billingRefreshUrl;
-
-                if (!refreshUrl) {
-                    return;
-                }
-
-                const numberFormatter = new Intl.NumberFormat();
-                const errorPanel = document.getElementById('billing-status-refresh-error');
-                const errorMessage = document.getElementById('billing-status-refresh-error-message');
-                const updatedAt = document.getElementById('billing-status-updated');
-                let isRefreshing = false;
-
-                const refreshMetrics = async () => {
-                    if (isRefreshing || document.visibilityState !== 'visible') {
-                        return;
-                    }
-
-                    isRefreshing = true;
-
-                    try {
-                        const response = await fetch(refreshUrl, {
-                            headers: { Accept: 'application/json' },
-                            cache: 'no-store',
-                        });
-
-                        if (!response.ok) {
-                            throw new Error('Live refresh is unavailable. Showing the last successful counts.');
-                        }
-
-                        const payload = await response.json();
-                        const { summary } = payload;
-
-                        if (summary.source_error) {
-                            throw new Error(summary.source_error);
-                        }
-
-                        Object.entries(summary).forEach(([key, value]) => {
-                            const metric = document.querySelector(`[data-billing-metric="${key}"]`);
-                            if (metric && typeof value === 'number') {
-                                metric.textContent = numberFormatter.format(value);
-                            }
-                        });
-
-                        updatedAt.textContent = `Updated ${payload.updated_at}`;
-                        errorPanel.hidden = true;
-                    } catch (error) {
-                        errorMessage.textContent = error.message || 'Live refresh is unavailable. Showing the last successful counts.';
-                        errorPanel.hidden = false;
-                    } finally {
-                        isRefreshing = false;
-                    }
-                };
-
-                window.setInterval(refreshMetrics, 30000);
-            })();
-        </script>
-    @endpush
 </x-project_app-layout>

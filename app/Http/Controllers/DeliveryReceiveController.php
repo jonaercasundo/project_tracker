@@ -6,6 +6,7 @@ use App\Models\DeliveryHistory;
 use App\Models\Inventory;
 use App\Models\InventoryHistory;
 use App\Models\PackageStatus;
+use App\Services\TrackerUpdateBroadcaster;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -116,7 +117,7 @@ class DeliveryReceiveController extends Controller
         return $defaultQty * $multiplier;
     }
 
-    public function store(Request $request, $packageStatusId)
+    public function store(Request $request, $packageStatusId, TrackerUpdateBroadcaster $broadcaster)
     {
         $packageStatus = PackageStatus::with([
             'delivery',
@@ -194,6 +195,8 @@ class DeliveryReceiveController extends Controller
             ]);
 
             DB::commit();
+
+            $broadcaster->forCompanyForDelivery((int) $packageStatus->delivery?->delivery_id, ['deliveries', 'inventory']);
 
             return redirect()
                 ->route('delivery.success')

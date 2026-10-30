@@ -30,5 +30,6 @@
 
     </div>
 
+    @include('shared.live-updates')
 </body>
 </html>

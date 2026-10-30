@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\BillingSheetSync;
 use App\Services\BillingSheetSyncService;
 use App\Services\GoogleSheetsApiClient;
+use App\Services\TrackerUpdateBroadcaster;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -29,7 +30,7 @@ class SyncBillingSheetDate implements ShouldQueue
         $this->onQueue('default');
     }
 
-    public function handle(BillingSheetSyncService $syncService, GoogleSheetsApiClient $sheets): void
+    public function handle(BillingSheetSyncService $syncService, GoogleSheetsApiClient $sheets, TrackerUpdateBroadcaster $broadcaster): void
     {
         $sync = BillingSheetSync::query()->findOrFail($this->billingSheetSyncId);
         if (! in_array($sync->outcome, ['queued', 'retrying', 'dispatch_failed', 'queue_unavailable'], true)) {
@@ -38,11 +39,14 @@ class SyncBillingSheetDate implements ShouldQueue
 
         try {
             $syncService->sync($sync, $sheets);
+            $broadcaster->forCompanyForDelivery($sync->delivery_id, ['billing', 'deliveries']);
         } catch (Throwable $exception) {
             $sync->refresh()->forceFill([
                 'outcome' => 'retrying',
                 'error_details' => mb_substr($exception->getMessage(), 0, 2000),
             ])->save();
+
+            $broadcaster->forCompanyForDelivery($sync->delivery_id, ['billing']);
 
             throw $exception;
         }
@@ -59,6 +63,7 @@ class SyncBillingSheetDate implements ShouldQueue
             'outcome' => 'api_failed',
             'error_details' => mb_substr($exception?->getMessage() ?? 'Google Sheets queue job failed.', 0, 2000),
         ])->save();
+        app(TrackerUpdateBroadcaster::class)->forCompanyForDelivery($sync->delivery_id, ['billing']);
         Log::error('Billing Google Sheets sync exhausted its queue retries.', [
             'billing_sheet_sync_id' => $sync->getKey(),
             'delivery_id' => $sync->delivery_id,

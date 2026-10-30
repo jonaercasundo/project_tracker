@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Services\DeliveryAuditTrailService;
 use App\Services\LogisticsDrResolver;
 use App\Services\LogisticsDrTrackingService;
+use App\Services\TrackerUpdateBroadcaster;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
@@ -158,6 +159,11 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
                     ]);
                 app(DeliveryAuditTrailService::class)->recordWebhookEventByRowId($this->eventRowId);
             }, 3);
+
+            $processedEvent = DB::table('logistics_webhook_events')->where('id', $this->eventRowId)->first();
+            if ($processedEvent !== null && $processedEvent->processing_status === 'processed') {
+                $this->broadcastForIntegration($processedEvent, app(TrackerUpdateBroadcaster::class));
+            }
         } catch (Throwable $exception) {
             DB::table('logistics_webhook_events')
                 ->where('id', $this->eventRowId)
@@ -169,6 +175,7 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
                 ]);
 
             app(DeliveryAuditTrailService::class)->recordWebhookEventByRowId($this->eventRowId);
+            $this->broadcastForIntegration($event, app(TrackerUpdateBroadcaster::class));
 
             Log::warning('Logistics webhook event reconciliation failed.', [
                 'event_row_id' => $this->eventRowId,
@@ -213,9 +220,35 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
 
         app(DeliveryAuditTrailService::class)->recordWebhookEventByRowId($this->eventRowId);
 
+        $event = DB::table('logistics_webhook_events')->where('id', $this->eventRowId)->first();
+        if ($event !== null) {
+            $this->broadcastForIntegration($event, app(TrackerUpdateBroadcaster::class));
+        }
+
         Log::warning('Logistics webhook event exhausted its queue retries.', [
             'event_row_id' => $this->eventRowId,
             'exception' => $exception === null ? null : $exception::class,
         ]);
+    }
+
+    private function broadcastForIntegration(object $event, TrackerUpdateBroadcaster $broadcaster): void
+    {
+        try {
+            $projectId = $event->resolved_project_id === null
+                ? DB::table('logistics_integration_projects')
+                    ->where('integration_id', $event->integration_id)
+                    ->value('project_id')
+                : $event->resolved_project_id;
+            $companyId = $broadcaster->companyIdForProject($projectId === null ? null : (int) $projectId);
+
+            if ($companyId !== null) {
+                $broadcaster->forCompany($companyId, ['deliveries']);
+            }
+        } catch (Throwable $exception) {
+            Log::warning('Could not resolve company for logistics live update.', [
+                'event_row_id' => $this->eventRowId,
+                'exception' => $exception::class,
+            ]);
+        }
     }
 }

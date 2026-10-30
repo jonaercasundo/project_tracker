@@ -110,5 +110,6 @@
             });
         </script>
         <x-ai-assistant />
+        @include('shared.live-updates')
     </body>
 </html>

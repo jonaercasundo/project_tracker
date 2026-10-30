@@ -1,4 +1,5 @@
 import './bootstrap';
+import './live-updates';
 import './bidding.js';
 import './bidding-schools.js';
 import './bidding-documents.js';

@@ -47,26 +47,86 @@ class BillingDocumentStatusService
             $applicableDrs = [];
             $processedDrs = [];
             $processedTodayDrs = [];
+            $rowsByLot = [];
 
             foreach (self::LOTS as $lotNumber) {
-                $rows = $this->lotSheetRows($lotNumber);
-                $projectDrs = $projectDrsByLot[$lotNumber];
+                $rowsByLot[$lotNumber] = $this->lotSheetRows($lotNumber);
+                foreach ($rowsByLot[$lotNumber] as $row) {
+                    $drNumber = $this->normalizeDrNumber($row['dr']);
+                    if ($drNumber !== '' && isset($projectDrsByLot[$lotNumber][$drNumber])) {
+                        $applicableDrs[$drNumber] = true;
+                    }
+                }
+            }
 
-                foreach ($rows as $row) {
-                    $drNumber = $this->normalizeDrNumber((string) ($row['dr'] ?? ''));
-                    if ($drNumber === '' || ! isset($projectDrs[$drNumber])) {
+            $schoolRows = [];
+            $rowCount = max(array_map('count', $rowsByLot));
+            for ($rowIndex = 0; $rowIndex < $rowCount; $rowIndex++) {
+                $schoolId = '';
+                foreach (self::LOTS as $lotNumber) {
+                    $schoolId = trim((string) ($rowsByLot[$lotNumber][$rowIndex]['school_id'] ?? ''));
+                    if ($schoolId !== '') {
+                        break;
+                    }
+                }
+
+                $schoolKey = $schoolId !== '' ? 'school:'.$schoolId : 'row:'.$rowIndex;
+                $schoolRows[$schoolKey] ??= ['lots' => [], 'dates' => [], 'drs' => []];
+
+                foreach (self::LOTS as $lotNumber) {
+                    $row = $rowsByLot[$lotNumber][$rowIndex] ?? null;
+                    if ($row === null) {
                         continue;
                     }
 
-                    $applicableDrs[$drNumber] = true;
-                    $receivedDate = trim((string) ($row['received'] ?? ''));
-                    if ($receivedDate !== '') {
-                        $processedDrs[$drNumber] = true;
+                    if (trim($row['package']) !== '') {
+                        $schoolRows[$schoolKey]['lots'][$lotNumber] = true;
                     }
 
-                    $checkingDate = trim((string) ($row['checking'] ?? ''));
-                    if ($checkingDate !== '' && $this->dateInApplicationTimezone($checkingDate) === now(config('app.timezone'))->toDateString()) {
-                        $processedTodayDrs[$drNumber] = true;
+                    $encodedDate = trim($row['encoded_date']);
+                    if ($encodedDate !== '') {
+                        $schoolRows[$schoolKey]['dates'][$lotNumber] ??= $encodedDate;
+                    }
+
+                    $drNumber = $this->normalizeDrNumber($row['dr']);
+                    if ($drNumber !== '' && isset($projectDrsByLot[$lotNumber][$drNumber])) {
+                        $schoolRows[$schoolKey]['drs'][$lotNumber][$drNumber] = true;
+                    }
+                }
+            }
+
+            foreach ($schoolRows as $schoolRow) {
+                $applicableLots = array_keys($schoolRow['lots']);
+                if ($applicableLots === []) {
+                    continue;
+                }
+
+                $isFullyEncoded = true;
+                $wereAllDatesEnteredToday = true;
+                foreach ($applicableLots as $lotNumber) {
+                    $encodedDate = $schoolRow['dates'][$lotNumber] ?? null;
+                    if ($encodedDate === null) {
+                        $isFullyEncoded = false;
+                        $wereAllDatesEnteredToday = false;
+
+                        continue;
+                    }
+
+                    if ($this->dateInApplicationTimezone($encodedDate) !== now(config('app.timezone'))->toDateString()) {
+                        $wereAllDatesEnteredToday = false;
+                    }
+                }
+
+                if (! $isFullyEncoded) {
+                    continue;
+                }
+
+                foreach ($schoolRow['drs'] as $lotDrs) {
+                    foreach ($lotDrs as $drNumber => $_) {
+                        $processedDrs[$drNumber] = true;
+                        if ($wereAllDatesEnteredToday) {
+                            $processedTodayDrs[$drNumber] = true;
+                        }
                     }
                 }
             }
@@ -92,27 +152,29 @@ class BillingDocumentStatusService
         }
     }
 
-    /** @return array<int, array{dr: string, received: string, checking: string}> */
+    /** @return array<int, array{school_id: string, dr: string, package: string, encoded_date: string}> */
     private function lotSheetRows(string $lotNumber): array
     {
         $settings = $this->configuration->current();
-        $cacheKey = 'billing-document-status:v2:'.hash('sha256', $settings['spreadsheet_id'].'|'.$settings['sheet_tab'].'|'.$lotNumber);
+        $cacheKey = 'billing-document-status:v3:'.hash('sha256', $settings['spreadsheet_id'].'|'.$settings['sheet_tab'].'|'.$lotNumber);
 
         return Cache::remember($cacheKey, now()->addSeconds(10), function () use ($settings, $lotNumber): array {
             $tab = "'".str_replace("'", "''", $settings['sheet_tab'])."'!";
             $headers = $this->sheets->values($tab.'A1:CU20', $settings['spreadsheet_id']);
             $headerMap = $this->findLotColumns($headers, $lotNumber);
+            $schoolIdValues = $this->sheets->values($tab.$headerMap['school_id_column'].'2:'.$headerMap['school_id_column'], $settings['spreadsheet_id']);
             $drValues = $this->sheets->values($tab.$headerMap['dr_column'].'2:'.$headerMap['dr_column'], $settings['spreadsheet_id']);
-            $receivedValues = $this->sheets->values($tab.$headerMap['received_column'].'2:'.$headerMap['received_column'], $settings['spreadsheet_id']);
-            $checkingValues = $this->sheets->values($tab.$headerMap['checking_column'].'2:'.$headerMap['checking_column'], $settings['spreadsheet_id']);
+            $packageValues = $this->sheets->values($tab.$headerMap['package_column'].'2:'.$headerMap['package_column'], $settings['spreadsheet_id']);
+            $encodedDateValues = $this->sheets->values($tab.$headerMap['encoded_date_column'].'2:'.$headerMap['encoded_date_column'], $settings['spreadsheet_id']);
             $rows = [];
-            $rowCount = max(count($drValues), count($receivedValues), count($checkingValues));
+            $rowCount = max(count($schoolIdValues), count($drValues), count($packageValues), count($encodedDateValues));
 
             for ($index = 0; $index < $rowCount; $index++) {
                 $rows[] = [
+                    'school_id' => (string) ($schoolIdValues[$index][0] ?? ''),
                     'dr' => (string) ($drValues[$index][0] ?? ''),
-                    'received' => (string) ($receivedValues[$index][0] ?? ''),
-                    'checking' => (string) ($checkingValues[$index][0] ?? ''),
+                    'package' => (string) ($packageValues[$index][0] ?? ''),
+                    'encoded_date' => (string) ($encodedDateValues[$index][0] ?? ''),
                 ];
             }
 
@@ -121,36 +183,44 @@ class BillingDocumentStatusService
     }
 
     /** @param array<int, array<int, mixed>> $headerRows
-     * @return array{dr_column: string, received_column: string, checking_column: string}
+     * @return array{school_id_column: string, dr_column: string, package_column: string, encoded_date_column: string}
      */
     private function findLotColumns(array $headerRows, string $lotNumber): array
     {
         foreach ($headerRows as $headerRow) {
             $drColumns = [];
-            $receivedColumn = null;
-            $checkingColumn = null;
+            $schoolIdColumn = null;
+            $packageColumn = null;
+            $encodedDateColumn = null;
 
             foreach ($headerRow as $index => $value) {
                 $header = mb_strtolower(preg_replace('/\s+/', ' ', trim((string) $value)) ?? '');
+                if ($header === 'schoolid') {
+                    $schoolIdColumn = $this->columnLetters($index + 1);
+                }
                 if ($header === 'bir dr') {
                     $drColumns[] = $this->columnLetters($index + 1);
                 }
-                if (str_contains($header, 'date received') && str_contains($header, 'lot '.$lotNumber) && ! str_contains($header, 'from 3pl')) {
-                    $receivedColumn = $this->columnLetters($index + 1);
+                if (preg_match('/^core package code lot\s*'.preg_quote($lotNumber, '/').'$/', $header) === 1) {
+                    $packageColumn = $this->columnLetters($index + 1);
                 }
-                $normalizedHeader = str_replace('cheking', 'checking', $header);
-                if (str_contains($normalizedHeader, 'date checking') && str_contains($normalizedHeader, 'lot '.$lotNumber)) {
-                    $checkingColumn = $this->columnLetters($index + 1);
+                if (str_contains($header, 'date encoded in sap') && str_contains($header, 'lot '.$lotNumber)) {
+                    $encodedDateColumn = $this->columnLetters($index + 1);
                 }
             }
 
             $lotIndex = array_search($lotNumber, self::LOTS, true);
-            if ($lotIndex !== false && isset($drColumns[$lotIndex]) && $receivedColumn !== null && $checkingColumn !== null) {
-                return ['dr_column' => $drColumns[$lotIndex], 'received_column' => $receivedColumn, 'checking_column' => $checkingColumn];
+            if ($schoolIdColumn !== null && $lotIndex !== false && isset($drColumns[$lotIndex]) && $packageColumn !== null && $encodedDateColumn !== null) {
+                return [
+                    'school_id_column' => $schoolIdColumn,
+                    'dr_column' => $drColumns[$lotIndex],
+                    'package_column' => $packageColumn,
+                    'encoded_date_column' => $encodedDateColumn,
+                ];
             }
         }
 
-        throw new RuntimeException('The BIR DR, DATE RECEIVED, and DATE CHECKING columns for a supported lot could not be found in the configured billing sheet.');
+        throw new RuntimeException('The school, BIR DR, Core Package Code, and DATE ENCODED IN SAP columns for a supported lot could not be found in the configured billing sheet.');
     }
 
     private function dateInApplicationTimezone(string $value): ?string

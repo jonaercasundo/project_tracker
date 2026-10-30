@@ -105,6 +105,7 @@
         </script>
         @stack('scripts')
           <x-ai-assistant />
-          </body> 
+            @include('shared.live-updates')
+          </body>
     
 </html>

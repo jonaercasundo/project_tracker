@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Services\BillingOperationalSyncService;
+use App\Services\TrackerUpdateBroadcaster;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,7 @@ class SyncProjectBillingOperationalStages implements ShouldQueue
         $this->onConnection('billing_sync')->onQueue('billing_sync');
     }
 
-    public function handle(BillingOperationalSyncService $sync): void
+    public function handle(BillingOperationalSyncService $sync, TrackerUpdateBroadcaster $broadcaster): void
     {
         $claimed = DB::table('billing_sync_runs')
             ->where('id', $this->syncRunId)
@@ -58,6 +59,7 @@ class SyncProjectBillingOperationalStages implements ShouldQueue
                 'completed_at' => now(),
                 'updated_at' => now(),
             ]);
+            $this->broadcastForProject((int) $run->project_id, $broadcaster, ['billing', 'deliveries']);
         } catch (RuntimeException $exception) {
             DB::table('billing_sync_runs')->where('id', $this->syncRunId)->update([
                 'status' => 'failed',
@@ -65,6 +67,7 @@ class SyncProjectBillingOperationalStages implements ShouldQueue
                 'completed_at' => now(),
                 'updated_at' => now(),
             ]);
+            $this->broadcastForProject((int) $run->project_id, $broadcaster, ['billing']);
         } catch (Throwable $exception) {
             Log::error('Queued Sync Billing failed.', [
                 'billing_sync_run_id' => $this->syncRunId,
@@ -79,6 +82,7 @@ class SyncProjectBillingOperationalStages implements ShouldQueue
                 'completed_at' => now(),
                 'updated_at' => now(),
             ]);
+            $this->broadcastForProject((int) $run->project_id, $broadcaster, ['billing']);
         }
     }
 
@@ -97,5 +101,23 @@ class SyncProjectBillingOperationalStages implements ShouldQueue
             'billing_sync_run_id' => $this->syncRunId,
             'exception' => $exception,
         ]);
+
+        $run = DB::table('billing_sync_runs')->where('id', $this->syncRunId)->first();
+        if ($run !== null) {
+            $broadcaster = app(TrackerUpdateBroadcaster::class);
+            $companyId = $broadcaster->companyIdForProject((int) $run->project_id);
+            if ($companyId !== null) {
+                $broadcaster->forCompany($companyId, ['billing']);
+            }
+        }
+    }
+
+    /** @param array<int, string> $modules */
+    private function broadcastForProject(int $projectId, TrackerUpdateBroadcaster $broadcaster, array $modules): void
+    {
+        $companyId = $broadcaster->companyIdForProject($projectId);
+        if ($companyId !== null) {
+            $broadcaster->forCompany($companyId, $modules);
+        }
     }
 }

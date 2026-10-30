@@ -11,6 +11,7 @@
     'wrapperClass' => 'min-w-0 space-y-1 text-xs font-semibold text-slate-600',
     'labelClass' => 'text-xs font-semibold text-slate-600',
     'required' => false,
+    'submitOnChange' => false,
 ])
 
 @php
@@ -33,6 +34,7 @@
         options: @js($projectOptions),
         selectedId: @js((string) $selected),
         enabled: @js((bool) $enabled),
+        submitOnChange: @js((bool) $submitOnChange),
         allLabel: @js($allLabel),
         idPrefix: @js($id),
     })"

@@ -22,6 +22,7 @@ export function searchableProjectDropdown(config) {
         options: config.options,
         selectedId: config.selectedId,
         enabled: config.enabled,
+        submitOnChange: config.submitOnChange ?? false,
         allLabel: config.allLabel,
         idPrefix: config.idPrefix,
         search: '',
@@ -93,6 +94,9 @@ export function searchableProjectDropdown(config) {
             this.selectedId = option.id;
             this.$refs.project.value = option.id;
             this.$refs.project.dispatchEvent(new Event('change', { bubbles: true }));
+            if (this.submitOnChange) {
+                this.$refs.project.form?.requestSubmit();
+            }
             this.dismiss();
             this.$refs.trigger.focus();
         },

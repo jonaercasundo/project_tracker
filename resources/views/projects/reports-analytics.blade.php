@@ -14,7 +14,7 @@
             </p>
         </header>
 
-        <form method="GET" action="{{ route('projects.reports.analytics') }}" @change="$event.target.name === 'project_id' && $el.requestSubmit()" class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Billing report filters">
+        <form method="GET" action="{{ route('projects.reports.analytics') }}" class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Billing report filters">
             <div class="min-w-0">
                 <x-searchable-project-filter
                     :projects="$projects"
@@ -22,6 +22,7 @@
                     name="project_id"
                     id="billing-project-filter"
                     :truncate-selected="false"
+                    :submit-on-change="true"
                     wrapper-class="min-w-0 space-y-1 text-xs font-semibold text-slate-600"
                     label-class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500"
                 />

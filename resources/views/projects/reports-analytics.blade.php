@@ -11,14 +11,17 @@
             </div>
         </header>
 
-        <form method="GET" action="{{ route('projects.reports.analytics') }}" class="grid min-w-0 gap-4 border-2 border-slate-900 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_14rem] sm:items-end" aria-label="Billing report filters">
+        <form method="GET" action="{{ route('projects.reports.analytics') }}" @change="$event.target.name === 'project_id' && $el.requestSubmit()" class="grid min-w-0 gap-4 border-2 border-slate-900 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_14rem] sm:items-end" aria-label="Billing report filters">
             <div>
-                <label for="billing-project" class="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">Project</label>
-                <select id="billing-project" name="project_id" onchange="this.form.requestSubmit()" class="w-full min-w-0 whitespace-normal border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                    @foreach ($projects as $project)
-                        <option value="{{ $project->project_id }}" @selected((string) $selectedProjectId === (string) $project->project_id)>{{ $project->project_name }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-project-filter
+                    :projects="$projects"
+                    :selected="$selectedProjectId"
+                    name="project_id"
+                    id="billing-project-filter"
+                    :truncate-selected="true"
+                    wrapper-class="min-w-0 space-y-1 text-xs font-semibold text-slate-600"
+                    label-class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-600"
+                />
             </div>
             <div>
                 <label for="billing-lot" class="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">Lot</label>

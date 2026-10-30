@@ -597,7 +597,7 @@ it('views and edits quantities for the selected package item assignments', funct
     $this->get($showUrl)->assertOk()->assertSee('>6</td>', false);
 });
 
-it('validates package item quantities and locks changes after a related delivery', function () {
+it('validates package item quantities and locks changes after a related delivery is processed or billed', function () {
     projectDetailsUser();
     projectDetailsFixtures();
     DB::table('package_content')->insert(['package_id' => 2, 'item_id' => 1, 'qty' => 2]);
@@ -609,9 +609,30 @@ it('validates package item quantities and locks changes after a related delivery
 
     $deliveryId = DB::table('deliveries')->where('project_id', 1)->value('delivery_id');
     DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['keystage_id' => 1]);
-    $this->from($editUrl)->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 5]])
+    $this->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 5]])
+        ->assertRedirect(route('projects.packages.show', [1, 2]))
+        ->assertSessionHas('success');
+
+    DB::table('package_status')->insert(['delivery_id' => $deliveryId, 'package_id' => 2, 'status' => 'pending']);
+    $this->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 6]])
+        ->assertRedirect(route('projects.packages.show', [1, 2]))
+        ->assertSessionHas('success');
+
+    DB::table('package_status')->where('package_id', 2)->update(['status' => 'released']);
+    $this->from($editUrl)->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 7]])
         ->assertRedirect($editUrl)->assertSessionHasErrors('items');
-    $this->assertDatabaseHas('package_content', ['package_id' => 2, 'item_id' => 1, 'qty' => 2]);
+    $this->assertDatabaseHas('package_content', ['package_id' => 2, 'item_id' => 1, 'qty' => 6]);
+
+    DB::table('package_status')->where('package_id', 2)->update(['status' => 'pending']);
+    DB::table('delivery_billing_records')->insert(['delivery_id' => $deliveryId, 'status' => 'pending_billing']);
+    $this->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 7]])
+        ->assertRedirect(route('projects.packages.show', [1, 2]))
+        ->assertSessionHas('success');
+
+    DB::table('delivery_billing_records')->where('delivery_id', $deliveryId)->update(['status' => 'for_billing']);
+    $this->from($editUrl)->put(route('projects.packages.update', [1, 2]), ['items' => [1 => 8]])
+        ->assertRedirect($editUrl)->assertSessionHasErrors('items');
+    $this->assertDatabaseHas('package_content', ['package_id' => 2, 'item_id' => 1, 'qty' => 7]);
 });
 
 it('does not expose a package through another project route', function () {
@@ -645,19 +666,27 @@ it('edits package item quantities and rejects decimals or quantities with delive
 
     $deliveryId = DB::table('deliveries')->where('project_id', 1)->value('delivery_id');
     DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['lot_id' => 1]);
-    $this->from($editUrl)->put(route('projects.items.update', [1, 1]), [
-        'item_name' => 'Should roll back after delivery assignment',
+    $this->put(route('projects.items.update', [1, 1]), [
+        'item_name' => 'Direct updated',
         'package_contents' => [1 => 8],
-    ])->assertRedirect($editUrl)->assertSessionHasErrors('package_contents.1');
+    ])->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'items']))
+        ->assertSessionHas('success');
 
     DB::table('deliveries')->where('delivery_id', $deliveryId)->update(['lot_id' => null]);
     DB::table('package_status')->insert(['delivery_id' => $deliveryId, 'package_id' => 1, 'status' => 'pending']);
+    $this->put(route('projects.items.update', [1, 1]), [
+        'item_name' => 'Direct updated',
+        'package_contents' => [1 => 9],
+    ])->assertRedirect(route('projects.show', ['project' => 1, 'tab' => 'items']))
+        ->assertSessionHas('success');
+
+    DB::table('package_status')->where('package_id', 1)->update(['status' => 'delivered']);
     $this->from($editUrl)->put(route('projects.items.update', [1, 1]), [
-        'item_name' => 'Should roll back after package status',
-        'package_contents' => [1 => 8],
+        'item_name' => 'Should roll back after package delivery',
+        'package_contents' => [1 => 10],
     ])->assertRedirect($editUrl)->assertSessionHasErrors('package_contents.1');
 
-    $this->assertDatabaseHas('package_content', ['package_id' => 1, 'item_id' => 1, 'qty' => 7]);
+    $this->assertDatabaseHas('package_content', ['package_id' => 1, 'item_id' => 1, 'qty' => 9]);
     $this->assertDatabaseHas('item', ['item_id' => 1, 'item_name' => 'Direct updated']);
 });
 

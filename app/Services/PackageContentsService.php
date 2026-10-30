@@ -46,25 +46,43 @@ class PackageContentsService
             abort(404);
         }
 
-        $hasAssignedDelivery = ($package->keystage_id !== null || $package->lot_id !== null)
-            && Schema::hasTable('deliveries')
-            && DB::table('deliveries')->where(function ($query) use ($package): void {
+        $relatedDeliveries = static function ($query) use ($package): void {
+            $query->where(function ($scope) use ($package): void {
                 if ($package->keystage_id !== null) {
-                    $query->where('keystage_id', $package->keystage_id);
+                    $scope->where('keystage_id', $package->keystage_id);
                 }
                 if ($package->lot_id !== null) {
-                    $query->orWhere(function ($lotDeliveries) use ($package): void {
+                    $scope->orWhere(function ($lotDeliveries) use ($package): void {
                         $lotDeliveries->whereNull('keystage_id')->where('lot_id', $package->lot_id);
                     });
                 }
-            })->exists();
+            });
+        };
 
-        if ($hasAssignedDelivery) {
-            return 'This package is assigned to a delivery. Its item quantities cannot be changed because that would alter delivery, billing, or inventory requirements.';
+        if (Schema::hasTable('package_status') && DB::table('package_status')
+            ->where('package_id', $packageId)
+            ->whereRaw("LOWER(TRIM(COALESCE(status, 'pending'))) NOT IN ('pending', '')")
+            ->exists()) {
+            return 'This package has progressed beyond pending delivery. Its item quantities are locked to preserve recorded delivery and inventory activity.';
         }
 
-        if (Schema::hasTable('package_status') && DB::table('package_status')->where('package_id', $packageId)->exists()) {
-            return 'This package already has delivery status records. Its item quantities cannot be changed because that would alter recorded delivery and billing requirements.';
+        if (Schema::hasTable('deliveries') && Schema::hasColumn('deliveries', 'status')
+            && ($package->keystage_id !== null || $package->lot_id !== null)
+            && DB::table('deliveries')->where($relatedDeliveries)
+                ->whereIn(DB::raw('LOWER(TRIM(COALESCE(status, \'\')))'), ['delivered', 'accepted'])
+                ->exists()) {
+            return 'A related delivery is already delivered or accepted. Its item quantities are locked to preserve delivery history.';
+        }
+
+        if (Schema::hasTable('delivery_billing_records') && Schema::hasTable('deliveries')
+            && Schema::hasColumn('delivery_billing_records', 'status')
+            && ($package->keystage_id !== null || $package->lot_id !== null)
+            && DB::table('delivery_billing_records as billing')
+                ->join('deliveries as delivery', 'delivery.delivery_id', '=', 'billing.delivery_id')
+                ->where($relatedDeliveries)
+                ->whereRaw("LOWER(TRIM(COALESCE(billing.status, 'pending_billing'))) <> 'pending_billing'")
+                ->exists()) {
+            return 'A related delivery has entered billing review or has billing history. Its item quantities are locked to preserve billing records.';
         }
 
         if (Schema::hasTable('inventory_history') && Schema::hasColumn('inventory_history', 'package_id') && DB::table('inventory_history')->where('package_id', $packageId)->exists()) {

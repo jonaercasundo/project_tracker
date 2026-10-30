@@ -171,7 +171,7 @@ it('shows delivery and separate item and document return analytics', function ()
         ->assertSee('2 returns logged')
         ->assertSee('3 items added after receipt confirmation')
         ->assertSee('Document returns are tracked separately from inventory.')
-        ->assertSee('DR-100');
+        ->assertDontSee('Recent delivery records');
 });
 
 it('credits only confirmed item returns through inventory history and keeps document returns inventory neutral', function (): void {

@@ -120,34 +120,5 @@
             </section>
         </div>
 
-        <section class="overflow-hidden border-2 border-slate-900 bg-white" aria-labelledby="recent-deliveries-title">
-            <div class="flex items-end justify-between gap-3 border-b-2 border-slate-900 px-4 py-4 sm:px-5">
-                <div>
-                    <h2 id="recent-deliveries-title" class="text-sm font-black uppercase tracking-[0.16em] text-slate-800">Recent delivery records</h2>
-                    <p class="mt-1 text-xs text-slate-500">Latest delivery activity across projects.</p>
-                </div>
-                <a href="{{ route('deliveries.tracking') }}" class="shrink-0 text-xs font-bold text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900">View tracking</a>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[680px] text-left text-xs">
-                    <thead class="bg-stone-100 text-[10px] uppercase tracking-wider text-slate-600">
-                        <tr><th class="px-4 py-3 font-black">DR</th><th class="px-4 py-3 font-black">Project</th><th class="px-4 py-3 font-black">School</th><th class="px-4 py-3 font-black">Status</th><th class="px-4 py-3 font-black">Delivery date</th></tr>
-                    </thead>
-                    <tbody class="divide-y divide-stone-200">
-                        @forelse ($recentDeliveries as $delivery)
-                            <tr class="hover:bg-amber-50/50">
-                                <td class="whitespace-nowrap px-4 py-3 font-bold text-slate-900">{{ $delivery->dr_no ?: '—' }}</td>
-                                <td class="max-w-[220px] truncate px-4 py-3 text-slate-700">{{ $delivery->project_name ?: '—' }}</td>
-                                <td class="px-4 py-3 text-slate-700">{{ $delivery->school_name ?: $delivery->school_id ?: '—' }}</td>
-                                <td class="px-4 py-3"><span class="inline-flex rounded-sm border border-slate-300 px-2 py-1 text-[10px] font-bold capitalize text-slate-700">{{ str_replace('_', ' ', $delivery->status ?: 'pending') }}</span></td>
-                                <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ $delivery->delivery_date ? \Illuminate\Support\Carbon::parse($delivery->delivery_date)->format('M d, Y') : '—' }}</td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="5" class="px-4 py-10 text-center text-slate-500">No delivery records to show.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </section>
     </div>
 </x-project_app-layout>

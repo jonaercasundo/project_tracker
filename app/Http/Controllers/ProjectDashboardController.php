@@ -50,22 +50,6 @@ class ProjectDashboardController extends Controller
             ]];
         });
 
-        $recentDeliveries = DB::table('deliveries')
-            ->leftJoin('projects', 'projects.project_id', '=', 'deliveries.project_id')
-            ->leftJoin('school', 'school.school_id', '=', 'deliveries.school_id')
-            ->orderByDesc('deliveries.delivery_date')
-            ->orderByDesc('deliveries.delivery_id')
-            ->limit(8)
-            ->get([
-                'deliveries.delivery_id',
-                'deliveries.dr_no',
-                'deliveries.delivery_date',
-                'deliveries.status',
-                'projects.project_name',
-                'school.school_id',
-                'school.school_name',
-            ]);
-
         return view('projects.reports-analytics', [
             'totalProjects' => Project::count(),
             'totalDeliveries' => $totalDeliveries,
@@ -74,7 +58,6 @@ class ProjectDashboardController extends Controller
             'deliveryProgress' => $deliveryProgress,
             'deliveryStatuses' => $deliveryStatuses,
             'returnSummary' => $returnSummary,
-            'recentDeliveries' => $recentDeliveries,
             'snapshotAt' => now(),
         ]);
     }

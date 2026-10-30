@@ -29,12 +29,6 @@
                 <input name="school_id" type="search" value="{{ $filters['school_id'] ?? '' }}" maxlength="100" placeholder="School ID" aria-label="Filter by School ID" class="w-32 rounded-lg border-slate-200 text-xs">
                 <select name="return_type" aria-label="Filter by return type" class="rounded-lg border-slate-200 text-xs"><option value="">All return types</option><option value="Item Return" @selected(($filters['return_type'] ?? '') === 'Item Return')>Item Return</option><option value="Document Return" @selected(($filters['return_type'] ?? '') === 'Document Return')>Document Return</option></select>
                 <select name="return_status" aria-label="Filter by return status" class="rounded-lg border-slate-200 text-xs"><option value="">All return statuses</option>@foreach(['Reported', 'In Transit', 'Received', 'Rejected'] as $status)<option value="{{ $status }}" @selected(($filters['return_status'] ?? '') === $status)>{{ $status }}</option>@endforeach</select>
-                <input name="return_date_from" type="date" value="{{ $filters['return_date_from'] ?? '' }}" aria-label="Monitoring date from" title="Monitoring date from" class="rounded-lg border-slate-200 text-xs">
-                <input name="return_date_to" type="date" value="{{ $filters['return_date_to'] ?? '' }}" aria-label="Monitoring date to" title="Monitoring date to" class="rounded-lg border-slate-200 text-xs">
-                <input name="received_date_from" type="date" value="{{ $filters['received_date_from'] ?? '' }}" aria-label="Received date from" title="Received date from" class="rounded-lg border-slate-200 text-xs">
-                <input name="received_date_to" type="date" value="{{ $filters['received_date_to'] ?? '' }}" aria-label="Received date to" title="Received date to" class="rounded-lg border-slate-200 text-xs">
-                <input name="quantity_from" type="number" min="1" value="{{ $filters['quantity_from'] ?? '' }}" placeholder="Min quantity" aria-label="Minimum quantity returned" class="w-28 rounded-lg border-slate-200 text-xs">
-                <input name="quantity_to" type="number" min="1" value="{{ $filters['quantity_to'] ?? '' }}" placeholder="Max quantity" aria-label="Maximum quantity returned" class="w-28 rounded-lg border-slate-200 text-xs">
                 <button class="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Filter</button>
             </form>
         </div>

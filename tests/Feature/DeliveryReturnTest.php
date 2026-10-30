@@ -124,7 +124,13 @@ it('shows return monitoring in the MMC sidebar and opens its project workspace',
         ->assertDontSee('name="quantity_returned"', false)
         ->assertDontSee('name="remarks"', false)
         ->assertDontSee('name="monitoring_date"', false)
-        ->assertDontSee('name="status"', false);
+        ->assertDontSee('name="status"', false)
+        ->assertDontSee('name="return_date_from"', false)
+        ->assertDontSee('name="return_date_to"', false)
+        ->assertDontSee('name="received_date_from"', false)
+        ->assertDontSee('name="received_date_to"', false)
+        ->assertDontSee('name="quantity_from"', false)
+        ->assertDontSee('name="quantity_to"', false);
 });
 
 it('credits only confirmed item returns through inventory history and keeps document returns inventory neutral', function (): void {

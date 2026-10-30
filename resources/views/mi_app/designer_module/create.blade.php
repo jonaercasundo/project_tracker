@@ -1672,7 +1672,10 @@
                                 const normalizedInput = input.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
                                 return normalizedInput.length > 0 && !Array.from(colorSelect.options).some((option) => option.value.trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedInput);
                             },
-                            create: (input) => input.trim().replace(/\s+/g, ' '),
+                            create: (input) => {
+                                const value = input.trim().replace(/\s+/g, ' ');
+                                return value ? { value, text: value } : false;
+                            },
                             onInitialize: function () {
                                 const selectControl = this;
                                 this.dropdown_content.addEventListener('click', (event) => {
@@ -1720,7 +1723,10 @@
                                 const normalizedInput = input.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
                                 return normalizedInput.length > 0 && !Array.from(materialsSelect.options).some((option) => option.value.trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedInput);
                             },
-                            create: (input) => input.trim().replace(/\s+/g, ' '),
+                            create: (input) => {
+                                const value = input.trim().replace(/\s+/g, ' ');
+                                return value ? { value, text: value } : false;
+                            },
                             onInitialize: function () {
                                 const selectControl = this;
                                 this.dropdown_content.addEventListener('click', (event) => {

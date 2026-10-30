@@ -9,6 +9,9 @@ use App\Models\Inventory;
 use App\Models\InventoryHistory;
 use App\Models\Item;
 use App\Models\Warehouse;
+use App\Services\DeliveryReturnSpreadsheetSyncService;
+use App\Services\GoogleSheetsApiClient;
+use App\Services\GoogleSheetsBillingConfiguration;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -55,13 +58,13 @@ class DeliveryReturnController extends Controller
         ])->header('Cache-Control', 'private, no-store');
     }
 
-    public function store(StoreDeliveryReturnRequest $request, int $project): JsonResponse|RedirectResponse
+    public function store(StoreDeliveryReturnRequest $request, int $project, DeliveryReturnSpreadsheetSyncService $spreadsheetSync, GoogleSheetsApiClient $sheets, GoogleSheetsBillingConfiguration $configuration): JsonResponse|RedirectResponse
     {
         $fields = $request->validated();
         $delivery = Delivery::query()->where('project_id', $project)->where('school_id', $fields['school_id'])
             ->orderByDesc('delivery_date')->orderByDesc('delivery_id')->first();
         abort_if($delivery === null, 422, 'No delivery is recorded for this School ID in the selected project.');
-        DeliveryReturn::query()->create([
+        $deliveryReturn = DeliveryReturn::query()->create([
             ...$fields,
             'project_id' => $project,
             'lot_id' => $delivery->lot_id,
@@ -72,16 +75,23 @@ class DeliveryReturnController extends Controller
             'monitoring_date' => now()->toDateString(),
             'reported_by_user_id' => Auth::id(),
         ]);
+        $spreadsheetSyncResult = $spreadsheetSync->sync($deliveryReturn, $sheets, $configuration);
+        $message = 'Return recorded. Stock changes only when an Item Return is marked Received.';
+        if ($spreadsheetSyncResult === false) {
+            $message .= ' The spreadsheet date could not be updated; check the application log.';
+        } elseif ($spreadsheetSyncResult === null) {
+            $message .= ' Google Sheets is not configured, so the spreadsheet date was not updated.';
+        }
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Return recorded. Stock changes only when an Item Return is marked Received.']);
+            return response()->json(['message' => $message]);
         }
 
         return redirect()->route('deliveries.return-monitoring', ['project_id' => $project])
-            ->with('success', 'Return recorded. Stock changes only when an Item Return is marked Received.');
+            ->with('success', $message);
     }
 
-    public function update(Request $request, int $project, int $return): JsonResponse|RedirectResponse
+    public function update(Request $request, int $project, int $return, DeliveryReturnSpreadsheetSyncService $spreadsheetSync, GoogleSheetsApiClient $sheets, GoogleSheetsBillingConfiguration $configuration): JsonResponse|RedirectResponse
     {
         $existingReturn = DeliveryReturn::query()->where('project_id', $project)->findOrFail($return);
         $requiresItemReceipt = $existingReturn->return_type === 'Item Return' && $request->input('status') === 'Received';
@@ -151,13 +161,24 @@ class DeliveryReturnController extends Controller
             }
             $record->fill($fields)->save();
         }, 3);
+        $spreadsheetSyncResult = null;
+        if ($existingReturn->status !== 'Received' && $fields['status'] === 'Received') {
+            $existingReturn->refresh();
+            $spreadsheetSyncResult = $spreadsheetSync->sync($existingReturn, $sheets, $configuration, true);
+        }
+        $message = 'Return tracking updated.';
+        if ($spreadsheetSyncResult === false) {
+            $message .= ' The spreadsheet dates could not be updated; check the application log.';
+        } elseif ($spreadsheetSyncResult === null && $fields['status'] === 'Received') {
+            $message .= ' Google Sheets is not configured, so the spreadsheet dates were not updated.';
+        }
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Return tracking updated.']);
+            return response()->json(['message' => $message]);
         }
 
         return redirect()->route('deliveries.return-monitoring', ['project_id' => $project])
-            ->with('success', 'Return tracking updated.');
+            ->with('success', $message);
     }
 
     /** @return array<string, mixed> */

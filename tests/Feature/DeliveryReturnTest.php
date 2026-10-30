@@ -1,7 +1,11 @@
 <?php
 
 use App\Models\Company;
+use App\Models\DeliveryReturn;
 use App\Models\User;
+use App\Services\DeliveryReturnSpreadsheetSyncService;
+use App\Services\GoogleSheetsApiClient;
+use App\Services\GoogleSheetsBillingConfiguration;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -186,7 +190,7 @@ it('credits only confirmed item returns through inventory history and keeps docu
         'school_id' => 'SCH-1',
         'reason' => 'Wrong size delivered',
     ]);
-    $itemReturn->assertOk()->assertJsonPath('message', 'Return recorded. Stock changes only when an Item Return is marked Received.');
+    $itemReturn->assertOk()->assertJsonPath('message', 'Return recorded. Stock changes only when an Item Return is marked Received. Google Sheets is not configured, so the spreadsheet date was not updated.');
     $returnId = (int) DB::table('delivery_returns')->where('return_type', 'Item Return')->value('return_id');
     $this->assertDatabaseHas('delivery_returns', [
         'return_id' => $returnId,
@@ -276,4 +280,59 @@ it('credits only confirmed item returns through inventory history and keeps docu
     expect($filteredItemReturns->json('html'))
         ->toContain('Wrong size delivered')
         ->not->toContain('Signed delivery receipt returned');
+});
+
+it('writes the return dates to the exact spreadsheet row matched by School ID and BIR DR', function (): void {
+    $header = array_fill(0, 99, '');
+    $header[0] = 'School ID';
+    $header[20] = 'BIR DR';
+    $header[97] = 'Returned Date';
+    $header[98] = 'Received Date';
+    $data = array_fill(0, 99, '');
+    $data[0] = 'SCH-1';
+    $data[20] = 'DR-100';
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->twice()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->twice()->with("'Copy of SME LOT 2,9,11'!A:CU", '1sOESkXSA8CbgkJMA_Y-sYzkngEimsrnn3qQwBvZHtUw')->andReturn([$header, $data]);
+    $sheets->shouldReceive('updateCells')->once()->with([
+        ['range' => "'Copy of SME LOT 2,9,11'!CT2", 'majorDimension' => 'ROWS', 'values' => [['2026-10-30']]],
+    ], '1sOESkXSA8CbgkJMA_Y-sYzkngEimsrnn3qQwBvZHtUw');
+    $sheets->shouldReceive('updateCells')->once()->with([
+        ['range' => "'Copy of SME LOT 2,9,11'!CT2", 'majorDimension' => 'ROWS', 'values' => [['2026-10-30']]],
+        ['range' => "'Copy of SME LOT 2,9,11'!CU2", 'majorDimension' => 'ROWS', 'values' => [['2026-10-31']]],
+    ], '1sOESkXSA8CbgkJMA_Y-sYzkngEimsrnn3qQwBvZHtUw');
+    $deliveryReturn = new DeliveryReturn([
+        'school_id' => 'SCH-1',
+        'dr_no' => 'DR-100',
+        'monitoring_date' => '2026-10-30',
+        'received_date' => '2026-10-31',
+    ]);
+    $sync = new DeliveryReturnSpreadsheetSyncService;
+    $configuration = new GoogleSheetsBillingConfiguration;
+
+    expect($sync->sync($deliveryReturn, $sheets, $configuration))->toBeTrue()
+        ->and($sync->sync($deliveryReturn, $sheets, $configuration, true))->toBeTrue();
+});
+
+it('does not write spreadsheet dates when multiple rows match the School ID and BIR DR', function (): void {
+    $header = array_fill(0, 99, '');
+    $header[0] = 'School ID';
+    $header[20] = 'BIR DR';
+    $header[97] = 'Returned Date';
+    $header[98] = 'Received Date';
+    $data = array_fill(0, 99, '');
+    $data[0] = 'SCH-1';
+    $data[20] = 'DR-100';
+    $sheets = Mockery::mock(GoogleSheetsApiClient::class);
+    $sheets->shouldReceive('configurationStatus')->once()->andReturn(['configured' => true, 'reason' => null]);
+    $sheets->shouldReceive('values')->once()->andReturn([$header, $data, $data]);
+    $sheets->shouldNotReceive('updateCells');
+
+    $result = (new DeliveryReturnSpreadsheetSyncService)->sync(new DeliveryReturn([
+        'school_id' => 'SCH-1',
+        'dr_no' => 'DR-100',
+        'monitoring_date' => '2026-10-30',
+    ]), $sheets, new GoogleSheetsBillingConfiguration);
+
+    expect($result)->toBeFalse();
 });

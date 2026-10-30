@@ -43,7 +43,7 @@
                     ['key' => 'total', 'label' => 'Total Schools', 'value' => $summary['total'], 'description' => 'Unique schools with applicable DRs across supported lots', 'color' => 'blue', 'icon' => 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01'],
                     ['key' => 'processed', 'label' => 'Processed', 'value' => $summary['processed'], 'description' => 'Schools encoded for every applicable lot', 'color' => 'cyan', 'icon' => 'M9 12l2 2 4-4m5-3v6a8 8 0 1 1-3-6'],
                     ['key' => 'remaining', 'label' => 'Remaining', 'value' => $summary['remaining'], 'description' => 'Schools missing a date for an applicable lot', 'color' => 'amber', 'icon' => 'M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
-                    ['key' => 'processed_today', 'label' => 'Processed Today', 'value' => $summary['processed_today'], 'description' => 'Schools fully encoded today · '.config('app.timezone'), 'color' => 'blue', 'icon' => 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Zm3 11 2 2 4-4'],
+                    ['key' => 'processed_today', 'label' => 'Processed Today', 'value' => $summary['processed_today'], 'description' => 'Schools with an applicable SAP date today · '.config('app.timezone'), 'color' => 'blue', 'icon' => 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Zm3 11 2 2 4-4'],
                 ];
                 $toneClasses = [
                     'blue' => 'bg-blue-50 text-blue-700 ring-blue-100',

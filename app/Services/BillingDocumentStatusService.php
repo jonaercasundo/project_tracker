@@ -61,13 +61,16 @@ class BillingDocumentStatusService
                         continue;
                     }
 
-                    $schoolRows[$schoolId] ??= ['lots' => [], 'dates' => [], 'has_project_dr' => false];
+                    $schoolRows[$schoolId] ??= ['lots' => [], 'dates' => [], 'has_project_dr' => false, 'has_sap_date_today' => false];
 
                     if (trim($row['package']) !== '') {
                         $schoolRows[$schoolId]['lots'][$lotNumber] = true;
                         $encodedDate = trim($row['encoded_date']);
                         if ($encodedDate !== '') {
                             $schoolRows[$schoolId]['dates'][$lotNumber] ??= $encodedDate;
+                            if ($this->dateInApplicationTimezone($encodedDate) === now(config('app.timezone'))->toDateString()) {
+                                $schoolRows[$schoolId]['has_sap_date_today'] = true;
+                            }
                         }
                     }
 
@@ -92,20 +95,17 @@ class BillingDocumentStatusService
                 }
 
                 $applicableSchools[$schoolId] = true;
+                if ($schoolRow['has_sap_date_today']) {
+                    $processedTodaySchools[$schoolId] = true;
+                }
 
                 $isFullyEncoded = true;
-                $wereAllDatesEnteredToday = true;
                 foreach ($applicableLots as $lotNumber) {
                     $encodedDate = $schoolRow['dates'][$lotNumber] ?? null;
                     if ($encodedDate === null) {
                         $isFullyEncoded = false;
-                        $wereAllDatesEnteredToday = false;
 
                         continue;
-                    }
-
-                    if ($this->dateInApplicationTimezone($encodedDate) !== now(config('app.timezone'))->toDateString()) {
-                        $wereAllDatesEnteredToday = false;
                     }
                 }
 
@@ -114,9 +114,6 @@ class BillingDocumentStatusService
                 }
 
                 $processedSchools[$schoolId] = true;
-                if ($wereAllDatesEnteredToday) {
-                    $processedTodaySchools[$schoolId] = true;
-                }
             }
 
             $total = count($applicableSchools);
@@ -213,9 +210,28 @@ class BillingDocumentStatusService
 
     private function dateInApplicationTimezone(string $value): ?string
     {
+        $timezone = config('app.timezone');
+        $formats = match (true) {
+            preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 => ['!Y-m-d'],
+            preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $value) === 1 => ['!m/d/Y', '!d/m/Y'],
+            preg_match('/^\d{1,2}[-\/]\p{L}{3}[-\/]\d{4}$/u', $value) === 1 => ['!d-M-Y', '!d/M/Y'],
+            default => [],
+        };
+
+        foreach ($formats as $format) {
+            try {
+                $date = CarbonImmutable::createFromFormat($format, $value, $timezone);
+                if ($date !== false) {
+                    return $date->setTimezone($timezone)->toDateString();
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
         try {
-            return CarbonImmutable::parse($value, config('app.timezone'))
-                ->setTimezone(config('app.timezone'))
+            return CarbonImmutable::parse($value, $timezone)
+                ->setTimezone($timezone)
                 ->toDateString();
         } catch (\Throwable) {
             return null;

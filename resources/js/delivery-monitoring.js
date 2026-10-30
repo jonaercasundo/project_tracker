@@ -544,7 +544,7 @@ if (monitoring) {
     function displayDate(dateValue) {
         const [year, month, day] = dateValue.split('-');
 
-        return `${day}/${month}/${year}`;
+        return `${month}/${day}/${year}`;
     }
 
     function parseDisplayDate(dateValue) {
@@ -553,7 +553,7 @@ if (monitoring) {
             return null;
         }
 
-        const [, day, month, year] = match;
+        const [, month, day, year] = match;
         const date = new Date(Number(year), Number(month) - 1, Number(day));
         if (date.getFullYear() !== Number(year) || date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) {
             return null;
@@ -569,9 +569,9 @@ if (monitoring) {
             const error = document.getElementById(`${input.id}-error`);
             const parsedDate = parseDisplayDate(input.value);
             const message = input.value.trim() === ''
-                ? 'Enter a date in DD/MM/YYYY format.'
+                ? 'Enter a date in MM/DD/YYYY format.'
                 : parsedDate === null
-                    ? 'Enter a valid date in DD/MM/YYYY format.'
+                    ? 'Enter a valid date in MM/DD/YYYY format.'
                     : '';
 
             input.setCustomValidity(message);

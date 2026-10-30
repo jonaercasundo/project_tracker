@@ -26,6 +26,7 @@
             <h3 class="font-bold text-slate-900">Return monitoring</h3>
             <form data-return-filter method="GET" action="{{ route('deliveries.return-monitoring') }}" class="flex flex-wrap gap-2">
                 <input type="hidden" name="project_id" value="{{ $project }}">
+                <input name="school_id" type="search" value="{{ $filters['school_id'] ?? '' }}" maxlength="100" placeholder="School ID" aria-label="Filter by School ID" class="w-32 rounded-lg border-slate-200 text-xs">
                 <select name="return_type" aria-label="Filter by return type" class="rounded-lg border-slate-200 text-xs"><option value="">All return types</option><option value="Item Return" @selected(($filters['return_type'] ?? '') === 'Item Return')>Item Return</option><option value="Document Return" @selected(($filters['return_type'] ?? '') === 'Document Return')>Document Return</option></select>
                 <select name="return_status" aria-label="Filter by return status" class="rounded-lg border-slate-200 text-xs"><option value="">All return statuses</option>@foreach(['Reported', 'In Transit', 'Received', 'Rejected'] as $status)<option value="{{ $status }}" @selected(($filters['return_status'] ?? '') === $status)>{{ $status }}</option>@endforeach</select>
                 <input name="return_date_from" type="date" value="{{ $filters['return_date_from'] ?? '' }}" aria-label="Monitoring date from" title="Monitoring date from" class="rounded-lg border-slate-200 text-xs">
@@ -38,12 +39,14 @@
             </form>
         </div>
         <div data-return-records class="mt-4 overflow-x-auto">
-            <table class="w-full min-w-[950px] text-left text-xs">
-                <thead class="bg-slate-50 text-slate-500"><tr><th class="p-2">Type / DR</th><th class="p-2">Item / Quantity</th><th class="p-2">Reason / Remarks</th><th class="p-2">Status</th><th class="p-2">Monitoring Date</th><th class="p-2">Received Date / By</th><th class="p-2">Update</th></tr></thead>
+            <table class="w-full min-w-[1100px] text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500"><tr><th class="p-2">School ID</th><th class="p-2">DR</th><th class="p-2">Return Type</th><th class="p-2">Item / Quantity</th><th class="p-2">Reason / Remarks</th><th class="p-2">Status</th><th class="p-2">Monitoring Date</th><th class="p-2">Received Date / By</th><th class="p-2">Update</th></tr></thead>
                 <tbody class="divide-y divide-slate-100">
                     @forelse($records as $record)
                         <tr class="align-top">
-                            <td class="p-2">{{ $record->return_type }}<br><span class="text-slate-500">{{ $record->dr_no ?: 'Delivery '.$record->delivery_id }} · Lot {{ $record->lot_id ?? '—' }} · School {{ $record->school_id ?? '—' }} · Package {{ $record->package_id ?? '—' }}</span></td>
+                            <td class="p-2 font-semibold">{{ $record->school_id ?: '—' }}</td>
+                            <td class="p-2 font-semibold">{{ $record->dr_no ?: 'Delivery '.$record->delivery_id }}</td>
+                            <td class="p-2">{{ $record->return_type }}<br><span class="text-slate-500">Lot {{ $record->lot_id ?? '—' }} · Package {{ $record->package_id ?? '—' }}</span></td>
                             <td class="p-2">{{ $record->return_type === 'Document Return' ? 'Document' : ($record->item?->item_name ?? 'Item not recorded') }}<br>{{ $record->quantity_returned ?? '—' }}</td>
                             <td class="p-2">{{ $record->reason }}<br><span class="text-slate-500">{{ $record->remarks ?: '—' }}</span></td>
                             <td class="p-2">{{ $record->status }}</td>
@@ -73,7 +76,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="p-4 text-center text-slate-500">No returns match these filters.</td></tr>
+                        <tr><td colspan="9" class="p-4 text-center text-slate-500">No returns match these filters.</td></tr>
                     @endforelse
                 </tbody>
             </table>

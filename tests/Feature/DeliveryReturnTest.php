@@ -204,6 +204,7 @@ it('credits only confirmed item returns through inventory history and keeps docu
 
     $filteredReturns = $this->getJson(route('deliveries.monitoring.returns', [
         'project' => 1,
+        'school_id' => 'SCH-1',
         'return_type' => 'Document Return',
         'return_status' => 'Received',
         'return_date_from' => '2026-10-22',
@@ -211,6 +212,8 @@ it('credits only confirmed item returns through inventory history and keeps docu
     ]));
     expect($filteredReturns->json('html'))
         ->toContain('Document Return')
+        ->toContain('School ID')
+        ->toContain('DR-100')
         ->toContain('Monitoring Date')
         ->toContain('Received Date / By')
         ->toContain('Signed delivery receipt returned')

@@ -25,6 +25,7 @@ class DeliveryReturnController extends Controller
             'project_id' => ['nullable', 'integer', 'min:1', Rule::exists('projects', 'project_id')],
             'return_type' => ['nullable', Rule::in(['Item Return', 'Document Return'])],
             'return_status' => ['nullable', Rule::in(['Reported', 'In Transit', 'Received', 'Rejected'])],
+            'school_id' => ['nullable', 'string', 'max:100'],
             'return_date_from' => ['nullable', 'date_format:Y-m-d'],
             'return_date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:return_date_from'],
             'received_date_from' => ['nullable', 'date_format:Y-m-d'],
@@ -163,6 +164,7 @@ class DeliveryReturnController extends Controller
     private function panelData(int $project, array $filters): array
     {
         $records = DeliveryReturn::query()->with(['item', 'warehouse'])->where('project_id', $project)
+            ->when($filters['school_id'] ?? null, fn ($query, string $value) => $query->where('school_id', $value))
             ->when($filters['return_type'] ?? null, fn ($query, string $value) => $query->where('return_type', $value))
             ->when($filters['return_status'] ?? null, fn ($query, string $value) => $query->where('status', $value))
             ->when($filters['return_date_from'] ?? null, fn ($query, string $value) => $query->whereDate('monitoring_date', '>=', $value))
@@ -171,7 +173,8 @@ class DeliveryReturnController extends Controller
             ->when($filters['received_date_to'] ?? null, fn ($query, string $value) => $query->whereDate('received_date', '<=', $value))
             ->when($filters['quantity_from'] ?? null, fn ($query, int $value) => $query->where('quantity_returned', '>=', $value))
             ->when($filters['quantity_to'] ?? null, fn ($query, int $value) => $query->where('quantity_returned', '<=', $value))
-            ->orderByDesc('monitoring_date')->orderByDesc('return_id')->paginate(25)->withQueryString();
+            ->orderBy('school_id')->orderBy('dr_no')->orderByDesc('monitoring_date')->orderByDesc('return_id')
+            ->paginate(25)->withQueryString();
 
         return [
             'records' => $records,
@@ -191,6 +194,7 @@ class DeliveryReturnController extends Controller
         return [
             'return_type' => ['nullable', Rule::in(['Item Return', 'Document Return'])],
             'return_status' => ['nullable', Rule::in(['Reported', 'In Transit', 'Received', 'Rejected'])],
+            'school_id' => ['nullable', 'string', 'max:100'],
             'return_date_from' => ['nullable', 'date_format:Y-m-d'],
             'return_date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:return_date_from'],
             'received_date_from' => ['nullable', 'date_format:Y-m-d'],

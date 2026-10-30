@@ -10,11 +10,11 @@
                     <option value="Document Return">Document Return</option>
                 </select>
             </label>
-            <label class="text-xs font-semibold text-slate-600 sm:col-span-2">School ID
+            <label class="text-xs font-semibold text-slate-600">School ID
                 <input name="school_id" data-return-school type="text" required maxlength="100" autocomplete="off" placeholder="Enter School ID" class="mt-1 w-full rounded-lg border-slate-200 text-sm">
             </label>
-            <label class="text-xs font-semibold text-slate-600">Reason
-                <input name="reason" required maxlength="2000" class="mt-1 w-full rounded-lg border-slate-200 text-sm">
+            <label class="text-xs font-semibold text-slate-600 sm:col-span-2 xl:col-span-4">Reason
+                <textarea name="reason" required maxlength="2000" rows="3" class="mt-1 w-full resize-y rounded-lg border-slate-200 text-sm"></textarea>
             </label>
             <div class="flex items-end"><button type="submit" class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">Record return</button></div>
             <p data-return-feedback role="status" aria-live="polite" class="sm:col-span-2 xl:col-span-4 text-sm text-slate-600"></p>

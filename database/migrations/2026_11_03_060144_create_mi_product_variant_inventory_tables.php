@@ -28,10 +28,11 @@ return new class extends Migration
             $table->string('movement_type', 20);
             $table->integer('quantity_change');
             $table->unsignedInteger('quantity_after');
-            $table->foreignId('changed_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->integer('changed_by')->nullable();
             $table->string('remarks', 500)->nullable();
             $table->timestamps();
             $table->foreign('warehouse_id')->references('warehouse_id')->on('warehouse')->cascadeOnDelete();
+            $table->foreign('changed_by')->references('user_id')->on('users')->nullOnDelete();
             $table->index(['variant_id', 'warehouse_id', 'created_at'], 'mi_variant_movement_lookup_idx');
         });
     }

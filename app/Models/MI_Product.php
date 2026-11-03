@@ -205,4 +205,9 @@ class MI_Product extends Model
     {
         return $this->hasMany(MIProductVariant::class, 'product_id', 'product_id')->orderBy('sequence');
     }
+
+    public function priceComparisons(): HasMany
+    {
+        return $this->hasMany(MIProductPriceComparison::class, 'product_id', 'product_id')->latest();
+    }
 }

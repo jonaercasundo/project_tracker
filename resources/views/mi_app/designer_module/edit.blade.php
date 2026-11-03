@@ -303,6 +303,8 @@
                     </div>
                 </section>
 
+                @include('mi_app.designer_module.partials._price-comparisons')
+
                 <footer class="tx-footer">
                     <p id="save_status" aria-live="polite" class="tx-edit-footer-status">Review your changes before saving.</p>
                     <div class="tx-footer-inner">

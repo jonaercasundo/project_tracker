@@ -1705,6 +1705,20 @@
             </section>
 
 
+            @if($product->priceComparisons->isNotEmpty())
+                <section class="pd-card">
+                    <div class="pd-card-header"><span class="pd-card-icon purple">06</span><div class="pd-card-heading"><h2>Saved Price Comparisons</h2><p>Market offers selected and saved for this product.</p></div></div>
+                    <div class="pd-card-body grid grid-cols-1 gap-4 md:grid-cols-2">
+                        @foreach($product->priceComparisons as $comparison)
+                            <article class="rounded-xl border border-slate-200 bg-white p-4"><div class="flex gap-4">
+                                @if($comparison->photo_path)<img src="{{ Storage::disk('public')->url($comparison->photo_path) }}" alt="{{ $comparison->product_name }}" class="h-20 w-20 rounded-lg object-cover">@elseif($comparison->photo_url)<img src="{{ $comparison->photo_url }}" alt="{{ $comparison->product_name }}" loading="lazy" referrerpolicy="no-referrer" class="h-20 w-20 rounded-lg object-cover">@endif
+                                <div class="min-w-0"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $comparison->store_name }}</p><h3 class="mt-1 font-semibold">{{ $comparison->product_name }}</h3><p class="mt-1">{{ $comparison->currency }} {{ number_format((float) $comparison->price, 2) }}</p><a href="{{ $comparison->product_link }}" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block break-all text-sm text-blue-700 underline">View product</a></div>
+                            </div></article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
             @if($product->variants->isNotEmpty())
                 <section class="pd-card">
                     <div class="pd-card-header"><span class="pd-card-icon purple">04</span><div class="pd-card-heading"><h2>Product Variants</h2><p>Sellable variants with their own SKU, attributes, dimensions, and prices.</p></div></div>

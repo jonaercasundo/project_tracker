@@ -31,6 +31,7 @@ beforeEach(function () {
         '2026_10_06_040342_create_mi_product_images_table.php',
         '2026_10_06_085134_add_unique_item_code_to_mi_products_table.php',
         '2026_10_12_055813_create_mi_product_factory_costs_table.php',
+        '2026_11_03_093224_create_mi_product_price_comparisons_table.php',
         '2026_10_20_082229_add_country_of_production_to_mi_products_table.php',
     ] as $migration) {
         (require database_path('migrations/'.$migration))->up();
@@ -1047,4 +1048,42 @@ it('enforces a single primary factory cost per product at the database boundary'
 
     expect($product->factoryCosts()->where('is_primary', true)->pluck('id')->all())->toBe([$primary->id]);
     expect($secondary->fresh()->is_primary)->toBeFalse();
+});
+
+it('reports an unconfigured price search without returning invented results', function () {
+    $this->signInMI($this->miUser());
+
+    $this->postJson(route('mi_app.price-comparisons.search'), [
+        'method' => 'name', 'product_name' => 'Oak table', 'query' => 'round', 'max_results' => 5,
+    ])->assertStatus(503)->assertJsonPath('results', [])->assertJsonPath('message', 'Price comparison search is not configured. Configure an approved product-search provider that supports product offers and image-based search.');
+});
+
+it('requires the selected search method input and never falls back from image to name', function () {
+    $this->signInMI($this->miUser());
+
+    $this->postJson(route('mi_app.price-comparisons.search'), ['method' => 'name', 'max_results' => 5])
+        ->assertUnprocessable()->assertJsonValidationErrors('product_name');
+    $this->postJson(route('mi_app.price-comparisons.search'), ['method' => 'image', 'product_name' => 'Oak table', 'max_results' => 5])
+        ->assertUnprocessable()->assertJsonPath('results', [])->assertJsonPath('message', 'Choose an image file or enter an image URL to search by image.');
+});
+
+it('saves only validated selected price comparisons for the authorized product', function () {
+    $product = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+    $result = [
+        'store_name' => 'Example Store', 'product_name' => 'Oak side table', 'photo_url' => 'https://example.com/table.jpg',
+        'price' => '125.00', 'currency' => 'usd', 'product_link' => 'https://example.com/table',
+    ];
+
+    $this->postJson(route('mi_app.price-comparisons.store', $product), ['results' => [$result]])
+        ->assertCreated()->assertJsonPath('message', 'Selected comparisons saved.');
+    $this->assertDatabaseHas('mi_product_price_comparisons', [
+        'product_id' => $product->getKey(), 'store_name' => 'Example Store', 'currency' => 'USD', 'product_link' => 'https://example.com/table',
+    ]);
+    $this->postJson(route('mi_app.price-comparisons.store', $product), ['results' => [$result]])->assertCreated();
+    $this->assertDatabaseCount('mi_product_price_comparisons', 1);
+
+    $this->postJson(route('mi_app.price-comparisons.store', $product), ['results' => [[...$result, 'product_link' => 'javascript:alert(1)']]])
+        ->assertUnprocessable()->assertJsonValidationErrors('results.0.product_link');
+    $this->assertDatabaseCount('mi_product_price_comparisons', 1);
 });

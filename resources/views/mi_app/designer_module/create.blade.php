@@ -1510,6 +1510,8 @@
                     FOOTER
                     ================================================= --}}
 
+                @include('mi_app.designer_module.partials._price-comparisons')
+
                 <div class="tx-footer">
 
                     <div class="tx-footer-inner">

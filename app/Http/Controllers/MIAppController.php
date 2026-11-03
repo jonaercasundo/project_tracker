@@ -438,6 +438,11 @@ class MIAppController extends Controller
 
     public function store(Request $request, MIProductFactoryCostService $factoryCosts, MIProductAttributeOptionService $attributeOptions)
     {
+        $comparisonJson = $request->input('price_comparisons_json');
+        if (is_string($comparisonJson) && $comparisonJson !== '') {
+            $decodedComparisons = json_decode($comparisonJson, true);
+            $request->merge(['price_comparisons' => is_array($decodedComparisons) ? $decodedComparisons : $comparisonJson]);
+        }
         foreach (['materials', 'color'] as $field) {
             $values = $request->input($field);
             if (is_array($values)) {
@@ -528,6 +533,14 @@ class MIAppController extends Controller
             'product_images.*' => 'file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
             'image_links' => 'nullable|array',
             'image_links.*' => 'nullable|url|max:1000',
+            'price_comparisons' => 'nullable|array|max:20',
+            'price_comparisons.*' => ['required', 'array:store_name,product_name,photo_url,price,currency,product_link'],
+            'price_comparisons.*.store_name' => 'required|string|max:255',
+            'price_comparisons.*.product_name' => 'required|string|max:255',
+            'price_comparisons.*.photo_url' => 'nullable|url:http,https|max:2048',
+            'price_comparisons.*.price' => 'required|numeric|min:0|max:999999999999.99',
+            'price_comparisons.*.currency' => 'required|alpha|size:3',
+            'price_comparisons.*.product_link' => 'required|url:http,https|max:2048',
         ]);
 
         $validated['country_of_production'] = $validated['country_of_production'] === 'Other'
@@ -537,11 +550,13 @@ class MIAppController extends Controller
 
         $factoryCostRows = $validated['factory_costs'] ?? [];
         $variantRows = $validated['variants'] ?? [];
+        $comparisonRows = $validated['price_comparisons'] ?? [];
         if (collect($factoryCostRows)->filter(fn (array $cost): bool => (bool) ($cost['is_primary'] ?? false))->count() > 1) {
             throw ValidationException::withMessages(['factory_costs' => 'Select only one primary factory cost.']);
         }
         unset($validated['factory_costs']);
         unset($validated['variants']);
+        unset($validated['price_comparisons']);
 
         $this->validateProductTaxonomy($validated);
         $uploadedPaths = [];
@@ -661,6 +676,12 @@ class MIAppController extends Controller
             $product->save();
 
             $this->synchronizeProductVariants($product, $variantRows, $attributeOptions);
+            foreach ($comparisonRows as $comparison) {
+                $product->priceComparisons()->firstOrCreate(
+                    ['product_link' => $comparison['product_link']],
+                    [...$comparison, 'currency' => strtoupper($comparison['currency'])],
+                );
+            }
 
             DB::commit();
 
@@ -697,7 +718,7 @@ class MIAppController extends Controller
     public function edit(MI_Product $product): View
     {
         Gate::authorize('update', $product);
-        $product->load(['category', 'subCategory', 'productType', 'collection', 'images', 'factoryCosts', 'variants.inventories.warehouse']);
+        $product->load(['category', 'subCategory', 'productType', 'collection', 'images', 'factoryCosts', 'variants.inventories.warehouse', 'priceComparisons']);
         $categories = MI_Category::orderBy('name')->get();
         $subCategories = MI_SubCategory::orderBy('name')->get();
         $productTypes = MI_ProductType::orderBy('name')->get();
@@ -920,6 +941,7 @@ class MIAppController extends Controller
             'images',
             'factoryCosts',
             'variants.inventories.warehouse',
+            'priceComparisons',
         ]);
 
         return view('mi_app.designer_module.show', compact('product'));

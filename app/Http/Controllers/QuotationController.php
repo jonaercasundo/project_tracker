@@ -273,10 +273,12 @@ class QuotationController extends Controller
 
                 $variant = $item['variant_id'] !== null ? $variants->get($item['variant_id']) : null;
                 if ($variant !== null) {
+                    $variantMaterials = $variant->materials ?: array_filter([$variant->material]);
+                    $variantColors = $variant->colors ?: array_filter([$variant->color]);
                     $product->sku = $variant->sku;
-                    $product->item_name .= ' — '.$variant->material.($variant->color ? ' / '.$variant->color : '');
-                    $product->materials = [$variant->material];
-                    $product->color = $variant->color ? [$variant->color] : [];
+                    $product->item_name .= ' — '.implode(', ', $variantMaterials).($variantColors !== [] ? ' / '.implode(', ', $variantColors) : '');
+                    $product->materials = $variantMaterials;
+                    $product->color = $variantColors;
                     $product->product_length = $variant->product_length;
                     $product->product_width = $variant->product_width;
                     $product->product_height = $variant->product_height;

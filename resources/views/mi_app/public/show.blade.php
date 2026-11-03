@@ -764,7 +764,7 @@
                     <label for="pdCurrentVariant">Product Variant</label>
                     <select id="pdCurrentVariant">
                         @foreach($product->variants as $variant)
-                            <option value="{{ $variant->variant_id }}" @selected((int) ($selectedVariant->variant_id ?? 0) === (int) $variant->variant_id)>{{ $variant->material }}{{ $variant->color ? ' / '.$variant->color : '' }} — {{ $variant->sku }}</option>
+                            <option value="{{ $variant->variant_id }}" @selected((int) ($selectedVariant->variant_id ?? 0) === (int) $variant->variant_id)>{{ collect($variant->materials ?: [$variant->material])->filter()->implode(', ') }}{{ ($variant->colors ?: array_filter([$variant->color])) !== [] ? ' / '.collect($variant->colors ?: array_filter([$variant->color]))->implode(', ') : '' }} — {{ $variant->sku }}</option>
                         @endforeach
                     </select>
                     <p id="pdVariantSummary" class="mt-2 text-sm text-slate-600" aria-live="polite"></p>
@@ -1188,7 +1188,8 @@
 
         variants: @json($product->variants->map(fn ($variant) => [
             'id' => $variant->variant_id, 'sku' => $variant->sku, 'material' => $variant->material,
-            'color' => $variant->color, 'length' => $variant->product_length, 'width' => $variant->product_width,
+            'color' => $variant->color, 'materials' => $variant->materials ?: array_filter([$variant->material]),
+            'colors' => $variant->colors ?: array_filter([$variant->color]), 'length' => $variant->product_length, 'width' => $variant->product_width,
             'height' => $variant->product_height, 'depth' => $variant->product_depth, 'price' => $variant->selling_price,
             'purchase_price' => $variant->purchase_price,
         ])->values())
@@ -2320,7 +2321,9 @@
                 if (!variant) return;
                 const dimensions = [variant.length, variant.width, variant.height, variant.depth].map((value) => value ?? '—').join(' × ');
                 const selling = variant.price === null ? 'Price on request' : `Selling: PHP ${Number(variant.price).toFixed(2)}`;
-                summary.textContent = `SKU ${variant.sku} · ${variant.material}${variant.color ? ' / ' + variant.color : ''} · ${dimensions} cm · ${selling}`;
+                const materials = (variant.materials || [variant.material]).join(', ');
+                const colors = (variant.colors || [variant.color]).filter(Boolean).join(', ');
+                summary.textContent = `SKU ${variant.sku} · ${materials}${colors ? ' / ' + colors : ''} · ${dimensions} cm · ${selling}`;
             };
             variantSelect?.addEventListener('change', updateVariantSummary);
             updateVariantSummary();

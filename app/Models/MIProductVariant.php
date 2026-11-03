@@ -13,11 +13,12 @@ class MIProductVariant extends Model
     protected $primaryKey = 'variant_id';
 
     protected $fillable = [
-        'sequence', 'material', 'color', 'product_length', 'product_width', 'product_height',
+        'sequence', 'material', 'color', 'materials', 'colors', 'product_length', 'product_width', 'product_height',
         'product_depth', 'purchase_price', 'selling_price', 'sku',
     ];
 
     protected $casts = [
+        'materials' => 'array', 'colors' => 'array',
         'product_length' => 'decimal:2', 'product_width' => 'decimal:2',
         'product_height' => 'decimal:2', 'product_depth' => 'decimal:2',
         'purchase_price' => 'decimal:2', 'selling_price' => 'decimal:2',

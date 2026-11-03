@@ -33,16 +33,27 @@ class MIProductAttributeOptionService
             return [];
         }
 
-        $materialNames = array_map(static fn (array $variant): string => (string) ($variant['material'] ?? ''), $variants);
-        $colorNames = array_values(array_filter(array_map(static fn (array $variant): string => (string) ($variant['color'] ?? ''), $variants), static fn (string $name): bool => trim($name) !== ''));
+        $materialNames = [];
+        $colorNames = [];
+        foreach ($variants as $variant) {
+            $materialNames = array_merge($materialNames, $this->variantOptionValues($variant, 'materials', 'material'));
+            $colorNames = array_merge($colorNames, $this->variantOptionValues($variant, 'colors', 'color'));
+        }
+
         $materialMap = $this->canonicalMap($this->persistMaterials($materialNames));
         $colorMap = $this->canonicalMap($this->persistColors($colorNames));
 
         foreach ($variants as &$variant) {
-            $variant['material'] = $materialMap[$this->normalizedKey((string) ($variant['material'] ?? ''))];
-            $variant['color'] = trim((string) ($variant['color'] ?? '')) === ''
-                ? null
-                : $colorMap[$this->normalizedKey((string) $variant['color'])];
+            $variant['materials'] = $this->canonicalizeOptions(
+                $this->variantOptionValues($variant, 'materials', 'material'),
+                $materialMap,
+            );
+            $variant['colors'] = $this->canonicalizeOptions(
+                $this->variantOptionValues($variant, 'colors', 'color'),
+                $colorMap,
+            );
+            $variant['material'] = $variant['materials'][0] ?? '';
+            $variant['color'] = $variant['colors'][0] ?? null;
         }
         unset($variant);
 
@@ -105,5 +116,38 @@ class MIProductAttributeOptionService
     private function normalizedKey(string $value): string
     {
         return mb_strtolower($this->normalizeSpacing($value));
+    }
+
+    /** @param array<string, mixed> $variant
+     * @return array<int, string>
+     */
+    private function variantOptionValues(array $variant, string $pluralKey, string $legacyKey): array
+    {
+        $values = $variant[$pluralKey] ?? [$variant[$legacyKey] ?? ''];
+        if (! is_array($values)) {
+            $values = [$values];
+        }
+
+        return array_values(array_filter(array_map(
+            fn (mixed $value): string => $this->normalizeSpacing((string) $value),
+            $values,
+        ), static fn (string $value): bool => $value !== ''));
+    }
+
+    /** @param array<int, string> $values
+     * @param  array<string, string>  $canonicalMap
+     * @return array<int, string>
+     */
+    private function canonicalizeOptions(array $values, array $canonicalMap): array
+    {
+        $canonicalValues = [];
+        foreach ($values as $value) {
+            $key = $this->normalizedKey($value);
+            if (isset($canonicalMap[$key])) {
+                $canonicalValues[$key] = $canonicalMap[$key];
+            }
+        }
+
+        return array_values($canonicalValues);
     }
 }

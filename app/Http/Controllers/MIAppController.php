@@ -94,7 +94,9 @@ class MIAppController extends Controller
                 $q->orWhereHas('variants', function ($query) use ($search): void {
                     $query->where('sku', 'like', "%{$search}%")
                         ->orWhere('material', 'like', "%{$search}%")
-                        ->orWhere('color', 'like', "%{$search}%");
+                        ->orWhere('color', 'like', "%{$search}%")
+                        ->orWhereRaw('CAST(materials AS CHAR) LIKE ?', ["%{$search}%"])
+                        ->orWhereRaw('CAST(colors AS CHAR) LIKE ?', ["%{$search}%"]);
                 });
             });
         }
@@ -479,9 +481,13 @@ class MIAppController extends Controller
             'color' => 'nullable|array|max:100',
             'color.*' => 'required|string|max:255',
             'variants' => 'nullable|array|max:100',
-            'variants.*' => ['required', 'array:sequence,material,color,product_length,product_width,product_height,product_depth,purchase_price,selling_price,sku'],
+            'variants.*' => ['required', 'array:sequence,materials,colors,material,color,product_length,product_width,product_height,product_depth,purchase_price,selling_price,sku'],
             'variants.*.sequence' => ['required', 'integer', 'min:1', 'max:9999', 'distinct'],
-            'variants.*.material' => 'required|string|max:255',
+            'variants.*.materials' => 'required_without:variants.*.material|array|min:1|max:100',
+            'variants.*.materials.*' => 'required|string|max:255',
+            'variants.*.material' => 'nullable|string|max:255',
+            'variants.*.colors' => 'nullable|array|max:100',
+            'variants.*.colors.*' => 'required|string|max:255',
             'variants.*.color' => 'nullable|string|max:255',
             'variants.*.sku' => ['nullable', 'string', 'max:255', 'distinct', Rule::unique('mi_product_variants', 'sku'), Rule::unique('mi_products', 'sku')],
             'variants.*.product_length' => 'nullable|numeric|min:0|max:99999999.99',

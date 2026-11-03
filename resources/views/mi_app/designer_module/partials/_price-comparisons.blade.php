@@ -3,8 +3,8 @@
     <div class="tx-card-head"><span class="tx-card-icon">06</span><div><h2 id="price_comparison_heading">AI-Assisted Price Comparison</h2><p>Find market offers, review them, then choose which comparisons to save.</p></div></div>
     <div class="tx-card-body space-y-5">
         <div data-name-fields class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <label class="tx-label">Product name<input id="comparison_product_name" class="tx-field mt-2" type="text" value="{{ old('item_name', $product->item_name ?? '') }}" maxlength="255" placeholder="Uses the product name above"></label>
             <label class="tx-label">Optional search refinement<input id="comparison_query" class="tx-field mt-2" type="text" maxlength="300" placeholder="Short description or keywords"></label>
+            <label class="tx-label">Reference link (optional)<input id="comparison_reference_url" class="tx-field mt-2" type="url" maxlength="2048" placeholder="https://example.com/product"><a id="comparison_reference_preview" href="#" target="_blank" rel="noopener noreferrer" class="mt-2 hidden break-all text-xs text-blue-700 underline">Open reference link</a></label>
         </div>
         <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(180px,260px)_auto] md:items-end">
             <label class="tx-label">Maximum results<input id="comparison_limit" class="tx-field mt-2" type="number" min="1" max="20" value="8"></label>
@@ -41,14 +41,20 @@
     const resultsNode = document.getElementById('comparison_results');
     const statusNode = document.getElementById('comparison_status');
     const saveButton = document.getElementById('comparison_save');
-    document.getElementById('item_name')?.addEventListener('input', (event) => {
-        document.getElementById('comparison_product_name').value = event.currentTarget.value;
-    });
+    const productNameInput = document.getElementById('item_name');
     const selectedResults = () => [...resultsNode.querySelectorAll('input[type="checkbox"]:checked')].map((checkbox) => JSON.parse(checkbox.dataset.result));
     const safeHttpUrl = (value) => {
         try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.href : null; }
         catch { return null; }
     };
+    const referenceInput = document.getElementById('comparison_reference_url');
+    const referencePreview = document.getElementById('comparison_reference_preview');
+    referenceInput.addEventListener('input', () => {
+        const safeUrl = safeHttpUrl(referenceInput.value.trim());
+        if (safeUrl) { referencePreview.href = safeUrl; }
+        else { referencePreview.href = '#'; }
+        referencePreview.classList.toggle('hidden', !safeUrl);
+    });
     const renderResults = (results) => {
         resultsNode.replaceChildren();
         const safeResults = results.filter((result) => result && typeof result.store_name === 'string' && result.store_name.trim() && typeof result.product_name === 'string' && result.product_name.trim() && Number.isFinite(Number(result.price)) && Number(result.price) >= 0 && typeof result.currency === 'string' && /^[a-z]{3}$/i.test(result.currency) && safeHttpUrl(result.product_link) && (!result.photo_url || safeHttpUrl(result.photo_url))).map((result) => ({ ...result, price: Number(result.price).toFixed(2), currency: result.currency.toUpperCase(), product_link: safeHttpUrl(result.product_link), photo_url: result.photo_url ? safeHttpUrl(result.photo_url) : null }));
@@ -68,7 +74,7 @@
     };
     document.getElementById('comparison_search').addEventListener('click', async (event) => {
         const button = event.currentTarget; button.disabled = true; button.textContent = 'Searching…'; statusNode.textContent = 'Searching for current product offers…';
-        const data = new FormData(); data.append('product_name', document.getElementById('comparison_product_name').value); data.append('query', document.getElementById('comparison_query').value); data.append('max_results', document.getElementById('comparison_limit').value);
+        const data = new FormData(); data.append('product_name', productNameInput?.value || ''); data.append('query', document.getElementById('comparison_query').value); data.append('reference_url', referenceInput.value); data.append('max_results', document.getElementById('comparison_limit').value);
         try { const response = await fetch(searchUrl, { method: 'POST', headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' }, body: data }); const payload = await response.json(); renderResults(payload.results || []); statusNode.textContent = (payload.message || (response.ok ? 'Review the results before saving.' : 'Search failed.')) + (payload.request_id ? ` (Request ID: ${payload.request_id})` : ''); }
         catch { statusNode.textContent = 'Could not reach the search service. Try again.'; }
         finally { button.disabled = false; button.textContent = 'Find Prices'; }

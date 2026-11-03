@@ -23,6 +23,7 @@ class MIProductPriceComparisonController extends Controller
             'image_file' => ['prohibited'],
             'product_name' => ['required', 'string', 'max:255'],
             'query' => ['nullable', 'string', 'max:300'],
+            'reference_url' => ['nullable', 'url:http,https', 'max:2048'],
             'max_results' => ['required', 'integer', 'min:1', 'max:20'],
         ]);
 
@@ -40,6 +41,7 @@ class MIProductPriceComparisonController extends Controller
                 $configuration->model(),
                 $validated['product_name'],
                 $validated['query'] ?? null,
+                $validated['reference_url'] ?? null,
                 (int) $validated['max_results'],
             );
         } catch (Throwable $exception) {

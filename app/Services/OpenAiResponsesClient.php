@@ -20,7 +20,7 @@ class OpenAiResponsesClient
         }
     }
 
-    public function searchProductOffers(string $apiKey, string $model, string $productName, ?string $refinement, int $maxResults): Response
+    public function searchProductOffers(string $apiKey, string $model, string $productName, ?string $refinement, ?string $referenceUrl, int $maxResults): Response
     {
         $searchTerm = trim($productName.' '.($refinement ?? ''));
         $payload = [
@@ -36,7 +36,7 @@ class OpenAiResponsesClient
                 ],
                 [
                     'role' => 'user',
-                    'content' => "Find up to {$maxResults} current offers for this product: {$searchTerm}",
+                    'content' => "Find up to {$maxResults} current offers for this product: {$searchTerm}".($referenceUrl ? "\nReference product page for identifying the item: {$referenceUrl}" : ''),
                 ],
             ],
         ];

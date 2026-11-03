@@ -72,7 +72,10 @@ it('shows the authorized AI Assistant launcher on MI Product Masterlist and Crea
     $this->get(route('mi_app.create'))
         ->assertOk()
         ->assertSee('AI Assistant')
-        ->assertSee('data-ai-assistant', false);
+        ->assertSee('data-ai-assistant', false)
+        ->assertSee('Reference link (optional)')
+        ->assertSee('id="item_name"', false)
+        ->assertDontSee('comparison_product_name');
 });
 
 it('preserves omitted attributes every image identity and generated values during an ordinary save', function () {
@@ -1077,11 +1080,13 @@ it('returns only OpenAI offer results whose product pages are cited', function (
         ]],
     ], 200)]);
 
-    $this->postJson(route('mi_app.price-comparisons.search'), ['product_name' => 'Oak table', 'max_results' => 5])
+    $referenceUrl = 'https://shop.example/current-oak-table';
+    $this->postJson(route('mi_app.price-comparisons.search'), ['product_name' => 'Oak table', 'reference_url' => $referenceUrl, 'max_results' => 5])
         ->assertOk()->assertJsonCount(1, 'results')->assertJsonPath('results.0.store_name', 'Cited Shop')
         ->assertJsonPath('results.0.product_link', 'https://shop.example/oak-table');
     Http::assertSent(fn ($request): bool => $request['tools'][0]['type'] === 'web_search'
         && $request['tool_choice'] === 'required'
+        && str_contains($request['input'][1]['content'], $referenceUrl)
         && ! isset($request['text']['format']));
 });
 

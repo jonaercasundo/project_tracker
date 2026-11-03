@@ -1,7 +1,7 @@
 @php
     $materialGroups = [
 
-        'Solid Wood' => [
+        'Wood Materials' => [
             'Solid Wood',
             'Acacia Wood',
             'Ash Wood',

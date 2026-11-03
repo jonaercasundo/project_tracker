@@ -9,6 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
@@ -1050,12 +1051,36 @@ it('enforces a single primary factory cost per product at the database boundary'
     expect($secondary->fresh()->is_primary)->toBeFalse();
 });
 
-it('reports an unconfigured price search without returning invented results', function () {
+it('reports missing OpenAI web search credentials without returning invented results', function () {
     $this->signInMI($this->miUser());
+    config()->set('services.openai.key', null);
 
     $this->postJson(route('mi_app.price-comparisons.search'), [
         'product_name' => 'Oak table', 'query' => 'round', 'max_results' => 5,
-    ])->assertStatus(503)->assertJsonPath('results', [])->assertJsonPath('message', 'Price comparison search is not configured. Configure an approved product-search provider that returns verifiable product offers.');
+    ])->assertStatus(503)->assertJsonPath('results', [])->assertJsonPath('message', 'OpenAI web search is not configured. Add OPENAI_API_KEY or save an API key in AI Provider Settings.');
+});
+
+it('returns only OpenAI offer results whose product pages are cited', function () {
+    $this->signInMI($this->miUser());
+    config()->set('services.openai.key', 'test-key');
+    Http::fake(['https://api.openai.com/v1/responses' => Http::response([
+        'output' => [[
+            'type' => 'message',
+            'content' => [[
+                'type' => 'output_text',
+                'text' => json_encode(['results' => [
+                    ['store_name' => 'Cited Shop', 'product_name' => 'Oak Table', 'photo_url' => null, 'price' => 100, 'currency' => 'USD', 'product_link' => 'https://shop.example/oak-table'],
+                    ['store_name' => 'Uncited Shop', 'product_name' => 'Other Table', 'photo_url' => null, 'price' => 1, 'currency' => 'USD', 'product_link' => 'https://other.example/table'],
+                ]]),
+                'annotations' => [['type' => 'url_citation', 'url' => 'https://shop.example/oak-table', 'title' => 'Oak Table']],
+            ]],
+        ]],
+    ], 200)]);
+
+    $this->postJson(route('mi_app.price-comparisons.search'), ['product_name' => 'Oak table', 'max_results' => 5])
+        ->assertOk()->assertJsonCount(1, 'results')->assertJsonPath('results.0.store_name', 'Cited Shop')
+        ->assertJsonPath('results.0.product_link', 'https://shop.example/oak-table');
+    Http::assertSent(fn ($request): bool => $request['tools'][0]['type'] === 'web_search' && $request['tool_choice'] === 'required');
 });
 
 it('requires the selected search method input and never falls back from image to name', function () {

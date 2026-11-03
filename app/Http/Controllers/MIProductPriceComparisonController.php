@@ -3,16 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\MI_Product;
+use App\Services\AiProviderConfiguration;
+use App\Services\OpenAiResponsesClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class MIProductPriceComparisonController extends Controller
 {
-    public function search(Request $request): JsonResponse
+    public function search(Request $request, AiProviderConfiguration $configuration, OpenAiResponsesClient $client): JsonResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'method' => ['prohibited'],
             'image_url' => ['prohibited'],
             'image_file' => ['prohibited'],
@@ -21,10 +25,118 @@ class MIProductPriceComparisonController extends Controller
             'max_results' => ['required', 'integer', 'min:1', 'max:20'],
         ]);
 
+        $apiKey = $configuration->apiKey();
+        if ($apiKey === null) {
+            return response()->json([
+                'message' => 'OpenAI web search is not configured. Add OPENAI_API_KEY or save an API key in AI Provider Settings.',
+                'results' => [],
+            ], 503);
+        }
+
+        try {
+            $response = $client->searchProductOffers(
+                $apiKey,
+                $configuration->model(),
+                $validated['product_name'],
+                $validated['query'] ?? null,
+                (int) $validated['max_results'],
+            );
+        } catch (Throwable $exception) {
+            Log::warning('MI product price search could not reach OpenAI.', ['exception' => $exception::class]);
+
+            return response()->json(['message' => 'The web search provider could not be reached. Try again later.', 'results' => []], 502);
+        }
+
+        if (! $response->successful()) {
+            Log::warning('MI product price search provider rejected the request.', ['status' => $response->status()]);
+
+            return response()->json(['message' => 'The web search provider rejected the request. Check the API key, model access, and web search availability.', 'results' => []], 502);
+        }
+
+        $results = $this->verifiedResults($response->json('output', []), (int) $validated['max_results']);
+
         return response()->json([
-            'message' => 'Price comparison search is not configured. Configure an approved product-search provider that returns verifiable product offers.',
-            'results' => [],
-        ], 503);
+            'message' => $results === [] ? 'No cited product offers were found. Try a more specific product name.' : 'Review these cited product offers before saving.',
+            'results' => $results,
+        ]);
+    }
+
+    /** @param array<int, mixed> $output
+     * @return array<int, array{store_name: string, product_name: string, photo_url: ?string, price: float, currency: string, product_link: string}>
+     */
+    private function verifiedResults(array $output, int $maxResults): array
+    {
+        $text = '';
+        $citedUrls = [];
+        foreach ($output as $item) {
+            if (($item['type'] ?? null) !== 'message') {
+                continue;
+            }
+
+            foreach ($item['content'] ?? [] as $content) {
+                if (($content['type'] ?? null) === 'output_text' && is_string($content['text'] ?? null)) {
+                    $text .= $content['text'];
+                }
+                foreach ($content['annotations'] ?? [] as $annotation) {
+                    $url = $annotation['url'] ?? $annotation['url_citation']['url'] ?? null;
+                    if (is_string($url) && filter_var($url, FILTER_VALIDATE_URL) && in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+                        $citedUrls[] = $url;
+                    }
+                }
+            }
+        }
+
+        $decoded = json_decode($text, true);
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $results = [];
+        foreach ($decoded['results'] ?? [] as $result) {
+            if (! is_array($result)) {
+                continue;
+            }
+
+            $productLink = $result['product_link'] ?? null;
+            $photoUrl = $result['photo_url'] ?? null;
+            $price = $result['price'] ?? null;
+            $currency = $result['currency'] ?? null;
+            if (! is_string($productLink)
+                || ! in_array($productLink, $citedUrls, true)
+                || ! is_string($result['store_name'] ?? null)
+                || trim($result['store_name']) === ''
+                || ! is_string($result['product_name'] ?? null)
+                || trim($result['product_name']) === ''
+                || ! is_numeric($price)
+                || (float) $price < 0
+                || ! is_string($currency)
+                || ! preg_match('/\A[A-Z]{3}\z/i', $currency)
+                || ! filter_var($productLink, FILTER_VALIDATE_URL)
+                || ! in_array(strtolower((string) parse_url($productLink, PHP_URL_SCHEME)), ['http', 'https'], true)
+            ) {
+                continue;
+            }
+
+            if ($photoUrl !== null && (! is_string($photoUrl)
+                || ! filter_var($photoUrl, FILTER_VALIDATE_URL)
+                || ! in_array(strtolower((string) parse_url($photoUrl, PHP_URL_SCHEME)), ['http', 'https'], true))) {
+                $photoUrl = null;
+            }
+
+            $results[] = [
+                'store_name' => trim($result['store_name']),
+                'product_name' => trim($result['product_name']),
+                'photo_url' => $photoUrl,
+                'price' => (float) $price,
+                'currency' => strtoupper($currency),
+                'product_link' => $productLink,
+            ];
+            if (count($results) >= $maxResults) {
+                break;
+            }
+        }
+
+        return $results;
     }
 
     public function store(Request $request, MI_Product $product): JsonResponse

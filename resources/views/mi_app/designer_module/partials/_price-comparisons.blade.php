@@ -10,7 +10,7 @@
             <label class="tx-label">Maximum results<input id="comparison_limit" class="tx-field mt-2" type="number" min="1" max="20" value="8"></label>
             <button type="button" id="comparison_search" class="tx-btn-small w-fit">Find Prices</button>
         </div>
-        <p id="comparison_status" role="status" aria-live="polite" class="tx-hint">Search is not configured yet. An approved product search provider is required; no sample or invented offers will be shown.</p>
+        <p id="comparison_status" role="status" aria-live="polite" class="tx-hint">Search uses OpenAI web search. Offers without a cited product page are excluded.</p>
         @if($isExistingProduct)
             <div class="flex flex-wrap gap-2"><button type="button" id="comparison_select_all" class="tx-btn-small">Select all</button><button type="button" id="comparison_clear_selection" class="tx-btn-small">Clear selection</button><button type="button" id="comparison_save" class="tx-btn-small" disabled>Save selected</button></div>
         @else

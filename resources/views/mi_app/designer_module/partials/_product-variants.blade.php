@@ -42,7 +42,7 @@
             const isMultiple = select.multiple;
             const normalize = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
             new TomSelect(select, {
-                plugins: isMultiple ? ['remove_button'] : [],
+                plugins: ['remove_button'],
                 createOnBlur: false,
                 persist: false,
                 create: (input) => {
@@ -55,13 +55,14 @@
                 },
                 allowEmptyOption: isMultiple,
                 maxItems: isMultiple ? 100 : 1,
-                hideSelected: isMultiple,
+                hideSelected: true,
                 closeAfterSelect: false,
                 dropdownParent: 'body',
                 placeholder: select.dataset.placeholder,
                 searchField: ['text'],
                 onInitialize: function () {
                     const selectControl = this;
+                    this.wrapper.classList.add('tx-variant-select');
                     this.dropdown_content.addEventListener('click', (event) => {
                         const target = event.target;
                         if (!(target instanceof Element) || !target.closest('.create')) return;

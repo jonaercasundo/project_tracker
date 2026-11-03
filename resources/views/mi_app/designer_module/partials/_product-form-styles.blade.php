@@ -1020,6 +1020,37 @@
             border-left-color: rgba(47, 91, 239, .2);
         }
 
+        .tx-console .tx-variant-select.single .ts-control > .item {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 8px;
+            border: 1px solid #bfd0fb;
+            border-radius: 7px;
+            background: var(--tx-primary-soft);
+            color: var(--tx-primary);
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .tx-console .tx-variant-select.single .ts-control > .item .remove {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 0 0 5px;
+            border: 0;
+            border-left: 1px solid rgba(47, 91, 239, .2);
+            background: transparent;
+            color: inherit;
+            font-size: 13px;
+            line-height: 1;
+            text-decoration: none;
+        }
+
+        .tx-console .tx-variant-select.single .ts-control > .item .remove:hover {
+            opacity: .65;
+        }
+
         /* =========================================================
            PRODUCT VARIANTS
            ========================================================= */

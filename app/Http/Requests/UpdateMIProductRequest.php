@@ -40,8 +40,11 @@ class UpdateMIProductRequest extends FormRequest
         $product = $this->route('product');
         $ownedImage = Rule::exists('mi_product_images', 'id')->where('product_id', $product->getKey());
         $ownedCost = Rule::exists('mi_product_factory_costs', 'id')->where('product_id', $product->getKey());
+        $ownedVariant = Rule::exists('mi_product_variants', 'variant_id')->where('product_id', $product->getKey());
         $rules = [
             'item_name' => 'required|string|max:255',
+            'variants_present' => ['sometimes', 'accepted'],
+            'sku' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('mi_products', 'sku')->ignore($product, 'product_id'), Rule::unique('mi_product_variants', 'sku')],
             'item_code' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('mi_products', 'item_code')->ignore($product)],
             'description' => 'sometimes|nullable|string|max:20000',
             'type_of_sample' => 'required|string|max:255',
@@ -52,10 +55,23 @@ class UpdateMIProductRequest extends FormRequest
             'sub_category_id' => 'sometimes|required|integer|exists:mi_sub_categories,id',
             'product_type_id' => 'sometimes|nullable|integer|exists:mi_product_types,id',
             'collection_id' => 'sometimes|nullable|integer|exists:mi_collections,id',
-            'materials' => 'required|array|min:1|max:100',
+            'materials' => 'required_without:variants|array|min:1|max:100',
             'materials.*' => 'required|string|max:255',
             'color' => 'sometimes|nullable|array|max:100',
             'color.*' => 'required|string|max:255',
+            'variants' => ['sometimes', 'array', 'max:100'],
+            'variants.*' => ['required', 'array:id,sequence,material,color,product_length,product_width,product_height,product_depth,purchase_price,selling_price,sku'],
+            'variants.*.id' => ['nullable', 'integer', 'distinct', $ownedVariant],
+            'variants.*.sequence' => ['required', 'integer', 'min:1', 'max:9999', 'distinct'],
+            'variants.*.material' => ['required', 'string', 'max:255'],
+            'variants.*.color' => ['nullable', 'string', 'max:255'],
+            'variants.*.sku' => ['nullable', 'string', 'max:255', 'distinct'],
+            'variants.*.product_length' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
+            'variants.*.product_width' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
+            'variants.*.product_height' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
+            'variants.*.product_depth' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
+            'variants.*.purchase_price' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+            'variants.*.selling_price' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'type' => 'sometimes|nullable|string|max:255',
             'price' => 'sometimes|nullable|numeric|min:0|max:9999999999.99',
             'purchase_cost' => 'sometimes|nullable|numeric|min:0|max:9999999999.99',
@@ -84,6 +100,14 @@ class UpdateMIProductRequest extends FormRequest
             foreach (['height', 'width', 'length', 'depth'] as $dimension) {
                 $rules[$prefix.'_'.$dimension] = 'sometimes|nullable|numeric|min:0|max:99999999.99';
             }
+        }
+        foreach ($this->input('variants', []) as $index => $variant) {
+            $uniqueSku = Rule::unique('mi_product_variants', 'sku');
+            if (! empty($variant['id'])) {
+                $uniqueSku->ignore($variant['id'], 'variant_id');
+            }
+            $rules["variants.{$index}.sku"][] = $uniqueSku;
+            $rules["variants.{$index}.sku"][] = Rule::unique('mi_products', 'sku');
         }
 
         return $rules;

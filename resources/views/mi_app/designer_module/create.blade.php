@@ -801,8 +801,7 @@
                             <div>
 
                                 <label for="materials" class="tx-label">
-                                    Materials
-                                    <span class="tx-required">*</span>
+                                    Materials (legacy product-level)
                                 </label>
 
                                 <div class="tx-multi-select-wrap">
@@ -828,8 +827,6 @@
                                         name="materials[]"
                                         multiple
                                         size="12"
-                                        required
-                                        data-required
                                         class="tx-field tx-multi-select materials-select"
                                         @error('materials') aria-invalid="true" aria-describedby="materials_error" @enderror
                                     >
@@ -1212,6 +1209,8 @@
                     </div>
 
                 </section>
+
+                @include('mi_app.designer_module.partials._product-variants')
 
                 @include('mi_app.designer_module.partials._factory-costs')
 

@@ -11,6 +11,9 @@ use App\Models\MI_Product;
 use App\Models\MI_Product_Image;
 use App\Models\MI_ProductType;
 use App\Models\MI_SubCategory;
+use App\Models\MIProductVariant;
+use App\Models\MIProductVariantInventoryMovement;
+use App\Models\Warehouse;
 use App\Services\MIProductAttributeOptionService;
 use App\Services\MIProductFactoryCostService;
 use Illuminate\Contracts\View\View;
@@ -25,6 +28,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class MIAppController extends Controller
@@ -59,6 +63,7 @@ class MIAppController extends Controller
 
                 // Product fields
                 $q->where('item_name', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%")
                     ->orWhere('type_of_sample', 'like', "%{$search}%")
                     ->orWhere('designed_by', 'like', "%{$search}%")
                     ->orWhere('classification', 'like', "%{$search}%");
@@ -85,6 +90,12 @@ class MIAppController extends Controller
                 $q->orWhereHas('collection', function ($query) use ($search) {
                     $query->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%");
+                });
+
+                $q->orWhereHas('variants', function ($query) use ($search): void {
+                    $query->where('sku', 'like', "%{$search}%")
+                        ->orWhere('material', 'like', "%{$search}%")
+                        ->orWhere('color', 'like', "%{$search}%");
                 });
             });
         }
@@ -446,6 +457,7 @@ class MIAppController extends Controller
 
             // Product Information
             'item_name' => 'required|string|max:255',
+            'sku' => ['nullable', 'string', 'max:255', Rule::unique('mi_products', 'sku'), Rule::unique('mi_product_variants', 'sku')],
             'description' => 'nullable|string',
 
             // Taxonomy
@@ -461,13 +473,25 @@ class MIAppController extends Controller
             'designed_by' => 'nullable|string|max:255',
 
             // Attributes
-            'materials' => 'required|array|min:1|max:100',
+            'materials' => 'required_without:variants|array|min:1|max:100',
             'materials.*' => 'required|string|max:255',
 
             'type' => 'nullable|string|max:255',
 
             'color' => 'nullable|array|max:100',
             'color.*' => 'required|string|max:255',
+            'variants' => 'nullable|array|max:100',
+            'variants.*' => ['required', 'array:sequence,material,color,product_length,product_width,product_height,product_depth,purchase_price,selling_price,sku'],
+            'variants.*.sequence' => ['required', 'integer', 'min:1', 'max:9999', 'distinct'],
+            'variants.*.material' => 'required|string|max:255',
+            'variants.*.color' => 'nullable|string|max:255',
+            'variants.*.sku' => ['nullable', 'string', 'max:255', 'distinct', Rule::unique('mi_product_variants', 'sku'), Rule::unique('mi_products', 'sku')],
+            'variants.*.product_length' => 'nullable|numeric|min:0|max:99999999.99',
+            'variants.*.product_width' => 'nullable|numeric|min:0|max:99999999.99',
+            'variants.*.product_height' => 'nullable|numeric|min:0|max:99999999.99',
+            'variants.*.product_depth' => 'nullable|numeric|min:0|max:99999999.99',
+            'variants.*.purchase_price' => 'nullable|numeric|min:0|max:9999999999.99',
+            'variants.*.selling_price' => 'nullable|numeric|min:0|max:9999999999.99',
 
             // Product Dimensions
             'product_height' => 'nullable|numeric',
@@ -508,10 +532,12 @@ class MIAppController extends Controller
         unset($validated['custom_country']);
 
         $factoryCostRows = $validated['factory_costs'] ?? [];
+        $variantRows = $validated['variants'] ?? [];
         if (collect($factoryCostRows)->filter(fn (array $cost): bool => (bool) ($cost['is_primary'] ?? false))->count() > 1) {
             throw ValidationException::withMessages(['factory_costs' => 'Select only one primary factory cost.']);
         }
         unset($validated['factory_costs']);
+        unset($validated['variants']);
 
         $this->validateProductTaxonomy($validated);
         $uploadedPaths = [];
@@ -526,9 +552,9 @@ class MIAppController extends Controller
 
         try {
 
-            $validated['materials'] = $attributeOptions->persistMaterials($validated['materials']);
+            $validated['materials'] = $attributeOptions->persistMaterials($validated['materials'] ?? []);
             $validated['color'] = $attributeOptions->persistColors($validated['color'] ?? []);
-            if ($validated['materials'] === []) {
+            if ($validated['materials'] === [] && $variantRows === []) {
                 throw ValidationException::withMessages(['materials' => 'Select at least one material.']);
             }
             $product = MI_Product::create($validated);
@@ -611,7 +637,7 @@ class MIAppController extends Controller
                 substr($collection->code ?? 'XXX', 0, 3)
             );
 
-            $product->sku =
+            $product->sku = $product->sku ?: (
                 $categoryCode
                 .'-'
                 .$subCategoryCode
@@ -620,7 +646,7 @@ class MIAppController extends Controller
                 .'-'
                 .$subsubCategory
                 .'-'
-                .str_pad($product->product_id, 4, '0', STR_PAD_LEFT);
+                .str_pad($product->product_id, 4, '0', STR_PAD_LEFT));
 
             /*
             |--------------------------------------------------------------------------
@@ -629,6 +655,8 @@ class MIAppController extends Controller
             */
 
             $product->save();
+
+            $this->synchronizeProductVariants($product, $variantRows, false);
 
             DB::commit();
 
@@ -665,15 +693,16 @@ class MIAppController extends Controller
     public function edit(MI_Product $product): View
     {
         Gate::authorize('update', $product);
-        $product->load(['category', 'subCategory', 'productType', 'collection', 'images', 'factoryCosts']);
+        $product->load(['category', 'subCategory', 'productType', 'collection', 'images', 'factoryCosts', 'variants.inventories.warehouse']);
         $categories = MI_Category::orderBy('name')->get();
         $subCategories = MI_SubCategory::orderBy('name')->get();
         $productTypes = MI_ProductType::orderBy('name')->get();
         $collections = MI_Collection::orderBy('name')->get();
         $materialOptions = MI_Material::where('is_active', true)->orderBy('material_name')->get();
         $colorOptions = MI_Color::where('is_active', true)->orderBy('color_name')->get();
+        $warehouses = Warehouse::query()->orderBy('warehouse_name')->get(['warehouse_id', 'warehouse_name']);
 
-        return view('mi_app.designer_module.edit', compact('product', 'categories', 'subCategories', 'productTypes', 'collections', 'materialOptions', 'colorOptions'));
+        return view('mi_app.designer_module.edit', compact('product', 'categories', 'subCategories', 'productTypes', 'collections', 'materialOptions', 'colorOptions', 'warehouses'));
     }
 
     public function update(UpdateMIProductRequest $request, MI_Product $product, MIProductFactoryCostService $factoryCosts, MIProductAttributeOptionService $attributeOptions): RedirectResponse
@@ -683,7 +712,8 @@ class MIAppController extends Controller
         if (in_array((int) ($validated['primary_image_id'] ?? 0), $removeIds, true)) {
             throw ValidationException::withMessages(['primary_image_id' => 'Select an image that is not marked for removal.']);
         }
-        $controls = ['image_links', 'product_images', 'remove_image_ids', 'primary_image_id', 'image_order', 'factory_costs', 'remove_factory_cost_ids'];
+        $controls = ['image_links', 'product_images', 'remove_image_ids', 'primary_image_id', 'image_order', 'factory_costs', 'remove_factory_cost_ids', 'variants', 'variants_present'];
+        $baseSkuChanged = isset($validated['sku']) && $validated['sku'] !== $product->sku;
         $attributes = Arr::except($validated, $controls);
         if (($attributes['country_of_production'] ?? null) === 'Other') {
             $attributes['country_of_production'] = trim($attributes['custom_country']);
@@ -697,10 +727,10 @@ class MIAppController extends Controller
         $removedPaths = [];
 
         try {
-            DB::transaction(function () use ($product, $attributes, $validated, $request, $removeIds, $factoryCosts, $attributeOptions, &$uploadedPaths, &$removedPaths): void {
+            DB::transaction(function () use ($product, $attributes, $validated, $request, $removeIds, $factoryCosts, $attributeOptions, $baseSkuChanged, &$uploadedPaths, &$removedPaths): void {
                 $lockedProduct = MI_Product::whereKey($product->getKey())->lockForUpdate()->firstOrFail();
-                $attributes['materials'] = $attributeOptions->persistMaterials($attributes['materials']);
-                if ($attributes['materials'] === []) {
+                $attributes['materials'] = $attributeOptions->persistMaterials($attributes['materials'] ?? $lockedProduct->materials ?? []);
+                if ($attributes['materials'] === [] && ($validated['variants'] ?? []) === []) {
                     throw ValidationException::withMessages(['materials' => 'Select at least one material.']);
                 }
                 if (array_key_exists('color', $attributes)) {
@@ -709,6 +739,11 @@ class MIAppController extends Controller
                 $validatedTaxonomy = array_replace($lockedProduct->only(['category_id', 'sub_category_id', 'product_type_id', 'collection_id']), $attributes);
                 $this->validateProductTaxonomy($validatedTaxonomy);
                 $lockedProduct->fill($attributes)->save();
+                if (array_key_exists('variants_present', $validated)) {
+                    $this->synchronizeProductVariants($lockedProduct, $validated['variants'] ?? [], $baseSkuChanged);
+                } elseif ($baseSkuChanged) {
+                    $this->synchronizeProductVariants($lockedProduct, $lockedProduct->variants()->get()->map(fn (MIProductVariant $variant): array => $variant->toArray())->all(), true);
+                }
                 if (array_key_exists('factory_costs', $validated) || array_key_exists('remove_factory_cost_ids', $validated)) {
                     $factoryCosts->synchronize($lockedProduct, $validated['factory_costs'] ?? [], $validated['remove_factory_cost_ids'] ?? []);
                 }
@@ -883,9 +918,41 @@ class MIAppController extends Controller
             'collection',
             'images',
             'factoryCosts',
+            'variants.inventories.warehouse',
         ]);
 
         return view('mi_app.designer_module.show', compact('product'));
+    }
+
+    /** @param array<int, array<string, mixed>> $rows */
+    private function synchronizeProductVariants(MI_Product $product, array $rows, bool $regenerateSkus): void
+    {
+        $keptIds = [];
+        $submittedIds = collect($rows)->map(fn (array $row): int => (int) ($row['id'] ?? $row['variant_id'] ?? 0))->filter()->all();
+        $removedIds = $product->variants()->pluck('variant_id')->diff($submittedIds);
+        if ($removedIds->isNotEmpty() && MIProductVariantInventoryMovement::query()->whereIn('variant_id', $removedIds)->exists()) {
+            throw ValidationException::withMessages(['variants' => 'A variant with recorded inventory movements cannot be removed.']);
+        }
+
+        foreach ($rows as $row) {
+            $variantId = isset($row['id']) ? (int) $row['id'] : (isset($row['variant_id']) ? (int) $row['variant_id'] : null);
+            unset($row['id'], $row['variant_id'], $row['product_id'], $row['created_at'], $row['updated_at']);
+            if ($regenerateSkus) {
+                $row['sku'] = $product->sku.'-'.str_pad((string) $row['sequence'], 2, '0', STR_PAD_LEFT);
+            } elseif (empty($row['sku'])) {
+                $row['sku'] = $product->sku.'-'.str_pad((string) $row['sequence'], 2, '0', STR_PAD_LEFT);
+            }
+            if ($variantId) {
+                $variant = $product->variants()->lockForUpdate()->findOrFail($variantId);
+                $variant->fill($row)->save();
+                $keptIds[] = $variant->getKey();
+            } else {
+                $variant = $product->variants()->create($row);
+                $keptIds[] = $variant->getKey();
+            }
+        }
+
+        $product->variants()->whereNotIn('variant_id', $keptIds)->delete();
     }
 
     public function taxonomy_edit($type, $id)

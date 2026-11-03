@@ -1705,6 +1705,19 @@
             </section>
 
 
+            @if($product->variants->isNotEmpty())
+                <section class="pd-card">
+                    <div class="pd-card-header"><span class="pd-card-icon purple">04</span><div class="pd-card-heading"><h2>Product Variants</h2><p>Sellable variants with their own SKU, attributes, dimensions, and prices.</p></div></div>
+                    <div class="pd-card-body overflow-x-auto">
+                        <table class="min-w-full text-left text-sm"><thead><tr class="border-b text-slate-500"><th class="p-2">SKU</th><th class="p-2">Material</th><th class="p-2">Color</th><th class="p-2">Dimensions (L × W × H × D cm)</th><th class="p-2">Purchase</th><th class="p-2">Selling</th><th class="p-2">Stock by warehouse</th></tr></thead><tbody>
+                            @foreach($product->variants as $variant)
+                                <tr class="border-b border-slate-100"><td class="p-2 font-mono">{{ $variant->sku }}</td><td class="p-2">{{ $variant->material }}</td><td class="p-2">{{ $variant->color ?: '—' }}</td><td class="p-2">{{ collect([$variant->product_length, $variant->product_width, $variant->product_height, $variant->product_depth])->map(fn ($value) => $value ?? '—')->implode(' × ') }}</td><td class="p-2">{{ $variant->purchase_price === null ? '—' : 'PHP '.$variant->purchase_price }}</td><td class="p-2">{{ $variant->selling_price === null ? '—' : 'PHP '.$variant->selling_price }}</td><td class="p-2">@forelse($variant->inventories as $stock){{ $stock->warehouse->warehouse_name }}: {{ number_format($stock->quantity) }}@if(!$loop->last) · @endif @empty 0 @endforelse</td></tr>
+                            @endforeach
+                        </tbody></table>
+                    </div>
+                </section>
+            @endif
+
             {{-- =====================================================
                  MATERIALS & COLORS
             ====================================================== --}}

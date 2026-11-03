@@ -3,11 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\MI_Product;
+use App\Models\MIProductVariant;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
 
 class QuotationController extends Controller
 {
@@ -44,12 +45,12 @@ class QuotationController extends Controller
 
         $pdf->setOptions([
             'isHtml5ParserEnabled' => true,
-            'isRemoteEnabled'      => true,
-            'isPhpEnabled'         => false,
-            'defaultFont'          => 'DejaVu Sans',
+            'isRemoteEnabled' => true,
+            'isPhpEnabled' => false,
+            'defaultFont' => 'DejaVu Sans',
         ]);
 
-        $filename = 'quotation-' . $quotation['quote_number'] . '.pdf';
+        $filename = 'quotation-'.$quotation['quote_number'].'.pdf';
 
         return $pdf->download($filename);
     }
@@ -119,7 +120,7 @@ class QuotationController extends Controller
         );
 
         if (
-            !is_array($productsInput) ||
+            ! is_array($productsInput) ||
             empty($productsInput)
         ) {
             abort(
@@ -142,8 +143,8 @@ class QuotationController extends Controller
 
             abort(
                 422,
-                'A quotation can include at most ' .
-                self::MAX_PRODUCTS_PER_QUOTATION .
+                'A quotation can include at most '.
+                self::MAX_PRODUCTS_PER_QUOTATION.
                 ' products.'
             );
         }
@@ -157,7 +158,7 @@ class QuotationController extends Controller
         $cleanProducts = collect($productsInput)
             ->map(function ($item) {
 
-                if (!is_array($item)) {
+                if (! is_array($item)) {
                     return null;
                 }
 
@@ -173,7 +174,8 @@ class QuotationController extends Controller
                 }
 
                 return [
-                    'id'       => $id,
+                    'id' => $id,
+                    'variant_id' => isset($item['variant_id']) && (int) $item['variant_id'] > 0 ? (int) $item['variant_id'] : null,
                     'quantity' => $quantity,
                 ];
             })
@@ -226,6 +228,11 @@ class QuotationController extends Controller
             ->get()
             ->keyBy('product_id');
 
+        $variants = MIProductVariant::query()
+            ->whereIn('variant_id', $cleanProducts->pluck('variant_id')->filter()->unique())
+            ->get()
+            ->keyBy('variant_id');
+
         /*
         |--------------------------------------------------------------------------
         | Make Sure All Products Exist
@@ -234,14 +241,17 @@ class QuotationController extends Controller
 
         foreach ($cleanProducts as $item) {
 
-            if (!$products->has($item['id'])) {
+            if (! $products->has($item['id'])) {
 
                 abort(
                     404,
-                    'Product ID ' .
-                    $item['id'] .
+                    'Product ID '.
+                    $item['id'].
                     ' was not found.'
                 );
+            }
+            if ($item['variant_id'] !== null && (! $variants->has($item['variant_id']) || (int) $variants->get($item['variant_id'])->product_id !== $item['id'])) {
+                abort(422, 'Choose a variant that belongs to the selected product.');
             }
         }
 
@@ -255,16 +265,30 @@ class QuotationController extends Controller
         */
 
         $quotationItems = $cleanProducts
-            ->map(function ($item) use ($products) {
+            ->map(function ($item) use ($products, $variants) {
 
-                $product = $products->get(
+                $product = clone $products->get(
                     $item['id']
                 );
+
+                $variant = $item['variant_id'] !== null ? $variants->get($item['variant_id']) : null;
+                if ($variant !== null) {
+                    $product->sku = $variant->sku;
+                    $product->item_name .= ' — '.$variant->material.($variant->color ? ' / '.$variant->color : '');
+                    $product->materials = [$variant->material];
+                    $product->color = $variant->color ? [$variant->color] : [];
+                    $product->product_length = $variant->product_length;
+                    $product->product_width = $variant->product_width;
+                    $product->product_height = $variant->product_height;
+                    $product->product_depth = $variant->product_depth;
+                    $product->price = $variant->selling_price;
+                    $product->purchase_cost = $variant->purchase_price;
+                }
 
                 $quantity = (int) $item['quantity'];
 
                 $unitPrice = (float) (
-                    $product->price ?? 0
+                    $variant?->selling_price ?? $product->price ?? 0
                 );
 
                 $subtotal = $unitPrice * $quantity;
@@ -281,11 +305,11 @@ class QuotationController extends Controller
                     );
 
                 return (object) [
-                    'product'      => $product,
-                    'quantity'     => $quantity,
-                    'unit_price'   => $unitPrice,
-                    'subtotal'     => $subtotal,
-                    'product_image'=> $productImage,
+                    'product' => $product,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'subtotal' => $subtotal,
+                    'product_image' => $productImage,
                 ];
             })
             ->values();
@@ -311,9 +335,9 @@ class QuotationController extends Controller
         */
 
         $quoteNumber =
-            'Q-' .
-            now()->format('Ymd-His') .
-            '-' .
+            'Q-'.
+            now()->format('Ymd-His').
+            '-'.
             strtoupper(
                 substr(
                     bin2hex(random_bytes(2)),
@@ -348,11 +372,11 @@ class QuotationController extends Controller
         */
 
         return [
-            'customer_name'  => $customerName,
+            'customer_name' => $customerName,
             'quotationItems' => $quotationItems,
-            'total'          => $total,
-            'quote_number'   => $quoteNumber,
-            'issued_at'      => $issuedAt,
+            'total' => $total,
+            'quote_number' => $quoteNumber,
+            'issued_at' => $issuedAt,
         ];
     }
 
@@ -365,7 +389,7 @@ class QuotationController extends Controller
         MI_Product $product
     ): ?string {
 
-        $cacheKey = 'quotation_pdf_image:' . $product->product_id;
+        $cacheKey = 'quotation_pdf_image:'.$product->product_id;
 
         // Cache::rememberForever-style but with a TTL, and caching
         // the "no image available" result too (as an empty string
@@ -411,7 +435,7 @@ class QuotationController extends Controller
         */
 
         if (
-            !$product->relationLoaded('images') ||
+            ! $product->relationLoaded('images') ||
             $product->images->isEmpty()
         ) {
             return null;
@@ -433,12 +457,12 @@ class QuotationController extends Controller
 
             if (
                 $image->image_type === 'upload' &&
-                !empty($image->image_path)
+                ! empty($image->image_path)
             ) {
 
                 $storagePath =
                     storage_path(
-                        'app/public/' .
+                        'app/public/'.
                         ltrim(
                             $image->image_path,
                             '/'
@@ -446,23 +470,20 @@ class QuotationController extends Controller
                     );
 
                 if (
-                    !is_file($storagePath) ||
-                    !is_readable($storagePath)
+                    ! is_file($storagePath) ||
+                    ! is_readable($storagePath)
                 ) {
 
                     Log::warning(
                         'Quotation image file not found',
                         [
-                            'product_id' =>
-                                $product->product_id,
+                            'product_id' => $product->product_id,
 
-                            'image_id' =>
-                                $image->id ??
+                            'image_id' => $image->id ??
                                 $image->product_image_id ??
                                 null,
 
-                            'path' =>
-                                $storagePath,
+                            'path' => $storagePath,
                         ]
                     );
 
@@ -497,14 +518,11 @@ class QuotationController extends Controller
                     Log::warning(
                         'Quotation image conversion failed',
                         [
-                            'product_id' =>
-                                $product->product_id,
+                            'product_id' => $product->product_id,
 
-                            'path' =>
-                                $storagePath,
+                            'path' => $storagePath,
 
-                            'error' =>
-                                $e->getMessage(),
+                            'error' => $e->getMessage(),
                         ]
                     );
                 }
@@ -519,7 +537,7 @@ class QuotationController extends Controller
             */
 
             if (
-                !empty($image->image_url)
+                ! empty($image->image_url)
             ) {
 
                 $imageUrl =
@@ -536,20 +554,17 @@ class QuotationController extends Controller
                             ->get($imageUrl);
 
                     if (
-                        !$response->successful()
+                        ! $response->successful()
                     ) {
 
                         Log::warning(
                             'Quotation external image download failed',
                             [
-                                'product_id' =>
-                                    $product->product_id,
+                                'product_id' => $product->product_id,
 
-                                'url' =>
-                                    $imageUrl,
+                                'url' => $imageUrl,
 
-                                'status' =>
-                                    $response->status(),
+                                'status' => $response->status(),
                             ]
                         );
 
@@ -582,14 +597,11 @@ class QuotationController extends Controller
                     Log::warning(
                         'Quotation external image error',
                         [
-                            'product_id' =>
-                                $product->product_id,
+                            'product_id' => $product->product_id,
 
-                            'url' =>
-                                $imageUrl,
+                            'url' => $imageUrl,
 
-                            'error' =>
-                                $e->getMessage(),
+                            'error' => $e->getMessage(),
                         ]
                     );
                 }
@@ -621,8 +633,8 @@ class QuotationController extends Controller
         ) {
 
             return
-                'https://drive.google.com/thumbnail?id=' .
-                $matches[1] .
+                'https://drive.google.com/thumbnail?id='.
+                $matches[1].
                 '&sz=w1600';
         }
 
@@ -641,8 +653,8 @@ class QuotationController extends Controller
         ) {
 
             return
-                'https://drive.google.com/thumbnail?id=' .
-                $matches[1] .
+                'https://drive.google.com/thumbnail?id='.
+                $matches[1].
                 '&sz=w1600';
         }
 
@@ -661,8 +673,8 @@ class QuotationController extends Controller
         ) {
 
             return
-                'https://drive.google.com/thumbnail?id=' .
-                $matches[1] .
+                'https://drive.google.com/thumbnail?id='.
+                $matches[1].
                 '&sz=w1600';
         }
 
@@ -679,7 +691,7 @@ class QuotationController extends Controller
 
         if (
             empty($imageData) ||
-            !is_string($imageData)
+            ! is_string($imageData)
         ) {
             return null;
         }
@@ -734,7 +746,7 @@ class QuotationController extends Controller
         ) {
 
             return
-                'data:image/jpeg;base64,' .
+                'data:image/jpeg;base64,'.
                 base64_encode(
                     $imageData
                 );
@@ -751,7 +763,7 @@ class QuotationController extends Controller
         ) {
 
             return
-                'data:image/png;base64,' .
+                'data:image/png;base64,'.
                 base64_encode(
                     $imageData
                 );
@@ -764,10 +776,10 @@ class QuotationController extends Controller
         */
 
         if (
-            !function_exists(
+            ! function_exists(
                 'imagecreatefromstring'
             ) ||
-            !function_exists(
+            ! function_exists(
                 'imagejpeg'
             )
         ) {
@@ -887,7 +899,7 @@ class QuotationController extends Controller
             }
 
             return
-                'data:image/jpeg;base64,' .
+                'data:image/jpeg;base64,'.
                 base64_encode(
                     $jpegData
                 );
@@ -897,8 +909,7 @@ class QuotationController extends Controller
             Log::warning(
                 'Quotation image processing error',
                 [
-                    'error' =>
-                        $e->getMessage(),
+                    'error' => $e->getMessage(),
                 ]
             );
 

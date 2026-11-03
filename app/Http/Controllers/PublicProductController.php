@@ -16,10 +16,11 @@ class PublicProductController extends Controller
         // on your model, then uncomment the line below:
         // abort_if($product->status !== 'active', 404);
 
-        $product->load(['category', 'subCategory', 'collection', 'images']);
+        $product->load(['category', 'subCategory', 'collection', 'images', 'variants']);
 
         return view('mi_app.public.show', [
             'product' => $product,
+            'selectedVariant' => null,
         ]);
     }
 }

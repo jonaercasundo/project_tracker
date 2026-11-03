@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MI_Product;
+use App\Models\MIProductVariant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -53,9 +54,11 @@ class ProductScanController extends Controller
         |
         */
 
-        $product = $this->resolveProductFromCode($code);
+        $normalizedCode = $this->extractCodeFromInput($code);
+        $selectedVariant = MIProductVariant::query()->with('product')->where('sku', $normalizedCode)->first();
+        $product = $selectedVariant?->product ?? $this->resolveProductFromCode($code);
 
-        if (!$product) {
+        if (! $product) {
 
             Log::info(
                 'Product scan lookup failed',
@@ -69,6 +72,8 @@ class ProductScanController extends Controller
             ]);
         }
 
+        $product->loadMissing(['category', 'subCategory', 'collection', 'images', 'variants']);
+
         /*
         |--------------------------------------------------------------------------
         | Render Product Detail
@@ -77,6 +82,7 @@ class ProductScanController extends Controller
 
         return view('mi_app.public.show', [
             'product' => $product,
+            'selectedVariant' => $selectedVariant,
         ]);
     }
 
@@ -160,7 +166,7 @@ class ProductScanController extends Controller
             $path = parse_url($input, PHP_URL_PATH) ?? '';
             $segments = array_values(array_filter(explode('/', $path)));
 
-            if (!empty($segments)) {
+            if (! empty($segments)) {
                 return trim(end($segments));
             }
 

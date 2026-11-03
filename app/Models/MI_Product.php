@@ -23,6 +23,7 @@ class MI_Product extends Model
     protected $fillable = [
 
         'item_name',
+        'sku',
         'item_code',
         'description',
 
@@ -198,5 +199,10 @@ class MI_Product extends Model
             'product_id'
         )
             ->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(MIProductVariant::class, 'product_id', 'product_id')->orderBy('sequence');
     }
 }

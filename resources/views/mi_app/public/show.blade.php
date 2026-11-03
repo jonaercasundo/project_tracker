@@ -759,6 +759,18 @@
                 Add Product
             </p>
 
+            @if($product->variants->isNotEmpty())
+                <div class="pd-field">
+                    <label for="pdCurrentVariant">Product Variant</label>
+                    <select id="pdCurrentVariant">
+                        @foreach($product->variants as $variant)
+                            <option value="{{ $variant->variant_id }}" @selected((int) ($selectedVariant->variant_id ?? 0) === (int) $variant->variant_id)>{{ $variant->material }}{{ $variant->color ? ' / '.$variant->color : '' }} — {{ $variant->sku }}</option>
+                        @endforeach
+                    </select>
+                    <p id="pdVariantSummary" class="mt-2 text-sm text-slate-600" aria-live="polite"></p>
+                </div>
+            @endif
+
 
             <div class="pd-field">
 
@@ -1172,7 +1184,14 @@
             @json($product->item_name),
 
         price:
-            @json($product->price)
+            @json($product->price),
+
+        variants: @json($product->variants->map(fn ($variant) => [
+            'id' => $variant->variant_id, 'sku' => $variant->sku, 'material' => $variant->material,
+            'color' => $variant->color, 'length' => $variant->product_length, 'width' => $variant->product_width,
+            'height' => $variant->product_height, 'depth' => $variant->product_depth, 'price' => $variant->selling_price,
+            'purchase_price' => $variant->purchase_price,
+        ])->values())
 
     };
 
@@ -1315,6 +1334,15 @@
 
     function pdAddCurrentProduct()
     {
+        const variantSelect = document.getElementById('pdCurrentVariant');
+        const selectedVariant = PD_CURRENT_PRODUCT.variants.find((variant) => Number(variant.id) === Number(variantSelect?.value)) || null;
+        const cartProduct = selectedVariant ? {
+            ...PD_CURRENT_PRODUCT,
+            variant_id: selectedVariant.id,
+            sku: selectedVariant.sku,
+            name: `${PD_CURRENT_PRODUCT.name} (${selectedVariant.material}${selectedVariant.color ? ' / ' + selectedVariant.color : ''})`,
+            price: selectedVariant.price
+        } : { ...PD_CURRENT_PRODUCT, variant_id: null };
         const quantityInput =
             document.getElementById(
                 'pdCurrentQuantity'
@@ -1352,10 +1380,8 @@
             cart.findIndex(
                 function (item) {
 
-                    return Number(item.id)
-                        === Number(
-                            PD_CURRENT_PRODUCT.id
-                        );
+                    return Number(item.id) === Number(cartProduct.id)
+                        && Number(item.variant_id || 0) === Number(cartProduct.variant_id || 0);
 
                 }
             );
@@ -1382,16 +1408,13 @@
             |--------------------------------------------------------------------------
             */
 
-            cart[existingIndex].sku =
-                PD_CURRENT_PRODUCT.sku;
+            cart[existingIndex].sku = cartProduct.sku;
 
 
-            cart[existingIndex].name =
-                PD_CURRENT_PRODUCT.name;
+            cart[existingIndex].name = cartProduct.name;
 
 
-            cart[existingIndex].price =
-                PD_CURRENT_PRODUCT.price;
+            cart[existingIndex].price = cartProduct.price;
 
         }
 
@@ -1408,14 +1431,16 @@
 
                 id:
                     Number(
-                        PD_CURRENT_PRODUCT.id
+                        cartProduct.id
                     ),
 
+                variant_id: cartProduct.variant_id,
+
                 sku:
-                    PD_CURRENT_PRODUCT.sku,
+                    cartProduct.sku,
 
                 name:
-                    PD_CURRENT_PRODUCT.name,
+                    cartProduct.name,
 
                 /*
                 |--------------------------------------------------------------------------
@@ -1430,9 +1455,9 @@
                 */
 
                 price:
-                    PD_CURRENT_PRODUCT.price !== null
+                    cartProduct.price !== null
                         ? Number(
-                            PD_CURRENT_PRODUCT.price
+                            cartProduct.price
                         )
                         : null,
 
@@ -2180,6 +2205,8 @@
                                 item.id
                             ),
 
+                        variant_id: item.variant_id ? Number(item.variant_id) : null,
+
                         quantity:
                             Math.max(
                                 1,
@@ -2284,6 +2311,19 @@
     document.addEventListener(
         'DOMContentLoaded',
         function () {
+
+            const variantSelect = document.getElementById('pdCurrentVariant');
+            const summary = document.getElementById('pdVariantSummary');
+            const updateVariantSummary = () => {
+                if (!variantSelect || !summary) return;
+                const variant = PD_CURRENT_PRODUCT.variants.find((item) => Number(item.id) === Number(variantSelect.value));
+                if (!variant) return;
+                const dimensions = [variant.length, variant.width, variant.height, variant.depth].map((value) => value ?? '—').join(' × ');
+                const selling = variant.price === null ? 'Price on request' : `Selling: PHP ${Number(variant.price).toFixed(2)}`;
+                summary.textContent = `SKU ${variant.sku} · ${variant.material}${variant.color ? ' / ' + variant.color : ''} · ${dimensions} cm · ${selling}`;
+            };
+            variantSelect?.addEventListener('change', updateVariantSummary);
+            updateVariantSummary();
 
             pdRenderCart();
 

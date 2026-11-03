@@ -200,14 +200,14 @@
                                     $selectedValues = old($field, $values) ?: [];
                                 @endphp
                                 <div>
-                                    <label for="{{ $field }}" class="tx-label">{{ $label }} @if($field === 'materials')<span class="tx-required">*</span>@endif</label>
+                                    <label for="{{ $field }}" class="tx-label">{{ $field === 'materials' ? 'Materials (legacy product-level)' : $label }}</label>
                                     <div class="tx-multi-select-wrap">
                                         <div class="tx-multi-toolbar">
                                             <span class="tx-multi-hint">Select one or more {{ strtolower($label) }}</span>
                                             <button type="button" class="tx-multi-clear" data-target="{{ $field }}" aria-label="Clear {{ strtolower($label) }}" hidden>Clear</button>
                                         </div>
                                         <input type="hidden" name="{{ $field }}" value="">
-                                        <select id="{{ $field }}" name="{{ $field }}[]" multiple size="{{ $field === 'materials' ? 12 : 8 }}" @if($field === 'materials') required @endif class="tx-field tx-multi-select {{ $errors->has($field) || $errors->has($field.'.*') ? 'field-invalid' : '' }}" @if($errors->has($field) || $errors->has($field.'.*')) aria-invalid="true" aria-describedby="{{ $field }}_error" @endif>
+                                        <select id="{{ $field }}" name="{{ $field }}[]" multiple size="{{ $field === 'materials' ? 12 : 8 }}" class="tx-field tx-multi-select {{ $errors->has($field) || $errors->has($field.'.*') ? 'field-invalid' : '' }}" @if($errors->has($field) || $errors->has($field.'.*')) aria-invalid="true" aria-describedby="{{ $field }}_error" @endif>
                                             @include('mi_app.designer_module.partials._attribute-options', ['attribute' => $field, 'selectedValues' => $selectedValues])
                                         </select>
                                         <div id="{{ $field }}_chips" class="tx-multi-chips" aria-live="polite"></div>
@@ -242,6 +242,8 @@
                         </div>
                     </div>
                 </section>
+
+                @include('mi_app.designer_module.partials._product-variants')
 
                 @include('mi_app.designer_module.partials._factory-costs')
 
@@ -324,6 +326,7 @@
                     })();
                 </script>
             </form>
+            @include('mi_app.designer_module.partials._variant-stock')
             <template id="new_image_template">@include('mi_app.designer_module.partials._new-image', ['index' => '__INDEX__', 'url' => ''])</template>
         </div>
     </div>

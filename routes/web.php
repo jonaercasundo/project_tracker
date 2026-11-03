@@ -40,6 +40,7 @@ use App\Http\Controllers\LogisticsChannelController;
 use App\Http\Controllers\MIAppController;
 use App\Http\Controllers\MIApprovalController;
 use App\Http\Controllers\MIForexRateController;
+use App\Http\Controllers\MIProductVariantInventoryController;
 use App\Http\Controllers\MmcPplManagementController;
 use App\Http\Controllers\MmcPplWorkbookImportController;
 use App\Http\Controllers\OperationsLifecycleController;
@@ -775,6 +776,7 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         Route::get('/mi/dashboard', [MIAppController::class, 'dashboard'])->name('mi_app.dashboard');
         Route::post('/mi/setting_store', [MIAppController::class, 'setting_store'])->name('mi_app.store');
         Route::post('/mi/store', [MIAppController::class, 'store'])->name('mi_app.store_1');
+        Route::post('/mi/variants/{variant}/stock-movements', [MIProductVariantInventoryController::class, 'store'])->whereNumber('variant')->name('mi_app.variants.stock-movements.store');
         Route::get('/mi/{product}', [MIAppController::class, 'show'])->name('mi_app.show');
         Route::get('/mi/{product}/edit', [MIAppController::class, 'edit'])->name('mi_app.edit');
         Route::match(['put', 'patch'], '/mi/{product}', [MIAppController::class, 'update'])->name('mi_app.update');

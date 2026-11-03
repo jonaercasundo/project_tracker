@@ -14,7 +14,7 @@
             <label for="sku" class="tx-label">Base SKU <span class="text-slate-500">(auto-generated)</span></label>
             <input id="sku" value="{{ $variantBaseSku }}" maxlength="255" class="tx-field bg-slate-100 text-slate-600" placeholder="Assigned after the product is saved" readonly aria-readonly="true">
         </div>
-        <div id="product_variants" class="grid grid-cols-1 gap-4">
+        <div id="product_variants">
             @foreach($variantRows as $index => $variant)
                 @include('mi_app.designer_module.partials._product-variant-row', ['index' => $index, 'variant' => $variant, 'baseSku' => $variantBaseSku])
             @endforeach

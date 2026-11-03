@@ -11,30 +11,58 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('mi_product_variant_inventory', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('variant_id')->constrained('mi_product_variants', 'variant_id')->cascadeOnDelete();
-            $table->integer('warehouse_id');
-            $table->unsignedInteger('quantity')->default(0);
-            $table->timestamps();
-            $table->foreign('warehouse_id')->references('warehouse_id')->on('warehouse')->cascadeOnDelete();
-            $table->unique(['variant_id', 'warehouse_id']);
-        });
+        if (! Schema::hasTable('mi_product_variant_inventory')) {
+            Schema::create('mi_product_variant_inventory', function (Blueprint $table): void {
+                $table->id();
+                $table->foreignId('variant_id')->constrained('mi_product_variants', 'variant_id')->cascadeOnDelete();
+                $table->integer('warehouse_id');
+                $table->unsignedInteger('quantity')->default(0);
+                $table->timestamps();
+                $table->foreign('warehouse_id')->references('warehouse_id')->on('warehouse')->cascadeOnDelete();
+                $table->unique(['variant_id', 'warehouse_id']);
+            });
+        }
 
-        Schema::create('mi_product_variant_inventory_movements', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('variant_id')->constrained('mi_product_variants', 'variant_id')->cascadeOnDelete();
-            $table->integer('warehouse_id');
-            $table->string('movement_type', 20);
-            $table->integer('quantity_change');
-            $table->unsignedInteger('quantity_after');
-            $table->integer('changed_by')->nullable();
-            $table->string('remarks', 500)->nullable();
-            $table->timestamps();
-            $table->foreign('warehouse_id')->references('warehouse_id')->on('warehouse')->cascadeOnDelete();
-            $table->foreign('changed_by')->references('user_id')->on('users')->nullOnDelete();
-            $table->index(['variant_id', 'warehouse_id', 'created_at'], 'mi_variant_movement_lookup_idx');
-        });
+        if (! Schema::hasTable('mi_product_variant_inventory_movements')) {
+            Schema::create('mi_product_variant_inventory_movements', function (Blueprint $table): void {
+                $table->id();
+                $table->foreignId('variant_id')->constrained('mi_product_variants', 'variant_id')->cascadeOnDelete();
+                $table->integer('warehouse_id');
+                $table->string('movement_type', 20);
+                $table->integer('quantity_change');
+                $table->unsignedInteger('quantity_after');
+                $table->unsignedBigInteger('changed_by')->nullable();
+                $table->string('remarks', 500)->nullable();
+                $table->timestamps();
+                $table->foreign('warehouse_id')->references('warehouse_id')->on('warehouse')->cascadeOnDelete();
+                $table->foreign('changed_by')->references('user_id')->on('users')->nullOnDelete();
+                $table->index(['variant_id', 'warehouse_id', 'created_at'], 'mi_variant_movement_lookup_idx');
+            });
+        } else {
+            $changedByForeignKeyExists = collect(Schema::getForeignKeys('mi_product_variant_inventory_movements'))
+                ->contains(fn (array $foreignKey): bool => $foreignKey['columns'] === ['changed_by']);
+
+            if (! $changedByForeignKeyExists && Schema::getColumnType('mi_product_variant_inventory_movements', 'changed_by') !== 'bigint') {
+                Schema::table('mi_product_variant_inventory_movements', function (Blueprint $table): void {
+                    $table->unsignedBigInteger('changed_by')->nullable()->change();
+                });
+            }
+
+            if (! $changedByForeignKeyExists) {
+                Schema::table('mi_product_variant_inventory_movements', function (Blueprint $table): void {
+                    $table->foreign('changed_by')->references('user_id')->on('users')->nullOnDelete();
+                });
+            }
+
+            $hasLookupIndex = collect(Schema::getIndexes('mi_product_variant_inventory_movements'))
+                ->contains(fn (array $index): bool => $index['columns'] === ['variant_id', 'warehouse_id', 'created_at']);
+
+            if (! $hasLookupIndex) {
+                Schema::table('mi_product_variant_inventory_movements', function (Blueprint $table): void {
+                    $table->index(['variant_id', 'warehouse_id', 'created_at'], 'mi_variant_movement_lookup_idx');
+                });
+            }
+        }
     }
 
     /**

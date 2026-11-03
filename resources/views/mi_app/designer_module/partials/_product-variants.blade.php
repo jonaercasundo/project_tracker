@@ -14,6 +14,44 @@
             <label for="sku" class="tx-label">Base SKU <span class="text-slate-500">(auto-generated)</span></label>
             <input id="sku" value="{{ $variantBaseSku }}" maxlength="255" class="tx-field bg-slate-100 text-slate-600" placeholder="Assigned after the product is saved" readonly aria-readonly="true">
         </div>
+        <div class="tx-subpanel tx-variant-bulk-builder">
+            <div class="tx-subpanel-head">
+                <div>
+                    <h3>Add multiple variants</h3>
+                    <p>Select materials and colors in order. Each matching pair becomes a separate SKU row.</p>
+                </div>
+            </div>
+            <div class="tx-variant-grid">
+                <div>
+                    <label for="variant_option_materials" class="tx-label">Materials</label>
+                    <div class="tx-multi-select-wrap">
+                        <div class="tx-multi-toolbar">
+                            <span class="tx-multi-hint">Select or type several materials</span>
+                            <button type="button" class="tx-multi-clear" data-clear-variant-options="materials" hidden>Clear</button>
+                        </div>
+                        <select id="variant_option_materials" multiple class="tx-field variant-option-builder" data-placeholder="Search or add materials...">
+                            @include('mi_app.designer_module.partials._attribute-options', ['attribute' => 'materials', 'selectedValues' => []])
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label for="variant_option_colors" class="tx-label">Colors</label>
+                    <div class="tx-multi-select-wrap">
+                        <div class="tx-multi-toolbar">
+                            <span class="tx-multi-hint">Select matching colors in the same order</span>
+                            <button type="button" class="tx-multi-clear" data-clear-variant-options="colors" hidden>Clear</button>
+                        </div>
+                        <select id="variant_option_colors" multiple class="tx-field variant-option-builder" data-placeholder="Search or add colors...">
+                            @include('mi_app.designer_module.partials._attribute-options', ['attribute' => 'color', 'selectedValues' => []])
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="tx-variant-bulk-actions">
+                <button type="button" id="generate_product_variants" class="tx-btn-small">Create variant rows</button>
+                <p id="variant_builder_message" class="tx-hint" role="status" aria-live="polite" hidden></p>
+            </div>
+        </div>
         <div id="product_variants">
             @foreach($variantRows as $index => $variant)
                 @include('mi_app.designer_module.partials._product-variant-row', ['index' => $index, 'variant' => $variant, 'baseSku' => $variantBaseSku])
@@ -24,7 +62,7 @@
                 @foreach($messages as $message)<p class="tx-error">{{ $message }}</p>@endforeach
             @endif
         @endforeach
-        <p class="tx-hint mt-3">New rows receive the next sequence suffix after the product base SKU is generated (for example, -01). You can edit a variant SKU if it remains unique.</p>
+        <p class="tx-hint mt-3">Each row is one sellable variant with its own stock and SKU. New rows receive the next sequence suffix after the product base SKU is generated (for example, -01). You can edit a variant SKU if it remains unique.</p>
     </div>
 </section>
 <template id="product_variant_template">@include('mi_app.designer_module.partials._product-variant-row', ['index' => '__INDEX__', 'variant' => ['sequence' => '__SEQUENCE__', 'material' => '', 'color' => '', 'sku' => '__SKU__'], 'baseSku' => '__BASE__'])</template>
@@ -33,10 +71,14 @@
     const rows = document.getElementById('product_variants');
     const base = document.getElementById('sku');
     const template = document.getElementById('product_variant_template');
-    let nextIndex = rows.querySelectorAll('[data-variant-row]').length;
+    const existingIndices = [...rows.querySelectorAll('[data-variant-row]')].map((row) => {
+        const fieldName = row.querySelector('[name^="variants["]')?.name ?? '';
+        return Number(fieldName.match(/^variants\[(\d+)\]/)?.[1]);
+    }).filter(Number.isFinite);
+    let nextIndex = Math.max(-1, ...existingIndices) + 1;
     const initializedDropdowns = new WeakSet();
     const initializeDropdowns = (root) => {
-        root.querySelectorAll('.variant-dropdown, .legacy-attribute-select').forEach((select) => {
+        root.querySelectorAll('.variant-dropdown, .legacy-attribute-select, .variant-option-builder').forEach((select) => {
             if (initializedDropdowns.has(select) || select.tomselect || !window.TomSelect) return;
             initializedDropdowns.add(select);
             const isMultiple = select.multiple;
@@ -93,15 +135,62 @@
         const sequence = Number(input.dataset.sequence);
         input.value = base.value.trim() ? `${base.value.trim()}-${String(sequence).padStart(2, '0')}` : '';
     });
-    base.addEventListener('input', refreshAutoSkus);
-    document.addEventListener('DOMContentLoaded', () => initializeDropdowns(document));
-    document.getElementById('add_product_variant').addEventListener('click', () => {
+    const addVariantRow = (material = '', color = '') => {
         const sequences = [...rows.querySelectorAll('[data-sequence]')].map((input) => Number(input.dataset.sequence)).filter(Number.isFinite);
         const sequence = Math.max(0, ...sequences) + 1;
         const sku = base.value.trim() ? `${base.value.trim()}-${String(sequence).padStart(2, '0')}` : '';
         const html = template.innerHTML.replaceAll('__INDEX__', String(nextIndex++)).replaceAll('__SEQUENCE__', String(sequence)).replaceAll('__SKU__', sku).replaceAll('__BASE__', base.value.trim());
         rows.insertAdjacentHTML('beforeend', html);
-        initializeDropdowns(rows.lastElementChild);
+        const row = rows.lastElementChild;
+        initializeDropdowns(row);
+
+        [['materials', material], ['colors', color]].forEach(([attribute, value]) => {
+            if (!value) return;
+            const source = document.getElementById(`variant_option_${attribute}`)?.tomselect;
+            const target = row.querySelector(`select[name$="[${attribute === 'materials' ? 'material' : 'color'}]"]`)?.tomselect;
+            if (!target) return;
+            const option = source?.options[value];
+            if (!target.options[value]) target.addOption({ value, text: option?.text ?? value });
+            target.addItem(value);
+        });
+    };
+    base.addEventListener('input', refreshAutoSkus);
+    document.addEventListener('DOMContentLoaded', () => initializeDropdowns(document));
+    document.getElementById('add_product_variant').addEventListener('click', () => addVariantRow());
+    document.getElementById('generate_product_variants').addEventListener('click', () => {
+        const materialSelect = document.getElementById('variant_option_materials').tomselect;
+        const colorSelect = document.getElementById('variant_option_colors').tomselect;
+        const materials = materialSelect.items;
+        const colors = colorSelect.items;
+        const message = document.getElementById('variant_builder_message');
+        message.hidden = false;
+        const setMessage = (text, isError = false) => {
+            message.textContent = text;
+            message.classList.toggle('tx-error', isError);
+            message.classList.toggle('tx-hint', !isError);
+        };
+
+        if (materials.length === 0) {
+            setMessage('Select at least one material to create variant rows.', true);
+            return;
+        }
+        if (colors.length > 0 && colors.length !== materials.length) {
+            setMessage('Select one color for each material, in the same order, or clear Colors to leave them blank.', true);
+            return;
+        }
+        if (rows.querySelectorAll('[data-variant-row]').length + materials.length > 100) {
+            setMessage('A product can have at most 100 variant rows.', true);
+            return;
+        }
+
+        const generatedCount = materials.length;
+        materials.forEach((material, index) => addVariantRow(material, colors[index] ?? ''));
+        materialSelect.clear();
+        colorSelect.clear();
+        setMessage(`${generatedCount} variant row${generatedCount === 1 ? '' : 's'} created. Enter the dimensions and prices for each row.`);
+    });
+    document.querySelectorAll('[data-clear-variant-options]').forEach((button) => {
+        button.addEventListener('click', () => document.getElementById(`variant_option_${button.dataset.clearVariantOptions}`)?.tomselect?.clear());
     });
     rows.addEventListener('input', (event) => {
         if (event.target.matches('[data-variant-sku]')) event.target.dataset.variantAuto = 'false';

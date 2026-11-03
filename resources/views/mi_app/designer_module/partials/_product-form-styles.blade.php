@@ -1072,6 +1072,24 @@
             gap: 16px;
         }
 
+        .tx-variant-bulk-builder .tx-variant-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            align-items: end;
+        }
+
+        .tx-variant-bulk-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px 14px;
+            margin-top: 14px;
+        }
+
+        .tx-variant-bulk-actions .tx-hint,
+        .tx-variant-bulk-actions .tx-error {
+            margin: 0;
+        }
+
         .tx-variant-sku-row {
             display: flex;
             align-items: center;
@@ -1098,6 +1116,14 @@
             .tx-variant-grid {
                 grid-template-columns:
                     repeat(2, minmax(0, 1fr));
+            }
+
+        }
+
+        @media (max-width: 699px) {
+
+            .tx-variant-bulk-builder .tx-variant-grid {
+                grid-template-columns: minmax(0, 1fr);
             }
 
         }

@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 class MIProductPriceComparisonController extends Controller
@@ -48,9 +49,24 @@ class MIProductPriceComparisonController extends Controller
         }
 
         if (! $response->successful()) {
-            Log::warning('MI product price search provider rejected the request.', ['status' => $response->status()]);
+            $providerCode = $response->json('error.code');
+            $providerMessage = $response->json('error.message');
+            $requestId = $response->header('x-request-id');
+            Log::warning('MI product price search provider rejected the request.', [
+                'status' => $response->status(),
+                'provider_code' => is_string($providerCode) ? $providerCode : null,
+                'request_id' => $requestId,
+                'model' => $configuration->model(),
+            ]);
 
-            return response()->json(['message' => 'The web search provider rejected the request. Check the API key, model access, and web search availability.', 'results' => []], 502);
+            $message = match ($response->status()) {
+                401 => 'OpenAI rejected the saved API key. Verify the key used by the AI assistant.',
+                403 => 'OpenAI denied access to the configured model or web search tool for this API project.',
+                429 => 'OpenAI rate limits or API quota prevented this search. Check the project usage and billing limits.',
+                default => 'OpenAI rejected the web search request'.(is_string($providerMessage) && trim($providerMessage) !== '' ? ': '.Str::limit(strip_tags($providerMessage), 240) : '. Check the model and web search access.'),
+            };
+
+            return response()->json(['message' => $message, 'request_id' => $requestId, 'results' => []], 502);
         }
 
         $results = $this->verifiedResults($response->json('output', []), (int) $validated['max_results']);

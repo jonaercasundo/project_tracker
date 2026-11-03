@@ -69,7 +69,7 @@
     document.getElementById('comparison_search').addEventListener('click', async (event) => {
         const button = event.currentTarget; button.disabled = true; button.textContent = 'Searching…'; statusNode.textContent = 'Searching for current product offers…';
         const data = new FormData(); data.append('product_name', document.getElementById('comparison_product_name').value); data.append('query', document.getElementById('comparison_query').value); data.append('max_results', document.getElementById('comparison_limit').value);
-        try { const response = await fetch(searchUrl, { method: 'POST', headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' }, body: data }); const payload = await response.json(); renderResults(payload.results || []); statusNode.textContent = payload.message || (response.ok ? 'Review the results before saving.' : 'Search failed.'); }
+        try { const response = await fetch(searchUrl, { method: 'POST', headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' }, body: data }); const payload = await response.json(); renderResults(payload.results || []); statusNode.textContent = (payload.message || (response.ok ? 'Review the results before saving.' : 'Search failed.')) + (payload.request_id ? ` (Request ID: ${payload.request_id})` : ''); }
         catch { statusNode.textContent = 'Could not reach the search service. Try again.'; }
         finally { button.disabled = false; button.textContent = 'Find Prices'; }
     });

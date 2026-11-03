@@ -1083,6 +1083,20 @@ it('returns only OpenAI offer results whose product pages are cited', function (
     Http::assertSent(fn ($request): bool => $request['tools'][0]['type'] === 'web_search' && $request['tool_choice'] === 'required');
 });
 
+it('returns actionable OpenAI web search rejection details without exposing credentials', function () {
+    $this->signInMI($this->miUser());
+    config()->set('services.openai.key', 'test-key');
+    Http::fake(['https://api.openai.com/v1/responses' => Http::response([
+        'error' => ['code' => 'unsupported_tool', 'message' => 'The selected model cannot use web_search.'],
+    ], 400, ['x-request-id' => 'req_price_search_test'])]);
+
+    $this->postJson(route('mi_app.price-comparisons.search'), ['product_name' => 'Oak table', 'max_results' => 5])
+        ->assertStatus(502)
+        ->assertJsonPath('message', 'OpenAI rejected the web search request: The selected model cannot use web_search.')
+        ->assertJsonPath('request_id', 'req_price_search_test')
+        ->assertDontSee('test-key');
+});
+
 it('requires the selected search method input and never falls back from image to name', function () {
     $this->signInMI($this->miUser());
 

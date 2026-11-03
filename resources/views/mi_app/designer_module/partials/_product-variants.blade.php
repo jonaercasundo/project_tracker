@@ -36,24 +36,55 @@
     const base = document.getElementById('sku');
     const template = document.getElementById('product_variant_template');
     let nextIndex = rows.querySelectorAll('[data-variant-row]').length;
+    const initializedDropdowns = new WeakSet();
+    const initializeDropdowns = (root) => {
+        root.querySelectorAll('.variant-dropdown').forEach((select) => {
+            if (initializedDropdowns.has(select) || !window.TomSelect) return;
+            initializedDropdowns.add(select);
+            new TomSelect(select, {
+                create: false,
+                allowEmptyOption: true,
+                maxOptions: null,
+                dropdownParent: 'body',
+                placeholder: select.dataset.placeholder,
+                searchField: ['text'],
+                closeAfterSelect: true,
+            });
+        });
+    };
     const refreshAutoSkus = () => rows.querySelectorAll('[data-variant-auto="true"]').forEach((input) => {
         const sequence = Number(input.dataset.sequence);
         input.value = base.value.trim() ? `${base.value.trim()}-${String(sequence).padStart(2, '0')}` : '';
     });
     base.addEventListener('input', refreshAutoSkus);
+    document.addEventListener('DOMContentLoaded', () => initializeDropdowns(rows));
     document.getElementById('add_product_variant').addEventListener('click', () => {
         const sequences = [...rows.querySelectorAll('[data-sequence]')].map((input) => Number(input.dataset.sequence)).filter(Number.isFinite);
         const sequence = Math.max(0, ...sequences) + 1;
         const sku = base.value.trim() ? `${base.value.trim()}-${String(sequence).padStart(2, '0')}` : '';
         const html = template.innerHTML.replaceAll('__INDEX__', String(nextIndex++)).replaceAll('__SEQUENCE__', String(sequence)).replaceAll('__SKU__', sku).replaceAll('__BASE__', base.value.trim());
         rows.insertAdjacentHTML('beforeend', html);
+        initializeDropdowns(rows.lastElementChild);
     });
     rows.addEventListener('input', (event) => {
         if (event.target.matches('[data-variant-sku]')) event.target.dataset.variantAuto = 'false';
     });
     rows.addEventListener('click', (event) => {
+        const editSku = event.target.closest('[data-edit-variant-sku]');
+        if (editSku) {
+            const input = editSku.parentElement.querySelector('[data-variant-sku]');
+            const useGenerated = !input.readOnly;
+            input.readOnly = useGenerated;
+            input.dataset.variantAuto = useGenerated ? 'true' : 'false';
+            editSku.textContent = useGenerated ? 'Edit SKU' : 'Use generated SKU';
+            if (useGenerated) refreshAutoSkus(); else input.focus();
+            return;
+        }
         const remove = event.target.closest('[data-remove-variant]');
-        if (remove) remove.closest('[data-variant-row]').remove();
+        if (remove) {
+            remove.closest('[data-variant-row]').querySelectorAll('.variant-dropdown').forEach((select) => select.tomselect?.destroy());
+            remove.closest('[data-variant-row]').remove();
+        }
     });
 })();
 </script>

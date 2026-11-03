@@ -659,7 +659,7 @@ class MIAppController extends Controller
             DB::commit();
 
             return redirect()
-                ->route('mi_app.index')
+                ->route('mi_app.show', $product)
                 ->with('success', 'Product saved successfully!');
 
         } catch (\Throwable $e) {

@@ -25,8 +25,8 @@
                     <span class="tx-multi-hint">Search saved options or type to add a material</span>
                     <button type="button" class="tx-multi-clear" hidden>Clear</button>
                 </div>
-                <select id="{{ $fieldId }}_material" required name="variants[{{ $index }}][material]" class="tx-field variant-dropdown" data-placeholder="Search or add material...">
-                    <option value="">Search or add material...</option>
+                <select id="{{ $fieldId }}_material" required name="variants[{{ $index }}][material]" class="tx-field variant-dropdown" data-placeholder="Search or add materials...">
+                    <option value=""></option>
                     @include('mi_app.designer_module.partials._attribute-options', ['attribute' => 'materials', 'selectedValues' => array_filter([(string) ($variant['material'] ?? '')])])
                 </select>
             </div>
@@ -39,8 +39,8 @@
                     <span class="tx-multi-hint">Search saved options or type to add a color</span>
                     <button type="button" class="tx-multi-clear" hidden>Clear</button>
                 </div>
-                <select id="{{ $fieldId }}_color" name="variants[{{ $index }}][color]" class="tx-field variant-dropdown" data-placeholder="Search or add color...">
-                    <option value="">Search or add color...</option>
+                <select id="{{ $fieldId }}_color" name="variants[{{ $index }}][color]" class="tx-field variant-dropdown" data-placeholder="Search or add colors...">
+                    <option value=""></option>
                     @include('mi_app.designer_module.partials._attribute-options', ['attribute' => 'color', 'selectedValues' => array_filter([(string) ($variant['color'] ?? '')])])
                 </select>
             </div>

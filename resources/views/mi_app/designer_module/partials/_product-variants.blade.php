@@ -53,7 +53,7 @@
                     const normalizedInput = normalize(input);
                     return normalizedInput !== '' && !Array.from(select.options).some((option) => normalize(option.value) === normalizedInput);
                 },
-                allowEmptyOption: true,
+                allowEmptyOption: isMultiple,
                 maxItems: isMultiple ? 100 : 1,
                 hideSelected: isMultiple,
                 closeAfterSelect: !isMultiple,

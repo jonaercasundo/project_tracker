@@ -203,16 +203,16 @@
                                     <label for="{{ $field }}" class="tx-label">{{ $field === 'materials' ? 'Materials (legacy product-level)' : $label }}</label>
                                     <div class="tx-multi-select-wrap">
                                         <div class="tx-multi-toolbar">
-                                            <span class="tx-multi-hint">Select one or more {{ strtolower($label) }}</span>
+                                            <span class="tx-multi-hint">Search saved options or type to add a {{ rtrim(strtolower($label), 's') }}</span>
                                             <button type="button" class="tx-multi-clear" data-target="{{ $field }}" aria-label="Clear {{ strtolower($label) }}" hidden>Clear</button>
                                         </div>
                                         <input type="hidden" name="{{ $field }}" value="">
-                                        <select id="{{ $field }}" name="{{ $field }}[]" multiple size="{{ $field === 'materials' ? 12 : 8 }}" class="tx-field tx-multi-select {{ $errors->has($field) || $errors->has($field.'.*') ? 'field-invalid' : '' }}" @if($errors->has($field) || $errors->has($field.'.*')) aria-invalid="true" aria-describedby="{{ $field }}_error" @endif>
+                                        <select id="{{ $field }}" name="{{ $field }}[]" multiple size="{{ $field === 'materials' ? 12 : 8 }}" data-placeholder="Search or add {{ strtolower($label) }}..." class="tx-field tx-multi-select legacy-attribute-select {{ $errors->has($field) || $errors->has($field.'.*') ? 'field-invalid' : '' }}" @if($errors->has($field) || $errors->has($field.'.*')) aria-invalid="true" aria-describedby="{{ $field }}_error" @endif>
                                             @include('mi_app.designer_module.partials._attribute-options', ['attribute' => $field, 'selectedValues' => $selectedValues])
                                         </select>
-                                        <div id="{{ $field }}_chips" class="tx-multi-chips" aria-live="polite"></div>
+                                        <div id="{{ $field }}_chips" class="tx-multi-chips" aria-live="polite" hidden></div>
                                         <p id="{{ $field }}_selection_error" class="tx-error" data-multi-error hidden>Select at least one material.</p>
-                                        <p class="tx-hint" data-native-multi-hint>Hold Ctrl or Command to select multiple values.</p>
+                                        <p class="tx-hint">Type to search saved options, or add a new value from the suggestions.</p>
                                     </div>
                                     @foreach($errors->get($field) + $errors->get($field.'.*') as $messages)
                                         @foreach((array) $messages as $message)<p id="{{ $field }}_error" class="tx-error">{{ $message }}</p>@endforeach

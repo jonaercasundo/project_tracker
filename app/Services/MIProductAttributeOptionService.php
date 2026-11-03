@@ -24,6 +24,31 @@ class MIProductAttributeOptionService
         return $this->persist($values, MI_Color::class, 'color_name');
     }
 
+    /** @param array<int, array<string, mixed>> $variants
+     * @return array<int, array<string, mixed>>
+     */
+    public function persistVariantOptions(array $variants): array
+    {
+        if ($variants === []) {
+            return [];
+        }
+
+        $materialNames = array_map(static fn (array $variant): string => (string) ($variant['material'] ?? ''), $variants);
+        $colorNames = array_values(array_filter(array_map(static fn (array $variant): string => (string) ($variant['color'] ?? ''), $variants), static fn (string $name): bool => trim($name) !== ''));
+        $materialMap = $this->canonicalMap($this->persistMaterials($materialNames));
+        $colorMap = $this->canonicalMap($this->persistColors($colorNames));
+
+        foreach ($variants as &$variant) {
+            $variant['material'] = $materialMap[$this->normalizedKey((string) ($variant['material'] ?? ''))];
+            $variant['color'] = trim((string) ($variant['color'] ?? '')) === ''
+                ? null
+                : $colorMap[$this->normalizedKey((string) $variant['color'])];
+        }
+        unset($variant);
+
+        return array_values($variants);
+    }
+
     /** @param array<int, string> $values
      * @return array<int, string>
      */
@@ -62,5 +87,23 @@ class MIProductAttributeOptionService
     private function normalizeSpacing(string $value): string
     {
         return preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
+    }
+
+    /** @param array<int, string> $values
+     * @return array<string, string>
+     */
+    private function canonicalMap(array $values): array
+    {
+        $canonicalNames = [];
+        foreach ($values as $value) {
+            $canonicalNames[$this->normalizedKey($value)] = $value;
+        }
+
+        return $canonicalNames;
+    }
+
+    private function normalizedKey(string $value): string
+    {
+        return mb_strtolower($this->normalizeSpacing($value));
     }
 }

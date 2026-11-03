@@ -325,15 +325,15 @@ class MIAppController extends Controller
                     */
                 case 'material':
 
-                    $materialName = trim((string) $request->input('material_name', ''));
+                    $materialName = preg_replace('/\s+/u', ' ', trim((string) $request->input('material_name', ''))) ?? trim((string) $request->input('material_name', ''));
                     $normalizedName = mb_strtolower($materialName);
                     $request->merge(['material_name' => $materialName]);
                     $request->validate([
                         'material_name' => 'required|string|max:255',
                     ]);
 
-                    if (MI_Material::where('normalized_name', $normalizedName)
-                        ->orWhereRaw('LOWER(TRIM(material_name)) = ?', [$normalizedName])->exists()) {
+                    $existingMaterialNames = MI_Material::query()->pluck('material_name');
+                    if ($existingMaterialNames->contains(fn (string $existingName): bool => mb_strtolower(preg_replace('/\s+/u', ' ', trim($existingName)) ?? trim($existingName)) === $normalizedName)) {
                         throw ValidationException::withMessages(['material_name' => 'The material name has already been taken.']);
                     }
 
@@ -654,12 +654,12 @@ class MIAppController extends Controller
 
             $product->save();
 
-            $this->synchronizeProductVariants($product, $variantRows);
+            $this->synchronizeProductVariants($product, $variantRows, $attributeOptions);
 
             DB::commit();
 
             return redirect()
-                ->route('mi_app.show', $product)
+                ->route('mi_app.index')
                 ->with('success', 'Product saved successfully!');
 
         } catch (\Throwable $e) {
@@ -737,7 +737,7 @@ class MIAppController extends Controller
                 $this->validateProductTaxonomy($validatedTaxonomy);
                 $lockedProduct->fill($attributes)->save();
                 if (array_key_exists('variants_present', $validated)) {
-                    $this->synchronizeProductVariants($lockedProduct, $validated['variants'] ?? []);
+                    $this->synchronizeProductVariants($lockedProduct, $validated['variants'] ?? [], $attributeOptions);
                 }
                 if (array_key_exists('factory_costs', $validated) || array_key_exists('remove_factory_cost_ids', $validated)) {
                     $factoryCosts->synchronize($lockedProduct, $validated['factory_costs'] ?? [], $validated['remove_factory_cost_ids'] ?? []);
@@ -920,8 +920,9 @@ class MIAppController extends Controller
     }
 
     /** @param array<int, array<string, mixed>> $rows */
-    private function synchronizeProductVariants(MI_Product $product, array $rows): void
+    private function synchronizeProductVariants(MI_Product $product, array $rows, MIProductAttributeOptionService $attributeOptions): void
     {
+        $rows = $attributeOptions->persistVariantOptions($rows);
         $keptIds = [];
         $submittedIds = collect($rows)->map(fn (array $row): int => (int) ($row['id'] ?? $row['variant_id'] ?? 0))->filter()->all();
         $removedIds = $product->variants()->pluck('variant_id')->diff($submittedIds);

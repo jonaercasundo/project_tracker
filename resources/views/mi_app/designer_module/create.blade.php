@@ -809,7 +809,7 @@
                                     <div class="tx-multi-toolbar">
 
                                         <span class="tx-multi-hint">
-                                            Select one or more materials
+                                            Search saved options or type to add a material
                                         </span>
 
                                         <button
@@ -827,7 +827,8 @@
                                         name="materials[]"
                                         multiple
                                         size="12"
-                                        class="tx-field tx-multi-select materials-select"
+                                        data-placeholder="Search or add materials..."
+                                        class="tx-field tx-multi-select materials-select legacy-attribute-select"
                                         @error('materials') aria-invalid="true" aria-describedby="materials_error" @enderror
                                     >
 
@@ -839,6 +840,7 @@
                                         id="materials_chips"
                                         class="tx-multi-chips"
                                         aria-live="polite"
+                                        hidden
                                     ></div>
 
                                 </div>
@@ -878,7 +880,7 @@
                                     <div class="tx-multi-toolbar">
 
                                         <span class="tx-multi-hint">
-                                            Select one or more colors
+                                            Search saved options or type to add a color
                                         </span>
 
                                         <button
@@ -896,7 +898,8 @@
                                         name="color[]"
                                         multiple
                                         size="8"
-                                        class="tx-field tx-multi-select"
+                                        data-placeholder="Search or add colors..."
+                                        class="tx-field tx-multi-select legacy-attribute-select"
                                         @error('color') aria-invalid="true" aria-describedby="color_error" @enderror
                                     >
 
@@ -908,6 +911,7 @@
                                         id="color_chips"
                                         class="tx-multi-chips"
                                         aria-live="polite"
+                                        hidden
                                     ></div>
 
                                 </div>
@@ -1655,7 +1659,7 @@
                 const colorSelect =
                     document.getElementById('color');
 
-                if (colorSelect) {
+                if (colorSelect && !colorSelect.tomselect) {
 
                     new TomSelect(
                         colorSelect,
@@ -1708,7 +1712,7 @@
                 const materialsSelect =
                     document.getElementById('materials');
 
-                if (materialsSelect) {
+                if (materialsSelect && !materialsSelect.tomselect) {
 
                     new TomSelect(
                         materialsSelect,

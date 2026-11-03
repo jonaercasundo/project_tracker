@@ -280,11 +280,12 @@ $colorGroups = [
     $knownValues = array_merge(...array_values($groups));
     $options = $attribute === 'materials' ? $materialOptions : $colorOptions;
     $optionName = $attribute === 'materials' ? 'material_name' : 'color_name';
-    $knownKeys = array_map(fn ($value) => mb_strtolower(trim($value)), $knownValues);
+    $normalizeOptionKey = fn ($value) => mb_strtolower(preg_replace('/\s+/u', ' ', trim((string) $value)) ?? trim((string) $value));
+    $knownKeys = array_map($normalizeOptionKey, $knownValues);
     $customValues = $options->pluck($optionName)->all();
     $customValues = array_merge($customValues, array_diff($selectedValues, $knownValues));
-    $customValues = collect($customValues)->unique(fn ($value) => mb_strtolower(trim($value)))
-        ->reject(fn ($value) => in_array(mb_strtolower(trim($value)), $knownKeys, true))->values();
+    $customValues = collect($customValues)->unique($normalizeOptionKey)
+        ->reject(fn ($value) => in_array($normalizeOptionKey($value), $knownKeys, true))->values();
 @endphp
 @foreach($groups as $group => $choices)
     <optgroup label="{{ $group }}">

@@ -14,8 +14,6 @@
             <label for="sku" class="tx-label">Base SKU <span class="text-slate-500">(auto-generated)</span></label>
             <input id="sku" value="{{ $variantBaseSku }}" maxlength="255" class="tx-field bg-slate-100 text-slate-600" placeholder="Assigned after the product is saved" readonly aria-readonly="true">
         </div>
-        <datalist id="variant_material_options">@foreach($materialOptions as $option)<option value="{{ $option->material_name }}">@endforeach</datalist>
-        <datalist id="variant_color_options">@foreach($colorOptions as $option)<option value="{{ $option->color_name }}">@endforeach</datalist>
         <div id="product_variants" class="grid grid-cols-1 gap-4">
             @foreach($variantRows as $index => $variant)
                 @include('mi_app.designer_module.partials._product-variant-row', ['index' => $index, 'variant' => $variant, 'baseSku' => $variantBaseSku])
@@ -38,18 +36,45 @@
     let nextIndex = rows.querySelectorAll('[data-variant-row]').length;
     const initializedDropdowns = new WeakSet();
     const initializeDropdowns = (root) => {
-        root.querySelectorAll('.variant-dropdown').forEach((select) => {
-            if (initializedDropdowns.has(select) || !window.TomSelect) return;
+        root.querySelectorAll('.variant-dropdown, .legacy-attribute-select').forEach((select) => {
+            if (initializedDropdowns.has(select) || select.tomselect || !window.TomSelect) return;
             initializedDropdowns.add(select);
+            const isMultiple = select.multiple;
+            const normalize = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
             new TomSelect(select, {
-                create: false,
+                plugins: isMultiple ? ['remove_button'] : [],
+                createOnBlur: false,
+                persist: false,
+                create: (input) => {
+                    const value = input.trim().replace(/\s+/g, ' ');
+                    return value ? { value, text: value } : false;
+                },
+                createFilter: (input) => {
+                    const normalizedInput = normalize(input);
+                    return normalizedInput !== '' && !Array.from(select.options).some((option) => normalize(option.value) === normalizedInput);
+                },
                 allowEmptyOption: true,
-                maxOptions: null,
+                maxItems: isMultiple ? 100 : 1,
+                hideSelected: isMultiple,
+                closeAfterSelect: !isMultiple,
                 dropdownParent: 'body',
                 placeholder: select.dataset.placeholder,
                 searchField: ['text'],
-                closeAfterSelect: true,
+                render: {
+                    option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim().replace(/\s+/g, ' '))}"</div>`,
+                    no_results: () => '<div class="no-results">No saved option found. Type a new value to add it.</div>',
+                },
             });
+            const clearButton = select.closest('.tx-multi-select-wrap')?.querySelector('.tx-multi-clear');
+            const syncClearButton = () => {
+                if (clearButton) clearButton.hidden = select.tomselect.items.length === 0;
+            };
+            select.tomselect?.on('item_add item_remove clear', syncClearButton);
+            clearButton?.addEventListener('click', (event) => {
+                event.preventDefault();
+                select.tomselect?.clear();
+            });
+            syncClearButton();
         });
     };
     const refreshAutoSkus = () => rows.querySelectorAll('[data-variant-auto="true"]').forEach((input) => {
@@ -57,7 +82,7 @@
         input.value = base.value.trim() ? `${base.value.trim()}-${String(sequence).padStart(2, '0')}` : '';
     });
     base.addEventListener('input', refreshAutoSkus);
-    document.addEventListener('DOMContentLoaded', () => initializeDropdowns(rows));
+    document.addEventListener('DOMContentLoaded', () => initializeDropdowns(document));
     document.getElementById('add_product_variant').addEventListener('click', () => {
         const sequences = [...rows.querySelectorAll('[data-sequence]')].map((input) => Number(input.dataset.sequence)).filter(Number.isFinite);
         const sequence = Math.max(0, ...sequences) + 1;

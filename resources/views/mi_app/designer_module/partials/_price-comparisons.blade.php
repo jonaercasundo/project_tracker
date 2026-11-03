@@ -1,10 +1,20 @@
 @php($isExistingProduct = isset($product) && $product->exists)
+<style>
+    .tx-price-comparison-reference { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; }
+    .tx-price-comparison-reference .tx-label { display: block; margin: 0; }
+    .tx-price-comparison-reference input { min-width: 0; }
+    .tx-price-comparison-reference a { max-width: 100%; overflow-wrap: anywhere; text-transform: none; }
+</style>
 <section class="tx-card lvl-3" id="price_comparison" aria-labelledby="price_comparison_heading">
     <div class="tx-card-head"><span class="tx-card-icon">06</span><div><h2 id="price_comparison_heading">AI-Assisted Price Comparison</h2><p>Find market offers, review them, then choose which comparisons to save.</p></div></div>
     <div class="tx-card-body space-y-5">
         <div data-name-fields class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label class="tx-label">Optional search refinement<input id="comparison_query" class="tx-field mt-2" type="text" maxlength="300" placeholder="Short description or keywords"></label>
-            <label class="tx-label">Reference link (optional)<input id="comparison_reference_url" class="tx-field mt-2" type="url" maxlength="2048" placeholder="https://example.com/product"><a id="comparison_reference_preview" href="#" target="_blank" rel="noopener noreferrer" class="mt-2 hidden break-all text-xs text-blue-700 underline">Open reference link</a></label>
+            <div class="tx-price-comparison-reference">
+                <label class="tx-label" for="comparison_reference_url">Reference link (optional)</label>
+                <input id="comparison_reference_url" class="tx-field" type="url" maxlength="2048" placeholder="https://example.com/product">
+                <a id="comparison_reference_preview" href="#" target="_blank" rel="noopener noreferrer" class="hidden text-xs text-blue-700 underline">Open reference link</a>
+            </div>
         </div>
         <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(180px,260px)_auto] md:items-end">
             <label class="tx-label">Maximum results<input id="comparison_limit" class="tx-field mt-2" type="number" min="1" max="20" value="8"></label>

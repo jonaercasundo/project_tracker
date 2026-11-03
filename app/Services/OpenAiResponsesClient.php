@@ -29,7 +29,6 @@ class OpenAiResponsesClient
             'tool_choice' => 'required',
             'max_output_tokens' => 2500,
             'store' => false,
-            'text' => ['format' => ['type' => 'json_object']],
             'input' => [
                 [
                     'role' => 'system',

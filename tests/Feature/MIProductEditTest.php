@@ -1080,7 +1080,9 @@ it('returns only OpenAI offer results whose product pages are cited', function (
     $this->postJson(route('mi_app.price-comparisons.search'), ['product_name' => 'Oak table', 'max_results' => 5])
         ->assertOk()->assertJsonCount(1, 'results')->assertJsonPath('results.0.store_name', 'Cited Shop')
         ->assertJsonPath('results.0.product_link', 'https://shop.example/oak-table');
-    Http::assertSent(fn ($request): bool => $request['tools'][0]['type'] === 'web_search' && $request['tool_choice'] === 'required');
+    Http::assertSent(fn ($request): bool => $request['tools'][0]['type'] === 'web_search'
+        && $request['tool_choice'] === 'required'
+        && ! isset($request['text']['format']));
 });
 
 it('returns actionable OpenAI web search rejection details without exposing credentials', function () {

@@ -44,7 +44,6 @@ class UpdateMIProductRequest extends FormRequest
         $rules = [
             'item_name' => 'required|string|max:255',
             'variants_present' => ['sometimes', 'accepted'],
-            'sku' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('mi_products', 'sku')->ignore($product, 'product_id'), Rule::unique('mi_product_variants', 'sku')],
             'item_code' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('mi_products', 'item_code')->ignore($product)],
             'description' => 'sometimes|nullable|string|max:20000',
             'type_of_sample' => 'required|string|max:255',

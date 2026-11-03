@@ -11,7 +11,6 @@ use App\Models\MI_Product;
 use App\Models\MI_Product_Image;
 use App\Models\MI_ProductType;
 use App\Models\MI_SubCategory;
-use App\Models\MIProductVariant;
 use App\Models\MIProductVariantInventoryMovement;
 use App\Models\Warehouse;
 use App\Services\MIProductAttributeOptionService;
@@ -457,7 +456,6 @@ class MIAppController extends Controller
 
             // Product Information
             'item_name' => 'required|string|max:255',
-            'sku' => ['nullable', 'string', 'max:255', Rule::unique('mi_products', 'sku'), Rule::unique('mi_product_variants', 'sku')],
             'description' => 'nullable|string',
 
             // Taxonomy
@@ -656,7 +654,7 @@ class MIAppController extends Controller
 
             $product->save();
 
-            $this->synchronizeProductVariants($product, $variantRows, false);
+            $this->synchronizeProductVariants($product, $variantRows);
 
             DB::commit();
 
@@ -713,7 +711,6 @@ class MIAppController extends Controller
             throw ValidationException::withMessages(['primary_image_id' => 'Select an image that is not marked for removal.']);
         }
         $controls = ['image_links', 'product_images', 'remove_image_ids', 'primary_image_id', 'image_order', 'factory_costs', 'remove_factory_cost_ids', 'variants', 'variants_present'];
-        $baseSkuChanged = isset($validated['sku']) && $validated['sku'] !== $product->sku;
         $attributes = Arr::except($validated, $controls);
         if (($attributes['country_of_production'] ?? null) === 'Other') {
             $attributes['country_of_production'] = trim($attributes['custom_country']);
@@ -727,7 +724,7 @@ class MIAppController extends Controller
         $removedPaths = [];
 
         try {
-            DB::transaction(function () use ($product, $attributes, $validated, $request, $removeIds, $factoryCosts, $attributeOptions, $baseSkuChanged, &$uploadedPaths, &$removedPaths): void {
+            DB::transaction(function () use ($product, $attributes, $validated, $request, $removeIds, $factoryCosts, $attributeOptions, &$uploadedPaths, &$removedPaths): void {
                 $lockedProduct = MI_Product::whereKey($product->getKey())->lockForUpdate()->firstOrFail();
                 $attributes['materials'] = $attributeOptions->persistMaterials($attributes['materials'] ?? $lockedProduct->materials ?? []);
                 if ($attributes['materials'] === [] && ($validated['variants'] ?? []) === []) {
@@ -740,9 +737,7 @@ class MIAppController extends Controller
                 $this->validateProductTaxonomy($validatedTaxonomy);
                 $lockedProduct->fill($attributes)->save();
                 if (array_key_exists('variants_present', $validated)) {
-                    $this->synchronizeProductVariants($lockedProduct, $validated['variants'] ?? [], $baseSkuChanged);
-                } elseif ($baseSkuChanged) {
-                    $this->synchronizeProductVariants($lockedProduct, $lockedProduct->variants()->get()->map(fn (MIProductVariant $variant): array => $variant->toArray())->all(), true);
+                    $this->synchronizeProductVariants($lockedProduct, $validated['variants'] ?? []);
                 }
                 if (array_key_exists('factory_costs', $validated) || array_key_exists('remove_factory_cost_ids', $validated)) {
                     $factoryCosts->synchronize($lockedProduct, $validated['factory_costs'] ?? [], $validated['remove_factory_cost_ids'] ?? []);
@@ -925,7 +920,7 @@ class MIAppController extends Controller
     }
 
     /** @param array<int, array<string, mixed>> $rows */
-    private function synchronizeProductVariants(MI_Product $product, array $rows, bool $regenerateSkus): void
+    private function synchronizeProductVariants(MI_Product $product, array $rows): void
     {
         $keptIds = [];
         $submittedIds = collect($rows)->map(fn (array $row): int => (int) ($row['id'] ?? $row['variant_id'] ?? 0))->filter()->all();
@@ -937,9 +932,7 @@ class MIAppController extends Controller
         foreach ($rows as $row) {
             $variantId = isset($row['id']) ? (int) $row['id'] : (isset($row['variant_id']) ? (int) $row['variant_id'] : null);
             unset($row['id'], $row['variant_id'], $row['product_id'], $row['created_at'], $row['updated_at']);
-            if ($regenerateSkus) {
-                $row['sku'] = $product->sku.'-'.str_pad((string) $row['sequence'], 2, '0', STR_PAD_LEFT);
-            } elseif (empty($row['sku'])) {
+            if (empty($row['sku'])) {
                 $row['sku'] = $product->sku.'-'.str_pad((string) $row['sequence'], 2, '0', STR_PAD_LEFT);
             }
             if ($variantId) {

@@ -1,6 +1,6 @@
 @php
     $variantRows = old('variants', isset($product) ? $product->variants->map(fn ($variant) => $variant->only(['variant_id', 'sequence', 'material', 'color', 'product_length', 'product_width', 'product_height', 'product_depth', 'purchase_price', 'selling_price', 'sku']))->all() : []);
-    $variantBaseSku = old('sku', $product->sku ?? '');
+    $variantBaseSku = $product->sku ?? '';
 @endphp
 <section class="tx-card lvl-2" aria-labelledby="variants_heading">
     <div class="tx-card-head">
@@ -11,9 +11,8 @@
     <div class="tx-card-body">
         @if(isset($product))<input type="hidden" name="variants_present" value="1">@endif
         <div class="mb-5 max-w-md">
-            <label for="sku" class="tx-label">Base SKU</label>
-            <input id="sku" name="sku" value="{{ $variantBaseSku }}" maxlength="255" class="tx-field" placeholder="Generated from product category if left blank">
-            @error('sku')<p class="tx-error">{{ $message }}</p>@enderror
+            <label for="sku" class="tx-label">Base SKU <span class="text-slate-500">(auto-generated)</span></label>
+            <input id="sku" value="{{ $variantBaseSku }}" maxlength="255" class="tx-field bg-slate-100 text-slate-600" placeholder="Assigned after the product is saved" readonly aria-readonly="true">
         </div>
         <datalist id="variant_material_options">@foreach($materialOptions as $option)<option value="{{ $option->material_name }}">@endforeach</datalist>
         <datalist id="variant_color_options">@foreach($colorOptions as $option)<option value="{{ $option->color_name }}">@endforeach</datalist>
@@ -27,7 +26,7 @@
                 @foreach($messages as $message)<p class="tx-error">{{ $message }}</p>@endforeach
             @endif
         @endforeach
-        <p class="tx-hint mt-3">New rows use the next sequence suffix (for example, -01). You can edit a variant SKU if it remains unique.</p>
+        <p class="tx-hint mt-3">New rows receive the next sequence suffix after the product base SKU is generated (for example, -01). You can edit a variant SKU if it remains unique.</p>
     </div>
 </section>
 <template id="product_variant_template">@include('mi_app.designer_module.partials._product-variant-row', ['index' => '__INDEX__', 'variant' => ['sequence' => '__SEQUENCE__', 'material' => '', 'color' => '', 'sku' => '__SKU__'], 'baseSku' => '__BASE__'])</template>

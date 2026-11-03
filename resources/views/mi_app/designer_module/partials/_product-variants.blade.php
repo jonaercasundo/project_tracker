@@ -56,7 +56,7 @@
                 allowEmptyOption: isMultiple,
                 maxItems: isMultiple ? 100 : 1,
                 hideSelected: isMultiple,
-                closeAfterSelect: !isMultiple,
+                closeAfterSelect: false,
                 dropdownParent: 'body',
                 placeholder: select.dataset.placeholder,
                 searchField: ['text'],

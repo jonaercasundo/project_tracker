@@ -2,17 +2,9 @@
 <section class="tx-card lvl-3" id="price_comparison" aria-labelledby="price_comparison_heading">
     <div class="tx-card-head"><span class="tx-card-icon">06</span><div><h2 id="price_comparison_heading">AI-Assisted Price Comparison</h2><p>Find market offers, review them, then choose which comparisons to save.</p></div></div>
     <div class="tx-card-body space-y-5">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <label class="tx-edit-choice"><input type="radio" name="comparison_method" value="name" checked> Search by product name</label>
-            <label class="tx-edit-choice"><input type="radio" name="comparison_method" value="image"> Search by product image</label>
-        </div>
         <div data-name-fields class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label class="tx-label">Product name<input id="comparison_product_name" class="tx-field mt-2" type="text" value="{{ old('item_name', $product->item_name ?? '') }}" maxlength="255" placeholder="Uses the product name above"></label>
             <label class="tx-label">Optional search refinement<input id="comparison_query" class="tx-field mt-2" type="text" maxlength="300" placeholder="Short description or keywords"></label>
-        </div>
-        <div data-image-fields hidden class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <label class="tx-label">Image URL<input id="comparison_image_url" class="tx-field mt-2" type="url" maxlength="2048" placeholder="https://example.com/product-image.jpg"></label>
-            <label class="tx-label">Or upload an image<input id="comparison_image_file" class="tx-field mt-2" type="file" accept="image/jpeg,image/png,image/webp"><span class="tx-hint">JPEG, PNG, or WebP; maximum 5 MB.</span></label>
         </div>
         <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(180px,260px)_auto] md:items-end">
             <label class="tx-label">Maximum results<input id="comparison_limit" class="tx-field mt-2" type="number" min="1" max="20" value="8"></label>
@@ -74,14 +66,9 @@
         });
         saveButton.disabled = safeResults.length === 0;
     };
-    document.querySelectorAll('input[name="comparison_method"]').forEach((radio) => radio.addEventListener('change', () => {
-        document.querySelector('[data-name-fields]').hidden = radio.value !== 'name' || !radio.checked;
-        document.querySelector('[data-image-fields]').hidden = radio.value !== 'image' || !radio.checked;
-    }));
     document.getElementById('comparison_search').addEventListener('click', async (event) => {
         const button = event.currentTarget; button.disabled = true; button.textContent = 'Searching…'; statusNode.textContent = 'Searching for current product offers…';
-        const data = new FormData(); data.append('method', document.querySelector('input[name="comparison_method"]:checked').value); data.append('product_name', document.getElementById('comparison_product_name').value); data.append('query', document.getElementById('comparison_query').value); data.append('image_url', document.getElementById('comparison_image_url').value); data.append('max_results', document.getElementById('comparison_limit').value);
-        const image = document.getElementById('comparison_image_file').files[0]; if (image) data.append('image_file', image);
+        const data = new FormData(); data.append('product_name', document.getElementById('comparison_product_name').value); data.append('query', document.getElementById('comparison_query').value); data.append('max_results', document.getElementById('comparison_limit').value);
         try { const response = await fetch(searchUrl, { method: 'POST', headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' }, body: data }); const payload = await response.json(); renderResults(payload.results || []); statusNode.textContent = payload.message || (response.ok ? 'Review the results before saving.' : 'Search failed.'); }
         catch { statusNode.textContent = 'Could not reach the search service. Try again.'; }
         finally { button.disabled = false; button.textContent = 'Find Prices'; }

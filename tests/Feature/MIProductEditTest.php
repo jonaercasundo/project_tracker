@@ -1054,8 +1054,8 @@ it('reports an unconfigured price search without returning invented results', fu
     $this->signInMI($this->miUser());
 
     $this->postJson(route('mi_app.price-comparisons.search'), [
-        'method' => 'name', 'product_name' => 'Oak table', 'query' => 'round', 'max_results' => 5,
-    ])->assertStatus(503)->assertJsonPath('results', [])->assertJsonPath('message', 'Price comparison search is not configured. Configure an approved product-search provider that supports product offers and image-based search.');
+        'product_name' => 'Oak table', 'query' => 'round', 'max_results' => 5,
+    ])->assertStatus(503)->assertJsonPath('results', [])->assertJsonPath('message', 'Price comparison search is not configured. Configure an approved product-search provider that returns verifiable product offers.');
 });
 
 it('requires the selected search method input and never falls back from image to name', function () {
@@ -1064,7 +1064,7 @@ it('requires the selected search method input and never falls back from image to
     $this->postJson(route('mi_app.price-comparisons.search'), ['method' => 'name', 'max_results' => 5])
         ->assertUnprocessable()->assertJsonValidationErrors('product_name');
     $this->postJson(route('mi_app.price-comparisons.search'), ['method' => 'image', 'product_name' => 'Oak table', 'max_results' => 5])
-        ->assertUnprocessable()->assertJsonPath('results', [])->assertJsonPath('message', 'Choose an image file or enter an image URL to search by image.');
+        ->assertUnprocessable()->assertJsonValidationErrors('method');
 });
 
 it('saves only validated selected price comparisons for the authorized product', function () {

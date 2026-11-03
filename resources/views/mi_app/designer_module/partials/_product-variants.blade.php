@@ -60,6 +60,17 @@
                 dropdownParent: 'body',
                 placeholder: select.dataset.placeholder,
                 searchField: ['text'],
+                onInitialize: function () {
+                    const selectControl = this;
+                    this.dropdown_content.addEventListener('click', (event) => {
+                        const target = event.target;
+                        if (!(target instanceof Element) || !target.closest('.create')) return;
+
+                        event.preventDefault();
+                        event.stopPropagation();
+                        selectControl.createItem();
+                    });
+                },
                 render: {
                     option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim().replace(/\s+/g, ' '))}"</div>`,
                     no_results: () => '<div class="no-results">No saved option found. Type a new value to add it.</div>',

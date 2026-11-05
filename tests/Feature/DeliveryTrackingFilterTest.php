@@ -3,6 +3,7 @@
 use App\Models\Company;
 use App\Models\User;
 use App\Services\DashboardService;
+use App\Services\ProjectDeliveryProgressService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
@@ -139,10 +140,21 @@ class DeliveryTrackingFilterTestCase extends TestCase
         $user->shouldReceive('hasAnyRole')->andReturn(true);
         $user->shouldReceive('hasRole')->andReturn(false);
         $user->shouldReceive('can')->andReturn(false);
+        $user->shouldReceive('checkPermissionTo')->andReturn(false);
 
         $dashboardService = Mockery::mock(DashboardService::class);
         $dashboardService->shouldReceive('currentCompany')->andReturn($company);
         $this->app->instance(DashboardService::class, $dashboardService);
+
+        $progressService = Mockery::mock(ProjectDeliveryProgressService::class);
+        $progressService->shouldReceive('report')->andReturn(['summary' => [
+            'pending_deliveries_count' => 0,
+            'stock_out_drs_count' => 0,
+            'completed_deliveries_count' => 0,
+            'billing_drs_count' => 0,
+            'billed_delivery_drs_count' => 0,
+        ]]);
+        $this->app->instance(ProjectDeliveryProgressService::class, $progressService);
 
         $this->actingAs($user);
     }
@@ -256,3 +268,52 @@ it('accepts a project without a year', function (): void {
         ->assertSee('DR #DR-A-01')
         ->assertDontSee('DR #DR-B-01');
 });
+
+it('filters logistics status by the exact project school and delivery reference', function (string $status, array $expectedReferences): void {
+    Schema::create('logistics_integrations', function (Blueprint $table): void {
+        $table->string('integration_id')->primary();
+        $table->string('name');
+    });
+    Schema::create('logistics_dr_tracking', function (Blueprint $table): void {
+        $table->increments('id');
+        $table->string('integration_id');
+        $table->unsignedInteger('project_id');
+        $table->string('school_id');
+        $table->string('dr_reference');
+        $table->string('logistics_status');
+        $table->dateTime('event_occurred_at');
+        $table->string('reconciliation_status');
+        $table->unsignedInteger('latest_sequence');
+    });
+    foreach ([
+        [1, 'S-1', 'DR-A-01', 'logistics_received'],
+        [1, 'S-1', 'DR-A-02', 'delivered'],
+        [2, 'S-1', 'DR-A-03', 'logistics_received'],
+        [1, 'S-2', 'DR-A-04', 'logistics_received'],
+        [1, 'S-1', 'dr-a-05', 'logistics_received'],
+    ] as [$projectId, $schoolId, $reference, $trackingStatus]) {
+        DB::table('logistics_dr_tracking')->insert([
+            'integration_id' => 'test-partner',
+            'project_id' => $projectId,
+            'school_id' => $schoolId,
+            'dr_reference' => $reference,
+            'logistics_status' => $trackingStatus,
+            'event_occurred_at' => '2026-03-01 12:00:00',
+            'reconciliation_status' => 'synchronized',
+            'latest_sequence' => 1,
+        ]);
+    }
+
+    $response = $this->get('/deliveries/tracking?'.http_build_query([
+        'project' => 1,
+        'logistics_status' => $status,
+        'per_page' => 20,
+    ]));
+
+    $response->assertOk();
+    expect(array_column($response->viewData('grouped_deliveries'), 'dr_no'))->toBe($expectedReferences);
+})->with([
+    'received' => ['logistics_received', ['DR-A-01']],
+    'delivered' => ['delivered', ['DR-A-02']],
+    'pending' => ['pending', ['DR-A-03', 'DR-A-04', 'DR-A-05', 'DR-A-06', 'DR-A-07', 'DR-A-08', 'DR-A-09', 'DR-A-10', 'DR-A-11']],
+]);

@@ -241,7 +241,9 @@ class DeliveryController extends Controller
                     ->from('logistics_dr_tracking as tracking')
                     ->whereColumn('tracking.project_id', 'd.project_id');
                 if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
-                    $trackingQuery->whereRaw('BINARY tracking.school_id = BINARY d.school_id')
+                    $trackingQuery->whereRaw('tracking.school_scope_hash = SHA2(CAST(d.school_id AS BINARY), 256)')
+                        ->whereRaw('tracking.dr_reference_hash = SHA2(CAST(d.dr_no AS BINARY), 256)')
+                        ->whereRaw('BINARY tracking.school_id = BINARY d.school_id')
                         ->whereRaw('BINARY tracking.dr_reference = BINARY d.dr_no');
                 } else {
                     $trackingQuery->whereRaw('tracking.school_id = d.school_id COLLATE BINARY')

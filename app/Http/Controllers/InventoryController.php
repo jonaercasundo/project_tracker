@@ -7,6 +7,7 @@ use App\Models\InventoryHistory;
 use App\Models\Item;
 use App\Models\Project;
 use App\Models\Warehouse;
+use App\Services\BillingOperationalSyncService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -88,7 +89,7 @@ class InventoryController extends Controller
         return view('inventory.index', compact('inventories', 'projects', 'warehouses'));
     }
 
-    public function balances(Request $request): View
+    public function balances(Request $request, BillingOperationalSyncService $warehouseRouting): View
     {
         $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
@@ -124,22 +125,69 @@ class InventoryController extends Controller
 
         $lotAllocations = DB::table('deliveries as dr')
             ->join('package as packages', 'packages.lot_id', '=', 'dr.lot_id')
-            ->leftJoin('logistics_location as locations', 'locations.logistics_location_id', '=', 'dr.logistics_location_id')
             ->whereNull('dr.keystage_id')
-            ->select(['dr.project_id', 'packages.package_id', 'dr.package_qty', 'locations.warehouse_id']);
+            ->select(['dr.delivery_id', 'dr.project_id', 'dr.package_qty', 'dr.school_id', 'dr.dr_no', 'dr.logistics_location_id', 'packages.package_id']);
 
         $keystageAllocations = DB::table('deliveries as dr')
             ->join('package as packages', 'packages.keystage_id', '=', 'dr.keystage_id')
-            ->leftJoin('logistics_location as locations', 'locations.logistics_location_id', '=', 'dr.logistics_location_id')
             ->whereNotNull('dr.keystage_id')
-            ->select(['dr.project_id', 'packages.package_id', 'dr.package_qty', 'locations.warehouse_id']);
+            ->select(['dr.delivery_id', 'dr.project_id', 'dr.package_qty', 'dr.school_id', 'dr.dr_no', 'dr.logistics_location_id', 'packages.package_id']);
 
-        $actualDrTotals = DB::query()
+        $inventoryItemIds = DB::table('inventory')->select('item_id')->distinct();
+        $actualDrAllocations = DB::query()
             ->fromSub($keystageAllocations->unionAll($lotAllocations), 'allocations')
             ->join('package_content as contents', 'contents.package_id', '=', 'allocations.package_id')
-            ->select(['allocations.project_id', 'contents.item_id', 'allocations.warehouse_id'])
-            ->selectRaw('SUM(CASE WHEN allocations.package_qty > 0 THEN allocations.package_qty * CASE WHEN contents.qty > 0 THEN contents.qty ELSE 1 END ELSE 0 END) as actual_dr_quantity')
-            ->groupBy('allocations.project_id', 'contents.item_id', 'allocations.warehouse_id');
+            ->join('item as allocated_items', function ($join): void {
+                $join->on('allocated_items.item_id', '=', 'contents.item_id')
+                    ->on('allocated_items.project_id', '=', 'allocations.project_id');
+            })
+            ->leftJoin('school as schools', 'schools.school_id', '=', 'allocations.school_id')
+            ->leftJoin('logistics_location as locations', 'locations.logistics_location_id', '=', 'allocations.logistics_location_id')
+            ->whereIn('contents.item_id', $inventoryItemIds)
+            ->when($request->filled('project_id'), fn ($query) => $query->where('allocations.project_id', $request->integer('project_id')))
+            ->select([
+                'allocations.delivery_id',
+                'allocations.project_id',
+                'contents.item_id',
+                'allocations.package_qty',
+                'contents.qty as content_quantity',
+                'allocations.dr_no',
+                'locations.warehouse_id',
+                'schools.region as school_region',
+            ]);
+
+        $actualDrByItemWarehouse = [];
+        $unmappedActualDrItems = [];
+        $warehouseByDelivery = [];
+
+        foreach ($actualDrAllocations->get() as $allocation) {
+            $warehouseCacheKey = $allocation->warehouse_id !== null
+                ? 'location:'.$allocation->warehouse_id
+                : 'school-region:'.trim((string) $allocation->school_region);
+
+            if (! array_key_exists($warehouseCacheKey, $warehouseByDelivery)) {
+                try {
+                    $warehouseByDelivery[$warehouseCacheKey] = $warehouseRouting->resolveWarehouseForDelivery($allocation);
+                } catch (\RuntimeException) {
+                    $warehouseByDelivery[$warehouseCacheKey] = null;
+                }
+            }
+
+            $actualDrQuantity = (int) $allocation->package_qty > 0
+                ? (int) $allocation->package_qty * ((int) $allocation->content_quantity > 0 ? (int) $allocation->content_quantity : 1)
+                : 0;
+            $itemKey = $allocation->project_id.':'.$allocation->item_id;
+            $warehouseId = $warehouseByDelivery[$warehouseCacheKey];
+
+            if ($warehouseId === null) {
+                $unmappedActualDrItems[$itemKey] = true;
+
+                continue;
+            }
+
+            $key = $itemKey.':'.$warehouseId;
+            $actualDrByItemWarehouse[$key] = ($actualDrByItemWarehouse[$key] ?? 0) + $actualDrQuantity;
+        }
 
         $query = DB::query()
             ->fromSub($currentBalances, 'balances')
@@ -148,11 +196,6 @@ class InventoryController extends Controller
             ->leftJoinSub($transactionTotals, 'transactions', function ($join): void {
                 $join->on('transactions.item_id', '=', 'balances.item_id')
                     ->on('transactions.warehouse_id', '=', 'balances.warehouse_id');
-            })
-            ->leftJoinSub($actualDrTotals, 'actual_dr', function ($join): void {
-                $join->on('actual_dr.item_id', '=', 'balances.item_id')
-                    ->on('actual_dr.project_id', '=', 'items.project_id')
-                    ->on('actual_dr.warehouse_id', '=', 'balances.warehouse_id');
             })
             ->select([
                 'items.item_id',
@@ -163,8 +206,7 @@ class InventoryController extends Controller
             ])
             ->selectRaw('COALESCE(transactions.stock_in_quantity, 0) as stock_in_quantity')
             ->selectRaw('COALESCE(transactions.stock_out_quantity, 0) as stock_out_quantity')
-            ->selectRaw('(COALESCE(transactions.stock_in_quantity, 0) - COALESCE(transactions.stock_out_quantity, 0)) as stock_on_hand_quantity')
-            ->selectRaw('COALESCE(actual_dr.actual_dr_quantity, 0) as actual_dr_quantity');
+            ->selectRaw('(COALESCE(transactions.stock_in_quantity, 0) - COALESCE(transactions.stock_out_quantity, 0)) as stock_on_hand_quantity');
 
         if ($request->filled('project_id')) {
             $query->where('items.project_id', $request->integer('project_id'));
@@ -183,28 +225,45 @@ class InventoryController extends Controller
         }
 
         $filteredBalances = clone $query;
+        $filteredBalanceKeys = DB::query()
+            ->fromSub(clone $filteredBalances, 'filtered_balances')
+            ->select(['project_id', 'item_id', 'warehouse_id'])
+            ->distinct()
+            ->get();
+
         $warehouseSummaries = DB::query()
             ->fromSub(clone $filteredBalances, 'filtered_balances')
             ->select(['warehouse_id', 'warehouse_name'])
             ->selectRaw('SUM(stock_in_quantity) as stock_in_quantity')
             ->selectRaw('SUM(stock_out_quantity) as stock_out_quantity')
             ->selectRaw('SUM(stock_on_hand_quantity) as stock_on_hand_quantity')
-            ->selectRaw('SUM(actual_dr_quantity) as actual_dr_quantity')
             ->groupBy('warehouse_id', 'warehouse_name')
             ->orderBy('warehouse_name')
             ->get();
 
-        $percentageOf = static function (float|int|string|null $quantity, float|int|string|null $denominator): float {
+        $itemWarehouseKey = static fn (int|string|null $projectId, int|string|null $itemId, int|string|null $warehouseId): string => ($projectId ?? 'unassigned').':'.($itemId ?? 'unassigned').':'.($warehouseId ?? 'unassigned');
+        $percentageOf = static function (float|int|string|null $quantity, float|int|string|null $denominator): ?float {
+            if ($denominator === null) {
+                return null;
+            }
+
             $denominator = (float) $denominator;
 
             return $denominator === 0.0 ? 0.0 : ((float) $quantity / $denominator) * 100;
         };
 
         foreach ($warehouseSummaries as $summary) {
+            $warehouseKeys = $filteredBalanceKeys->where('warehouse_id', $summary->warehouse_id);
+            $summary->actual_dr_mapping_unavailable = $warehouseKeys->contains(fn ($row): bool => isset($unmappedActualDrItems[$row->project_id.':'.$row->item_id]));
+            $summary->actual_dr_quantity = $summary->actual_dr_mapping_unavailable
+                ? null
+                : $warehouseKeys->sum(fn ($row): int => $actualDrByItemWarehouse[$itemWarehouseKey($row->project_id, $row->item_id, $row->warehouse_id)] ?? 0);
             $summary->stock_in_percentage = $percentageOf($summary->stock_in_quantity, $summary->actual_dr_quantity);
             $summary->stock_out_percentage = $percentageOf($summary->stock_out_quantity, $summary->stock_in_quantity);
             $summary->stock_on_hand_percentage = $percentageOf($summary->stock_on_hand_quantity, $summary->actual_dr_quantity);
         }
+
+        $hasUnmappedActualDr = $warehouseSummaries->contains('actual_dr_mapping_unavailable', true);
 
         $inventories = $query
             ->orderBy('items.item_name')
@@ -212,7 +271,13 @@ class InventoryController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $inventories->getCollection()->transform(function ($inventory) use ($percentageOf) {
+        $inventories->getCollection()->transform(function ($inventory) use ($percentageOf, $actualDrByItemWarehouse, $unmappedActualDrItems, $itemWarehouseKey, &$hasUnmappedActualDr) {
+            $itemKey = $inventory->project_id.':'.$inventory->item_id;
+            $inventory->actual_dr_mapping_unavailable = isset($unmappedActualDrItems[$itemKey]);
+            $inventory->actual_dr_quantity = $inventory->actual_dr_mapping_unavailable
+                ? null
+                : ($actualDrByItemWarehouse[$itemWarehouseKey($inventory->project_id, $inventory->item_id, $inventory->warehouse_id)] ?? 0);
+            $hasUnmappedActualDr = $hasUnmappedActualDr || $inventory->actual_dr_mapping_unavailable;
             $inventory->stock_in_percentage = $percentageOf($inventory->stock_in_quantity, $inventory->actual_dr_quantity);
             $inventory->stock_out_percentage = $percentageOf($inventory->stock_out_quantity, $inventory->stock_in_quantity);
             $inventory->stock_on_hand_percentage = $percentageOf($inventory->stock_on_hand_quantity, $inventory->actual_dr_quantity);
@@ -222,7 +287,7 @@ class InventoryController extends Controller
 
         $warehouses = Warehouse::query()->orderBy('warehouse_name')->get();
 
-        return view('inventory.balances', compact('inventories', 'projects', 'warehouses', 'warehouseSummaries'));
+        return view('inventory.balances', compact('inventories', 'projects', 'warehouses', 'warehouseSummaries', 'hasUnmappedActualDr'));
     }
 
     public function create()

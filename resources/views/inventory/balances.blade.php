@@ -66,14 +66,20 @@
             <div class="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <h2 id="warehouse-summary-heading" class="text-base font-semibold text-slate-900">Warehouse Summary</h2>
-                    <p class="mt-1 text-xs text-slate-500">Stock In and Stock on Hand percentages use the matching Actual DR quantity. Stock Out percentage uses Stock In Quantity. Warehouse percentages use summed quantities and summed Actual DR quantities.</p>
+                    <p class="mt-1 text-xs text-slate-500">Actual DR quantity is attributed to a warehouse through the school or delivery address and its configured location mapping. Stock In and Stock on Hand percentages use matching Actual DR quantity; Stock Out percentage uses Stock In Quantity. Warehouse percentages use summed quantities and summed matching Actual DR quantities.</p>
                 </div>
             </div>
+            @if($hasUnmappedActualDr)
+                <div class="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900" role="alert">
+                    Some Actual DR quantities could not be confidently attributed to a warehouse through the school or delivery address. Affected Actual DR denominators and Stock In/Stock on Hand percentages are unavailable. Review the address and warehouse location mapping.
+                </div>
+            @endif
             <div class="overflow-x-auto">
-                <table class="min-w-[900px] divide-y divide-slate-100">
+                <table class="min-w-[1100px] divide-y divide-slate-100">
                     <thead class="bg-slate-50">
                         <tr>
                             <th scope="col" class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Warehouse</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actual DR Quantity</th>
                             <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In Quantity</th>
                             <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In % of Actual DR</th>
                             <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out Quantity</th>
@@ -86,16 +92,24 @@
                         @forelse($warehouseSummaries as $summary)
                             <tr class="transition-colors hover:bg-slate-50/70">
                                 <td class="px-5 py-4 text-sm font-semibold text-slate-900">{{ $summary->warehouse_name ?: 'Unassigned warehouse' }}</td>
+                                <td class="px-5 py-4 text-right text-sm tabular-nums text-slate-600">
+                                    @if($summary->actual_dr_mapping_unavailable)
+                                        <div>Unavailable</div>
+                                        <div class="mt-1 text-xs text-amber-700">Address-to-warehouse mapping needs review</div>
+                                    @else
+                                        {{ number_format((float) $summary->actual_dr_quantity) }}
+                                    @endif
+                                </td>
                                 <td class="px-5 py-4 text-right text-sm tabular-nums text-emerald-700">{{ number_format((float) $summary->stock_in_quantity) }}</td>
-                                <td class="px-5 py-4 text-right text-sm tabular-nums text-slate-600">{{ number_format($summary->stock_in_percentage, 1) }}%</td>
+                                <td class="px-5 py-4 text-right text-sm tabular-nums text-slate-600">{{ $summary->stock_in_percentage === null ? 'N/A' : number_format($summary->stock_in_percentage, 1).'%' }}</td>
                                 <td class="px-5 py-4 text-right text-sm tabular-nums text-rose-700">{{ number_format((float) $summary->stock_out_quantity) }}</td>
                                 <td class="px-5 py-4 text-right text-sm tabular-nums text-slate-600">{{ number_format($summary->stock_out_percentage, 1) }}%</td>
                                 <td class="px-5 py-4 text-right text-sm font-semibold tabular-nums text-slate-900">{{ number_format((float) $summary->stock_on_hand_quantity) }}</td>
-                                <td class="px-5 py-4 text-right text-sm tabular-nums text-slate-600">{{ number_format($summary->stock_on_hand_percentage, 1) }}%</td>
+                                <td class="px-5 py-4 text-right text-sm tabular-nums text-slate-600">{{ $summary->stock_on_hand_percentage === null ? 'N/A' : number_format($summary->stock_on_hand_percentage, 1).'%' }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-5 py-10 text-center text-sm text-slate-500">No warehouse totals match the selected filters.</td>
+                                <td colspan="8" class="px-5 py-10 text-center text-sm text-slate-500">No warehouse totals match the selected filters.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -105,13 +119,14 @@
 
         <section class="mt-6 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm" aria-labelledby="inventory-balance-heading">
             <h2 id="inventory-balance-heading" class="sr-only">Inventory balances by warehouse</h2>
-            <p class="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">Stock In % and Stock on Hand % are measured against Actual DR Quantity for the same item, project, and warehouse. Stock Out % is measured against Stock In Quantity.</p>
+            <p class="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">Actual DR quantity is attributed through the school or delivery address and its configured warehouse/location mapping. Stock In % and Stock on Hand % use Actual DR quantity for the same item, project, and warehouse; Stock Out % uses Stock In Quantity.</p>
             <div class="overflow-x-auto">
-                <table class="min-w-[900px] divide-y divide-slate-100">
+                <table class="min-w-[1100px] divide-y divide-slate-100">
                     <thead class="bg-slate-50">
                         <tr>
                             <th scope="col" class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Item</th>
                             <th scope="col" class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Warehouse</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actual DR Quantity</th>
                             <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In Quantity / Stock In % of Actual DR</th>
                             <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out Quantity / Stock Out % of Stock In</th>
                             <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock on Hand Quantity / Stock on Hand % of Actual DR</th>
@@ -122,9 +137,17 @@
                             <tr class="transition-colors hover:bg-slate-50/70">
                                 <td class="px-5 py-4 text-sm font-semibold text-slate-900">{{ $inventory->item_name ?: 'Unnamed item' }}</td>
                                 <td class="px-5 py-4 text-sm text-slate-600">{{ $inventory->warehouse_name ?: 'Unassigned warehouse' }}</td>
+                                <td class="px-5 py-4 text-right text-sm tabular-nums text-slate-600">
+                                    @if($inventory->actual_dr_mapping_unavailable)
+                                        <div>Unavailable</div>
+                                        <div class="mt-1 text-xs text-amber-700">Address-to-warehouse mapping needs review</div>
+                                    @else
+                                        {{ number_format((float) $inventory->actual_dr_quantity) }}
+                                    @endif
+                                </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
                                     <div class="text-sm text-emerald-700">{{ number_format((float) $inventory->stock_in_quantity) }}</div>
-                                    <div class="mt-1 text-xs text-slate-500">{{ number_format($inventory->stock_in_percentage, 1) }}%</div>
+                                    <div class="mt-1 text-xs text-slate-500">{{ $inventory->stock_in_percentage === null ? 'N/A' : number_format($inventory->stock_in_percentage, 1).'%' }}</div>
                                 </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
                                     <div class="text-sm text-rose-700">{{ number_format((float) $inventory->stock_out_quantity) }}</div>
@@ -132,12 +155,12 @@
                                 </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
                                     <div class="text-sm font-semibold text-slate-900">{{ number_format((float) $inventory->stock_on_hand_quantity) }}</div>
-                                    <div class="mt-1 text-xs font-normal text-slate-500">{{ number_format($inventory->stock_on_hand_percentage, 1) }}%</div>
+                                    <div class="mt-1 text-xs font-normal text-slate-500">{{ $inventory->stock_on_hand_percentage === null ? 'N/A' : number_format($inventory->stock_on_hand_percentage, 1).'%' }}</div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-5 py-14 text-center">
+                                <td colspan="6" class="px-5 py-14 text-center">
                                     <p class="text-sm font-semibold text-slate-800">No inventory balances found</p>
                                     <p class="mt-1 text-xs text-slate-500">Adjust your search or filters and try again.</p>
                                 </td>

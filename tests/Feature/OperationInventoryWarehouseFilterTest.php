@@ -244,6 +244,67 @@ it('shows zero percentages when a filtered quantity has no total', function () {
     expect((float) $inventory->stock_out_percentage)->toBe(0.0);
 });
 
+it('attributes delivery quantity through the configured school region warehouse mapping', function () {
+    inventoryFilterUser();
+    inventoryFilterFixtures();
+    DB::table('school')->insert(['school_id' => 'S-REGION-I', 'region' => 'Region I']);
+    DB::table('package')->insert(['package_id' => 9, 'lot_id' => 9]);
+    DB::table('package_content')->insert(['package_id' => 9, 'item_id' => 1, 'qty' => 2]);
+    DB::table('deliveries')->insert([
+        'delivery_id' => 9,
+        'project_id' => 1,
+        'school_id' => 'S-REGION-I',
+        'lot_id' => 9,
+        'package_qty' => 3,
+        'dr_no' => 'DR-REGION-I',
+    ]);
+    DB::table('inventory_history')->insert([
+        'item_id' => 1,
+        'warehouse_id' => 1,
+        'old_qty' => 0,
+        'new_qty' => 3,
+        'change_type' => 'stock_in',
+    ]);
+
+    $response = $this->get('/inventory-balances?project_id=1&warehouse_id=1&search=Chair');
+
+    $inventory = $response->viewData('inventories')->first();
+    $summary = $response->viewData('warehouseSummaries')->first();
+    expect($inventory->warehouse_id)->toBe(1);
+    expect((int) $inventory->actual_dr_quantity)->toBe(6);
+    expect(round((float) $inventory->stock_in_percentage, 1))->toBe(50.0);
+    expect((int) $summary->actual_dr_quantity)->toBe(6);
+    expect(round((float) $summary->stock_in_percentage, 1))->toBe(50.0);
+});
+
+it('marks actual delivery quantity unavailable when school region has no warehouse mapping', function () {
+    inventoryFilterUser();
+    inventoryFilterFixtures();
+    DB::table('school')->insert(['school_id' => 'S-UNKNOWN-REGION', 'region' => 'Unmapped Region']);
+    DB::table('package')->insert(['package_id' => 10, 'lot_id' => 10]);
+    DB::table('package_content')->insert(['package_id' => 10, 'item_id' => 1, 'qty' => 2]);
+    DB::table('deliveries')->insert([
+        'delivery_id' => 10,
+        'project_id' => 1,
+        'school_id' => 'S-UNKNOWN-REGION',
+        'lot_id' => 10,
+        'package_qty' => 3,
+        'dr_no' => 'DR-UNKNOWN-REGION',
+    ]);
+
+    $response = $this->get('/inventory-balances?project_id=1&warehouse_id=1&search=Chair');
+
+    $response->assertOk()
+        ->assertSee('Address-to-warehouse mapping needs review')
+        ->assertSee('Some Actual DR quantities could not be confidently attributed to a warehouse');
+    $inventory = $response->viewData('inventories')->first();
+    $summary = $response->viewData('warehouseSummaries')->first();
+    expect($inventory->actual_dr_quantity)->toBeNull();
+    expect($inventory->stock_in_percentage)->toBeNull();
+    expect($summary->actual_dr_quantity)->toBeNull();
+    expect($summary->stock_on_hand_percentage)->toBeNull();
+});
+
 it('does not allow the inventory balances filter to select another company project', function () {
     $user = inventoryFilterUser();
     inventoryFilterFixtures();

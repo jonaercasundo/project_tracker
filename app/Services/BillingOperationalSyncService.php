@@ -168,7 +168,7 @@ class BillingOperationalSyncService
                     ];
                     $hasPendingPackage = true;
 
-                    $warehouseId = $this->warehouseForDelivery($delivery);
+                    $warehouseId = $this->resolveWarehouseForDelivery($delivery);
 
                     if ($currentStatus === 'released') {
                         foreach ($contents as $content) {
@@ -264,7 +264,7 @@ class BillingOperationalSyncService
         }, 3);
     }
 
-    private function warehouseForDelivery(object $delivery): int
+    public function resolveWarehouseForDelivery(object $delivery): int
     {
         if ($delivery->warehouse_id !== null) {
             return (int) $delivery->warehouse_id;

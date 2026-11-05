@@ -1239,8 +1239,28 @@ describe('project DR progress report', function () {
             ->and($report['required_per_day'])->toBe(0.14)
             ->and($report['recent_pace'])->toBe(0.14)
             ->and($report['pace_status'])->toBe('On track')
-            ->and($report['timeline'][array_key_last($report['timeline'])]['created'])->toBe(2)
-            ->and($report['timeline'][array_key_last($report['timeline'])]['actual'])->toBe(1);
+            ->and($report['pace_assessment'])->toBe('ON TRACK TO MEET NOV 12')
+            ->and($report['elapsed_percentage'])->toBe(30.0)
+            ->and($report['recorded_through_today'])->toBe(2);
+    });
+
+    it('forecasts a wide miss when no DRs completed in the recent seven-day period', function () {
+        $this->travelTo(CarbonImmutable::parse('2026-11-05 12:00:00', config('app.timezone')));
+        $today = CarbonImmutable::today(config('app.timezone'));
+        $cutoff = CarbonImmutable::parse('2026-12-15', config('app.timezone'));
+        DB::table('projects')->insert(['project_id' => 96, 'project_name' => 'No recent completions', 'start_date' => $today->subDays(20)->toDateString()]);
+        DB::table('deliveries')->insert([
+            ['delivery_id' => 961, 'project_id' => 96, 'dr_no' => 'DR-NO-RECENT-1', 'lot_id' => 996, 'status' => 'pending', 'created_at' => $today->subDays(19)->toDateTimeString(), 'delivered_date' => null],
+            ['delivery_id' => 962, 'project_id' => 96, 'dr_no' => 'DR-NO-RECENT-2', 'lot_id' => 996, 'status' => 'pending', 'created_at' => $today->subDays(18)->toDateTimeString(), 'delivered_date' => null],
+        ]);
+
+        $report = app(ProjectDrProgressReportService::class)->summarize(96, $cutoff);
+
+        expect($report['days_remaining'])->toBe(40)
+            ->and($report['recent_pace'])->toBe(0.0)
+            ->and($report['required_per_day'])->toBe(0.05)
+            ->and($report['pace_assessment'])->toBe('WILL MISS DEC 15 BY A WIDE MARGIN')
+            ->and($report['elapsed_percentage'])->toBeLessThan(100);
     });
 
     it('uses dated package delivery history to determine completion at the cutoff', function () {
@@ -1287,9 +1307,11 @@ describe('project DR progress report', function () {
 
         $response->assertOk()
             ->assertSee('Cutoff Date')
-            ->assertSee('Actual progress against cutoff')
+            ->assertSee('How this report is counted')
+            ->assertSee('Time elapsed')
+            ->assertSee('DRs recorded through today')
             ->assertSee($cutoff->toDateString())
-            ->assertSee('<polyline', false);
+            ->assertSee('aria-label="Cutoff timeline', false);
 
         $this->getJson(route('projects.reports.analytics.data', ['project_id' => 95, 'cutoff_date' => $cutoff->toDateString()]))
             ->assertOk()

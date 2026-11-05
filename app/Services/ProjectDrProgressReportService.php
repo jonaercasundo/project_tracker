@@ -111,45 +111,23 @@ class ProjectDrProgressReportService
         $startDate = $projectStartDate !== null && $projectStartDate <= ($earliestCreatedDate ?? $today->toDateString())
             ? $projectStartDate
             : ($earliestCreatedDate ?? $today->toDateString());
-        $timelineEnd = $today->greaterThan($cutoffDate) ? $today : $cutoffDate;
-        if ($timelineEnd->toDateString() < $startDate) {
-            $startDate = $timelineEnd->toDateString();
-        }
-
-        $timeline = [];
-        $createdTotal = 0;
-        $completedTotal = 0;
-        $date = CarbonImmutable::parse($startDate, config('app.timezone'));
-        $endDate = $timelineEnd->toDateString();
         $todayDate = $today->toDateString();
         $actualThroughDate = $latestActualDate->toDateString();
-        $createdDates = array_keys(array_filter($createdByDate, fn (int $count, string $createdDate): bool => $createdDate <= $todayDate, ARRAY_FILTER_USE_BOTH));
-        $completedDates = array_keys(array_filter($completedByDate, fn (int $count, string $completedDate): bool => $completedDate <= $actualThroughDate, ARRAY_FILTER_USE_BOTH));
-        sort($createdDates);
-        sort($completedDates);
-        $createdDateIndex = 0;
-        $completedDateIndex = 0;
-        $dayCount = (int) $date->diffInDays($timelineEnd) + 1;
-        $stepDays = max(1, (int) ceil($dayCount / 1000));
-        while (true) {
-            $pointDate = $date->greaterThan($timelineEnd) ? $timelineEnd : $date;
-            $dateKey = $pointDate->toDateString();
-            $createdThrough = min($dateKey, $todayDate);
-            while (isset($createdDates[$createdDateIndex]) && $createdDates[$createdDateIndex] <= $createdThrough) {
-                $createdTotal += $createdByDate[$createdDates[$createdDateIndex]];
-                $createdDateIndex++;
-            }
-            $completedThrough = min($dateKey, $actualThroughDate);
-            while (isset($completedDates[$completedDateIndex]) && $completedDates[$completedDateIndex] <= $completedThrough) {
-                $completedTotal += $completedByDate[$completedDates[$completedDateIndex]];
-                $completedDateIndex++;
-            }
-            $timeline[] = ['date' => $dateKey, 'created' => $createdTotal, 'actual' => $completedTotal];
-            if ($dateKey === $endDate) {
-                break;
-            }
-            $date = $date->addDays($stepDays);
-        }
+        $reportStart = CarbonImmutable::parse($startDate, config('app.timezone'));
+        $timelineSpanDays = $reportStart->lessThan($cutoffDate) ? (int) $reportStart->diffInDays($cutoffDate) : 0;
+        $midpointDate = $timelineSpanDays > 0
+            ? $reportStart->addDays(intdiv($timelineSpanDays, 2))->toDateString()
+            : $cutoffDate->toDateString();
+        $elapsedPercentage = $cutoffDate->lessThanOrEqualTo($today)
+            ? 100.0
+            : ($today->lessThanOrEqualTo($reportStart) || $timelineSpanDays === 0
+                ? 0.0
+                : min(100.0, round(($reportStart->diffInDays($today) / $timelineSpanDays) * 100, 1)));
+        $recordedThroughToday = array_sum(array_filter(
+            $createdByDate,
+            fn (int $count, string $recordedDate): bool => $recordedDate <= $todayDate,
+            ARRAY_FILTER_USE_BOTH,
+        ));
 
         $total = count($scopedReceipts);
         $completed = array_sum(array_filter($completedByDate, fn (int $count, string $date): bool => $date <= $latestActualDate->toDateString(), ARRAY_FILTER_USE_BOTH));
@@ -161,6 +139,10 @@ class ProjectDrProgressReportService
         $recentCompleted = array_sum(array_filter($completedByDate, fn (int $count, string $date): bool => $date >= $paceStart && $date <= $latestActualDate->toDateString(), ARRAY_FILTER_USE_BOTH));
         $recentAverage = $recentCompleted / 7;
         $recentPace = round($recentAverage, 2);
+        $forecastDaysToComplete = $recentAverage > 0 ? (int) ceil($remaining / $recentAverage) : null;
+        $forecastFinishDate = $forecastDaysToComplete === null
+            ? null
+            : $latestActualDate->addDays($forecastDaysToComplete)->toDateString();
         $limitations = [];
         if ($missingCreationDateReceipts !== []) {
             $limitations[] = count($missingCreationDateReceipts).' DR(s) have no deliveries.created_at value and cannot be assigned to the cutoff population.';
@@ -181,19 +163,43 @@ class ProjectDrProgressReportService
             $paceStatus = 'At this pace, cutoff will be missed';
         }
 
+        $cutoffLabel = strtoupper($cutoffDate->format('M d'));
+        if ($cutoffDate->lessThan($today)) {
+            $paceAssessment = 'CUTOFF PASSED';
+        } elseif ($cutoffDate->equalTo($today)) {
+            $paceAssessment = $remaining === 0 ? 'TARGET MET' : 'CUTOFF TODAY';
+        } elseif ($remaining === 0) {
+            $paceAssessment = 'TARGET MET';
+        } elseif ($forecastFinishDate === null) {
+            $paceAssessment = 'WILL MISS '.$cutoffLabel.' BY A WIDE MARGIN';
+        } elseif ($forecastFinishDate <= $cutoffDate->toDateString()) {
+            $paceAssessment = 'ON TRACK TO MEET '.$cutoffLabel;
+        } else {
+            $missDays = (int) $cutoffDate->diffInDays(CarbonImmutable::parse($forecastFinishDate, config('app.timezone')));
+            $wideMarginThreshold = max(7, (int) ceil($daysRemaining * 0.25));
+            $paceAssessment = 'WILL MISS '.$cutoffLabel.($missDays >= $wideMarginThreshold
+                ? ' BY A WIDE MARGIN'
+                : ' BY '.$missDays.' DAYS');
+        }
+
         return [
             'cutoff_date' => $cutoffDate->toDateString(),
             'today' => $today->toDateString(),
+            'actual_data_through' => $actualThroughDate,
             'start_date' => $startDate,
+            'midpoint_date' => $midpointDate,
+            'elapsed_percentage' => $elapsedPercentage,
             'days_remaining' => $daysRemaining,
             'total_drs' => $total,
+            'recorded_through_today' => $recordedThroughToday,
             'completed' => $completed,
             'percentage' => $total > 0 ? round(($completed / $total) * 100, 1) : 0,
             'remaining' => $remaining,
             'required_per_day' => $requiredPerDay,
             'recent_pace' => $recentPace,
+            'forecast_finish_date' => $forecastFinishDate,
+            'pace_assessment' => $paceAssessment,
             'pace_status' => $paceStatus,
-            'timeline' => $timeline,
             'data_limitation' => $limitations === [] ? null : implode(' ', $limitations),
             'creation_definition' => 'One distinct, nonblank project DR number with deliveries.created_at on or before the cutoff. Blank DRs and receipts containing cancelled, void, deleted or rejected delivery rows are excluded.',
             'completion_definition' => 'A DR is complete when all of its expected packages have dated delivered/accepted history; when no package allocations are expected, every delivery row must have a delivered_date or accepted_date.',

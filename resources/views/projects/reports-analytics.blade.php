@@ -72,101 +72,106 @@
         </section>
 
         @if ($drProgressReport)
-            <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" aria-labelledby="dr-progress-title">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Delivery Receipt Progress</p>
-                        <h2 id="dr-progress-title" class="mt-1 text-lg font-extrabold tracking-tight text-slate-950">Actual progress against cutoff</h2>
-                        <p class="mt-1 text-sm text-slate-500">Cutoff: <time datetime="{{ $drProgressReport['cutoff_date'] }}" class="font-semibold text-slate-700">{{ \Carbon\CarbonImmutable::parse($drProgressReport['cutoff_date'])->format('M d, Y') }}</time>
-                            @if ($drProgressReport['days_remaining'] > 0)
-                                <span class="mx-1 text-slate-300">·</span>{{ $drProgressReport['days_remaining'] }} days remaining
-                            @elseif ($drProgressReport['pace_status'] === 'Cutoff passed')
-                                <span class="mx-1 text-slate-300">·</span>Cutoff has passed
-                            @endif
-                        </p>
-                        <p class="mt-2 max-w-3xl text-xs leading-5 text-slate-500">Scope: {{ $drProgressReport['creation_definition'] }} Actual completion: {{ $drProgressReport['completion_definition'] }}</p>
+            @php
+                $recordedPercentage = $drProgressReport['total_drs'] > 0
+                    ? min(100, ($drProgressReport['recorded_through_today'] / $drProgressReport['total_drs']) * 100)
+                    : 0;
+                $todayPosition = $drProgressReport['elapsed_percentage'];
+                $todayLabelTransform = $todayPosition <= 10
+                    ? 'translateX(0)'
+                    : ($todayPosition >= 90 ? 'translateX(-100%)' : 'translateX(-50%)');
+                $isPastCutoff = $drProgressReport['cutoff_date'] < $drProgressReport['today'];
+                $isFutureCutoff = $drProgressReport['days_remaining'] > 0;
+                $forecastTone = in_array($drProgressReport['pace_status'], ['On track', 'Target met'], true)
+                    ? 'text-emerald-700'
+                    : (in_array($drProgressReport['pace_status'], ['At this pace, cutoff will be missed', 'Cutoff is today'], true)
+                        ? 'text-rose-600'
+                        : 'text-slate-600');
+                $todayMarkerLabel = $isPastCutoff
+                    ? 'TODAY - AFTER CUTOFF'
+                    : 'TODAY - '.strtoupper(\Carbon\CarbonImmutable::parse($drProgressReport['today'])->format('M d'));
+            @endphp
+            <section class="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-labelledby="dr-progress-title">
+                <header class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <h2 id="dr-progress-title" class="text-sm font-black uppercase tracking-[0.12em] text-slate-800 sm:text-base">
+                        {{ strtoupper(\Carbon\CarbonImmutable::parse($drProgressReport['cutoff_date'])->format('M d')) }} CUTOFF
+                        @if ($isFutureCutoff)
+                            <span class="px-1 text-slate-400">&middot;</span>{{ $drProgressReport['days_remaining'] }} DAYS LEFT
+                        @elseif ($isPastCutoff)
+                            <span class="px-1 text-slate-400">&middot;</span>CUTOFF PASSED
+                        @else
+                            <span class="px-1 text-slate-400">&middot;</span>CUTOFF TODAY
+                        @endif
+                    </h2>
+                    <p class="text-xs font-black uppercase tracking-wide {{ $forecastTone }} sm:text-right">{{ $drProgressReport['pace_assessment'] }}</p>
+                </header>
+
+                <p class="text-xs font-semibold text-slate-500">{{ number_format($drProgressReport['total_drs']) }} DRs in scope <span class="px-1 text-slate-300">|</span> {{ number_format($drProgressReport['remaining']) }} remaining</p>
+
+                <div aria-label="Cutoff timeline from report start to selected cutoff">
+                    <div class="relative mb-1 h-5">
+                        <span class="absolute top-0 whitespace-nowrap text-[10px] font-extrabold tracking-wide text-slate-700" style="left: {{ $todayPosition }}%; transform: {{ $todayLabelTransform }}">{{ $todayMarkerLabel }}</span>
                     </div>
-                    <span class="inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-bold {{ $drProgressReport['pace_status'] === 'On track' || $drProgressReport['pace_status'] === 'Target met' ? 'bg-emerald-50 text-emerald-700' : ($drProgressReport['pace_status'] === 'At this pace, cutoff will be missed' ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600') }}">{{ $drProgressReport['pace_status'] }}</span>
+                    <div class="relative h-4 overflow-visible rounded-sm border border-slate-300 bg-slate-100" role="img" aria-label="{{ number_format($drProgressReport['elapsed_percentage'], 1) }} percent of calendar time elapsed to cutoff">
+                        <div class="absolute inset-y-0 left-0 rounded-l-sm bg-slate-300" style="width: {{ $drProgressReport['elapsed_percentage'] }}%"></div>
+                        <span class="absolute inset-y-[-4px] z-10 border-l-2 border-slate-800" style="left: {{ $todayPosition }}%" aria-hidden="true"></span>
+                        <span class="absolute inset-y-[-2px] right-0 border-l-2 border-rose-500" aria-hidden="true"></span>
+                    </div>
+                    <div class="mt-1 flex items-start justify-between gap-2 text-[10px] font-semibold leading-4 text-slate-500 sm:text-xs">
+                        <span class="text-left">{{ \Carbon\CarbonImmutable::parse($drProgressReport['start_date'])->format('M d') }}</span>
+                        <span class="text-center">{{ \Carbon\CarbonImmutable::parse($drProgressReport['midpoint_date'])->format('M d') }}</span>
+                        <span class="text-right">{{ \Carbon\CarbonImmutable::parse($drProgressReport['cutoff_date'])->format('M d') }}</span>
+                    </div>
+                    <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-semibold text-slate-500">
+                        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-slate-300" aria-hidden="true"></span>Time elapsed</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-orange-500" aria-hidden="true"></span>DRs recorded</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-600" aria-hidden="true"></span>Actual completed</span>
+                    </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
-                    <article class="rounded-xl border border-slate-200 bg-slate-50 p-4"><p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">DRs in scope</p><p class="mt-2 font-mono text-2xl font-bold tabular-nums text-slate-950">{{ number_format($drProgressReport['total_drs']) }}</p></article>
-                    <article class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4"><p class="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Actual completed</p><p class="mt-2 font-mono text-2xl font-bold tabular-nums text-slate-950">{{ number_format($drProgressReport['completed']) }} <span class="text-sm font-semibold text-slate-500">({{ number_format($drProgressReport['percentage'], 1) }}%)</span></p></article>
-                    <article class="rounded-xl border border-slate-200 bg-slate-50 p-4"><p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Remaining</p><p class="mt-2 font-mono text-2xl font-bold tabular-nums text-slate-950">{{ number_format($drProgressReport['remaining']) }}</p></article>
-                    <article class="rounded-xl border border-amber-100 bg-amber-50/60 p-4"><p class="text-[11px] font-bold uppercase tracking-wide text-amber-700">Needed per day</p><p class="mt-2 font-mono text-2xl font-bold tabular-nums text-slate-950">{{ $drProgressReport['required_per_day'] === null ? '—' : number_format($drProgressReport['required_per_day'], 2) }}</p></article>
-                    <article class="col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 lg:col-span-1"><p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Recent pace · last 7 days</p><p class="mt-2 font-mono text-2xl font-bold tabular-nums text-slate-950">{{ number_format($drProgressReport['recent_pace'], 2) }} <span class="text-sm font-semibold text-slate-500">/ day</span></p></article>
+                <div class="grid gap-3 sm:grid-cols-2 sm:gap-5">
+                    <div>
+                        <div class="mb-1 flex items-baseline justify-between gap-2 text-xs">
+                            <span class="font-bold text-orange-700">DRs recorded through today</span>
+                            <span class="font-mono font-bold tabular-nums text-slate-700">{{ number_format($drProgressReport['recorded_through_today']) }} / {{ number_format($drProgressReport['total_drs']) }}</span>
+                        </div>
+                        <div class="h-1.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label="{{ number_format($recordedPercentage, 1) }} percent of cutoff population recorded by today">
+                            <div class="h-full rounded-full bg-orange-500" style="width: {{ $recordedPercentage }}%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="mb-1 flex items-baseline justify-between gap-2 text-xs">
+                            <span class="font-bold text-emerald-700">Actual completed</span>
+                            <span class="font-mono font-bold tabular-nums text-slate-700">{{ number_format($drProgressReport['completed']) }} / {{ number_format($drProgressReport['total_drs']) }} ({{ number_format($drProgressReport['percentage'], 1) }}%)</span>
+                        </div>
+                        <div class="h-1.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label="{{ number_format($drProgressReport['percentage'], 1) }} percent of cutoff population completed">
+                            <div class="h-full rounded-full bg-emerald-600" style="width: {{ min(100, $drProgressReport['percentage']) }}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-4 sm:gap-4">
+                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Actual progress</p><p class="mt-0.5 font-mono text-lg font-black tabular-nums text-slate-950">{{ number_format($drProgressReport['percentage'], 1) }}%</p></div>
+                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Needed per day</p><p class="mt-0.5 font-mono text-lg font-black tabular-nums text-slate-950">{{ $drProgressReport['required_per_day'] === null ? 'N/A' : number_format($drProgressReport['required_per_day'], 2) }}</p></div>
+                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Actual pace / last 7 days</p><p class="mt-0.5 font-mono text-lg font-black tabular-nums text-slate-950">{{ number_format($drProgressReport['recent_pace'], 2) }}<span class="ml-1 text-xs font-semibold text-slate-500">/ day</span></p></div>
+                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Remaining</p><p class="mt-0.5 font-mono text-lg font-black tabular-nums text-slate-950">{{ number_format($drProgressReport['remaining']) }}</p></div>
+                </div>
+
+                <div class="flex flex-wrap justify-between gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[10px] text-slate-500 sm:text-xs">
+                    <span>Report start: {{ \Carbon\CarbonImmutable::parse($drProgressReport['start_date'])->format('M d, Y') }}</span>
+                    <span>Actual data through: {{ \Carbon\CarbonImmutable::parse($drProgressReport['actual_data_through'])->format('M d, Y') }}</span>
                 </div>
 
                 @if ($drProgressReport['data_limitation'])
-                    <p role="status" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-900">{{ $drProgressReport['data_limitation'] }}</p>
+                    <p role="status" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">{{ $drProgressReport['data_limitation'] }}</p>
                 @endif
 
-                <div class="rounded-xl border border-slate-200 p-3 sm:p-4">
-                    <div class="mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600" aria-label="Chart legend">
-                        <span class="inline-flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-orange-500" aria-hidden="true"></span>DRs created</span>
-                        <span class="inline-flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-emerald-600" aria-hidden="true"></span>Actual progress</span>
-                        @if ($drProgressReport['cutoff_date'] > $drProgressReport['today'])
-                            <span class="inline-flex items-center gap-2"><span class="h-4 border-l-2 border-dashed border-rose-500" aria-hidden="true"></span>Cutoff target</span>
-                        @endif
-                    </div>
-                    @php
-                        $chartWidth = 900;
-                        $chartHeight = 300;
-                        $chartLeft = 46;
-                        $chartRight = 20;
-                        $chartTop = 18;
-                        $chartBottom = 38;
-                        $chartPoints = $drProgressReport['timeline'];
-                        $chartStart = \Carbon\CarbonImmutable::parse($chartPoints[0]['date']);
-                        $chartEnd = \Carbon\CarbonImmutable::parse($chartPoints[array_key_last($chartPoints)]['date']);
-                        $chartSpan = max(1, (int) $chartStart->diffInDays($chartEnd));
-                        $chartMax = max(1, max(array_map(fn (array $point): int => max($point['created'], $point['actual']), $chartPoints)));
-                        $chartX = fn (string $date): float => $chartLeft + (min($chartSpan, max(0, (int) $chartStart->diffInDays(\Carbon\CarbonImmutable::parse($date)))) * ($chartWidth - $chartLeft - $chartRight) / $chartSpan);
-                        $chartY = fn (int $value): float => $chartHeight - $chartBottom - ($value * ($chartHeight - $chartTop - $chartBottom) / $chartMax);
-                        $chartPlot = array_map(fn (array $point): array => [
-                            'date' => $point['date'],
-                            'x' => $chartX($point['date']),
-                            'created_y' => $chartY($point['created']),
-                            'actual_y' => $chartY($point['actual']),
-                        ], $chartPoints);
-                        $createdLine = implode(' ', array_map(fn (array $point): string => $point['x'].','.$point['created_y'], $chartPlot));
-                        $actualLine = implode(' ', array_map(fn (array $point): string => $point['x'].','.$point['actual_y'], $chartPlot));
-                        $chartTicks = array_unique(array_map(fn (int $tick): int => (int) ceil($chartMax * $tick / 4), range(0, 4)));
-                        $todayX = $chartX($drProgressReport['today']);
-                        $cutoffX = $chartX($drProgressReport['cutoff_date']);
-                    @endphp
-                    <div class="relative h-64 w-full sm:h-80" role="img" aria-label="Timeline comparing cumulative DRs created and actual DR progress">
-                        <svg id="dr-progress-chart" class="block h-full w-full" viewBox="0 0 {{ $chartWidth }} {{ $chartHeight }}" preserveAspectRatio="none" aria-hidden="true">
-                            @foreach ($chartTicks as $tick)
-                                @php($tickY = $chartY($tick))
-                                <line x1="{{ $chartLeft }}" y1="{{ $tickY }}" x2="{{ $chartWidth - $chartRight }}" y2="{{ $tickY }}" stroke="#e2e8f0" stroke-width="1" />
-                                <text x="{{ $chartLeft - 10 }}" y="{{ $tickY + 4 }}" fill="#64748b" font-size="11" text-anchor="end">{{ number_format($tick) }}</text>
-                            @endforeach
-                            <line x1="{{ $todayX }}" y1="{{ $chartTop }}" x2="{{ $todayX }}" y2="{{ $chartHeight - $chartBottom }}" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 4" />
-                            @if ($drProgressReport['cutoff_date'] > $drProgressReport['today'])
-                                <line x1="{{ $cutoffX }}" y1="{{ $chartTop }}" x2="{{ $cutoffX }}" y2="{{ $chartHeight - $chartBottom }}" stroke="#f43f5e" stroke-width="2" stroke-dasharray="5 5" />
-                            @endif
-                            <polyline points="{{ $createdLine }}" fill="none" stroke="#f97316" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-                            <polyline points="{{ $actualLine }}" fill="none" stroke="#059669" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-                            @if (count($chartPlot) === 1)
-                                <circle cx="{{ $chartPlot[0]['x'] }}" cy="{{ $chartPlot[0]['created_y'] }}" r="4" fill="#f97316" />
-                                <circle cx="{{ $chartPlot[0]['x'] }}" cy="{{ $chartPlot[0]['actual_y'] }}" r="4" fill="#059669" />
-                            @endif
-                            <text x="{{ min($todayX + 5, $chartWidth - $chartRight - 48) }}" y="{{ $chartTop + 12 }}" fill="#475569" font-size="11" font-weight="700">TODAY</text>
-                            @if ($drProgressReport['cutoff_date'] > $drProgressReport['today'])
-                                <text x="{{ min($cutoffX + 5, $chartWidth - $chartRight - 70) }}" y="{{ $chartTop + 25 }}" fill="#e11d48" font-size="11" font-weight="700">CUTOFF</text>
-                            @endif
-                            @foreach (array_unique([0, (int) floor((count($chartPlot) - 1) / 2), count($chartPlot) - 1]) as $index)
-                                @php($anchor = $index === 0 ? 'start' : ($index === count($chartPlot) - 1 ? 'end' : 'middle'))
-                                <text x="{{ $chartPlot[$index]['x'] }}" y="{{ $chartHeight - 10 }}" fill="#64748b" font-size="11" text-anchor="{{ $anchor }}">{{ \Carbon\CarbonImmutable::parse($chartPlot[$index]['date'])->format('M j') }}</text>
-                            @endforeach
-                        </svg>
-                    </div>
-                    <div class="mt-2 flex flex-wrap justify-between gap-x-3 gap-y-1 text-[11px] text-slate-500"><span>Report start: {{ \Carbon\CarbonImmutable::parse($drProgressReport['start_date'])->format('M d, Y') }}</span><span>Actual data through {{ \Carbon\CarbonImmutable::parse($drProgressReport['cutoff_date'] > $drProgressReport['today'] ? $drProgressReport['today'] : $drProgressReport['cutoff_date'])->format('M d, Y') }}</span></div>
-                </div>
+                <details class="text-[11px] leading-5 text-slate-500">
+                    <summary class="cursor-pointer font-semibold text-slate-600">How this report is counted</summary>
+                    <p class="mt-1">{{ $drProgressReport['creation_definition'] }} {{ $drProgressReport['completion_definition'] }} The orange meter counts records entered by today within the cutoff population; the gray rail represents calendar time only.</p>
+                </details>
             </section>
         @endif
-
         @if ($selectedProjectId === null)
             <p class="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">No projects are available for this report.</p>
         @endif

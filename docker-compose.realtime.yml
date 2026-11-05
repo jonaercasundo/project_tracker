@@ -1,0 +1,39 @@
+name: project-tracker-realtime
+
+x-runtime: &runtime
+  image: logistics-worker-php:8.3
+  working_dir: /var/www/html/project_tracker
+  user: "1101:33"
+  restart: unless-stopped
+  init: true
+  volumes:
+    - /var/www/html/project_tracker:/var/www/html/project_tracker
+  networks:
+    - laravel
+
+services:
+  reverb:
+    <<: *runtime
+    container_name: project_tracker_reverb
+    command: [php, artisan, "reverb:start", "--host=0.0.0.0", "--port=8080", --no-interaction]
+    ulimits:
+      nofile:
+        soft: 10000
+        hard: 10000
+
+  default-worker:
+    <<: *runtime
+    container_name: project_tracker_default_worker
+    command: [php, artisan, "queue:work", database, "--queue=default", "--sleep=3", "--tries=3", "--timeout=60", --no-interaction]
+    stop_grace_period: 90s
+
+  billing-worker:
+    <<: *runtime
+    container_name: project_tracker_billing_worker
+    command: [php, artisan, "queue:work", billing_sync, "--queue=billing_sync", "--sleep=3", "--tries=1", "--timeout=1800", --no-interaction]
+    stop_grace_period: 1900s
+
+networks:
+  laravel:
+    external: true
+    name: project-tracker_laravel

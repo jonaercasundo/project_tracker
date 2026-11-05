@@ -146,15 +146,14 @@ class InventoryController extends Controller
             ->whereIn('contents.item_id', $inventoryItemIds)
             ->when($request->filled('project_id'), fn ($query) => $query->where('allocations.project_id', $request->integer('project_id')))
             ->select([
-                'allocations.delivery_id',
                 'allocations.project_id',
                 'contents.item_id',
-                'allocations.package_qty',
-                'contents.qty as content_quantity',
-                'allocations.dr_no',
                 'locations.warehouse_id',
                 'schools.region as school_region',
-            ]);
+            ])
+            ->selectRaw('MIN(allocations.dr_no) as dr_no')
+            ->selectRaw('SUM(CASE WHEN allocations.package_qty > 0 THEN allocations.package_qty * (CASE WHEN contents.qty > 0 THEN contents.qty ELSE 1 END) ELSE 0 END) as actual_dr_quantity')
+            ->groupBy('allocations.project_id', 'contents.item_id', 'locations.warehouse_id', 'schools.region');
 
         $actualDrByItemWarehouse = [];
         $unmappedActualDrItems = [];
@@ -173,9 +172,7 @@ class InventoryController extends Controller
                 }
             }
 
-            $actualDrQuantity = (int) $allocation->package_qty > 0
-                ? (int) $allocation->package_qty * ((int) $allocation->content_quantity > 0 ? (int) $allocation->content_quantity : 1)
-                : 0;
+            $actualDrQuantity = (int) $allocation->actual_dr_quantity;
             $itemKey = $allocation->project_id.':'.$allocation->item_id;
             $warehouseId = $warehouseByDelivery[$warehouseCacheKey];
 

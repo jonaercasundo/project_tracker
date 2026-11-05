@@ -230,6 +230,30 @@ it('calculates inventory percentages against actual delivery quantities and pres
     expect(round((float) $inventories['1:1']->stock_on_hand_percentage, 1))->toBe(-10.0);
 });
 
+it('sums large delivery allocation sets in inventory balances', function () {
+    inventoryFilterUser();
+    inventoryFilterFixtures();
+    DB::table('logistics_location')->insert(['logistics_location_id' => 1, 'warehouse_id' => 1]);
+    DB::table('package')->insert(['package_id' => 1, 'lot_id' => 1]);
+    DB::table('package_content')->insert(['package_id' => 1, 'item_id' => 1, 'qty' => 2]);
+
+    foreach (array_chunk(range(1, 10001), 100) as $deliveryIds) {
+        DB::table('deliveries')->insert(array_map(static fn (int $deliveryId): array => [
+            'delivery_id' => $deliveryId,
+            'project_id' => 1,
+            'lot_id' => 1,
+            'package_qty' => 3,
+            'logistics_location_id' => 1,
+        ], $deliveryIds));
+    }
+
+    $response = $this->get('/inventory-balances');
+
+    $response->assertOk();
+    $inventory = $response->viewData('inventories')->first(fn ($inventory) => $inventory->item_id === 1 && $inventory->warehouse_id === 1);
+    expect((int) $inventory->actual_dr_quantity)->toBe(60006);
+});
+
 it('shows zero percentages when a filtered quantity has no total', function () {
     inventoryFilterUser();
     inventoryFilterFixtures();

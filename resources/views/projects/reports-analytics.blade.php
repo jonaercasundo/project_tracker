@@ -109,75 +109,62 @@
                             <span class="inline-flex items-center gap-2"><span class="h-4 border-l-2 border-dashed border-rose-500" aria-hidden="true"></span>Cutoff target</span>
                         @endif
                     </div>
+                    @php
+                        $chartWidth = 900;
+                        $chartHeight = 300;
+                        $chartLeft = 46;
+                        $chartRight = 20;
+                        $chartTop = 18;
+                        $chartBottom = 38;
+                        $chartPoints = $drProgressReport['timeline'];
+                        $chartStart = \Carbon\CarbonImmutable::parse($chartPoints[0]['date']);
+                        $chartEnd = \Carbon\CarbonImmutable::parse($chartPoints[array_key_last($chartPoints)]['date']);
+                        $chartSpan = max(1, (int) $chartStart->diffInDays($chartEnd));
+                        $chartMax = max(1, max(array_map(fn (array $point): int => max($point['created'], $point['actual']), $chartPoints)));
+                        $chartX = fn (string $date): float => $chartLeft + (min($chartSpan, max(0, (int) $chartStart->diffInDays(\Carbon\CarbonImmutable::parse($date)))) * ($chartWidth - $chartLeft - $chartRight) / $chartSpan);
+                        $chartY = fn (int $value): float => $chartHeight - $chartBottom - ($value * ($chartHeight - $chartTop - $chartBottom) / $chartMax);
+                        $chartPlot = array_map(fn (array $point): array => [
+                            'date' => $point['date'],
+                            'x' => $chartX($point['date']),
+                            'created_y' => $chartY($point['created']),
+                            'actual_y' => $chartY($point['actual']),
+                        ], $chartPoints);
+                        $createdLine = implode(' ', array_map(fn (array $point): string => $point['x'].','.$point['created_y'], $chartPlot));
+                        $actualLine = implode(' ', array_map(fn (array $point): string => $point['x'].','.$point['actual_y'], $chartPlot));
+                        $chartTicks = array_unique(array_map(fn (int $tick): int => (int) ceil($chartMax * $tick / 4), range(0, 4)));
+                        $todayX = $chartX($drProgressReport['today']);
+                        $cutoffX = $chartX($drProgressReport['cutoff_date']);
+                    @endphp
                     <div class="relative h-64 w-full sm:h-80" role="img" aria-label="Timeline comparing cumulative DRs created and actual DR progress">
-                        <canvas id="dr-progress-chart" aria-hidden="true"></canvas>
+                        <svg id="dr-progress-chart" class="block h-full w-full" viewBox="0 0 {{ $chartWidth }} {{ $chartHeight }}" preserveAspectRatio="none" aria-hidden="true">
+                            @foreach ($chartTicks as $tick)
+                                @php($tickY = $chartY($tick))
+                                <line x1="{{ $chartLeft }}" y1="{{ $tickY }}" x2="{{ $chartWidth - $chartRight }}" y2="{{ $tickY }}" stroke="#e2e8f0" stroke-width="1" />
+                                <text x="{{ $chartLeft - 10 }}" y="{{ $tickY + 4 }}" fill="#64748b" font-size="11" text-anchor="end">{{ number_format($tick) }}</text>
+                            @endforeach
+                            <line x1="{{ $todayX }}" y1="{{ $chartTop }}" x2="{{ $todayX }}" y2="{{ $chartHeight - $chartBottom }}" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 4" />
+                            @if ($drProgressReport['cutoff_date'] > $drProgressReport['today'])
+                                <line x1="{{ $cutoffX }}" y1="{{ $chartTop }}" x2="{{ $cutoffX }}" y2="{{ $chartHeight - $chartBottom }}" stroke="#f43f5e" stroke-width="2" stroke-dasharray="5 5" />
+                            @endif
+                            <polyline points="{{ $createdLine }}" fill="none" stroke="#f97316" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            <polyline points="{{ $actualLine }}" fill="none" stroke="#059669" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            @if (count($chartPlot) === 1)
+                                <circle cx="{{ $chartPlot[0]['x'] }}" cy="{{ $chartPlot[0]['created_y'] }}" r="4" fill="#f97316" />
+                                <circle cx="{{ $chartPlot[0]['x'] }}" cy="{{ $chartPlot[0]['actual_y'] }}" r="4" fill="#059669" />
+                            @endif
+                            <text x="{{ min($todayX + 5, $chartWidth - $chartRight - 48) }}" y="{{ $chartTop + 12 }}" fill="#475569" font-size="11" font-weight="700">TODAY</text>
+                            @if ($drProgressReport['cutoff_date'] > $drProgressReport['today'])
+                                <text x="{{ min($cutoffX + 5, $chartWidth - $chartRight - 70) }}" y="{{ $chartTop + 25 }}" fill="#e11d48" font-size="11" font-weight="700">CUTOFF</text>
+                            @endif
+                            @foreach (array_unique([0, (int) floor((count($chartPlot) - 1) / 2), count($chartPlot) - 1]) as $index)
+                                @php($anchor = $index === 0 ? 'start' : ($index === count($chartPlot) - 1 ? 'end' : 'middle'))
+                                <text x="{{ $chartPlot[$index]['x'] }}" y="{{ $chartHeight - 10 }}" fill="#64748b" font-size="11" text-anchor="{{ $anchor }}">{{ \Carbon\CarbonImmutable::parse($chartPlot[$index]['date'])->format('M j') }}</text>
+                            @endforeach
+                        </svg>
                     </div>
                     <div class="mt-2 flex flex-wrap justify-between gap-x-3 gap-y-1 text-[11px] text-slate-500"><span>Report start: {{ \Carbon\CarbonImmutable::parse($drProgressReport['start_date'])->format('M d, Y') }}</span><span>Actual data through {{ \Carbon\CarbonImmutable::parse($drProgressReport['cutoff_date'] > $drProgressReport['today'] ? $drProgressReport['today'] : $drProgressReport['cutoff_date'])->format('M d, Y') }}</span></div>
                 </div>
             </section>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
-            <script>
-                (() => {
-                    const report = @json($drProgressReport);
-                    const canvas = document.getElementById('dr-progress-chart');
-                    const points = report.timeline || [];
-                    if (!canvas || points.length === 0 || typeof Chart === 'undefined') return;
-                    const todayIndex = points.findIndex(point => point.date >= report.today);
-                    const cutoffIndex = points.findIndex(point => point.date >= report.cutoff_date);
-                    const markers = [{index: todayIndex, label: 'TODAY', color: '#475569'}];
-                    if (report.cutoff_date > report.today) {
-                        markers.push({index: cutoffIndex, label: 'CUTOFF', color: '#e11d48'});
-                    }
-                    const markerPlugin = {
-                        id: 'drReportMarkers',
-                        afterDatasetsDraw(chart) {
-                            const {ctx, chartArea, scales: {x}} = chart;
-                            markers.filter(marker => marker.index >= 0).forEach(marker => {
-                                const markerX = x.getPixelForValue(marker.index);
-                                ctx.save();
-                                ctx.strokeStyle = marker.color;
-                                ctx.lineWidth = marker.label === 'CUTOFF' ? 2 : 1.5;
-                                ctx.setLineDash(marker.label === 'CUTOFF' ? [5, 5] : [3, 4]);
-                                ctx.beginPath();
-                                ctx.moveTo(markerX, chartArea.top);
-                                ctx.lineTo(markerX, chartArea.bottom);
-                                ctx.stroke();
-                                ctx.setLineDash([]);
-                                ctx.fillStyle = marker.color;
-                                ctx.font = '700 10px sans-serif';
-                                ctx.textBaseline = 'top';
-                                const labelX = Math.min(markerX + 5, chartArea.right - ctx.measureText(marker.label).width);
-                                ctx.fillText(marker.label, Math.max(chartArea.left, labelX), chartArea.top + 4);
-                                ctx.restore();
-                            });
-                        },
-                    };
-                    new Chart(canvas, {
-                        type: 'line',
-                        data: {
-                            labels: points.map(point => point.date),
-                            datasets: [
-                                {label: 'DRs created', data: points.map(point => point.created), borderColor: '#f97316', backgroundColor: '#f97316', borderWidth: 3, pointRadius: 0, pointHitRadius: 8, tension: 0, stepped: 'before'},
-                                {label: 'Actual progress', data: points.map(point => point.actual), borderColor: '#059669', backgroundColor: '#059669', borderWidth: 3, pointRadius: 0, pointHitRadius: 8, tension: 0, stepped: 'before'},
-                            ],
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            interaction: {mode: 'index', intersect: false},
-                            plugins: {legend: {display: false}},
-                            scales: {
-                                x: {grid: {display: false}, ticks: {color: '#64748b', maxTicksLimit: 8, maxRotation: 0, callback(value) {
-                                    const date = new Date(`${this.getLabelForValue(value)}T00:00:00`);
-                                    return date.toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
-                                }}},
-                                y: {beginAtZero: true, ticks: {color: '#64748b', precision: 0}, grid: {color: '#e2e8f0'}},
-                            },
-                        },
-                        plugins: [markerPlugin],
-                    });
-                })();
-            </script>
         @endif
 
         @if ($selectedProjectId === null)

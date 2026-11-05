@@ -1288,7 +1288,8 @@ describe('project DR progress report', function () {
         $response->assertOk()
             ->assertSee('Cutoff Date')
             ->assertSee('Actual progress against cutoff')
-            ->assertSee($cutoff->toDateString());
+            ->assertSee($cutoff->toDateString())
+            ->assertSee('<polyline', false);
 
         $this->getJson(route('projects.reports.analytics.data', ['project_id' => 95, 'cutoff_date' => $cutoff->toDateString()]))
             ->assertOk()

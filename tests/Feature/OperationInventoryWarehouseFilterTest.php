@@ -162,7 +162,7 @@ it('shows inventory transactions and current stock grouped by item and warehouse
     expect((array) $filtered->viewData('inventories')->first())->toMatchArray([
         'stock_in_quantity' => 5,
         'stock_out_quantity' => 3,
-        'stock_on_hand_quantity' => 17,
+        'stock_on_hand_quantity' => 2,
     ]);
 
     $projectRows = $this->get('/inventory-balances?project_id=1')->viewData('inventories');
@@ -170,36 +170,64 @@ it('shows inventory transactions and current stock grouped by item and warehouse
     expect($projectRows->getCollection()->pluck('warehouse_name')->unique()->count())->toBe(3);
 });
 
-it('shows filtered warehouse and item shares of each inventory quantity', function () {
+it('calculates inventory percentages against actual delivery quantities and preserves negative balances', function () {
     inventoryFilterUser();
     inventoryFilterFixtures();
+    DB::table('item')->insert([
+        'item_id' => 3,
+        'item_name' => 'Table',
+        'project_id' => 1,
+    ]);
+    Inventory::create(['inventory_id' => 5, 'item_id' => 3, 'warehouse_id' => 1, 'qty' => 60, 'inventory_status' => 'Approved', 'created_at' => '2026-10-03 12:00:00']);
+    DB::table('logistics_location')->insert([
+        ['logistics_location_id' => 1, 'warehouse_id' => 1],
+        ['logistics_location_id' => 2, 'warehouse_id' => 2],
+    ]);
+    DB::table('package')->insert([
+        ['package_id' => 1, 'lot_id' => 1],
+        ['package_id' => 2, 'lot_id' => 2],
+    ]);
+    DB::table('package_content')->insert([
+        ['package_id' => 1, 'item_id' => 1, 'qty' => 2],
+        ['package_id' => 2, 'item_id' => 1, 'qty' => 3],
+        ['package_id' => 1, 'item_id' => 3, 'qty' => 18],
+    ]);
+    DB::table('deliveries')->insert([
+        ['delivery_id' => 1, 'project_id' => 1, 'lot_id' => 1, 'package_qty' => 10, 'logistics_location_id' => 1],
+        ['delivery_id' => 2, 'project_id' => 1, 'lot_id' => 2, 'package_qty' => 10, 'logistics_location_id' => 2],
+    ]);
     DB::table('inventory_history')->insert([
-        ['item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 0, 'new_qty' => 5, 'change_type' => 'stock_in'],
-        ['item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 5, 'new_qty' => 2, 'change_type' => 'stock_out'],
-        ['item_id' => 1, 'warehouse_id' => 2, 'old_qty' => 0, 'new_qty' => 8, 'change_type' => 'stock_in'],
+        ['item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 0, 'new_qty' => 10, 'change_type' => 'stock_in'],
+        ['item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 22, 'new_qty' => 10, 'change_type' => 'stock_out'],
+        ['item_id' => 1, 'warehouse_id' => 2, 'old_qty' => 0, 'new_qty' => 20, 'change_type' => 'stock_in'],
+        ['item_id' => 1, 'warehouse_id' => 2, 'old_qty' => 30, 'new_qty' => 20, 'change_type' => 'stock_out'],
+        ['item_id' => 3, 'warehouse_id' => 1, 'old_qty' => 0, 'new_qty' => 90, 'change_type' => 'stock_in'],
+        ['item_id' => 3, 'warehouse_id' => 1, 'old_qty' => 120, 'new_qty' => 90, 'change_type' => 'stock_out'],
     ]);
 
-    $response = $this->get('/inventory-balances?project_id=1&search=Chair');
+    $response = $this->get('/inventory-balances?project_id=1&search=a');
 
     $response->assertOk()
         ->assertSee('Warehouse Summary')
-        ->assertSee('38.5%')
-        ->assertSee('61.5%')
-        ->assertSee('16.7%')
-        ->assertSee('33.3%')
-        ->assertSee('50.0%');
+        ->assertSee('Stock In % of Actual DR')
+        ->assertSee('Stock Out % of Stock In')
+        ->assertSee('Stock on Hand % of Actual DR')
+        ->assertSee('120.0%')
+        ->assertSee('-10.0%');
 
     $summaries = $response->viewData('warehouseSummaries')->keyBy('warehouse_id');
     expect($summaries)->toHaveCount(3);
-    expect(round((float) $summaries[1]->stock_in_percentage, 1))->toBe(38.5);
-    expect(round((float) $summaries[2]->stock_in_percentage, 1))->toBe(61.5);
+    expect(round((float) $summaries[1]->stock_in_percentage, 1))->toBe(50.0);
+    expect(round((float) $summaries[1]->stock_out_percentage, 1))->toBe(42.0);
+    expect(round((float) $summaries[1]->stock_on_hand_percentage, 1))->toBe(29.0);
+    expect(round((float) $summaries[2]->stock_in_percentage, 1))->toBe(66.7);
     expect((float) $summaries[3]->stock_in_percentage)->toBe(0.0);
-    expect((float) $summaries[1]->stock_out_percentage)->toBe(100.0);
-    expect(round((float) $summaries[1]->stock_on_hand_percentage, 1))->toBe(16.7);
 
-    $inventories = $response->viewData('inventories')->getCollection()->keyBy('warehouse_id');
-    expect(round((float) $inventories[1]->stock_in_percentage, 1))->toBe(38.5);
-    expect(round((float) $inventories[2]->stock_on_hand_percentage, 1))->toBe(33.3);
+    $inventories = $response->viewData('inventories')->getCollection()->keyBy(fn ($inventory) => $inventory->item_id.':'.$inventory->warehouse_id);
+    expect(round((float) $inventories['1:1']->stock_in_percentage, 1))->toBe(50.0);
+    expect(round((float) $inventories['1:1']->stock_out_percentage, 1))->toBe(120.0);
+    expect((float) $inventories['1:1']->stock_on_hand_quantity)->toBe(-2.0);
+    expect(round((float) $inventories['1:1']->stock_on_hand_percentage, 1))->toBe(-10.0);
 });
 
 it('shows zero percentages when a filtered quantity has no total', function () {

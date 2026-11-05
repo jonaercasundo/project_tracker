@@ -120,8 +120,26 @@ class InventoryController extends Controller
 
         $currentBalances = DB::table('inventory')
             ->select(['item_id', 'warehouse_id'])
-            ->selectRaw('SUM(COALESCE(qty, 0)) as stock_on_hand_quantity')
             ->groupBy('item_id', 'warehouse_id');
+
+        $lotAllocations = DB::table('deliveries as dr')
+            ->join('package as packages', 'packages.lot_id', '=', 'dr.lot_id')
+            ->leftJoin('logistics_location as locations', 'locations.logistics_location_id', '=', 'dr.logistics_location_id')
+            ->whereNull('dr.keystage_id')
+            ->select(['dr.project_id', 'packages.package_id', 'dr.package_qty', 'locations.warehouse_id']);
+
+        $keystageAllocations = DB::table('deliveries as dr')
+            ->join('package as packages', 'packages.keystage_id', '=', 'dr.keystage_id')
+            ->leftJoin('logistics_location as locations', 'locations.logistics_location_id', '=', 'dr.logistics_location_id')
+            ->whereNotNull('dr.keystage_id')
+            ->select(['dr.project_id', 'packages.package_id', 'dr.package_qty', 'locations.warehouse_id']);
+
+        $actualDrTotals = DB::query()
+            ->fromSub($keystageAllocations->unionAll($lotAllocations), 'allocations')
+            ->join('package_content as contents', 'contents.package_id', '=', 'allocations.package_id')
+            ->select(['allocations.project_id', 'contents.item_id', 'allocations.warehouse_id'])
+            ->selectRaw('SUM(CASE WHEN allocations.package_qty > 0 THEN allocations.package_qty * CASE WHEN contents.qty > 0 THEN contents.qty ELSE 1 END ELSE 0 END) as actual_dr_quantity')
+            ->groupBy('allocations.project_id', 'contents.item_id', 'allocations.warehouse_id');
 
         $query = DB::query()
             ->fromSub($currentBalances, 'balances')
@@ -130,6 +148,11 @@ class InventoryController extends Controller
             ->leftJoinSub($transactionTotals, 'transactions', function ($join): void {
                 $join->on('transactions.item_id', '=', 'balances.item_id')
                     ->on('transactions.warehouse_id', '=', 'balances.warehouse_id');
+            })
+            ->leftJoinSub($actualDrTotals, 'actual_dr', function ($join): void {
+                $join->on('actual_dr.item_id', '=', 'balances.item_id')
+                    ->on('actual_dr.project_id', '=', 'items.project_id')
+                    ->on('actual_dr.warehouse_id', '=', 'balances.warehouse_id');
             })
             ->select([
                 'items.item_id',
@@ -140,7 +163,8 @@ class InventoryController extends Controller
             ])
             ->selectRaw('COALESCE(transactions.stock_in_quantity, 0) as stock_in_quantity')
             ->selectRaw('COALESCE(transactions.stock_out_quantity, 0) as stock_out_quantity')
-            ->selectRaw('balances.stock_on_hand_quantity');
+            ->selectRaw('(COALESCE(transactions.stock_in_quantity, 0) - COALESCE(transactions.stock_out_quantity, 0)) as stock_on_hand_quantity')
+            ->selectRaw('COALESCE(actual_dr.actual_dr_quantity, 0) as actual_dr_quantity');
 
         if ($request->filled('project_id')) {
             $query->where('items.project_id', $request->integer('project_id'));
@@ -159,33 +183,27 @@ class InventoryController extends Controller
         }
 
         $filteredBalances = clone $query;
-        $quantityTotals = DB::query()
-            ->fromSub(clone $filteredBalances, 'filtered_balances')
-            ->selectRaw('COALESCE(SUM(stock_in_quantity), 0) as stock_in_quantity')
-            ->selectRaw('COALESCE(SUM(stock_out_quantity), 0) as stock_out_quantity')
-            ->selectRaw('COALESCE(SUM(stock_on_hand_quantity), 0) as stock_on_hand_quantity')
-            ->first();
-
         $warehouseSummaries = DB::query()
             ->fromSub(clone $filteredBalances, 'filtered_balances')
             ->select(['warehouse_id', 'warehouse_name'])
             ->selectRaw('SUM(stock_in_quantity) as stock_in_quantity')
             ->selectRaw('SUM(stock_out_quantity) as stock_out_quantity')
             ->selectRaw('SUM(stock_on_hand_quantity) as stock_on_hand_quantity')
+            ->selectRaw('SUM(actual_dr_quantity) as actual_dr_quantity')
             ->groupBy('warehouse_id', 'warehouse_name')
             ->orderBy('warehouse_name')
             ->get();
 
-        $percentageOf = static function (float|int|string|null $quantity, float|int|string|null $total): float {
-            $total = (float) $total;
+        $percentageOf = static function (float|int|string|null $quantity, float|int|string|null $denominator): float {
+            $denominator = (float) $denominator;
 
-            return $total === 0.0 ? 0.0 : ((float) $quantity / $total) * 100;
+            return $denominator === 0.0 ? 0.0 : ((float) $quantity / $denominator) * 100;
         };
 
         foreach ($warehouseSummaries as $summary) {
-            $summary->stock_in_percentage = $percentageOf($summary->stock_in_quantity, $quantityTotals->stock_in_quantity);
-            $summary->stock_out_percentage = $percentageOf($summary->stock_out_quantity, $quantityTotals->stock_out_quantity);
-            $summary->stock_on_hand_percentage = $percentageOf($summary->stock_on_hand_quantity, $quantityTotals->stock_on_hand_quantity);
+            $summary->stock_in_percentage = $percentageOf($summary->stock_in_quantity, $summary->actual_dr_quantity);
+            $summary->stock_out_percentage = $percentageOf($summary->stock_out_quantity, $summary->stock_in_quantity);
+            $summary->stock_on_hand_percentage = $percentageOf($summary->stock_on_hand_quantity, $summary->actual_dr_quantity);
         }
 
         $inventories = $query
@@ -194,10 +212,10 @@ class InventoryController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $inventories->getCollection()->transform(function ($inventory) use ($percentageOf, $quantityTotals) {
-            $inventory->stock_in_percentage = $percentageOf($inventory->stock_in_quantity, $quantityTotals->stock_in_quantity);
-            $inventory->stock_out_percentage = $percentageOf($inventory->stock_out_quantity, $quantityTotals->stock_out_quantity);
-            $inventory->stock_on_hand_percentage = $percentageOf($inventory->stock_on_hand_quantity, $quantityTotals->stock_on_hand_quantity);
+        $inventories->getCollection()->transform(function ($inventory) use ($percentageOf) {
+            $inventory->stock_in_percentage = $percentageOf($inventory->stock_in_quantity, $inventory->actual_dr_quantity);
+            $inventory->stock_out_percentage = $percentageOf($inventory->stock_out_quantity, $inventory->stock_in_quantity);
+            $inventory->stock_on_hand_percentage = $percentageOf($inventory->stock_on_hand_quantity, $inventory->actual_dr_quantity);
 
             return $inventory;
         });

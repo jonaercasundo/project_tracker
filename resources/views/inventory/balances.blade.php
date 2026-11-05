@@ -66,7 +66,7 @@
             <div class="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <h2 id="warehouse-summary-heading" class="text-base font-semibold text-slate-900">Warehouse Summary</h2>
-                    <p class="mt-1 text-xs text-slate-500">Percentages show each warehouse’s share of the filtered total for that quantity.</p>
+                    <p class="mt-1 text-xs text-slate-500">Stock In and Stock on Hand percentages use the matching Actual DR quantity. Stock Out percentage uses Stock In Quantity. Warehouse percentages use summed quantities and summed Actual DR quantities.</p>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -75,11 +75,11 @@
                         <tr>
                             <th scope="col" class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Warehouse</th>
                             <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In Quantity</th>
-                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In %</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In % of Actual DR</th>
                             <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out Quantity</th>
-                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out %</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out % of Stock In</th>
                             <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock on Hand Quantity</th>
-                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock on Hand %</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock on Hand % of Actual DR</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
@@ -105,16 +105,16 @@
 
         <section class="mt-6 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm" aria-labelledby="inventory-balance-heading">
             <h2 id="inventory-balance-heading" class="sr-only">Inventory balances by warehouse</h2>
-            <p class="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">Each percentage is this item and warehouse row’s share of the filtered total for that quantity.</p>
+            <p class="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">Stock In % and Stock on Hand % are measured against Actual DR Quantity for the same item, project, and warehouse. Stock Out % is measured against Stock In Quantity.</p>
             <div class="overflow-x-auto">
                 <table class="min-w-[900px] divide-y divide-slate-100">
                     <thead class="bg-slate-50">
                         <tr>
                             <th scope="col" class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Item</th>
                             <th scope="col" class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Warehouse</th>
-                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In Quantity / %</th>
-                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out Quantity / %</th>
-                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock on Hand Quantity / %</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In Quantity / Stock In % of Actual DR</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out Quantity / Stock Out % of Stock In</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock on Hand Quantity / Stock on Hand % of Actual DR</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">

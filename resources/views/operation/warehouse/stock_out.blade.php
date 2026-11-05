@@ -246,6 +246,8 @@
         // Lets two different QR codes that resolve to the same item show as one
         // row with an incrementing qty, without collapsing what actually gets saved.
         const stagedByItemName = new Map();
+        const scanRows = [];
+        const sessionStorageKey = 'warehouse-stock-out-session';
 
         let warehouseId = null;
         const warehouseSelect = document.getElementById('warehouseSelect');
@@ -286,6 +288,94 @@
             return String(name ?? '').trim().toLowerCase();
         }
 
+        function persistSession() {
+            if (!warehouseId) return;
+
+            try {
+                sessionStorage.setItem(sessionStorageKey, JSON.stringify({
+                    warehouseId,
+                    transactionType,
+                    scanType,
+                    scannedCount,
+                    successCounter,
+                    failedCounter,
+                    duplicateCounter,
+                    stagedItems,
+                    scanRows,
+                    reviewItems,
+                    hasSaved,
+                    saveStatusText: saveStatusText.textContent,
+                    saveStatusClassName: saveStatusText.className,
+                }));
+            } catch (error) {
+                console.warn('Unable to persist stock-out session:', error);
+            }
+        }
+
+        function restoreSession() {
+            let savedSession;
+
+            try {
+                savedSession = JSON.parse(sessionStorage.getItem(sessionStorageKey) ?? 'null');
+            } catch (error) {
+                console.warn('Unable to restore stock-out session:', error);
+                sessionStorage.removeItem(sessionStorageKey);
+                return;
+            }
+
+            if (!savedSession || !savedSession.warehouseId) return;
+
+            warehouseId = String(savedSession.warehouseId);
+            warehouseSelect.value = warehouseId;
+            if (!warehouseSelect.value) {
+                sessionStorage.removeItem(sessionStorageKey);
+                warehouseId = null;
+                return;
+            }
+            transactionType = savedSession.transactionType ?? null;
+            scanType = savedSession.scanType ?? null;
+            scannedCount = Number(savedSession.scannedCount ?? 0);
+            successCounter = Number(savedSession.successCounter ?? 0);
+            failedCounter = Number(savedSession.failedCounter ?? 0);
+            duplicateCounter = Number(savedSession.duplicateCounter ?? 0);
+            stagedItems = Array.isArray(savedSession.stagedItems) ? savedSession.stagedItems : [];
+            scannedList.clear();
+            stagedItems.forEach((item) => {
+                if (item.qr) scannedList.add(item.qr);
+            });
+            stagedByItemName.clear();
+            scanRows.length = 0;
+            reviewItems = [];
+            scanTable.replaceChildren();
+            reviewTable.replaceChildren();
+
+            if (Array.isArray(savedSession.scanRows)) {
+                savedSession.scanRows.forEach((row) => addRow(row, false));
+            }
+
+            if (Array.isArray(savedSession.reviewItems)) {
+                savedSession.reviewItems.forEach((item) => addReviewRow(item, false));
+            }
+
+            hasSaved = Boolean(savedSession.hasSaved);
+            saveStatusText.textContent = savedSession.saveStatusText ?? '';
+            saveStatusText.className = savedSession.saveStatusClassName ?? 'text-sm mt-1';
+            btnNewSession.hidden = !scanType;
+            step1.classList.add('hidden');
+            step2.classList.toggle('hidden', Boolean(scanType));
+            step3.classList.toggle('hidden', !scanType);
+
+            if (scanType) {
+                scanTypeText.textContent = scanType === 'PACKAGE' ? '📦 Package' : '📄 Individual Item';
+            }
+
+            updateDashboard();
+
+            if (scanType && !hasSaved) {
+                activateScanner();
+            }
+        }
+
         // ============================================================
         // STEP 1 — Select Warehouse Type
         // ============================================================
@@ -298,6 +388,7 @@
             }
 
             warehouseId = warehouseSelect.value;
+            persistSession();
 
             step1.classList.add('hidden');
             step2.classList.remove('hidden');
@@ -314,6 +405,8 @@
 
             scanType = type;
             scanTypeText.textContent = label;
+            btnNewSession.hidden = false;
+            persistSession();
             step2.classList.add('hidden');
             step3.classList.remove('hidden');
             activateScanner();
@@ -717,6 +810,7 @@
             btnSaveToDb.disabled = stagedItems.length === 0 || isSaving || hasSaved;
 
             unsavedBanner.classList.toggle('hidden', stagedItems.length === 0 || hasSaved);
+            persistSession();
         }
 
         function statusBadgeClass(status) {
@@ -738,13 +832,25 @@
         }
 
         // Returns the created <tr> so callers can update it in place (for merges).
-        function addRow(data) {
+        function addRow(data, shouldTrack = true) {
+            const rowData = {
+                package: data.package ?? '-',
+                item: data.item ?? '-',
+                qty: data.qty ?? '-',
+                status: data.status ?? '-',
+            };
+
+            if (shouldTrack) {
+                scanRows.push(rowData);
+            }
+
             rowCounter++;
             const status = data.status ?? '-';
             const badgeClass = statusBadgeClass(status);
 
             const row = document.createElement('tr');
             row.className = 'hover:bg-slate-50';
+            row.scanData = rowData;
             row.innerHTML = `
                 <td class="px-4 py-3 row-number">${rowCounter}</td>
                 <td class="px-4 py-3">${escapeHtml(data.package ?? '-')}</td>
@@ -764,6 +870,7 @@
         function updateRowQty(rowEl, newQty) {
             const qtyCell = rowEl.querySelector('.row-qty');
             qtyCell.textContent = newQty;
+            rowEl.scanData.qty = newQty;
 
             rowEl.classList.add('bg-indigo-50');
             setTimeout(() => rowEl.classList.remove('bg-indigo-50'), 600);
@@ -774,11 +881,13 @@
             div.textContent = str;
             return div.innerHTML;
         }
-        function addReviewRow(data) {
+        function addReviewRow(data, shouldTrack = true) {
 
             reviewSection.classList.remove('hidden');
 
-            reviewItems.push(data);
+            if (shouldTrack) {
+                reviewItems.push(data);
+            }
 
             const row = document.createElement('tr');
 
@@ -879,6 +988,7 @@
                     if (failedCount === 0) {
 
                         hasSaved = true;
+                        btnNewSession.hidden = false;
 
                         saveStatusText.textContent =
                             `✔ Saved ${savedCount} item(s) to the database.`;
@@ -937,6 +1047,8 @@
 
                 }
 
+                persistSession();
+
             }
         });
 
@@ -958,14 +1070,19 @@
             rowCounter = 0;
 
             stagedItems = [];
+            scanRows.length = 0;
             scannedList.clear();
             stagedByItemName.clear();
+            reviewItems = [];
 
             hasSaved = false;
             isSaving = false;
             scannerEnabled = false;
             scannerInput.blur();
             scanTable.innerHTML = '';
+            reviewTable.innerHTML = '';
+            reviewSection.classList.add('hidden');
+            btnNewSession.hidden = true;
             saveStatusText.textContent = '';
             btnSaveToDb.textContent = '💾 Save to Database';
 
@@ -978,7 +1095,10 @@
             step1.classList.remove('hidden');
 
             updateDashboard();
+            sessionStorage.removeItem(sessionStorageKey);
         });
+
+        restoreSession();
     })();
     </script>
     @endpush

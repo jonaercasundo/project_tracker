@@ -170,6 +170,52 @@ it('shows inventory transactions and current stock grouped by item and warehouse
     expect($projectRows->getCollection()->pluck('warehouse_name')->unique()->count())->toBe(3);
 });
 
+it('shows filtered warehouse and item shares of each inventory quantity', function () {
+    inventoryFilterUser();
+    inventoryFilterFixtures();
+    DB::table('inventory_history')->insert([
+        ['item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 0, 'new_qty' => 5, 'change_type' => 'stock_in'],
+        ['item_id' => 1, 'warehouse_id' => 1, 'old_qty' => 5, 'new_qty' => 2, 'change_type' => 'stock_out'],
+        ['item_id' => 1, 'warehouse_id' => 2, 'old_qty' => 0, 'new_qty' => 8, 'change_type' => 'stock_in'],
+    ]);
+
+    $response = $this->get('/inventory-balances?project_id=1&search=Chair');
+
+    $response->assertOk()
+        ->assertSee('Warehouse Summary')
+        ->assertSee('38.5%')
+        ->assertSee('61.5%')
+        ->assertSee('16.7%')
+        ->assertSee('33.3%')
+        ->assertSee('50.0%');
+
+    $summaries = $response->viewData('warehouseSummaries')->keyBy('warehouse_id');
+    expect($summaries)->toHaveCount(3);
+    expect(round((float) $summaries[1]->stock_in_percentage, 1))->toBe(38.5);
+    expect(round((float) $summaries[2]->stock_in_percentage, 1))->toBe(61.5);
+    expect((float) $summaries[3]->stock_in_percentage)->toBe(0.0);
+    expect((float) $summaries[1]->stock_out_percentage)->toBe(100.0);
+    expect(round((float) $summaries[1]->stock_on_hand_percentage, 1))->toBe(16.7);
+
+    $inventories = $response->viewData('inventories')->getCollection()->keyBy('warehouse_id');
+    expect(round((float) $inventories[1]->stock_in_percentage, 1))->toBe(38.5);
+    expect(round((float) $inventories[2]->stock_on_hand_percentage, 1))->toBe(33.3);
+});
+
+it('shows zero percentages when a filtered quantity has no total', function () {
+    inventoryFilterUser();
+    inventoryFilterFixtures();
+
+    $response = $this->get('/inventory-balances?project_id=2');
+
+    $summary = $response->viewData('warehouseSummaries')->first();
+    $inventory = $response->viewData('inventories')->first();
+    expect((float) $summary->stock_in_percentage)->toBe(0.0);
+    expect((float) $summary->stock_out_percentage)->toBe(0.0);
+    expect((float) $inventory->stock_in_percentage)->toBe(0.0);
+    expect((float) $inventory->stock_out_percentage)->toBe(0.0);
+});
+
 it('does not allow the inventory balances filter to select another company project', function () {
     $user = inventoryFilterUser();
     inventoryFilterFixtures();

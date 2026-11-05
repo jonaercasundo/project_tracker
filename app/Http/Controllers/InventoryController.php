@@ -158,15 +158,53 @@ class InventoryController extends Controller
             });
         }
 
+        $filteredBalances = clone $query;
+        $quantityTotals = DB::query()
+            ->fromSub(clone $filteredBalances, 'filtered_balances')
+            ->selectRaw('COALESCE(SUM(stock_in_quantity), 0) as stock_in_quantity')
+            ->selectRaw('COALESCE(SUM(stock_out_quantity), 0) as stock_out_quantity')
+            ->selectRaw('COALESCE(SUM(stock_on_hand_quantity), 0) as stock_on_hand_quantity')
+            ->first();
+
+        $warehouseSummaries = DB::query()
+            ->fromSub(clone $filteredBalances, 'filtered_balances')
+            ->select(['warehouse_id', 'warehouse_name'])
+            ->selectRaw('SUM(stock_in_quantity) as stock_in_quantity')
+            ->selectRaw('SUM(stock_out_quantity) as stock_out_quantity')
+            ->selectRaw('SUM(stock_on_hand_quantity) as stock_on_hand_quantity')
+            ->groupBy('warehouse_id', 'warehouse_name')
+            ->orderBy('warehouse_name')
+            ->get();
+
+        $percentageOf = static function (float|int|string|null $quantity, float|int|string|null $total): float {
+            $total = (float) $total;
+
+            return $total === 0.0 ? 0.0 : ((float) $quantity / $total) * 100;
+        };
+
+        foreach ($warehouseSummaries as $summary) {
+            $summary->stock_in_percentage = $percentageOf($summary->stock_in_quantity, $quantityTotals->stock_in_quantity);
+            $summary->stock_out_percentage = $percentageOf($summary->stock_out_quantity, $quantityTotals->stock_out_quantity);
+            $summary->stock_on_hand_percentage = $percentageOf($summary->stock_on_hand_quantity, $quantityTotals->stock_on_hand_quantity);
+        }
+
         $inventories = $query
             ->orderBy('items.item_name')
             ->orderBy('warehouses.warehouse_name')
             ->paginate(25)
             ->withQueryString();
 
+        $inventories->getCollection()->transform(function ($inventory) use ($percentageOf, $quantityTotals) {
+            $inventory->stock_in_percentage = $percentageOf($inventory->stock_in_quantity, $quantityTotals->stock_in_quantity);
+            $inventory->stock_out_percentage = $percentageOf($inventory->stock_out_quantity, $quantityTotals->stock_out_quantity);
+            $inventory->stock_on_hand_percentage = $percentageOf($inventory->stock_on_hand_quantity, $quantityTotals->stock_on_hand_quantity);
+
+            return $inventory;
+        });
+
         $warehouses = Warehouse::query()->orderBy('warehouse_name')->get();
 
-        return view('inventory.balances', compact('inventories', 'projects', 'warehouses'));
+        return view('inventory.balances', compact('inventories', 'projects', 'warehouses', 'warehouseSummaries'));
     }
 
     public function create()

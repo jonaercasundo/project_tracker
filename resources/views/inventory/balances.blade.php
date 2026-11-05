@@ -62,17 +62,59 @@
             </div>
         </form>
 
+        <section class="mt-6 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm" aria-labelledby="warehouse-summary-heading">
+            <div class="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h2 id="warehouse-summary-heading" class="text-base font-semibold text-slate-900">Warehouse Summary</h2>
+                    <p class="mt-1 text-xs text-slate-500">Percentages show each warehouse’s share of the filtered total for that quantity.</p>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-[900px] divide-y divide-slate-100">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th scope="col" class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Warehouse</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In Quantity</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In %</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out Quantity</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out %</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock on Hand Quantity</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock on Hand %</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-50">
+                        @forelse($warehouseSummaries as $summary)
+                            <tr class="transition-colors hover:bg-slate-50/70">
+                                <td class="px-5 py-4 text-sm font-semibold text-slate-900">{{ $summary->warehouse_name ?: 'Unassigned warehouse' }}</td>
+                                <td class="px-5 py-4 text-right text-sm tabular-nums text-emerald-700">{{ number_format((float) $summary->stock_in_quantity) }}</td>
+                                <td class="px-5 py-4 text-right text-sm tabular-nums text-slate-600">{{ number_format($summary->stock_in_percentage, 1) }}%</td>
+                                <td class="px-5 py-4 text-right text-sm tabular-nums text-rose-700">{{ number_format((float) $summary->stock_out_quantity) }}</td>
+                                <td class="px-5 py-4 text-right text-sm tabular-nums text-slate-600">{{ number_format($summary->stock_out_percentage, 1) }}%</td>
+                                <td class="px-5 py-4 text-right text-sm font-semibold tabular-nums text-slate-900">{{ number_format((float) $summary->stock_on_hand_quantity) }}</td>
+                                <td class="px-5 py-4 text-right text-sm tabular-nums text-slate-600">{{ number_format($summary->stock_on_hand_percentage, 1) }}%</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="px-5 py-10 text-center text-sm text-slate-500">No warehouse totals match the selected filters.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <section class="mt-6 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm" aria-labelledby="inventory-balance-heading">
             <h2 id="inventory-balance-heading" class="sr-only">Inventory balances by warehouse</h2>
+            <p class="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">Each percentage is this item and warehouse row’s share of the filtered total for that quantity.</p>
             <div class="overflow-x-auto">
-                <table class="min-w-[850px] divide-y divide-slate-100">
+                <table class="min-w-[900px] divide-y divide-slate-100">
                     <thead class="bg-slate-50">
                         <tr>
                             <th scope="col" class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Item</th>
                             <th scope="col" class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Warehouse</th>
-                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In Quantity</th>
-                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out Quantity</th>
-                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock on Hand Quantity</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock In Quantity / %</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock Out Quantity / %</th>
+                            <th scope="col" class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock on Hand Quantity / %</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
@@ -80,9 +122,18 @@
                             <tr class="transition-colors hover:bg-slate-50/70">
                                 <td class="px-5 py-4 text-sm font-semibold text-slate-900">{{ $inventory->item_name ?: 'Unnamed item' }}</td>
                                 <td class="px-5 py-4 text-sm text-slate-600">{{ $inventory->warehouse_name ?: 'Unassigned warehouse' }}</td>
-                                <td class="px-5 py-4 text-right text-sm tabular-nums text-emerald-700">{{ number_format((float) $inventory->stock_in_quantity) }}</td>
-                                <td class="px-5 py-4 text-right text-sm tabular-nums text-rose-700">{{ number_format((float) $inventory->stock_out_quantity) }}</td>
-                                <td class="px-5 py-4 text-right text-sm font-semibold tabular-nums text-slate-900">{{ number_format((float) $inventory->stock_on_hand_quantity) }}</td>
+                                <td class="px-5 py-4 text-right tabular-nums">
+                                    <div class="text-sm text-emerald-700">{{ number_format((float) $inventory->stock_in_quantity) }}</div>
+                                    <div class="mt-1 text-xs text-slate-500">{{ number_format($inventory->stock_in_percentage, 1) }}%</div>
+                                </td>
+                                <td class="px-5 py-4 text-right tabular-nums">
+                                    <div class="text-sm text-rose-700">{{ number_format((float) $inventory->stock_out_quantity) }}</div>
+                                    <div class="mt-1 text-xs text-slate-500">{{ number_format($inventory->stock_out_percentage, 1) }}%</div>
+                                </td>
+                                <td class="px-5 py-4 text-right tabular-nums">
+                                    <div class="text-sm font-semibold text-slate-900">{{ number_format((float) $inventory->stock_on_hand_quantity) }}</div>
+                                    <div class="mt-1 text-xs font-normal text-slate-500">{{ number_format($inventory->stock_on_hand_percentage, 1) }}%</div>
+                                </td>
                             </tr>
                         @empty
                             <tr>

@@ -3,6 +3,9 @@
 use App\Models\Company;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\BillingDocumentStatusService;
+use App\Services\ProjectDrProgressReportService;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
@@ -1178,4 +1181,126 @@ describe('project award dates', function () {
         'impossible calendar date' => '2026-02-30',
         'wrong date format' => '23/09/2026',
     ]);
+});
+
+describe('project DR progress report', function () {
+    it('scopes DRs by creation date and excludes delivery progress after the cutoff', function () {
+        $this->travelTo(CarbonImmutable::parse('2026-11-05 12:00:00', config('app.timezone')));
+        $today = CarbonImmutable::today(config('app.timezone'));
+        $cutoff = $today->subDays(4);
+        $start = $today->subDays(10);
+        DB::table('projects')->insert(['project_id' => 91, 'project_name' => 'DR report', 'start_date' => $start->toDateString()]);
+        DB::table('deliveries')->insert([
+            ['delivery_id' => 901, 'project_id' => 91, 'dr_no' => 'DR-A', 'lot_id' => 990, 'status' => 'pending', 'created_at' => $start->toDateTimeString(), 'delivered_date' => $start->addDays(2)->toDateString()],
+            ['delivery_id' => 902, 'project_id' => 91, 'dr_no' => 'DR-B', 'lot_id' => 990, 'status' => 'pending', 'created_at' => $cutoff->subDay()->toDateTimeString(), 'delivered_date' => $cutoff->addDay()->toDateString()],
+            ['delivery_id' => 903, 'project_id' => 91, 'dr_no' => 'DR-C', 'lot_id' => 990, 'status' => 'pending', 'created_at' => $cutoff->addDay()->toDateTimeString(), 'delivered_date' => null],
+        ]);
+
+        $report = app(ProjectDrProgressReportService::class)->summarize(91, $cutoff);
+
+        expect($report['total_drs'])->toBe(2)
+            ->and($report['completed'])->toBe(1)
+            ->and($report['remaining'])->toBe(1)
+            ->and($report['percentage'])->toBe(50.0)
+            ->and($report['days_remaining'])->toBe(0)
+            ->and($report['pace_status'])->toBe('Cutoff passed');
+    });
+
+    it('does not treat DR creation as progress and reports undated completed states', function () {
+        $this->travelTo(CarbonImmutable::parse('2026-11-05 12:00:00', config('app.timezone')));
+        $today = CarbonImmutable::today(config('app.timezone'));
+        DB::table('projects')->insert(['project_id' => 92, 'project_name' => 'Undated DR report', 'start_date' => $today->subDays(2)->toDateString()]);
+        DB::table('deliveries')->insert([
+            ['delivery_id' => 911, 'project_id' => 92, 'dr_no' => 'DR-PENDING', 'lot_id' => 991, 'status' => 'pending', 'created_at' => $today->subDays(2)->toDateTimeString()],
+            ['delivery_id' => 912, 'project_id' => 92, 'dr_no' => 'DR-UNDATED', 'lot_id' => 991, 'status' => 'delivered', 'created_at' => $today->subDay()->toDateTimeString()],
+        ]);
+
+        $report = app(ProjectDrProgressReportService::class)->summarize(92, $today);
+
+        expect($report['total_drs'])->toBe(2)
+            ->and($report['completed'])->toBe(0)
+            ->and($report['remaining'])->toBe(2)
+            ->and($report['data_limitation'])->toContain('1 DR(s)');
+    });
+
+    it('calculates future target pace without negative days', function () {
+        $this->travelTo(CarbonImmutable::parse('2026-11-05 12:00:00', config('app.timezone')));
+        $today = CarbonImmutable::today(config('app.timezone'));
+        $cutoff = $today->addDays(7);
+        DB::table('projects')->insert(['project_id' => 93, 'project_name' => 'Future DR report', 'start_date' => $today->subDays(3)->toDateString()]);
+        DB::table('deliveries')->insert([
+            ['delivery_id' => 921, 'project_id' => 93, 'dr_no' => 'DR-DONE', 'lot_id' => 992, 'status' => 'pending', 'created_at' => $today->subDay()->toDateTimeString(), 'delivered_date' => $today->toDateString()],
+            ['delivery_id' => 922, 'project_id' => 93, 'dr_no' => 'DR-OPEN', 'lot_id' => 992, 'status' => 'pending', 'created_at' => $today->toDateTimeString(), 'delivered_date' => null],
+        ]);
+
+        $report = app(ProjectDrProgressReportService::class)->summarize(93, $cutoff);
+
+        expect($report['days_remaining'])->toBe(7)
+            ->and($report['required_per_day'])->toBe(0.14)
+            ->and($report['recent_pace'])->toBe(0.14)
+            ->and($report['pace_status'])->toBe('On track')
+            ->and($report['timeline'][array_key_last($report['timeline'])]['created'])->toBe(2)
+            ->and($report['timeline'][array_key_last($report['timeline'])]['actual'])->toBe(1);
+    });
+
+    it('uses dated package delivery history to determine completion at the cutoff', function () {
+        $this->travelTo(CarbonImmutable::parse('2026-11-05 12:00:00', config('app.timezone')));
+        $today = CarbonImmutable::today(config('app.timezone'));
+        $cutoff = $today->subDays(2);
+        DB::table('projects')->insert(['project_id' => 94, 'project_name' => 'Package history report', 'start_date' => $today->subDays(5)->toDateString()]);
+        DB::table('deliveries')->insert([
+            ['delivery_id' => 941, 'project_id' => 94, 'dr_no' => 'DR-BEFORE', 'lot_id' => 994, 'status' => 'pending', 'created_at' => $today->subDays(5)->toDateTimeString()],
+            ['delivery_id' => 942, 'project_id' => 94, 'dr_no' => 'DR-AFTER', 'lot_id' => 995, 'status' => 'pending', 'created_at' => $today->subDays(5)->toDateTimeString()],
+        ]);
+        DB::table('package')->insert([
+            ['package_id' => 9941, 'lot_id' => 994],
+            ['package_id' => 9942, 'lot_id' => 995],
+        ]);
+        DB::table('package_status')->insert([
+            ['package_status_id' => 9941, 'delivery_id' => 941, 'package_id' => 9941, 'status' => 'delivered'],
+            ['package_status_id' => 9942, 'delivery_id' => 942, 'package_id' => 9942, 'status' => 'delivered'],
+        ]);
+        DB::table('delivery_history')->insert([
+            ['id' => 9941, 'package_status_id' => 9941, 'status' => 'delivered', 'created_at' => $today->subDays(3)->toDateTimeString()],
+            ['id' => 9942, 'package_status_id' => 9942, 'status' => 'delivered', 'created_at' => $today->subDay()->toDateTimeString()],
+        ]);
+
+        $report = app(ProjectDrProgressReportService::class)->summarize(94, $cutoff);
+
+        expect($report['total_drs'])->toBe(2)
+            ->and($report['completed'])->toBe(1)
+            ->and($report['remaining'])->toBe(1);
+    });
+
+    it('renders the cutoff filter and DR report for the selected project', function () {
+        $this->travelTo(CarbonImmutable::parse('2026-11-05 12:00:00', config('app.timezone')));
+        projectDetailsUser();
+        $cutoff = CarbonImmutable::today(config('app.timezone'))->subDay();
+        DB::table('projects')->insert(['project_id' => 95, 'project_name' => 'Visible report', 'start_date' => $cutoff->subDays(3)->toDateString()]);
+        $billingStatus = Mockery::mock(BillingDocumentStatusService::class);
+        $billingStatus->shouldReceive('summarize')->twice()->with(95)->andReturn([
+            'total' => 0, 'processed' => 0, 'remaining' => 0, 'processed_today' => 0, 'source_error' => null,
+        ]);
+        $this->app->instance(BillingDocumentStatusService::class, $billingStatus);
+
+        $response = $this->get(route('projects.reports.analytics', ['project_id' => 95, 'cutoff_date' => $cutoff->toDateString()]));
+
+        $response->assertOk()
+            ->assertSee('Cutoff Date')
+            ->assertSee('Actual progress against cutoff')
+            ->assertSee($cutoff->toDateString());
+
+        $this->getJson(route('projects.reports.analytics.data', ['project_id' => 95, 'cutoff_date' => $cutoff->toDateString()]))
+            ->assertOk()
+            ->assertJsonPath('dr_progress.cutoff_date', $cutoff->toDateString());
+    });
+
+    it('rejects cutoff dates that do not use the date picker format', function () {
+        projectDetailsUser();
+
+        $this->from(route('projects.reports.analytics'))
+            ->get(route('projects.reports.analytics', ['cutoff_date' => 'not-a-date']))
+            ->assertRedirect(route('projects.reports.analytics'))
+            ->assertSessionHasErrors('cutoff_date');
+    });
 });

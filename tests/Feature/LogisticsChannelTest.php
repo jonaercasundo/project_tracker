@@ -166,6 +166,57 @@ it('shows the management page only to MMC users', function () {
     $this->get('/logistics-channel')->assertForbidden();
 });
 
+it('shows management statuses only for active integrations with usable credentials', function () {
+    Schema::table('school', function (Blueprint $table): void {
+        $table->string('region')->nullable();
+    });
+    Schema::create('logistics_integration_regions', function (Blueprint $table): void {
+        $table->unsignedBigInteger('integration_id');
+        $table->unsignedInteger('project_id');
+        $table->string('region');
+    });
+    Schema::create('delivery_billing_records', function (Blueprint $table): void {
+        $table->unsignedInteger('delivery_id');
+        $table->string('status');
+    });
+    [$operator, $company] = logisticsChannelAccount();
+    foreach (['active', 'inactive', 'expired', 'revoked', 'missing'] as $state) {
+        $integrationId = DB::table('logistics_integrations')->insertGetId([
+            'integration_id' => 'partner-'.$state,
+            'name' => 'Partner '.$state,
+            'enabled_event_types' => '[]',
+            'status' => $state === 'inactive' ? 'inactive' : 'active',
+        ]);
+        DB::table('logistics_integration_projects')->insert([
+            'integration_id' => $integrationId, 'project_id' => 502698,
+        ]);
+        if ($state !== 'missing') {
+            DB::table('logistics_integration_credentials')->insert([
+                'integration_id' => $integrationId,
+                'key_id' => 'key-'.$state,
+                'secret' => 'test-only-secret',
+                'status' => $state === 'revoked' ? 'revoked' : 'active',
+                'expires_at' => $state === 'expired' ? now()->subDay() : null,
+            ]);
+        }
+    }
+    DB::table('deliveries')->insert([
+        'project_id' => 502698, 'school_id' => '134967', 'dr_no' => 'STATUS-001', 'status' => 'delivered',
+    ]);
+    $this->withoutVite()->actingAs($operator)->withSession(['company_id' => $company->company_id]);
+
+    $this->get('/logistics-channel?tab=management')
+        ->assertOk()
+        ->assertViewHas('partnerStatuses', fn (array $statuses): bool => count($statuses) === 1
+            && $statuses[0]['integration_id'] === 'partner-active'
+            && $statuses[0]['total_drs'] === 1)
+        ->assertSee('Partner active')
+        ->assertDontSee('Partner inactive')
+        ->assertDontSee('Partner expired')
+        ->assertDontSee('Partner revoked')
+        ->assertDontSee('Partner missing');
+});
+
 it('builds Overview metrics from summary counts without paginating tracking rows', function () {
     [$operator, $company] = logisticsChannelAccount();
     $tracking = Mockery::mock(LogisticsDrTrackingService::class);

@@ -65,6 +65,7 @@ class LogisticsManagementStatusService
                     ->on('school.school_id', '=', 'delivery.school_id');
             })
             ->leftJoinSub($billingStates, 'billing_state', 'billing_state.delivery_id', '=', 'delivery.delivery_id')
+            ->whereIn('assigned_project.integration_id', $integrationKeys)
             ->whereIn('assigned_project.project_id', $projectIds)
             ->whereNotNull('delivery.dr_no')
             ->whereRaw("TRIM(delivery.dr_no) <> ''")

@@ -60,17 +60,15 @@ class LogisticsManagementStatusService
         $deliveryRows = DB::table('logistics_integration_projects as assigned_project')
             ->join('logistics_integrations as integration', 'integration.id', '=', 'assigned_project.integration_id')
             ->join('deliveries as delivery', 'delivery.project_id', '=', 'assigned_project.project_id')
-            ->leftJoin('school', function ($join): void {
-                $join->on('school.project_id', '=', 'delivery.project_id')
-                    ->on('school.school_id', '=', 'delivery.school_id');
-            })
+            ->leftJoin('school', 'school.school_id', '=', 'delivery.school_id')
             ->leftJoinSub($billingStates, 'billing_state', 'billing_state.delivery_id', '=', 'delivery.delivery_id')
             ->whereIn('assigned_project.integration_id', $integrationKeys)
             ->whereIn('assigned_project.project_id', $projectIds)
             ->whereNotNull('delivery.dr_no')
             ->whereRaw("TRIM(delivery.dr_no) <> ''")
             ->get([
-                'integration.id as integration_key', 'assigned_project.project_id', 'delivery.school_id', 'school.region',
+                'integration.id as integration_key', 'assigned_project.project_id', 'delivery.school_id',
+                'school.region as delivery_region',
                 'delivery.dr_no', 'delivery.status as delivery_status', 'billing_state.active_record_count',
                 'billing_state.has_billed', 'billing_state.has_for_billing', 'billing_state.has_on_hold',
             ]);
@@ -84,8 +82,8 @@ class LogisticsManagementStatusService
                 $isAllowed = $allowedSchools->contains(fn (object $scope): bool => (int) $scope->project_id === (int) $delivery->project_id
                     && (string) $scope->school_id === (string) $delivery->school_id);
             } elseif ($allowedRegions->isNotEmpty()) {
-                $isAllowed = $delivery->region !== null && $allowedRegions->contains(fn (object $scope): bool => (int) $scope->project_id === (int) $delivery->project_id
-                    && (string) $scope->region === (string) $delivery->region);
+                $isAllowed = $delivery->delivery_region !== null && $allowedRegions->contains(fn (object $scope): bool => (int) $scope->project_id === (int) $delivery->project_id
+                    && (string) $scope->region === (string) $delivery->delivery_region);
             } else {
                 $isAllowed = true;
             }
@@ -94,7 +92,7 @@ class LogisticsManagementStatusService
                 continue;
             }
 
-            $region = trim((string) $delivery->region) !== '' ? trim((string) $delivery->region) : 'Region not set';
+            $region = trim((string) $delivery->delivery_region) !== '' ? trim((string) $delivery->delivery_region) : 'Region not set';
             $groupKey = $integrationKey.':'.(int) $delivery->project_id.':'.base64_encode($region);
             $documentKey = base64_encode((string) $delivery->school_id).':'.base64_encode((string) $delivery->dr_no);
             $groups[$groupKey] ??= [

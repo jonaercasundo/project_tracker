@@ -93,14 +93,17 @@ class LogisticsManagementStatusService
             }
 
             $region = trim((string) $delivery->delivery_region) !== '' ? trim((string) $delivery->delivery_region) : 'Region not set';
-            $groupKey = $integrationKey.':'.(int) $delivery->project_id.':'.base64_encode($region);
-            $documentKey = base64_encode((string) $delivery->school_id).':'.base64_encode((string) $delivery->dr_no);
+            $projectId = (int) $delivery->project_id;
+            $groupKey = (string) $integrationKey;
+            $documentKey = $projectId.':'.base64_encode((string) $delivery->school_id).':'.base64_encode((string) $delivery->dr_no);
             $groups[$groupKey] ??= [
                 'integration_key' => $integrationKey,
-                'project_id' => (int) $delivery->project_id,
-                'region' => $region,
+                'project_ids' => [],
+                'regions' => [],
                 'documents' => [],
             ];
+            $groups[$groupKey]['project_ids'][$projectId] = true;
+            $groups[$groupKey]['regions'][$region] = true;
             $groups[$groupKey]['documents'][$documentKey] ??= ['delivery_statuses' => [], 'billing_statuses' => []];
 
             $deliveryStatus = strtolower(trim((string) $delivery->delivery_status));
@@ -131,8 +134,13 @@ class LogisticsManagementStatusService
             }
 
             $integration = $integrationProjects->first(fn (object $row): bool => (int) $row->integration_key === $group['integration_key']);
-            $project = $integrationProjects->first(fn (object $row): bool => (int) $row->integration_key === $group['integration_key']
-                && (int) $row->project_id === $group['project_id']);
+            $projectNames = $integrationProjects
+                ->where('integration_key', $group['integration_key'])
+                ->whereIn('project_id', array_keys($group['project_ids']))
+                ->pluck('project_name')
+                ->unique()
+                ->values()
+                ->all();
             $report[] = [
                 'integration_id' => $integration->integration_id,
                 'partner_name' => $integration->partner_name,
@@ -140,9 +148,8 @@ class LogisticsManagementStatusService
                     && in_array($group['integration_key'], $activeCredentialIntegrationKeys, true)
                     ? 'Active'
                     : 'Inactive',
-                'project_id' => $group['project_id'],
-                'project_name' => $project->project_name,
-                'region' => $group['region'],
+                'project_name' => implode(', ', $projectNames),
+                'region' => implode(', ', array_keys($group['regions'])),
                 'total_drs' => count($group['documents']),
                 'delivery_statuses' => $deliveryCounts,
                 'billing_statuses' => $billingCounts,

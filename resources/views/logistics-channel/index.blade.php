@@ -144,8 +144,8 @@
                                 <th class="px-3 py-3 font-bold">Logistics Partner</th>
                                 <th class="px-3 py-3 font-bold">Project / Region</th>
                                 <th class="px-3 py-3 text-right font-bold">Assigned Schools</th>
-                                <th class="px-3 py-3 font-bold">Logistics Status</th>
-                                <th class="px-3 py-3 font-bold">Billing Document Status</th>
+                                <th class="px-3 py-3 font-bold">Logistics Status by School</th>
+                                <th class="px-3 py-3 font-bold">Billing Status by School</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 bg-white">
@@ -164,14 +164,14 @@
                                     <td class="px-3 py-3">
                                         <div class="flex max-w-sm flex-wrap gap-1.5">
                                             @foreach($partnerStatus['delivery_statuses'] as $status => $count)
-                                                <span class="rounded-full px-2 py-1 text-[10px] font-bold {{ $pill($status) }}">{{ $humanize($status) }} {{ number_format($count) }} · {{ number_format(($count / max(1, $partnerStatus['total_schools'])) * 100, 1) }}%</span>
+                                                <span class="rounded-full px-2 py-1 text-[10px] font-bold {{ $pill($status) }}">{{ $humanize($status) }} {{ number_format($count) }} schools · {{ number_format(($count / max(1, $partnerStatus['total_schools'])) * 100, 1) }}%</span>
                                             @endforeach
                                         </div>
                                     </td>
                                     <td class="px-3 py-3">
                                         <div class="flex max-w-sm flex-wrap gap-1.5">
                                             @foreach($partnerStatus['billing_statuses'] as $status => $count)
-                                                <span class="rounded-full px-2 py-1 text-[10px] font-bold {{ $pill($status) }}">{{ $status === 'no_document' ? 'No billing record' : $humanize($status) }} {{ number_format($count) }} · {{ number_format(($count / max(1, $partnerStatus['total_schools'])) * 100, 1) }}%</span>
+                                                <span class="rounded-full px-2 py-1 text-[10px] font-bold {{ $pill($status) }}">{{ $status === 'no_document' ? 'No billing record' : $humanize($status) }} {{ number_format($count) }} schools · {{ number_format(($count / max(1, $partnerStatus['total_schools'])) * 100, 1) }}%</span>
                                             @endforeach
                                         </div>
                                     </td>

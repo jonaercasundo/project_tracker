@@ -149,7 +149,7 @@ class LogisticsManagementStatusService
                     ? 'billed'
                     : ((int) $delivery->has_for_billing === 1
                         ? 'for_billing'
-                        : ((int) $delivery->has_on_hold === 1 ? 'on_hold' : 'pending_billing')));
+                        : ((int) $delivery->has_on_hold === 1 ? 'returned' : 'pending_billing')));
             $groups[$groupKey]['documents'][$documentKey]['billing_statuses'][$billingStatus] = true;
         }
 
@@ -160,22 +160,38 @@ class LogisticsManagementStatusService
             $schools = [];
             foreach ($group['documents'] as $document) {
                 $deliveryStatuses = array_keys($document['delivery_statuses']);
-                $deliveryState = count($deliveryStatuses) === 1 ? $deliveryStatuses[0] : 'mixed';
+                $deliveryState = in_array('delivered', $deliveryStatuses, true)
+                    ? 'delivered'
+                    : (in_array('logistics_received', $deliveryStatuses, true) ? 'logistics_received' : null);
                 $billingStatuses = array_keys($document['billing_statuses']);
-                $billingState = count($billingStatuses) === 1 ? $billingStatuses[0] : 'mixed';
+                $billingState = in_array('returned', $billingStatuses, true)
+                    ? 'returned'
+                    : (in_array('for_billing', $billingStatuses, true) ? 'for_billing' : null);
                 $schoolKey = $document['school_key'];
                 $schools[$schoolKey] ??= ['delivery_statuses' => [], 'billing_statuses' => []];
-                $schools[$schoolKey]['delivery_statuses'][$deliveryState] = true;
-                $schools[$schoolKey]['billing_statuses'][$billingState] = true;
+                if ($deliveryState !== null) {
+                    $schools[$schoolKey]['delivery_statuses'][$deliveryState] = true;
+                }
+                if ($billingState !== null) {
+                    $schools[$schoolKey]['billing_statuses'][$billingState] = true;
+                }
             }
 
             foreach ($schools as $school) {
                 $schoolDeliveryStatuses = array_keys($school['delivery_statuses']);
-                $deliveryState = count($schoolDeliveryStatuses) === 1 ? $schoolDeliveryStatuses[0] : 'mixed';
+                $deliveryState = in_array('delivered', $schoolDeliveryStatuses, true)
+                    ? 'delivered'
+                    : (in_array('logistics_received', $schoolDeliveryStatuses, true) ? 'logistics_received' : null);
                 $schoolBillingStatuses = array_keys($school['billing_statuses']);
-                $billingState = count($schoolBillingStatuses) === 1 ? $schoolBillingStatuses[0] : 'mixed';
-                $deliveryCounts[$deliveryState] = ($deliveryCounts[$deliveryState] ?? 0) + 1;
-                $billingCounts[$billingState] = ($billingCounts[$billingState] ?? 0) + 1;
+                $billingState = in_array('returned', $schoolBillingStatuses, true)
+                    ? 'returned'
+                    : (in_array('for_billing', $schoolBillingStatuses, true) ? 'for_billing' : null);
+                if ($deliveryState !== null) {
+                    $deliveryCounts[$deliveryState] = ($deliveryCounts[$deliveryState] ?? 0) + 1;
+                }
+                if ($billingState !== null) {
+                    $billingCounts[$billingState] = ($billingCounts[$billingState] ?? 0) + 1;
+                }
             }
 
             $integration = $integrationProjects->first(fn (object $row): bool => (int) $row->integration_key === $group['integration_key']);

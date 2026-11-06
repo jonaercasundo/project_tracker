@@ -315,12 +315,15 @@
                                 <label for="authorized-regions" class="block text-xs font-bold text-slate-600">Assigned regions <span class="font-normal text-slate-400">(recommended)</span></label>
                                 <span id="region-status" class="text-[11px] text-slate-500" role="status" aria-live="polite"></span>
                             </div>
-                            <select id="authorized-regions" name="region_scopes[]" multiple size="5" aria-describedby="regions-help" class="{{ $field }}">
+                            <div id="authorized-regions" role="group" aria-describedby="regions-help" class="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
                                 @foreach($regions as $region)
                                     @php($scopeToken = (int) $region->project_id.':'.rtrim(strtr(base64_encode((string) $region->region), '+/', '-_'), '='))
-                                    <option value="{{ $scopeToken }}" @selected(in_array($scopeToken, old('region_scopes', $editingRegionTokens), true))>{{ $region->region }} · Project {{ $region->project_id }}</option>
+                                    <label class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 transition hover:bg-slate-50 motion-reduce:transition-none">
+                                        <input type="checkbox" name="region_scopes[]" value="{{ $scopeToken }}" @checked(in_array($scopeToken, old('region_scopes', $editingRegionTokens), true)) class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-cyan-700 focus:ring-cyan-600">
+                                        <span class="min-w-0 break-words">{{ $region->region }} - Project {{ $region->project_id }}</span>
+                                    </label>
                                 @endforeach
-                            </select>
+                            </div>
                             <p id="regions-help" class="mt-1 text-[11px] text-slate-500">Select the regions this partner handles in each selected project.</p>
                         </div>
 
@@ -743,11 +746,11 @@
             schools.addEventListener('change', () => {
                 if (schools.selectedOptions.length) {
                     allSchools.checked = false;
-                    Array.from(regions.options).forEach(option => { option.selected = false; });
+                    regions.querySelectorAll('input[name="region_scopes[]"]').forEach(input => { input.checked = false; });
                 }
             });
             regions.addEventListener('change', () => {
-                if (regions.selectedOptions.length) {
+                if (regions.querySelector('input[name="region_scopes[]"]:checked')) {
                     allSchools.checked = false;
                     Array.from(schools.options).forEach(option => { option.selected = false; });
                 }
@@ -755,7 +758,7 @@
             allSchools.addEventListener('change', () => {
                 if (allSchools.checked) {
                     Array.from(schools.options).forEach(option => { option.selected = false; });
-                    Array.from(regions.options).forEach(option => { option.selected = false; });
+                    regions.querySelectorAll('input[name="region_scopes[]"]').forEach(input => { input.checked = false; });
                 }
             });
             form.addEventListener('submit', event => {
@@ -769,7 +772,7 @@
                 updateProjectCount();
                 const projectIds = Array.from(projects.querySelectorAll('input[name="project_ids[]"]:checked'), input => input.value);
                 const keepSchools = new Set([...initialSchools, ...Array.from(schools.selectedOptions, option => option.value)]);
-                const keepRegions = new Set([...initialRegions, ...Array.from(regions.selectedOptions, option => option.value)]);
+                const keepRegions = new Set([...initialRegions, ...Array.from(regions.querySelectorAll('input[name="region_scopes[]"]:checked'), input => input.value)]);
                 requestController?.abort();
                 requestController = undefined;
                 setSchoolState('idle');
@@ -803,7 +806,19 @@
                     }
                     for (const region of regionRows) {
                         const token = `${region.project_id}:${encodeId(region.region)}`;
-                        regions.add(new Option(`${region.region} ? Project ${region.project_id}`, token, false, keepRegions.has(token)));
+                        const label = document.createElement('label');
+                        label.className = 'flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 transition hover:bg-slate-50 motion-reduce:transition-none';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = 'region_scopes[]';
+                        checkbox.value = token;
+                        checkbox.checked = keepRegions.has(token);
+                        checkbox.className = 'mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-cyan-700 focus:ring-cyan-600';
+                        const labelText = document.createElement('span');
+                        labelText.className = 'min-w-0 break-words';
+                        labelText.textContent = `${region.region} - Project ${region.project_id}`;
+                        label.append(checkbox, labelText);
+                        regions.append(label);
                     }
                     setSchoolState('idle', `${schoolRows.length} ${schoolRows.length === 1 ? 'school' : 'schools'}`);
                     setRegionState('idle', `${regionRows.length} ${regionRows.length === 1 ? 'region' : 'regions'}`);
@@ -812,7 +827,10 @@
                     setSchoolState('failed', error.message);
                     setRegionState('failed', error.message);
                     schools.add(new Option(error.message, '', true, true));
-                    regions.add(new Option(error.message, '', true, true));
+                    const errorMessage = document.createElement('p');
+                    errorMessage.className = 'px-2 py-2 text-xs text-rose-700';
+                    errorMessage.textContent = error.message;
+                    regions.append(errorMessage);
                 }
             });
         })();

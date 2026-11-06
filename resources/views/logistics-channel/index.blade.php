@@ -131,7 +131,7 @@
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 id="partner-status-title" class="text-lg font-black text-slate-950">Partner Delivery &amp; Billing Status</h2>
-                            <p class="mt-1 text-xs leading-5 text-slate-500">A DR counts as assigned after the logistics partner confirms receipt. Status and billing counts include only received DRs.</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">Each school is counted once. Status and billing counts include schools with a logistics receipt.</p>
                         </div>
                         <a href="{{ route('logistics-channel.index', ['tab' => 'partners']) }}" target="_blank" rel="noopener" class="{{ $btnGhost }}">Manage partners &amp; regions</a>
                     </div>
@@ -143,7 +143,7 @@
                             <tr>
                                 <th class="px-3 py-3 font-bold">Logistics Partner</th>
                                 <th class="px-3 py-3 font-bold">Project / Region</th>
-                                <th class="px-3 py-3 text-right font-bold">Assigned DRs</th>
+                                <th class="px-3 py-3 text-right font-bold">Assigned Schools</th>
                                 <th class="px-3 py-3 font-bold">Logistics Status</th>
                                 <th class="px-3 py-3 font-bold">Billing Document Status</th>
                             </tr>
@@ -160,18 +160,18 @@
                                         <p class="font-semibold">{{ $partnerStatus['project_name'] }}</p>
                                         <p class="mt-1 text-slate-500">{{ $partnerStatus['region'] }}</p>
                                     </td>
-                                    <td class="px-3 py-3 text-right font-mono text-base font-black tabular-nums text-slate-900">{{ number_format($partnerStatus['total_drs']) }}</td>
+                                    <td class="px-3 py-3 text-right font-mono text-base font-black tabular-nums text-slate-900">{{ number_format($partnerStatus['total_schools']) }}</td>
                                     <td class="px-3 py-3">
                                         <div class="flex max-w-sm flex-wrap gap-1.5">
                                             @foreach($partnerStatus['delivery_statuses'] as $status => $count)
-                                                <span class="rounded-full px-2 py-1 text-[10px] font-bold {{ $pill($status) }}">{{ $humanize($status) }} {{ number_format($count) }} · {{ number_format(($count / max(1, $partnerStatus['total_drs'])) * 100, 1) }}%</span>
+                                                <span class="rounded-full px-2 py-1 text-[10px] font-bold {{ $pill($status) }}">{{ $humanize($status) }} {{ number_format($count) }} · {{ number_format(($count / max(1, $partnerStatus['total_schools'])) * 100, 1) }}%</span>
                                             @endforeach
                                         </div>
                                     </td>
                                     <td class="px-3 py-3">
                                         <div class="flex max-w-sm flex-wrap gap-1.5">
                                             @foreach($partnerStatus['billing_statuses'] as $status => $count)
-                                                <span class="rounded-full px-2 py-1 text-[10px] font-bold {{ $pill($status) }}">{{ $status === 'no_document' ? 'No billing record' : $humanize($status) }} {{ number_format($count) }} · {{ number_format(($count / max(1, $partnerStatus['total_drs'])) * 100, 1) }}%</span>
+                                                <span class="rounded-full px-2 py-1 text-[10px] font-bold {{ $pill($status) }}">{{ $status === 'no_document' ? 'No billing record' : $humanize($status) }} {{ number_format($count) }} · {{ number_format(($count / max(1, $partnerStatus['total_schools'])) * 100, 1) }}%</span>
                                             @endforeach
                                         </div>
                                     </td>

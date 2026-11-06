@@ -127,6 +127,7 @@ class LogisticsManagementStatusService
             $groups[$groupKey]['project_ids'][$projectId] = true;
             $groups[$groupKey]['regions'][$region] = true;
             $groups[$groupKey]['documents'][$documentKey] ??= ['delivery_statuses' => [], 'billing_statuses' => []];
+            $groups[$groupKey]['documents'][$documentKey]['school_key'] = $projectId.':'.base64_encode((string) $delivery->school_id);
 
             if ($delivery->authentication_method === 'manual') {
                 $deliveryStatus = in_array(strtolower(trim((string) $delivery->source_delivery_status)), ['delivered', 'accepted'], true)
@@ -156,11 +157,23 @@ class LogisticsManagementStatusService
         foreach ($groups as $group) {
             $deliveryCounts = [];
             $billingCounts = [];
+            $schools = [];
             foreach ($group['documents'] as $document) {
                 $deliveryStatuses = array_keys($document['delivery_statuses']);
                 $deliveryState = count($deliveryStatuses) === 1 ? $deliveryStatuses[0] : 'mixed';
                 $billingStatuses = array_keys($document['billing_statuses']);
                 $billingState = count($billingStatuses) === 1 ? $billingStatuses[0] : 'mixed';
+                $schoolKey = $document['school_key'];
+                $schools[$schoolKey] ??= ['delivery_statuses' => [], 'billing_statuses' => []];
+                $schools[$schoolKey]['delivery_statuses'][$deliveryState] = true;
+                $schools[$schoolKey]['billing_statuses'][$billingState] = true;
+            }
+
+            foreach ($schools as $school) {
+                $schoolDeliveryStatuses = array_keys($school['delivery_statuses']);
+                $deliveryState = count($schoolDeliveryStatuses) === 1 ? $schoolDeliveryStatuses[0] : 'mixed';
+                $schoolBillingStatuses = array_keys($school['billing_statuses']);
+                $billingState = count($schoolBillingStatuses) === 1 ? $schoolBillingStatuses[0] : 'mixed';
                 $deliveryCounts[$deliveryState] = ($deliveryCounts[$deliveryState] ?? 0) + 1;
                 $billingCounts[$billingState] = ($billingCounts[$billingState] ?? 0) + 1;
             }
@@ -181,6 +194,7 @@ class LogisticsManagementStatusService
                     : (in_array($group['integration_key'], $activeCredentialIntegrationKeys, true) ? 'API Active' : 'API Inactive'),
                 'project_name' => implode(', ', $projectNames),
                 'region' => implode(', ', array_keys($group['regions'])),
+                'total_schools' => count($schools),
                 'total_drs' => count($group['documents']),
                 'delivery_statuses' => $deliveryCounts,
                 'billing_statuses' => $billingCounts,

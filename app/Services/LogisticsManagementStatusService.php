@@ -12,6 +12,15 @@ class LogisticsManagementStatusService
         $integrationProjects = DB::table('logistics_integration_projects as assigned_project')
             ->join('logistics_integrations as integration', 'integration.id', '=', 'assigned_project.integration_id')
             ->join('projects', 'projects.project_id', '=', 'assigned_project.project_id')
+            ->where('integration.status', 'active')
+            ->whereExists(function ($credentials): void {
+                $credentials->selectRaw('1')
+                    ->from('logistics_integration_credentials as credential')
+                    ->whereColumn('credential.integration_id', 'integration.id')
+                    ->where('credential.status', 'active')
+                    ->where(fn ($expires) => $expires->whereNull('credential.expires_at')
+                        ->orWhere('credential.expires_at', '>', now()));
+            })
             ->orderBy('integration.name')
             ->orderBy('projects.project_name')
             ->get([

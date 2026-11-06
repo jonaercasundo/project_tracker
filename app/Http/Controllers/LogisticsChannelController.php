@@ -9,6 +9,7 @@ use App\Models\LogisticsIntegrationCredential;
 use App\Services\LogisticsChannelService;
 use App\Services\LogisticsDrTrackingService;
 use App\Services\LogisticsIntegrationRegistry;
+use App\Services\LogisticsManagementStatusService;
 use App\Services\LogisticsWebhookEventService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -26,7 +27,8 @@ class LogisticsChannelController extends Controller
         private LogisticsChannelService $channel,
         private LogisticsDrTrackingService $tracking,
         private LogisticsIntegrationRegistry $integrations,
-        private LogisticsWebhookEventService $events
+        private LogisticsWebhookEventService $events,
+        private LogisticsManagementStatusService $managementStatus
     ) {}
 
     public function index(Request $request): View
@@ -36,7 +38,7 @@ class LogisticsChannelController extends Controller
             return view('logistics-channel.unavailable');
         }
         $filters = $request->validate([
-            'tab' => ['nullable', Rule::in(['overview', 'integrations', 'api', 'tracking', 'events', 'reconciliation', 'audit'])],
+            'tab' => ['nullable', Rule::in(['management', 'overview', 'integrations', 'api', 'tracking', 'events', 'reconciliation', 'audit'])],
             'integration_id' => ['nullable', 'string', 'max:64'],
             'project_id' => ['nullable', 'integer'],
             'dr_reference' => ['nullable', 'string', 'max:100'],
@@ -47,7 +49,7 @@ class LogisticsChannelController extends Controller
             'to' => ['nullable', 'date', 'after_or_equal:from'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
         ]);
-        $tab = $filters['tab'] ?? 'overview';
+        $tab = $filters['tab'] ?? 'management';
         $perPage = (int) ($filters['per_page'] ?? 25);
         $editing = $request->filled('edit')
             ? LogisticsIntegration::query()->with('projects', 'schools', 'credentials')->findOrFail($request->integer('edit'))
@@ -118,10 +120,11 @@ class LogisticsChannelController extends Controller
             ])
             : null;
         $metrics = $this->dashboardMetrics($tab === 'overview', $trackingRows['summary'] ?? null);
+        $partnerStatuses = $tab === 'management' ? $this->managementStatus->partnerStatuses() : [];
         $webhookUrl = route('api.v1.logistics.webhooks.delivery-status');
 
         return view('logistics-channel.index', compact(
-            'tab', 'filters', 'integrations', 'integrationRegions', 'legacyIntegrations', 'metrics', 'projects', 'schools', 'regions',
+            'tab', 'filters', 'integrations', 'integrationRegions', 'legacyIntegrations', 'metrics', 'partnerStatuses', 'projects', 'schools', 'regions',
             'selectedProjects', 'editing', 'editingSchoolTokens', 'editingRegionTokens', 'allSchools', 'eventRows', 'auditRows', 'trackingRows', 'webhookUrl'
         ));
     }

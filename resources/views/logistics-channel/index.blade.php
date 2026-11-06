@@ -2,6 +2,7 @@
     @php
 
         $tabs = [
+            'management' => 'Logistics Management',
             'overview' => 'Overview',
             'integrations' => 'Integrations',
             'api' => 'API & Webhooks',
@@ -48,8 +49,11 @@
                 $v === '' => 'bg-slate-100 text-slate-500',
                 str_contains($v, 'fail'), str_contains($v, 'reject'), str_contains($v, 'error') => 'bg-rose-50 text-rose-800',
                 str_contains($v, 'required'), str_contains($v, 'review'), str_contains($v, 'unresolved'), str_contains($v, 'conflict') => 'bg-orange-50 text-orange-800',
+                str_contains($v, 'cancel'), str_contains($v, 'hold') => 'bg-rose-50 text-rose-800',
+                str_contains($v, 'mixed') => 'bg-orange-50 text-orange-800',
+                str_contains($v, 'for_billing') => 'bg-amber-50 text-amber-800',
                 str_contains($v, 'pending'), str_contains($v, 'queue'), str_contains($v, 'process') && ! str_contains($v, 'processed') => 'bg-amber-50 text-amber-800',
-                str_contains($v, 'success'), str_contains($v, 'processed'), str_contains($v, 'resolved'), str_contains($v, 'complete'), str_contains($v, 'matched'), str_contains($v, 'clear') => 'bg-emerald-50 text-emerald-800',
+                str_contains($v, 'success'), str_contains($v, 'processed'), str_contains($v, 'resolved'), str_contains($v, 'complete'), str_contains($v, 'matched'), str_contains($v, 'clear'), str_contains($v, 'billed'), str_contains($v, 'delivered'), str_contains($v, 'accepted') => 'bg-emerald-50 text-emerald-800',
                 default => 'bg-slate-100 text-slate-700',
             };
         };
@@ -78,7 +82,7 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300">MMC · External delivery partner</p>
                     <h1 class="mt-3 text-3xl font-black tracking-tight">Logistics Channel</h1>
-                    <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Manage partner credentials and project access, then follow each verified DR from Logistics custody through delivery.</p>
+                    <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Monitor delivery and billing document status for each assigned partner, project, and region; manage API access in the same workspace.</p>
                 </div>
                 <div class="flex flex-wrap gap-3 text-xs" role="group" aria-label="System health">
                     <span class="rounded-full border border-white/15 bg-white/5 px-3 py-2">Queue {{ ($metrics['queue_depth'] ?? null) === null ? 'unavailable' : number_format($metrics['queue_depth']).' waiting' }}</span>
@@ -111,6 +115,67 @@
                     @foreach($errors->all() as $message)<li>{{ $message }}</li>@endforeach
                 </ul>
             </div>
+        @endif
+
+        {{-- LOGISTICS MANAGEMENT STATUS --}}
+        @if($tab === 'management')
+            <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="partner-status-title">
+                <header>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 id="partner-status-title" class="text-lg font-black text-slate-950">Partner Delivery &amp; Billing Status</h2>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">Assigned DRs are grouped by logistics partner, project, and school region. Delivery status comes from deliveries; billing document status comes from the delivery billing ledger.</p>
+                        </div>
+                        <a href="{{ route('logistics-channel.index', ['tab' => 'integrations']) }}" class="{{ $btnGhost }}">Manage partners &amp; regions</a>
+                    </div>
+                </header>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                        <thead class="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                            <tr>
+                                <th class="px-3 py-3 font-bold">Logistics Partner</th>
+                                <th class="px-3 py-3 font-bold">Project / Region</th>
+                                <th class="px-3 py-3 text-right font-bold">Assigned DRs</th>
+                                <th class="px-3 py-3 font-bold">Delivery Status</th>
+                                <th class="px-3 py-3 font-bold">Billing Document Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            @forelse($partnerStatuses as $partnerStatus)
+                                <tr class="align-top">
+                                    <td class="px-3 py-3">
+                                        <p class="font-bold text-slate-900">{{ $partnerStatus['partner_name'] }}</p>
+                                        <p class="mt-1 font-mono text-[10px] text-slate-500">{{ $partnerStatus['integration_id'] }}</p>
+                                        <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold {{ $partnerStatus['integration_status'] === 'active' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">API {{ ucfirst($partnerStatus['integration_status']) }}</span>
+                                    </td>
+                                    <td class="px-3 py-3 text-slate-700">
+                                        <p class="font-semibold">{{ $partnerStatus['project_name'] }}</p>
+                                        <p class="mt-1 text-slate-500">{{ $partnerStatus['region'] }}</p>
+                                    </td>
+                                    <td class="px-3 py-3 text-right font-mono text-base font-black tabular-nums text-slate-900">{{ number_format($partnerStatus['total_drs']) }}</td>
+                                    <td class="px-3 py-3">
+                                        <div class="flex max-w-sm flex-wrap gap-1.5">
+                                            @foreach($partnerStatus['delivery_statuses'] as $status => $count)
+                                                <span class="rounded-full px-2 py-1 text-[10px] font-bold {{ $pill($status) }}">{{ $humanize($status) }} {{ number_format($count) }} · {{ number_format(($count / max(1, $partnerStatus['total_drs'])) * 100, 1) }}%</span>
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <div class="flex max-w-sm flex-wrap gap-1.5">
+                                            @foreach($partnerStatus['billing_statuses'] as $status => $count)
+                                                <span class="rounded-full px-2 py-1 text-[10px] font-bold {{ $pill($status) }}">{{ $status === 'no_document' ? 'No billing record' : $humanize($status) }} {{ number_format($count) }} · {{ number_format(($count / max(1, $partnerStatus['total_drs'])) * 100, 1) }}%</span>
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="5" class="px-4 py-10 text-center text-sm text-slate-500">No delivery receipts are available for the assigned partner projects and regions.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         @endif
 
         {{-- OVERVIEW --}}

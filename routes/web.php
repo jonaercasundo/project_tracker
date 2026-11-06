@@ -209,12 +209,14 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         });
 
     });
-    Route::middleware(['company.context:MMC', 'role:user'])->group(function (): void {
-        Route::get('/integrations/mmc-platform', [MmcPlatformIntegrationController::class, 'index'])
-            ->name('integrations.mmc-platform.index');
-        Route::post('/integrations/mmc-platform/test-connection', [MmcPlatformIntegrationController::class, 'testConnection'])
+    Route::middleware(['company.context:MMC', 'role:Administrator'])->group(function (): void {
+        Route::get('/admin/integrations/mmc-platform', [MmcPlatformIntegrationController::class, 'index'])
+            ->name('admin.integrations.mmc-platform.index');
+        Route::post('/admin/integrations/mmc-platform', [MmcPlatformIntegrationController::class, 'store'])
+            ->name('admin.integrations.mmc-platform.store');
+        Route::post('/admin/integrations/mmc-platform/test-connection', [MmcPlatformIntegrationController::class, 'testConnection'])
             ->middleware('throttle:5,1')
-            ->name('integrations.mmc-platform.test-connection');
+            ->name('admin.integrations.mmc-platform.test-connection');
     });
 
     Route::middleware(['role:Administrator'])->group(function () {

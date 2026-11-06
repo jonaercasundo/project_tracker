@@ -10,77 +10,146 @@ use Throwable;
 
 class MmcPlatformApiClient
 {
-    /** @return array{configured: bool, secure: bool, base_url: ?string, reason: ?string} */
+    public function __construct(private MmcPlatformConfiguration $configuration) {}
+
+    /** @return array{configured: bool, secure: bool, base_url: ?string, has_key: bool, credential_source: string, storage_available: bool, reason: ?string} */
     public function configurationStatus(): array
     {
-        $baseUrl = trim((string) config('services.mmc_platform.base_url'));
-        $readKey = trim((string) config('services.mmc_platform.read_key'));
+        $configuration = $this->configuration->current();
+        $baseUrl = trim($configuration['base_url']);
+        $readKey = trim($configuration['read_key']);
 
         if ($baseUrl === '') {
             return [
                 'configured' => false,
                 'secure' => false,
                 'base_url' => null,
-                'reason' => 'Set MMC_PLATFORM_API_BASE_URL and MMC_PLATFORM_READ_KEY in the server environment.',
+                'has_key' => $readKey !== '',
+                'credential_source' => $configuration['credential_source'],
+                'storage_available' => $configuration['storage_available'],
+                'reason' => $configuration['credential_error'] ?? 'Enter an API base URL and read-only API key.',
             ];
         }
 
-        $parts = parse_url($baseUrl);
+        $urlError = $this->baseUrlError($baseUrl);
+        if ($urlError !== null) {
+            return [
+                'configured' => false,
+                'secure' => false,
+                'base_url' => null,
+                'has_key' => $readKey !== '',
+                'credential_source' => $configuration['credential_source'],
+                'storage_available' => $configuration['storage_available'],
+                'reason' => $configuration['credential_error'] ?? $urlError,
+            ];
+        }
+
+        if ($readKey === '' || $configuration['credential_error'] !== null) {
+            return [
+                'configured' => false,
+                'secure' => str_starts_with(strtolower($baseUrl), 'https://'),
+                'base_url' => rtrim($baseUrl, '/'),
+                'has_key' => false,
+                'credential_source' => $configuration['credential_source'],
+                'storage_available' => $configuration['storage_available'],
+                'reason' => $configuration['credential_error'] ?? 'Enter a read-only API key beginning with mmc_.',
+            ];
+        }
+
+        return [
+            'configured' => true,
+            'secure' => str_starts_with(strtolower($baseUrl), 'https://'),
+            'base_url' => rtrim($baseUrl, '/'),
+            'has_key' => true,
+            'credential_source' => $configuration['credential_source'],
+            'storage_available' => $configuration['storage_available'],
+            'reason' => null,
+        ];
+    }
+
+    public function baseUrlError(string $baseUrl): ?string
+    {
+        $parts = parse_url(trim($baseUrl));
         if (! is_array($parts)
-            || ! in_array($parts['scheme'] ?? '', ['https', 'http'], true)
+            || ! filter_var(trim($baseUrl), FILTER_VALIDATE_URL)
+            || ! in_array(strtolower($parts['scheme'] ?? ''), ['https', 'http'], true)
             || ! isset($parts['host'])
             || isset($parts['user'])
             || isset($parts['pass'])
             || isset($parts['query'])
             || isset($parts['fragment'])) {
-            return ['configured' => false, 'secure' => false, 'base_url' => null, 'reason' => 'The MMC API base URL is invalid.'];
+            return 'The MMC API base URL is invalid. Use a URL without credentials, query parameters, or a fragment.';
         }
 
-        $isLoopback = in_array(strtolower($parts['host']), ['localhost', '127.0.0.1', '::1'], true);
-        $secure = ($parts['scheme'] ?? '') === 'https';
-        $safeBaseUrl = rtrim($baseUrl, '/');
-        if (! $secure && ! $isLoopback) {
-            return ['configured' => false, 'secure' => false, 'base_url' => $safeBaseUrl, 'reason' => 'Use HTTPS before sending an API key over the network. HTTP is allowed only for a loopback development endpoint.'];
+        $host = trim(strtolower($parts['host']), '[]');
+        $isLoopback = in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+        if (strtolower($parts['scheme']) !== 'https' && ! $isLoopback) {
+            return 'Use HTTPS before sending an API key to a non-local host.';
         }
 
-        if ($readKey === '') {
-            return [
-                'configured' => false,
-                'secure' => $secure,
-                'base_url' => $safeBaseUrl,
-                'reason' => 'Set MMC_PLATFORM_API_BASE_URL and MMC_PLATFORM_READ_KEY in the server environment.',
-            ];
-        }
-
-        return ['configured' => true, 'secure' => $secure, 'base_url' => $safeBaseUrl, 'reason' => null];
+        return null;
     }
 
-    /** @return array{status: string, message: string} */
-    public function testConnection(): array
+    /** @return array{status: string, message: string, preview: array<string, scalar|null>} */
+    public function testConnection(?string $baseUrl = null, ?string $readKey = null): array
     {
-        $status = $this->configurationStatus();
-        if (! $status['configured']) {
-            return ['status' => 'configuration_required', 'message' => $status['reason'] ?? 'MMC Platform is not configured.'];
+        $configuration = $this->configuration->current();
+        $baseUrl = trim($baseUrl ?? $configuration['base_url']);
+        $readKey = trim($readKey ?? '') !== '' ? trim((string) $readKey) : trim($configuration['read_key']);
+        $urlError = $this->baseUrlError($baseUrl);
+        if ($urlError !== null) {
+            return ['status' => 'failed', 'message' => $urlError, 'preview' => []];
+        }
+        if (! str_starts_with($readKey, 'mmc_')) {
+            return ['status' => 'failed', 'message' => 'Enter a valid read-only API key beginning with mmc_.', 'preview' => []];
+        }
+
+        $endpoint = rtrim($baseUrl, '/').'/programs';
+        try {
+            $preflight = $this->unauthenticatedRequest()->get($endpoint, ['limit' => 1]);
+        } catch (ConnectionException) {
+            return ['status' => 'failed', 'message' => 'Could not verify the MMC Platform host. Check the URL, TLS certificate, network route, and service availability. The API key was not sent.', 'preview' => []];
+        } catch (Throwable) {
+            return ['status' => 'failed', 'message' => 'Could not verify the MMC Platform endpoint. The API key was not sent.', 'preview' => []];
+        }
+
+        if (! in_array($preflight->status(), [401, 403], true)) {
+            $message = match ($preflight->status()) {
+                200 => 'The endpoint responded without requiring authentication. The API key was not sent.',
+                404 => 'The verified host does not expose GET /programs at this base URL. The API key was not sent.',
+                429 => 'The endpoint rate limit was reached during host verification. The API key was not sent.',
+                default => 'The endpoint could not be verified (HTTP '.$preflight->status().'). The API key was not sent.',
+            };
+
+            return ['status' => 'failed', 'message' => $message, 'preview' => []];
         }
 
         try {
-            $response = $this->request()->get('programs', ['limit' => 1]);
+            $response = $this->authenticatedRequest($readKey)->get($endpoint, ['limit' => 1]);
         } catch (ConnectionException) {
-            return ['status' => 'failed', 'message' => 'Could not reach the MMC Platform API. Check the host, network route, and service availability.'];
+            return ['status' => 'failed', 'message' => 'The authenticated request failed after endpoint verification. Check connectivity; no Tracker data was changed.', 'preview' => []];
         } catch (Throwable) {
-            return ['status' => 'failed', 'message' => 'The MMC Platform connection test failed.'];
+            return ['status' => 'failed', 'message' => 'The MMC Platform connection test failed without exposing the API key.', 'preview' => []];
         }
 
-        if ($response->successful()) {
-            return ['status' => 'success', 'message' => 'Tracker authenticated and reached the MMC Platform read API.'];
+        if (! $response->successful()) {
+            $message = match ($response->status()) {
+                401, 403 => 'The API key was rejected or does not have the read scope.',
+                404 => 'The verified host does not expose GET /programs at this base URL.',
+                429 => 'The platform rate limit was reached. Wait before testing again.',
+                default => 'The MMC Platform returned HTTP '.$response->status().'.',
+            };
+
+            return ['status' => 'failed', 'message' => $message, 'preview' => []];
         }
 
-        return match ($response->status()) {
-            401, 403 => ['status' => 'failed', 'message' => 'The API key was rejected or does not have the read scope.'],
-            404 => ['status' => 'failed', 'message' => 'The configured API base URL does not expose the expected /programs endpoint.'],
-            429 => ['status' => 'failed', 'message' => 'The platform rate limit was reached. Wait before testing again.'],
-            default => ['status' => 'failed', 'message' => 'The MMC Platform returned HTTP '.$response->status().'.'],
-        };
+        $preview = $this->safeProgramPreview($response->json());
+
+        return [
+            'status' => 'success',
+            'message' => 'Tracker authenticated and reached the MMC Platform read API.',
+            'preview' => $preview,
+        ];
     }
 
     /** @param array<string, scalar|null> $query */
@@ -90,7 +159,17 @@ class MmcPlatformApiClient
             throw new \InvalidArgumentException('Unsupported MMC Platform feed.');
         }
 
-        $response = $this->request()->get($feed, $query);
+        $configuration = $this->configuration->current();
+        if ($this->baseUrlError($configuration['base_url']) !== null || ! str_starts_with($configuration['read_key'], 'mmc_')) {
+            throw new \RuntimeException('MMC Platform API configuration is invalid.');
+        }
+
+        $verification = $this->testConnection($configuration['base_url'], $configuration['read_key']);
+        if ($verification['status'] !== 'success') {
+            throw new \RuntimeException('MMC Platform host verification failed: '.$verification['message']);
+        }
+
+        $response = $this->authenticatedRequest($configuration['read_key'])->get(rtrim($configuration['base_url'], '/').'/'.$feed, $query);
         $response->throw();
         $payload = $response->json();
         if (! is_array($payload)) {
@@ -100,15 +179,18 @@ class MmcPlatformApiClient
         return $payload;
     }
 
-    private function request(): PendingRequest
+    private function unauthenticatedRequest(): PendingRequest
     {
-        $status = $this->configurationStatus();
-        if (! $status['configured']) {
-            throw new \RuntimeException($status['reason'] ?? 'MMC Platform is not configured.');
-        }
+        return Http::withoutRedirecting()
+            ->acceptJson()
+            ->connectTimeout(5)
+            ->timeout(8);
+    }
 
-        return Http::baseUrl($status['base_url'])
-            ->withToken((string) config('services.mmc_platform.read_key'))
+    private function authenticatedRequest(string $readKey): PendingRequest
+    {
+        return Http::withoutRedirecting()
+            ->withToken($readKey)
             ->acceptJson()
             ->connectTimeout(5)
             ->timeout(20)
@@ -116,5 +198,39 @@ class MmcPlatformApiClient
                 return $exception instanceof ConnectionException
                     || ($exception instanceof RequestException && ($exception->response->serverError() || $exception->response->status() === 429));
             }, false);
+    }
+
+    /**
+     * @return array<string, scalar|null>
+     */
+    private function safeProgramPreview(mixed $payload): array
+    {
+        if (! is_array($payload)) {
+            return [];
+        }
+
+        $programs = $payload['data'] ?? $payload['programs'] ?? $payload;
+        if (! is_array($programs)) {
+            return [];
+        }
+
+        if (array_is_list($programs)) {
+            $program = $programs[0] ?? null;
+        } else {
+            $program = $programs;
+        }
+        if (! is_array($program)) {
+            return [];
+        }
+
+        $preview = [];
+        foreach (['id', 'name', 'project_title', 'fiscal_year'] as $field) {
+            $value = $program[$field] ?? null;
+            if (is_scalar($value) || $value === null) {
+                $preview[$field] = is_string($value) ? mb_substr($value, 0, 160) : $value;
+            }
+        }
+
+        return $preview;
     }
 }

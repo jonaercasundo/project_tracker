@@ -18,7 +18,7 @@
     <body class="antialiased bg-slate-50 text-slate-800 min-h-full flex flex-col relative selection:bg-blue-600 selection:text-white">
         @php
             $isAdminWorkspace = request()->routeIs(
-                'admin.dashboard', 'admin.ai-configuration.*', 'admin.ai-management.*',
+                'admin.dashboard', 'admin.ai-configuration.*', 'admin.ai-management.*', 'admin.integrations.*',
                 'admin.access.*', 'admin.audit.*', 'roles.*', 'roleaccess.*',
                 'companies.*', 'integrations.jarvis.*'
             );

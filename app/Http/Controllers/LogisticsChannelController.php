@@ -55,6 +55,13 @@ class LogisticsChannelController extends Controller
         $integrations = LogisticsIntegration::query()->withCount([
             'credentials as active_credentials_count' => fn ($query) => $query->where('status', 'active'),
         ])->orderBy('name')->paginate($perPage, ['*'], 'integrations_page')->withQueryString();
+        $integrationRegions = DB::table('logistics_integration_regions as assigned_region')
+            ->join('projects', 'projects.project_id', '=', 'assigned_region.project_id')
+            ->whereIn('assigned_region.integration_id', $integrations->getCollection()->pluck('id'))
+            ->orderBy('projects.project_name')
+            ->orderBy('assigned_region.region')
+            ->get(['assigned_region.integration_id', 'projects.project_name', 'assigned_region.region'])
+            ->groupBy('integration_id');
         $legacyIntegrations = collect($this->integrations->environmentIntegrationIds())
             ->reject(fn (string $id): bool => LogisticsIntegration::query()->where('integration_id', $id)->exists())
             ->map(fn (string $id): array => [
@@ -72,12 +79,26 @@ class LogisticsChannelController extends Controller
             ->whereIn('project_id', $selectedProjects)
             ->orderBy('school_name')
             ->get(['project_id', 'school_id', 'school_name']);
+        $regions = $selectedProjects === [] ? collect() : DB::table('school')
+            ->whereIn('project_id', $selectedProjects)
+            ->whereNotNull('region')
+            ->whereRaw("TRIM(region) <> ''")
+            ->select(['project_id', 'region'])
+            ->distinct()
+            ->orderBy('project_id')
+            ->orderBy('region')
+            ->get();
         $editingSchoolTokens = $editing === null ? [] : DB::table('logistics_integration_schools')
             ->where('integration_id', $editing->id)
             ->get(['project_id', 'school_id'])
             ->map(fn (object $row): string => (int) $row->project_id.':'.rtrim(strtr(base64_encode((string) $row->school_id), '+/', '-_'), '='))
             ->all();
-        $allSchools = $editing !== null && $editingSchoolTokens === [];
+        $editingRegionTokens = $editing === null || ! Schema::hasTable('logistics_integration_regions') ? [] : DB::table('logistics_integration_regions')
+            ->where('integration_id', $editing->id)
+            ->get(['project_id', 'region'])
+            ->map(fn (object $row): string => (int) $row->project_id.':'.rtrim(strtr(base64_encode((string) $row->region), '+/', '-_'), '='))
+            ->all();
+        $allSchools = $editing !== null && $editingSchoolTokens === [] && $editingRegionTokens === [];
         $eventRows = in_array($tab, ['events', 'reconciliation'], true)
             ? $this->eventRows($filters, $perPage, $tab === 'reconciliation')
             : null;
@@ -100,8 +121,8 @@ class LogisticsChannelController extends Controller
         $webhookUrl = route('api.v1.logistics.webhooks.delivery-status');
 
         return view('logistics-channel.index', compact(
-            'tab', 'filters', 'integrations', 'legacyIntegrations', 'metrics', 'projects', 'schools',
-            'selectedProjects', 'editing', 'editingSchoolTokens', 'allSchools', 'eventRows', 'auditRows', 'trackingRows', 'webhookUrl'
+            'tab', 'filters', 'integrations', 'integrationRegions', 'legacyIntegrations', 'metrics', 'projects', 'schools', 'regions',
+            'selectedProjects', 'editing', 'editingSchoolTokens', 'editingRegionTokens', 'allSchools', 'eventRows', 'auditRows', 'trackingRows', 'webhookUrl'
         ));
     }
 
@@ -186,6 +207,27 @@ class LogisticsChannelController extends Controller
             ->orderBy('school_name')->get(['project_id', 'school_id', 'school_name']);
 
         return response()->json($schools);
+    }
+
+    public function regions(Request $request): JsonResponse
+    {
+        Gate::authorize('viewAny', LogisticsIntegration::class);
+        abort_unless($this->managementSchemaReady(), 503, 'Logistics Channel management storage is not ready.');
+        $validated = $request->validate([
+            'project_ids' => ['required', 'array', 'min:1'],
+            'project_ids.*' => ['required', 'integer', 'distinct', 'exists:projects,project_id'],
+        ]);
+        $regions = DB::table('school')
+            ->whereIn('project_id', array_map('intval', $validated['project_ids']))
+            ->whereNotNull('region')
+            ->whereRaw("TRIM(region) <> ''")
+            ->select(['project_id', 'region'])
+            ->distinct()
+            ->orderBy('project_id')
+            ->orderBy('region')
+            ->get();
+
+        return response()->json($regions);
     }
 
     public function retryEvent(Request $request, int $event): RedirectResponse
@@ -304,6 +346,7 @@ class LogisticsChannelController extends Controller
             'logistics_integrations',
             'logistics_integration_projects',
             'logistics_integration_schools',
+            'logistics_integration_regions',
             'logistics_integration_credentials',
             'logistics_integration_audit_logs',
         ] as $table) {

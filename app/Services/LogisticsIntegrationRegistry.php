@@ -57,7 +57,7 @@ class LogisticsIntegrationRegistry
         return $this->environmentCredential($keyId);
     }
 
-    /** @return array{project_ids: array<int, int>, school_ids: array<int, string>, school_scopes: array<int, array{project_id:int,school_id:string}>} */
+    /** @return array{project_ids: array<int, int>, school_ids: array<int, string>, school_scopes: array<int, array{project_id:int,school_id:string}>, region_scopes: array<int, array{project_id:int,region:string}>} */
     public function scope(string $integrationId): array
     {
         $integration = Schema::hasTable('logistics_integrations')
@@ -80,8 +80,17 @@ class LogisticsIntegrationRegistry
                 ->get(['project_id', 'school_id'])
                 ->map(fn (object $row): array => ['project_id' => (int) $row->project_id, 'school_id' => (string) $row->school_id])
                 ->all();
+            $regionScopes = Schema::hasTable('logistics_integration_regions')
+                ? DB::table('logistics_integration_regions')
+                    ->where('integration_id', $integration->id)
+                    ->orderBy('project_id')
+                    ->orderBy('region')
+                    ->get(['project_id', 'region'])
+                    ->map(fn (object $row): array => ['project_id' => (int) $row->project_id, 'region' => (string) $row->region])
+                    ->all()
+                : [];
 
-            return ['project_ids' => $projectIds, 'school_ids' => [], 'school_scopes' => $schoolScopes];
+            return ['project_ids' => $projectIds, 'school_ids' => [], 'school_scopes' => $schoolScopes, 'region_scopes' => $regionScopes];
         }
 
         $legacyScope = config('logistics-webhooks.integration_scopes.'.$integrationId, []);
@@ -90,6 +99,7 @@ class LogisticsIntegrationRegistry
             'project_ids' => array_map('intval', is_array($legacyScope['project_ids'] ?? null) ? $legacyScope['project_ids'] : []),
             'school_ids' => array_map('strval', is_array($legacyScope['school_ids'] ?? null) ? $legacyScope['school_ids'] : []),
             'school_scopes' => [],
+            'region_scopes' => [],
         ];
     }
 

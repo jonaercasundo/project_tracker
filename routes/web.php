@@ -205,6 +205,7 @@ Route::middleware(['auth', 'active.user'])->group(function () {
             Route::post('/integrations/{integration}/credentials/{credential}/revoke', [LogisticsChannelController::class, 'revoke'])->middleware('throttle:10,1')->name('integrations.credentials.revoke');
             Route::post('/integrations/adopt-environment', [LogisticsChannelController::class, 'adopt'])->middleware('throttle:5,1')->name('integrations.adopt');
             Route::get('/schools', [LogisticsChannelController::class, 'schools'])->name('schools');
+            Route::get('/regions', [LogisticsChannelController::class, 'regions'])->name('regions');
             Route::post('/events/{event}/retry', [LogisticsChannelController::class, 'retryEvent'])->whereNumber('event')->middleware('throttle:10,1')->name('events.retry');
         });
 

@@ -47,6 +47,7 @@ class LogisticsChannelService
             $this->audit($integration, $actorId, 'integration_created', null, null, [
                 'project_ids' => array_map('intval', $data['project_ids']),
                 'school_scope_count' => count($data['school_scopes'] ?? []),
+                'region_scope_count' => count($data['region_scopes'] ?? []),
             ], $ipAddress);
 
             return $integration;
@@ -71,6 +72,7 @@ class LogisticsChannelService
             $this->audit($lockedIntegration, $actorId, 'integration_updated', null, null, [
                 'project_ids' => array_map('intval', $data['project_ids']),
                 'school_scope_count' => count($data['school_scopes'] ?? []),
+                'region_scope_count' => count($data['region_scopes'] ?? []),
                 'status' => $data['status'],
             ], $ipAddress);
         }, 3);
@@ -218,15 +220,18 @@ class LogisticsChannelService
     private function saveScopes(LogisticsIntegration $integration, array $data): void
     {
         $schoolScopes = $data['school_scopes'] ?? [];
+        $regionScopes = $data['region_scopes'] ?? [];
         $allSchools = ($data['all_schools'] ?? false) === true || ($data['all_schools'] ?? null) === '1';
-        if (($schoolScopes !== []) === $allSchools) {
+        $scopeModeCount = (int) ($schoolScopes !== []) + (int) ($regionScopes !== []) + (int) $allSchools;
+        if ($scopeModeCount !== 1) {
             throw ValidationException::withMessages([
-                'school_scopes' => 'Choose specific schools or explicitly allow all schools in the selected projects.',
+                'school_scopes' => 'Choose specific schools, regions, or explicitly allow all schools in the selected projects.',
             ]);
         }
 
         DB::table('logistics_integration_projects')->where('integration_id', $integration->id)->delete();
         DB::table('logistics_integration_schools')->where('integration_id', $integration->id)->delete();
+        DB::table('logistics_integration_regions')->where('integration_id', $integration->id)->delete();
         foreach (array_unique(array_map('intval', $data['project_ids'])) as $projectId) {
             DB::table('logistics_integration_projects')->insert([
                 'integration_id' => $integration->id,
@@ -250,6 +255,30 @@ class LogisticsChannelService
                 'integration_id' => $integration->id,
                 'project_id' => $projectId,
                 'school_id' => $schoolId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        foreach ($regionScopes as $scopeToken) {
+            [$projectIdText, $regionToken] = explode(':', $scopeToken, 2);
+            $projectId = (int) $projectIdText;
+            $region = base64_decode(strtr($regionToken, '-_', '+/'), true);
+            if ($region === false || trim($region) === '' || ! in_array($projectId, array_map('intval', $data['project_ids']), true)
+                || ! DB::table('school')->where('project_id', $projectId)->where('region', $region)->exists()
+            ) {
+                throw ValidationException::withMessages(['region_scopes' => 'Choose regions that belong to an authorized project.']);
+            }
+            if (DB::table('logistics_integration_regions')->where('project_id', $projectId)
+                ->where('region', $region)->where('integration_id', '<>', $integration->id)->exists()
+            ) {
+                throw ValidationException::withMessages(['region_scopes' => 'This region is already assigned to another Logistics API partner for the selected project.']);
+            }
+
+            DB::table('logistics_integration_regions')->insert([
+                'integration_id' => $integration->id,
+                'project_id' => $projectId,
+                'region' => $region,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

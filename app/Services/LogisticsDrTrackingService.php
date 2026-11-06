@@ -233,18 +233,35 @@ class LogisticsDrTrackingService
                     ->join('logistics_integration_projects as integration_project', 'integration_project.integration_id', '=', 'integration.id')
                     ->where('integration.integration_id', $filters['integration_id'])
                     ->whereColumn('integration_project.project_id', 'delivery.project_id')
-                    ->where(function (Builder $schoolScopeQuery): void {
-                        $schoolScopeQuery->whereNotExists(function (Builder $unrestrictedScope): void {
-                            $unrestrictedScope->selectRaw('1')
-                                ->from('logistics_integration_schools as configured_school')
-                                ->whereColumn('configured_school.integration_id', 'integration.id')
-                                ->whereColumn('configured_school.project_id', 'delivery.project_id');
+                    ->where(function (Builder $scopeQuery): void {
+                        $scopeQuery->where(function (Builder $unrestrictedScope): void {
+                            $unrestrictedScope->whereNotExists(function (Builder $schoolScope): void {
+                                $schoolScope->selectRaw('1')
+                                    ->from('logistics_integration_schools as configured_school')
+                                    ->whereColumn('configured_school.integration_id', 'integration.id')
+                                    ->whereColumn('configured_school.project_id', 'delivery.project_id');
+                            })->whereNotExists(function (Builder $regionScope): void {
+                                $regionScope->selectRaw('1')
+                                    ->from('logistics_integration_regions as configured_region')
+                                    ->whereColumn('configured_region.integration_id', 'integration.id')
+                                    ->whereColumn('configured_region.project_id', 'delivery.project_id');
+                            });
                         })->orWhereExists(function (Builder $authorizedSchool): void {
                             $authorizedSchool->selectRaw('1')
                                 ->from('logistics_integration_schools as configured_school')
                                 ->whereColumn('configured_school.integration_id', 'integration.id')
                                 ->whereColumn('configured_school.project_id', 'delivery.project_id');
                             $this->whereColumnExact($authorizedSchool, 'configured_school.school_id', 'delivery.school_id');
+                        })->orWhereExists(function (Builder $authorizedRegion): void {
+                            $authorizedRegion->selectRaw('1')
+                                ->from('logistics_integration_regions as configured_region')
+                                ->join('school as scoped_school', function (JoinClause $join): void {
+                                    $join->on('scoped_school.project_id', '=', 'configured_region.project_id');
+                                    $this->whereColumnExact($join, 'scoped_school.school_id', 'delivery.school_id');
+                                    $this->whereColumnExact($join, 'scoped_school.region', 'configured_region.region');
+                                })
+                                ->whereColumn('configured_region.integration_id', 'integration.id')
+                                ->whereColumn('configured_region.project_id', 'delivery.project_id');
                         });
                     });
             });

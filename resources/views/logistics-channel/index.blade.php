@@ -163,9 +163,9 @@
             <section class="grid gap-5 xl:grid-cols-[minmax(300px,0.85fr)_minmax(0,1.4fr)]">
                 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <h2 class="text-lg font-black text-slate-900">{{ $editing ? 'Edit integration' : 'Add integration' }}</h2>
-                    <p class="mt-1 text-xs leading-5 text-slate-500">Each partner receives a separate HMAC key and an explicit MMC project scope.</p>
+                    <p class="mt-1 text-xs leading-5 text-slate-500">Each partner connects through its own API credential and gets an explicit project and region scope.</p>
 
-                    <form method="POST" action="{{ $editing ? route('logistics-channel.integrations.update', $editing) : route('logistics-channel.integrations.store') }}" class="mt-5 space-y-4" id="integration-form" data-schools-url="{{ route('logistics-channel.schools') }}" data-selected-schools="{{ json_encode($editingSchoolTokens) }}">
+                    <form method="POST" action="{{ $editing ? route('logistics-channel.integrations.update', $editing) : route('logistics-channel.integrations.store') }}" class="mt-5 space-y-4" id="integration-form" data-schools-url="{{ route('logistics-channel.schools') }}" data-regions-url="{{ route('logistics-channel.regions') }}" data-selected-schools="{{ json_encode($editingSchoolTokens) }}" data-selected-regions="{{ json_encode($editingRegionTokens) }}">
                         @csrf
                         @if($editing) @method('PATCH') @endif
 
@@ -226,6 +226,20 @@
 
                         <div>
                             <div class="mb-1 flex items-center justify-between gap-2">
+                                <label for="authorized-regions" class="block text-xs font-bold text-slate-600">Assigned regions <span class="font-normal text-slate-400">(recommended)</span></label>
+                                <span id="region-status" class="text-[11px] text-slate-500" role="status" aria-live="polite"></span>
+                            </div>
+                            <select id="authorized-regions" name="region_scopes[]" multiple size="5" aria-describedby="regions-help" class="{{ $field }}">
+                                @foreach($regions as $region)
+                                    @php($scopeToken = (int) $region->project_id.':'.rtrim(strtr(base64_encode((string) $region->region), '+/', '-_'), '='))
+                                    <option value="{{ $scopeToken }}" @selected(in_array($scopeToken, old('region_scopes', $editingRegionTokens), true))>{{ $region->region }} · Project {{ $region->project_id }}</option>
+                                @endforeach
+                            </select>
+                            <p id="regions-help" class="mt-1 text-[11px] text-slate-500">Select the regions this API partner handles in each selected project. The webhook will only match schools in these regions.</p>
+                        </div>
+
+                        <div>
+                            <div class="mb-1 flex items-center justify-between gap-2">
                                 <label for="authorized-schools" class="block text-xs font-bold text-slate-600">Authorized schools <span class="font-normal text-slate-400">(optional)</span></label>
                                 <span id="school-status" class="text-[11px] text-slate-500" role="status" aria-live="polite"></span>
                             </div>
@@ -235,10 +249,10 @@
                                     <option value="{{ $scopeToken }}" @selected(in_array($scopeToken, old('school_scopes', $editingSchoolTokens), true))>{{ $school->school_name ?: $school->school_id }} · {{ $school->school_id }} · Project {{ $school->project_id }}</option>
                                 @endforeach
                             </select>
-                            <p id="schools-help" class="mt-1 text-[11px] text-slate-500">A selected school is tied to its project. If no schools are selected, explicitly allow all schools below.</p>
+                            <p id="schools-help" class="mt-1 text-[11px] text-slate-500">Use specific schools instead of regions, or explicitly allow all schools below.</p>
                             <label class="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
                                 <input id="all-schools" type="checkbox" name="all_schools" value="1" @checked((string) old('all_schools', $allSchools ? '1' : '') === '1') class="mt-0.5 rounded border-amber-400 text-amber-800 focus:ring-amber-700">
-                                <span><strong>Allow every school</strong> in the selected projects. Choose this when school-level restriction is not required.</span>
+                                <span><strong>Allow every school</strong> in the selected projects. Choose this when region or school restrictions are not required.</span>
                             </label>
                         </div>
 
@@ -276,6 +290,13 @@
                                         <div>
                                             <h3 class="font-bold text-slate-900">{{ $integration->name }}</h3>
                                             <p class="mt-1 font-mono text-xs text-slate-500">{{ $integration->integration_id }}</p>
+                                            @php($assignedRegions = $integrationRegions->get($integration->id, collect()))
+                                            @if($assignedRegions->isNotEmpty())
+                                                <p class="mt-2 text-xs text-slate-600">
+                                                    <span class="font-bold">Assigned regions:</span>
+                                                    {{ $assignedRegions->map(fn ($scope) => $scope->project_name.' · '.$scope->region)->implode(', ') }}
+                                                </p>
+                                            @endif
                                         </div>
                                         <div class="flex items-center gap-2">
                                             <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $integration->status === 'active' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">{{ ucfirst($integration->status) }}</span>
@@ -564,87 +585,130 @@
                 if (el) copy(btn, el.textContent);
             }));
 
-            // Integration form: project/school scope picker.
+            // Integration form: project, region, and school scope picker.
             const form = document.getElementById('integration-form');
             const projects = document.getElementById('authorized-projects');
             const schools = document.getElementById('authorized-schools');
+            const regions = document.getElementById('authorized-regions');
             const allSchools = document.getElementById('all-schools');
-            if (!form || !projects || !schools) return;
+            if (!form || !projects || !schools || !regions) return;
 
             const submit = document.getElementById('integration-submit');
             const schoolStatus = document.getElementById('school-status');
+            const regionStatus = document.getElementById('region-status');
             const projectCount = document.getElementById('project-count');
-            const endpoint = form.dataset.schoolsUrl;
-            const initial = new Set(JSON.parse(form.dataset.selectedSchools || '[]'));
+            const schoolEndpoint = form.dataset.schoolsUrl;
+            const regionEndpoint = form.dataset.regionsUrl;
+            const initialSchools = new Set(JSON.parse(form.dataset.selectedSchools || '[]'));
+            const initialRegions = new Set(JSON.parse(form.dataset.selectedRegions || '[]'));
             let requestController;
             let schoolOptionsLoading = false;
             let schoolOptionsFailed = false;
+            let regionOptionsLoading = false;
+            let regionOptionsFailed = false;
 
-            const updateProjectCount = () => {
-                const n = projects.querySelectorAll('input[name="project_ids[]"]:checked').length;
-                projectCount.textContent = n ? `${n} selected` : 'None selected';
+            const updateSubmitState = () => {
+                if (submit) submit.disabled = schoolOptionsLoading || schoolOptionsFailed || regionOptionsLoading || regionOptionsFailed;
             };
             const setSchoolState = (state, message = '') => {
                 schoolOptionsLoading = state === 'loading';
                 schoolOptionsFailed = state === 'failed';
                 schoolStatus.textContent = message;
                 schools.setAttribute('aria-busy', String(schoolOptionsLoading));
-                if (submit) submit.disabled = schoolOptionsLoading || schoolOptionsFailed;
+                updateSubmitState();
             };
-            // base64url of the UTF-8 bytes, matching the server's base64_encode (btoa alone breaks on non-Latin1 IDs).
+            const setRegionState = (state, message = '') => {
+                regionOptionsLoading = state === 'loading';
+                regionOptionsFailed = state === 'failed';
+                regionStatus.textContent = message;
+                regions.setAttribute('aria-busy', String(regionOptionsLoading));
+                updateSubmitState();
+            };
+            const updateProjectCount = () => {
+                const count = projects.querySelectorAll('input[name="project_ids[]"]:checked').length;
+                projectCount.textContent = count ? `${count} selected` : 'None selected';
+            };
             const encodeId = value => {
                 const bytes = new TextEncoder().encode(String(value));
                 let binary = '';
-                bytes.forEach(b => { binary += String.fromCharCode(b); });
+                bytes.forEach(byte => { binary += String.fromCharCode(byte); });
                 return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
             };
 
             updateProjectCount();
-
             schools.addEventListener('change', () => {
-                if (schools.selectedOptions.length) allSchools.checked = false;
+                if (schools.selectedOptions.length) {
+                    allSchools.checked = false;
+                    Array.from(regions.options).forEach(option => { option.selected = false; });
+                }
+            });
+            regions.addEventListener('change', () => {
+                if (regions.selectedOptions.length) {
+                    allSchools.checked = false;
+                    Array.from(schools.options).forEach(option => { option.selected = false; });
+                }
             });
             allSchools.addEventListener('change', () => {
-                if (allSchools.checked) Array.from(schools.options).forEach(o => { o.selected = false; });
+                if (allSchools.checked) {
+                    Array.from(schools.options).forEach(option => { option.selected = false; });
+                    Array.from(regions.options).forEach(option => { option.selected = false; });
+                }
             });
             form.addEventListener('submit', event => {
-                if (schoolOptionsLoading || schoolOptionsFailed) {
+                if (schoolOptionsLoading || schoolOptionsFailed || regionOptionsLoading || regionOptionsFailed) {
                     event.preventDefault();
-                    window.alert('Wait for school access options to load successfully before saving this scope.');
+                    window.alert('Wait for project region and school options to load successfully before saving this scope.');
                 }
             });
 
             projects.addEventListener('change', async () => {
                 updateProjectCount();
                 const projectIds = Array.from(projects.querySelectorAll('input[name="project_ids[]"]:checked'), input => input.value);
-                // Keep whatever the person already picked when the list refreshes.
-                const keep = new Set([...initial, ...Array.from(schools.selectedOptions, o => o.value)]);
+                const keepSchools = new Set([...initialSchools, ...Array.from(schools.selectedOptions, option => option.value)]);
+                const keepRegions = new Set([...initialRegions, ...Array.from(regions.selectedOptions, option => option.value)]);
                 requestController?.abort();
                 requestController = undefined;
                 setSchoolState('idle');
+                setRegionState('idle');
                 schools.replaceChildren();
+                regions.replaceChildren();
                 if (!projectIds.length) return;
 
                 const controller = new AbortController();
                 requestController = controller;
-                setSchoolState('loading', 'Loading schools…');
-                const url = new URL(endpoint, window.location.origin);
-                projectIds.forEach(id => url.searchParams.append('project_ids[]', id));
+                setSchoolState('loading', 'Loading schools...');
+                setRegionState('loading', 'Loading regions...');
+                const schoolUrl = new URL(schoolEndpoint, window.location.origin);
+                const regionUrl = new URL(regionEndpoint, window.location.origin);
+                projectIds.forEach(id => {
+                    schoolUrl.searchParams.append('project_ids[]', id);
+                    regionUrl.searchParams.append('project_ids[]', id);
+                });
 
                 try {
-                    const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal: controller.signal });
-                    if (!response.ok) throw new Error('Schools could not be loaded. Reselect the projects to try again.');
-                    const rows = await response.json();
+                    const [schoolResponse, regionResponse] = await Promise.all([
+                        fetch(schoolUrl, { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal: controller.signal }),
+                        fetch(regionUrl, { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal: controller.signal }),
+                    ]);
+                    if (!schoolResponse.ok || !regionResponse.ok) throw new Error('Project regions and schools could not be loaded. Reselect the projects to try again.');
+                    const [schoolRows, regionRows] = await Promise.all([schoolResponse.json(), regionResponse.json()]);
                     if (requestController !== controller) return;
-                    for (const school of rows) {
+                    for (const school of schoolRows) {
                         const token = `${school.project_id}:${encodeId(school.school_id)}`;
-                        schools.add(new Option(`${school.school_name || school.school_id} · ${school.school_id} · Project ${school.project_id}`, token, false, keep.has(token)));
+                        schools.add(new Option(`${school.school_name || school.school_id} ? ${school.school_id} ? Project ${school.project_id}`, token, false, keepSchools.has(token)));
                     }
-                    setSchoolState('idle', `${rows.length} ${rows.length === 1 ? 'school' : 'schools'}`);
+                    for (const region of regionRows) {
+                        const token = `${region.project_id}:${encodeId(region.region)}`;
+                        regions.add(new Option(`${region.region} ? Project ${region.project_id}`, token, false, keepRegions.has(token)));
+                    }
+                    setSchoolState('idle', `${schoolRows.length} ${schoolRows.length === 1 ? 'school' : 'schools'}`);
+                    setRegionState('idle', `${regionRows.length} ${regionRows.length === 1 ? 'region' : 'regions'}`);
                 } catch (error) {
                     if (requestController !== controller || error.name === 'AbortError') return;
                     setSchoolState('failed', error.message);
+                    setRegionState('failed', error.message);
                     schools.add(new Option(error.message, '', true, true));
+                    regions.add(new Option(error.message, '', true, true));
                 }
             });
         })();

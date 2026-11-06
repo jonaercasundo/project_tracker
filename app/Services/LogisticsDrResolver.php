@@ -50,12 +50,23 @@ class LogisticsDrResolver
         $projectIds = $scope['project_ids'];
         $schoolIds = $scope['school_ids'];
         $schoolScopes = $scope['school_scopes'];
+        $regionScopes = $scope['region_scopes'];
 
         if ($projectIds === []) {
             return $this->unresolved('out_of_scope', 'No project scope or approved DR mapping is configured for this integration.');
         }
 
-        $scopedDeliveries = $deliveries->filter(function (object $delivery) use ($projectIds, $schoolIds, $schoolScopes): bool {
+        $regionsByScope = [];
+        if ($regionScopes !== []) {
+            $regionRows = DB::table('school')->whereIn('project_id', array_column($regionScopes, 'project_id'))
+                ->get(['project_id', 'school_id', 'region']);
+            foreach ($regionRows as $regionRow) {
+                $scopeKey = (int) $regionRow->project_id.':'.rtrim(strtr(base64_encode((string) $regionRow->school_id), '+/', '-_'), '=');
+                $regionsByScope[$scopeKey] = (string) $regionRow->region;
+            }
+        }
+
+        $scopedDeliveries = $deliveries->filter(function (object $delivery) use ($projectIds, $schoolIds, $schoolScopes, $regionScopes, $regionsByScope): bool {
             if (! in_array((int) $delivery->project_id, $projectIds, true)) {
                 return false;
             }
@@ -63,6 +74,14 @@ class LogisticsDrResolver
             if ($schoolScopes !== []) {
                 return collect($schoolScopes)->contains(fn (array $allowedScope): bool => $allowedScope['project_id'] === (int) $delivery->project_id
                     && $allowedScope['school_id'] === (string) $delivery->school_id);
+            }
+
+            if ($regionScopes !== []) {
+                $scopeKey = (int) $delivery->project_id.':'.rtrim(strtr(base64_encode((string) $delivery->school_id), '+/', '-_'), '=');
+                $schoolRegion = $regionsByScope[$scopeKey] ?? null;
+
+                return $schoolRegion !== null && collect($regionScopes)->contains(fn (array $allowedScope): bool => $allowedScope['project_id'] === (int) $delivery->project_id
+                    && $allowedScope['region'] === $schoolRegion);
             }
 
             return $schoolIds === [] || in_array((string) $delivery->school_id, $schoolIds, true);

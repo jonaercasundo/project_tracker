@@ -30,6 +30,8 @@ class UpdateLogisticsIntegrationRequest extends FormRequest
             'project_ids.*' => ['required', 'integer', 'distinct', 'exists:projects,project_id'],
             'school_scopes' => ['nullable', 'array'],
             'school_scopes.*' => ['required', 'string', 'distinct', 'regex:/\A[0-9]+:[A-Za-z0-9_-]+\z/'],
+            'region_scopes' => ['nullable', 'array'],
+            'region_scopes.*' => ['required', 'string', 'distinct', 'regex:/\A[0-9]+:[A-Za-z0-9_-]+\z/'],
             'all_schools' => ['sometimes', 'accepted'],
             'enabled_event_types' => ['required', 'array', 'min:1'],
             'enabled_event_types.*' => ['required', 'string', 'distinct', Rule::in(config('logistics-webhooks.allowed_event_types', []))],

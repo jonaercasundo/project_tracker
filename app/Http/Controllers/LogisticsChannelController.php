@@ -52,7 +52,7 @@ class LogisticsChannelController extends Controller
         $tab = $filters['tab'] ?? 'management';
         $perPage = (int) ($filters['per_page'] ?? 25);
         $editing = $request->filled('edit')
-            ? LogisticsIntegration::query()->with('projects', 'schools', 'credentials')->withCount([
+            ? LogisticsIntegration::query()->with('projects', 'credentials')->withCount([
                 'credentials as active_credentials_count' => fn ($query) => $query->where('status', 'active')
                     ->where(fn ($expires) => $expires->whereNull('expires_at')->orWhere('expires_at', '>', now())),
             ])->findOrFail($request->integer('edit'))

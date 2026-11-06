@@ -322,12 +322,23 @@ it('authenticates database credentials and refuses disabled integrations', funct
 
 it('updates an integration without changing credentials and narrows its project and school scope', function () {
     [$admin, $company] = logisticsChannelAccount();
-    $created = app(LogisticsChannelService::class)->create(logisticsChannelIntegrationData(), $admin->user_id, '127.0.0.1');
+    Schema::table('school', function (Blueprint $table): void {
+        $table->string('region')->nullable();
+    });
+    (require database_path('migrations/2026_11_06_065116_create_logistics_integration_regions_table.php'))->up();
     DB::table('deliveries')->insert([
         ['project_id' => 502698, 'school_id' => '134967', 'dr_no' => '0035470', 'status' => 'warehouse'],
         ['project_id' => 502699, 'school_id' => '134968', 'dr_no' => '0035470', 'status' => 'warehouse'],
     ]);
-    $this->actingAs($admin)->withSession(['company_id' => $company->company_id]);
+    $created = app(LogisticsChannelService::class)->create(logisticsChannelIntegrationData(['connection_type' => 'api']), $admin->user_id, '127.0.0.1');
+    $this->withoutVite()->actingAs($admin)->withSession(['company_id' => $company->company_id]);
+    $credentialBefore = $created['integration']->credentials()->firstOrFail()->getRawOriginal();
+
+    $this->get(route('logistics-channel.index', ['tab' => 'integrations', 'edit' => $created['integration']->id]))
+        ->assertOk()
+        ->assertViewHas('selectedProjects', [502698])
+        ->assertViewHas('editingSchoolTokens', ['502698:MTM0OTY3'])
+        ->assertDontSee($created['secret']);
 
     $this->patch(route('logistics-channel.integrations.update', $created['integration']), [
         'name' => 'MMC Logistics North',
@@ -338,10 +349,16 @@ it('updates an integration without changing credentials and narrows its project 
         'status' => 'active',
     ])->assertRedirect();
 
+    expect($created['integration']->credentials()->firstOrFail()->getRawOriginal())->toBe($credentialBefore);
+    $this->get(route('logistics-channel.index', ['tab' => 'integrations', 'edit' => $created['integration']->id]))
+        ->assertOk()
+        ->assertViewHas('selectedProjects', [502699])
+        ->assertViewHas('editingSchoolTokens', ['502699:MTM0OTY4']);
+
     expect($created['integration']->fresh()->name)->toBe('MMC Logistics North')
         ->and($created['integration']->credentials()->count())->toBe(1)
-        ->and(app(LogisticsDrResolver::class)->resolve('logistics-mmc-test', '0035470')['project_id'])->toBe(502699)
-        ->and(app(LogisticsDrResolver::class)->resolve('logistics-mmc-test', '0035470')['delivery_count'])->toBe(1)
+        ->and(app(LogisticsDrResolver::class)->resolve($created['integration']->integration_id, '0035470')['project_id'])->toBe(502699)
+        ->and(app(LogisticsDrResolver::class)->resolve($created['integration']->integration_id, '0035470')['delivery_count'])->toBe(1)
         ->and($created['integration']->fresh()->enabled_event_types)->toBe(['delivery.logistics_received']);
     logisticsChannelSignIn($this, $created['key_id'], $created['secret'], logisticsChannelPayload([
         'event_type' => 'delivery.delivered',

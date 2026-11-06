@@ -61,6 +61,17 @@ class LogisticsChannelService
     {
         DB::transaction(function () use ($integration, $data, $actorId, $ipAddress): void {
             $lockedIntegration = LogisticsIntegration::query()->lockForUpdate()->findOrFail($integration->id);
+            if ($data['status'] === 'active' && ! LogisticsIntegrationCredential::query()
+                ->where('integration_id', $lockedIntegration->id)
+                ->where('status', 'active')
+                ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+                ->exists()
+            ) {
+                throw ValidationException::withMessages([
+                    'status' => 'Create or rotate an active API credential before activating this integration.',
+                ]);
+            }
+
             $lockedIntegration->fill([
                 'name' => $data['name'],
                 'webhook_url' => $data['webhook_url'] ?: route('api.v1.logistics.webhooks.delivery-status'),
@@ -112,13 +123,26 @@ class LogisticsChannelService
         abort_unless((int) $credential->integration_id === (int) $integration->id, 404);
 
         DB::transaction(function () use ($integration, $credential, $actorId, $ipAddress): void {
+            $lockedIntegration = LogisticsIntegration::query()->lockForUpdate()->findOrFail($integration->id);
             $lockedCredential = LogisticsIntegrationCredential::query()->lockForUpdate()->findOrFail($credential->id);
             if ($lockedCredential->status === 'revoked') {
                 return;
             }
 
             $lockedCredential->forceFill(['status' => 'revoked', 'revoked_at' => now()])->save();
-            $this->audit($integration, $actorId, 'credential_revoked', 'credential', $lockedCredential->key_id, [], $ipAddress);
+            $this->audit($lockedIntegration, $actorId, 'credential_revoked', 'credential', $lockedCredential->key_id, [], $ipAddress);
+
+            $hasActiveCredential = LogisticsIntegrationCredential::query()
+                ->where('integration_id', $lockedIntegration->id)
+                ->where('status', 'active')
+                ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+                ->exists();
+            if (! $hasActiveCredential && $lockedIntegration->status === 'active') {
+                $lockedIntegration->forceFill(['status' => 'disabled', 'updated_by' => $actorId])->save();
+                $this->audit($lockedIntegration, $actorId, 'integration_disabled_no_active_credentials', null, null, [
+                    'reason' => 'The last active signing credential was revoked.',
+                ], $ipAddress);
+            }
         }, 3);
     }
 

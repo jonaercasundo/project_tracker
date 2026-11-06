@@ -52,10 +52,14 @@ class LogisticsChannelController extends Controller
         $tab = $filters['tab'] ?? 'management';
         $perPage = (int) ($filters['per_page'] ?? 25);
         $editing = $request->filled('edit')
-            ? LogisticsIntegration::query()->with('projects', 'schools', 'credentials')->findOrFail($request->integer('edit'))
+            ? LogisticsIntegration::query()->with('projects', 'schools', 'credentials')->withCount([
+                'credentials as active_credentials_count' => fn ($query) => $query->where('status', 'active')
+                    ->where(fn ($expires) => $expires->whereNull('expires_at')->orWhere('expires_at', '>', now())),
+            ])->findOrFail($request->integer('edit'))
             : null;
         $integrations = LogisticsIntegration::query()->withCount([
-            'credentials as active_credentials_count' => fn ($query) => $query->where('status', 'active'),
+            'credentials as active_credentials_count' => fn ($query) => $query->where('status', 'active')
+                ->where(fn ($expires) => $expires->whereNull('expires_at')->orWhere('expires_at', '>', now())),
         ])->orderBy('name')->paginate($perPage, ['*'], 'integrations_page')->withQueryString();
         $integrationRegions = DB::table('logistics_integration_regions as assigned_region')
             ->join('projects', 'projects.project_id', '=', 'assigned_region.project_id')

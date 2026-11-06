@@ -69,6 +69,9 @@
             'backlog' => 'bg-rose-400/15 text-rose-200',
         ];
         $workerKey = $metrics['worker_activity'] ?? 'unavailable';
+        $editingDefaultStatus = $editing === null
+            ? 'active'
+            : ($editing->status === 'active' && (int) ($editing->active_credentials_count ?? 0) === 0 ? 'disabled' : $editing->status);
 
         $field = 'w-full rounded-xl border-slate-200 text-sm focus:border-cyan-600 focus:ring-cyan-600';
         $btnPrimary = 'rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600';
@@ -147,7 +150,7 @@
                                     <td class="px-3 py-3">
                                         <p class="font-bold text-slate-900">{{ $partnerStatus['partner_name'] }}</p>
                                         <p class="mt-1 font-mono text-[10px] text-slate-500">{{ $partnerStatus['integration_id'] }}</p>
-                                        <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold {{ $partnerStatus['integration_status'] === 'active' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">API {{ ucfirst($partnerStatus['integration_status']) }}</span>
+                                        <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold {{ $partnerStatus['api_status'] === 'Active' ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800' }}">API {{ $partnerStatus['api_status'] }}</span>
                                     </td>
                                     <td class="px-3 py-3 text-slate-700">
                                         <p class="font-semibold">{{ $partnerStatus['project_name'] }}</p>
@@ -258,8 +261,8 @@
                         <div>
                             <label for="integration-status" class="mb-1 block text-xs font-bold text-slate-600">Integration status</label>
                             <select id="integration-status" name="status" class="{{ $field }}">
-                                <option value="active" @selected(old('status', $editing->status ?? 'active') === 'active')>Active</option>
-                                <option value="disabled" @selected(old('status', $editing->status ?? 'active') === 'disabled')>Disabled</option>
+                                <option value="active" @selected(old('status', $editingDefaultStatus) === 'active')>Active</option>
+                                <option value="disabled" @selected(old('status', $editingDefaultStatus) === 'disabled')>Disabled</option>
                             </select>
                         </div>
 
@@ -364,7 +367,8 @@
                                             @endif
                                         </div>
                                         <div class="flex items-center gap-2">
-                                            <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $integration->status === 'active' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">{{ ucfirst($integration->status) }}</span>
+                                            @php($apiActive = $integration->status === 'active' && (int) $integration->active_credentials_count > 0)
+                                            <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $apiActive ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800' }}">{{ $apiActive ? 'Active' : 'Inactive' }}</span>
                                             <a href="{{ route('logistics-channel.index', ['tab' => 'integrations', 'edit' => $integration->id]) }}" aria-label="Edit {{ $integration->name }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Edit</a>
                                         </div>
                                     </div>

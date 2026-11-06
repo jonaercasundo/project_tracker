@@ -24,6 +24,14 @@ class LogisticsManagementStatusService
         }
 
         $integrationKeys = $integrationProjects->pluck('integration_key')->unique()->all();
+        $activeCredentialIntegrationKeys = DB::table('logistics_integration_credentials')
+            ->whereIn('integration_id', $integrationKeys)
+            ->where('status', 'active')
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->distinct()
+            ->pluck('integration_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
         $schoolScopes = DB::table('logistics_integration_schools')
             ->whereIn('integration_id', $integrationKeys)
             ->get(['integration_id', 'project_id', 'school_id'])
@@ -120,7 +128,10 @@ class LogisticsManagementStatusService
             $report[] = [
                 'integration_id' => $integration->integration_id,
                 'partner_name' => $integration->partner_name,
-                'integration_status' => $integration->integration_status,
+                'api_status' => $integration->integration_status === 'active'
+                    && in_array($group['integration_key'], $activeCredentialIntegrationKeys, true)
+                    ? 'Active'
+                    : 'Inactive',
                 'project_id' => $group['project_id'],
                 'project_name' => $project->project_name,
                 'region' => $group['region'],

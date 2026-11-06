@@ -128,6 +128,14 @@ class LogisticsManagementStatusService
             $groups[$groupKey]['regions'][$region] = true;
             $groups[$groupKey]['documents'][$documentKey] ??= ['delivery_statuses' => [], 'billing_statuses' => []];
             $groups[$groupKey]['documents'][$documentKey]['school_key'] = $projectId.':'.base64_encode((string) $delivery->school_id);
+            $billingStatus = (int) ($delivery->active_record_count ?? 0) === 0
+                ? 'no_document'
+                : ((int) $delivery->has_billed === 1
+                    ? 'billed'
+                    : ((int) $delivery->has_for_billing === 1
+                        ? 'for_billing'
+                        : ((int) $delivery->has_on_hold === 1 ? 'returned' : 'pending_billing')));
+            $billingConfirmsDelivery = in_array($billingStatus, ['for_billing', 'billed', 'returned'], true);
 
             if ($delivery->authentication_method === 'manual') {
                 $deliveryStatus = in_array(strtolower(trim((string) $delivery->source_delivery_status)), ['delivered', 'accepted'], true)
@@ -137,21 +145,21 @@ class LogisticsManagementStatusService
                 $trackingKey = $delivery->integration_code.':'.$projectId.':'.base64_encode((string) $delivery->school_id).':'.base64_encode((string) $delivery->dr_no);
                 $deliveryStatus = $trackingStatuses[$trackingKey] ?? null;
                 if (! in_array($deliveryStatus, ['logistics_received', 'delivered'], true)) {
-                    $groups[$groupKey]['documents'][$documentKey]['delivery_statuses']['pending'] = true;
+                    if ($billingConfirmsDelivery) {
+                        $deliveryStatus = 'delivered';
+                    } else {
+                        $groups[$groupKey]['documents'][$documentKey]['delivery_statuses']['pending'] = true;
 
-                    continue;
+                        continue;
+                    }
                 }
             }
 
-            $groups[$groupKey]['documents'][$documentKey]['delivery_statuses'][$deliveryStatus] = true;
+            if ($billingConfirmsDelivery) {
+                $deliveryStatus = 'delivered';
+            }
 
-            $billingStatus = (int) ($delivery->active_record_count ?? 0) === 0
-                ? 'no_document'
-                : ((int) $delivery->has_billed === 1
-                    ? 'billed'
-                    : ((int) $delivery->has_for_billing === 1
-                        ? 'for_billing'
-                        : ((int) $delivery->has_on_hold === 1 ? 'returned' : 'pending_billing')));
+            $groups[$groupKey]['documents'][$documentKey]['delivery_statuses'][$deliveryStatus] = true;
             $groups[$groupKey]['documents'][$documentKey]['billing_statuses'][$billingStatus] = true;
         }
 

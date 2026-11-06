@@ -131,7 +131,7 @@
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 id="partner-status-title" class="text-lg font-black text-slate-950">Partner Delivery &amp; Billing Status</h2>
-                            <p class="mt-1 text-xs leading-5 text-slate-500">Each school is counted once. Status and billing counts include schools with a logistics receipt.</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">Each school is counted once. A billing status of For billing, Billed, or Returned also counts as Delivered.</p>
                         </div>
                         <a href="{{ route('logistics-channel.index', ['tab' => 'partners']) }}" target="_blank" rel="noopener" class="{{ $btnGhost }}">Manage partners &amp; regions</a>
                     </div>

@@ -374,7 +374,7 @@
         </a>
         @endif
 
-        @if($currentUser?->hasRole('Administrator') && $currentCompany?->code === 'MMC' && $currentCompany?->is_active)
+        @if($currentUser?->hasAnyRole(['user', 'Administrator']) && $currentCompany?->code === 'MMC' && $currentCompany?->is_active)
             <a href="{{ route('admin.integrations.mmc-platform.index') }}"
                @if(request()->routeIs('admin.integrations.mmc-platform.*')) aria-current="page" @endif
                class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('admin.integrations.mmc-platform.*') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">

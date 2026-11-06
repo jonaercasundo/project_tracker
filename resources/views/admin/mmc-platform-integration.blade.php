@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div>
-            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Administrator / Integrations</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Integrations</p>
             <h1 class="mt-1 text-xl font-semibold text-slate-900">MMC Platform API</h1>
         </div>
     </x-slot>

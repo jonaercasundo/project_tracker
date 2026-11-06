@@ -25,7 +25,7 @@ function mmcPlatformAdministrator(): void
     test()->signInMI($administrator);
 }
 
-it('shows the MMC platform connection status only to administrators', function () {
+it('shows the MMC platform connection status to MMC users and administrators', function () {
     mmcPlatformAdministrator();
 
     $this->get(route('admin.integrations.mmc-platform.index'))
@@ -36,6 +36,12 @@ it('shows the MMC platform connection status only to administrators', function (
 
     $member = $this->miUser('user', 'MMC');
     $this->actingAs($member)->withSession(['company_id' => $member->companies()->sole()->getKey()]);
+    $this->get(route('admin.integrations.mmc-platform.index'))
+        ->assertOk()
+        ->assertSee('MMC Platform API');
+
+    $miMember = $this->miUser('user', 'MI');
+    $this->actingAs($miMember)->withSession(['company_id' => $miMember->companies()->sole()->getKey()]);
     $this->get(route('admin.integrations.mmc-platform.index'))->assertForbidden();
 });
 

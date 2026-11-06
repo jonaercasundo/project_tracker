@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class LogisticsManagementStatusService
 {
@@ -50,6 +51,19 @@ class LogisticsManagementStatusService
             ->get(['integration_id', 'project_id', 'region'])
             ->groupBy('integration_id');
         $projectIds = $integrationProjects->pluck('project_id')->unique()->map(fn (mixed $id): int => (int) $id)->all();
+        $trackingStatuses = [];
+        if (Schema::hasTable('logistics_dr_tracking')) {
+            $integrationIds = $integrationProjects->pluck('integration_id')->unique()->all();
+            $trackingRows = DB::table('logistics_dr_tracking')
+                ->whereIn('integration_id', $integrationIds)
+                ->whereIn('project_id', $projectIds)
+                ->get(['integration_id', 'project_id', 'school_id', 'dr_reference', 'logistics_status']);
+
+            foreach ($trackingRows as $tracking) {
+                $trackingKey = $tracking->integration_id.':'.(int) $tracking->project_id.':'.base64_encode((string) $tracking->school_id).':'.base64_encode((string) $tracking->dr_reference);
+                $trackingStatuses[$trackingKey] = strtolower(trim((string) $tracking->logistics_status));
+            }
+        }
         $billingStates = DB::table('delivery_billing_records')
             ->select('delivery_id')
             ->selectRaw('SUM(CASE WHEN status <> ? THEN 1 ELSE 0 END) as active_record_count', ['revoked'])
@@ -67,9 +81,10 @@ class LogisticsManagementStatusService
             ->whereNotNull('delivery.dr_no')
             ->whereRaw("TRIM(delivery.dr_no) <> ''")
             ->get([
-                'integration.id as integration_key', 'assigned_project.project_id', 'delivery.school_id',
+                'integration.id as integration_key', 'integration.integration_id as integration_code',
+                'assigned_project.project_id', 'delivery.school_id',
                 'school.region as delivery_region',
-                'delivery.dr_no', 'delivery.status as delivery_status', 'billing_state.active_record_count',
+                'delivery.dr_no', 'billing_state.active_record_count',
                 'billing_state.has_billed', 'billing_state.has_for_billing', 'billing_state.has_on_hold',
             ]);
 
@@ -106,8 +121,8 @@ class LogisticsManagementStatusService
             $groups[$groupKey]['regions'][$region] = true;
             $groups[$groupKey]['documents'][$documentKey] ??= ['delivery_statuses' => [], 'billing_statuses' => []];
 
-            $deliveryStatus = strtolower(trim((string) $delivery->delivery_status));
-            $deliveryStatus = $deliveryStatus !== '' ? $deliveryStatus : 'pending';
+            $trackingKey = $delivery->integration_code.':'.$projectId.':'.base64_encode((string) $delivery->school_id).':'.base64_encode((string) $delivery->dr_no);
+            $deliveryStatus = $trackingStatuses[$trackingKey] ?? 'pending';
             $groups[$groupKey]['documents'][$documentKey]['delivery_statuses'][$deliveryStatus] = true;
 
             $billingStatus = (int) ($delivery->active_record_count ?? 0) === 0

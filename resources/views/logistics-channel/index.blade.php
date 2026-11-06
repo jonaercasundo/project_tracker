@@ -127,7 +127,7 @@
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 id="partner-status-title" class="text-lg font-black text-slate-950">Partner Delivery &amp; Billing Status</h2>
-                            <p class="mt-1 text-xs leading-5 text-slate-500">Each logistics partner appears once. DR counts and delivery and billing statuses are combined across its assigned projects and regions.</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">Each logistics partner appears once. Status comes from its latest logistics update; DRs without a partner update remain pending.</p>
                         </div>
                         <a href="{{ route('logistics-channel.index', ['tab' => 'integrations']) }}" class="{{ $btnGhost }}">Manage partners &amp; regions</a>
                     </div>
@@ -140,7 +140,7 @@
                                 <th class="px-3 py-3 font-bold">Logistics Partner</th>
                                 <th class="px-3 py-3 font-bold">Project / Region</th>
                                 <th class="px-3 py-3 text-right font-bold">Assigned DRs</th>
-                                <th class="px-3 py-3 font-bold">Delivery Status</th>
+                                <th class="px-3 py-3 font-bold">Logistics Status</th>
                                 <th class="px-3 py-3 font-bold">Billing Document Status</th>
                             </tr>
                         </thead>

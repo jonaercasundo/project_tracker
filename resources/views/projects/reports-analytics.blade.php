@@ -121,8 +121,8 @@
                     <div class="relative mb-1 h-5">
                         <span class="absolute top-0 whitespace-nowrap text-[9px] font-extrabold tracking-wide text-slate-700" style="left: {{ $todayPosition }}%; transform: {{ $todayLabelTransform }}">{{ $todayMarkerLabel }}</span>
                     </div>
-                    <div class="relative h-3.5 overflow-visible border border-slate-400 bg-slate-200" role="img" aria-label="{{ number_format($drProgressReport['elapsed_percentage'], 1) }} percent of calendar time elapsed to cutoff">
-                        <div class="absolute inset-y-0 left-0 bg-orange-500" style="width: {{ $drProgressReport['elapsed_percentage'] }}%"></div>
+                    <div class="relative h-3.5 overflow-visible border border-slate-400 bg-slate-200" role="img" aria-label="{{ number_format($drProgressReport['percentage'], 1) }} percent of delivery receipts processed; today is {{ \Carbon\CarbonImmutable::parse($drProgressReport['today'])->format('M d') }}">
+                        <div class="absolute inset-y-0 left-0 bg-emerald-500" style="width: {{ $drProgressReport['percentage'] }}%"></div>
                         <span class="absolute inset-y-[-3px] z-10 border-l-[3px] border-slate-800" style="left: {{ $todayPosition }}%" aria-hidden="true"></span>
                         <span class="absolute inset-y-[-2px] right-0 border-l-2 border-rose-500" aria-hidden="true"></span>
                     </div>
@@ -147,7 +147,7 @@
 
                 <details class="text-[10px] leading-4 text-slate-500">
                     <summary class="cursor-pointer font-semibold text-slate-600">How this report is counted</summary>
-                    <p class="mt-1">{{ $drProgressReport['creation_definition'] }} {{ $drProgressReport['completion_definition'] }} The orange timeline fill represents calendar time elapsed.</p>
+                    <p class="mt-1">{{ $drProgressReport['creation_definition'] }} {{ $drProgressReport['completion_definition'] }} The green fill represents the percentage of delivery receipts processed; the black marker shows today on the date timeline.</p>
                 </details>
             </section>
         @endif

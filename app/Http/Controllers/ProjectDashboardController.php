@@ -15,17 +15,28 @@ class ProjectDashboardController extends Controller
 {
     public function reportsAnalytics(Request $request, BillingDocumentStatusService $billingDocumentStatus, ProjectDrProgressReportService $drProgressReport): View
     {
-        $projects = Project::query()->orderBy('project_name')->get(['project_id', 'project_name']);
-        $selectedProjectId = $request->validate([
+        $projects = Project::query()->orderBy('project_name')->get([
+            'project_id', 'project_name', 'report_delivery_start_date', 'report_cutoff_date',
+        ]);
+        $validated = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,project_id'],
             'cutoff_date' => ['nullable', 'date_format:Y-m-d'],
             'delivery_start_date' => ['nullable', 'date_format:Y-m-d'],
-        ])['project_id'] ?? $projects->firstWhere('project_name', 'Billing Documentation')?->project_id ?? $projects->first()?->project_id;
-        $cutoffDate = CarbonImmutable::parse($request->input('cutoff_date', now()->toDateString()), config('app.timezone'));
+        ]);
+        $selectedProjectId = $validated['project_id'] ?? $projects->firstWhere('project_name', 'Billing Documentation')?->project_id ?? $projects->first()?->project_id;
         $selectedProject = $projects->firstWhere('project_id', $selectedProjectId);
+        $cutoffDate = CarbonImmutable::parse(
+            $validated['cutoff_date'] ?? $selectedProject?->report_cutoff_date ?? now()->toDateString(),
+            config('app.timezone'),
+        );
         $summary = $selectedProjectId !== null
             ? $billingDocumentStatus->summarize((int) $selectedProjectId)
             : ['total' => 0, 'processed' => 0, 'remaining' => 0, 'processed_today' => 0, 'source_error' => null];
+        $deliveryStartDate = isset($validated['delivery_start_date'])
+            ? CarbonImmutable::parse($validated['delivery_start_date'], config('app.timezone'))
+            : ($selectedProject?->report_delivery_start_date
+                ? CarbonImmutable::parse($selectedProject->report_delivery_start_date, config('app.timezone'))
+                : null);
 
         return view('projects.reports-analytics', [
             'projects' => $projects,
@@ -38,12 +49,29 @@ class ProjectDashboardController extends Controller
                 ? $drProgressReport->summarize(
                     (int) $selectedProjectId,
                     $cutoffDate,
-                    $request->filled('delivery_start_date')
-                        ? CarbonImmutable::parse($request->input('delivery_start_date'), config('app.timezone'))
-                        : null,
+                    $deliveryStartDate,
                 )
                 : null,
         ]);
+    }
+
+    public function updateReportDate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'project_id' => ['required', 'integer', 'exists:projects,project_id'],
+            'date_field' => ['required', 'in:delivery_start_date,cutoff_date'],
+            'date' => ['required', 'date_format:Y-m-d'],
+        ]);
+
+        $column = $validated['date_field'] === 'delivery_start_date'
+            ? 'report_delivery_start_date'
+            : 'report_cutoff_date';
+
+        Project::query()
+            ->where('project_id', $validated['project_id'])
+            ->update([$column => $validated['date']]);
+
+        return response()->json(['success' => true]);
     }
 
     public function reportsAnalyticsData(Request $request, BillingDocumentStatusService $billingDocumentStatus, ProjectDrProgressReportService $drProgressReport): JsonResponse
@@ -53,15 +81,23 @@ class ProjectDashboardController extends Controller
             'cutoff_date' => ['nullable', 'date_format:Y-m-d'],
             'delivery_start_date' => ['nullable', 'date_format:Y-m-d'],
         ]);
+        $project = Project::query()->findOrFail($validated['project_id']);
+        $cutoffDate = CarbonImmutable::parse(
+            $validated['cutoff_date'] ?? $project->report_cutoff_date ?? now()->toDateString(),
+            config('app.timezone'),
+        );
+        $deliveryStartDate = isset($validated['delivery_start_date'])
+            ? CarbonImmutable::parse($validated['delivery_start_date'], config('app.timezone'))
+            : ($project->report_delivery_start_date
+                ? CarbonImmutable::parse($project->report_delivery_start_date, config('app.timezone'))
+                : null);
 
         return response()->json([
             'summary' => $billingDocumentStatus->summarize((int) $validated['project_id']),
             'dr_progress' => $drProgressReport->summarize(
                 (int) $validated['project_id'],
-                CarbonImmutable::parse($validated['cutoff_date'] ?? now()->toDateString(), config('app.timezone')),
-                isset($validated['delivery_start_date'])
-                    ? CarbonImmutable::parse($validated['delivery_start_date'], config('app.timezone'))
-                    : null,
+                $cutoffDate,
+                $deliveryStartDate,
             ),
             'updated_at' => now()->format('M d, Y · g:i A'),
         ])->header('Cache-Control', 'no-store, private');

@@ -33,12 +33,16 @@ class Project extends Model
         'status',
         'project_information_id',
         'end_date',
+        'report_delivery_start_date',
+        'report_cutoff_date',
     ];
 
     protected $casts = [
         'notice_of_award_date' => 'date',
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'report_delivery_start_date' => 'date',
+        'report_cutoff_date' => 'date',
         'contract_amount' => 'decimal:2',
     ];
 

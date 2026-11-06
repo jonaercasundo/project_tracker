@@ -17,7 +17,7 @@
             </div>
         </header>
 
-        <form method="GET" action="{{ route('projects.reports.analytics') }}" class="grid min-w-0 grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_220px_220px] sm:items-end sm:p-5" aria-label="Project report filters">
+        <form method="GET" action="{{ route('projects.reports.analytics') }}" data-initial-project-id="{{ $selectedProjectId }}" class="grid min-w-0 grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_220px_220px] sm:items-end sm:p-5" aria-label="Project report filters">
             <div class="min-w-0">
                 <x-searchable-project-filter
                     :projects="$projects"
@@ -30,16 +30,16 @@
                     label-class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500"
                 />
             </div>
-            <div class="min-w-0 space-y-1 text-xs font-semibold text-slate-600">
-                <label for="report-cutoff-date" class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Cutoff Date</label>
-                <input id="report-cutoff-date" name="cutoff_date" type="date" value="{{ $cutoffDate->toDateString() }}" onchange="this.form.requestSubmit()" class="h-[42px] w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
             @if ($drProgressReport)
                 <div class="min-w-0 space-y-1 text-xs font-semibold text-slate-600">
                     <label for="delivery-start-date" class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Delivery Started</label>
-                    <input id="delivery-start-date" name="delivery_start_date" type="date" value="{{ $drProgressReport['start_date'] }}" onchange="this.form.requestSubmit()" class="h-[42px] w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input id="delivery-start-date" name="delivery_start_date" type="date" value="{{ $drProgressReport['start_date'] }}" onchange="saveReportDate(this)" class="h-[42px] w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
             @endif
+            <div class="min-w-0 space-y-1 text-xs font-semibold text-slate-600">
+                <label for="report-cutoff-date" class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Cutoff Date</label>
+                <input id="report-cutoff-date" name="cutoff_date" type="date" value="{{ $cutoffDate->toDateString() }}" onchange="saveReportDate(this)" class="h-[42px] w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
         </form>
 
         <div id="billing-status-refresh-error" role="alert" @if (! $summary['source_error']) hidden @endif class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
@@ -155,4 +155,42 @@
             <p class="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">No projects are available for this report.</p>
         @endif
     </div>
+    <script>
+        async function saveReportDate(input) {
+            const form = input.form;
+            const projectId = form.querySelector('[name="project_id"]').value;
+            const dateField = input.id === 'delivery-start-date' ? 'delivery_start_date' : 'cutoff_date';
+            input.disabled = true;
+
+            try {
+                const response = await fetch(@js(route('projects.reports.analytics.dates.update')), {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify({ project_id: projectId, date_field: dateField, date: input.value }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('The date could not be saved. Please try again.');
+                }
+
+                form.requestSubmit();
+            } catch (error) {
+                window.alert(error.message);
+                input.disabled = false;
+            }
+        }
+
+        document.querySelector('form[aria-label="Project report filters"]')?.addEventListener('submit', function () {
+            const selectedProjectId = this.querySelector('[name="project_id"]').value;
+
+            if (selectedProjectId !== this.dataset.initialProjectId) {
+                this.querySelector('[name="delivery_start_date"]')?.removeAttribute('name');
+                this.querySelector('[name="cutoff_date"]')?.removeAttribute('name');
+            }
+        });
+    </script>
 </x-project_app-layout>

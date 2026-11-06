@@ -301,6 +301,8 @@ Route::middleware(['auth', 'active.user'])->group(function () {
             ->name('projects.reports.analytics');
         Route::get('/projects/reports-analytics/data', [ProjectDashboardController::class, 'reportsAnalyticsData'])
             ->name('projects.reports.analytics.data');
+        Route::patch('/projects/reports-analytics/dates', [ProjectDashboardController::class, 'updateReportDate'])
+            ->name('projects.reports.analytics.dates.update');
 
         Route::get('/operations/lifecycle', [OperationsLifecycleController::class, 'index'])
             ->name('operations.lifecycle.index');

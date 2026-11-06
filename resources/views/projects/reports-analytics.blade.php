@@ -123,6 +123,9 @@
                     </div>
                     <div class="relative h-3.5 overflow-visible border border-slate-400 bg-slate-200" role="img" aria-label="{{ number_format($drProgressReport['percentage'], 1) }} percent of delivery receipts processed; today is {{ \Carbon\CarbonImmutable::parse($drProgressReport['today'])->format('M d') }}">
                         <div class="absolute inset-y-0 left-0 bg-emerald-500" style="width: {{ $drProgressReport['percentage'] }}%"></div>
+                        @if ($todayPosition > $drProgressReport['percentage'])
+                            <div class="absolute inset-y-0 bg-rose-600" style="left: {{ $drProgressReport['percentage'] }}%; width: {{ $todayPosition - $drProgressReport['percentage'] }}%"></div>
+                        @endif
                         <span class="absolute inset-y-[-3px] z-10 border-l-[3px] border-slate-800" style="left: {{ $todayPosition }}%" aria-hidden="true"></span>
                         <span class="absolute inset-y-[-2px] right-0 border-l-2 border-rose-500" aria-hidden="true"></span>
                     </div>
@@ -147,7 +150,7 @@
 
                 <details class="text-[10px] leading-4 text-slate-500">
                     <summary class="cursor-pointer font-semibold text-slate-600">How this report is counted</summary>
-                    <p class="mt-1">{{ $drProgressReport['creation_definition'] }} {{ $drProgressReport['completion_definition'] }} The green fill represents the percentage of delivery receipts processed; the black marker shows today on the date timeline.</p>
+                    <p class="mt-1">{{ $drProgressReport['creation_definition'] }} {{ $drProgressReport['completion_definition'] }} The green fill represents delivery receipts processed. The red segment shows the gap between actual progress and time elapsed; the black marker shows today on the date timeline.</p>
                 </details>
             </section>
         @endif

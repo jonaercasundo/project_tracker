@@ -17,7 +17,7 @@
             </div>
         </header>
 
-        <form method="GET" action="{{ route('projects.reports.analytics') }}" class="grid min-w-0 grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_220px] sm:items-end sm:p-5" aria-label="Project report filters">
+        <form method="GET" action="{{ route('projects.reports.analytics') }}" class="grid min-w-0 grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_220px_220px] sm:items-end sm:p-5" aria-label="Project report filters">
             <div class="min-w-0">
                 <x-searchable-project-filter
                     :projects="$projects"
@@ -34,6 +34,12 @@
                 <label for="report-cutoff-date" class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Cutoff Date</label>
                 <input id="report-cutoff-date" name="cutoff_date" type="date" value="{{ $cutoffDate->toDateString() }}" onchange="this.form.requestSubmit()" class="h-[42px] w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
+            @if ($drProgressReport)
+                <div class="min-w-0 space-y-1 text-xs font-semibold text-slate-600">
+                    <label for="delivery-start-date" class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Delivery Started</label>
+                    <input id="delivery-start-date" name="delivery_start_date" type="date" value="{{ $drProgressReport['start_date'] }}" onchange="this.form.requestSubmit()" class="h-[42px] w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            @endif
         </form>
 
         <div id="billing-status-refresh-error" role="alert" @if (! $summary['source_error']) hidden @endif class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
@@ -89,6 +95,9 @@
                     : 'TODAY - '.strtoupper(\Carbon\CarbonImmutable::parse($drProgressReport['today'])->format('M d'));
                 $timelineStart = \Carbon\CarbonImmutable::parse($drProgressReport['start_date']);
                 $timelineCutoff = \Carbon\CarbonImmutable::parse($drProgressReport['cutoff_date']);
+                $timelineSpanDays = max(0, (int) $timelineStart->diffInDays($timelineCutoff));
+                $timelineFirstThird = $timelineStart->addDays(intdiv($timelineSpanDays, 3));
+                $timelineSecondThird = $timelineStart->addDays(intdiv($timelineSpanDays * 2, 3));
                 $forecastDateLabel = $drProgressReport['forecast_finish_date']
                     ? strtoupper(\Carbon\CarbonImmutable::parse($drProgressReport['forecast_finish_date'])->format('M d'))
                     : 'NOT IN SIGHT';
@@ -119,8 +128,8 @@
                     </div>
                     <div class="flex items-start justify-between gap-2 text-[9px] font-semibold leading-3 text-slate-500">
                         <span>{{ $timelineStart->format('M d') }}</span>
-                        <span>{{ $timelineStart->addMonthNoOverflow()->format('M d') }}</span>
-                        <span>{{ $timelineCutoff->subDays(14)->format('M d') }}</span>
+                        <span>{{ $timelineFirstThird->format('M d') }}</span>
+                        <span>{{ $timelineSecondThird->format('M d') }}</span>
                         <span class="text-right">{{ $timelineCutoff->format('M d') }}</span>
                     </div>
                 </div>

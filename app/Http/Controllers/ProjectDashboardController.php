@@ -19,6 +19,7 @@ class ProjectDashboardController extends Controller
         $selectedProjectId = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,project_id'],
             'cutoff_date' => ['nullable', 'date_format:Y-m-d'],
+            'delivery_start_date' => ['nullable', 'date_format:Y-m-d'],
         ])['project_id'] ?? $projects->firstWhere('project_name', 'Billing Documentation')?->project_id ?? $projects->first()?->project_id;
         $cutoffDate = CarbonImmutable::parse($request->input('cutoff_date', now()->toDateString()), config('app.timezone'));
         $selectedProject = $projects->firstWhere('project_id', $selectedProjectId);
@@ -34,7 +35,13 @@ class ProjectDashboardController extends Controller
             'snapshotAt' => now(),
             'cutoffDate' => $cutoffDate,
             'drProgressReport' => $selectedProjectId !== null
-                ? $drProgressReport->summarize((int) $selectedProjectId, $cutoffDate)
+                ? $drProgressReport->summarize(
+                    (int) $selectedProjectId,
+                    $cutoffDate,
+                    $request->filled('delivery_start_date')
+                        ? CarbonImmutable::parse($request->input('delivery_start_date'), config('app.timezone'))
+                        : null,
+                )
                 : null,
         ]);
     }
@@ -44,6 +51,7 @@ class ProjectDashboardController extends Controller
         $validated = $request->validate([
             'project_id' => ['required', 'integer', 'exists:projects,project_id'],
             'cutoff_date' => ['nullable', 'date_format:Y-m-d'],
+            'delivery_start_date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
         return response()->json([
@@ -51,6 +59,9 @@ class ProjectDashboardController extends Controller
             'dr_progress' => $drProgressReport->summarize(
                 (int) $validated['project_id'],
                 CarbonImmutable::parse($validated['cutoff_date'] ?? now()->toDateString(), config('app.timezone')),
+                isset($validated['delivery_start_date'])
+                    ? CarbonImmutable::parse($validated['delivery_start_date'], config('app.timezone'))
+                    : null,
             ),
             'updated_at' => now()->format('M d, Y · g:i A'),
         ])->header('Cache-Control', 'no-store, private');

@@ -10,7 +10,7 @@ class ProjectDrProgressReportService
     private const INVALID_DELIVERY_STATUSES = ['cancelled', 'canceled', 'void', 'voided', 'deleted', 'rejected'];
 
     /** @return array<string, mixed> */
-    public function summarize(int $projectId, CarbonImmutable $cutoffDate): array
+    public function summarize(int $projectId, CarbonImmutable $cutoffDate, ?CarbonImmutable $deliveryStartDate = null): array
     {
         $today = CarbonImmutable::today(config('app.timezone'));
         $latestActualDate = $cutoffDate->min($today);
@@ -108,9 +108,9 @@ class ProjectDrProgressReportService
 
         $earliestCreatedDate = collect($scopedReceipts)->min(fn (array $receipt): string => substr($receipt['created_at'], 0, 10));
         $projectStartDate = $project?->start_date ? CarbonImmutable::parse($project->start_date)->toDateString() : null;
-        $startDate = $projectStartDate !== null && $projectStartDate <= ($earliestCreatedDate ?? $today->toDateString())
+        $startDate = $deliveryStartDate?->toDateString() ?? ($projectStartDate !== null && $projectStartDate <= ($earliestCreatedDate ?? $today->toDateString())
             ? $projectStartDate
-            : ($earliestCreatedDate ?? $today->toDateString());
+            : ($earliestCreatedDate ?? $today->toDateString()));
         $todayDate = $today->toDateString();
         $actualThroughDate = $latestActualDate->toDateString();
         $reportStart = CarbonImmutable::parse($startDate, config('app.timezone'));

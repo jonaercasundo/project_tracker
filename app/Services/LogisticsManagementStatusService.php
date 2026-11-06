@@ -162,7 +162,9 @@ class LogisticsManagementStatusService
                 $deliveryStatuses = array_keys($document['delivery_statuses']);
                 $deliveryState = in_array('delivered', $deliveryStatuses, true)
                     ? 'delivered'
-                    : (in_array('logistics_received', $deliveryStatuses, true) ? 'logistics_received' : null);
+                    : (in_array('logistics_received', $deliveryStatuses, true)
+                        ? 'logistics_received'
+                        : (in_array('pending', $deliveryStatuses, true) ? 'pending' : null));
                 $billingStatuses = array_keys($document['billing_statuses']);
                 $billingState = in_array('returned', $billingStatuses, true)
                     ? 'returned'
@@ -181,7 +183,9 @@ class LogisticsManagementStatusService
                 $schoolDeliveryStatuses = array_keys($school['delivery_statuses']);
                 $deliveryState = in_array('delivered', $schoolDeliveryStatuses, true)
                     ? 'delivered'
-                    : (in_array('logistics_received', $schoolDeliveryStatuses, true) ? 'logistics_received' : null);
+                    : (in_array('logistics_received', $schoolDeliveryStatuses, true)
+                        ? 'logistics_received'
+                        : (in_array('pending', $schoolDeliveryStatuses, true) ? 'pending' : null));
                 $schoolBillingStatuses = array_keys($school['billing_statuses']);
                 $billingState = in_array('returned', $schoolBillingStatuses, true)
                     ? 'returned'

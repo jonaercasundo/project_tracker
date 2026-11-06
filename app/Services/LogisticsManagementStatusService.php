@@ -122,7 +122,11 @@ class LogisticsManagementStatusService
             $groups[$groupKey]['documents'][$documentKey] ??= ['delivery_statuses' => [], 'billing_statuses' => []];
 
             $trackingKey = $delivery->integration_code.':'.$projectId.':'.base64_encode((string) $delivery->school_id).':'.base64_encode((string) $delivery->dr_no);
-            $deliveryStatus = $trackingStatuses[$trackingKey] ?? 'pending';
+            $deliveryStatus = $trackingStatuses[$trackingKey] ?? null;
+            if (! in_array($deliveryStatus, ['logistics_received', 'delivered'], true)) {
+                continue;
+            }
+
             $groups[$groupKey]['documents'][$documentKey]['delivery_statuses'][$deliveryStatus] = true;
 
             $billingStatus = (int) ($delivery->active_record_count ?? 0) === 0

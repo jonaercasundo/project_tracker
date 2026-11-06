@@ -127,7 +127,7 @@
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 id="partner-status-title" class="text-lg font-black text-slate-950">Partner Delivery &amp; Billing Status</h2>
-                            <p class="mt-1 text-xs leading-5 text-slate-500">Each logistics partner appears once. Status comes from its latest logistics update; DRs without a partner update remain pending.</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">A DR counts as assigned after the logistics partner confirms receipt. Status and billing counts include only received DRs.</p>
                         </div>
                         <a href="{{ route('logistics-channel.index', ['tab' => 'integrations']) }}" class="{{ $btnGhost }}">Manage partners &amp; regions</a>
                     </div>

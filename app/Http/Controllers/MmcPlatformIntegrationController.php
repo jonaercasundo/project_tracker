@@ -17,7 +17,7 @@ class MmcPlatformIntegrationController extends Controller
 {
     public function index(MmcPlatformApiClient $client): View
     {
-        return view('admin.mmc-platform-integration', [
+        return view('integrations.mmc-platform', [
             'connection' => $client->configurationStatus(),
             'testResult' => session('mmc_platform_test'),
         ]);
@@ -67,7 +67,7 @@ class MmcPlatformIntegrationController extends Controller
             'credential_replaced' => $submittedKey !== '',
         ]);
 
-        return to_route('admin.integrations.mmc-platform.index')
+        return to_route('integrations.mmc-platform.index')
             ->with('success', 'MMC Platform configuration saved. The API key is encrypted and will not be shown again.');
     }
 

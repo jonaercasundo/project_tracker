@@ -84,11 +84,6 @@
 
         <div class="space-y-1">
             <p x-show="!sidebarCollapsed" class="px-3 pb-1 text-[9px] font-extrabold uppercase tracking-[.16em] text-slate-400">Integrations</p>
-            @if (auth()->user()->currentCompany()?->code === 'MMC' && auth()->user()->hasRole('Administrator'))
-                <a href="{{ route('admin.integrations.mmc-platform.index') }}" @class(['group flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500', 'bg-blue-50 text-blue-800' => request()->routeIs('admin.integrations.mmc-platform.*'), 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' => ! request()->routeIs('admin.integrations.mmc-platform.*')]) title="MMC Platform API configuration">
-                    <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10v10H7zM3 12h4m10 0h4M12 3v4m0 10v4"/></svg><span x-show="!sidebarCollapsed">MMC Platform API</span>
-                </a>
-            @endif
             <a href="{{ route('integrations.jarvis.index') }}" @class(['group flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500', 'bg-blue-50 text-blue-800' => request()->routeIs('integrations.jarvis.*'), 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' => ! request()->routeIs('integrations.jarvis.*')]) title="JARVIS API token">
                 <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14 7a5 5 0 0 0-8.6 3.5c0 1 .3 1.9.8 2.7L4 15.5V20h4.5l2-2h2l2-2h2l2-2a5 5 0 0 0-2.5-8.5M16 8h.01"/></svg><span x-show="!sidebarCollapsed">JARVIS API</span>
             </a>

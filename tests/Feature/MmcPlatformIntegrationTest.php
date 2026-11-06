@@ -22,17 +22,18 @@ class MmcPlatformIntegrationTestCase extends MIWorkflowTestCase
 
 pest()->extend(MmcPlatformIntegrationTestCase::class)->in('MmcPlatformIntegrationTest.php');
 
-function mmcPlatformAdministrator(): void
+function mmcPlatformUser(): void
 {
-    $administrator = test()->miUser('Administrator', 'MMC');
-    test()->signInMI($administrator);
+    $user = test()->miUser('user', 'MMC');
+    test()->signInMI($user);
 }
 
-it('restricts the configuration screen to MMC administrators', function () {
-    mmcPlatformAdministrator();
-    $this->get(route('admin.integrations.mmc-platform.index'))
+it('shows the configuration screen in the MMC user workspace only', function () {
+    mmcPlatformUser();
+    $this->get(route('integrations.mmc-platform.index'))
         ->assertOk()
         ->assertSee('MMC Platform API')
+        ->assertSee('Operations / Integrations')
         ->assertSee('API Base URL')
         ->assertSee('Read-only API Key')
         ->assertSee('Test Connection')
@@ -40,32 +41,28 @@ it('restricts the configuration screen to MMC administrators', function () {
         ->assertSee('showApiKey')
         ->assertDontSee('mmc_test_read_key');
 
-    $member = $this->miUser('user', 'MMC');
-    $this->actingAs($member)->withSession(['company_id' => $member->companies()->sole()->getKey()]);
-    $this->get(route('admin.integrations.mmc-platform.index'))->assertForbidden();
-    $this->post(route('admin.integrations.mmc-platform.store'), [
-        'base_url' => 'https://platform.example.test/api/v1',
-        'read_key' => 'mmc_test_read_key',
-    ])->assertForbidden();
+    $administrator = $this->miUser('Administrator', 'MMC');
+    $this->actingAs($administrator)->withSession(['company_id' => $administrator->companies()->sole()->getKey()]);
+    $this->get(route('integrations.mmc-platform.index'))->assertForbidden();
 
-    $miAdministrator = $this->miUser('Administrator', 'MI');
-    $this->actingAs($miAdministrator)->withSession(['company_id' => $miAdministrator->companies()->sole()->getKey()]);
-    $this->get(route('admin.integrations.mmc-platform.index'))->assertForbidden();
+    $miMember = $this->miUser('user', 'MI');
+    $this->actingAs($miMember)->withSession(['company_id' => $miMember->companies()->sole()->getKey()]);
+    $this->get(route('integrations.mmc-platform.index'))->assertForbidden();
 });
 
 it('stores the API key encrypted and never renders it back to the page', function () {
-    mmcPlatformAdministrator();
+    mmcPlatformUser();
 
     $secret = 'mmc_test_read_key';
-    $this->post(route('admin.integrations.mmc-platform.store'), [
+    $this->post(route('integrations.mmc-platform.store'), [
         'base_url' => 'https://platform.example.test/api/v1',
         'read_key' => $secret,
-    ])->assertRedirect(route('admin.integrations.mmc-platform.index'));
+    ])->assertRedirect(route('integrations.mmc-platform.index'));
 
     $encryptedKey = DB::table('mmc_platform_settings')->where('id', 1)->value('read_key');
     expect($encryptedKey)->not->toBe($secret)->not->toContain($secret);
 
-    $this->get(route('admin.integrations.mmc-platform.index'))
+    $this->get(route('integrations.mmc-platform.index'))
         ->assertOk()
         ->assertSee('API key configured')
         ->assertDontSee($secret);
@@ -81,9 +78,9 @@ it('probes the endpoint without credentials and previews only safe program field
             'fiscal_year' => 2026,
             'billing_number' => 'MUST_NOT_BE_SHOWN',
         ]]], 200);
-    mmcPlatformAdministrator();
+    mmcPlatformUser();
 
-    $this->post(route('admin.integrations.mmc-platform.test-connection'), [
+    $this->post(route('integrations.mmc-platform.test-connection'), [
         'base_url' => 'https://platform.example.test/api/v1',
         'read_key' => 'mmc_test_read_key',
     ])
@@ -98,7 +95,7 @@ it('probes the endpoint without credentials and previews only safe program field
     Http::assertSent(fn (HttpRequest $request): bool => $request->url() === 'https://platform.example.test/api/v1/programs?limit=1'
         && $request->hasHeader('Authorization', 'Bearer mmc_test_read_key'));
 
-    $this->get(route('admin.integrations.mmc-platform.index'))
+    $this->get(route('integrations.mmc-platform.index'))
         ->assertOk()
         ->assertSee('Sample Program')
         ->assertDontSee('MUST_NOT_BE_SHOWN')
@@ -107,9 +104,9 @@ it('probes the endpoint without credentials and previews only safe program field
 
 it('does not send the key when the endpoint cannot be verified', function () {
     Http::fakeSequence()->push('', 302, ['Location' => 'https://other.example.test/']);
-    mmcPlatformAdministrator();
+    mmcPlatformUser();
 
-    $this->post(route('admin.integrations.mmc-platform.test-connection'), [
+    $this->post(route('integrations.mmc-platform.test-connection'), [
         'base_url' => 'https://platform.example.test/api/v1',
         'read_key' => 'mmc_test_read_key',
     ])->assertRedirect()->assertSessionHas('mmc_platform_test.status', 'failed');
@@ -120,9 +117,9 @@ it('does not send the key when the endpoint cannot be verified', function () {
 
 it('rejects non-local HTTP URLs without making a request', function () {
     Http::preventStrayRequests();
-    mmcPlatformAdministrator();
+    mmcPlatformUser();
 
-    $this->post(route('admin.integrations.mmc-platform.test-connection'), [
+    $this->post(route('integrations.mmc-platform.test-connection'), [
         'base_url' => 'http://platform.example.test/api/v1',
         'read_key' => 'mmc_test_read_key',
     ])->assertRedirect()->assertSessionHasErrors('base_url');

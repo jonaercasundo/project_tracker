@@ -1,7 +1,7 @@
-<x-app-layout>
+<x-project_app-layout>
     <x-slot name="header">
         <div>
-            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Administrator / Integrations</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Operations / Integrations</p>
             <h1 class="mt-1 text-xl font-semibold text-slate-900">MMC Platform API</h1>
         </div>
     </x-slot>
@@ -73,7 +73,7 @@
             </div>
         </section>
 
-        <form method="POST" action="{{ route('admin.integrations.mmc-platform.store') }}" class="space-y-6">
+        <form method="POST" action="{{ route('integrations.mmc-platform.store') }}" class="space-y-6">
             @csrf
             <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-5 py-5 sm:px-6">
@@ -111,11 +111,11 @@
             </section>
 
             <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <button type="submit" formaction="{{ route('admin.integrations.mmc-platform.test-connection') }}" formnovalidate class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-blue-500 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Test Connection</button>
+                <button type="submit" formaction="{{ route('integrations.mmc-platform.test-connection') }}" formnovalidate class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-blue-500 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Test Connection</button>
                 <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Save Configuration</button>
             </div>
         </form>
 
         <p class="text-xs leading-5 text-slate-500">The API key is encrypted in the MMC Platform settings table with Laravel's application key. Keep the same <code class="rounded bg-slate-100 px-1">APP_KEY</code> across app servers and backups so the saved credential remains decryptable.</p>
     </div>
-</x-app-layout>
+</x-project_app-layout>

@@ -98,6 +98,11 @@
                 $progressStatusTone = in_array($drProgressReport['pace_status'], ['On track', 'Target met'], true)
                     ? 'text-emerald-700'
                     : 'text-rose-600';
+                $historicalForecastLabel = $drProgressReport['remaining'] === 0
+                    ? 'COMPLETED'
+                    : ($drProgressReport['historical_forecast_finish_date']
+                        ? strtoupper(\Carbon\CarbonImmutable::parse($drProgressReport['historical_forecast_finish_date'])->format('M d, Y'))
+                        : 'NOT ENOUGH HISTORY');
                 $todayMarkerLabel = $isPastCutoff
                     ? 'TODAY - AFTER CUTOFF'
                     : 'TODAY - '.strtoupper(\Carbon\CarbonImmutable::parse($drProgressReport['today'])->format('M d'));
@@ -142,10 +147,11 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-200 pt-2 sm:grid-cols-3 sm:gap-4">
+                <div class="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-200 pt-2 sm:grid-cols-4 sm:gap-4">
                     <div><p class="text-[9px] font-bold uppercase tracking-wide text-slate-500">Progress</p><p class="mt-0.5 font-mono text-base font-black tabular-nums text-slate-950">{{ number_format($drProgressReport['percentage'], 1) }}%</p></div>
                     <div><p class="text-[9px] font-bold uppercase tracking-wide text-slate-500">Needed per day</p><p class="mt-0.5 font-mono text-base font-black tabular-nums text-slate-950">{{ $drProgressReport['required_per_day'] === null ? 'N/A' : number_format($drProgressReport['required_per_day'], 0) }}</p></div>
                     <div><p class="text-[9px] font-bold uppercase tracking-wide text-slate-500">Progress Status</p><p class="mt-0.5 text-sm font-black uppercase {{ $progressStatusTone }}">{{ $progressStatus }}</p></div>
+                    <div><p class="text-[9px] font-bold uppercase tracking-wide text-slate-500">Estimated Completion</p><p class="mt-0.5 text-sm font-black uppercase text-slate-950">{{ $historicalForecastLabel }}</p><p class="text-[9px] text-slate-500">At historical pace</p></div>
                 </div>
 
                 @if ($drProgressReport['data_limitation'])
@@ -154,7 +160,7 @@
 
                 <details class="text-[10px] leading-4 text-slate-500">
                     <summary class="cursor-pointer font-semibold text-slate-600">How this report is counted</summary>
-                    <p class="mt-1">{{ $drProgressReport['creation_definition'] }} {{ $drProgressReport['completion_definition'] }} The green fill represents delivery receipts processed. The red segment shows the gap between actual progress and time elapsed; the black marker shows today on the date timeline.</p>
+                    <p class="mt-1">{{ $drProgressReport['creation_definition'] }} {{ $drProgressReport['completion_definition'] }} The green fill represents delivery receipts processed. The red segment shows the gap between actual progress and time elapsed; the black marker shows today on the date timeline. Estimated completion uses the average number of DRs completed per day since delivery started.</p>
                 </details>
             </section>
         @endif

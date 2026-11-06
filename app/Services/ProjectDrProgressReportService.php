@@ -132,6 +132,17 @@ class ProjectDrProgressReportService
         $total = count($scopedReceipts);
         $completed = array_sum(array_filter($completedByDate, fn (int $count, string $date): bool => $date <= $latestActualDate->toDateString(), ARRAY_FILTER_USE_BOTH));
         $remaining = max(0, $total - $completed);
+        $historicalPeriodDays = $reportStart->lessThanOrEqualTo($latestActualDate)
+            ? max(1, (int) $reportStart->diffInDays($latestActualDate) + 1)
+            : 0;
+        $historicalDailyRate = $historicalPeriodDays > 0 ? $completed / $historicalPeriodDays : 0.0;
+        $historicalForecastFinishDate = $total === 0
+            ? null
+            : ($remaining === 0
+                ? $latestActualDate->toDateString()
+                : ($historicalDailyRate > 0
+                    ? $latestActualDate->addDays((int) ceil($remaining / $historicalDailyRate))->toDateString()
+                    : null));
         $daysRemaining = $cutoffDate->greaterThan($today) ? (int) $today->diffInDays($cutoffDate) : 0;
         $requiredAverage = $daysRemaining > 0 && $remaining > 0 ? $remaining / $daysRemaining : null;
         $requiredPerDay = $requiredAverage === null ? null : round($requiredAverage, 2);
@@ -198,6 +209,7 @@ class ProjectDrProgressReportService
             'required_per_day' => $requiredPerDay,
             'recent_pace' => $recentPace,
             'forecast_finish_date' => $forecastFinishDate,
+            'historical_forecast_finish_date' => $historicalForecastFinishDate,
             'pace_assessment' => $paceAssessment,
             'pace_status' => $paceStatus,
             'data_limitation' => $limitations === [] ? null : implode(' ', $limitations),

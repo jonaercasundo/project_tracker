@@ -91,7 +91,7 @@
                     ? 'TODAY - AFTER CUTOFF'
                     : 'TODAY - '.strtoupper(\Carbon\CarbonImmutable::parse($drProgressReport['today'])->format('M d'));
             @endphp
-            <section class="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-labelledby="dr-progress-title">
+            <section class="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:space-y-3.5 sm:p-5" aria-labelledby="dr-progress-title">
                 <header class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <h2 id="dr-progress-title" class="text-sm font-black uppercase tracking-[0.12em] text-slate-800 sm:text-base">
                         {{ strtoupper(\Carbon\CarbonImmutable::parse($drProgressReport['cutoff_date'])->format('M d')) }} CUTOFF
@@ -103,13 +103,13 @@
                             <span class="px-1 text-slate-400">&middot;</span>CUTOFF TODAY
                         @endif
                     </h2>
-                    <p class="text-xs font-black uppercase tracking-wide {{ $forecastTone }} sm:text-right">{{ $drProgressReport['pace_assessment'] }}</p>
+                    <p class="text-[11px] font-black uppercase tracking-wide {{ $forecastTone }} sm:text-right">{{ $drProgressReport['pace_assessment'] }}</p>
                 </header>
 
-                <p class="text-xs font-semibold text-slate-500">{{ number_format($drProgressReport['total_drs']) }} DRs in scope <span class="px-1 text-slate-300">|</span> {{ number_format($drProgressReport['remaining']) }} remaining</p>
+                <p class="text-xs font-medium text-slate-600">{{ number_format($drProgressReport['total_drs']) }} DRs in scope <span class="px-1 text-slate-300">|</span> {{ number_format($drProgressReport['remaining']) }} remaining</p>
 
                 <div aria-label="Cutoff timeline from report start to selected cutoff">
-                    <div class="relative mb-1 h-5">
+                    <div class="relative mb-1 h-6">
                         <span class="absolute top-0 whitespace-nowrap text-[10px] font-extrabold tracking-wide text-slate-700" style="left: {{ $todayPosition }}%; transform: {{ $todayLabelTransform }}">{{ $todayMarkerLabel }}</span>
                     </div>
                     <div class="relative h-4 overflow-visible rounded-sm border border-slate-300 bg-slate-100" role="img" aria-label="{{ number_format($drProgressReport['elapsed_percentage'], 1) }} percent of calendar time elapsed to cutoff">
@@ -129,7 +129,7 @@
                     </div>
                 </div>
 
-                <div class="grid gap-3 sm:grid-cols-2 sm:gap-5">
+                <div class="grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 sm:gap-5">
                     <div>
                         <div class="mb-1 flex items-baseline justify-between gap-2 text-xs">
                             <span class="font-bold text-orange-700">DRs recorded through today</span>
@@ -150,11 +150,11 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-4 sm:gap-4">
-                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Actual progress</p><p class="mt-0.5 font-mono text-lg font-black tabular-nums text-slate-950">{{ number_format($drProgressReport['percentage'], 1) }}%</p></div>
-                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Needed per day</p><p class="mt-0.5 font-mono text-lg font-black tabular-nums text-slate-950">{{ $drProgressReport['required_per_day'] === null ? 'N/A' : number_format($drProgressReport['required_per_day'], 2) }}</p></div>
-                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Actual pace / last 7 days</p><p class="mt-0.5 font-mono text-lg font-black tabular-nums text-slate-950">{{ number_format($drProgressReport['recent_pace'], 2) }}<span class="ml-1 text-xs font-semibold text-slate-500">/ day</span></p></div>
-                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Remaining</p><p class="mt-0.5 font-mono text-lg font-black tabular-nums text-slate-950">{{ number_format($drProgressReport['remaining']) }}</p></div>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-3 sm:grid-cols-4 sm:gap-4">
+                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Actual progress</p><p class="mt-0.5 font-mono text-xl font-black tabular-nums text-slate-950">{{ number_format($drProgressReport['percentage'], 1) }}%</p></div>
+                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Needed per day</p><p class="mt-0.5 font-mono text-xl font-black tabular-nums text-slate-950">{{ $drProgressReport['required_per_day'] === null ? 'N/A' : number_format($drProgressReport['required_per_day'], 2) }}</p></div>
+                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Actual pace / last 7 days</p><p class="mt-0.5 font-mono text-xl font-black tabular-nums text-slate-950">{{ number_format($drProgressReport['recent_pace'], 2) }}<span class="ml-1 text-xs font-semibold text-slate-500">/ day</span></p></div>
+                    <div><p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Remaining</p><p class="mt-0.5 font-mono text-xl font-black tabular-nums text-slate-950">{{ number_format($drProgressReport['remaining']) }}</p></div>
                 </div>
 
                 <div class="flex flex-wrap justify-between gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[10px] text-slate-500 sm:text-xs">

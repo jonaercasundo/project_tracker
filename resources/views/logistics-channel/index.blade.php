@@ -766,7 +766,7 @@
                 }
             });
 
-            projects.addEventListener('change', async () => {
+            const loadProjectScopes = async () => {
                 updateProjectCount();
                 const projectIds = Array.from(projects.querySelectorAll('input[name="project_ids[]"]:checked'), input => input.value);
                 const keepSchools = new Set([...initialSchools, ...Array.from(schools.querySelectorAll('input[name="school_scopes[]"]:checked'), input => input.value)]);
@@ -840,12 +840,16 @@
                     errorMessage.className = 'px-2 py-2 text-xs text-rose-700';
                     errorMessage.textContent = error.message;
                     schools.append(errorMessage);
-                    const errorMessage = document.createElement('p');
-                    errorMessage.className = 'px-2 py-2 text-xs text-rose-700';
-                    errorMessage.textContent = error.message;
-                    regions.append(errorMessage);
+                    const regionErrorMessage = document.createElement('p');
+                    regionErrorMessage.className = 'px-2 py-2 text-xs text-rose-700';
+                    regionErrorMessage.textContent = error.message;
+                    regions.append(regionErrorMessage);
                 }
-            });
+            };
+            projects.addEventListener('change', loadProjectScopes);
+            if (projects.querySelector('input[name="project_ids[]"]:checked')) {
+                loadProjectScopes();
+            }
         })();
     </script>
 </x-project_app-layout>

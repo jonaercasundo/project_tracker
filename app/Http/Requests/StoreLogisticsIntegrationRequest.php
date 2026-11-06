@@ -26,7 +26,6 @@ class StoreLogisticsIntegrationRequest extends FormRequest
     {
         return [
             'connection_type' => ['required', Rule::in(['api', 'manual'])],
-            'integration_id' => ['required', 'string', 'max:64', 'regex:/\A[A-Za-z0-9._-]+\z/', 'unique:logistics_integrations,integration_id'],
             'name' => ['required', 'string', 'max:120'],
             'webhook_url' => ['exclude_unless:connection_type,api', 'required', 'url', 'max:500', 'regex:/\Ahttps:\/\//i'],
             'project_ids' => ['required', 'array', 'min:1'],

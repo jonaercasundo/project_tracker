@@ -38,7 +38,7 @@ class LogisticsChannelController extends Controller
             return view('logistics-channel.unavailable');
         }
         $filters = $request->validate([
-            'tab' => ['nullable', Rule::in(['management', 'overview', 'integrations', 'api', 'tracking', 'events', 'reconciliation', 'audit'])],
+            'tab' => ['nullable', Rule::in(['management', 'overview', 'partners', 'integrations', 'api', 'tracking', 'events', 'reconciliation', 'audit'])],
             'integration_id' => ['nullable', 'string', 'max:64'],
             'project_id' => ['nullable', 'integer'],
             'dr_reference' => ['nullable', 'string', 'max:100'],
@@ -57,26 +57,26 @@ class LogisticsChannelController extends Controller
                     ->where(fn ($expires) => $expires->whereNull('expires_at')->orWhere('expires_at', '>', now())),
             ])->findOrFail($request->integer('edit'))
             : null;
-        $integrations = LogisticsIntegration::query()->withCount([
-            'credentials as active_credentials_count' => fn ($query) => $query->where('status', 'active')
-                ->where(fn ($expires) => $expires->whereNull('expires_at')->orWhere('expires_at', '>', now())),
-        ])->orderBy('name')->paginate($perPage, ['*'], 'integrations_page')->withQueryString();
-        $integrationRegions = DB::table('logistics_integration_regions as assigned_region')
-            ->join('projects', 'projects.project_id', '=', 'assigned_region.project_id')
-            ->whereIn('assigned_region.integration_id', $integrations->getCollection()->pluck('id'))
-            ->orderBy('projects.project_name')
-            ->orderBy('assigned_region.region')
-            ->get(['assigned_region.integration_id', 'projects.project_name', 'assigned_region.region'])
-            ->groupBy('integration_id');
-        $legacyIntegrations = collect($this->integrations->environmentIntegrationIds())
-            ->reject(fn (string $id): bool => LogisticsIntegration::query()->where('integration_id', $id)->exists())
-            ->map(fn (string $id): array => [
-                'integration_id' => $id,
-                'name' => $id,
-                'status' => 'active',
-                'project_ids' => $this->integrations->scope($id)['project_ids'],
-            ])->values();
         $projects = DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']);
+        $partnerProjectId = $tab === 'partners' && isset($filters['project_id']) ? (int) $filters['project_id'] : null;
+        $partnerProjectName = $partnerProjectId === null
+            ? null
+            : $projects->firstWhere('project_id', $partnerProjectId)?->project_name;
+        $partnerIntegrations = $partnerProjectId === null ? collect() : LogisticsIntegration::query()
+            ->with('credentials')
+            ->withCount([
+                'credentials as active_credentials_count' => fn ($query) => $query->where('status', 'active')
+                    ->where(fn ($expires) => $expires->whereNull('expires_at')->orWhere('expires_at', '>', now())),
+            ])
+            ->whereHas('projects', fn ($query) => $query->where('projects.project_id', $partnerProjectId))
+            ->orderBy('name')
+            ->get();
+        $integrationRegions = $partnerProjectId === null || $partnerIntegrations->isEmpty() ? collect() : DB::table('logistics_integration_regions as assigned_region')
+            ->where('assigned_region.project_id', $partnerProjectId)
+            ->whereIn('assigned_region.integration_id', $partnerIntegrations->pluck('id'))
+            ->orderBy('assigned_region.region')
+            ->get(['assigned_region.integration_id', 'assigned_region.region'])
+            ->groupBy('integration_id');
         $selectedProjects = array_values(array_filter(array_map('intval', (array) ($request->input('project_ids', [])))));
         if ($selectedProjects === [] && $editing !== null) {
             $selectedProjects = $editing->projects->pluck('project_id')->map(fn ($id): int => (int) $id)->all();
@@ -132,7 +132,7 @@ class LogisticsChannelController extends Controller
         $webhookUrl = route('api.v1.logistics.webhooks.delivery-status');
 
         return view('logistics-channel.index', compact(
-            'tab', 'filters', 'integrations', 'integrationRegions', 'legacyIntegrations', 'metrics', 'partnerStatuses', 'projects', 'schools', 'regions',
+            'tab', 'filters', 'partnerIntegrations', 'partnerProjectId', 'partnerProjectName', 'integrationRegions', 'metrics', 'partnerStatuses', 'projects', 'schools', 'regions',
             'selectedProjects', 'editing', 'editingSchoolTokens', 'editingRegionTokens', 'allSchools', 'eventRows', 'auditRows', 'trackingRows', 'webhookUrl'
         ));
     }

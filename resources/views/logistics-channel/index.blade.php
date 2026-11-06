@@ -5,6 +5,7 @@
             'management' => 'Logistics Management',
             'overview' => 'Overview',
             'integrations' => 'Integrations',
+            'partners' => 'Partners',
             'api' => 'API & Webhooks',
             'tracking' => 'DR Tracking',
             'events' => 'Event Logs',
@@ -132,7 +133,7 @@
                             <h2 id="partner-status-title" class="text-lg font-black text-slate-950">Partner Delivery &amp; Billing Status</h2>
                             <p class="mt-1 text-xs leading-5 text-slate-500">A DR counts as assigned after the logistics partner confirms receipt. Status and billing counts include only received DRs.</p>
                         </div>
-                        <a href="{{ route('logistics-channel.index', ['tab' => 'integrations']) }}" target="_blank" rel="noopener" class="{{ $btnGhost }}">Manage partners &amp; regions</a>
+                        <a href="{{ route('logistics-channel.index', ['tab' => 'partners']) }}" target="_blank" rel="noopener" class="{{ $btnGhost }}">Manage partners &amp; regions</a>
                     </div>
                 </header>
 
@@ -231,7 +232,7 @@
 
         {{-- INTEGRATIONS --}}
         @if($tab === 'integrations')
-            <section class="grid gap-5 xl:grid-cols-[minmax(300px,0.85fr)_minmax(0,1.4fr)]">
+            <section class="grid gap-5">
                 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <h2 class="text-lg font-black text-slate-900">{{ $editing ? 'Edit logistics partner' : 'Add logistics partner' }}</h2>
                     <p class="mt-1 text-xs leading-5 text-slate-500">Choose API updates or manual tracking, then assign the projects and regions this partner handles.</p>
@@ -254,19 +255,10 @@
                         @endif
 
                         <div>
-                            <label for="integration-name" class="mb-1 block text-xs font-bold text-slate-600">Integration name</label>
+                            <label for="integration-name" class="mb-1 block text-xs font-bold text-slate-600">Logistics partner name</label>
                             <input id="integration-name" name="name" required maxlength="120" value="{{ old('name', $editing->name ?? '') }}" class="{{ $field }}" @error('name') aria-invalid="true" @enderror>
                             @error('name')<p class="mt-1 text-xs text-rose-700">{{ $message }}</p>@enderror
                         </div>
-
-                        @unless($editing)
-                            <div>
-                                <label for="integration-id" class="mb-1 block text-xs font-bold text-slate-600">Integration ID</label>
-                                <input id="integration-id" name="integration_id" required maxlength="64" pattern="[A-Za-z0-9._-]+" aria-describedby="integration-id-help" value="{{ old('integration_id') }}" placeholder="logistics-partner-east" class="{{ $field }} font-mono" @error('integration_id') aria-invalid="true" @enderror>
-                                <p id="integration-id-help" class="mt-1 text-[11px] text-slate-500">Letters, numbers, dots, dashes, and underscores. This cannot be changed after you create the integration.</p>
-                                @error('integration_id')<p class="mt-1 text-xs text-rose-700">{{ $message }}</p>@enderror
-                            </div>
-                        @endunless
 
                         <div data-api-fields @if($connectionType !== 'api') hidden @endif>
                             <div>
@@ -312,10 +304,10 @@
 
                         <div>
                             <div class="mb-1 flex items-center justify-between gap-2">
-                                <label for="authorized-regions" class="block text-xs font-bold text-slate-600">Assigned regions <span class="font-normal text-slate-400">(recommended)</span></label>
+                                <label id="authorized-regions-label" class="block text-xs font-bold text-slate-600">Assigned regions <span class="font-normal text-slate-400">(recommended)</span></label>
                                 <span id="region-status" class="text-[11px] text-slate-500" role="status" aria-live="polite"></span>
                             </div>
-                            <div id="authorized-regions" role="group" aria-describedby="regions-help" class="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+                            <div id="authorized-regions" role="group" aria-labelledby="authorized-regions-label" aria-describedby="regions-help" class="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
                                 @foreach($regions as $region)
                                     @php($scopeToken = (int) $region->project_id.':'.rtrim(strtr(base64_encode((string) $region->region), '+/', '-_'), '='))
                                     <label class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 transition hover:bg-slate-50 motion-reduce:transition-none">
@@ -329,15 +321,18 @@
 
                         <div>
                             <div class="mb-1 flex items-center justify-between gap-2">
-                                <label for="authorized-schools" class="block text-xs font-bold text-slate-600">Authorized schools <span class="font-normal text-slate-400">(optional)</span></label>
+                                <label id="authorized-schools-label" class="block text-xs font-bold text-slate-600">Authorized schools <span class="font-normal text-slate-400">(optional)</span></label>
                                 <span id="school-status" class="text-[11px] text-slate-500" role="status" aria-live="polite"></span>
                             </div>
-                            <select id="authorized-schools" name="school_scopes[]" multiple size="5" aria-describedby="schools-help" class="{{ $field }}">
+                            <div id="authorized-schools" role="group" aria-labelledby="authorized-schools-label" aria-describedby="schools-help" class="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
                                 @foreach($schools as $school)
                                     @php($scopeToken = (int) $school->project_id.':'.rtrim(strtr(base64_encode((string) $school->school_id), '+/', '-_'), '='))
-                                    <option value="{{ $scopeToken }}" @selected(in_array($scopeToken, old('school_scopes', $editingSchoolTokens), true))>{{ $school->school_name ?: $school->school_id }} · {{ $school->school_id }} · Project {{ $school->project_id }}</option>
+                                    <label class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 transition hover:bg-slate-50 motion-reduce:transition-none">
+                                        <input type="checkbox" name="school_scopes[]" value="{{ $scopeToken }}" @checked(in_array($scopeToken, old('school_scopes', $editingSchoolTokens), true)) class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-cyan-700 focus:ring-cyan-600">
+                                        <span class="min-w-0 break-words">{{ $school->school_name ?: $school->school_id }} - {{ $school->school_id }} - Project {{ $school->project_id }}</span>
+                                    </label>
                                 @endforeach
-                            </select>
+                            </div>
                             <p id="schools-help" class="mt-1 text-[11px] text-slate-500">Use specific schools instead of regions, or explicitly allow all schools below.</p>
                             <label class="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
                                 <input id="all-schools" type="checkbox" name="all_schools" value="1" @checked((string) old('all_schools', $allSchools ? '1' : '') === '1') class="mt-0.5 rounded border-amber-400 text-amber-800 focus:ring-amber-700">
@@ -366,33 +361,53 @@
                     @endif
                 </article>
 
-                <div class="space-y-4">
+            </section>
+        @endif
+
+        {{-- PARTNERS --}}
+        @if($tab === 'partners')
+            <section class="space-y-5">
+                <header class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 class="text-lg font-black text-slate-950">Logistics partners by project</h2>
+                    <p class="mt-1 text-xs leading-5 text-slate-500">Choose a project to see the logistics partners and assigned delivery regions for that project.</p>
+                    <form method="GET" action="{{ route('logistics-channel.index') }}" class="mt-4 flex flex-wrap items-end gap-3">
+                        <input type="hidden" name="tab" value="partners">
+                        <div class="min-w-64 flex-1">
+                            <label for="partner-project" class="mb-1 block text-xs font-bold text-slate-600">Project</label>
+                            <select id="partner-project" name="project_id" required class="{{ $field }}">
+                                <option value="">Select a project</option>
+                                @foreach($projects as $project)
+                                    <option value="{{ $project->project_id }}" @selected((string) $partnerProjectId === (string) $project->project_id)>{{ $project->project_name ?: 'Project '.$project->project_id }} · {{ $project->project_id }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <button type="submit" class="{{ $btnPrimary }}">Show partners</button>
+                    </form>
+                </header>
+
+                @if($partnerProjectId === null)
+                    <p class="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">Select a project to view its logistics partners.</p>
+                @else
                     <article class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div class="border-b border-slate-100 px-5 py-4">
-                            <h2 class="text-sm font-extrabold text-slate-900">Logistics partners</h2>
-                            <p class="mt-1 text-xs text-slate-500">API keys are encrypted at rest; manual partners do not use credentials.</p>
+                            <h3 class="font-extrabold text-slate-900">{{ $partnerProjectName ?: 'Project '.$partnerProjectId }} <span class="font-normal text-slate-500">· {{ $partnerProjectId }}</span></h3>
                         </div>
                         <ul class="divide-y divide-slate-100">
-                            @forelse($integrations as $integration)
-                                <li class="space-y-3 p-5 {{ $editing && $editing->id === $integration->id ? 'bg-cyan-50/50' : '' }}">
+                            @forelse($partnerIntegrations as $integration)
+                                <li class="space-y-3 p-5">
                                     <div class="flex flex-wrap items-start justify-between gap-3">
                                         <div>
-                                            <h3 class="font-bold text-slate-900">{{ $integration->name }}</h3>
+                                            <h4 class="font-bold text-slate-900">{{ $integration->name }}</h4>
                                             <p class="mt-1 font-mono text-xs text-slate-500">{{ $integration->integration_id }}</p>
                                             @php($assignedRegions = $integrationRegions->get($integration->id, collect()))
-                                            @if($assignedRegions->isNotEmpty())
-                                                <p class="mt-2 text-xs text-slate-600">
-                                                    <span class="font-bold">Assigned regions:</span>
-                                                    {{ $assignedRegions->map(fn ($scope) => $scope->project_name.' · '.$scope->region)->implode(', ') }}
-                                                </p>
-                                            @endif
+                                            <p class="mt-2 text-xs text-slate-600"><span class="font-bold">Assigned regions:</span> {{ $assignedRegions->isNotEmpty() ? $assignedRegions->pluck('region')->implode(', ') : 'No region restriction configured' }}</p>
                                         </div>
                                         <div class="flex items-center gap-2">
                                             @php($isManual = $integration->authentication_method === 'manual')
                                             @php($apiActive = $integration->status === 'active' && (int) $integration->active_credentials_count > 0)
                                             @php($partnerState = $isManual ? ($integration->status === 'active' ? 'No API · Active' : 'No API · Disabled') : ($apiActive ? 'API Active' : 'API Inactive'))
                                             <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $isManual ? 'bg-blue-50 text-blue-800' : ($apiActive ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800') }}">{{ $partnerState }}</span>
-                                            <a href="{{ route('logistics-channel.index', ['tab' => 'integrations', 'edit' => $integration->id]) }}" aria-label="Edit {{ $integration->name }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Edit</a>
+                                            <a href="{{ route('logistics-channel.index', ['tab' => 'integrations', 'edit' => $integration->id]) }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Edit</a>
                                         </div>
                                     </div>
                                     <ul class="flex flex-wrap gap-2" aria-label="Credentials for {{ $integration->name }}">
@@ -409,33 +424,16 @@
                                                 @endif
                                             </li>
                                         @empty
-                                            <li class="text-xs text-slate-500">{{ $isManual ? 'Manual tracking partner. No API credentials are used.' : 'No credentials registered. Rotate the key to create one.' }}</li>
+                                            <li class="text-xs text-slate-500">{{ $isManual ? 'Manual tracking partner. No API credentials are used.' : 'No credentials registered.' }}</li>
                                         @endforelse
                                     </ul>
                                 </li>
                             @empty
-                                <li class="p-6 text-sm text-slate-500">No database-managed integrations yet. Add one using the form, or adopt an environment integration if one is listed below.</li>
+                                <li class="p-6 text-sm text-slate-500">No logistics partners are assigned to this project yet.</li>
                             @endforelse
                         </ul>
-                        @if($integrations->hasPages())<div class="border-t border-slate-100 p-4">{{ $integrations->links() }}</div>@endif
                     </article>
-
-                    @if($legacyIntegrations->isNotEmpty())
-                        <article class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                            <h2 class="text-sm font-extrabold text-amber-950">Environment-managed integrations</h2>
-                            <p class="mt-1 text-xs leading-5 text-amber-900">These continue using their current HMAC secrets and configured scopes. Adoption encrypts the existing secret in MMC without showing or rotating it.</p>
-                            @foreach($legacyIntegrations as $legacy)
-                                <form method="POST" action="{{ route('logistics-channel.integrations.adopt') }}" class="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-amber-200 bg-white p-4" data-confirm="Adopt this environment integration into encrypted database storage without changing its secret or project scope?">
-                                    @csrf<input type="hidden" name="integration_id" value="{{ $legacy['integration_id'] }}">
-                                    <div class="min-w-48 flex-1"><p class="mb-1 text-[11px] font-bold text-slate-600">Integration ID</p><p class="font-mono text-sm text-slate-900">{{ $legacy['integration_id'] }}</p></div>
-                                    <label class="min-w-40 flex-1 text-[11px] font-bold text-slate-600">Display name<input name="name" required maxlength="120" value="{{ $legacy['name'] }}" class="mt-1 w-full rounded-lg border-slate-200 text-sm font-normal"></label>
-                                    <p class="w-full text-[11px] text-slate-500">Authorized project IDs: {{ $legacy['project_ids'] ? implode(', ', $legacy['project_ids']) : 'No project-wide scope (approved DR mappings only)' }}</p>
-                                    <button class="rounded-lg bg-amber-900 px-3 py-2 text-xs font-bold text-white hover:bg-amber-800">Adopt without rotation</button>
-                                </form>
-                            @endforeach
-                        </article>
-                    @endif
-                </div>
+                @endif
             </section>
         @endif
 
@@ -744,7 +742,7 @@
 
             updateProjectCount();
             schools.addEventListener('change', () => {
-                if (schools.selectedOptions.length) {
+                if (schools.querySelector('input[name="school_scopes[]"]:checked')) {
                     allSchools.checked = false;
                     regions.querySelectorAll('input[name="region_scopes[]"]').forEach(input => { input.checked = false; });
                 }
@@ -752,12 +750,12 @@
             regions.addEventListener('change', () => {
                 if (regions.querySelector('input[name="region_scopes[]"]:checked')) {
                     allSchools.checked = false;
-                    Array.from(schools.options).forEach(option => { option.selected = false; });
+                    schools.querySelectorAll('input[name="school_scopes[]"]').forEach(input => { input.checked = false; });
                 }
             });
             allSchools.addEventListener('change', () => {
                 if (allSchools.checked) {
-                    Array.from(schools.options).forEach(option => { option.selected = false; });
+                    schools.querySelectorAll('input[name="school_scopes[]"]').forEach(input => { input.checked = false; });
                     regions.querySelectorAll('input[name="region_scopes[]"]').forEach(input => { input.checked = false; });
                 }
             });
@@ -771,7 +769,7 @@
             projects.addEventListener('change', async () => {
                 updateProjectCount();
                 const projectIds = Array.from(projects.querySelectorAll('input[name="project_ids[]"]:checked'), input => input.value);
-                const keepSchools = new Set([...initialSchools, ...Array.from(schools.selectedOptions, option => option.value)]);
+                const keepSchools = new Set([...initialSchools, ...Array.from(schools.querySelectorAll('input[name="school_scopes[]"]:checked'), input => input.value)]);
                 const keepRegions = new Set([...initialRegions, ...Array.from(regions.querySelectorAll('input[name="region_scopes[]"]:checked'), input => input.value)]);
                 requestController?.abort();
                 requestController = undefined;
@@ -802,7 +800,19 @@
                     if (requestController !== controller) return;
                     for (const school of schoolRows) {
                         const token = `${school.project_id}:${encodeId(school.school_id)}`;
-                        schools.add(new Option(`${school.school_name || school.school_id} ? ${school.school_id} ? Project ${school.project_id}`, token, false, keepSchools.has(token)));
+                        const label = document.createElement('label');
+                        label.className = 'flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 transition hover:bg-slate-50 motion-reduce:transition-none';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = 'school_scopes[]';
+                        checkbox.value = token;
+                        checkbox.checked = keepSchools.has(token);
+                        checkbox.className = 'mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-cyan-700 focus:ring-cyan-600';
+                        const labelText = document.createElement('span');
+                        labelText.className = 'min-w-0 break-words';
+                        labelText.textContent = `${school.school_name || school.school_id} - ${school.school_id} - Project ${school.project_id}`;
+                        label.append(checkbox, labelText);
+                        schools.append(label);
                     }
                     for (const region of regionRows) {
                         const token = `${region.project_id}:${encodeId(region.region)}`;
@@ -826,7 +836,10 @@
                     if (requestController !== controller || error.name === 'AbortError') return;
                     setSchoolState('failed', error.message);
                     setRegionState('failed', error.message);
-                    schools.add(new Option(error.message, '', true, true));
+                    const errorMessage = document.createElement('p');
+                    errorMessage.className = 'px-2 py-2 text-xs text-rose-700';
+                    errorMessage.textContent = error.message;
+                    schools.append(errorMessage);
                     const errorMessage = document.createElement('p');
                     errorMessage.className = 'px-2 py-2 text-xs text-rose-700';
                     errorMessage.textContent = error.message;

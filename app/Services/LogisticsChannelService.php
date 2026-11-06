@@ -16,18 +16,13 @@ class LogisticsChannelService
     /** @param array<string, mixed> $data @return array{integration: LogisticsIntegration,key_id:string|null,secret:string|null} */
     public function create(array $data, int $actorId, ?string $ipAddress): array
     {
-        if (in_array($data['integration_id'], $this->registry->environmentIntegrationIds(), true)) {
-            throw ValidationException::withMessages([
-                'integration_id' => 'This ID is already configured in the environment. Adopt that integration to preserve its credentials and scope.',
-            ]);
-        }
-
         $isApiIntegration = $data['connection_type'] === 'api';
+        $integrationId = $this->newIntegrationId($data['name']);
         $secret = $isApiIntegration ? $this->generateSecret() : null;
-        $keyId = $isApiIntegration ? $this->newKeyId($data['integration_id']) : null;
-        $integration = DB::transaction(function () use ($data, $actorId, $ipAddress, $secret, $keyId, $isApiIntegration): LogisticsIntegration {
+        $keyId = $isApiIntegration ? $this->newKeyId($integrationId) : null;
+        $integration = DB::transaction(function () use ($data, $actorId, $ipAddress, $secret, $keyId, $integrationId, $isApiIntegration): LogisticsIntegration {
             $integration = LogisticsIntegration::query()->create([
-                'integration_id' => $data['integration_id'],
+                'integration_id' => $integrationId,
                 'name' => $data['name'],
                 'authentication_method' => $isApiIntegration ? 'hmac_sha256' : 'manual',
                 'webhook_url' => $isApiIntegration ? ($data['webhook_url'] ?: route('api.v1.logistics.webhooks.delivery-status')) : null,
@@ -321,6 +316,23 @@ class LogisticsChannelService
     private function generateSecret(): string
     {
         return rtrim(strtr(base64_encode(random_bytes(48)), '+/', '-_'), '=');
+    }
+
+    private function newIntegrationId(string $name): string
+    {
+        $baseId = substr(Str::slug($name) ?: 'logistics-partner', 0, 64);
+        $environmentIds = array_map(Str::lower(...), $this->registry->environmentIntegrationIds());
+        $integrationId = $baseId;
+        $suffix = 2;
+
+        while (DB::table('logistics_integrations')->where('integration_id', $integrationId)->exists()
+            || in_array(Str::lower($integrationId), $environmentIds, true)
+        ) {
+            $suffixText = '-'.$suffix++;
+            $integrationId = substr($baseId, 0, 64 - strlen($suffixText)).$suffixText;
+        }
+
+        return $integrationId;
     }
 
     private function newKeyId(string $integrationId): string

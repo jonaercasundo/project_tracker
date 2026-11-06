@@ -374,14 +374,14 @@
         </a>
         @endif
 
-        @if($currentUser?->hasAnyRole(['user', 'Administrator']) && $currentCompany?->code === 'MMC' && $currentCompany?->is_active)
-            <a href="{{ route('admin.integrations.mmc-platform.index') }}"
-               @if(request()->routeIs('admin.integrations.mmc-platform.*')) aria-current="page" @endif
-               class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('admin.integrations.mmc-platform.*') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
-                @if(request()->routeIs('admin.integrations.mmc-platform.*'))
+        @if($currentUser?->hasRole('user') && $currentCompany?->code === 'MMC' && $currentCompany?->is_active)
+            <a href="{{ route('integrations.mmc-platform.index') }}"
+               @if(request()->routeIs('integrations.mmc-platform.*')) aria-current="page" @endif
+               class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('integrations.mmc-platform.*') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+                @if(request()->routeIs('integrations.mmc-platform.*'))
                     <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
                 @endif
-                <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('admin.integrations.mmc-platform.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('integrations.mmc-platform.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10v10H7zM3 12h4m10 0h4M12 3v4m0 10v4" />
                 </svg>
                 <span>MMC Platform API</span>

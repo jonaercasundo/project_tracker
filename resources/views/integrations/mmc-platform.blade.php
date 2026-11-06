@@ -1,7 +1,7 @@
-<x-app-layout>
+<x-project_app-layout>
     <x-slot name="header">
         <div>
-            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Integrations</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Operations / Integrations</p>
             <h1 class="mt-1 text-xl font-semibold text-slate-900">MMC Platform API</h1>
         </div>
     </x-slot>
@@ -32,7 +32,7 @@
                 @endif
             </div>
             @if ($connection['configured'])
-                <form method="POST" action="{{ route('admin.integrations.mmc-platform.test-connection') }}">
+                    <form method="POST" action="{{ route('integrations.mmc-platform.test-connection') }}">
                     @csrf
                     <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Test read access</button>
                 </form>
@@ -62,4 +62,4 @@
             <p class="mt-1 text-sm leading-6 text-blue-900">The test calls <code class="rounded bg-white/70 px-1">GET /programs?limit=1</code> only. No records are imported or changed yet. The platform contract provides cursor feeds at <code class="rounded bg-white/70 px-1">/sync/lots</code>, <code class="rounded bg-white/70 px-1">/sync/schools</code>, and <code class="rounded bg-white/70 px-1">/sync/deliveries</code>; the data sync must preserve each feed cursor only after its page is durably applied.</p>
         </section>
     </div>
-</x-app-layout>
+</x-project_app-layout>

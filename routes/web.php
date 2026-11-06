@@ -7,7 +7,6 @@ use App\Http\Controllers\ActionCrawlerController;
 use App\Http\Controllers\Admin\AdminControlCenterController;
 use App\Http\Controllers\Admin\AiConfigurationController;
 use App\Http\Controllers\Admin\GoogleSheetsSettingsController;
-use App\Http\Controllers\Admin\MmcPlatformIntegrationController;
 use App\Http\Controllers\AiLiquidationAttachmentController;
 use App\Http\Controllers\AiQuotationController;
 use App\Http\Controllers\AssistantController;
@@ -43,6 +42,7 @@ use App\Http\Controllers\MIApprovalController;
 use App\Http\Controllers\MIForexRateController;
 use App\Http\Controllers\MIProductPriceComparisonController;
 use App\Http\Controllers\MIProductVariantInventoryController;
+use App\Http\Controllers\MmcPlatformIntegrationController;
 use App\Http\Controllers\MmcPplManagementController;
 use App\Http\Controllers\MmcPplWorkbookImportController;
 use App\Http\Controllers\OperationsLifecycleController;
@@ -209,12 +209,12 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         });
 
     });
-    Route::middleware(['company.context:MMC', 'role:user,Administrator'])->group(function (): void {
-        Route::get('/admin/integrations/mmc-platform', [MmcPlatformIntegrationController::class, 'index'])
-            ->name('admin.integrations.mmc-platform.index');
-        Route::post('/admin/integrations/mmc-platform/test-connection', [MmcPlatformIntegrationController::class, 'testConnection'])
+    Route::middleware(['company.context:MMC', 'role:user'])->group(function (): void {
+        Route::get('/integrations/mmc-platform', [MmcPlatformIntegrationController::class, 'index'])
+            ->name('integrations.mmc-platform.index');
+        Route::post('/integrations/mmc-platform/test-connection', [MmcPlatformIntegrationController::class, 'testConnection'])
             ->middleware('throttle:5,1')
-            ->name('admin.integrations.mmc-platform.test-connection');
+            ->name('integrations.mmc-platform.test-connection');
     });
 
     Route::middleware(['role:Administrator'])->group(function () {

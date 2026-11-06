@@ -58,11 +58,12 @@ class LogisticsDrResolver
 
         $regionsByScope = [];
         if ($regionScopes !== []) {
-            $regionRows = DB::table('school')->whereIn('project_id', array_column($regionScopes, 'project_id'))
-                ->get(['project_id', 'school_id', 'region']);
-            foreach ($regionRows as $regionRow) {
-                $scopeKey = (int) $regionRow->project_id.':'.rtrim(strtr(base64_encode((string) $regionRow->school_id), '+/', '-_'), '=');
-                $regionsByScope[$scopeKey] = (string) $regionRow->region;
+            $regionsBySchool = DB::table('school')
+                ->whereIn('school_id', $deliveries->pluck('school_id')->unique()->all())
+                ->pluck('region', 'school_id');
+            foreach ($deliveries as $delivery) {
+                $scopeKey = (int) $delivery->project_id.':'.rtrim(strtr(base64_encode((string) $delivery->school_id), '+/', '-_'), '=');
+                $regionsByScope[$scopeKey] = (string) ($regionsBySchool->get((string) $delivery->school_id) ?? '');
             }
         }
 

@@ -81,15 +81,19 @@ class LogisticsChannelController extends Controller
         if ($selectedProjects === [] && $editing !== null) {
             $selectedProjects = $editing->projects->pluck('project_id')->map(fn ($id): int => (int) $id)->all();
         }
-        $schools = $selectedProjects === [] ? collect() : DB::table('school')
-            ->whereIn('project_id', $selectedProjects)
-            ->orderBy('school_name')
-            ->get(['project_id', 'school_id', 'school_name']);
-        $regions = $selectedProjects === [] ? collect() : DB::table('school')
-            ->whereIn('project_id', $selectedProjects)
-            ->whereNotNull('region')
-            ->whereRaw("TRIM(region) <> ''")
-            ->select(['project_id', 'region'])
+        $schools = $selectedProjects === [] ? collect() : DB::table('deliveries as delivery')
+            ->join('school', 'school.school_id', '=', 'delivery.school_id')
+            ->whereIn('delivery.project_id', $selectedProjects)
+            ->orderBy('school.school_name')
+            ->select('delivery.project_id as project_id', 'school.school_id', 'school.school_name')
+            ->distinct()
+            ->get();
+        $regions = $selectedProjects === [] ? collect() : DB::table('deliveries as delivery')
+            ->join('school', 'school.school_id', '=', 'delivery.school_id')
+            ->whereIn('delivery.project_id', $selectedProjects)
+            ->whereNotNull('school.region')
+            ->whereRaw("TRIM(school.region) <> ''")
+            ->select('delivery.project_id as project_id', 'school.region')
             ->distinct()
             ->orderBy('project_id')
             ->orderBy('region')
@@ -215,8 +219,13 @@ class LogisticsChannelController extends Controller
             'project_ids' => ['required', 'array', 'min:1'],
             'project_ids.*' => ['required', 'integer', 'distinct', 'exists:projects,project_id'],
         ]);
-        $schools = DB::table('school')->whereIn('project_id', array_map('intval', $validated['project_ids']))
-            ->orderBy('school_name')->get(['project_id', 'school_id', 'school_name']);
+        $schools = DB::table('deliveries as delivery')
+            ->join('school', 'school.school_id', '=', 'delivery.school_id')
+            ->whereIn('delivery.project_id', array_map('intval', $validated['project_ids']))
+            ->orderBy('school.school_name')
+            ->select('delivery.project_id as project_id', 'school.school_id', 'school.school_name')
+            ->distinct()
+            ->get();
 
         return response()->json($schools);
     }
@@ -229,11 +238,12 @@ class LogisticsChannelController extends Controller
             'project_ids' => ['required', 'array', 'min:1'],
             'project_ids.*' => ['required', 'integer', 'distinct', 'exists:projects,project_id'],
         ]);
-        $regions = DB::table('school')
-            ->whereIn('project_id', array_map('intval', $validated['project_ids']))
-            ->whereNotNull('region')
-            ->whereRaw("TRIM(region) <> ''")
-            ->select(['project_id', 'region'])
+        $regions = DB::table('deliveries as delivery')
+            ->join('school', 'school.school_id', '=', 'delivery.school_id')
+            ->whereIn('delivery.project_id', array_map('intval', $validated['project_ids']))
+            ->whereNotNull('school.region')
+            ->whereRaw("TRIM(school.region) <> ''")
+            ->select('delivery.project_id as project_id', 'school.region')
             ->distinct()
             ->orderBy('project_id')
             ->orderBy('region')

@@ -275,7 +275,9 @@ class LogisticsChannelService
             $projectId = (int) $projectIdText;
             $schoolId = base64_decode(strtr($schoolToken, '-_', '+/'), true);
             if ($schoolId === false || ! in_array($projectId, array_map('intval', $data['project_ids']), true)
-                || ! DB::table('school')->where('project_id', $projectId)->where('school_id', $schoolId)->exists()
+                || ! DB::table('deliveries as delivery')
+                    ->join('school', 'school.school_id', '=', 'delivery.school_id')
+                    ->where('delivery.project_id', $projectId)->where('delivery.school_id', $schoolId)->exists()
             ) {
                 throw ValidationException::withMessages(['school_scopes' => 'Choose schools that belong to an authorized project.']);
             }
@@ -294,7 +296,9 @@ class LogisticsChannelService
             $projectId = (int) $projectIdText;
             $region = base64_decode(strtr($regionToken, '-_', '+/'), true);
             if ($region === false || trim($region) === '' || ! in_array($projectId, array_map('intval', $data['project_ids']), true)
-                || ! DB::table('school')->where('project_id', $projectId)->where('region', $region)->exists()
+                || ! DB::table('deliveries as delivery')
+                    ->join('school', 'school.school_id', '=', 'delivery.school_id')
+                    ->where('delivery.project_id', $projectId)->where('school.region', $region)->exists()
             ) {
                 throw ValidationException::withMessages(['region_scopes' => 'Choose regions that belong to an authorized project.']);
             }

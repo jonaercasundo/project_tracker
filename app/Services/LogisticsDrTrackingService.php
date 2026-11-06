@@ -256,7 +256,6 @@ class LogisticsDrTrackingService
                             $authorizedRegion->selectRaw('1')
                                 ->from('logistics_integration_regions as configured_region')
                                 ->join('school as scoped_school', function (JoinClause $join): void {
-                                    $join->on('scoped_school.project_id', '=', 'configured_region.project_id');
                                     $this->whereColumnExact($join, 'scoped_school.school_id', 'delivery.school_id');
                                     $this->whereColumnExact($join, 'scoped_school.region', 'configured_region.region');
                                 })

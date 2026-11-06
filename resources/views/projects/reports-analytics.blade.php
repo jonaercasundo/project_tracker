@@ -158,10 +158,6 @@
                     <p role="status" class="text-[10px] leading-4 text-amber-800">{{ $drProgressReport['data_limitation'] }}</p>
                 @endif
 
-                <details class="text-[10px] leading-4 text-slate-500">
-                    <summary class="cursor-pointer font-semibold text-slate-600">How this report is counted</summary>
-                    <p class="mt-1">{{ $drProgressReport['creation_definition'] }} {{ $drProgressReport['completion_definition'] }} The green fill represents delivery receipts processed. The red segment shows the gap between actual progress and time elapsed; the black marker shows today on the date timeline. Estimated completion uses the average number of DRs completed per day since delivery started.</p>
-                </details>
             </section>
         @endif
         @if ($selectedProjectId === null)

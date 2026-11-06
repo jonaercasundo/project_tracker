@@ -13,7 +13,7 @@ class LogisticsChannelService
 {
     public function __construct(private LogisticsIntegrationRegistry $registry) {}
 
-    /** @param array<string, mixed> $data @return array{integration: LogisticsIntegration,key_id:string,secret:string} */
+    /** @param array<string, mixed> $data @return array{integration: LogisticsIntegration,key_id:string|null,secret:string|null} */
     public function create(array $data, int $actorId, ?string $ipAddress): array
     {
         if (in_array($data['integration_id'], $this->registry->environmentIntegrationIds(), true)) {
@@ -22,32 +22,36 @@ class LogisticsChannelService
             ]);
         }
 
-        $secret = $this->generateSecret();
-        $keyId = $this->newKeyId($data['integration_id']);
-        $integration = DB::transaction(function () use ($data, $actorId, $ipAddress, $secret, $keyId): LogisticsIntegration {
+        $isApiIntegration = $data['connection_type'] === 'api';
+        $secret = $isApiIntegration ? $this->generateSecret() : null;
+        $keyId = $isApiIntegration ? $this->newKeyId($data['integration_id']) : null;
+        $integration = DB::transaction(function () use ($data, $actorId, $ipAddress, $secret, $keyId, $isApiIntegration): LogisticsIntegration {
             $integration = LogisticsIntegration::query()->create([
                 'integration_id' => $data['integration_id'],
                 'name' => $data['name'],
-                'authentication_method' => 'hmac_sha256',
-                'webhook_url' => $data['webhook_url'] ?: route('api.v1.logistics.webhooks.delivery-status'),
-                'enabled_event_types' => $data['enabled_event_types'],
+                'authentication_method' => $isApiIntegration ? 'hmac_sha256' : 'manual',
+                'webhook_url' => $isApiIntegration ? ($data['webhook_url'] ?: route('api.v1.logistics.webhooks.delivery-status')) : null,
+                'enabled_event_types' => $isApiIntegration ? $data['enabled_event_types'] : [],
                 'status' => $data['status'],
                 'created_by' => $actorId,
                 'updated_by' => $actorId,
             ]);
 
             $this->saveScopes($integration, $data);
-            LogisticsIntegrationCredential::query()->create([
-                'integration_id' => $integration->id,
-                'key_id' => $keyId,
-                'secret' => $secret,
-                'status' => 'active',
-                'created_by' => $actorId,
-            ]);
+            if ($isApiIntegration) {
+                LogisticsIntegrationCredential::query()->create([
+                    'integration_id' => $integration->id,
+                    'key_id' => $keyId,
+                    'secret' => $secret,
+                    'status' => 'active',
+                    'created_by' => $actorId,
+                ]);
+            }
             $this->audit($integration, $actorId, 'integration_created', null, null, [
                 'project_ids' => array_map('intval', $data['project_ids']),
                 'school_scope_count' => count($data['school_scopes'] ?? []),
                 'region_scope_count' => count($data['region_scopes'] ?? []),
+                'connection_type' => $isApiIntegration ? 'api' : 'manual',
             ], $ipAddress);
 
             return $integration;
@@ -61,7 +65,8 @@ class LogisticsChannelService
     {
         DB::transaction(function () use ($integration, $data, $actorId, $ipAddress): void {
             $lockedIntegration = LogisticsIntegration::query()->lockForUpdate()->findOrFail($integration->id);
-            if ($data['status'] === 'active' && ! LogisticsIntegrationCredential::query()
+            $isApiIntegration = $lockedIntegration->authentication_method !== 'manual';
+            if ($isApiIntegration && $data['status'] === 'active' && ! LogisticsIntegrationCredential::query()
                 ->where('integration_id', $lockedIntegration->id)
                 ->where('status', 'active')
                 ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
@@ -74,8 +79,8 @@ class LogisticsChannelService
 
             $lockedIntegration->fill([
                 'name' => $data['name'],
-                'webhook_url' => $data['webhook_url'] ?: route('api.v1.logistics.webhooks.delivery-status'),
-                'enabled_event_types' => $data['enabled_event_types'],
+                'webhook_url' => $isApiIntegration ? ($data['webhook_url'] ?: route('api.v1.logistics.webhooks.delivery-status')) : null,
+                'enabled_event_types' => $isApiIntegration ? ($data['enabled_event_types'] ?? []) : [],
                 'status' => $data['status'],
                 'updated_by' => $actorId,
             ])->save();
@@ -296,7 +301,7 @@ class LogisticsChannelService
             if (DB::table('logistics_integration_regions')->where('project_id', $projectId)
                 ->where('region', $region)->where('integration_id', '<>', $integration->id)->exists()
             ) {
-                throw ValidationException::withMessages(['region_scopes' => 'This region is already assigned to another Logistics API partner for the selected project.']);
+                throw ValidationException::withMessages(['region_scopes' => 'This region is already assigned to another logistics partner for the selected project.']);
             }
 
             DB::table('logistics_integration_regions')->insert([

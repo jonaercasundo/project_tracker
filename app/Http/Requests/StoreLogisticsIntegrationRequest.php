@@ -25,9 +25,10 @@ class StoreLogisticsIntegrationRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'connection_type' => ['required', Rule::in(['api', 'manual'])],
             'integration_id' => ['required', 'string', 'max:64', 'regex:/\A[A-Za-z0-9._-]+\z/', 'unique:logistics_integrations,integration_id'],
             'name' => ['required', 'string', 'max:120'],
-            'webhook_url' => ['nullable', 'url', 'max:500', 'regex:/\Ahttps:\/\//i'],
+            'webhook_url' => ['exclude_unless:connection_type,api', 'required', 'url', 'max:500', 'regex:/\Ahttps:\/\//i'],
             'project_ids' => ['required', 'array', 'min:1'],
             'project_ids.*' => ['required', 'integer', 'distinct', 'exists:projects,project_id'],
             'school_scopes' => ['nullable', 'array'],
@@ -35,7 +36,7 @@ class StoreLogisticsIntegrationRequest extends FormRequest
             'region_scopes' => ['nullable', 'array'],
             'region_scopes.*' => ['required', 'string', 'distinct', 'regex:/\A[0-9]+:[A-Za-z0-9_-]+\z/'],
             'all_schools' => ['sometimes', 'accepted'],
-            'enabled_event_types' => ['required', 'array', 'min:1'],
+            'enabled_event_types' => ['exclude_unless:connection_type,api', 'required', 'array', 'min:1'],
             'enabled_event_types.*' => ['required', 'string', 'distinct', Rule::in(config('logistics-webhooks.allowed_event_types', []))],
             'status' => ['required', Rule::in(['active', 'disabled'])],
         ];

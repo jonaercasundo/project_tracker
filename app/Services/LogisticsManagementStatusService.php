@@ -14,19 +14,26 @@ class LogisticsManagementStatusService
             ->join('logistics_integrations as integration', 'integration.id', '=', 'assigned_project.integration_id')
             ->join('projects', 'projects.project_id', '=', 'assigned_project.project_id')
             ->where('integration.status', 'active')
-            ->whereExists(function ($credentials): void {
-                $credentials->selectRaw('1')
-                    ->from('logistics_integration_credentials as credential')
-                    ->whereColumn('credential.integration_id', 'integration.id')
-                    ->where('credential.status', 'active')
-                    ->where(fn ($expires) => $expires->whereNull('credential.expires_at')
-                        ->orWhere('credential.expires_at', '>', now()));
+            ->where(function ($connection): void {
+                $connection->where('integration.authentication_method', 'manual')
+                    ->orWhere(function ($api): void {
+                        $api->where('integration.authentication_method', 'hmac_sha256')
+                            ->whereExists(function ($credentials): void {
+                                $credentials->selectRaw('1')
+                                    ->from('logistics_integration_credentials as credential')
+                                    ->whereColumn('credential.integration_id', 'integration.id')
+                                    ->where('credential.status', 'active')
+                                    ->where(fn ($expires) => $expires->whereNull('credential.expires_at')
+                                        ->orWhere('credential.expires_at', '>', now()));
+                            });
+                    });
             })
             ->orderBy('integration.name')
             ->orderBy('projects.project_name')
             ->get([
                 'integration.id as integration_key', 'integration.integration_id', 'integration.name as partner_name',
-                'integration.status as integration_status', 'assigned_project.project_id', 'projects.project_name',
+                'integration.status as integration_status', 'integration.authentication_method',
+                'assigned_project.project_id', 'projects.project_name',
             ]);
 
         if ($integrationProjects->isEmpty()) {
@@ -82,9 +89,9 @@ class LogisticsManagementStatusService
             ->whereRaw("TRIM(delivery.dr_no) <> ''")
             ->get([
                 'integration.id as integration_key', 'integration.integration_id as integration_code',
-                'assigned_project.project_id', 'delivery.school_id',
+                'integration.authentication_method', 'assigned_project.project_id', 'delivery.school_id',
                 'school.region as delivery_region',
-                'delivery.dr_no', 'billing_state.active_record_count',
+                'delivery.dr_no', 'delivery.status as source_delivery_status', 'billing_state.active_record_count',
                 'billing_state.has_billed', 'billing_state.has_for_billing', 'billing_state.has_on_hold',
             ]);
 
@@ -121,10 +128,16 @@ class LogisticsManagementStatusService
             $groups[$groupKey]['regions'][$region] = true;
             $groups[$groupKey]['documents'][$documentKey] ??= ['delivery_statuses' => [], 'billing_statuses' => []];
 
-            $trackingKey = $delivery->integration_code.':'.$projectId.':'.base64_encode((string) $delivery->school_id).':'.base64_encode((string) $delivery->dr_no);
-            $deliveryStatus = $trackingStatuses[$trackingKey] ?? null;
-            if (! in_array($deliveryStatus, ['logistics_received', 'delivered'], true)) {
-                continue;
+            if ($delivery->authentication_method === 'manual') {
+                $deliveryStatus = in_array(strtolower(trim((string) $delivery->source_delivery_status)), ['delivered', 'accepted'], true)
+                    ? 'delivered'
+                    : 'pending';
+            } else {
+                $trackingKey = $delivery->integration_code.':'.$projectId.':'.base64_encode((string) $delivery->school_id).':'.base64_encode((string) $delivery->dr_no);
+                $deliveryStatus = $trackingStatuses[$trackingKey] ?? null;
+                if (! in_array($deliveryStatus, ['logistics_received', 'delivered'], true)) {
+                    continue;
+                }
             }
 
             $groups[$groupKey]['documents'][$documentKey]['delivery_statuses'][$deliveryStatus] = true;
@@ -163,10 +176,9 @@ class LogisticsManagementStatusService
             $report[] = [
                 'integration_id' => $integration->integration_id,
                 'partner_name' => $integration->partner_name,
-                'api_status' => $integration->integration_status === 'active'
-                    && in_array($group['integration_key'], $activeCredentialIntegrationKeys, true)
-                    ? 'Active'
-                    : 'Inactive',
+                'api_status' => $integration->authentication_method === 'manual'
+                    ? 'No API'
+                    : (in_array($group['integration_key'], $activeCredentialIntegrationKeys, true) ? 'API Active' : 'API Inactive'),
                 'project_name' => implode(', ', $projectNames),
                 'region' => implode(', ', array_keys($group['regions'])),
                 'total_drs' => count($group['documents']),

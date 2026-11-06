@@ -133,11 +133,16 @@ class LogisticsChannelController extends Controller
         ));
     }
 
-    public function store(StoreLogisticsIntegrationRequest $request): HttpResponse
+    public function store(StoreLogisticsIntegrationRequest $request): HttpResponse|RedirectResponse
     {
         Gate::authorize('create', LogisticsIntegration::class);
         abort_unless($this->managementSchemaReady(), 503, 'Logistics Channel management storage is not ready.');
         $credential = $this->channel->create($request->validated(), (int) $request->user()->user_id, $request->ip());
+
+        if ($credential['key_id'] === null || $credential['secret'] === null) {
+            return to_route('logistics-channel.index', ['tab' => 'integrations'])
+                ->with('status', 'Manual logistics partner added with its project and region assignments.');
+        }
 
         return response()->view('logistics-channel.credential', [
             'integration' => $credential['integration'],

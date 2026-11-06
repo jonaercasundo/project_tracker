@@ -30,6 +30,7 @@ class LogisticsIntegrationRegistry
         if ($credential !== null) {
             $integration = LogisticsIntegration::query()->find($credential->integration_id);
             $enabled = $integration?->status === 'active'
+                && $integration?->authentication_method !== 'manual'
                 && $credential->status === 'active'
                 && ($credential->expires_at === null || $credential->expires_at->isFuture());
 
@@ -111,7 +112,9 @@ class LogisticsIntegrationRegistry
             : null;
 
         if ($integration !== null) {
-            return $integration->status === 'active' ? ($integration->enabled_event_types ?? []) : [];
+            return $integration->status === 'active' && $integration->authentication_method !== 'manual'
+                ? ($integration->enabled_event_types ?? [])
+                : [];
         }
 
         return config('logistics-webhooks.allowed_event_types', []);
@@ -124,7 +127,7 @@ class LogisticsIntegrationRegistry
             : null;
 
         if ($integration !== null) {
-            return $integration->status === 'active';
+            return $integration->status === 'active' && $integration->authentication_method !== 'manual';
         }
 
         $legacyKeys = config('logistics-webhooks.keys', []);

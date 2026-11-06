@@ -71,7 +71,10 @@
         $workerKey = $metrics['worker_activity'] ?? 'unavailable';
         $editingDefaultStatus = $editing === null
             ? 'active'
-            : ($editing->status === 'active' && (int) ($editing->active_credentials_count ?? 0) === 0 ? 'disabled' : $editing->status);
+            : ($editing->authentication_method !== 'manual' && $editing->status === 'active' && (int) ($editing->active_credentials_count ?? 0) === 0 ? 'disabled' : $editing->status);
+        $connectionType = $editing === null
+            ? old('connection_type', 'api')
+            : ($editing->authentication_method === 'manual' ? 'manual' : 'api');
 
         $field = 'w-full rounded-xl border-slate-200 text-sm focus:border-cyan-600 focus:ring-cyan-600';
         $btnPrimary = 'rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600';
@@ -129,7 +132,7 @@
                             <h2 id="partner-status-title" class="text-lg font-black text-slate-950">Partner Delivery &amp; Billing Status</h2>
                             <p class="mt-1 text-xs leading-5 text-slate-500">A DR counts as assigned after the logistics partner confirms receipt. Status and billing counts include only received DRs.</p>
                         </div>
-                        <a href="{{ route('logistics-channel.index', ['tab' => 'integrations']) }}" class="{{ $btnGhost }}">Manage partners &amp; regions</a>
+                        <a href="{{ route('logistics-channel.index', ['tab' => 'integrations']) }}" target="_blank" rel="noopener" class="{{ $btnGhost }}">Manage partners &amp; regions</a>
                     </div>
                 </header>
 
@@ -150,7 +153,7 @@
                                     <td class="px-3 py-3">
                                         <p class="font-bold text-slate-900">{{ $partnerStatus['partner_name'] }}</p>
                                         <p class="mt-1 font-mono text-[10px] text-slate-500">{{ $partnerStatus['integration_id'] }}</p>
-                                        <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold {{ $partnerStatus['api_status'] === 'Active' ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800' }}">API {{ $partnerStatus['api_status'] }}</span>
+                                        <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold {{ $partnerStatus['api_status'] === 'API Active' ? 'bg-emerald-50 text-emerald-800' : ($partnerStatus['api_status'] === 'No API' ? 'bg-blue-50 text-blue-800' : 'bg-rose-50 text-rose-800') }}">{{ $partnerStatus['api_status'] }}</span>
                                     </td>
                                     <td class="px-3 py-3 text-slate-700">
                                         <p class="font-semibold">{{ $partnerStatus['project_name'] }}</p>
@@ -230,12 +233,25 @@
         @if($tab === 'integrations')
             <section class="grid gap-5 xl:grid-cols-[minmax(300px,0.85fr)_minmax(0,1.4fr)]">
                 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 class="text-lg font-black text-slate-900">{{ $editing ? 'Edit integration' : 'Add integration' }}</h2>
-                    <p class="mt-1 text-xs leading-5 text-slate-500">Each partner connects through its own API credential and gets an explicit project and region scope.</p>
+                    <h2 class="text-lg font-black text-slate-900">{{ $editing ? 'Edit logistics partner' : 'Add logistics partner' }}</h2>
+                    <p class="mt-1 text-xs leading-5 text-slate-500">Choose API updates or manual tracking, then assign the projects and regions this partner handles.</p>
 
-                    <form method="POST" action="{{ $editing ? route('logistics-channel.integrations.update', $editing) : route('logistics-channel.integrations.store') }}" class="mt-5 space-y-4" id="integration-form" data-schools-url="{{ route('logistics-channel.schools') }}" data-regions-url="{{ route('logistics-channel.regions') }}" data-selected-schools="{{ json_encode($editingSchoolTokens) }}" data-selected-regions="{{ json_encode($editingRegionTokens) }}">
+                    <form method="POST" action="{{ $editing ? route('logistics-channel.integrations.update', $editing) : route('logistics-channel.integrations.store') }}" class="mt-5 space-y-4" id="integration-form" data-connection-type="{{ $connectionType }}" data-schools-url="{{ route('logistics-channel.schools') }}" data-regions-url="{{ route('logistics-channel.regions') }}" data-selected-schools="{{ json_encode($editingSchoolTokens) }}" data-selected-regions="{{ json_encode($editingRegionTokens) }}">
                         @csrf
                         @if($editing) @method('PATCH') @endif
+
+                        @if($editing)
+                            <div class="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">Connection: <strong>{{ $connectionType === 'manual' ? 'No API (manual tracking)' : 'With API' }}</strong></div>
+                        @else
+                            <div>
+                                <label for="connection-type" class="mb-1 block text-xs font-bold text-slate-600">Partner connection</label>
+                                <select id="connection-type" name="connection_type" class="{{ $field }}">
+                                    <option value="api" @selected($connectionType === 'api')>With API</option>
+                                    <option value="manual" @selected($connectionType === 'manual')>No API (manual tracking)</option>
+                                </select>
+                                @error('connection_type')<p class="mt-1 text-xs text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                        @endif
 
                         <div>
                             <label for="integration-name" class="mb-1 block text-xs font-bold text-slate-600">Integration name</label>
@@ -252,29 +268,31 @@
                             </div>
                         @endunless
 
-                        <div>
-                            <label for="webhook-url" class="mb-1 block text-xs font-bold text-slate-600">Webhook endpoint URL</label>
-                            <input id="webhook-url" name="webhook_url" type="url" value="{{ old('webhook_url', $editing->webhook_url ?? $webhookUrl) }}" class="{{ $field }}" @error('webhook_url') aria-invalid="true" @enderror>
-                            @error('webhook_url')<p class="mt-1 text-xs text-rose-700">{{ $message }}</p>@enderror
+                        <div data-api-fields @if($connectionType !== 'api') hidden @endif>
+                            <div>
+                                <label for="webhook-url" class="mb-1 block text-xs font-bold text-slate-600">Webhook endpoint URL</label>
+                                <input id="webhook-url" name="webhook_url" type="url" value="{{ old('webhook_url', $editing->webhook_url ?? $webhookUrl) }}" class="{{ $field }}" @error('webhook_url') aria-invalid="true" @enderror>
+                                @error('webhook_url')<p class="mt-1 text-xs text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+
+                            <fieldset class="mt-4">
+                                <legend class="mb-2 text-xs font-bold text-slate-600">Enabled event types</legend>
+                                @foreach(['delivery.logistics_received' => 'Logistics Received', 'delivery.delivered' => 'Logistics Delivered'] as $eventType => $eventLabel)
+                                    <label class="flex items-center gap-2 py-1.5 text-sm text-slate-700">
+                                        <input type="checkbox" name="enabled_event_types[]" value="{{ $eventType }}" @checked(in_array($eventType, old('enabled_event_types', $editing->enabled_event_types ?? ['delivery.logistics_received', 'delivery.delivered']), true)) class="rounded border-slate-300 text-cyan-700 focus:ring-cyan-600">
+                                        <span>{{ $eventLabel }} <code class="ml-1 text-[11px] text-slate-400">{{ $eventType }}</code></span>
+                                    </label>
+                                @endforeach
+                            </fieldset>
                         </div>
 
                         <div>
-                            <label for="integration-status" class="mb-1 block text-xs font-bold text-slate-600">Integration status</label>
+                            <label for="integration-status" class="mb-1 block text-xs font-bold text-slate-600">Partner status</label>
                             <select id="integration-status" name="status" class="{{ $field }}">
                                 <option value="active" @selected(old('status', $editingDefaultStatus) === 'active')>Active</option>
                                 <option value="disabled" @selected(old('status', $editingDefaultStatus) === 'disabled')>Disabled</option>
                             </select>
                         </div>
-
-                        <fieldset>
-                            <legend class="mb-2 text-xs font-bold text-slate-600">Enabled event types</legend>
-                            @foreach(['delivery.logistics_received' => 'Logistics Received', 'delivery.delivered' => 'Logistics Delivered'] as $eventType => $eventLabel)
-                                <label class="flex items-center gap-2 py-1.5 text-sm text-slate-700">
-                                    <input type="checkbox" name="enabled_event_types[]" value="{{ $eventType }}" @checked(in_array($eventType, old('enabled_event_types', $editing->enabled_event_types ?? ['delivery.logistics_received', 'delivery.delivered']), true)) class="rounded border-slate-300 text-cyan-700 focus:ring-cyan-600">
-                                    <span>{{ $eventLabel }} <code class="ml-1 text-[11px] text-slate-400">{{ $eventType }}</code></span>
-                                </label>
-                            @endforeach
-                        </fieldset>
 
                         <div>
                             <div class="mb-1 flex items-center justify-between gap-2">
@@ -303,7 +321,7 @@
                                     <option value="{{ $scopeToken }}" @selected(in_array($scopeToken, old('region_scopes', $editingRegionTokens), true))>{{ $region->region }} · Project {{ $region->project_id }}</option>
                                 @endforeach
                             </select>
-                            <p id="regions-help" class="mt-1 text-[11px] text-slate-500">Select the regions this API partner handles in each selected project. The webhook will only match schools in these regions.</p>
+                            <p id="regions-help" class="mt-1 text-[11px] text-slate-500">Select the regions this partner handles in each selected project.</p>
                         </div>
 
                         <div>
@@ -325,12 +343,12 @@
                         </div>
 
                         <div class="flex flex-wrap gap-2 pt-2">
-                            <button type="submit" id="integration-submit" class="{{ $btnPrimary }} disabled:cursor-not-allowed disabled:opacity-60">{{ $editing ? 'Save integration' : 'Create integration and key' }}</button>
+                            <button type="submit" id="integration-submit" class="{{ $btnPrimary }} disabled:cursor-not-allowed disabled:opacity-60">{{ $editing ? 'Save partner' : ($connectionType === 'api' ? 'Create partner and API key' : 'Add manual partner') }}</button>
                             @if($editing)<a href="{{ route('logistics-channel.index', ['tab' => 'integrations']) }}" class="{{ $btnGhost }}">Cancel</a>@endif
                         </div>
                     </form>
 
-                    @if($editing)
+                    @if($editing && $editing->authentication_method !== 'manual')
                         <form method="POST" action="{{ route('logistics-channel.integrations.rotate', $editing) }}" class="mt-5 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-5" data-confirm="Create a new signing credential? Current active credentials remain valid for the overlap period.">
                             @csrf
                             <label class="text-xs font-bold text-slate-600">Key overlap period
@@ -348,8 +366,8 @@
                 <div class="space-y-4">
                     <article class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div class="border-b border-slate-100 px-5 py-4">
-                            <h2 class="text-sm font-extrabold text-slate-900">Managed integrations</h2>
-                            <p class="mt-1 text-xs text-slate-500">Secrets are encrypted at rest. Only key IDs and credential state are listed.</p>
+                            <h2 class="text-sm font-extrabold text-slate-900">Logistics partners</h2>
+                            <p class="mt-1 text-xs text-slate-500">API keys are encrypted at rest; manual partners do not use credentials.</p>
                         </div>
                         <ul class="divide-y divide-slate-100">
                             @forelse($integrations as $integration)
@@ -367,8 +385,10 @@
                                             @endif
                                         </div>
                                         <div class="flex items-center gap-2">
+                                            @php($isManual = $integration->authentication_method === 'manual')
                                             @php($apiActive = $integration->status === 'active' && (int) $integration->active_credentials_count > 0)
-                                            <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $apiActive ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800' }}">{{ $apiActive ? 'Active' : 'Inactive' }}</span>
+                                            @php($partnerState = $isManual ? ($integration->status === 'active' ? 'No API · Active' : 'No API · Disabled') : ($apiActive ? 'API Active' : 'API Inactive'))
+                                            <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $isManual ? 'bg-blue-50 text-blue-800' : ($apiActive ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800') }}">{{ $partnerState }}</span>
                                             <a href="{{ route('logistics-channel.index', ['tab' => 'integrations', 'edit' => $integration->id]) }}" aria-label="Edit {{ $integration->name }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Edit</a>
                                         </div>
                                     </div>
@@ -386,7 +406,7 @@
                                                 @endif
                                             </li>
                                         @empty
-                                            <li class="text-xs text-slate-500">No credentials registered. Rotate the key to create one.</li>
+                                            <li class="text-xs text-slate-500">{{ $isManual ? 'Manual tracking partner. No API credentials are used.' : 'No credentials registered. Rotate the key to create one.' }}</li>
                                         @endforelse
                                     </ul>
                                 </li>
@@ -660,6 +680,21 @@
             const schools = document.getElementById('authorized-schools');
             const regions = document.getElementById('authorized-regions');
             const allSchools = document.getElementById('all-schools');
+            const connectionType = document.getElementById('connection-type');
+            const apiFields = form?.querySelectorAll('[data-api-fields]') ?? [];
+            const setConnectionFields = () => {
+                const isApi = (connectionType?.value ?? form?.dataset.connectionType) === 'api';
+                apiFields.forEach(fieldGroup => {
+                    fieldGroup.hidden = !isApi;
+                    fieldGroup.querySelectorAll('input, select, textarea').forEach(field => { field.disabled = !isApi; });
+                });
+                const submitButton = document.getElementById('integration-submit');
+                if (submitButton && !form?.querySelector('input[name="_method"]')) {
+                    submitButton.textContent = isApi ? 'Create partner and API key' : 'Add manual partner';
+                }
+            };
+            connectionType?.addEventListener('change', setConnectionFields);
+            setConnectionFields();
             if (!form || !projects || !schools || !regions) return;
 
             const submit = document.getElementById('integration-submit');

@@ -23,9 +23,13 @@ class UpdateLogisticsIntegrationRequest extends FormRequest
      */
     public function rules(): array
     {
+        $isApiIntegration = $this->route('integration')?->authentication_method !== 'manual';
+
         return [
             'name' => ['required', 'string', 'max:120'],
-            'webhook_url' => ['nullable', 'url', 'max:500', 'regex:/\Ahttps:\/\//i'],
+            'webhook_url' => $isApiIntegration
+                ? ['required', 'url', 'max:500', 'regex:/\Ahttps:\/\//i']
+                : ['exclude'],
             'project_ids' => ['required', 'array', 'min:1'],
             'project_ids.*' => ['required', 'integer', 'distinct', 'exists:projects,project_id'],
             'school_scopes' => ['nullable', 'array'],
@@ -33,7 +37,7 @@ class UpdateLogisticsIntegrationRequest extends FormRequest
             'region_scopes' => ['nullable', 'array'],
             'region_scopes.*' => ['required', 'string', 'distinct', 'regex:/\A[0-9]+:[A-Za-z0-9_-]+\z/'],
             'all_schools' => ['sometimes', 'accepted'],
-            'enabled_event_types' => ['required', 'array', 'min:1'],
+            'enabled_event_types' => $isApiIntegration ? ['required', 'array', 'min:1'] : ['exclude'],
             'enabled_event_types.*' => ['required', 'string', 'distinct', Rule::in(config('logistics-webhooks.allowed_event_types', []))],
             'status' => ['required', Rule::in(['active', 'disabled'])],
         ];

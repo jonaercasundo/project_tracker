@@ -19,7 +19,7 @@
         @php
             $isAdminWorkspace = request()->routeIs(
                 'admin.dashboard', 'admin.ai-configuration.*', 'admin.ai-management.*',
-                'admin.access.*', 'admin.audit.*', 'roles.*', 'roleaccess.*',
+                'admin.access.*', 'admin.audit.*', 'admin.integrations.*', 'roles.*', 'roleaccess.*',
                 'companies.*', 'integrations.jarvis.*'
             );
         @endphp

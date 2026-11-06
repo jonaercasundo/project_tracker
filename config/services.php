@@ -21,6 +21,10 @@ return [
         'assistant_model' => env('OPENAI_ASSISTANT_MODEL', 'gpt-5.5'),
         'assistant_timeout' => env('OPENAI_ASSISTANT_TIMEOUT', 90),
     ],
+    'mmc_platform' => [
+        'base_url' => env('MMC_PLATFORM_API_BASE_URL'),
+        'read_key' => env('MMC_PLATFORM_READ_KEY'),
+    ],
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
     ],

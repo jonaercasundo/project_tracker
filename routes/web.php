@@ -7,6 +7,7 @@ use App\Http\Controllers\ActionCrawlerController;
 use App\Http\Controllers\Admin\AdminControlCenterController;
 use App\Http\Controllers\Admin\AiConfigurationController;
 use App\Http\Controllers\Admin\GoogleSheetsSettingsController;
+use App\Http\Controllers\Admin\MmcPlatformIntegrationController;
 use App\Http\Controllers\AiLiquidationAttachmentController;
 use App\Http\Controllers\AiQuotationController;
 use App\Http\Controllers\AssistantController;
@@ -209,6 +210,12 @@ Route::middleware(['auth', 'active.user'])->group(function () {
 
     });
     Route::middleware(['role:Administrator'])->group(function () {
+
+        Route::get('/admin/integrations/mmc-platform', [MmcPlatformIntegrationController::class, 'index'])
+            ->name('admin.integrations.mmc-platform.index');
+        Route::post('/admin/integrations/mmc-platform/test-connection', [MmcPlatformIntegrationController::class, 'testConnection'])
+            ->middleware('throttle:5,1')
+            ->name('admin.integrations.mmc-platform.test-connection');
 
         Route::middleware(['can:ai.settings.manage'])->prefix('admin/settings/ai')->name('admin.ai-configuration.')->group(function () {
             Route::get('/', [AiConfigurationController::class, 'index'])->name('index');

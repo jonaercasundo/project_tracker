@@ -60,13 +60,14 @@
             })"
             x-init="init()"
             @keydown.escape.window="if (contextPanelOpen) contextPanelOpen = false; else if (mobileSidebarOpen) mobileSidebarOpen = false; else if (contextOpen) contextOpen = false; else if (open && workspace) exitWorkspace(); else if (open) close()"
-            @dragover.prevent="if (attachmentAllowed && $event.dataTransfer?.types?.includes('Files')) draggingWorkbook = true"
-            @dragleave="if ($event.target === $el) draggingWorkbook = false"
-            @drop.prevent="if (attachmentAllowed) { draggingWorkbook = false; uploadDropped($event); }"
+            @dragover.window="if (attachmentAllowed && $event.dataTransfer?.types?.includes('Files')) { $event.preventDefault(); draggingWorkbook = true; }"
+            @dragleave.window="if ($event.relatedTarget === null) draggingWorkbook = false"
+            @dragend.window="draggingWorkbook = false"
+            @drop.window="if (attachmentAllowed && draggingWorkbook) { $event.preventDefault(); uploadDropped($event); } else { draggingWorkbook = false; }"
             class="fixed z-[1000] bottom-5 right-5 sm:bottom-6 sm:right-6"
             data-ai-assistant
         >
-            <div x-show="draggingWorkbook" x-transition.opacity class="pointer-events-none fixed inset-0 z-[1001] grid place-items-center bg-blue-950/30 p-6 text-center text-lg font-semibold text-white" role="status">Drop a supported file to attach it to this conversation.</div>
+            <div x-cloak x-show="draggingWorkbook" x-transition.opacity class="pointer-events-none fixed bottom-24 right-5 z-[1001] max-w-[calc(100vw-2.5rem)] rounded-2xl border border-blue-200 bg-white px-5 py-4 text-sm font-semibold text-slate-800 shadow-xl sm:bottom-24 sm:right-6" role="status" aria-live="polite">Drop a supported file to attach it to this conversation.</div>
             @unless ($workspace)
                 <button type="button" @click="toggle()" class="flex items-center gap-3 rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl transition hover:bg-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-300" aria-label="Open AI Assistant">
                     <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500"><x-ai-icon name="sparkles" size="16" /></span>

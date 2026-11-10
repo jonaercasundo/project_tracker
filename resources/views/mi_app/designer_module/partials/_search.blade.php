@@ -74,14 +74,37 @@
             placeholder="Search item name, category, collection, designer...">
     </div>
 
-    {{-- Date Encoded --}}
+    {{-- Encoded Date --}}
+    @php
+        $selectedEncodedPeriod = request('encoded_period', request()->filled('encoded_date_from') || request()->filled('encoded_date_to') ? 'custom' : 'all');
+    @endphp
     <div class="tx-filter-wrap wide">
-        <label for="encoded_date_from" class="mb-1 block text-xs font-semibold text-slate-500">Encoded date from</label>
-        <input id="encoded_date_from" type="date" name="encoded_date_from" value="{{ request('encoded_date_from') }}" aria-label="Encoded date from" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100">
+        <label for="encoded_period" class="mb-1 block text-xs font-semibold text-slate-500">Encoded date</label>
+        <div class="tx-filter-select-outer">
+            <select id="encoded_period" name="encoded_period" x-model="encodedPeriod" aria-label="Filter by encoded date">
+                <option value="all" @selected($selectedEncodedPeriod === 'all')>Any date</option>
+                <option value="today" @selected($selectedEncodedPeriod === 'today')>Today</option>
+                <option value="1_week" @selected($selectedEncodedPeriod === '1_week')>1 Week</option>
+                <option value="2_weeks" @selected($selectedEncodedPeriod === '2_weeks')>2 Weeks</option>
+                <option value="1_month" @selected($selectedEncodedPeriod === '1_month')>1 Month</option>
+                <option value="3_months" @selected($selectedEncodedPeriod === '3_months')>3 Months</option>
+                <option value="6_months" @selected($selectedEncodedPeriod === '6_months')>6 Months</option>
+                <option value="9_months" @selected($selectedEncodedPeriod === '9_months')>9 Months</option>
+                <option value="1_year" @selected($selectedEncodedPeriod === '1_year')>1 Year</option>
+                <option value="custom" @selected($selectedEncodedPeriod === 'custom')>Custom date range</option>
+            </select>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+        </div>
     </div>
-    <div class="tx-filter-wrap wide">
-        <label for="encoded_date_to" class="mb-1 block text-xs font-semibold text-slate-500">Encoded date to</label>
-        <input id="encoded_date_to" type="date" name="encoded_date_to" value="{{ request('encoded_date_to') }}" aria-label="Encoded date to" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100">
+    <div x-cloak x-show="encodedPeriod === 'custom'" class="tx-filter-wrap wide space-y-2">
+        <div>
+            <label for="encoded_date_from" class="mb-1 block text-xs font-semibold text-slate-500">From</label>
+            <input id="encoded_date_from" type="date" name="encoded_date_from" value="{{ request('encoded_date_from') }}" :disabled="encodedPeriod !== 'custom'" @disabled($selectedEncodedPeriod !== 'custom') aria-label="Encoded date from" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100">
+        </div>
+        <div>
+            <label for="encoded_date_to" class="mb-1 block text-xs font-semibold text-slate-500">To</label>
+            <input id="encoded_date_to" type="date" name="encoded_date_to" value="{{ request('encoded_date_to') }}" :disabled="encodedPeriod !== 'custom'" @disabled($selectedEncodedPeriod !== 'custom') aria-label="Encoded date to" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100">
+        </div>
     </div>
 
     {{-- Product Taxonomy --}}
@@ -148,7 +171,7 @@
             Search
         </button>
 
-        @if(request()->filled('search') || request()->filled('status') || request()->filled('classification') || request()->filled('country_of_production') || request()->filled('missing_cop') || request()->filled('encoded_date_from') || request()->filled('encoded_date_to') || request()->filled('category_id') || request()->filled('sub_category_id') || request()->filled('product_type_id') || request()->filled('collection_id'))
+        @if(request()->filled('search') || request()->filled('status') || request()->filled('classification') || request()->filled('country_of_production') || request()->filled('missing_cop') || (request()->filled('encoded_period') && request('encoded_period') !== 'all') || request()->filled('encoded_date_from') || request()->filled('encoded_date_to') || request()->filled('category_id') || request()->filled('sub_category_id') || request()->filled('product_type_id') || request()->filled('collection_id'))
             <a href="{{ route('mi_app.index') }}" class="tx-btn-clear">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 Clear

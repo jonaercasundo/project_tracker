@@ -37,6 +37,7 @@ class MIAppController extends Controller
         $filters = $request->validate([
             'encoded_date_from' => ['nullable', 'date_format:Y-m-d'],
             'encoded_date_to' => ['nullable', 'date_format:Y-m-d'],
+            'encoded_period' => ['nullable', Rule::in(['all', 'today', '1_week', '2_weeks', '1_month', '3_months', '6_months', '9_months', '1_year', 'custom'])],
             'category_id' => ['nullable', 'integer', 'exists:mi_categories,id'],
             'sub_category_id' => ['nullable', 'integer', 'exists:mi_sub_categories,id'],
             'product_type_id' => ['nullable', 'integer', 'exists:mi_product_types,id'],
@@ -123,12 +124,34 @@ class MIAppController extends Controller
             $query->where('status', $request->status);
         }
 
-        if (! empty($filters['encoded_date_from'])) {
-            $query->whereDate('created_at', '>=', $filters['encoded_date_from']);
+        $encodedDateFrom = $filters['encoded_date_from'] ?? null;
+        $encodedDateTo = $filters['encoded_date_to'] ?? null;
+        $encodedPeriod = $filters['encoded_period'] ?? null;
+
+        if ($encodedPeriod === 'all') {
+            $encodedDateFrom = null;
+            $encodedDateTo = null;
+        } elseif ($encodedPeriod !== null && $encodedPeriod !== 'custom') {
+            $today = now(config('app.timezone'))->startOfDay();
+            $encodedDateTo = $today->toDateString();
+            $encodedDateFrom = match ($encodedPeriod) {
+                'today' => $today->toDateString(),
+                '1_week' => $today->copy()->subDays(6)->toDateString(),
+                '2_weeks' => $today->copy()->subDays(13)->toDateString(),
+                '1_month' => $today->copy()->subMonthNoOverflow()->toDateString(),
+                '3_months' => $today->copy()->subMonthsNoOverflow(3)->toDateString(),
+                '6_months' => $today->copy()->subMonthsNoOverflow(6)->toDateString(),
+                '9_months' => $today->copy()->subMonthsNoOverflow(9)->toDateString(),
+                '1_year' => $today->copy()->subYearNoOverflow()->toDateString(),
+            };
         }
 
-        if (! empty($filters['encoded_date_to'])) {
-            $query->whereDate('created_at', '<=', $filters['encoded_date_to']);
+        if (! empty($encodedDateFrom)) {
+            $query->whereDate('created_at', '>=', $encodedDateFrom);
+        }
+
+        if (! empty($encodedDateTo)) {
+            $query->whereDate('created_at', '<=', $encodedDateTo);
         }
 
         foreach ([

@@ -3,8 +3,11 @@ const supportedViews = ['photo', 'table'];
 
 window.miCatalogView = () => ({
     view: 'table',
+    encodedPeriod: 'all',
 
     initialize() {
+        this.encodedPeriod = document.getElementById('encoded_period')?.value || 'all';
+
         try {
             const savedView = window.localStorage.getItem(storageKey);
             if (supportedViews.includes(savedView)) this.view = savedView;

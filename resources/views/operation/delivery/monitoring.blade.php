@@ -4,7 +4,7 @@
             <div>
                 <p class="text-xs font-bold uppercase tracking-widest text-blue-600">Operations / Delivery Monitoring</p>
                 <h1 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-900">Project Delivery Monitoring</h1>
-                <p class="mt-2 text-sm text-slate-500">Check warehouse readiness, then follow DR, Stock Out, Delivered, Billing and Billed.</p>
+                <p class="mt-2 text-sm text-slate-500">Check warehouse readiness, then follow each school through Stock Out, Delivered, Billing and Billed.</p>
             </div>
             <span class="text-xs text-slate-500">Live Tracker records · <span id="monitoring-project-count">{{ isset($filters['project_id']) ? 'Loading…' : 'Choose a project' }}</span></span>
         </div>

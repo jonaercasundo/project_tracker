@@ -1,6 +1,6 @@
 @php($operationalStages = collect($project['operational_pipeline'])->except('delivery_billing'))
 <p class="mb-3 text-xs font-bold uppercase tracking-wide text-slate-600">Operational Flow</p>
-<ol class="grid gap-4 md:grid-cols-5 md:gap-2" aria-label="DR through Stock Out to billed operational pipeline">
+<ol class="grid gap-4 md:grid-cols-5 md:gap-2" aria-label="School operational pipeline from stock out through billing">
     @foreach($operationalStages as $key => $stage)
         <li class="relative pl-7 md:pl-0">
             @unless($loop->last)<span aria-hidden="true" class="absolute left-2 top-4 h-full w-px bg-slate-200 md:left-2 md:top-2 md:h-px md:w-full"></span>@endunless
@@ -11,15 +11,15 @@
                     <p class="mt-1 text-sm font-semibold text-slate-500">Per item unit</p>
                     <p class="mt-1 text-[11px] leading-4 text-slate-500">See details</p>
                 @elseif($key === 'dr')
-                    <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['remaining_count']) }} <span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['remaining_total']) }} DRs</span></p>
-                    <p class="mt-1 text-xs font-semibold tabular-nums text-blue-700">{{ $stage['total'] ? 'Recorded' : 'No DRs' }}</p>
+                    <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['remaining_count']) }} <span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['remaining_total']) }} Schools</span></p>
+                    <p class="mt-1 text-xs font-semibold tabular-nums text-blue-700">{{ $stage['total'] ? 'DRs recorded' : 'No schools with DRs' }}</p>
                 @else
                     @if(in_array($key, ['stock_out', 'delivered'], true))
-                        <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['pending_count']) }} <span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['pending_total']) }} DRs</span></p>
+                        <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['pending_count']) }} <span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['pending_total']) }} Schools</span></p>
                     @else
-                        <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['completed']) }} @if($key !== 'dr')<span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['total']) }}{{ in_array($key, ['stock_out', 'delivered', 'billing'], true) ? ' DRs' : '' }}</span>@endif</p>
+                        <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['completed']) }} <span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['total']) }} Schools</span></p>
                     @endif
-                    <p class="mt-1 text-xs font-semibold tabular-nums {{ ($stage['completed'] ?? 0) > 0 ? 'text-blue-700' : 'text-slate-500' }}">{{ $key === 'dr' ? ($stage['total'] ? 'Recorded' : 'No DRs') : ($key === 'billing' ? number_format($stage['percent'] ?? 0, 1).'%' : ($stage['percent'] === null ? ($key === 'delivered' ? 'N/A' : 'No records') : number_format($stage['percent'], 1).'%')) }}</p>
+                    <p class="mt-1 text-xs font-semibold tabular-nums {{ ($stage['completed'] ?? 0) > 0 ? 'text-blue-700' : 'text-slate-500' }}">{{ $key === 'dr' ? ($stage['total'] ? 'Recorded' : 'No schools with DRs') : ($key === 'billing' ? number_format($stage['percent'] ?? 0, 1).'%' : ($stage['percent'] === null ? ($key === 'delivered' ? 'N/A' : 'No records') : number_format($stage['percent'], 1).'%')) }}</p>
                     @if($key === 'billed')<p class="mt-1 text-[11px] leading-4 text-slate-500">{{ $stage['unit'] }}</p>@endif
                 @endif
             </div>

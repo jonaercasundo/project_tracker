@@ -460,7 +460,7 @@ class ProjectDeliveryProgressService
             ->select(['allocation.project_id', 'allocation.dr_no']);
         $this->groupReceipts($releasedDrs, 'allocation');
 
-        $matchedReceipts = DB::query()->fromSub($this->receipts($filters)->select(['receipt.project_id', 'receipt.dr_no']), 'receipt')
+        $matchedReceipts = DB::query()->fromSub($this->validReceiptKeys($filters), 'receipt')
             ->joinSub($releasedDrs, 'stock_out_dr', function (JoinClause $join): void {
                 $this->matchReceipt($join, 'stock_out_dr', 'receipt');
             })
@@ -474,7 +474,7 @@ class ProjectDeliveryProgressService
             ->select('history.project_id')
             ->selectRaw($this->receiptExpression('history').' as dr_no')
             ->distinct();
-        $matchedSyncedReceipts = DB::query()->fromSub($this->receipts($filters)->select(['receipt.project_id', 'receipt.dr_no']), 'receipt')
+        $matchedSyncedReceipts = DB::query()->fromSub($this->validReceiptKeys($filters), 'receipt')
             ->joinSub($syncedDrs, 'synced_stock_out', function (JoinClause $join): void {
                 $this->matchReceipt($join, 'synced_stock_out', 'receipt');
             })
@@ -487,11 +487,24 @@ class ProjectDeliveryProgressService
     }
 
     /** @param array<string, mixed> $filters */
+    private function validReceiptKeys(array $filters): Builder
+    {
+        if (isset($filters['delivery_status'])) {
+            return $this->receipts($filters)->select(['receipt.project_id', 'receipt.dr_no']);
+        }
+
+        return DB::query()->fromSub($this->receiptRows($filters), 'receipt')
+            ->select(['receipt.project_id', 'receipt.dr_no'])
+            ->whereNotNull('receipt.dr_no')
+            ->whereRaw("TRIM(receipt.dr_no) <> ''")
+            ->where('receipt.invalid_rows_count', 0);
+    }
+
+    /** @param array<string, mixed> $filters */
     private function schoolPipelineStats(array $filters): Builder
     {
-        $receipts = $this->receipts($filters);
         $schoolDrs = $this->deliveries($filters)
-            ->joinSub($receipts->select(['receipt.project_id', 'receipt.dr_no']), 'valid_receipt', function (JoinClause $join): void {
+            ->joinSub($this->validReceiptKeys($filters), 'valid_receipt', function (JoinClause $join): void {
                 $this->matchReceipt($join, 'valid_receipt', 'd');
             })
             ->whereNotNull('d.school_id')

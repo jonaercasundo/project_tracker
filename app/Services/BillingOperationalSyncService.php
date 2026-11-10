@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Inventory;
+use App\Models\InventoryHistory;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -311,8 +313,61 @@ class BillingOperationalSyncService
         return $hubWarehouseIds->sole();
     }
 
+    /** @param array<int, array<string, int|string>> $lines */
+    public function recordReconciledStockOut(array $lines, string $batchNo): void
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new RuntimeException('Reconciled stock-out requires a database transaction.');
+        }
+        foreach ($lines as $line) {
+            if ((int) $line['project_id'] !== 502698 || (int) $line['quantity'] < 1) {
+                throw new RuntimeException('Only positive SME2 reconciliation lines are allowed.');
+            }
+        }
+        foreach (collect($lines)->groupBy('warehouse_id') as $warehouseId => $warehouseLines) {
+            $this->deductInventory($warehouseLines->all(), $batchNo.'-W'.$warehouseId, now(), 'Bypass Encoding', null, 'Bypass Encoding', true);
+        }
+    }
+
+    /** @param array<int, array{warehouse_id: int, item_id: int, required: int, available: int}> $shortages */
+    public function recordReconciliationStockIn(array $shortages, string $batchNo): void
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new RuntimeException('Reconciliation stock-in requires a database transaction.');
+        }
+        foreach ($shortages as $shortage) {
+            if (! DB::table('item')->where('item_id', $shortage['item_id'])->where('project_id', 502698)->exists()
+                || ! DB::table('warehouse')->where('warehouse_id', $shortage['warehouse_id'])->exists()) {
+                throw new RuntimeException('Reconciliation stock-in must refer to an SME2 item and existing warehouse.');
+            }
+            $inventory = Inventory::where('warehouse_id', $shortage['warehouse_id'])->where('item_id', $shortage['item_id'])->orderBy('inventory_id')->lockForUpdate()->first()
+                ?? new Inventory(['warehouse_id' => $shortage['warehouse_id'], 'item_id' => $shortage['item_id']]);
+            $oldQuantity = $inventory->exists ? (int) $inventory->qty : 0;
+            if ($oldQuantity !== $shortage['available']) {
+                throw new RuntimeException('Inventory changed before reconciliation stock-in.');
+            }
+            $quantity = $shortage['required'] - $oldQuantity;
+            if ($quantity <= 0) {
+                continue;
+            }
+            $inventory->withoutEvents(function () use ($inventory, $quantity, $oldQuantity): void {
+                $inventory->qty = $oldQuantity + $quantity;
+                $inventory->inventory_status = 'Approved';
+                $inventory->save();
+            });
+            InventoryHistory::create([
+                'batch_no' => $batchNo.'-IN-W'.$shortage['warehouse_id'], 'inventory_id' => $inventory->inventory_id,
+                'item_id' => $shortage['item_id'], 'warehouse_id' => $shortage['warehouse_id'],
+                'old_qty' => $oldQuantity, 'new_qty' => $oldQuantity + $quantity,
+                'changed_by' => 'Bypass Encoding', 'changed_by_user_id' => null, 'changed_at' => now(),
+                'remarks' => 'bypass inventories due to insufficient inventory during bypass encoding of stock out and deliveries',
+                'change_type' => 'stock_in', 'project_id' => 502698, 'quantity' => $quantity,
+            ]);
+        }
+    }
+
     /** @param array<int, array<string, int|string>> $stockOutLines */
-    private function deductInventory(array $stockOutLines, string $batchNo, mixed $changedAt, string $changedBy, int $userId): void
+    private function deductInventory(array $stockOutLines, string $batchNo, mixed $changedAt, string $changedBy, ?int $userId, ?string $remarks = null, bool $bulkHistory = false): void
     {
         $requiredByStock = [];
         foreach ($stockOutLines as $line) {
@@ -347,9 +402,10 @@ class BillingOperationalSyncService
             }
 
             $runningQuantity = $available;
+            $historyRows = [];
             foreach ($requirement['lines'] as $line) {
                 $nextQuantity = $runningQuantity - $line['quantity'];
-                $historyId = DB::table('inventory_history')->insertGetId([
+                $historyRow = [
                     'batch_no' => $batchNo,
                     'inventory_id' => $inventory->inventory_id,
                     'item_id' => $line['item_id'],
@@ -358,7 +414,7 @@ class BillingOperationalSyncService
                     'new_qty' => $nextQuantity,
                     'changed_by' => $changedBy,
                     'changed_by_user_id' => $userId,
-                    'remarks' => "Stock Out bypassed during the billing process by Sync Billing: content quantity {$line['content_quantity']} x package quantity {$line['package_quantity']}.",
+                    'remarks' => $remarks ?? "Stock Out bypassed during the billing process by Sync Billing: content quantity {$line['content_quantity']} x package quantity {$line['package_quantity']}.",
                     'change_type' => 'stock_out',
                     'changed_at' => $changedAt,
                     'project_id' => $line['project_id'],
@@ -366,9 +422,24 @@ class BillingOperationalSyncService
                     'package_id' => $line['package_id'],
                     'dr_no' => $line['dr_no'],
                     'quantity' => $line['quantity'],
-                ]);
-                app(DeliveryAuditTrailService::class)->recordInventoryHistoryById((int) $historyId);
+                ];
+                if ($bulkHistory) {
+                    $historyRows[] = $historyRow;
+                } else {
+                    $historyId = DB::table('inventory_history')->insertGetId($historyRow);
+                    app(DeliveryAuditTrailService::class)->recordInventoryHistoryById((int) $historyId);
+                }
                 $runningQuantity = $nextQuantity;
+            }
+            if ($bulkHistory) {
+                foreach (array_chunk($historyRows, 500) as $chunk) {
+                    DB::table('inventory_history')->insert($chunk);
+                }
+                $recorded = DB::table('inventory_history')->where('batch_no', $batchNo)->where('inventory_id', $inventory->inventory_id)->orderBy('history_id')->get();
+                if ($recorded->count() !== count($historyRows)) {
+                    throw new RuntimeException('Unexpected reconciliation history count.');
+                }
+                app(DeliveryAuditTrailService::class)->recordReconciledInventoryHistories($recorded->all());
             }
 
             DB::table('inventory')->where('inventory_id', $inventory->inventory_id)->update([

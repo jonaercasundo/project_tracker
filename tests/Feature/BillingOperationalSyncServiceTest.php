@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\BillingOperationalSyncService;
+use App\Services\Sme2InventoryReconciliationService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -117,6 +118,203 @@ class BillingOperationalSyncServiceTestCase extends TestCase
 }
 
 pest()->extend(BillingOperationalSyncServiceTestCase::class)->in(__FILE__);
+
+/** @return array{project_id: int, delivery_id: int, package_id: int} */
+function completedSme2Fixture(string $region = 'Region I'): array
+{
+    $fixture = billingOperationalFixture(region: $region);
+    DB::table('projects')->where('project_id', $fixture['project_id'])->update(['project_id' => 502698]);
+    DB::table('deliveries')->where('delivery_id', $fixture['delivery_id'])->update(['project_id' => 502698, 'status' => 'delivered']);
+    DB::table('item')->where('item_id', 91)->update(['project_id' => 502698]);
+    DB::table('warehouse')->insert(['warehouse_id' => 2, 'warehouse_name' => 'Pampanga']);
+    DB::table('inventory')->insert(['item_id' => 91, 'warehouse_id' => 2, 'qty' => 20, 'inventory_status' => 'Approved']);
+    $fixture['project_id'] = 502698;
+
+    return $fixture;
+}
+
+it('deducts a completed delivery through region routing with exact remarks and no repeat deduction', function () {
+    $fixture = completedSme2Fixture();
+    $service = app(Sme2InventoryReconciliationService::class);
+    $preview = $service->reconcile([]);
+    expect($preview['lines'][0]['quantity'])->toBe(6)
+        ->and(DB::table('inventory')->value('qty'))->toBe(20);
+
+    $service->reconcile([], true, $preview['fingerprint']);
+
+    $this->assertDatabaseHas('inventory_history', ['delivery_id' => $fixture['delivery_id'], 'package_id' => $fixture['package_id'], 'quantity' => 6, 'old_qty' => 20, 'new_qty' => 14, 'remarks' => 'Bypass Encoding']);
+    expect(DB::table('inventory')->value('qty'))->toBe(14)
+        ->and($service->reconcile([])['lines'])->toBe([]);
+    $rerun = $service->reconcile([]);
+    $service->reconcile([], true, $rerun['fingerprint']);
+    expect(DB::table('inventory_history')->count())->toBe(1);
+});
+
+it('credits recovered scanner deductions and applies only the remaining quantity', function () {
+    $fixture = completedSme2Fixture();
+    $statusId = (int) DB::table('package_status')->value('package_status_id');
+    $historyId = (int) DB::table('inventory_history')->insertGetId(['inventory_id' => 1, 'item_id' => 91, 'warehouse_id' => 2, 'old_qty' => 23, 'new_qty' => 20, 'change_type' => 'stock_out']);
+    $mapping = [['history_id' => $historyId, 'delivery_id' => $fixture['delivery_id'], 'package_id' => $fixture['package_id'], 'package_status_id' => $statusId, 'item_id' => 91, 'warehouse_id' => 2, 'deducted_quantity' => 3]];
+    $service = app(Sme2InventoryReconciliationService::class);
+    $preview = $service->reconcile($mapping);
+    expect($preview['lines'][0]['quantity'])->toBe(3);
+
+    $service->reconcile($mapping, true, $preview['fingerprint']);
+
+    expect(DB::table('inventory')->value('qty'))->toBe(17)
+        ->and($service->reconcile($mapping)['lines'])->toBe([]);
+    expect(fn () => $service->reconcile([...$mapping, ...$mapping]))->toThrow(RuntimeException::class, 'repeated recovered scanner mapping');
+});
+
+it('does not treat a failed or pending stock-out as completed movement', function () {
+    $fixture = completedSme2Fixture();
+    DB::table('deliveries')->where('delivery_id', $fixture['delivery_id'])->update(['status' => 'pending']);
+
+    $preview = app(Sme2InventoryReconciliationService::class)->reconcile([]);
+
+    expect($preview['lines'])->toBe([])
+        ->and(DB::table('inventory')->value('qty'))->toBe(20);
+});
+
+it('leaves missing mappings and quantities unresolved with specific reasons', function () {
+    completedSme2Fixture(region: 'Unknown region');
+    $service = app(Sme2InventoryReconciliationService::class);
+    expect($service->reconcile([])['rows'][0]['reason'])->toContain('missing_warehouse_mapping');
+    DB::table('package_content')->update(['qty' => null]);
+
+    $preview = $service->reconcile([]);
+
+    expect($preview['rows'][0]['reason'])->toBe('missing_item_or_package_quantity')
+        ->and($preview['lines'])->toBe([]);
+});
+
+it('rejects stale previews and holds insufficient stock without changing inventory history', function () {
+    completedSme2Fixture();
+    $service = app(Sme2InventoryReconciliationService::class);
+    $preview = $service->reconcile([]);
+    expect(fn () => $service->reconcile([], true, 'stale'))->toThrow(RuntimeException::class, 'Preview changed');
+    DB::table('inventory')->update(['qty' => 1]);
+
+    $blocked = $service->reconcile([]);
+    expect($blocked['rows'][0]['reason'])->toBe('blocked_insufficient_stock')
+        ->and($blocked['lines'])->toBe([]);
+    $service->reconcile([], true, $blocked['fingerprint']);
+    expect(DB::table('inventory')->value('qty'))->toBe(1)
+        ->and(DB::table('inventory_history')->count())->toBe(0);
+});
+
+it('applies funded item lines while holding stock shortages and excluding other projects', function () {
+    $fixture = completedSme2Fixture();
+    DB::table('inventory')->update(['qty' => 1]);
+    DB::table('item')->insert([['item_id' => 92, 'project_id' => 502698], ['item_id' => 99, 'project_id' => 123]]);
+    DB::table('package_content')->insert(['package_id' => $fixture['package_id'], 'item_id' => 92, 'qty' => 1]);
+    DB::table('inventory')->insert([['item_id' => 92, 'warehouse_id' => 2, 'qty' => 9], ['item_id' => 99, 'warehouse_id' => 2, 'qty' => 50]]);
+    $service = app(Sme2InventoryReconciliationService::class);
+    $preview = $service->reconcile([]);
+
+    $service->reconcile([], true, $preview['fingerprint']);
+
+    expect(DB::table('inventory')->where('item_id', 91)->value('qty'))->toBe(1)
+        ->and(DB::table('inventory')->where('item_id', 92)->value('qty'))->toBe(6)
+        ->and(DB::table('inventory')->where('item_id', 99)->value('qty'))->toBe(50)
+        ->and(DB::table('inventory_history')->count())->toBe(1)
+        ->and($service->reconcile([])['lines'])->toBe([]);
+});
+
+it('adds only authorized shortfalls with exact stock-in remarks and does not repeat them', function () {
+    $fixture = completedSme2Fixture();
+    DB::table('inventory')->where('item_id', 91)->update(['qty' => 1]);
+    DB::table('item')->insert(['item_id' => 92, 'project_id' => 502698]);
+    DB::table('package_content')->insert(['package_id' => $fixture['package_id'], 'item_id' => 92, 'qty' => 1]);
+    $service = app(Sme2InventoryReconciliationService::class);
+    $preview = $service->reconcile([], replenishShortfalls: true);
+
+    $service->reconcile([], true, $preview['fingerprint'], true);
+
+    $remark = 'bypass inventories due to insufficient inventory during bypass encoding of stock out and deliveries';
+    $this->assertDatabaseHas('inventory_history', ['item_id' => 91, 'change_type' => 'stock_in', 'quantity' => 5, 'old_qty' => 1, 'new_qty' => 6, 'remarks' => $remark]);
+    $this->assertDatabaseHas('inventory_history', ['item_id' => 92, 'change_type' => 'stock_in', 'quantity' => 3, 'remarks' => $remark]);
+    expect(DB::table('inventory_history')->where('change_type', 'stock_in')->value('batch_no'))->toBe($preview['batch_no'].'-IN-W2');
+    expect(DB::table('inventory')->sum('qty'))->toBe(0)
+        ->and(DB::table('inventory_history')->count())->toBe(4);
+    $again = $service->reconcile([], replenishShortfalls: true);
+    $service->reconcile([], true, $again['fingerprint'], true);
+    expect(DB::table('inventory_history')->count())->toBe(4);
+});
+
+it('stocks out only requested pending schools and ignores the school on a repeated run', function () {
+    $fixture = completedSme2Fixture();
+    DB::table('deliveries')->where('delivery_id', $fixture['delivery_id'])->update(['status' => 'pending']);
+    $service = app(Sme2InventoryReconciliationService::class);
+    $preview = $service->reconcile([], replenishShortfalls: true, stockOutSchoolIds: ['SCH-1', 'NOT-FOUND']);
+    expect($preview['schools'][1]['reason'])->toBe('school_not_found_in_sme2')
+        ->and(DB::table('package_status')->value('status'))->toBe('pending');
+
+    $service->reconcile([], true, $preview['fingerprint'], true, ['SCH-1', 'NOT-FOUND']);
+
+    expect(DB::table('package_status')->value('status'))->toBe('released')
+        ->and(DB::table('inventory')->value('qty'))->toBe(14)
+        ->and(DB::table('deliveries')->value('status'))->toBe('pending');
+    $rerun = $service->reconcile([], replenishShortfalls: true, stockOutSchoolIds: ['SCH-1']);
+    expect($rerun['lines'])->toBe([])
+        ->and($rerun['release_status_ids'])->toBe([])
+        ->and($rerun['schools'][0]['reason'])->toBe('skip_already_stock_out');
+});
+
+it('ignores every package of a requested school that already has a delivered row', function () {
+    completedSme2Fixture();
+    DB::table('deliveries')->insert(['project_id' => 502698, 'school_id' => 'SCH-1', 'lot_id' => 7, 'dr_no' => 'SECOND', 'package_qty' => 1, 'status' => 'pending']);
+    $service = app(Sme2InventoryReconciliationService::class);
+
+    $preview = $service->reconcile([], replenishShortfalls: true, stockOutSchoolIds: ['SCH-1']);
+
+    expect($preview['schools'][0]['reason'])->toBe('skip_already_delivered')
+        ->and($preview['lines'])->toBe([])
+        ->and($preview['release_status_ids'])->toBe([])
+        ->and(DB::table('inventory')->value('qty'))->toBe(20);
+});
+
+it('creates the missing status row for an allocated requested school package', function () {
+    $fixture = completedSme2Fixture();
+    DB::table('deliveries')->where('delivery_id', $fixture['delivery_id'])->update(['status' => 'pending']);
+    DB::table('package_status')->delete();
+    $service = app(Sme2InventoryReconciliationService::class);
+    $preview = $service->reconcile([], replenishShortfalls: true, stockOutSchoolIds: ['SCH-1']);
+
+    $service->reconcile([], true, $preview['fingerprint'], true, ['SCH-1']);
+
+    $this->assertDatabaseHas('package_status', ['delivery_id' => $fixture['delivery_id'], 'package_id' => $fixture['package_id'], 'status' => 'released']);
+    expect(DB::table('inventory')->value('qty'))->toBe(14)
+        ->and($service->reconcile([], replenishShortfalls: true, stockOutSchoolIds: ['SCH-1'])['lines'])->toBe([]);
+});
+
+it('records the source school and exact history metadata in bulk reconciliation audits', function () {
+    completedSme2Fixture();
+    Schema::table('school', function (Blueprint $table): void {
+        $table->string('school_name')->nullable();
+    });
+    DB::table('school')->update(['school_name' => 'Test School']);
+    Schema::create('delivery_audit_events', function (Blueprint $table): void {
+        $table->id();
+        $table->string('source_key')->unique();
+        foreach (['event_uuid', 'event_at', 'project_id', 'lot_id', 'school_id', 'school_name', 'package_code', 'dr_no', 'event_type', 'quantity', 'warehouse_id', 'warehouse_name', 'performed_by', 'actor_name', 'source_module', 'related_type', 'related_id', 'notes', 'metadata'] as $column) {
+            $table->text($column)->nullable();
+        }
+        $table->timestamps();
+    });
+    $service = app(Sme2InventoryReconciliationService::class);
+    $preview = $service->reconcile([]);
+
+    $service->reconcile([], true, $preview['fingerprint']);
+
+    $audit = DB::table('delivery_audit_events')->first();
+    $history = DB::table('inventory_history')->first();
+    expect($audit->school_name)->toBe('Test School')
+        ->and($audit->source_key)->toBe('legacy:inventory_history:'.$history->history_id)
+        ->and($audit->notes)->toBe('Bypass Encoding')
+        ->and(json_decode($audit->metadata, true)['quantity'])->toBe(6)
+        ->and(DB::table('delivery_audit_events')->count())->toBe(1);
+});
 
 /** @return array{project_id: int, delivery_id: int, package_id: int} */
 function billingOperationalFixture(?int $logisticsLocationId = null, string $region = 'Region IV-A'): array

@@ -9,6 +9,48 @@ use Illuminate\Support\Str;
 
 class DeliveryAuditTrailService
 {
+    /** @param array<int, object> $rows */
+    public function recordReconciledInventoryHistories(array $rows): void
+    {
+        if ($rows === [] || ! Schema::hasTable('delivery_audit_events')) {
+            return;
+        }
+        $deliveryIds = array_values(array_unique(array_column($rows, 'delivery_id')));
+        $deliveries = DB::table('deliveries as d')->leftJoin('school as s', 's.school_id', '=', 'd.school_id')
+            ->whereIn('d.delivery_id', $deliveryIds)->get(['d.delivery_id', 'd.project_id', 'd.lot_id', 'd.school_id', 's.school_name'])->keyBy('delivery_id');
+        $warehouses = DB::table('warehouse')->whereIn('warehouse_id', array_unique(array_column($rows, 'warehouse_id')))->pluck('warehouse_name', 'warehouse_id');
+        $packageCodes = collect();
+        foreach (['core_package_code', 'package_code'] as $column) {
+            if (Schema::hasColumn('package', $column)) {
+                $packageCodes = DB::table('package')->whereIn('package_id', array_unique(array_column($rows, 'package_id')))->pluck($column, 'package_id');
+                break;
+            }
+        }
+        $attributes = [];
+        $now = now();
+        foreach ($rows as $row) {
+            $delivery = $deliveries->get($row->delivery_id);
+            if ($delivery === null || (int) $row->project_id !== 502698 || (int) $delivery->project_id !== 502698 || $row->remarks !== 'Bypass Encoding') {
+                throw new \RuntimeException('Invalid reconciled inventory audit scope.');
+            }
+            $attributes[] = [
+                'event_uuid' => (string) Str::uuid(), 'source_key' => 'legacy:inventory_history:'.$row->history_id,
+                'event_at' => $row->changed_at, 'project_id' => $row->project_id, 'lot_id' => $delivery->lot_id,
+                'school_id' => $delivery->school_id, 'school_name' => $delivery->school_name,
+                'package_code' => $packageCodes->get($row->package_id), 'dr_no' => $row->dr_no,
+                'event_type' => $row->change_type, 'quantity' => $row->quantity,
+                'warehouse_id' => $row->warehouse_id, 'warehouse_name' => $warehouses->get($row->warehouse_id),
+                'performed_by' => $row->changed_by_user_id, 'actor_name' => $row->changed_by,
+                'source_module' => 'Inventory', 'related_type' => 'inventory_history', 'related_id' => (string) $row->history_id,
+                'notes' => $row->remarks, 'metadata' => json_encode((array) $row, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+                'created_at' => $now, 'updated_at' => $now,
+            ];
+        }
+        foreach (array_chunk($attributes, 500) as $chunk) {
+            DB::table('delivery_audit_events')->insertOrIgnore($chunk);
+        }
+    }
+
     public function recordInventoryHistoryById(int $historyId): void
     {
         if (! Schema::hasTable('delivery_audit_events')) {

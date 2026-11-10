@@ -9,17 +9,43 @@ use App\Services\MmcPlatformConfiguration;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Validator as ValidatorContract;
 
 class MmcPlatformIntegrationController extends Controller
 {
-    public function index(MmcPlatformApiClient $client): View
+    public function index(Request $request, MmcPlatformApiClient $client): View
     {
+        $tabs = ['overview', 'integration', 'partners', 'api-webhooks', 'reconciliation', 'audit-logs'];
+        $requestedTab = $request->query('tab', 'overview');
+        $tab = is_string($requestedTab) && in_array($requestedTab, $tabs, true) ? $requestedTab : 'overview';
+        $auditRows = null;
+        if ($tab === 'audit-logs' && Schema::hasTable('admin_activity_logs')) {
+            $auditRows = DB::table('admin_activity_logs')
+                ->where('event', 'integrations.mmc_platform_configuration_updated')
+                ->where('company_id', $request->user()->currentCompany()?->getKey())
+                ->orderByDesc('id')
+                ->select(['id', 'event', 'summary', 'actor_user_id', 'created_at'])
+                ->paginate(15)
+                ->withQueryString();
+        }
+
         return view('integrations.mmc-platform', [
             'connection' => $client->configurationStatus(),
             'testResult' => session('mmc_platform_test'),
+            'tab' => $tab,
+            'tabs' => [
+                'overview' => 'Overview',
+                'integration' => 'Integration',
+                'partners' => 'Partners',
+                'api-webhooks' => 'API & Webhooks',
+                'reconciliation' => 'Reconciliation',
+                'audit-logs' => 'Audit Logs',
+            ],
+            'auditRows' => $auditRows,
+            'auditStorageAvailable' => Schema::hasTable('admin_activity_logs'),
         ]);
     }
 
@@ -67,7 +93,7 @@ class MmcPlatformIntegrationController extends Controller
             'credential_replaced' => $submittedKey !== '',
         ]);
 
-        return to_route('integrations.mmc-platform.index')
+        return to_route('integrations.mmc-platform.index', ['tab' => 'integration'])
             ->with('success', 'MMC Platform configuration saved. The API key is encrypted and will not be shown again.');
     }
 

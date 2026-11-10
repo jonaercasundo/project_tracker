@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div>
             <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Operations / Integrations</p>
-            <h1 class="mt-1 text-xl font-semibold text-slate-900">MMC Platform API</h1>
+            <h1 class="mt-1 text-xl font-semibold text-slate-900">Third Party API Key Management</h1>
         </div>
     </x-slot>
 
@@ -52,6 +52,106 @@
                 </ul>
             </div>
         @endif
+
+        <nav class="-mx-4 flex gap-1 overflow-x-auto border-b border-slate-200 px-4 sm:mx-0 sm:px-0" aria-label="Third party API key management sections">
+            @foreach ($tabs as $key => $label)
+                <a href="{{ route('integrations.mmc-platform.index', ['tab' => $key]) }}" @if ($tab === $key) aria-current="page" @endif
+                    class="whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition {{ $tab === $key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800' }}">
+                    {{ $label }}
+                </a>
+            @endforeach
+        </nav>
+
+        @if ($tab === 'overview')
+            <section class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="overview-title">
+                <div>
+                    <h2 id="overview-title" class="text-lg font-semibold text-slate-900">MMC Platform connection overview</h2>
+                    <p class="mt-1 text-sm text-slate-500">Review the saved read-only connection and open a section to manage access or inspect integration details.</p>
+                </div>
+                <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="rounded-xl bg-slate-50 p-4">
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Connection</dt>
+                        <dd class="mt-2 text-sm font-semibold {{ $connection['configured'] ? 'text-emerald-700' : 'text-amber-700' }}">{{ $connection['configured'] ? 'Ready to test' : 'Configuration required' }}</dd>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 p-4">
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">API key</dt>
+                        <dd class="mt-2 text-sm font-semibold text-slate-800">{{ $connection['has_key'] ? 'Configured · hidden' : 'Not configured' }}</dd>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 p-4">
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Key source</dt>
+                        <dd class="mt-2 text-sm font-semibold text-slate-800">{{ ucfirst($connection['credential_source']) }}</dd>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 p-4">
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Transport</dt>
+                        <dd class="mt-2 text-sm font-semibold text-slate-800">{{ $connection['secure'] ? 'HTTPS' : 'Not verified' }}</dd>
+                    </div>
+                </dl>
+                @if ($connection['reason'])
+                    <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ $connection['reason'] }}</p>
+                @endif
+                <div class="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+                    This page currently manages the MMC Platform read-only connection. Partner registration, data synchronization, reconciliation runs, and webhook delivery are not configured here.
+                </div>
+            </section>
+        @elseif ($tab === 'partners')
+            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="partners-title">
+                <h2 id="partners-title" class="text-lg font-semibold text-slate-900">Partners</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600">No partner registry is connected to MMC Platform API settings yet. The current integration stores one MMC endpoint and its read-only key.</p>
+                <p class="mt-3 text-sm leading-6 text-slate-600">Partner credentials should be added here only when the partner ownership model, scopes, rotation process, and storage requirements are defined.</p>
+            </section>
+        @elseif ($tab === 'api-webhooks')
+            <section class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="api-title">
+                <div>
+                    <h2 id="api-title" class="text-lg font-semibold text-slate-900">API &amp; Webhooks</h2>
+                    <p class="mt-1 text-sm text-slate-500">Known MMC Platform read endpoints from the current API mapping.</p>
+                </div>
+                <div class="space-y-3 text-sm leading-6 text-slate-700">
+                    <p><code class="rounded bg-slate-100 px-1.5 py-0.5">GET /api/v1/programs</code> lists programs. The connection test checks this endpoint with a one-record limit.</p>
+                    <p><code class="rounded bg-slate-100 px-1.5 py-0.5">GET /api/v1/programs/{program_id}/master-list</code> returns paginated delivery rows; the guide documents a maximum page limit of 2,000.</p>
+                    <p>Authentication uses a read-scoped <code class="rounded bg-slate-100 px-1.5 py-0.5">mmc_</code> bearer key. The API guide does not document webhook events or signature validation; polling is the documented approach.</p>
+                </div>
+                <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Endpoint details and data ownership must be agreed before enabling synchronization. This screen only configures and tests the connection.</p>
+            </section>
+        @elseif ($tab === 'reconciliation')
+            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="reconciliation-title">
+                <h2 id="reconciliation-title" class="text-lg font-semibold text-slate-900">Reconciliation</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600">No MMC Platform reconciliation runs are available. The connection test does not import or change Tracker records.</p>
+                <p class="mt-3 text-sm leading-6 text-slate-600">A reconciliation workflow depends on an approved field mapping, stable external identifiers, deletion rules, and sync persistence. These decisions are recorded in the MMC Tracker API mapping document.</p>
+            </section>
+        @elseif ($tab === 'audit-logs')
+            <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="audit-title">
+                <div>
+                    <h2 id="audit-title" class="text-lg font-semibold text-slate-900">Audit Logs</h2>
+                    <p class="mt-1 text-sm text-slate-500">MMC Platform connection configuration changes recorded in Tracker.</p>
+                </div>
+                @if (! $auditStorageAvailable)
+                    <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">Audit log storage is not available.</p>
+                @elseif ($auditRows->isEmpty())
+                    <p class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">No MMC Platform configuration changes have been recorded.</p>
+                @else
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+                            <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                                <tr><th class="px-4 py-3 font-semibold">Date</th><th class="px-4 py-3 font-semibold">Event</th><th class="px-4 py-3 font-semibold">Actor ID</th><th class="px-4 py-3 font-semibold">Summary</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach ($auditRows as $auditRow)
+                                    <tr>
+                                        <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ \Illuminate\Support\Carbon::parse($auditRow->created_at)->format('M j, Y g:i A') }}</td>
+                                        <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{{ $auditRow->event }}</td>
+                                        <td class="px-4 py-3 text-slate-600">{{ $auditRow->actor_user_id ?? 'System' }}</td>
+                                        <td class="min-w-64 px-4 py-3 text-slate-700">{{ $auditRow->summary }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    {{ $auditRows->links() }}
+                @endif
+            </section>
+        @endif
+
+        @if ($tab === 'integration')
 
         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -107,5 +207,6 @@
         </form>
 
         <p class="text-xs leading-5 text-slate-500">The API key is encrypted in the MMC Platform settings table with Laravel's application key. Keep the same <code class="rounded bg-slate-100 px-1">APP_KEY</code> across app servers and backups so the saved credential remains decryptable.</p>
+        @endif
     </div>
 </x-project_app-layout>

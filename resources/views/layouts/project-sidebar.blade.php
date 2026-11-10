@@ -368,7 +368,7 @@
             <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('integrations.mmc-platform.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10v10H7zM3 12h4m10 0h4M12 3v4m0 10v4" />
             </svg>
-            <span>MMC Platform API</span>
+            <span>Third Party API Key Management</span>
         </a>
         <!-- Logistics Channel -->
         <a href="{{ route('logistics-channel.index') }}"

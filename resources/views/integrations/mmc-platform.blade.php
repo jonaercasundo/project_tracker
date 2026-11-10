@@ -100,16 +100,6 @@
                 </div>
             </section>
 
-            <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950 sm:p-6">
-                <h2 class="font-semibold">Verify the endpoint before sending the key</h2>
-                <p class="mt-1">Test Connection first probes <code class="rounded bg-white/70 px-1">GET /programs?limit=1</code> without credentials. Tracker sends the key only if the endpoint responds with an authentication challenge. Redirects are disabled, and the TLS certificate must validate.</p>
-            </section>
-
-            <section class="rounded-2xl border border-blue-200 bg-blue-50 p-5 text-sm leading-6 text-blue-950 sm:p-6">
-                <h2 class="font-semibold">Test and data sync are separate</h2>
-                <p class="mt-1">Connection testing only reads one program record. It does not import, update, or delete Tracker data. No data synchronization is enabled by this configuration screen.</p>
-            </section>
-
             <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button type="submit" formaction="{{ route('integrations.mmc-platform.test-connection') }}" formnovalidate class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-blue-500 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Test Connection</button>
                 <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Save Configuration</button>

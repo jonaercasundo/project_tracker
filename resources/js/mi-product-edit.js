@@ -95,7 +95,8 @@ if (form) {
                     no_results: () => `<div class="no-results">No ${select.id === 'materials' ? 'material' : 'color'} found. Type a new value to add it.</div>`,
                 },
             });
-            wrapper.querySelector('[data-native-multi-hint]').hidden = true;
+            const nativeHint = wrapper.querySelector('.tx-multi-hint');
+            if (nativeHint) nativeHint.hidden = true;
             if (select.hasAttribute('aria-describedby')) {
                 select.tomselect.control_input.setAttribute('aria-describedby', select.getAttribute('aria-describedby'));
             }

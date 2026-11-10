@@ -526,6 +526,21 @@
 
     $pdHasPrice = !is_null($product->price);
 
+    $pdVariants = $product->variants->map(fn ($variant) => [
+        'id' => $variant->variant_id,
+        'sku' => $variant->sku,
+        'material' => $variant->material,
+        'color' => $variant->color,
+        'materials' => $variant->materials ?: array_filter([$variant->material]),
+        'colors' => $variant->colors ?: array_filter([$variant->color]),
+        'length' => $variant->product_length,
+        'width' => $variant->product_width,
+        'height' => $variant->product_height,
+        'depth' => $variant->product_depth,
+        'price' => $variant->selling_price,
+        'purchase_price' => $variant->purchase_price,
+    ])->values();
+
 @endphp
 
 
@@ -1186,13 +1201,7 @@
         price:
             @json($product->price),
 
-        variants: @json($product->variants->map(fn ($variant) => [
-            'id' => $variant->variant_id, 'sku' => $variant->sku, 'material' => $variant->material,
-            'color' => $variant->color, 'materials' => $variant->materials ?: array_filter([$variant->material]),
-            'colors' => $variant->colors ?: array_filter([$variant->color]), 'length' => $variant->product_length, 'width' => $variant->product_width,
-            'height' => $variant->product_height, 'depth' => $variant->product_depth, 'price' => $variant->selling_price,
-            'purchase_price' => $variant->purchase_price,
-        ])->values())
+        variants: @json($pdVariants)
 
     };
 

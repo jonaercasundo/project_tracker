@@ -110,6 +110,13 @@ class InventoryController extends Controller
 
         if ($request->filled('project_id')) {
             abort_unless($projects->contains('project_id', $request->integer('project_id')), 404);
+        } else {
+            $inventories = null;
+            $warehouses = Warehouse::query()->orderBy('warehouse_name')->get();
+            $warehouseSummaries = collect();
+            $hasUnmappedActualDr = false;
+
+            return view('inventory.balances', compact('inventories', 'projects', 'warehouses', 'warehouseSummaries', 'hasUnmappedActualDr'));
         }
 
         $transactionTotals = DB::table('inventory_history')

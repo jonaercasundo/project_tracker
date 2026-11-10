@@ -40,7 +40,8 @@
                     all-label="All Projects"
                     :truncate-selected="true"
                     id="inventory-balance-project"
-                    rounded="rounded-lg" />
+                    rounded="rounded-lg"
+                    :submit-on-change="true" />
 
                 <div class="min-w-0 space-y-1">
                     <label for="inventory-balance-warehouse" class="text-xs font-semibold text-slate-600">Warehouse</label>
@@ -62,6 +63,7 @@
             </div>
         </form>
 
+        @if(request()->filled('project_id'))
         <section class="mt-6 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm" aria-labelledby="warehouse-summary-heading">
             <div class="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -173,5 +175,11 @@
                 <div class="border-t border-slate-100 bg-white p-4">{{ $inventories->links() }}</div>
             @endif
         </section>
+        @else
+            <div class="mt-6 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+                <p class="text-sm font-semibold text-slate-800">Select a project to view inventory balances</p>
+                <p class="mt-1 text-xs text-slate-500">Choose a project above. The warehouse summary and item balances will load automatically.</p>
+            </div>
+        @endif
     </div>
 </x-project_app-layout>

@@ -25,8 +25,8 @@ export function summarizeFactoryCosts(entries) {
 export function formatFactoryCost(cents) {
     if (cents === null) return '\u2014';
 
-    const pesos = String(cents / 100n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return `\u20b1${pesos}.${String(cents % 100n).padStart(2, '0')}`;
+    const amount = String(cents / 100n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `USD ${amount}.${String(cents % 100n).padStart(2, '0')}`;
 }
 
 export function initializeFactoryCosts(form, markDirty) {

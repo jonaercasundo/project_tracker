@@ -491,7 +491,7 @@ class ProjectDeliveryProgressService
     {
         $receipts = $this->receipts($filters);
         $schoolDrs = $this->deliveries($filters)
-            ->joinSub($receipts->select(['receipt.project_id', 'receipt.dr_no', 'receipt.is_completed']), 'valid_receipt', function (JoinClause $join): void {
+            ->joinSub($receipts->select(['receipt.project_id', 'receipt.dr_no']), 'valid_receipt', function (JoinClause $join): void {
                 $this->matchReceipt($join, 'valid_receipt', 'd');
             })
             ->whereNotNull('d.school_id')
@@ -500,8 +500,9 @@ class ProjectDeliveryProgressService
             ->distinct();
 
         $stockOutDrs = $this->stockOutDrRows($filters);
-        $deliveredDrs = $this->receipts($filters)->where('receipt.is_completed', 1)
-            ->select(['receipt.project_id', 'receipt.dr_no'])->distinct();
+        $deliveredDrs = DB::query()->fromSub($this->receipts($filters), 'completed_receipt')
+            ->where('completed_receipt.is_completed', 1)
+            ->select(['completed_receipt.project_id', 'completed_receipt.dr_no'])->distinct();
         $billingDrs = $this->deliveryStatusDrRows($filters, ['for_billing', 'billed']);
         $billedDrs = $this->deliveryStatusDrRows($filters, ['billed']);
 

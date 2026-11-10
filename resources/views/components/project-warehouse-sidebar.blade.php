@@ -93,7 +93,7 @@
 
             <ul
                 x-show="open"
-                x-collapse
+                x-transition
                 class="ml-6 mt-1 space-y-1 border-l border-slate-200 pl-4">
                 <li>
                     <a href="{{ route('warehouse.inventory.index') }}"
@@ -146,7 +146,7 @@
 
             <ul
                 x-show="open"
-                x-collapse
+                x-transition
                 class="ml-6 mt-1 space-y-1 border-l border-slate-200 pl-4">
 
                 <li>

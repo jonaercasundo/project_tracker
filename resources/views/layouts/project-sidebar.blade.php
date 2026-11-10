@@ -117,7 +117,7 @@
                 <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
             @endif
             <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('project.bidding.index') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 ００１．１２５－１．１２５V５．６２５A１．１２５ １．１２５ ０ ０１５％６２５４％５z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M7 3h7l4 4v14H6V3h1Zm7 0v5h4"></path>
             </svg>
             <span>Bidding Docs</span>
         </a>
@@ -215,7 +215,7 @@
                     </svg>
                 </button>
 
-                <ul x-show="open" x-collapse class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
+                <ul x-show="open" x-transition class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
                     @can('billing.qr.scan')
                         <li>
                             <a href="{{ route('billing.prepare') }}" @if(request()->routeIs('billing.prepare*')) aria-current="page" @endif
@@ -294,7 +294,7 @@
             </button>
 
             <ul x-show="open" 
-                x-collapse 
+                x-transition
                 class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
                 
                 <li>

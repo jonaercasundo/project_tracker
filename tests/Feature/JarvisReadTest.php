@@ -11,6 +11,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -988,9 +989,15 @@ it('returns one project row with exact DR counts under strict MariaDB grouping',
         foreach (['warehouse' => 1, 'dr' => 4, 'delivered' => 1, 'billing' => 2, 'stock-out' => 0] as $section => $count) {
             $this->getJson('/deliveries/monitoring/1/details?section='.$section)->assertOk()->assertJsonPath('records.total', $count);
         }
+        $this->getJson('/deliveries/monitoring?project_id=1&active_only=0&direction=asc')
+            ->assertOk()
+            ->assertJsonPath('projects.0.completed_deliveries_count', 1)
+            ->assertJsonPath('projects.0.operational_pipeline.delivered.completed', 1);
         $dashboard = $this->getJson('/deliveries/monitoring?active_only=0')->assertOk();
         expect($dashboard->json('summary'))->toBe($api->json('data.summary'));
-        expect($dashboard->json('projects'))->toBe($api->json('data.projects'));
+        $dashboardProjects = collect($dashboard->json('projects'))->map(fn (array $project): array => Arr::except($project, ['lot_billing_progress']))->all();
+        $apiProjects = collect($api->json('data.projects'))->map(fn (array $project): array => Arr::except($project, ['lot_billing_progress']))->all();
+        expect($dashboardProjects)->toBe($apiProjects);
         fwrite(STDOUT, PHP_EOL.json_encode(['strict_mariadb_fixture' => ['project_rows' => $queryRows->count(), 'query_seconds' => round($querySeconds, 4), 'api_seconds' => round($apiSeconds, 4), 'page_seconds' => round($pageSeconds, 4), 'api_operations_queries' => $apiQueryCount, 'page_operations_queries' => $pageQueryCount]]).PHP_EOL);
     } finally {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);

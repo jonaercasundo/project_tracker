@@ -50,7 +50,7 @@
             </button>
 
             <ul x-show="open" 
-                x-collapse 
+                x-transition
                 class="relative mt-1 ml-6 pl-4 space-y-0.5 before:content-[''] before:absolute before:left-0 before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
                 
                 <li>

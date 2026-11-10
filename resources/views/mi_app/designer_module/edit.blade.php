@@ -232,10 +232,10 @@
                                 </div>
                             @endforeach
                             <div class="tx-subpanel">
-                                <div class="tx-subpanel-head"><div><h3>Pricing</h3><p>Purchase cost and selling price</p></div></div>
+                                <div class="tx-subpanel-head"><div><h3>Pricing</h3><p>Purchase cost and selling price in USD</p></div></div>
                                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                    @include('mi_app.designer_module.partials._edit-field', ['name' => 'purchase_cost', 'label' => 'Purchase Cost (Legacy)', 'inputType' => 'number', 'required' => false])
-                                    @include('mi_app.designer_module.partials._edit-field', ['name' => 'price', 'label' => 'Selling Price', 'inputType' => 'number', 'required' => false])
+                                    @include('mi_app.designer_module.partials._edit-field', ['name' => 'purchase_cost', 'label' => 'Purchase Cost (USD, Legacy)', 'inputType' => 'number', 'required' => false])
+                                    @include('mi_app.designer_module.partials._edit-field', ['name' => 'price', 'label' => 'Selling Price (USD)', 'inputType' => 'number', 'required' => false])
                                 </div>
                                 <p class="tx-hint">The existing purchase cost is kept separately. Factory cost comparisons below do not change purchase cost or selling price.</p>
                             </div>

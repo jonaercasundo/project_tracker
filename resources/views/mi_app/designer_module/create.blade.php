@@ -1164,12 +1164,12 @@
                                 </div>
                                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                                     <div>
-                                        <label for="purchase_cost" class="tx-label">Purchase Price</label>
+                                        <label for="purchase_cost" class="tx-label">Purchase Price (USD)</label>
                                         <input id="purchase_cost" name="purchase_cost" type="number" min="0" max="9999999999.99" step="0.01" inputmode="decimal" value="{{ old('purchase_cost') }}" class="tx-field @error('purchase_cost') field-invalid @enderror" @error('purchase_cost') aria-invalid="true" aria-describedby="purchase_cost_error" @enderror>
                                         @error('purchase_cost')<p id="purchase_cost_error" class="tx-error">{{ $message }}</p>@enderror
                                     </div>
                                     <div>
-                                        <label for="price" class="tx-label">Selling Price</label>
+                                        <label for="price" class="tx-label">Selling Price (USD)</label>
                                         <input id="price" name="price" type="number" min="0" max="9999999999.99" step="0.01" inputmode="decimal" value="{{ old('price') }}" class="tx-field @error('price') field-invalid @enderror" @error('price') aria-invalid="true" aria-describedby="price_error" @enderror>
                                         @error('price')<p id="price_error" class="tx-error">{{ $message }}</p>@enderror
                                     </div>

@@ -182,15 +182,9 @@ class DeliveryController extends Controller
                     $progressFilters[$metricFilter] = $request->input($filter);
                 }
             }
-            $summary = $this->deliveryProgress->report($progressFilters)['summary'];
 
-            return response()->json(['stats' => [
-                'total_pending' => (int) $summary['pending_deliveries_count'],
-                'total_stock_out' => max(0, (int) $summary['stock_out_drs_count'] - (int) $summary['completed_deliveries_count']),
-                'total_delivered' => (int) $summary['completed_deliveries_count'],
-                'total_collection' => (int) $summary['billing_drs_count'],
-                'total_billed' => (int) $summary['billed_delivery_drs_count'],
-            ]])->header('Cache-Control', 'private, no-store');
+            return response()->json(['stats' => $this->schoolDeliveryStageStats($progressFilters)])
+                ->header('Cache-Control', 'private, no-store');
         }
 
         if (! $request->filled('project')) {
@@ -516,14 +510,7 @@ class DeliveryController extends Controller
         }
         $stats = [];
         if ($request->query('phase') !== 'records') {
-            $progressSummary = $this->deliveryProgress->report($progressFilters)['summary'];
-            $stats = [
-                'total_pending' => (int) $progressSummary['pending_deliveries_count'],
-                'total_stock_out' => max(0, (int) $progressSummary['stock_out_drs_count'] - (int) $progressSummary['completed_deliveries_count']),
-                'total_delivered' => (int) $progressSummary['completed_deliveries_count'],
-                'total_collection' => (int) $progressSummary['billing_drs_count'],
-                'total_billed' => (int) $progressSummary['billed_delivery_drs_count'],
-            ];
+            $stats = $this->schoolDeliveryStageStats($progressFilters);
         }
 
         // =========================
@@ -552,6 +539,20 @@ class DeliveryController extends Controller
         }
 
         return view('deliveries.index', $viewData);
+    }
+
+    /** @param array<string, mixed> $filters @return array{total_pending: int, total_stock_out: int, total_delivered: int, total_collection: int, total_billed: int} */
+    private function schoolDeliveryStageStats(array $filters): array
+    {
+        $counts = $this->deliveryProgress->schoolStageCounts($filters);
+
+        return [
+            'total_pending' => max(0, $counts['total'] - $counts['stock_out']),
+            'total_stock_out' => max(0, $counts['stock_out'] - $counts['delivered']),
+            'total_delivered' => max(0, $counts['delivered'] - $counts['billing']),
+            'total_collection' => max(0, $counts['billing'] - $counts['billed']),
+            'total_billed' => $counts['billed'],
+        ];
     }
 
     /**

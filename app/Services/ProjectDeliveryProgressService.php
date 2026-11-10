@@ -553,6 +553,20 @@ class ProjectDeliveryProgressService
             ->groupBy('school_stages.project_id');
     }
 
+    /** @param array<string, mixed> $filters @return array{total: int, stock_out: int, delivered: int, billing: int, billed: int} */
+    public function schoolStageCounts(array $filters): array
+    {
+        $counts = $this->schoolPipelineStats($filters)->first();
+
+        return [
+            'total' => (int) ($counts->total_operational_schools_count ?? 0),
+            'stock_out' => (int) ($counts->stock_out_schools_count ?? 0),
+            'delivered' => (int) ($counts->delivered_schools_count ?? 0),
+            'billing' => (int) ($counts->billing_schools_count ?? 0),
+            'billed' => (int) ($counts->billed_schools_count ?? 0),
+        ];
+    }
+
     /** @param array<string, mixed> $filters @param list<string> $statuses */
     private function deliveryStatusDrRows(array $filters, array $statuses): Builder
     {

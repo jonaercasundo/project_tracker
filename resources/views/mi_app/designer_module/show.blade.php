@@ -1663,7 +1663,7 @@
                                                 <div>
                                                     <span class="pd-factory-field-label">Currency</span>
                                                     <div class="pd-factory-field-value {{ $factoryCost->currency ? '' : 'empty' }}">
-                                                        {{ $factoryCost->currency ?: 'Not set' }}
+                                                        USD
                                                     </div>
                                                 </div>
                                                 <div>
@@ -1683,7 +1683,7 @@
                             <div class="pd-product-price">
                                 <span class="pd-field-label">Purchase Price</span>
                                 @if($product->purchase_cost !== null)
-                                    <div class="pd-field-value">PHP {{ $product->purchase_cost }}</div>
+                                    <div class="pd-field-value">USD {{ $product->purchase_cost }}</div>
                                 @else
                                     <div class="pd-field-value empty">Not set</div>
                                 @endif
@@ -1692,7 +1692,7 @@
                             <div class="pd-product-price">
                                 <span class="pd-field-label">Selling Price</span>
                                 @if($product->price !== null)
-                                    <div class="pd-field-value">PHP {{ $product->price }}</div>
+                                    <div class="pd-field-value">USD {{ $product->price }}</div>
                                 @else
                                     <div class="pd-field-value empty">Not set</div>
                                 @endif
@@ -1725,7 +1725,7 @@
                     <div class="pd-card-body overflow-x-auto">
                         <table class="min-w-full text-left text-sm"><thead><tr class="border-b text-slate-500"><th class="p-2">SKU</th><th class="p-2">Materials</th><th class="p-2">Colors</th><th class="p-2">Dimensions (L × W × H × D cm)</th><th class="p-2">Purchase</th><th class="p-2">Selling</th><th class="p-2">Stock by warehouse</th></tr></thead><tbody>
                             @foreach($product->variants as $variant)
-                                <tr class="border-b border-slate-100"><td class="p-2 font-mono">{{ $variant->sku }}</td><td class="p-2">{{ collect($variant->materials ?: [$variant->material])->filter()->implode(', ') }}</td><td class="p-2">{{ collect($variant->colors ?: array_filter([$variant->color]))->filter()->implode(', ') ?: '—' }}</td><td class="p-2">{{ collect([$variant->product_length, $variant->product_width, $variant->product_height, $variant->product_depth])->map(fn ($value) => $value ?? '—')->implode(' × ') }}</td><td class="p-2">{{ $variant->purchase_price === null ? '—' : 'PHP '.$variant->purchase_price }}</td><td class="p-2">{{ $variant->selling_price === null ? '—' : 'PHP '.$variant->selling_price }}</td><td class="p-2">@forelse($variant->inventories as $stock){{ $stock->warehouse->warehouse_name }}: {{ number_format($stock->quantity) }}@if(!$loop->last) · @endif @empty 0 @endforelse</td></tr>
+                                <tr class="border-b border-slate-100"><td class="p-2 font-mono">{{ $variant->sku }}</td><td class="p-2">{{ collect($variant->materials ?: [$variant->material])->filter()->implode(', ') }}</td><td class="p-2">{{ collect($variant->colors ?: array_filter([$variant->color]))->filter()->implode(', ') ?: '—' }}</td><td class="p-2">{{ collect([$variant->product_length, $variant->product_width, $variant->product_height, $variant->product_depth])->map(fn ($value) => $value ?? '—')->implode(' × ') }}</td><td class="p-2">{{ $variant->purchase_price === null ? '—' : 'USD '.$variant->purchase_price }}</td><td class="p-2">{{ $variant->selling_price === null ? '—' : 'USD '.$variant->selling_price }}</td><td class="p-2">@forelse($variant->inventories as $stock){{ $stock->warehouse->warehouse_name }}: {{ number_format($stock->quantity) }}@if(!$loop->last) · @endif @empty 0 @endforelse</td></tr>
                             @endforeach
                         </tbody></table>
                     </div>

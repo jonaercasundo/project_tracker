@@ -100,7 +100,7 @@ class AiQuotationController extends Controller
         return view('mi_app.public.print', [
             'customer_name' => $quotation->customer_name, 'quotationItems' => $quotationItems,
             'total' => $quotation->total, 'quote_number' => $quotation->quote_number,
-            'issued_at' => $quotation->confirmed_at, 'currency_symbol' => '₱',
+            'issued_at' => $quotation->confirmed_at, 'currency_symbol' => '$',
         ]);
     }
 

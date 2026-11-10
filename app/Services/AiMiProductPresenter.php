@@ -53,7 +53,7 @@ class AiMiProductPresenter
 
         if ($includeSellingPrice) {
             $presentedProduct['price'] = $product->price;
-            $presentedProduct['currency'] = 'PHP';
+            $presentedProduct['currency'] = 'USD';
             $presentedProduct['pricing_basis'] = 'MI product selling price';
         }
 

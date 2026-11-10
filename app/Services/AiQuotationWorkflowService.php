@@ -59,7 +59,7 @@ class AiQuotationWorkflowService
             $this->audit($conversation, $user, $company, 'preview_generated', ['item_count' => count($items)]);
         });
 
-        return ['customer_name' => $state['customer_name'], 'items' => $items, 'total' => $this->amount($items), 'currency' => 'PHP'];
+        return ['customer_name' => $state['customer_name'], 'items' => $items, 'total' => $this->amount($items), 'currency' => 'USD'];
     }
 
     /** @return array{quotation: AiQuotation|null, changed: bool, preview: array<string, mixed>|null} */
@@ -78,13 +78,13 @@ class AiQuotationWorkflowService
                 DB::table('ai_quotation_workflows')->where('id', $workflow->id)->update(['state' => json_encode($state, JSON_THROW_ON_ERROR), 'updated_at' => now()]);
                 $this->audit($conversation, $user, $company, 'price_changed_before_confirmation', ['item_count' => count($latest)]);
 
-                return ['quotation' => null, 'changed' => true, 'preview' => ['customer_name' => $state['customer_name'], 'items' => $latest, 'total' => $this->amount($latest), 'currency' => 'PHP']];
+                return ['quotation' => null, 'changed' => true, 'preview' => ['customer_name' => $state['customer_name'], 'items' => $latest, 'total' => $this->amount($latest), 'currency' => 'USD']];
             }
             $quote = AiQuotation::query()->create([
                 'quote_number' => 'Q-'.now()->format('Ymd-His').'-'.strtoupper(bin2hex(random_bytes(5))),
                 'idempotency_key' => $workflow->idempotency_key, 'conversation_id' => $conversation->getKey(),
                 'user_id' => $user->getKey(), 'company_id' => $company->getKey(), 'customer_name' => $state['customer_name'],
-                'currency' => 'PHP', 'items' => $latest, 'total' => $this->amount($latest), 'status' => 'draft', 'confirmed_at' => now(),
+                'currency' => 'USD', 'items' => $latest, 'total' => $this->amount($latest), 'status' => 'draft', 'confirmed_at' => now(),
             ]);
             DB::table('ai_quotation_workflows')->where('id', $workflow->id)->update(['quotation_id' => $quote->getKey(), 'updated_at' => now()]);
             $this->audit($conversation, $user, $company, 'draft_confirmed', ['item_count' => count($latest)], $quote->getKey());
@@ -119,7 +119,7 @@ class AiQuotationWorkflowService
             $unitCents = $this->cents((string) $product->price);
             abort_if($unitCents < 0, 422, 'A selected product has an invalid selling price.');
             $lineCents = $unitCents * $item['quantity'];
-            $priced[] = ['id' => (int) $product->product_id, 'name' => $product->item_name, 'sku' => $product->sku ?: $product->item_code, 'quantity' => $item['quantity'], 'unit_price' => $this->decimal($unitCents), 'subtotal' => $this->decimal($lineCents), 'currency' => 'PHP'];
+            $priced[] = ['id' => (int) $product->product_id, 'name' => $product->item_name, 'sku' => $product->sku ?: $product->item_code, 'quantity' => $item['quantity'], 'unit_price' => $this->decimal($unitCents), 'subtotal' => $this->decimal($lineCents), 'currency' => 'USD'];
         }
 
         return $priced;

@@ -6,7 +6,7 @@
     .tx-price-comparison-reference a { max-width: 100%; overflow-wrap: anywhere; text-transform: none; }
 </style>
 <section class="tx-card lvl-3" id="price_comparison" aria-labelledby="price_comparison_heading">
-    <div class="tx-card-head"><span class="tx-card-icon">06</span><div><h2 id="price_comparison_heading">AI-Assisted Price Comparison</h2><p>Find market offers, review them, then choose which comparisons to save.</p></div></div>
+    <div class="tx-card-head"><span class="tx-card-icon">06</span><div><h2 id="price_comparison_heading">AI-Assisted Price Comparison</h2><p>Find market offers in USD, review them, then choose which comparisons to save.</p></div></div>
     <div class="tx-card-body space-y-5">
         <div data-name-fields class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label class="tx-label">Optional search refinement<input id="comparison_query" class="tx-field mt-2" type="text" maxlength="300" placeholder="Short description or keywords"></label>
@@ -35,7 +35,7 @@
                     <article class="rounded-xl border border-slate-200 bg-white p-4">
                         <div class="flex gap-4">
                             @if($comparison->photo_path)<img src="{{ Storage::disk('public')->url($comparison->photo_path) }}" alt="{{ $comparison->product_name }}" class="h-20 w-20 rounded-lg object-cover">@elseif($comparison->photo_url)<img src="{{ $comparison->photo_url }}" alt="{{ $comparison->product_name }}" loading="lazy" referrerpolicy="no-referrer" class="h-20 w-20 rounded-lg object-cover">@endif
-                            <div class="min-w-0"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $comparison->store_name }}</p><h3 class="mt-1 font-semibold text-slate-900">{{ $comparison->product_name }}</h3><p class="mt-1">{{ $comparison->currency }} {{ number_format((float) $comparison->price, 2) }}</p><a href="{{ $comparison->product_link }}" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block break-all text-sm text-blue-700 underline">View product</a></div>
+                            <div class="min-w-0"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $comparison->store_name }}</p><h3 class="mt-1 font-semibold text-slate-900">{{ $comparison->product_name }}</h3><p class="mt-1">USD {{ number_format((float) $comparison->price, 2) }}</p><a href="{{ $comparison->product_link }}" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block break-all text-sm text-blue-700 underline">View product</a></div>
                         </div>
                     </article>
                 @endforeach
@@ -67,7 +67,7 @@
     });
     const renderResults = (results) => {
         resultsNode.replaceChildren();
-        const safeResults = results.filter((result) => result && typeof result.store_name === 'string' && result.store_name.trim() && typeof result.product_name === 'string' && result.product_name.trim() && Number.isFinite(Number(result.price)) && Number(result.price) >= 0 && typeof result.currency === 'string' && /^[a-z]{3}$/i.test(result.currency) && safeHttpUrl(result.product_link) && (!result.photo_url || safeHttpUrl(result.photo_url))).map((result) => ({ ...result, price: Number(result.price).toFixed(2), currency: result.currency.toUpperCase(), product_link: safeHttpUrl(result.product_link), photo_url: result.photo_url ? safeHttpUrl(result.photo_url) : null }));
+        const safeResults = results.filter((result) => result && typeof result.store_name === 'string' && result.store_name.trim() && typeof result.product_name === 'string' && result.product_name.trim() && Number.isFinite(Number(result.price)) && Number(result.price) >= 0 && result.currency === 'USD' && safeHttpUrl(result.product_link) && (!result.photo_url || safeHttpUrl(result.photo_url))).map((result) => ({ ...result, price: Number(result.price).toFixed(2), currency: 'USD', product_link: safeHttpUrl(result.product_link), photo_url: result.photo_url ? safeHttpUrl(result.photo_url) : null }));
         safeResults.forEach((result) => {
             const card = document.createElement('article'); card.className = 'rounded-xl border border-slate-200 bg-slate-50 p-4';
             const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.dataset.result = JSON.stringify(result); checkbox.setAttribute('aria-label', `Select ${result.product_name}`); checkbox.addEventListener('change', () => saveButton.disabled = selectedResults().length === 0);

@@ -2320,7 +2320,7 @@
                 const variant = PD_CURRENT_PRODUCT.variants.find((item) => Number(item.id) === Number(variantSelect.value));
                 if (!variant) return;
                 const dimensions = [variant.length, variant.width, variant.height, variant.depth].map((value) => value ?? '—').join(' × ');
-                const selling = variant.price === null ? 'Price on request' : `Selling: PHP ${Number(variant.price).toFixed(2)}`;
+                const selling = variant.price === null ? 'Price on request' : `Selling: USD ${Number(variant.price).toFixed(2)}`;
                 const materials = (variant.materials || [variant.material]).join(', ');
                 const colors = (variant.colors || [variant.color]).filter(Boolean).join(', ');
                 summary.textContent = `SKU ${variant.sku} · ${materials}${colors ? ' / ' + colors : ''} · ${dimensions} cm · ${selling}`;

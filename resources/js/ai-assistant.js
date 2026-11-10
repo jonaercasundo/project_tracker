@@ -166,7 +166,7 @@ window.aiAssistant = (settings) => ({
                 this.quote = payload.workflow;
                 if (this.quote) {
                     this.quoteDraft = { customer_name: this.quote.state.customer_name || '', items: this.quote.state.items || [] };
-                    if (this.quote.state.preview_items) this.quotePreview = { customer_name: this.quote.state.customer_name, items: this.quote.state.preview_items, total: this.sumQuote(this.quote.state.preview_items), currency: 'PHP' };
+                    if (this.quote.state.preview_items) this.quotePreview = { customer_name: this.quote.state.customer_name, items: this.quote.state.preview_items, total: this.sumQuote(this.quote.state.preview_items), currency: 'USD' };
                 }
             }
             sessionStorage.setItem(`assistant:${this.company}`, String(conversation.id));

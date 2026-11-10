@@ -14,7 +14,7 @@
     </div>
     <div class="tx-factory-fields">
         @if(!empty($cost['id']))<input type="hidden" name="factory_costs[{{ $index }}][id]" value="{{ $cost['id'] }}" data-factory-field @disabled($removed)>@endif
-        <input type="hidden" name="factory_costs[{{ $index }}][currency]" value="PHP" data-factory-field @disabled($removed)>
+        <input type="hidden" name="factory_costs[{{ $index }}][currency]" value="USD" data-factory-field @disabled($removed)>
         <input type="hidden" name="factory_costs[{{ $index }}][is_primary]" value="{{ $isPrimary ? '1' : '0' }}" data-factory-primary-value data-factory-field @disabled($removed)>
         <div>
             <label for="{{ $idPrefix }}_name" class="tx-label">Factory / Supplier Name <span class="tx-required">*</span></label>
@@ -22,10 +22,10 @@
             @error($fieldPrefix.'.factory_name')<p id="{{ $idPrefix }}_name_error" class="tx-error">{{ $message }}</p>@enderror
         </div>
         <div>
-            <label for="{{ $idPrefix }}_amount" class="tx-label">Factory Cost (PHP) <span class="tx-required">*</span></label>
+            <label for="{{ $idPrefix }}_amount" class="tx-label">Factory Cost (USD) <span class="tx-required">*</span></label>
             <input id="{{ $idPrefix }}_amount" type="text" inputmode="decimal" name="factory_costs[{{ $index }}][factory_cost]" value="{{ $cost['factory_cost'] ?? '' }}" required maxlength="16" pattern="[0-9]{1,13}(\.[0-9]{1,2})?" placeholder="0.00" data-factory-amount data-factory-field @disabled($removed) class="tx-field tx-mono @error($fieldPrefix.'.factory_cost') field-invalid @enderror" aria-describedby="{{ $idPrefix }}_amount_hint {{ $idPrefix }}_amount_validation @error($fieldPrefix.'.factory_cost') {{ $idPrefix }}_amount_error @enderror" @error($fieldPrefix.'.factory_cost') aria-invalid="true" @enderror>
             <p id="{{ $idPrefix }}_amount_hint" class="tx-hint">Enter a non-negative amount with up to 2 decimal places, without commas.</p>
-            <p id="{{ $idPrefix }}_amount_validation" data-factory-amount-error class="tx-error" hidden>Enter a valid PHP amount from 0 to 9,999,999,999,999.99, with up to 2 decimal places.</p>
+            <p id="{{ $idPrefix }}_amount_validation" data-factory-amount-error class="tx-error" hidden>Enter a valid USD amount from 0 to 9,999,999,999,999.99, with up to 2 decimal places.</p>
             @error($fieldPrefix.'.factory_cost')<p id="{{ $idPrefix }}_amount_error" class="tx-error">{{ $message }}</p>@enderror
         </div>
         <div>

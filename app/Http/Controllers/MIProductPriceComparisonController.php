@@ -128,7 +128,7 @@ class MIProductPriceComparisonController extends Controller
                 || ! is_numeric($price)
                 || (float) $price < 0
                 || ! is_string($currency)
-                || ! preg_match('/\A[A-Z]{3}\z/i', $currency)
+                || strtoupper($currency) !== 'USD'
                 || ! filter_var($productLink, FILTER_VALIDATE_URL)
                 || ! in_array(strtolower((string) parse_url($productLink, PHP_URL_SCHEME)), ['http', 'https'], true)
             ) {
@@ -167,7 +167,7 @@ class MIProductPriceComparisonController extends Controller
             'results.*.product_name' => ['required', 'string', 'max:255'],
             'results.*.photo_url' => ['nullable', 'url:http,https', 'max:2048'],
             'results.*.price' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],
-            'results.*.currency' => ['required', 'alpha', 'size:3'],
+            'results.*.currency' => ['required', 'in:USD'],
             'results.*.product_link' => ['required', 'url:http,https', 'max:2048'],
         ]);
 

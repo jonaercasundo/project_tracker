@@ -56,12 +56,12 @@
         @endforeach
 
         <div>
-            <label for="{{ $fieldId }}_purchase_price" class="tx-label">Purchase price</label>
+            <label for="{{ $fieldId }}_purchase_price" class="tx-label">Purchase price (USD)</label>
             <input id="{{ $fieldId }}_purchase_price" type="number" min="0" step="0.01" name="variants[{{ $index }}][purchase_price]" value="{{ $variant['purchase_price'] ?? '' }}" class="tx-field" placeholder="0.00">
         </div>
 
         <div>
-            <label for="{{ $fieldId }}_selling_price" class="tx-label">Selling price</label>
+            <label for="{{ $fieldId }}_selling_price" class="tx-label">Selling price (USD)</label>
             <input id="{{ $fieldId }}_selling_price" type="number" min="0" step="0.01" name="variants[{{ $index }}][selling_price]" value="{{ $variant['selling_price'] ?? '' }}" class="tx-field" placeholder="0.00">
         </div>
 

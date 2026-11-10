@@ -64,7 +64,7 @@
     </div>
     <div class="tx-card-body">
         <input type="hidden" name="factory_costs_present" value="1">
-        <p class="tx-hint">All costs are in PHP. @if(isset($product))Changes and removals apply when you save the product.@else Factory costs will be saved with the new product.@endif Add up to 100 factory costs.</p>
+        <p class="tx-hint">All costs are in USD. @if(isset($product))Changes and removals apply when you save the product.@else Factory costs will be saved with the new product.@endif Add up to 100 factory costs.</p>
         @foreach(['factory_costs', 'remove_factory_cost_ids', 'remove_factory_cost_ids.*'] as $field)
             @foreach($errors->get($field) as $messages)
                 @foreach((array) $messages as $message)<p class="tx-error">{{ $message }}</p>@endforeach

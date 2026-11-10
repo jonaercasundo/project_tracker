@@ -116,7 +116,13 @@ class InventoryController extends Controller
             $warehouseSummaries = collect();
             $hasUnmappedActualDr = false;
 
-            return view('inventory.balances', compact('inventories', 'projects', 'warehouses', 'warehouseSummaries', 'hasUnmappedActualDr'));
+            return view('inventory.balances', compact(
+                'inventories',
+                'projects',
+                'warehouses',
+                'warehouseSummaries',
+                'hasUnmappedActualDr'
+            ));
         }
 
         $transactionTotals = DB::table('inventory_history')

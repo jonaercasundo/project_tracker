@@ -567,6 +567,60 @@ class ProjectDeliveryProgressService
         ];
     }
 
+    /** @param array<string, mixed> $filters @return array{total: int, stock_out: int, delivered: int, billing: int, billed: int} */
+    public function drStageCounts(array $filters): array
+    {
+        $drs = $this->deliveries($filters)
+            ->joinSub($this->validReceiptKeys($filters), 'valid_receipt', function (JoinClause $join): void {
+                $this->matchReceipt($join, 'valid_receipt', 'd');
+            })
+            ->select(['d.project_id', 'valid_receipt.dr_no'])
+            ->distinct();
+
+        $stockOutDrs = $this->stockOutDrRows($filters);
+        $deliveredDrs = DB::query()->fromSub($this->receipts($filters), 'completed_receipt')
+            ->where('completed_receipt.is_completed', 1)
+            ->select(['completed_receipt.project_id', 'completed_receipt.dr_no'])->distinct();
+        $billingDrs = $this->deliveryStatusDrRows($filters, ['for_billing', 'billed']);
+        $billedDrs = $this->deliveryStatusDrRows($filters, ['billed']);
+
+        $drStages = DB::query()->fromSub($drs, 'dr_scope')
+            ->leftJoinSub($stockOutDrs, 'stock_out_dr', function (JoinClause $join): void {
+                $this->matchReceipt($join, 'stock_out_dr', 'dr_scope');
+            })
+            ->leftJoinSub($deliveredDrs, 'delivered_dr', function (JoinClause $join): void {
+                $this->matchReceipt($join, 'delivered_dr', 'dr_scope');
+            })
+            ->leftJoinSub($billingDrs, 'billing_dr', function (JoinClause $join): void {
+                $this->matchReceipt($join, 'billing_dr', 'dr_scope');
+            })
+            ->leftJoinSub($billedDrs, 'billed_dr', function (JoinClause $join): void {
+                $this->matchReceipt($join, 'billed_dr', 'dr_scope');
+            })
+            ->select(['dr_scope.project_id', 'dr_scope.dr_no'])
+            ->selectRaw('MAX(CASE WHEN stock_out_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_stock_out')
+            ->selectRaw('MAX(CASE WHEN delivered_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_delivered')
+            ->selectRaw('MAX(CASE WHEN billing_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_billing')
+            ->selectRaw('MAX(CASE WHEN billed_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_billed')
+            ->groupBy('dr_scope.project_id', 'dr_scope.dr_no');
+
+        $counts = DB::query()->fromSub($drStages, 'dr_stages')
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(dr_stages.has_stock_out) as stock_out')
+            ->selectRaw('SUM(dr_stages.has_delivered) as delivered')
+            ->selectRaw('SUM(dr_stages.has_billing) as billing')
+            ->selectRaw('SUM(dr_stages.has_billed) as billed')
+            ->first();
+
+        return [
+            'total' => (int) ($counts->total ?? 0),
+            'stock_out' => (int) ($counts->stock_out ?? 0),
+            'delivered' => (int) ($counts->delivered ?? 0),
+            'billing' => (int) ($counts->billing ?? 0),
+            'billed' => (int) ($counts->billed ?? 0),
+        ];
+    }
+
     /** @param array<string, mixed> $filters @param list<string> $statuses */
     private function deliveryStatusDrRows(array $filters, array $statuses): Builder
     {

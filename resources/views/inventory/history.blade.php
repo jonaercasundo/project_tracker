@@ -58,7 +58,8 @@
                 all-label="All Projects"
                 :truncate-selected="true"
                 id="inventory-history-project"
-                rounded="rounded-lg" />
+                rounded="rounded-lg"
+                :submit-on-change="true" />
 
             {{-- Change Type --}}
             <div class="min-w-0 space-y-1">
@@ -129,6 +130,7 @@
         </div>
     </form>
 
+    @if(request()->filled('project_id'))
     {{-- HISTORY TABLE --}}
     <div class="mt-6 bg-white rounded-xl shadow-[0_2px_8px_-3px_rgba(0,0,0,0.04)] border border-slate-100 overflow-hidden">
         <div class="overflow-x-auto">
@@ -263,6 +265,12 @@
             </div>
         @endif
     </div>
+    @else
+        <div class="mt-6 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+            <p class="text-sm font-semibold text-slate-800">Select a project to view inventory history</p>
+            <p class="mt-1 text-xs text-slate-500">Choose a project above. Its history table will load automatically.</p>
+        </div>
+    @endif
 
 </div>
 

@@ -183,7 +183,7 @@ class DeliveryController extends Controller
                 }
             }
 
-            return response()->json(['stats' => $this->schoolDeliveryStageStats($progressFilters)])
+            return response()->json(['stats' => $this->drDeliveryStageStats($progressFilters)])
                 ->header('Cache-Control', 'private, no-store');
         }
 
@@ -510,7 +510,7 @@ class DeliveryController extends Controller
         }
         $stats = [];
         if ($request->query('phase') !== 'records') {
-            $stats = $this->schoolDeliveryStageStats($progressFilters);
+            $stats = $this->drDeliveryStageStats($progressFilters);
         }
 
         // =========================
@@ -542,9 +542,9 @@ class DeliveryController extends Controller
     }
 
     /** @param array<string, mixed> $filters @return array{total_pending: int, total_stock_out: int, total_delivered: int, total_collection: int, total_billed: int} */
-    private function schoolDeliveryStageStats(array $filters): array
+    private function drDeliveryStageStats(array $filters): array
     {
-        $counts = $this->deliveryProgress->schoolStageCounts($filters);
+        $counts = $this->deliveryProgress->drStageCounts($filters);
 
         return [
             'total_pending' => max(0, $counts['total'] - $counts['stock_out']),

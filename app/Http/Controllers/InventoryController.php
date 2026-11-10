@@ -474,6 +474,15 @@ class InventoryController extends Controller
                 'project_id' => ['required', 'integer'],
             ]);
             abort_unless($projects->contains('project_id', (int) $validated['project_id']), 404);
+        } else {
+            $histories = null;
+            $warehouses = Warehouse::orderBy('warehouse_name')->get();
+
+            return view('inventory.history', compact(
+                'histories',
+                'warehouses',
+                'projects'
+            ));
         }
 
         $batchExpr = "IFNULL(batch_no, CONCAT('IND-', history_id))";

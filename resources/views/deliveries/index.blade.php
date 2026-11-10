@@ -64,7 +64,7 @@
             <span id="delivery-stat-pending" class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_pending'] ?? 0 }}">
                 {{ number_format($stats['total_pending'] ?? 0) }}
             </span>
-            <span class="relative text-[11px] text-slate-400">Schools awaiting Stock Out</span>
+            <span class="relative text-[11px] text-slate-400">DRs awaiting Stock Out</span>
         </div>
 
         {{-- TOTAL STOCK OUT (distinct DR-level) --}}
@@ -79,7 +79,7 @@
             <span id="delivery-stat-stock-out" class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_stock_out'] ?? 0 }}">
                 {{ number_format($stats['total_stock_out'] ?? 0) }}
             </span>
-            <span class="relative text-[11px] text-slate-400">Schools in Stock Out, not yet Delivered</span>
+            <span class="relative text-[11px] text-slate-400">DRs in Stock Out, not yet Delivered</span>
         </div>
 
         {{-- TOTAL DELIVERED (DR-level) --}}
@@ -94,7 +94,7 @@
             <span id="delivery-stat-delivered" class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_delivered'] ?? 0 }}">
                 {{ number_format($stats['total_delivered'] ?? 0) }}
             </span>
-            <span class="relative text-[11px] text-slate-400">Schools Delivered, not yet in Billing</span>
+            <span class="relative text-[11px] text-slate-400">DRs Delivered, not yet in Billing</span>
         </div>
 
         {{-- TOTAL COLLECTION --}}
@@ -110,7 +110,7 @@
             <span id="delivery-stat-billing" class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_collection'] ?? 0 }}">
                 {{ number_format($stats['total_collection'] ?? 0) }}
             </span>
-            <span class="relative text-[11px] text-slate-400">Schools in Billing, not yet Billed</span>
+            <span class="relative text-[11px] text-slate-400">DRs in Billing, not yet Billed</span>
         </div>
 
         {{-- TOTAL BILLED --}}
@@ -125,7 +125,7 @@
             <span id="delivery-stat-billed" class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_billed'] ?? 0 }}">
                 {{ number_format($stats['total_billed'] ?? 0) }}
             </span>
-            <span class="relative text-[11px] text-slate-400">Schools with Billed status</span>
+            <span class="relative text-[11px] text-slate-400">DRs with Billed status</span>
         </div>
 
     </div>

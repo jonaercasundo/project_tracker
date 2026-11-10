@@ -3,7 +3,7 @@
 {{-- ============================= --}}
 <style>
     .tx-search-form { display: flex; flex-direction: column; gap: 0.85rem; }
-    @media (min-width: 1024px) { .tx-search-form { flex-direction: row; align-items: center; } }
+    @media (min-width: 1024px) { .tx-search-form { flex-direction: row; flex-wrap: wrap; align-items: center; } }
 
     .tx-search-input-wrap { position: relative; flex: 1 1 auto; }
     .tx-search-input-wrap svg {
@@ -74,6 +74,36 @@
             placeholder="Search item name, category, collection, designer...">
     </div>
 
+    {{-- Date Encoded --}}
+    <div class="tx-filter-wrap wide">
+        <label for="encoded_date_from" class="mb-1 block text-xs font-semibold text-slate-500">Encoded date from</label>
+        <input id="encoded_date_from" type="date" name="encoded_date_from" value="{{ request('encoded_date_from') }}" aria-label="Encoded date from" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100">
+    </div>
+    <div class="tx-filter-wrap wide">
+        <label for="encoded_date_to" class="mb-1 block text-xs font-semibold text-slate-500">Encoded date to</label>
+        <input id="encoded_date_to" type="date" name="encoded_date_to" value="{{ request('encoded_date_to') }}" aria-label="Encoded date to" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100">
+    </div>
+
+    {{-- Product Taxonomy --}}
+    @foreach([
+        'category_id' => ['Category', 'Categories', $categories],
+        'sub_category_id' => ['Subcategory', 'Subcategories', $subCategories],
+        'product_type_id' => ['Sub-subcategory', 'Sub-subcategories', $productTypes],
+        'collection_id' => ['Collection', 'Collections', $collections],
+    ] as $filterName => [$filterLabel, $filterAllLabel, $filterOptions])
+        <div class="tx-filter-wrap">
+            <div class="tx-filter-select-outer">
+                <select name="{{ $filterName }}" aria-label="Filter by {{ strtolower($filterLabel) }}">
+                    <option value="">All {{ $filterAllLabel }}</option>
+                    @foreach($filterOptions as $filterOption)
+                        <option value="{{ $filterOption->id }}" @selected((string) request($filterName) === (string) $filterOption->id)>{{ $filterOption->name }}</option>
+                    @endforeach
+                </select>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </div>
+        </div>
+    @endforeach
+
     {{-- Missing COP --}}
     <div class="tx-filter-wrap">
         <div class="tx-filter-select-outer">
@@ -118,7 +148,7 @@
             Search
         </button>
 
-        @if(request()->filled('search') || request()->filled('status') || request()->filled('classification') || request()->filled('country_of_production') || request()->filled('missing_cop'))
+        @if(request()->filled('search') || request()->filled('status') || request()->filled('classification') || request()->filled('country_of_production') || request()->filled('missing_cop') || request()->filled('encoded_date_from') || request()->filled('encoded_date_to') || request()->filled('category_id') || request()->filled('sub_category_id') || request()->filled('product_type_id') || request()->filled('collection_id'))
             <a href="{{ route('mi_app.index') }}" class="tx-btn-clear">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 Clear

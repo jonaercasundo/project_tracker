@@ -34,6 +34,15 @@ class MIAppController extends Controller
 {
     public function index(Request $request)
     {
+        $filters = $request->validate([
+            'encoded_date_from' => ['nullable', 'date_format:Y-m-d'],
+            'encoded_date_to' => ['nullable', 'date_format:Y-m-d'],
+            'category_id' => ['nullable', 'integer', 'exists:mi_categories,id'],
+            'sub_category_id' => ['nullable', 'integer', 'exists:mi_sub_categories,id'],
+            'product_type_id' => ['nullable', 'integer', 'exists:mi_product_types,id'],
+            'collection_id' => ['nullable', 'integer', 'exists:mi_collections,id'],
+        ]);
+
         $query = MI_Product::with([
             'category',
             'subCategory',
@@ -111,6 +120,25 @@ class MIAppController extends Controller
             $query->where('status', $request->status);
         }
 
+        if (! empty($filters['encoded_date_from'])) {
+            $query->whereDate('created_at', '>=', $filters['encoded_date_from']);
+        }
+
+        if (! empty($filters['encoded_date_to'])) {
+            $query->whereDate('created_at', '<=', $filters['encoded_date_to']);
+        }
+
+        foreach ([
+            'category_id',
+            'sub_category_id',
+            'product_type_id',
+            'collection_id',
+        ] as $taxonomyFilter) {
+            if (! empty($filters[$taxonomyFilter])) {
+                $query->where($taxonomyFilter, $filters[$taxonomyFilter]);
+            }
+        }
+
         if ($hasCountryOfProductionColumn && $request->filled('country_of_production')) {
             if ($request->input('country_of_production') === '__not_set') {
                 $this->whereCopIsMissing($query);
@@ -124,8 +152,12 @@ class MIAppController extends Controller
         }
 
         $products = $query->latest()->paginate(15)->withQueryString();
+        $categories = MI_Category::query()->orderBy('name')->get(['id', 'name']);
+        $subCategories = MI_SubCategory::query()->orderBy('name')->get(['id', 'name']);
+        $productTypes = MI_ProductType::query()->orderBy('name')->get(['id', 'name']);
+        $collections = MI_Collection::query()->orderBy('name')->get(['id', 'name']);
 
-        return view('mi_app.designer_module.index', compact('products', 'countriesOfProduction', 'missingCopCount'));
+        return view('mi_app.designer_module.index', compact('products', 'countriesOfProduction', 'missingCopCount', 'categories', 'subCategories', 'productTypes', 'collections'));
     }
 
     private function whereCopIsMissing(Builder $query): Builder

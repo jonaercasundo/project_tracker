@@ -22,6 +22,14 @@ if (monitoring) {
     const municipality = form.elements.municipality;
     const apply = document.getElementById('monitoring-apply');
     const error = document.getElementById('monitoring-error');
+    const loadingStatus = document.getElementById('monitoring-loading-status');
+    const retry = document.getElementById('monitoring-retry');
+    const table = document.getElementById('monitoring-table');
+    const reports = new Map();
+    let lastReportUrl;
+    let lastReportUpdatesHistory = false;
+    let currentReportKey;
+    let displayedReportKey;
     let currentRequest;
     let locationRequest;
     const lotBillingRequests = new Map();
@@ -174,12 +182,81 @@ if (monitoring) {
 
     region.addEventListener('change', () => updateLocations(true, true));
     division.addEventListener('change', () => updateLocations(false, true));
-    updateLocations();
+    function reportKey(url) {
+        const params = new URLSearchParams(url.search);
+        params.sort();
+        return `${monitoring.dataset.cacheScope}:${url.pathname}?${params}`;
+    }
+
+    function readCachedReport(key) {
+        if (reports.has(key)) return reports.get(key);
+        try {
+            const cached = JSON.parse(sessionStorage.getItem(`monitoring:v1:${key}`));
+            if (cached && Date.now() - cached.savedAt < 300000) return cached.report;
+        } catch { /* Storage may be unavailable. */ }
+        return null;
+    }
+
+    function showReport(report, key) {
+        lotBillingRequests.forEach(request => request.abort());
+        lotBillingRequests.clear();
+        projectBillingPanels.clear();
+        returnRequests.forEach(request => request.abort());
+        returnRequests.clear();
+        document.getElementById('monitoring-results').innerHTML = report.summary_html;
+        table.innerHTML = report.projects_html;
+        document.getElementById('monitoring-project-count').textContent = `${report.summary.projects_count} projects`;
+        displayedReportKey = key;
+    }
+
+    let optionsRequest;
+    async function loadOptions() {
+        if (optionsRequest) return;
+        optionsRequest = true;
+        const status = document.getElementById('monitoring-options-status');
+        const retryOptions = document.getElementById('monitoring-options-retry');
+        status.textContent = 'Loading filter choices…';
+        retryOptions.hidden = true;
+        try {
+            const response = await fetch(monitoring.dataset.optionsEndpoint, { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal: AbortSignal.timeout(30000) });
+            if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('Filter choices could not be loaded. Retry, or sign in again if your session expired.');
+            const options = await response.json();
+            const dropdown = document.getElementById('monitoring-project-trigger').closest('[x-data]');
+            window.Alpine.$data(dropdown).options = options.projects.map(project => ({ id: String(project.project_id), name: project.project_name, code: '' }));
+            fillLocations(region, 'region', options.regions, region.value);
+            const year = form.elements.year;
+            const selectedYear = year.value;
+            year.replaceChildren(new Option('All years', ''));
+            for (const value of options.years) year.add(new Option(value, value));
+            if (selectedYear && !options.years.map(String).includes(selectedYear)) year.add(new Option(selectedYear, selectedYear));
+            year.value = selectedYear;
+            status.textContent = 'Filter choices loaded.';
+        } catch (exception) {
+            status.textContent = exception.message;
+            retryOptions.hidden = false;
+        } finally {
+            optionsRequest = false;
+        }
+    }
+    document.getElementById('monitoring-options-retry').addEventListener('click', loadOptions);
+    // Wait until Alpine has initialized the shared project dropdown.
+    queueMicrotask(loadOptions);
+    if (region.value || division.value || municipality.value) updateLocations();
+
+    retry.addEventListener('click', () => loadReport(lastReportUrl, lastReportUpdatesHistory));
 
     async function loadReport(url, updateHistory = true) {
+        const key = reportKey(url);
+        if (currentRequest && currentReportKey === key) return false;
+        lastReportUrl = new URL(url);
+        lastReportUpdatesHistory = updateHistory;
+        retry.hidden = true;
         if (!url.searchParams.get('project_id')) {
             currentRequest?.abort();
             currentRequest = undefined;
+            displayedReportKey = undefined;
+            loadingStatus.textContent = 'Choose a project above to load operational progress.';
+            table.removeAttribute('aria-busy');
             apply.disabled = Boolean(locationRequest);
             apply.textContent = 'Apply Filters';
             monitoring.removeAttribute('aria-busy');
@@ -197,6 +274,19 @@ if (monitoring) {
         currentRequest?.abort();
         const request = new AbortController();
         currentRequest = request;
+        currentReportKey = key;
+        const cached = readCachedReport(key);
+        if (cached) {
+            showReport(cached, key);
+        } else if (displayedReportKey !== key) {
+            document.getElementById('monitoring-results').replaceChildren();
+            table.innerHTML = '<p class="p-8 text-center text-slate-500">Loading operational progress…</p>';
+            document.getElementById('monitoring-project-count').textContent = 'Loading…';
+            displayedReportKey = undefined;
+        }
+        loadingStatus.textContent = displayedReportKey === key ? 'Showing previously loaded progress. Refreshing…' : 'Loading operational progress…';
+        table.setAttribute('aria-busy', 'true');
+        const timeout = setTimeout(() => request.abort(new Error('Operational progress timed out. Retry loading progress in a moment.')), 60000);
         apply.disabled = true;
         apply.textContent = 'Applying…';
         monitoring.setAttribute('aria-busy', 'true');
@@ -210,37 +300,45 @@ if (monitoring) {
             if (!response.headers.get('content-type')?.includes('application/json')) {
                 throw new Error(response.status === 504
                     ? 'Operational progress refresh timed out. Try applying the filters again in a moment.'
-                    : 'Your session has expired. Sign in again to refresh progress.');
+                    : response.redirected || response.status === 401
+                        ? 'Your session has expired. Sign in again to refresh progress.'
+                        : 'Operational progress could not be loaded. Retry loading progress in a moment.');
             }
             const report = await response.json();
+            if (currentRequest !== request) return false;
             if (!response.ok) {
                 throw new Error(Object.values(report.errors ?? {}).flat()[0] ?? 'Progress could not be refreshed. Please try again.');
             }
-            lotBillingRequests.forEach(request => request.abort());
-            lotBillingRequests.clear();
-            projectBillingPanels.clear();
-            returnRequests.forEach(request => request.abort());
-            returnRequests.clear();
-            document.getElementById('monitoring-results').innerHTML = report.summary_html;
-            document.getElementById('monitoring-table').innerHTML = report.projects_html;
-            document.getElementById('monitoring-project-count').textContent = `${report.summary.projects_count} projects`;
+            showReport(report, key);
+            const cachedReport = { summary_html: report.summary_html, projects_html: report.projects_html, summary: { projects_count: report.summary.projects_count } };
+            reports.set(key, cachedReport);
+            if (reports.size > 10) reports.delete(reports.keys().next().value);
+            try {
+                sessionStorage.setItem(`monitoring:v1:${key}`, JSON.stringify({ savedAt: Date.now(), report: cachedReport }));
+            } catch { /* Keep working when browser storage is full or disabled. */ }
+            loadingStatus.textContent = 'Operational progress updated.';
             if (updateHistory) {
                 window.history.pushState({}, '', url);
             }
             return true;
         } catch (exception) {
-            if (exception.name !== 'AbortError') {
+            if (exception.name !== 'AbortError' && currentRequest === request) {
                 error.textContent = exception.message;
                 error.classList.remove('hidden');
+                loadingStatus.textContent = displayedReportKey === key ? 'Refresh failed. Showing previously loaded progress.' : 'Operational progress could not be loaded.';
+                retry.hidden = false;
+                if (displayedReportKey !== key) table.textContent = 'No progress is available for these filters. Use Retry loading progress to try again.';
             }
 
             return false;
         } finally {
+            clearTimeout(timeout);
             if (currentRequest === request) {
                 currentRequest = undefined;
                 apply.disabled = Boolean(locationRequest);
                 apply.textContent = 'Apply Filters';
                 monitoring.removeAttribute('aria-busy');
+                table.removeAttribute('aria-busy');
             }
         }
     }

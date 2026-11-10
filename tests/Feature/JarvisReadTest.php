@@ -79,6 +79,51 @@ class JarvisReadSqliteToken extends PersonalAccessToken
 
 pest()->extend(JarvisReadTestCase::class);
 
+it('renders the monitoring shell without querying operational tables', function () {
+    jarvisOperations();
+    $user = jarvisReader();
+    $this->withoutVite();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    $page = $this->get('/deliveries/monitoring?project_id=1&year=2026&region=Region%20I&search=Science&sort=total_drs&direction=desc');
+
+    $queries = collect(DB::getQueryLog())->pluck('query');
+    DB::disableQueryLog();
+    $page->assertOk()->assertSee('Project Delivery Monitoring')->assertSee('monitoring-filters')
+        ->assertSee('Loading operational progress…')->assertSee('monitoring-retry');
+    expect($queries->filter(fn (string $query): bool => preg_match('/\b(?:deliveries|school|projects|inventory|package_status)\b/i', $query) === 1)->all())->toBe([]);
+    if ($path = getenv('MONITORING_SHELL_HTML')) {
+        file_put_contents($path, $page->getContent());
+    }
+});
+
+it('loads monitoring filter choices separately', function () {
+    jarvisOperations();
+    $user = jarvisReader();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+
+    $this->getJson('/deliveries/monitoring/options')->assertOk()
+        ->assertJsonPath('projects.0.project_name', 'Furniture')
+        ->assertJsonPath('regions.0', 'Region I')
+        ->assertJsonPath('years.0', 2026);
+});
+
+it('keeps asynchronous monitoring counts identical to the filtered report', function () {
+    jarvisOperations();
+    $user = jarvisReader();
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
+    $filters = ['project_id' => 1, 'active_only' => 0, 'year' => 2026, 'region' => 'Region I', 'search' => 'Science', 'sort' => 'total_drs', 'direction' => 'desc'];
+    $expected = app(ProjectDeliveryProgressService::class)->report([...$filters, 'defer_lot_billing' => true]);
+
+    $response = $this->getJson('/deliveries/monitoring?'.http_build_query($filters))->assertOk()
+        ->assertJsonStructure(['summary_html', 'projects_html']);
+
+    expect($response->json('summary'))->toEqual($expected['summary']);
+    expect($response->json('projects'))->toEqual($expected['projects']->all());
+});
+
 dataset('jarvis read endpoints', [
     'dashboard', 'projects', 'projects/1', 'operation-masterlist',
     'deliveries', 'inventory', 'warehouses', 'lots', 'packages', 'projects/delivery-progress',
@@ -266,31 +311,18 @@ it('counts distinct stock-out DRs once when matching package item history exists
 
     $project = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1])['projects']->first();
 
-    expect($project['operational_pipeline']['stock_out'])->toMatchArray([
-        'completed' => 1,
-        'total' => 2,
-        'percent' => 50.0,
-        'unit' => 'DRs',
-    ]);
+    expect($project['stock_out_drs_count'])->toBe(2);
 });
 
-it('shows zero stock-out DRs and zero percent when no matching stock-out history exists', function () {
+it('counts completed receipts as stock out without matching stock-out history', function () {
     jarvisOperations();
     DB::table('item')->insert(['item_id' => 3, 'item_name' => 'Workbook', 'project_id' => 1, 'unit' => 'boxes']);
     DB::table('package_content')->insert(['package_id' => 1, 'item_id' => 3, 'qty' => 1]);
 
-    $user = jarvisReader();
-    $this->withoutVite();
-    $this->actingAs($user)->withSession(['company_id' => $user->companies()->first()->company_id]);
-    $page = $this->get('/deliveries/monitoring?project_id=1');
-    $project = $page->viewData('report')['projects']->first();
+    $project = app(ProjectDeliveryProgressService::class)->report(['project_id' => 1])['projects']->first();
 
-    $page->assertSee('2 DRs')->assertSee('0.0%')->assertDontSee('Per item unit');
-    expect($project['operational_pipeline']['stock_out'])->toMatchArray([
-        'completed' => 0,
-        'total' => 2,
-        'percent' => 0.0,
-    ]);
+    expect($project['stock_out_drs_count'])->toBe(1);
+    expect($project['operational_pipeline']['stock_out']['completed'])->toBe(1);
 });
 
 it('excludes invalid DRs even when their package statuses indicate delivery completion', function (string $status) {

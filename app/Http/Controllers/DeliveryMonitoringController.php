@@ -317,9 +317,18 @@ class DeliveryMonitoringController extends Controller
         return view('operation.delivery.monitoring', [
             'report' => $report,
             'filters' => $filters,
-            'projects' => DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']),
-            'locations' => DB::table('school')->whereNotNull('region')->where('region', '<>', '')->distinct()->orderBy('region')->pluck('region'),
-            'years' => DB::table('deliveries')->whereNotNull('delivery_date')->selectRaw(DB::connection()->getDriverName() === 'sqlite' ? "CAST(strftime('%Y', delivery_date) AS INTEGER) as year" : 'YEAR(delivery_date) as year')->distinct()->orderByDesc('year')->pluck('year'),
+            'projects' => collect(),
+            'locations' => array_filter([$filters['region'] ?? null]),
+            'years' => array_filter([$filters['year'] ?? null]),
         ]);
+    }
+
+    public function options(): JsonResponse
+    {
+        return response()->json([
+            'projects' => DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']),
+            'regions' => DB::table('school')->whereNotNull('region')->where('region', '<>', '')->distinct()->orderBy('region')->pluck('region'),
+            'years' => DB::table('deliveries')->whereNotNull('delivery_date')->selectRaw(DB::connection()->getDriverName() === 'sqlite' ? "CAST(strftime('%Y', delivery_date) AS INTEGER) as year" : 'YEAR(delivery_date) as year')->distinct()->orderByDesc('year')->pluck('year'),
+        ])->header('Cache-Control', 'private, no-store');
     }
 }

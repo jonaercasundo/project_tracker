@@ -421,7 +421,7 @@ class ProjectDeliveryProgressService
 
     /**
      * Count distinct valid DRs with a released package and stock-out history, plus
-     * billing-synced DRs whose final delivered status supersedes the released row.
+     * billing-synced DRs and all completed delivered/accepted receipts.
      *
      * @param  array<string, mixed>  $filters
      */
@@ -481,7 +481,11 @@ class ProjectDeliveryProgressService
             ->select(['receipt.project_id', 'receipt.dr_no']);
         $this->groupReceipts($matchedSyncedReceipts, 'receipt');
 
-        return DB::query()->fromSub($matchedReceipts->unionAll($matchedSyncedReceipts), 'stock_out_rows')
+        $completedReceipts = DB::query()->fromSub($this->receipts($filters), 'completed_receipt')
+            ->where('completed_receipt.is_completed', 1)
+            ->select(['completed_receipt.project_id', 'completed_receipt.dr_no']);
+
+        return DB::query()->fromSub($matchedReceipts->unionAll($matchedSyncedReceipts)->unionAll($completedReceipts), 'stock_out_rows')
             ->select('stock_out_rows.project_id', 'stock_out_rows.dr_no')
             ->distinct();
     }

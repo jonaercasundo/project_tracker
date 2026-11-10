@@ -139,6 +139,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/deliveries/monitoring/locations', [DeliveryMonitoringController::class, 'locations'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.monitoring.locations');
+    Route::get('/deliveries/monitoring/options', [DeliveryMonitoringController::class, 'options'])
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('deliveries.monitoring.options');
     Route::get('/deliveries/monitoring/{project}/details', [DeliveryMonitoringController::class, 'details'])
         ->whereNumber('project')
         ->middleware(['company.context:MMC', 'role:user,Administrator'])

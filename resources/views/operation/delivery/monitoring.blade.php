@@ -1,5 +1,5 @@
 <x-project_app-layout>
-    <div class="space-y-6" id="delivery-monitoring" data-endpoint="{{ route('deliveries.monitoring') }}" data-locations-endpoint="{{ route('deliveries.monitoring.locations') }}">
+    <div class="space-y-6" id="delivery-monitoring" data-endpoint="{{ route('deliveries.monitoring') }}" data-options-endpoint="{{ route('deliveries.monitoring.options') }}" data-cache-scope="{{ auth()->id() }}:{{ session('company_id') }}" data-locations-endpoint="{{ route('deliveries.monitoring.locations') }}">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
                 <p class="text-xs font-bold uppercase tracking-widest text-blue-600">Operations / Delivery Monitoring</p>
@@ -15,6 +15,8 @@
 
         <details open class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <summary class="cursor-pointer text-sm font-bold text-slate-900">Filter progress <span class="ml-2 text-xs font-normal text-slate-500">DR filters apply to delivery/billing; warehouse inventory remains project-wide</span></summary>
+            <p id="monitoring-options-status" role="status" class="mt-3 text-sm text-slate-500">Loading filter choices…</p>
+            <button id="monitoring-options-retry" type="button" hidden class="mt-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">Retry filter choices</button>
             <form id="monitoring-filters" method="GET" action="{{ route('deliveries.monitoring') }}" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <div>
                     <label for="monitoring-year" class="mb-1 block text-xs font-semibold text-slate-600">Year</label>
@@ -68,6 +70,7 @@
                 </div>
             </form>
             <p id="monitoring-error" role="alert" class="mt-3 hidden text-sm text-rose-600"></p>
+            <button id="monitoring-retry" type="button" hidden class="mt-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">Retry loading progress</button>
             @if($errors->any())
                 <p class="mt-3 text-sm text-rose-600">{{ $errors->first() }}</p>
             @endif
@@ -97,6 +100,7 @@
                     <button form="monitoring-filters" type="submit" class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Search / Sort</button>
                 </div>
             </div>
+            <p id="monitoring-loading-status" role="status" class="px-5 py-3 text-sm text-slate-500">{{ isset($filters['project_id']) ? 'Loading operational progress…' : 'Choose a project above to load operational progress.' }}</p>
             <div id="monitoring-table" class="overflow-x-auto">
                 @include('operation.delivery.partials.monitoring-projects', ['report' => $report])
             </div>

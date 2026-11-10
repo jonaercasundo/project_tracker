@@ -24,7 +24,7 @@
                 @if(($report['empty_reason'] ?? null) === 'choose_project')
                     Choose a project above to load operational progress.
                 @elseif(($report['empty_reason'] ?? null) === 'loading')
-                    Loading operational progress…
+                    Operational Progress
                 @elseif(($report['empty_reason'] ?? null) === 'inactive_project')
                     The selected project is inactive and Active projects only is enabled. Turn off the active-only filter to view it.
                 @else
@@ -53,7 +53,7 @@
             @if(($report['empty_reason'] ?? null) === 'choose_project')
                 Choose a project above to load operational progress.
             @elseif(($report['empty_reason'] ?? null) === 'loading')
-                Loading operational progress…
+                Operational Progress
             @elseif(($report['empty_reason'] ?? null) === 'inactive_project')
                 The selected project is inactive and Active projects only is enabled. Turn off the active-only filter to view it.
             @else

@@ -300,7 +300,20 @@ class DeliveryMonitoringController extends Controller
         $filters = array_filter($request->validated(), fn (mixed $value): bool => $value !== null && $value !== '');
         $filters['active_only'] ??= 0;
         if ($request->expectsJson()) {
-            $report = $this->progress->report([...$filters, 'defer_lot_billing' => true]);
+            $overviewOnly = $request->query('phase') === 'overview';
+            $report = $this->progress->report([
+                ...$filters,
+                'defer_lot_billing' => true,
+                'compact' => $overviewOnly,
+            ]);
+
+            if ($overviewOnly) {
+                return response()->json([
+                    'phase' => 'overview',
+                    'projects' => $report['projects'],
+                    'summary' => $report['summary'],
+                ])->header('Cache-Control', 'private, no-store');
+            }
 
             return response()->json($report + [
                 'summary_html' => view('operation.delivery.partials.monitoring-results', ['report' => $report])->render(),

@@ -266,6 +266,45 @@ if (monitoring) {
         });
     }
 
+    function showOverview(report, key) {
+        const overview = document.createElement('div');
+        overview.className = 'overflow-x-auto';
+        overview.innerHTML = '<table class="w-full min-w-[1060px] table-fixed text-left text-sm"><thead class="bg-slate-50 text-xs font-semibold text-slate-500"><tr><th class="px-4 py-3">Project / Contract</th><th class="px-4 py-3">Operational Progress</th><th class="px-3 py-3">Last Activity</th><th class="px-3 py-3">Actions</th></tr></thead><tbody class="divide-y divide-slate-100"></tbody></table>';
+        const body = overview.querySelector('tbody');
+        for (const project of report.projects ?? []) {
+            const row = document.createElement('tr');
+            row.className = 'align-top';
+            const projectCell = document.createElement('td');
+            projectCell.className = 'px-4 py-5';
+            const projectName = document.createElement('p');
+            projectName.className = 'font-bold text-slate-900';
+            projectName.textContent = project.project_name;
+            const projectReference = document.createElement('p');
+            projectReference.className = 'mt-2 text-xs text-slate-500';
+            projectReference.textContent = project.ref_no || 'No reference recorded';
+            projectCell.append(projectName, projectReference);
+            const progressCell = document.createElement('td');
+            progressCell.className = 'px-4 py-5 text-sm text-slate-600';
+            const delivered = Number(project.completed_deliveries_count ?? 0);
+            const total = Number(project.total_deliveries_count ?? 0);
+            const packages = Number(project.delivered_packages_count ?? 0) + Number(project.accepted_packages_count ?? 0);
+            const allPackages = Number(project.total_packages_count ?? 0);
+            progressCell.innerHTML = `Deliveries <span data-progress-count="${delivered}">${delivered.toLocaleString()}</span> / <span data-progress-count="${total}">${total.toLocaleString()}</span> · Packages <span data-progress-count="${packages}">${packages.toLocaleString()}</span> / <span data-progress-count="${allPackages}">${allPackages.toLocaleString()}</span><p class="mt-2 text-xs text-slate-500">Loading warehouse, delivery and billing stages…</p>`;
+            const activityCell = document.createElement('td');
+            activityCell.className = 'px-3 py-5 text-xs text-slate-500';
+            activityCell.textContent = project.last_activity?.type || 'No dated activity';
+            const actionCell = document.createElement('td');
+            actionCell.className = 'px-3 py-5 text-xs text-slate-500';
+            actionCell.textContent = 'Loading…';
+            row.append(projectCell, progressCell, activityCell, actionCell);
+            body.append(row);
+        }
+        table.replaceChildren(overview);
+        document.getElementById('monitoring-project-count').textContent = `${report.summary?.projects_count ?? report.projects?.length ?? 0} projects`;
+        displayedReportKey = key;
+        animateProgressNumbers();
+    }
+
     const initialReportUrl = new URL(window.location.href);
     if (table.querySelector('[data-project-row]')) {
         displayedReportKey = reportKey(initialReportUrl);
@@ -318,6 +357,26 @@ if (monitoring) {
         monitoring.setAttribute('aria-busy', 'true');
         error.classList.add('hidden');
         try {
+            if (displayedReportKey !== key) {
+                const overviewUrl = new URL(url);
+                overviewUrl.searchParams.set('phase', 'overview');
+                const overviewResponse = await fetch(overviewUrl, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                    signal: request.signal,
+                });
+                if (!overviewResponse.headers.get('content-type')?.includes('application/json')) {
+                    throw new Error('Operational progress overview could not be loaded. Retry in a moment.');
+                }
+                const overview = await overviewResponse.json();
+                if (currentRequest !== request) return false;
+                if (!overviewResponse.ok) {
+                    throw new Error(Object.values(overview.errors ?? {}).flat()[0] ?? 'Operational progress overview could not be loaded.');
+                }
+                showOverview(overview, key);
+                loadingStatus.textContent = 'Operational Progress · Loading detailed stages…';
+            }
+
             const response = await fetch(url, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',

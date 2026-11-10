@@ -857,16 +857,33 @@
             {{-- =====================================================
                 MAIN CONTENT
                 ===================================================== --}}
-            <main class="tx-main-card">
+            <main class="tx-main-card" x-data="miCatalogView()" x-init="initialize()" x-cloak>
 
                 {{-- =================================================
                     SEARCH / FILTER AREA
                     ================================================= --}}
                 <section class="tx-toolbar-panel">
+                    <div class="mb-3 flex justify-end">
+                        <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm" role="group" aria-label="Product display mode">
+                            <button type="button" @click="setView('photo')" :aria-pressed="view === 'photo'" :class="view === 'photo' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'" class="inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="2.5" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="11.5" y="2.5" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="11.5" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="11.5" y="11.5" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+                                Photo Grid
+                            </button>
+                            <button type="button" @click="setView('table')" :aria-pressed="view === 'table'" :class="view === 'table' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'" class="inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="3" width="15" height="14" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 7h15M7 7v10m5-10v10" stroke="currentColor" stroke-width="1.5"/></svg>
+                                Table List
+                            </button>
+                        </div>
+                    </div>
                     @include(
                         'mi_app.designer_module.partials._search'
                     )
                 </section>
+
+                {{-- =================================================
+                    PHOTO GRID
+                    ================================================= --}}
+                @include('mi_app.designer_module.partials._photo-grid')
 
                 {{-- =================================================
                     DATA TABLE

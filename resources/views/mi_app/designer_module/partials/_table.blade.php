@@ -623,7 +623,7 @@
      PRODUCTS TABLE
      ========================================================= --}}
 
-<div class="tx-products-wrapper">
+<div class="tx-products-wrapper" x-show="view === 'table'">
 
     <table class="tx-products-table">
 

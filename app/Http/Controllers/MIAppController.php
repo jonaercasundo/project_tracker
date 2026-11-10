@@ -50,6 +50,7 @@ class MIAppController extends Controller
             'subCategory',
             'productType',
             'collection',
+            'images',
         ]);
 
         $hasCountryOfProductionColumn = Schema::hasColumn('mi_products', 'country_of_production');

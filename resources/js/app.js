@@ -10,6 +10,7 @@ import './billing-preparation.js';
 import './searchable-project-dropdown.js';
 import './project-details.js';
 import './mi-product-edit.js';
+import './mi-product-catalog-view.js';
 import './ai-assistant.js';
 import './ai-configuration.js';
 import Alpine from 'alpinejs';

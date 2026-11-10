@@ -100,7 +100,7 @@
                     <button form="monitoring-filters" type="submit" class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Search / Sort</button>
                 </div>
             </div>
-            <p id="monitoring-loading-status" role="status" class="px-5 py-3 text-sm text-slate-500">{{ isset($filters['project_id']) ? 'Loading operational progress…' : 'Choose a project above to load operational progress.' }}</p>
+            <p id="monitoring-loading-status" role="status" class="px-5 py-3 text-sm text-slate-500">{{ isset($filters['project_id']) ? 'Operational Progress' : 'Choose a project above to load operational progress.' }}</p>
             <div id="monitoring-table" class="overflow-x-auto">
                 @include('operation.delivery.partials.monitoring-projects', ['report' => $report])
             </div>

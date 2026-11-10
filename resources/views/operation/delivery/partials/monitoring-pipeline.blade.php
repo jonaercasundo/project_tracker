@@ -11,13 +11,13 @@
                     <p class="mt-1 text-sm font-semibold text-slate-500">Per item unit</p>
                     <p class="mt-1 text-[11px] leading-4 text-slate-500">See details</p>
                 @elseif($key === 'dr')
-                    <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['remaining_count']) }} <span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['remaining_total']) }} Schools</span></p>
+                    <p class="mt-1 text-sm font-bold tabular-nums text-slate-900"><span data-progress-count="{{ $stage['remaining_count'] }}">{{ number_format($stage['remaining_count']) }}</span> <span class="text-xs font-normal text-slate-500">/ <span data-progress-count="{{ $stage['remaining_total'] }}">{{ number_format($stage['remaining_total']) }}</span> Schools</span></p>
                     <p class="mt-1 text-xs font-semibold tabular-nums text-blue-700">{{ $stage['total'] ? 'DRs recorded' : 'No schools with DRs' }}</p>
                 @else
                     @if(in_array($key, ['stock_out', 'delivered'], true))
-                        <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['pending_count']) }} <span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['pending_total']) }} Schools</span></p>
+                        <p class="mt-1 text-sm font-bold tabular-nums text-slate-900"><span data-progress-count="{{ $stage['pending_count'] }}">{{ number_format($stage['pending_count']) }}</span> <span class="text-xs font-normal text-slate-500">/ <span data-progress-count="{{ $stage['pending_total'] }}">{{ number_format($stage['pending_total']) }}</span> Schools</span></p>
                     @else
-                        <p class="mt-1 text-sm font-bold tabular-nums text-slate-900">{{ number_format($stage['completed']) }} <span class="text-xs font-normal text-slate-500">/ {{ number_format($stage['total']) }} Schools</span></p>
+                        <p class="mt-1 text-sm font-bold tabular-nums text-slate-900"><span data-progress-count="{{ $stage['completed'] }}">{{ number_format($stage['completed']) }}</span> <span class="text-xs font-normal text-slate-500">/ <span data-progress-count="{{ $stage['total'] }}">{{ number_format($stage['total']) }}</span> Schools</span></p>
                     @endif
                     <p class="mt-1 text-xs font-semibold tabular-nums {{ ($stage['completed'] ?? 0) > 0 ? 'text-blue-700' : 'text-slate-500' }}">{{ $key === 'dr' ? ($stage['total'] ? 'Recorded' : 'No schools with DRs') : ($key === 'billing' ? number_format($stage['percent'] ?? 0, 1).'%' : ($stage['percent'] === null ? ($key === 'delivered' ? 'N/A' : 'No records') : number_format($stage['percent'], 1).'%')) }}</p>
                     @if($key === 'billed')<p class="mt-1 text-[11px] leading-4 text-slate-500">{{ $stage['unit'] }}</p>@endif

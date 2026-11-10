@@ -207,6 +207,7 @@ if (monitoring) {
         table.innerHTML = report.projects_html;
         document.getElementById('monitoring-project-count').textContent = `${report.summary.projects_count} projects`;
         displayedReportKey = key;
+        animateProgressNumbers();
     }
 
     let optionsRequest;
@@ -245,6 +246,32 @@ if (monitoring) {
 
     retry.addEventListener('click', () => loadReport(lastReportUrl, lastReportUpdatesHistory));
 
+    function animateProgressNumbers(root = table) {
+        root.querySelectorAll('[data-progress-count]').forEach(element => {
+            const target = Number(element.dataset.progressCount);
+            if (!Number.isFinite(target)) return;
+            const decimals = Number(element.dataset.progressDecimals ?? 0);
+            const startedAt = performance.now();
+            const duration = 700;
+            const update = now => {
+                const fraction = Math.min((now - startedAt) / duration, 1);
+                const eased = 1 - (1 - fraction) ** 3;
+                element.textContent = (target * eased).toLocaleString(undefined, {
+                    minimumFractionDigits: decimals,
+                    maximumFractionDigits: decimals,
+                });
+                if (fraction < 1) requestAnimationFrame(update);
+            };
+            requestAnimationFrame(update);
+        });
+    }
+
+    const initialReportUrl = new URL(window.location.href);
+    if (table.querySelector('[data-project-row]')) {
+        displayedReportKey = reportKey(initialReportUrl);
+        animateProgressNumbers();
+    }
+
     async function loadReport(url, updateHistory = true) {
         const key = reportKey(url);
         if (currentRequest && currentReportKey === key) return false;
@@ -279,12 +306,11 @@ if (monitoring) {
         if (cached) {
             showReport(cached, key);
         } else if (displayedReportKey !== key) {
-            document.getElementById('monitoring-results').replaceChildren();
-            table.innerHTML = '<p class="p-8 text-center text-slate-500">Loading operational progress…</p>';
-            document.getElementById('monitoring-project-count').textContent = 'Loading…';
-            displayedReportKey = undefined;
+            if (!table.textContent.trim()) {
+                table.innerHTML = '<p class="p-8 text-center text-slate-500">Operational Progress</p>';
+            }
         }
-        loadingStatus.textContent = displayedReportKey === key ? 'Showing previously loaded progress. Refreshing…' : 'Loading operational progress…';
+        loadingStatus.textContent = 'Operational Progress';
         table.setAttribute('aria-busy', 'true');
         const timeout = setTimeout(() => request.abort(new Error('Operational progress timed out. Retry loading progress in a moment.')), 60000);
         apply.disabled = true;

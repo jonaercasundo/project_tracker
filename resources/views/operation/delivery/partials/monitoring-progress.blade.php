@@ -1,6 +1,6 @@
 <div class="flex items-center justify-between gap-3 text-xs">
     <p class="font-semibold text-slate-700">Overall Operational Progress</p>
-    <span class="font-bold tabular-nums text-blue-700">{{ $project['overall_progress'] === null ? 'Unavailable' : number_format($project['overall_progress'], 1).'%' }}</span>
+    <span class="font-bold tabular-nums text-blue-700">@if($project['overall_progress'] === null)Unavailable @else<span data-progress-count="{{ $project['overall_progress'] }}" data-progress-decimals="1">{{ number_format($project['overall_progress'], 1) }}</span>%@endif</span>
 </div>
 <div class="mt-2 h-3 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="{{ $project['project_name'] }} overall operational progress" aria-valuemin="0" aria-valuemax="100" @if($project['overall_progress'] !== null) aria-valuenow="{{ $project['overall_progress'] }}" @else aria-valuetext="One or more operational stages have no schools to measure" @endif>
     @if($project['overall_progress'] !== null)<div class="h-full rounded-full bg-blue-600" style="width: {{ min(100, max(0, $project['overall_progress'])) }}%"></div>@endif

@@ -113,6 +113,36 @@
         color: var(--tx-ink-soft);
     }
 
+    .tx-row-photo-cell {
+        width: 64px;
+    }
+
+    .tx-row-photo-frame {
+        position: relative;
+        display: grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        overflow: hidden;
+        border: 1px solid var(--tx-line);
+        border-radius: 8px;
+        background: var(--tx-bg);
+        color: var(--tx-ink-faint);
+    }
+
+    .tx-row-photo-frame img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .tx-row-photo-frame svg {
+        width: 19px;
+        height: 19px;
+    }
+
     .tx-row-item {
         min-width: 190px;
         font-weight: 650;
@@ -662,6 +692,7 @@
                         </a>
                     </th>
                 @endforeach
+                <th scope="col" aria-label="Product photo"></th>
                 <th class="actions-col">Actions</th>
             </tr>
         </thead>
@@ -691,6 +722,22 @@
                     {{-- Item Number --}}
                     <td class="tx-row-index">
                         {{ $product->product_id }}
+                    </td>
+
+                    {{-- Product Photo --}}
+                    <td class="tx-row-photo-cell">
+                        <div class="tx-row-photo-frame">
+                            <div data-catalog-photo-placeholder @if($product->catalog_photo_url) hidden @endif aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" stroke="currentColor" stroke-width="1.5" />
+                                    <circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.5" />
+                                    <path d="m5 17 5-5 3.5 3 2.5-2 3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </div>
+                            @if($product->catalog_photo_url)
+                                <img src="{{ $product->catalog_photo_url }}" alt="Photo of {{ $itemName }}" loading="lazy" data-catalog-photo>
+                            @endif
+                        </div>
                     </td>
 
 
@@ -939,7 +986,7 @@
 
                 <tr class="tx-empty-row">
 
-                    <td colspan="7">
+                    <td colspan="9">
 
                         <div class="tx-empty-state">
 

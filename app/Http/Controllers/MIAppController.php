@@ -205,12 +205,49 @@ class MIAppController extends Controller
         }
 
         $products = $query->paginate(15)->withQueryString();
+        $products->getCollection()->each(function (MI_Product $product): void {
+            $product->setAttribute('catalog_photo_url', $this->catalogPhotoUrl($product));
+        });
+
         $categories = MI_Category::query()->orderBy('name')->get(['id', 'name']);
         $subCategories = MI_SubCategory::query()->orderBy('name')->get(['id', 'name']);
         $productTypes = MI_ProductType::query()->orderBy('name')->get(['id', 'name']);
         $collections = MI_Collection::query()->orderBy('name')->get(['id', 'name']);
 
         return view('mi_app.designer_module.index', compact('products', 'countriesOfProduction', 'missingCopCount', 'categories', 'subCategories', 'productTypes', 'collections'));
+    }
+
+    private function catalogPhotoUrl(MI_Product $product): ?string
+    {
+        $image = $product->images->firstWhere('is_primary', true) ?? $product->images->first();
+        if ($image === null) {
+            return null;
+        }
+
+        if ($image->image_type === 'upload' && $image->image_path) {
+            $extension = strtolower(pathinfo($image->image_path, PATHINFO_EXTENSION));
+
+            return in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)
+                ? Storage::disk('public')->url($image->image_path)
+                : null;
+        }
+
+        if (! $image->image_url) {
+            return null;
+        }
+
+        $imageUrl = trim($image->image_url);
+        if (preg_match('/drive\.google\.com\/uc\?.*id=([^&]+)/', $imageUrl, $matches)) {
+            $imageUrl = "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
+        } elseif (preg_match('#drive\.google\.com/file/d/([^/]+)#', $imageUrl, $matches)) {
+            $imageUrl = "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
+        } elseif (preg_match('/drive\.google\.com\/open\?id=([^&]+)/', $imageUrl, $matches)) {
+            $imageUrl = "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
+        }
+
+        return in_array(strtolower((string) parse_url($imageUrl, PHP_URL_SCHEME)), ['http', 'https'], true)
+            ? $imageUrl
+            : null;
     }
 
     private function whereCopIsMissing(Builder $query): Builder

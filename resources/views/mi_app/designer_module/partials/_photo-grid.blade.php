@@ -3,31 +3,7 @@
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             @foreach($products as $product)
                 @php
-                    $primaryImage = $product->images->firstWhere('is_primary', true) ?? $product->images->first();
-                    $photoUrl = null;
-
-                    if ($primaryImage?->image_type === 'upload' && $primaryImage->image_path) {
-                        $extension = strtolower(pathinfo($primaryImage->image_path, PATHINFO_EXTENSION));
-                        if (in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) {
-                            $photoUrl = asset('storage/'.$primaryImage->image_path);
-                        }
-                    } elseif ($primaryImage?->image_url) {
-                        $photoUrl = trim($primaryImage->image_url);
-
-                        if (preg_match('/drive\.google\.com\/uc\?.*id=([^&]+)/', $photoUrl, $matches)) {
-                            $photoUrl = "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
-                        } elseif (preg_match('#drive\.google\.com/file/d/([^/]+)#', $photoUrl, $matches)) {
-                            $photoUrl = "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
-                        } elseif (preg_match('/drive\.google\.com\/open\?id=([^&]+)/', $photoUrl, $matches)) {
-                            $photoUrl = "https://drive.google.com/thumbnail?id={$matches[1]}&sz=w1600";
-                        }
-
-                        $photoScheme = strtolower((string) parse_url($photoUrl, PHP_URL_SCHEME));
-                        if (! in_array($photoScheme, ['http', 'https'], true)) {
-                            $photoUrl = null;
-                        }
-                    }
-
+                    $photoUrl = $product->catalog_photo_url;
                     $itemName = $product->item_name ?: 'Unnamed Product';
                     $sku = $product->sku ?: 'No SKU';
                     $productId = $product->product_id;

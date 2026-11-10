@@ -40,6 +40,40 @@
         white-space: nowrap;
     }
 
+    .tx-sort-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        min-height: 1.5rem;
+        color: inherit;
+        text-decoration: none;
+        transition: color .15s ease;
+    }
+
+    .tx-sort-link:hover,
+    .tx-sort-link:focus-visible,
+    .tx-sort-link.is-active {
+        color: var(--tx-primary);
+    }
+
+    .tx-sort-link:focus-visible {
+        border-radius: 5px;
+        outline: 2px solid var(--tx-primary);
+        outline-offset: 3px;
+    }
+
+    .tx-sort-icon {
+        width: 0.8rem;
+        height: 0.8rem;
+        opacity: 0.5;
+        transition: opacity .15s ease, transform .15s ease;
+    }
+
+    .tx-sort-link:hover .tx-sort-icon,
+    .tx-sort-link.is-active .tx-sort-icon {
+        opacity: 1;
+    }
+
     .tx-products-table thead th.actions-col {
         width: 1%;
         min-width: 190px;
@@ -595,13 +629,39 @@
 
         <thead>
             <tr>
-                <th>Item No.</th>
-                <th>SKU</th>
-                <th>Category</th>
-                <th>Sub Category</th>
-                <th>Collection</th>
-                <th>Item Name</th>
-                <th>COP</th>
+                @foreach([
+                    'item_no' => 'Item No.',
+                    'sku' => 'SKU',
+                    'category' => 'Category',
+                    'sub_category' => 'Sub Category',
+                    'collection' => 'Collection',
+                    'item_name' => 'Item Name',
+                    'cop' => 'COP',
+                ] as $sortKey => $sortLabel)
+                    @php
+                        $isCurrentSort = request('sort') === $sortKey;
+                        $currentDirection = request('direction', 'asc');
+                        $nextDirection = $isCurrentSort && $currentDirection === 'asc' ? 'desc' : 'asc';
+                        $sortQuery = request()->query();
+                        unset($sortQuery['page']);
+                        $sortQuery['sort'] = $sortKey;
+                        $sortQuery['direction'] = $nextDirection;
+                    @endphp
+                    <th aria-sort="{{ $isCurrentSort ? ($currentDirection === 'asc' ? 'ascending' : 'descending') : 'none' }}">
+                        <a href="{{ route('mi_app.index', $sortQuery) }}" class="tx-sort-link {{ $isCurrentSort ? 'is-active' : '' }}" aria-label="Sort by {{ $sortLabel }} {{ $nextDirection }}">
+                            <span>{{ $sortLabel }}</span>
+                            <svg class="tx-sort-icon" aria-hidden="true" viewBox="0 0 16 16" fill="none">
+                                @if($isCurrentSort && $currentDirection === 'asc')
+                                    <path d="M8 3.25v9.5m0-9.5L4.5 6.75M8 3.25l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                @elseif($isCurrentSort)
+                                    <path d="M8 12.75v-9.5m0 9.5 3.5-3.5M8 12.75l-3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                @else
+                                    <path d="M5 4h6M5 8h4M5 12h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                                @endif
+                            </svg>
+                        </a>
+                    </th>
+                @endforeach
                 <th class="actions-col">Actions</th>
             </tr>
         </thead>
@@ -630,7 +690,7 @@
 
                     {{-- Item Number --}}
                     <td class="tx-row-index">
-                        {{ $products->firstItem() + $loop->index }}
+                        {{ $product->product_id }}
                     </td>
 
 

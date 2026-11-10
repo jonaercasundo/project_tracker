@@ -41,6 +41,8 @@ class MIAppController extends Controller
             'sub_category_id' => ['nullable', 'integer', 'exists:mi_sub_categories,id'],
             'product_type_id' => ['nullable', 'integer', 'exists:mi_product_types,id'],
             'collection_id' => ['nullable', 'integer', 'exists:mi_collections,id'],
+            'sort' => ['nullable', Rule::in(['item_no', 'sku', 'category', 'sub_category', 'collection', 'item_name', 'cop'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
 
         $query = MI_Product::with([
@@ -151,7 +153,34 @@ class MIAppController extends Controller
             $this->whereCopIsMissing($query);
         }
 
-        $products = $query->latest()->paginate(15)->withQueryString();
+        $sortColumn = $filters['sort'] ?? null;
+        $sortDirection = $filters['direction'] ?? 'asc';
+
+        match ($sortColumn) {
+            'item_no' => $query->orderBy('product_id', $sortDirection),
+            'sku' => $query->orderBy('sku', $sortDirection),
+            'category' => $query->orderBy(
+                MI_Category::query()->select('name')->whereColumn('mi_categories.id', 'mi_products.category_id'),
+                $sortDirection,
+            ),
+            'sub_category' => $query->orderBy(
+                MI_SubCategory::query()->select('name')->whereColumn('mi_sub_categories.id', 'mi_products.sub_category_id'),
+                $sortDirection,
+            ),
+            'collection' => $query->orderBy(
+                MI_Collection::query()->select('name')->whereColumn('mi_collections.id', 'mi_products.collection_id'),
+                $sortDirection,
+            ),
+            'item_name' => $query->orderBy('item_name', $sortDirection),
+            'cop' => $query->orderBy('country_of_production', $sortDirection),
+            default => $query->latest(),
+        };
+
+        if ($sortColumn !== null && $sortColumn !== 'item_no') {
+            $query->orderBy('product_id', 'desc');
+        }
+
+        $products = $query->paginate(15)->withQueryString();
         $categories = MI_Category::query()->orderBy('name')->get(['id', 'name']);
         $subCategories = MI_SubCategory::query()->orderBy('name')->get(['id', 'name']);
         $productTypes = MI_ProductType::query()->orderBy('name')->get(['id', 'name']);

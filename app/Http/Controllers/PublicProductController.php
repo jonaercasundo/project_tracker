@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\MI_Product;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Facades\Schema;
 
 class PublicProductController extends Controller
 {
@@ -16,7 +18,13 @@ class PublicProductController extends Controller
         // on your model, then uncomment the line below:
         // abort_if($product->status !== 'active', 404);
 
-        $product->load(['category', 'subCategory', 'collection', 'images', 'variants']);
+        $product->load(['category', 'subCategory', 'collection', 'images']);
+
+        if (Schema::hasTable('mi_product_variants')) {
+            $product->load('variants');
+        } else {
+            $product->setRelation('variants', new EloquentCollection);
+        }
 
         return view('mi_app.public.show', [
             'product' => $product,

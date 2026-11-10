@@ -130,20 +130,14 @@
 
         });
 
-        document.querySelectorAll('.dr-checkbox').forEach(cb => {
-
-            cb.addEventListener('change', () => {
-
-                const all = document.querySelectorAll('.dr-checkbox').length;
-                const checked = document.querySelectorAll('.dr-checkbox:checked').length;
-
-                if (selectAll) {
-                    selectAll.checked = all === checked;
-                    selectAll.indeterminate = checked > 0 && checked < all;
-                }
-
-            });
-
+        document.addEventListener('change', event => {
+            if (!event.target.matches('.dr-checkbox')) return;
+            const all = document.querySelectorAll('.dr-checkbox').length;
+            const checked = document.querySelectorAll('.dr-checkbox:checked').length;
+            if (selectAll) {
+                selectAll.checked = all === checked;
+                selectAll.indeterminate = checked > 0 && checked < all;
+            }
         });
 
         // =========================
@@ -195,6 +189,62 @@
 }
 
         restoreFilters(); // ← called here, inside DOMContentLoaded, so DOM vars are in scope
+
+        async function loadDeliveryPhases() {
+            if (!project?.value || !document.getElementById('delivery-summary-cards')) return;
+
+            const status = document.getElementById('delivery-loading-status');
+            const makePhaseUrl = phase => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('phase', phase);
+                return url;
+            };
+
+            try {
+                const summaryResponse = await fetch(makePhaseUrl('summary'), {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                if (!summaryResponse.ok) throw new Error('Delivery summary could not be loaded.');
+                const summary = await summaryResponse.json();
+                const statElements = {
+                    total_pending: document.getElementById('delivery-stat-pending'),
+                    total_stock_out: document.getElementById('delivery-stat-stock-out'),
+                    total_delivered: document.getElementById('delivery-stat-delivered'),
+                    total_collection: document.getElementById('delivery-stat-billing'),
+                    total_billed: document.getElementById('delivery-stat-billed'),
+                };
+                for (const [key, element] of Object.entries(statElements)) {
+                    const target = Number(summary.stats?.[key] ?? 0);
+                    if (!element || !Number.isFinite(target)) continue;
+                    const startedAt = performance.now();
+                    const animate = now => {
+                        const progress = Math.min((now - startedAt) / 600, 1);
+                        element.textContent = Math.round(target * (1 - (1 - progress) ** 3)).toLocaleString();
+                        element.title = target.toLocaleString();
+                        if (progress < 1) requestAnimationFrame(animate);
+                    };
+                    requestAnimationFrame(animate);
+                }
+                status.textContent = 'Summary loaded · Fetching delivery records…';
+
+                const recordsResponse = await fetch(makePhaseUrl('records'), {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                if (!recordsResponse.ok) throw new Error('Delivery records could not be loaded.');
+                const records = await recordsResponse.json();
+                const renderedPage = new DOMParser().parseFromString(records.html, 'text/html');
+                const renderedRecords = renderedPage.getElementById('delivery-records');
+                if (!renderedRecords) throw new Error('Delivery records could not be displayed. Refresh the page and try again.');
+                document.getElementById('delivery-records').innerHTML = renderedRecords.innerHTML;
+                status.textContent = 'Delivery records loaded.';
+            } catch (exception) {
+                status.textContent = exception.message;
+            }
+        }
+
+        loadDeliveryPhases();
 
     });
 

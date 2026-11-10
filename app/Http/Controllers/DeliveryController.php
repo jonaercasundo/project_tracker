@@ -171,6 +171,28 @@ class DeliveryController extends Controller
         }
 
         $projects = DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']);
+        if ($request->expectsJson() && $request->query('phase') === 'summary' && $request->filled('project')) {
+            $progressFilters = [
+                'project_id' => (int) $request->input('project'),
+                'active_only' => false,
+                'compact' => true,
+            ];
+            foreach (['lot' => 'lot_id', 'region' => 'region', 'division' => 'division', 'municipality' => 'municipality'] as $filter => $metricFilter) {
+                if ($request->filled($filter)) {
+                    $progressFilters[$metricFilter] = $request->input($filter);
+                }
+            }
+            $summary = $this->deliveryProgress->report($progressFilters)['summary'];
+
+            return response()->json(['stats' => [
+                'total_pending' => (int) $summary['pending_deliveries_count'],
+                'total_stock_out' => max(0, (int) $summary['stock_out_drs_count'] - (int) $summary['completed_deliveries_count']),
+                'total_delivered' => (int) $summary['completed_deliveries_count'],
+                'total_collection' => (int) $summary['billing_drs_count'],
+                'total_billed' => (int) $summary['billed_delivery_drs_count'],
+            ]])->header('Cache-Control', 'private, no-store');
+        }
+
         if (! $request->filled('project')) {
             return view('deliveries.index', [
                 'grouped_deliveries' => [],
@@ -180,6 +202,21 @@ class DeliveryController extends Controller
                 'total_pages' => 0,
                 'total_rows' => 0,
                 'stats' => [],
+            ]);
+        }
+
+        if (! $request->expectsJson()) {
+            $lots = DB::table('lot')->where('project_id', $request->project)->orderBy('lot_name')->get();
+
+            return view('deliveries.index', [
+                'grouped_deliveries' => [],
+                'projects' => $projects,
+                'lots' => $lots,
+                'page' => 1,
+                'total_pages' => 0,
+                'total_rows' => 0,
+                'stats' => [],
+                'loading' => true,
             ]);
         }
 
@@ -477,14 +514,17 @@ class DeliveryController extends Controller
                 $progressFilters[$metricFilter] = $request->input($filter);
             }
         }
-        $progressSummary = $this->deliveryProgress->report($progressFilters)['summary'];
-        $stats = [
-            'total_pending' => (int) $progressSummary['pending_deliveries_count'],
-            'total_stock_out' => max(0, (int) $progressSummary['stock_out_drs_count'] - (int) $progressSummary['completed_deliveries_count']),
-            'total_delivered' => (int) $progressSummary['completed_deliveries_count'],
-            'total_collection' => (int) $progressSummary['billing_drs_count'],
-            'total_billed' => (int) $progressSummary['billed_delivery_drs_count'],
-        ];
+        $stats = [];
+        if ($request->query('phase') !== 'records') {
+            $progressSummary = $this->deliveryProgress->report($progressFilters)['summary'];
+            $stats = [
+                'total_pending' => (int) $progressSummary['pending_deliveries_count'],
+                'total_stock_out' => max(0, (int) $progressSummary['stock_out_drs_count'] - (int) $progressSummary['completed_deliveries_count']),
+                'total_delivered' => (int) $progressSummary['completed_deliveries_count'],
+                'total_collection' => (int) $progressSummary['billing_drs_count'],
+                'total_billed' => (int) $progressSummary['billed_delivery_drs_count'],
+            ];
+        }
 
         // =========================
         // DROPDOWNS
@@ -496,7 +536,7 @@ class DeliveryController extends Controller
             ->orderBy('lot_name')
             ->get();
 
-        return view('deliveries.index', [
+        $viewData = [
             'grouped_deliveries' => $grouped,
             'projects' => $projects,
             'lots' => $lots,
@@ -504,7 +544,14 @@ class DeliveryController extends Controller
             'total_pages' => $total_pages,
             'total_rows' => $total_rows,
             'stats' => $stats,
-        ]);
+            'loading' => false,
+        ];
+        if ($request->expectsJson() && $request->query('phase') === 'records') {
+            return response()->json(['html' => view('deliveries.index', $viewData)->render()])
+                ->header('Cache-Control', 'private, no-store');
+        }
+
+        return view('deliveries.index', $viewData);
     }
 
     /**

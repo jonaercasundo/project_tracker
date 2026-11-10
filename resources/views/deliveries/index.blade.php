@@ -43,13 +43,14 @@
     {{-- FILTERS --}}
     @include('deliveries.partials._filters')
     @if(request()->filled('project'))
+    <p id="delivery-loading-status" role="status" class="text-xs text-slate-500">Loading delivery summary…</p>
     <label class="flex items-center gap-2 px-3 py-2 bg-white border rounded-xl text-xs font-semibold">
         <input type="checkbox" id="select-all-drs">
         Select All
     </label>
 
     {{-- SUMMARY CARDS (scoped to the selected project and delivery filters) --}}
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div id="delivery-summary-cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
 
         {{-- TOTAL PENDING (DR-level) --}}
         <div class="group relative bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md hover:border-amber-200 transition-all duration-200 p-4 flex flex-col gap-1 overflow-hidden">
@@ -60,7 +61,7 @@
                 <span class="text-[11px] font-bold uppercase tracking-wide text-amber-600">Pending</span>
                 <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
             </div>
-            <span class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_pending'] ?? 0 }}">
+            <span id="delivery-stat-pending" class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_pending'] ?? 0 }}">
                 {{ number_format($stats['total_pending'] ?? 0) }}
             </span>
             <span class="relative text-[11px] text-slate-400">DRs fully pending</span>
@@ -75,7 +76,7 @@
                 <span class="text-[11px] font-bold uppercase tracking-wide text-blue-600">Stock Out</span>
                 <span class="w-2 h-2 rounded-full bg-blue-400 shrink-0"></span>
             </div>
-            <span class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_stock_out'] ?? 0 }}">
+            <span id="delivery-stat-stock-out" class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_stock_out'] ?? 0 }}">
                 {{ number_format($stats['total_stock_out'] ?? 0) }}
             </span>
             <span class="relative text-[11px] text-slate-400">Stock-out DRs not yet delivered</span>
@@ -90,7 +91,7 @@
                 <span class="text-[11px] font-bold uppercase tracking-wide text-emerald-600">Delivered</span>
                 <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
             </div>
-            <span class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_delivered'] ?? 0 }}">
+            <span id="delivery-stat-delivered" class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_delivered'] ?? 0 }}">
                 {{ number_format($stats['total_delivered'] ?? 0) }}
             </span>
             <span class="relative text-[11px] text-slate-400">DRs delivered or accepted</span>
@@ -106,7 +107,7 @@
                 <span class="text-[11px] font-bold uppercase tracking-wide text-cyan-600">Billing</span>
                 <span class="w-2 h-2 rounded-full bg-cyan-400 shrink-0"></span>
             </div>
-            <span class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_collection'] ?? 0 }}">
+            <span id="delivery-stat-billing" class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_collection'] ?? 0 }}">
                 {{ number_format($stats['total_collection'] ?? 0) }}
             </span>
             <span class="relative text-[11px] text-slate-400">DRs in the billing stage</span>
@@ -121,7 +122,7 @@
                 <span class="text-[11px] font-bold uppercase tracking-wide text-slate-600">Billed</span>
                 <span class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
             </div>
-            <span class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_billed'] ?? 0 }}">
+            <span id="delivery-stat-billed" class="relative text-2xl font-extrabold text-slate-900 tabular-nums truncate" title="{{ $stats['total_billed'] ?? 0 }}">
                 {{ number_format($stats['total_billed'] ?? 0) }}
             </span>
             <span class="relative text-[11px] text-slate-400">Total billed</span>
@@ -130,11 +131,16 @@
     </div>
     @endif
 
+    <div id="delivery-records">
     {{-- CONTENT STATE HANDLERS --}}
     @if(!request()->filled('project'))
         <div class="text-center py-16 text-slate-500 bg-white rounded-2xl border border-slate-200 shadow-sm">
             <p class="text-sm font-semibold text-slate-700">Choose a project to load delivery records.</p>
             <p class="mt-1 text-xs text-slate-400">DRs, status totals, and package details will appear after you select a project.</p>
+        </div>
+    @elseif($loading ?? false)
+        <div class="text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200 shadow-sm" aria-live="polite">
+            <p class="text-sm font-medium text-slate-600">Summary loaded. Fetching delivery records…</p>
         </div>
     @elseif(empty($grouped_deliveries))
         <div class="text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200 shadow-sm">
@@ -390,6 +396,7 @@
         </div>
 
     @endif
+    </div>
 
 </div>
 

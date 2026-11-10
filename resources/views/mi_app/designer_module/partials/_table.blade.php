@@ -691,8 +691,10 @@
                             </svg>
                         </a>
                     </th>
+                    @if($sortKey === 'item_no')
+                        <th scope="col" class="tx-row-photo-cell">Photo</th>
+                    @endif
                 @endforeach
-                <th scope="col" aria-label="Product photo"></th>
                 <th class="actions-col">Actions</th>
             </tr>
         </thead>

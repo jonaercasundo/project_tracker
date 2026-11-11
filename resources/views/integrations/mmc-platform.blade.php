@@ -156,34 +156,6 @@
                         </div>
                     </template>
                 </section>
-                <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Endpoint details and data ownership must be agreed before enabling synchronization. This screen configures, tests, and previews read-only data only.</p>
-                <section class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5" aria-labelledby="sync-disabled-title">
-                    <div class="flex flex-wrap items-center gap-3">
-                        <button type="button" disabled aria-disabled="true" class="cursor-not-allowed rounded-lg bg-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600">Sync Data · Disabled</button>
-                        <div>
-                            <h3 id="sync-disabled-title" class="text-base font-semibold text-slate-900">Sync Data</h3>
-                            <p class="text-sm text-amber-800">Blocked until the API contract, field ownership, and update rules are approved.</p>
-                        </div>
-                    </div>
-                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Sync status">
-                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Progress</p><p class="mt-1 text-sm font-medium text-slate-700">Not started · disabled</p></div>
-                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Created</p><p class="mt-1 text-sm font-medium text-slate-700">Unavailable</p></div>
-                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Updated</p><p class="mt-1 text-sm font-medium text-slate-700">Unavailable</p></div>
-                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Skipped / failed</p><p class="mt-1 text-sm font-medium text-slate-700">Unavailable</p></div>
-                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Last successful sync</p><p class="mt-1 text-sm font-medium text-slate-700">No sync runs recorded</p></div>
-                    </div>
-                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-                        <p class="font-semibold">Configuration still required</p>
-                        <ul class="mt-2 list-inside list-disc space-y-1">
-                            <li>The guide calls <code>delivery_id</code> the permanent upstream row ID, but does not specify its type or whether it is globally unique. Tracker's existing <code>deliveries.delivery_id</code> is already the local primary key; a separate source ID mapping and uniqueness scope have not been approved.</li>
-                            <li>Delivery rows depend on Tracker project, lot, school, and stage relationships. The guide does not provide a complete, approved mapping to those local records or confirm the required field types and nullability.</li>
-                            <li>Ownership and allowed update rules for delivery, DR, inventory, and billing workflow fields are unresolved. Tracker-owned values must not be overwritten.</li>
-                            <li>No source-ID mapping, sync-run/error persistence, last-success state, or polling schedule exists for this integration.</li>
-                            <li>No dedicated <code>mmc-platform.sync</code> permission is configured. Sync access and the first-run confirmation step must be added after the mapping is approved.</li>
-                        </ul>
-                    </div>
-                    <p class="text-sm text-slate-700">Once these decisions are approved, sync can poll only <code>GET /api/v1/programs/{program_id}/master-list</code>, using its documented <code>page</code>/<code>limit</code> pagination (maximum 2,000). No write or automatic sync is currently available.</p>
-                </section>
             </section>
         @elseif ($tab === 'reconciliation')
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="reconciliation-title">

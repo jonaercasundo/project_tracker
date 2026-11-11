@@ -142,9 +142,10 @@ class MmcPlatformIntegrationController extends Controller
     {
         $data = $request->validate([
             'program_id' => ['required', 'string', 'max:255'],
-            'limit' => ['required', 'integer', 'min:1', 'max:100'],
+            'program_name' => ['nullable', 'string', 'max:255'],
+            'limit' => ['required', 'integer', 'min:1', 'max:2000'],
         ]);
 
-        return response()->json($client->previewMasterList($data['program_id'], (int) $data['limit']));
+        return response()->json($client->previewMasterList($data['program_id'], $data['program_name'] ?? '', (int) $data['limit']));
     }
 }

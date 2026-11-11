@@ -150,38 +150,98 @@ class MmcPlatformApiClient
         return ['status' => 'success', 'message' => 'Connection successful.', 'programs' => array_values(array_filter($programs, fn ($program): bool => is_array($program) && isset($program['id']))), 'raw' => $this->safeRaw($result['raw'])];
     }
 
-    /** @return array{status: string, message: string, records: array, raw: mixed, retrieved_at: string} */
-    public function previewMasterList(string $programId, int $limit): array
+    /** @return array{status: string, message: string, records: array, raw: mixed, retrieved_at: string, diagnostics: array} */
+    public function previewMasterList(string $programId, string $programName, int $limit): array
     {
-        $result = $this->getReadResponse('/programs/'.rawurlencode($programId).'/master-list', ['page' => 1, 'limit' => $limit]);
+        $path = '/programs/'.rawurlencode($programId).'/master-list';
         $timestamp = now()->toIso8601String();
-        if ($result['error'] !== null) {
-            return ['status' => 'failed', 'message' => $result['error'], 'records' => [], 'raw' => $result['raw'], 'retrieved_at' => $timestamp];
+        $records = [];
+        $requests = [];
+        $total = null;
+        $hasMore = null;
+        $dataCount = 0;
+        $raw = null;
+        $message = 'Data retrieved successfully.';
+        $status = 'success';
+        $maxPages = 10;
+
+        for ($page = 1; $page <= $maxPages && count($records) < $limit; $page++) {
+            $parameters = ['page' => $page, 'limit' => min(max(1, $limit - count($records)), 2000)];
+            $result = $this->getReadResponse($path, $parameters);
+            $requests[] = [
+                'http_status' => $result['http_status'],
+                'requested_endpoint' => $result['requested_endpoint'],
+                'parameters' => $parameters,
+            ];
+            $raw = $result['raw'];
+
+            if ($result['error'] !== null) {
+                $status = $records === [] ? 'failed' : 'partial';
+                $message = $records === [] ? $result['error'] : 'Some records were retrieved, but a later page failed: '.$result['error'];
+                break;
+            }
+
+            $payload = $result['payload'];
+            $pageRecords = is_array($payload) ? ($payload['data'] ?? $payload['master_list'] ?? $payload['records'] ?? $payload) : null;
+            if (! is_array($pageRecords) || ! array_is_list($pageRecords) || array_filter($pageRecords, fn ($record): bool => ! is_array($record)) !== []) {
+                $status = $records === [] ? 'failed' : 'partial';
+                $message = 'The master-list endpoint returned an unexpected response shape. Inspect the safe raw response and confirm the documented response envelope with the MMC API owner.';
+                break;
+            }
+
+            $records = array_merge($records, $pageRecords);
+            $dataCount += count($pageRecords);
+            $total = $this->responseValue($payload, 'total');
+            $hasMore = $this->responseValue($payload, 'has_more');
+            if (filter_var($hasMore, FILTER_VALIDATE_BOOLEAN) !== true || count($records) >= $limit) {
+                break;
+            }
+
+            if ($page === $maxPages) {
+                $status = 'partial';
+                $message = 'The preview reached its 10-page safety limit while the API still reports more data. Increase the sample selectively or ask the API owner about the response pagination.';
+            }
         }
 
-        $payload = $result['payload'];
-        $records = is_array($payload) ? ($payload['data'] ?? $payload['master_list'] ?? $payload['records'] ?? $payload) : null;
-        if (! is_array($records) || ! array_is_list($records) || array_filter($records, fn ($record): bool => ! is_array($record)) !== []) {
-            return ['status' => 'failed', 'message' => 'The master-list endpoint returned an unexpected response. Confirm its response format with the MMC API owner.', 'records' => [], 'raw' => $this->safeRaw($result['raw']), 'retrieved_at' => $timestamp];
+        $records = array_slice($records, 0, $limit);
+        $diagnostics = [
+            'http_status' => $requests === [] ? null : $requests[array_key_last($requests)]['http_status'],
+            'requested_endpoint' => $requests[0]['requested_endpoint'] ?? null,
+            'requests' => $requests,
+            'program_name' => $programName,
+            'program_id' => $programId,
+            'parameters' => array_column($requests, 'parameters'),
+            'total' => $total,
+            'data_count' => $dataCount,
+            'has_more' => $hasMore,
+        ];
+        $totalIsZero = is_numeric($diagnostics['total']) && (float) $diagnostics['total'] === 0.0;
+        if ($status === 'success' && $records === []) {
+            $message = $totalIsZero && filter_var($diagnostics['has_more'], FILTER_VALIDATE_BOOLEAN) === true
+                ? 'The MMC Platform returned total: 0 and an empty data array, but has_more is true. Ask the API owner to verify the program ID and pagination metadata.'
+                : ($totalIsZero
+                    ? 'The MMC Platform returned total: 0 and an empty data array for this program. Ask the API owner to verify this exact program ID is populated and visible to the read-scoped key.'
+                    : 'The MMC Platform returned no records in the requested pages. Review total and has_more below, then ask the API owner to verify the program’s master-list data.');
         }
 
-        return ['status' => 'success', 'message' => $records === [] ? 'No records were returned for this program.' : 'Data retrieved successfully.', 'records' => array_slice($records, 0, $limit), 'raw' => $this->safeRaw($result['raw']), 'retrieved_at' => $timestamp];
+        return ['status' => $status, 'message' => $message, 'records' => $records, 'raw' => $raw, 'retrieved_at' => $timestamp, 'diagnostics' => $diagnostics];
     }
 
-    /** @return array{error: ?string, payload: mixed, raw: mixed} */
+    /** @return array{error: ?string, payload: mixed, raw: mixed, http_status: ?int, requested_endpoint: ?string} */
     private function getReadResponse(string $path, array $query): array
     {
         $configuration = $this->configuration->current();
         if ($this->baseUrlError($configuration['base_url']) !== null || ! str_starts_with($configuration['read_key'], 'mmc_')) {
-            return ['error' => 'Configure a valid API base URL and read-scoped mmc_ bearer key first.', 'payload' => null, 'raw' => null];
+            return ['error' => 'Configure a valid API base URL and read-scoped mmc_ bearer key first.', 'payload' => null, 'raw' => null, 'http_status' => null, 'requested_endpoint' => null];
         }
 
+        $requestedEndpoint = rtrim($configuration['base_url'], '/').$path.'?'.http_build_query($query);
         try {
             $response = $this->authenticatedRequest($configuration['read_key'])->get(rtrim($configuration['base_url'], '/').$path, $query);
         } catch (ConnectionException) {
-            return ['error' => 'The MMC Platform is unavailable. Check network access, TLS, and whether the API service is running.', 'payload' => null, 'raw' => null];
+            return ['error' => 'The MMC Platform is unavailable. Check network access, TLS, and whether the API service is running.', 'payload' => null, 'raw' => null, 'http_status' => null, 'requested_endpoint' => $requestedEndpoint];
         } catch (Throwable) {
-            return ['error' => 'The MMC Platform request failed. Check the API host and try again.', 'payload' => null, 'raw' => null];
+            return ['error' => 'The MMC Platform request failed. Check the API host and try again.', 'payload' => null, 'raw' => null, 'http_status' => null, 'requested_endpoint' => $requestedEndpoint];
         }
 
         $raw = $response->body();
@@ -193,15 +253,28 @@ class MmcPlatformApiClient
                 default => 'The MMC Platform returned HTTP '.$response->status().'. Check service availability and try again.',
             };
 
-            return ['error' => $message, 'payload' => null, 'raw' => $this->safeRaw($raw)];
+            return ['error' => $message, 'payload' => null, 'raw' => $this->safeRaw($raw), 'http_status' => $response->status(), 'requested_endpoint' => $requestedEndpoint];
         }
 
         $payload = $response->json();
         if (! is_array($payload)) {
-            return ['error' => 'The MMC Platform returned malformed JSON. Ask the API owner to verify the response.', 'payload' => null, 'raw' => $this->safeRaw($raw)];
+            return ['error' => 'The MMC Platform returned malformed JSON. Ask the API owner to verify the response.', 'payload' => null, 'raw' => $this->safeRaw($raw), 'http_status' => $response->status(), 'requested_endpoint' => $requestedEndpoint];
         }
 
-        return ['error' => null, 'payload' => $payload, 'raw' => $this->safeRaw($payload)];
+        return ['error' => null, 'payload' => $payload, 'raw' => $this->safeRaw($payload), 'http_status' => $response->status(), 'requested_endpoint' => $requestedEndpoint];
+    }
+
+    private function responseValue(array $payload, string $key): mixed
+    {
+        foreach ([$payload, $payload['meta'] ?? null, $payload['pagination'] ?? null] as $container) {
+            if (is_array($container) && array_key_exists($key, $container)) {
+                $value = $container[$key];
+
+                return is_scalar($value) || $value === null ? $value : null;
+            }
+        }
+
+        return null;
     }
 
     private function safeRaw(mixed $payload): mixed

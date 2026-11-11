@@ -42,6 +42,12 @@ it('shows the configuration screen in the MMC user workspace only', function () 
         ->assertSee('showApiKey')
         ->assertDontSee('mmc_test_read_key');
 
+    $this->get(route('integrations.mmc-platform.index', ['tab' => 'api-webhooks']))
+        ->assertOk()
+        ->assertSee('Data Preview')
+        ->assertSee('HTTP status · requested endpoint')
+        ->assertSee('max="2000"', false);
+
     $administrator = $this->miUser('Administrator', 'MMC');
     $this->actingAs($administrator)->withSession(['company_id' => $administrator->companies()->sole()->getKey()]);
     $this->get(route('integrations.mmc-platform.index'))->assertForbidden();
@@ -125,17 +131,70 @@ it('returns a bounded read-only preview and redacts credential-like raw response
         'https://platform.example.test/api/v1/programs/program-123/master-list*' => Http::response(['data' => [
             ['delivery_id' => 'd-1', 'school_name' => 'North School', 'api_key' => 'must-hide'],
             ['delivery_id' => 'd-2', 'school_name' => 'South School'],
-        ]]),
+        ], 'total' => 2, 'has_more' => true]),
     ]);
 
-    $this->postJson(route('integrations.mmc-platform.preview-data'), ['program_id' => 'program-123', 'limit' => 1])
+    $this->postJson(route('integrations.mmc-platform.preview-data'), ['program_id' => 'program-123', 'program_name' => 'Sample Program', 'limit' => 1])
         ->assertOk()
         ->assertJsonPath('status', 'success')
         ->assertJsonPath('records.0.delivery_id', 'd-1')
+        ->assertJsonPath('diagnostics.http_status', 200)
+        ->assertJsonPath('diagnostics.program_name', 'Sample Program')
+        ->assertJsonPath('diagnostics.program_id', 'program-123')
+        ->assertJsonPath('diagnostics.parameters.0.page', 1)
+        ->assertJsonPath('diagnostics.parameters.0.limit', 1)
+        ->assertJsonPath('diagnostics.total', 2)
+        ->assertJsonPath('diagnostics.data_count', 2)
+        ->assertJsonPath('diagnostics.has_more', true)
         ->assertJsonPath('raw.data.0.api_key', '[REDACTED]');
 
     Http::assertSent(fn (HttpRequest $request): bool => $request->url() === 'https://platform.example.test/api/v1/programs/program-123/master-list?page=1&limit=1'
         && $request->hasHeader('Authorization', 'Bearer mmc_test_read_key'));
+});
+
+it('continues to the next documented page when the first page is empty but has more rows', function () {
+    mmcPlatformUser();
+    DB::table('mmc_platform_settings')->insert([
+        'id' => 1,
+        'base_url' => 'https://platform.example.test/api/v1',
+        'read_key' => Crypt::encryptString('mmc_test_read_key'),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    Http::fakeSequence()
+        ->push(['data' => [], 'total' => 1, 'has_more' => true], 200)
+        ->push(['data' => [['delivery_id' => 'd-1', 'school_name' => 'North School']], 'total' => 1, 'has_more' => false], 200);
+
+    $this->postJson(route('integrations.mmc-platform.preview-data'), ['program_id' => 'program-123', 'program_name' => 'Sample Program', 'limit' => 1])
+        ->assertOk()
+        ->assertJsonPath('records.0.delivery_id', 'd-1')
+        ->assertJsonPath('diagnostics.data_count', 1)
+        ->assertJsonPath('diagnostics.parameters.0.page', 1)
+        ->assertJsonPath('diagnostics.parameters.1.page', 2);
+
+    Http::assertSent(fn (HttpRequest $request): bool => str_contains($request->url(), '/master-list?page=2&limit=1'));
+});
+
+it('reports a genuine zero total from the upstream response distinctly', function () {
+    mmcPlatformUser();
+    DB::table('mmc_platform_settings')->insert([
+        'id' => 1,
+        'base_url' => 'https://platform.example.test/api/v1',
+        'read_key' => Crypt::encryptString('mmc_test_read_key'),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    Http::fake([
+        'https://platform.example.test/api/v1/programs/program-empty/master-list*' => Http::response(['data' => [], 'total' => 0, 'has_more' => false]),
+    ]);
+
+    $this->postJson(route('integrations.mmc-platform.preview-data'), ['program_id' => 'program-empty', 'program_name' => 'Empty Program', 'limit' => 25])
+        ->assertOk()
+        ->assertJsonPath('status', 'success')
+        ->assertJsonPath('message', 'The MMC Platform returned total: 0 and an empty data array for this program. Ask the API owner to verify this exact program ID is populated and visible to the read-scoped key.')
+        ->assertJsonPath('diagnostics.total', 0)
+        ->assertJsonPath('diagnostics.data_count', 0)
+        ->assertJsonPath('diagnostics.has_more', false);
 });
 
 it('rejects non-local HTTP URLs without making a request', function () {

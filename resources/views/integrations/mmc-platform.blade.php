@@ -100,16 +100,7 @@
                 <p class="mt-3 text-sm leading-6 text-slate-600">Partner credentials should be added here only when the partner ownership model, scopes, rotation process, and storage requirements are defined.</p>
             </section>
         @elseif ($tab === 'api-webhooks')
-            <section class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="api-title">
-                <div>
-                    <h2 id="api-title" class="text-lg font-semibold text-slate-900">API &amp; Webhooks</h2>
-                    <p class="mt-1 text-sm text-slate-500">Known MMC Platform read endpoints from the current API mapping.</p>
-                </div>
-                <div class="space-y-3 text-sm leading-6 text-slate-700">
-                    <p><code class="rounded bg-slate-100 px-1.5 py-0.5">GET /api/v1/programs</code> lists programs. The connection test checks this endpoint with a one-record limit.</p>
-                    <p><code class="rounded bg-slate-100 px-1.5 py-0.5">GET /api/v1/programs/{program_id}/master-list</code> returns paginated delivery rows; the guide documents a maximum page limit of 2,000.</p>
-                    <p>Authentication uses a read-scoped <code class="rounded bg-slate-100 px-1.5 py-0.5">mmc_</code> bearer key. The API guide does not document webhook events or signature validation; polling is the documented approach.</p>
-                </div>
+            <section class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="data-preview-title">
                 <section class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5" aria-labelledby="data-preview-title">
                     <div>
                         <h3 id="data-preview-title" class="text-base font-semibold text-slate-900">Data Preview</h3>

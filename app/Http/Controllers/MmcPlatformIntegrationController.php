@@ -148,4 +148,124 @@ class MmcPlatformIntegrationController extends Controller
 
         return response()->json($client->previewMasterList($data['program_id'], $data['program_name'] ?? '', (int) $data['limit']));
     }
+
+    public function syncProject(Request $request, MmcPlatformApiClient $client): JsonResponse
+    {
+        $data = $request->validate([
+            'program_id' => ['required', 'string', 'max:255'],
+            'program_name' => ['nullable', 'string', 'max:255'],
+            'program_info' => ['nullable', 'array:id,name,project_title,fiscal_year,status'],
+            'program_info.id' => ['nullable', 'string', 'max:255'],
+            'program_info.name' => ['nullable', 'string', 'max:255'],
+            'program_info.project_title' => ['nullable', 'string', 'max:255'],
+            'program_info.fiscal_year' => ['nullable', 'integer'],
+            'program_info.status' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        if (! Schema::hasTable('mmc_platform_project_syncs')) {
+            return response()->json(['status' => 'failed', 'message' => 'Run the MMC Platform project sync migration before syncing data.'], 503);
+        }
+
+        try {
+            $result = $client->fetchProjectMasterList($data['program_id']);
+            $records = $result['records'];
+            $entities = $this->groupSyncedEntities($records);
+            $companyId = (int) $request->user()->currentCompany()->getKey();
+            $syncedAt = now();
+
+            DB::transaction(function () use ($companyId, $data, $records, $entities, $syncedAt): void {
+                DB::table('mmc_platform_project_syncs')->updateOrInsert(
+                    ['company_id' => $companyId, 'program_id' => $data['program_id']],
+                    [
+                        'program_name' => $data['program_name'] ?? null,
+                        'program_info' => json_encode($data['program_info'] ?? [], JSON_THROW_ON_ERROR),
+                        'records' => json_encode(['master_list' => $records, 'entities' => $entities], JSON_THROW_ON_ERROR),
+                        'entity_counts' => json_encode(array_map('count', $entities), JSON_THROW_ON_ERROR),
+                        'record_count' => count($records),
+                        'synced_at' => $syncedAt,
+                        'updated_at' => $syncedAt,
+                        'created_at' => $syncedAt,
+                    ],
+                );
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'MMC project data saved to Tracker.',
+                'record_count' => count($records),
+                'entity_counts' => array_map('count', $entities),
+                'pages' => $result['pages'],
+                'synced_at' => $syncedAt->toIso8601String(),
+            ]);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'status' => 'failed',
+                'message' => $exception instanceof \RuntimeException || $exception instanceof \UnexpectedValueException
+                    ? $exception->getMessage()
+                    : 'The project data could not be saved. Please try again.',
+            ], 502);
+        }
+    }
+
+    /** @param array<int, array<string, mixed>> $records
+     * @return array<string, array<int, mixed>>
+     */
+    private function groupSyncedEntities(array $records): array
+    {
+        $entities = ['schools' => [], 'lots' => [], 'keystages' => [], 'items' => [], 'packages' => []];
+        $seen = ['schools' => [], 'lots' => [], 'keystages' => [], 'items' => [], 'packages' => []];
+
+        foreach ($records as $record) {
+            if (isset($record['school_id'])) {
+                $entities['schools'][] = $record;
+            }
+            if (isset($record['lot_id'])) {
+                $entities['lots'][] = $record;
+            }
+            foreach (['keystages', 'key_stages', 'key_stages_data', 'grade_levels'] as $key) {
+                foreach ((array) ($record[$key] ?? []) as $stage) {
+                    if (is_array($stage)) {
+                        $entities['keystages'][] = $stage;
+                    }
+                }
+            }
+            foreach ((array) ($record['lines'] ?? []) as $item) {
+                if (is_array($item)) {
+                    $entities['items'][] = $item;
+                    foreach ((array) ($item['packages'] ?? $item['package'] ?? []) as $package) {
+                        if (is_array($package)) {
+                            $entities['packages'][] = $package;
+                        }
+                    }
+                }
+            }
+            foreach ((array) ($record['packages'] ?? $record['package'] ?? []) as $package) {
+                if (is_array($package)) {
+                    $entities['packages'][] = $package;
+                }
+            }
+        }
+
+        foreach ($entities as $type => $rows) {
+            foreach ($rows as $row) {
+                $key = match ($type) {
+                    'schools' => $row['school_id'] ?? $row['id'] ?? null,
+                    'lots' => $row['lot_id'] ?? $row['id'] ?? null,
+                    'items' => $row['item_id'] ?? $row['item_code'] ?? $row['id'] ?? null,
+                    'packages' => $row['package_id'] ?? $row['id'] ?? null,
+                    default => $row['id'] ?? $row['key_stage_id'] ?? $row['name'] ?? null,
+                };
+                if ($key !== null) {
+                    $seen[$type][(string) $key] = $row;
+                }
+            }
+            if ($seen[$type] !== []) {
+                $entities[$type] = array_values($seen[$type]);
+            }
+        }
+
+        return $entities;
+    }
 }

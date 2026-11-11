@@ -230,6 +230,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         Route::post('/integrations/mmc-platform/preview-data', [MmcPlatformIntegrationController::class, 'previewData'])
             ->middleware('throttle:10,1')
             ->name('integrations.mmc-platform.preview-data');
+        Route::post('/integrations/mmc-platform/sync', [MmcPlatformIntegrationController::class, 'syncProject'])
+            ->middleware('throttle:3,1')
+            ->name('integrations.mmc-platform.sync');
     });
 
     Route::middleware(['role:Administrator'])->group(function () {

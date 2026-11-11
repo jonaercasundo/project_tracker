@@ -6,7 +6,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" x-data="{ showApiKey: false, previewBusy: false, programs: [], selectedProgram: '', sampleLimit: 25, result: null, connectionState: '', connectionMessage: '' }" x-init="if ({{ $tab === 'api-webhooks' ? 'true' : 'false' }}) $nextTick(() => $refs.testConnection.click())">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" x-data="{ showApiKey: false, previewBusy: false, syncBusy: false, programs: [], selectedProgram: '', sampleLimit: 25, result: null, syncResult: null, connectionState: '', connectionMessage: '' }" x-init="if ({{ $tab === 'api-webhooks' ? 'true' : 'false' }}) $nextTick(() => $refs.testConnection.click())">
         @if (session('success'))
             <div role="status" aria-live="polite" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('success') }}</div>
         @endif
@@ -90,7 +90,7 @@
                     <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ $connection['reason'] }}</p>
                 @endif
                 <div class="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
-                    This page manages the MMC Platform read-only connection and preview. Data synchronization and reconciliation are not configured; the guide documents polling endpoints, not webhooks.
+                    Sync saves a project-scoped MMC source snapshot in Tracker. It does not overwrite operational Tracker records. Apply the project sync migration before using the sync button.
                 </div>
             </section>
         @elseif ($tab === 'partners')
@@ -110,7 +110,7 @@
                         <button x-ref="testConnection" type="button" @click="previewBusy = true; connectionState = 'loading'; connectionMessage = 'Checking GET /api/v1/programs…'; fetch('{{ route('integrations.mmc-platform.connection-check') }}', {headers:{'Accept':'application/json'}}).then(r => r.json()).then(async d => { if (d.status !== 'success') { connectionState = 'error'; connectionMessage = d.message; return; } connectionState = 'success'; connectionMessage = 'Connection successful. Loading programs…'; const p = await fetch('{{ route('integrations.mmc-platform.programs') }}', {headers:{'Accept':'application/json'}}).then(r => r.json()); if (p.status !== 'success') { connectionMessage = `Connection successful. Programs could not be loaded: ${p.message}`; return; } programs = p.programs; if (!programs.length) { connectionMessage = 'Connection successful, but the endpoint returned no programs.'; } else { selectedProgram = String(programs[0].id); connectionMessage = 'Connection successful. Select a program to preview its data.'; } }).catch(() => { connectionState = 'error'; connectionMessage = 'Could not contact Tracker preview service. Please try again.'; }).finally(() => previewBusy = false)" :disabled="previewBusy" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60">Test Connection</button>
                         <span x-show="connectionState" :role="connectionState === 'error' ? 'alert' : 'status'" class="text-sm" :class="connectionState === 'error' ? 'text-rose-700' : (connectionState === 'success' ? 'font-semibold text-emerald-700' : 'text-slate-600')" x-text="connectionMessage"></span>
                     </div>
-                    <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-end">
+                    <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto_auto] sm:items-end">
                         <div>
                             <label for="preview-program" class="mb-1 block text-sm font-medium text-slate-700">Program</label>
                             <select id="preview-program" x-model="selectedProgram" :disabled="!programs.length || previewBusy" class="w-full rounded-lg border-slate-300 text-sm">
@@ -123,6 +123,11 @@
                             <input id="preview-limit" type="number" min="1" max="2000" x-model.number="sampleLimit" class="w-full rounded-lg border-slate-300 text-sm">
                         </div>
                         <button type="button" @click="previewBusy = true; result = null; fetch('{{ route('integrations.mmc-platform.preview-data') }}', {method:'POST', headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]')?.content || ''}, body:JSON.stringify({program_id:selectedProgram, program_name:programs.find(program => String(program.id) === selectedProgram)?.name || '', limit:sampleLimit})}).then(r => r.json()).then(d => result = d).catch(() => result = {status:'failed',message:'Could not contact Tracker preview service. Please try again.',records:[],raw:null,retrieved_at:null,diagnostics:null}).finally(() => previewBusy = false)" :disabled="previewBusy || !selectedProgram || sampleLimit < 1 || sampleLimit > 2000" class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-blue-500 hover:text-blue-700 disabled:opacity-50">Preview Data</button>
+                        <button type="button" @click="syncBusy = true; syncResult = null; const program = programs.find(program => String(program.id) === selectedProgram); const programInfo = Object.fromEntries(['id','name','project_title','fiscal_year','status'].filter(key => program?.[key] !== undefined).map(key => [key, program[key]])); fetch('{{ route('integrations.mmc-platform.sync') }}', {method:'POST', headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]')?.content || ''}, body:JSON.stringify({program_id:selectedProgram, program_name:program?.name || '', program_info:programInfo})}).then(async r => { const d = await r.json(); syncResult = {...d, status:r.ok ? d.status : 'failed'}; }).catch(() => syncResult = {status:'failed',message:'Could not contact Tracker sync service. Please try again.'}).finally(() => syncBusy = false)" :disabled="syncBusy || previewBusy || !selectedProgram" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" x-text="syncBusy ? 'Syncing…' : 'Sync to Tracker'"></button>
+                    </div>
+                    <div x-show="syncResult" role="status" class="rounded-lg border p-3 text-sm" :class="syncResult?.status === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'">
+                        <p class="font-semibold" x-text="syncResult?.message"></p>
+                        <p x-show="syncResult?.status === 'success'" class="mt-1" x-text="`Saved ${syncResult?.record_count ?? 0} master-list records over ${syncResult?.pages ?? 0} page(s). Schools: ${syncResult?.entity_counts?.schools ?? 0}; lots: ${syncResult?.entity_counts?.lots ?? 0}; keystages: ${syncResult?.entity_counts?.keystages ?? 0}; items: ${syncResult?.entity_counts?.items ?? 0}; packages: ${syncResult?.entity_counts?.packages ?? 0}.`"></p>
                     </div>
                     <p x-show="previewBusy" role="status" class="text-sm text-slate-600">Retrieving preview…</p>
                     <template x-if="result">
@@ -157,7 +162,7 @@
         @elseif ($tab === 'reconciliation')
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="reconciliation-title">
                 <h2 id="reconciliation-title" class="text-lg font-semibold text-slate-900">Reconciliation</h2>
-                <p class="mt-2 text-sm leading-6 text-slate-600">No MMC Platform reconciliation runs are available. The connection test does not import or change Tracker records.</p>
+                <p class="mt-2 text-sm leading-6 text-slate-600">Sync saves the selected project source data for reconciliation. It does not change Tracker's operational project, school, delivery, inventory, or billing records.</p>
                 <p class="mt-3 text-sm leading-6 text-slate-600">A reconciliation workflow depends on an approved field mapping, stable external identifiers, deletion rules, and sync persistence. These decisions are recorded in the MMC Tracker API mapping document.</p>
             </section>
         @elseif ($tab === 'audit-logs')

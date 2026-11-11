@@ -227,6 +227,43 @@ class MmcPlatformApiClient
         return ['status' => $status, 'message' => $message, 'records' => $records, 'raw' => $raw, 'retrieved_at' => $timestamp, 'diagnostics' => $diagnostics];
     }
 
+    /** @return array{records: array<int, array<string, mixed>>, pages: int} */
+    public function fetchProjectMasterList(string $programId): array
+    {
+        $records = [];
+        $page = 1;
+        $pageLimit = 2000;
+
+        do {
+            if ($page > 100) {
+                throw new \RuntimeException('The project master list exceeded the 100-page safety limit. No data was saved.');
+            }
+
+            $result = $this->getReadResponse('/programs/'.rawurlencode($programId).'/master-list', [
+                'page' => $page,
+                'limit' => $pageLimit,
+                'include' => 'lines',
+            ]);
+
+            if ($result['error'] !== null) {
+                throw new \RuntimeException($result['error']);
+            }
+
+            $payload = $result['payload'];
+            $pageRecords = $payload['data'] ?? $payload['master_list'] ?? $payload['records'] ?? null;
+            if (! is_array($pageRecords) || ! array_is_list($pageRecords) || array_filter($pageRecords, fn ($record): bool => ! is_array($record)) !== []) {
+                throw new \UnexpectedValueException('The master-list endpoint returned an unexpected response shape. No data was saved.');
+            }
+
+            $records = array_merge($records, $pageRecords);
+            $hasMore = $this->responseValue($payload, 'has_more');
+            $continue = $hasMore === null ? count($pageRecords) === $pageLimit : filter_var($hasMore, FILTER_VALIDATE_BOOLEAN);
+            $page++;
+        } while ($continue);
+
+        return ['records' => $records, 'pages' => $page - 1];
+    }
+
     /** @return array{error: ?string, payload: mixed, raw: mixed, http_status: ?int, requested_endpoint: ?string} */
     private function getReadResponse(string $path, array $query): array
     {

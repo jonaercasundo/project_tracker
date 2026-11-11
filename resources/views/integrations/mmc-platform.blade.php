@@ -156,7 +156,7 @@
                         </div>
                     </template>
                 </section>
-                <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Endpoint details and data ownership must be agreed before enabling synchronization. This screen only configures and tests the connection.</p>
+                <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Endpoint details and data ownership must be agreed before enabling synchronization. This screen configures, tests, and previews read-only data only.</p>
                 <section class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5" aria-labelledby="sync-disabled-title">
                     <div class="flex flex-wrap items-center gap-3">
                         <button type="button" disabled aria-disabled="true" class="cursor-not-allowed rounded-lg bg-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600">Sync Data · Disabled</button>

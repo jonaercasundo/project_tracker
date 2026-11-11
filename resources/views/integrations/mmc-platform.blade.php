@@ -6,7 +6,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" x-data="{ showApiKey: false }">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" x-data="{ showApiKey: false, previewBusy: false, programs: [], selectedProgram: '', sampleLimit: 25, result: null, connectionState: '', connectionMessage: '' }">
         @if (session('success'))
             <div role="status" aria-live="polite" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('success') }}</div>
         @endif
@@ -90,7 +90,7 @@
                     <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ $connection['reason'] }}</p>
                 @endif
                 <div class="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
-                    This page currently manages the MMC Platform read-only connection. Partner registration, data synchronization, reconciliation runs, and webhook delivery are not configured here.
+                    This page manages the MMC Platform read-only connection and preview. Data synchronization and reconciliation are not configured; the guide documents polling endpoints, not webhooks.
                 </div>
             </section>
         @elseif ($tab === 'partners')
@@ -110,7 +110,80 @@
                     <p><code class="rounded bg-slate-100 px-1.5 py-0.5">GET /api/v1/programs/{program_id}/master-list</code> returns paginated delivery rows; the guide documents a maximum page limit of 2,000.</p>
                     <p>Authentication uses a read-scoped <code class="rounded bg-slate-100 px-1.5 py-0.5">mmc_</code> bearer key. The API guide does not document webhook events or signature validation; polling is the documented approach.</p>
                 </div>
+                <section class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5" aria-labelledby="data-preview-title">
+                    <div>
+                        <h3 id="data-preview-title" class="text-base font-semibold text-slate-900">Data Preview</h3>
+                        <p class="mt-1 text-sm text-slate-600">Read-only sample from MMC Platform. Previewed records are not saved to Tracker.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="button" @click="previewBusy = true; connectionState = 'loading'; connectionMessage = 'Checking GET /api/v1/programs…'; fetch('{{ route('integrations.mmc-platform.connection-check') }}', {headers:{'Accept':'application/json'}}).then(r => r.json()).then(async d => { if (d.status !== 'success') { connectionState = 'error'; connectionMessage = d.message; return; } connectionState = 'success'; connectionMessage = 'Connection successful. Loading programs…'; const p = await fetch('{{ route('integrations.mmc-platform.programs') }}', {headers:{'Accept':'application/json'}}).then(r => r.json()); if (p.status !== 'success') { connectionMessage = `Connection successful. Programs could not be loaded: ${p.message}`; return; } programs = p.programs; if (!programs.length) { connectionMessage = 'Connection successful, but the endpoint returned no programs.'; } else { selectedProgram = String(programs[0].id); connectionMessage = 'Connection successful. Select a program to preview its data.'; } }).catch(() => { connectionState = 'error'; connectionMessage = 'Could not contact Tracker preview service. Please try again.'; }).finally(() => previewBusy = false)" :disabled="previewBusy" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60">Test Connection</button>
+                        <span x-show="connectionState" :role="connectionState === 'error' ? 'alert' : 'status'" class="text-sm" :class="connectionState === 'error' ? 'text-rose-700' : (connectionState === 'success' ? 'font-semibold text-emerald-700' : 'text-slate-600')" x-text="connectionMessage"></span>
+                    </div>
+                    <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-end">
+                        <div>
+                            <label for="preview-program" class="mb-1 block text-sm font-medium text-slate-700">Program</label>
+                            <select id="preview-program" x-model="selectedProgram" :disabled="!programs.length || previewBusy" class="w-full rounded-lg border-slate-300 text-sm">
+                                <option value="">Choose a program</option>
+                                <template x-for="program in programs" :key="program.id"><option :value="String(program.id)" x-text="`${program.name || 'Program'} (ID: ${program.id})`"></option></template>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="preview-limit" class="mb-1 block text-sm font-medium text-slate-700">Sample records</label>
+                            <input id="preview-limit" type="number" min="1" max="100" x-model.number="sampleLimit" class="w-full rounded-lg border-slate-300 text-sm">
+                        </div>
+                        <button type="button" @click="previewBusy = true; result = null; fetch('{{ route('integrations.mmc-platform.preview-data') }}', {method:'POST', headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]')?.content || ''}, body:JSON.stringify({program_id:selectedProgram, limit:sampleLimit})}).then(r => r.json()).then(d => result = d).catch(() => result = {status:'failed',message:'Could not contact Tracker preview service. Please try again.'}).finally(() => previewBusy = false)" :disabled="previewBusy || !selectedProgram || sampleLimit < 1 || sampleLimit > 100" class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-blue-500 hover:text-blue-700 disabled:opacity-50">Preview Data</button>
+                    </div>
+                    <p x-show="previewBusy" role="status" class="text-sm text-slate-600">Retrieving preview…</p>
+                    <template x-if="result">
+                        <div class="space-y-4 rounded-lg border bg-white p-4" :class="result.status === 'success' ? 'border-emerald-200' : 'border-rose-200'">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <p class="font-semibold" :class="result.status === 'success' ? 'text-emerald-800' : 'text-rose-800'" x-text="result.status === 'success' ? (result.records.length ? 'Data retrieved' : 'No data returned') : 'Preview failed'"></p>
+                                <span class="text-sm text-slate-600" x-text="`Records returned: ${result.records?.length || 0}`"></span>
+                            </div>
+                            <p class="text-sm text-slate-700" x-text="result.message"></p>
+                            <p class="text-xs text-slate-500" x-text="`Selected program: ${programs.find(program => String(program.id) === selectedProgram)?.name || selectedProgram} · Retrieved: ${result.retrieved_at || '—'}`"></p>
+                            <div x-show="result.status === 'success' && result.records.length" class="overflow-x-auto rounded-lg border border-slate-200">
+                                <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+                                    <thead class="bg-slate-50"><tr><template x-for="field in Object.keys(result.records[0] || {})" :key="field"><th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-slate-700" x-text="field"></th></template></tr></thead>
+                                    <tbody class="divide-y divide-slate-100"><template x-for="(record, rowIndex) in result.records" :key="rowIndex"><tr><template x-for="field in Object.keys(result.records[0] || {})" :key="field"><td class="max-w-xs break-words px-3 py-2 align-top text-slate-700" x-text="typeof record[field] === 'object' && record[field] !== null ? JSON.stringify(record[field]) : (record[field] ?? '—')"></td></template></tr></template></tbody>
+                                </table>
+                            </div>
+                            <details x-show="result.raw !== undefined && result.raw !== null" class="rounded-lg border border-slate-200 p-3">
+                                <summary class="cursor-pointer text-sm font-semibold text-slate-700">Inspect safe raw response</summary>
+                                <pre class="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-all rounded bg-slate-950 p-3 text-xs text-slate-100" x-text="JSON.stringify(result.raw, null, 2)"></pre>
+                                <p class="mt-2 text-xs text-slate-500">Authorization headers are never included; credential-like response fields are redacted.</p>
+                            </details>
+                        </div>
+                    </template>
+                </section>
                 <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Endpoint details and data ownership must be agreed before enabling synchronization. This screen only configures and tests the connection.</p>
+                <section class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5" aria-labelledby="sync-disabled-title">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="button" disabled aria-disabled="true" class="cursor-not-allowed rounded-lg bg-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600">Sync Data · Disabled</button>
+                        <div>
+                            <h3 id="sync-disabled-title" class="text-base font-semibold text-slate-900">Sync Data</h3>
+                            <p class="text-sm text-amber-800">Blocked until the API contract, field ownership, and update rules are approved.</p>
+                        </div>
+                    </div>
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Sync status">
+                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Progress</p><p class="mt-1 text-sm font-medium text-slate-700">Not started · disabled</p></div>
+                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Created</p><p class="mt-1 text-sm font-medium text-slate-700">Unavailable</p></div>
+                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Updated</p><p class="mt-1 text-sm font-medium text-slate-700">Unavailable</p></div>
+                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Skipped / failed</p><p class="mt-1 text-sm font-medium text-slate-700">Unavailable</p></div>
+                        <div class="rounded-lg border border-slate-200 bg-white p-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Last successful sync</p><p class="mt-1 text-sm font-medium text-slate-700">No sync runs recorded</p></div>
+                    </div>
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+                        <p class="font-semibold">Configuration still required</p>
+                        <ul class="mt-2 list-inside list-disc space-y-1">
+                            <li>The guide calls <code>delivery_id</code> the permanent upstream row ID, but does not specify its type or whether it is globally unique. Tracker's existing <code>deliveries.delivery_id</code> is already the local primary key; a separate source ID mapping and uniqueness scope have not been approved.</li>
+                            <li>Delivery rows depend on Tracker project, lot, school, and stage relationships. The guide does not provide a complete, approved mapping to those local records or confirm the required field types and nullability.</li>
+                            <li>Ownership and allowed update rules for delivery, DR, inventory, and billing workflow fields are unresolved. Tracker-owned values must not be overwritten.</li>
+                            <li>No source-ID mapping, sync-run/error persistence, last-success state, or polling schedule exists for this integration.</li>
+                            <li>No dedicated <code>mmc-platform.sync</code> permission is configured. Sync access and the first-run confirmation step must be added after the mapping is approved.</li>
+                        </ul>
+                    </div>
+                    <p class="text-sm text-slate-700">Once these decisions are approved, sync can poll only <code>GET /api/v1/programs/{program_id}/master-list</code>, using its documented <code>page</code>/<code>limit</code> pagination (maximum 2,000). No write or automatic sync is currently available.</p>
+                </section>
             </section>
         @elseif ($tab === 'reconciliation')
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="reconciliation-title">

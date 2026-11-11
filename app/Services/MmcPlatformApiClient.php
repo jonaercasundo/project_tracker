@@ -106,28 +106,9 @@ class MmcPlatformApiClient
 
         $endpoint = rtrim($baseUrl, '/').'/programs';
         try {
-            $preflight = $this->unauthenticatedRequest()->get($endpoint, ['limit' => 1]);
-        } catch (ConnectionException) {
-            return ['status' => 'failed', 'message' => 'Could not verify the MMC Platform host. Check the URL, TLS certificate, network route, and service availability. The API key was not sent.', 'preview' => []];
-        } catch (Throwable) {
-            return ['status' => 'failed', 'message' => 'Could not verify the MMC Platform endpoint. The API key was not sent.', 'preview' => []];
-        }
-
-        if (! in_array($preflight->status(), [401, 403], true)) {
-            $message = match ($preflight->status()) {
-                200 => 'The endpoint responded without requiring authentication. The API key was not sent.',
-                404 => 'The verified host does not expose GET /programs at this base URL. The API key was not sent.',
-                429 => 'The endpoint rate limit was reached during host verification. The API key was not sent.',
-                default => 'The endpoint could not be verified (HTTP '.$preflight->status().'). The API key was not sent.',
-            };
-
-            return ['status' => 'failed', 'message' => $message, 'preview' => []];
-        }
-
-        try {
             $response = $this->authenticatedRequest($readKey)->get($endpoint, ['limit' => 1]);
         } catch (ConnectionException) {
-            return ['status' => 'failed', 'message' => 'The authenticated request failed after endpoint verification. Check connectivity; no Tracker data was changed.', 'preview' => []];
+            return ['status' => 'failed', 'message' => 'Could not reach the MMC Platform. Check the URL, TLS certificate, network route, and service availability.', 'preview' => []];
         } catch (Throwable) {
             return ['status' => 'failed', 'message' => 'The MMC Platform connection test failed without exposing the API key.', 'preview' => []];
         }
@@ -135,7 +116,7 @@ class MmcPlatformApiClient
         if (! $response->successful()) {
             $message = match ($response->status()) {
                 401, 403 => 'The API key was rejected or does not have the read scope.',
-                404 => 'The verified host does not expose GET /programs at this base URL.',
+                404 => 'The configured host does not expose GET /api/v1/programs at this base URL. Check the API base URL.',
                 429 => 'The platform rate limit was reached. Wait before testing again.',
                 default => 'The MMC Platform returned HTTP '.$response->status().'.',
             };
@@ -150,6 +131,103 @@ class MmcPlatformApiClient
             'message' => 'Tracker authenticated and reached the MMC Platform read API.',
             'preview' => $preview,
         ];
+    }
+
+    /** @return array{status: string, message: string, programs: array, raw: mixed} */
+    public function getPrograms(): array
+    {
+        $result = $this->getReadResponse('/programs', []);
+        if ($result['error'] !== null) {
+            return ['status' => 'failed', 'message' => $result['error'], 'programs' => [], 'raw' => $result['raw']];
+        }
+
+        $payload = $result['payload'];
+        $programs = is_array($payload) ? ($payload['data'] ?? $payload['programs'] ?? $payload) : null;
+        if (! is_array($programs) || (! array_is_list($programs) && ! isset($programs['id']))) {
+            return ['status' => 'failed', 'message' => 'The programs endpoint returned an unexpected response. Confirm its response format with the MMC API owner.', 'programs' => [], 'raw' => $this->safeRaw($result['raw'])];
+        }
+
+        return ['status' => 'success', 'message' => 'Connection successful.', 'programs' => array_values(array_filter($programs, fn ($program): bool => is_array($program) && isset($program['id']))), 'raw' => $this->safeRaw($result['raw'])];
+    }
+
+    /** @return array{status: string, message: string, records: array, raw: mixed, retrieved_at: string} */
+    public function previewMasterList(string $programId, int $limit): array
+    {
+        $result = $this->getReadResponse('/programs/'.rawurlencode($programId).'/master-list', ['page' => 1, 'limit' => $limit]);
+        $timestamp = now()->toIso8601String();
+        if ($result['error'] !== null) {
+            return ['status' => 'failed', 'message' => $result['error'], 'records' => [], 'raw' => $result['raw'], 'retrieved_at' => $timestamp];
+        }
+
+        $payload = $result['payload'];
+        $records = is_array($payload) ? ($payload['data'] ?? $payload['master_list'] ?? $payload['records'] ?? $payload) : null;
+        if (! is_array($records) || ! array_is_list($records) || array_filter($records, fn ($record): bool => ! is_array($record)) !== []) {
+            return ['status' => 'failed', 'message' => 'The master-list endpoint returned an unexpected response. Confirm its response format with the MMC API owner.', 'records' => [], 'raw' => $this->safeRaw($result['raw']), 'retrieved_at' => $timestamp];
+        }
+
+        return ['status' => 'success', 'message' => $records === [] ? 'No records were returned for this program.' : 'Data retrieved successfully.', 'records' => array_slice($records, 0, $limit), 'raw' => $this->safeRaw($result['raw']), 'retrieved_at' => $timestamp];
+    }
+
+    /** @return array{error: ?string, payload: mixed, raw: mixed} */
+    private function getReadResponse(string $path, array $query): array
+    {
+        $configuration = $this->configuration->current();
+        if ($this->baseUrlError($configuration['base_url']) !== null || ! str_starts_with($configuration['read_key'], 'mmc_')) {
+            return ['error' => 'Configure a valid API base URL and read-scoped mmc_ bearer key first.', 'payload' => null, 'raw' => null];
+        }
+
+        try {
+            $response = $this->authenticatedRequest($configuration['read_key'])->get(rtrim($configuration['base_url'], '/').$path, $query);
+        } catch (ConnectionException) {
+            return ['error' => 'The MMC Platform is unavailable. Check network access, TLS, and whether the API service is running.', 'payload' => null, 'raw' => null];
+        } catch (Throwable) {
+            return ['error' => 'The MMC Platform request failed. Check the API host and try again.', 'payload' => null, 'raw' => null];
+        }
+
+        $raw = $response->body();
+        if (! $response->successful()) {
+            $message = match ($response->status()) {
+                401, 403 => 'Authentication failed. Confirm the bearer key is valid and has read scope.',
+                404 => str_contains($path, '/master-list') ? 'The program ID was not found, or the master-list endpoint is unavailable. Verify the selected program and confirm the endpoint with the MMC API owner.' : 'GET /api/v1/programs is unavailable at this base URL. Check the API base URL.',
+                429 => 'The platform rate limit was reached. Wait before trying again.',
+                default => 'The MMC Platform returned HTTP '.$response->status().'. Check service availability and try again.',
+            };
+
+            return ['error' => $message, 'payload' => null, 'raw' => $this->safeRaw($raw)];
+        }
+
+        $payload = $response->json();
+        if (! is_array($payload)) {
+            return ['error' => 'The MMC Platform returned malformed JSON. Ask the API owner to verify the response.', 'payload' => null, 'raw' => $this->safeRaw($raw)];
+        }
+
+        return ['error' => null, 'payload' => $payload, 'raw' => $this->safeRaw($payload)];
+    }
+
+    private function safeRaw(mixed $payload): mixed
+    {
+        $secret = trim($this->configuration->current()['read_key']);
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return mb_substr($secret === '' ? $payload : str_replace($secret, '[REDACTED]', $payload), 0, 12000);
+            }
+            $payload = $decoded;
+        }
+        if (is_array($payload)) {
+            $safe = [];
+            foreach ($payload as $key => $value) {
+                if (preg_match('/authorization|bearer|token|secret|api.?key/i', (string) $key)) {
+                    $safe[$key] = '[REDACTED]';
+                } else {
+                    $safe[$key] = is_array($value) ? $this->safeRaw($value) : (is_string($value) ? mb_substr($secret === '' ? $value : str_replace($secret, '[REDACTED]', $value), 0, 2000) : $value);
+                }
+            }
+
+            return $safe;
+        }
+
+        return is_string($payload) && $secret !== '' ? str_replace($secret, '[REDACTED]', $payload) : $payload;
     }
 
     /** @param array<string, scalar|null> $query */

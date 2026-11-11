@@ -7,6 +7,7 @@ use App\Services\AdminAuditLogger;
 use App\Services\MmcPlatformApiClient;
 use App\Services\MmcPlatformConfiguration;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -125,5 +126,25 @@ class MmcPlatformIntegrationController extends Controller
         );
 
         return back()->with('mmc_platform_test', $result);
+    }
+
+    public function programs(MmcPlatformApiClient $client): JsonResponse
+    {
+        return response()->json($client->getPrograms());
+    }
+
+    public function checkConfiguredConnection(MmcPlatformApiClient $client): JsonResponse
+    {
+        return response()->json($client->testConnection());
+    }
+
+    public function previewData(Request $request, MmcPlatformApiClient $client): JsonResponse
+    {
+        $data = $request->validate([
+            'program_id' => ['required', 'string', 'max:255'],
+            'limit' => ['required', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        return response()->json($client->previewMasterList($data['program_id'], (int) $data['limit']));
     }
 }

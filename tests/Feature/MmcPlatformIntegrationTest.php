@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\MIWorkflowTestCase;
@@ -30,9 +31,9 @@ function mmcPlatformUser(): void
 
 it('shows the configuration screen in the MMC user workspace only', function () {
     mmcPlatformUser();
-    $this->get(route('integrations.mmc-platform.index'))
+    $this->get(route('integrations.mmc-platform.index', ['tab' => 'integration']))
         ->assertOk()
-        ->assertSee('MMC Platform API')
+        ->assertSee('Third Party API Key Management')
         ->assertSee('Operations / Integrations')
         ->assertSee('API Base URL')
         ->assertSee('Read-only API Key')
@@ -57,27 +58,25 @@ it('stores the API key encrypted and never renders it back to the page', functio
     $this->post(route('integrations.mmc-platform.store'), [
         'base_url' => 'https://platform.example.test/api/v1',
         'read_key' => $secret,
-    ])->assertRedirect(route('integrations.mmc-platform.index'));
+    ])->assertRedirect(route('integrations.mmc-platform.index', ['tab' => 'integration']));
 
     $encryptedKey = DB::table('mmc_platform_settings')->where('id', 1)->value('read_key');
     expect($encryptedKey)->not->toBe($secret)->not->toContain($secret);
 
     $this->get(route('integrations.mmc-platform.index'))
         ->assertOk()
-        ->assertSee('API key configured')
+        ->assertSee('Configured · hidden')
         ->assertDontSee($secret);
 });
 
-it('probes the endpoint without credentials and previews only safe program fields', function () {
-    Http::fakeSequence()
-        ->push(['message' => 'Unauthenticated'], 401)
-        ->push(['data' => [[
-            'id' => 'program-123',
-            'name' => 'Sample Program',
-            'project_title' => 'School Kits',
-            'fiscal_year' => 2026,
-            'billing_number' => 'MUST_NOT_BE_SHOWN',
-        ]]], 200);
+it('tests the programs endpoint with the read bearer key and one-record limit', function () {
+    Http::fakeSequence()->push(['data' => [[
+        'id' => 'program-123',
+        'name' => 'Sample Program',
+        'project_title' => 'School Kits',
+        'fiscal_year' => 2026,
+        'billing_number' => 'MUST_NOT_BE_SHOWN',
+    ]]], 200);
     mmcPlatformUser();
 
     $this->post(route('integrations.mmc-platform.test-connection'), [
@@ -89,9 +88,7 @@ it('probes the endpoint without credentials and previews only safe program field
         ->assertSessionHas('mmc_platform_test.preview.name', 'Sample Program')
         ->assertSessionMissing('mmc_platform_test.preview.billing_number');
 
-    Http::assertSentCount(2);
-    Http::assertSent(fn (HttpRequest $request): bool => $request->url() === 'https://platform.example.test/api/v1/programs?limit=1'
-        && ! $request->hasHeader('Authorization'));
+    Http::assertSentCount(1);
     Http::assertSent(fn (HttpRequest $request): bool => $request->url() === 'https://platform.example.test/api/v1/programs?limit=1'
         && $request->hasHeader('Authorization', 'Bearer mmc_test_read_key'));
 
@@ -102,8 +99,8 @@ it('probes the endpoint without credentials and previews only safe program field
         ->assertDontSee('mmc_test_read_key');
 });
 
-it('does not send the key when the endpoint cannot be verified', function () {
-    Http::fakeSequence()->push('', 302, ['Location' => 'https://other.example.test/']);
+it('reports an unavailable endpoint without exposing the bearer key', function () {
+    Http::fakeSequence()->push('', 404);
     mmcPlatformUser();
 
     $this->post(route('integrations.mmc-platform.test-connection'), [
@@ -112,7 +109,33 @@ it('does not send the key when the endpoint cannot be verified', function () {
     ])->assertRedirect()->assertSessionHas('mmc_platform_test.status', 'failed');
 
     Http::assertSentCount(1);
-    Http::assertSent(fn (HttpRequest $request): bool => ! $request->hasHeader('Authorization'));
+    Http::assertSent(fn (HttpRequest $request): bool => $request->hasHeader('Authorization', 'Bearer mmc_test_read_key'));
+});
+
+it('returns a bounded read-only preview and redacts credential-like raw response fields', function () {
+    mmcPlatformUser();
+    DB::table('mmc_platform_settings')->insert([
+        'id' => 1,
+        'base_url' => 'https://platform.example.test/api/v1',
+        'read_key' => Crypt::encryptString('mmc_test_read_key'),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    Http::fake([
+        'https://platform.example.test/api/v1/programs/program-123/master-list*' => Http::response(['data' => [
+            ['delivery_id' => 'd-1', 'school_name' => 'North School', 'api_key' => 'must-hide'],
+            ['delivery_id' => 'd-2', 'school_name' => 'South School'],
+        ]]),
+    ]);
+
+    $this->postJson(route('integrations.mmc-platform.preview-data'), ['program_id' => 'program-123', 'limit' => 1])
+        ->assertOk()
+        ->assertJsonPath('status', 'success')
+        ->assertJsonPath('records.0.delivery_id', 'd-1')
+        ->assertJsonPath('raw.data.0.api_key', '[REDACTED]');
+
+    Http::assertSent(fn (HttpRequest $request): bool => $request->url() === 'https://platform.example.test/api/v1/programs/program-123/master-list?page=1&limit=1'
+        && $request->hasHeader('Authorization', 'Bearer mmc_test_read_key'));
 });
 
 it('rejects non-local HTTP URLs without making a request', function () {

@@ -1222,6 +1222,8 @@
                     SECTION 05 — MEDIA
                     ================================================= --}}
 
+                @php($imageLabelOptions = collect($imageLabelOptions)->merge(old('image_labels', []))->filter()->unique()->values())
+
                 <section class="tx-card lvl-3">
 
                     <div class="tx-card-head">
@@ -1296,7 +1298,7 @@
 
                                                 <select name="image_labels[]" class="tx-field">
                                                     <option value="">Select image label</option>
-                                                    @foreach(['Plate', 'Render', 'CAD Drawing', 'Actual Photo'] as $label)
+                                                    @foreach($imageLabelOptions as $label)
                                                         <option value="{{ $label }}" @selected($imageLabel === $label)>{{ $label }}</option>
                                                     @endforeach
                                                 </select>
@@ -1340,7 +1342,7 @@
 
                                             <select name="image_labels[]" class="tx-field">
                                                 <option value="">Select image label</option>
-                                                @foreach(['Plate', 'Render', 'CAD Drawing', 'Actual Photo'] as $label)
+                                                @foreach($imageLabelOptions as $label)
                                                     <option value="{{ $label }}" @selected(old('image_labels.0') === $label)>{{ $label }}</option>
                                                 @endforeach
                                             </select>
@@ -1356,7 +1358,7 @@
                                 <button
                                     type="button"
                                     onclick="addImageLink()"
-                                    class="tx-btn-small"
+                                    class="tx-btn-small tx-link-add"
                                 >
                                     + Add Image Link
                                 </button>
@@ -1649,10 +1651,6 @@
 
                 <select name="image_labels[]" class="tx-field">
                     <option value="">Select image label</option>
-                    <option value="Plate">Plate</option>
-                    <option value="Render">Render</option>
-                    <option value="CAD Drawing">CAD Drawing</option>
-                    <option value="Actual Photo">Actual Photo</option>
                 </select>
 
                 <textarea
@@ -1673,7 +1671,13 @@
                 </button>
             `;
 
+            const labelSelect = row.querySelector('select[name="image_labels[]"]');
+            @json($imageLabelOptions).forEach((label) => {
+                labelSelect.add(new Option(label, label));
+            });
+
             container.appendChild(row);
+            initializeImageLabelSelect(row);
 
         }
 
@@ -1689,6 +1693,31 @@
 
         }
 
+        function initializeImageLabelSelect(root = document) {
+            root.querySelectorAll('select[name="image_labels[]"]').forEach((select) => {
+                if (select.tomselect || !window.TomSelect) return;
+
+                new TomSelect(select, {
+                    create: (input) => {
+                        const value = input.trim().replace(/\s+/g, ' ');
+                        return value ? { value, text: value } : false;
+                    },
+                    createOnBlur: true,
+                    persist: false,
+                    maxItems: 1,
+                    allowEmptyOption: true,
+                    placeholder: 'Search or add an image label...',
+                    createFilter: (input) => {
+                        const normalize = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+                        return normalize(input) !== '' && !Array.from(select.options).some((option) => normalize(option.value) === normalize(input));
+                    },
+                    render: {
+                        option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim())}"</div>`,
+                    },
+                });
+            });
+        }
+
 
         /* =========================================================
            INITIALIZE
@@ -1697,6 +1726,8 @@
         document.addEventListener(
             'DOMContentLoaded',
             function () {
+
+                initializeImageLabelSelect();
 
                 /* -------------------------------------------------
                    TOM SELECT — COLOR

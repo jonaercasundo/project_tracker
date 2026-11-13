@@ -10,9 +10,9 @@
     <label for="image_url_{{ $index }}" data-url-label class="tx-label">Image URL</label>
     <input id="image_url_{{ $index }}" type="url" name="image_links[{{ $index }}]" value="{{ $url }}" maxlength="1000" placeholder="https://example.com/photo.jpg" data-image-url class="tx-field @error('image_links.'.$index) field-invalid @enderror" @error('image_links.'.$index) aria-invalid="true" aria-describedby="image_url_error_{{ $index }}" @enderror>
     <label for="image_label_{{ $index }}" class="tx-label">Image label</label>
-    <select id="image_label_{{ $index }}" name="image_labels[{{ $index }}]" class="tx-field">
+    <select id="image_label_{{ $index }}" name="image_labels[{{ $index }}]" data-image-label class="tx-field">
         <option value="">Select image label</option>
-        @foreach(['Plate', 'Render', 'CAD Drawing', 'Actual Photo'] as $label)
+        @foreach($imageLabelOptions as $label)
             <option value="{{ $label }}" @selected(old('image_labels.'.$index) === $label)>{{ $label }}</option>
         @endforeach
     </select>

@@ -242,8 +242,31 @@ if (form) {
     });
 
     const newImages = document.getElementById('new_images');
+    const initializeImageLabel = (root) => {
+        root.querySelectorAll('.image-label-select, [data-image-label]').forEach((select) => {
+            if (select.tomselect || typeof window.TomSelect !== 'function') return;
+            const normalize = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+            new window.TomSelect(select, {
+                create: (input) => {
+                    const value = input.trim().replace(/\s+/g, ' ');
+                    return value ? { value, text: value } : false;
+                },
+                createOnBlur: true,
+                persist: false,
+                maxItems: 1,
+                allowEmptyOption: true,
+                placeholder: 'Search or add an image label...',
+                createFilter: (input) => normalize(input) !== '' && !Array.from(select.options).some((option) => normalize(option.value) === normalize(input)),
+                render: {
+                    option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim())}"</div>`,
+                },
+            });
+        });
+    };
+    initializeImageLabel(form);
     let nextImageIndex = Math.max(-1, ...[...newImages.querySelectorAll('[data-image-url]')].map((input) => Number(input.name.match(/\[(\d+)\]/)[1]))) + 1;
     const initializeImage = (row) => {
+        initializeImageLabel(row);
         const mode = row.querySelector('[data-image-mode]');
         const url = row.querySelector('[data-image-url]');
         const upload = row.querySelector('[data-image-upload]');

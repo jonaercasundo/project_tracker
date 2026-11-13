@@ -715,11 +715,13 @@ class MIAppController extends Controller
             if ($request->image_links) {
                 foreach ($request->image_links as $index => $url) {
                     if (! empty($url)) {
+                        $imageLabel = $request->input("image_labels.{$index}");
+                        $this->rememberImageLabel($imageLabel);
                         MI_Product_Image::create([
                             'product_id' => $product->product_id,
                             'image_type' => 'url',
                             'image_url' => $url,
-                            'label' => $request->input("image_labels.{$index}"),
+                            'label' => $imageLabel,
                             'description' => $request->input("image_descriptions.{$index}"),
                             'is_primary' => $index == 0,
                             'sort_order' => $index,
@@ -870,10 +872,8 @@ class MIAppController extends Controller
     private function imageLabelOptions(): array
     {
         return collect(['Plate', 'Render', 'CAD Drawing', 'Actual Photo'])
-            ->concat(MI_Product_Image::query()
+            ->concat(DB::table('mi_product_image_labels')
                 ->whereNotNull('label')
-                ->whereRaw("TRIM(label) <> ''")
-                ->distinct()
                 ->orderBy('label')
                 ->pluck('label'))
             ->map(static fn (string $label): string => trim($label))
@@ -881,6 +881,21 @@ class MIAppController extends Controller
             ->unique(fn (string $label): string => mb_strtolower($label))
             ->values()
             ->all();
+    }
+
+    private function rememberImageLabel(?string $label): void
+    {
+        $label = trim((string) $label);
+        if ($label === '') {
+            return;
+        }
+
+        $now = now();
+        DB::table('mi_product_image_labels')->insertOrIgnore([
+            'label' => $label,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     public function update(UpdateMIProductRequest $request, MI_Product $product, MIProductFactoryCostService $factoryCosts, MIProductAttributeOptionService $attributeOptions): RedirectResponse
@@ -942,6 +957,7 @@ class MIAppController extends Controller
                 $nextOrder = (int) ($images->max('sort_order') ?? -1) + 1;
                 foreach ($validated['existing_image_labels'] ?? [] as $imageId => $label) {
                     if (is_numeric($imageId) && $images->contains(fn (MI_Product_Image $image): bool => $image->getKey() === (int) $imageId)) {
+                        $this->rememberImageLabel($label);
                         $images->firstWhere('id', (int) $imageId)?->update(['label' => $label]);
                     }
                 }
@@ -949,6 +965,7 @@ class MIAppController extends Controller
                     if (! $url || $images->contains('image_url', $url)) {
                         continue;
                     }
+                    $this->rememberImageLabel($validated['image_labels'][$index] ?? null);
                     $images->push($lockedProduct->images()->create([
                         'image_type' => 'url',
                         'image_url' => $url,

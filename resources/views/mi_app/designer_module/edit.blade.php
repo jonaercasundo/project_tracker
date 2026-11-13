@@ -248,6 +248,7 @@
                 @include('mi_app.designer_module.partials._factory-costs')
 
                 <section id="section_images" class="tx-card lvl-3" aria-labelledby="images_heading">
+                    @php($imageLabelOptions = collect($imageLabelOptions)->merge(old('image_labels', []))->merge(old('existing_image_labels', []))->filter()->unique()->values())
                     <div class="tx-card-head">
                         <span class="tx-card-icon">05</span>
                         <div><h2 id="images_heading">Product Media</h2><p>Manage existing photos, upload images, or add image links</p></div>
@@ -276,18 +277,13 @@
                                     </div>
                                     <div class="tx-edit-image-body">
                                         <span class="tx-edit-image-type">{{ $image->image_type === 'upload' ? 'Uploaded file' : 'Image URL' }}</span>
-                                        @php($imageLabelOptions = ['Plate', 'Render', 'CAD Drawing', 'Actual Photo'])
-                                        @if(in_array($image->label, $imageLabelOptions, true) || !$image->label)
-                                            <label class="tx-label" for="existing_image_label_{{ $image->id }}">Image label</label>
-                                            <select id="existing_image_label_{{ $image->id }}" name="existing_image_labels[{{ $image->id }}]" class="tx-field">
-                                                <option value="">Select image label</option>
-                                                @foreach($imageLabelOptions as $label)
-                                                    <option value="{{ $label }}" @selected(old('existing_image_labels.'.$image->id, $image->label) === $label)>{{ $label }}</option>
-                                                @endforeach
-                                            </select>
-                                        @else
-                                            <p class="tx-hint">Existing label: {{ $image->label }}</p>
-                                        @endif
+                                        <label class="tx-label" for="existing_image_label_{{ $image->id }}">Image label</label>
+                                        <select id="existing_image_label_{{ $image->id }}" name="existing_image_labels[{{ $image->id }}]" class="tx-field image-label-select">
+                                            <option value="">Select image label</option>
+                                            @foreach($imageLabelOptions as $label)
+                                                <option value="{{ $label }}" @selected(old('existing_image_labels.'.$image->id, $image->label) === $label)>{{ $label }}</option>
+                                            @endforeach
+                                        </select>
                                         @if($safeUrl)<a href="{{ $source }}" target="_blank" rel="noopener noreferrer" class="tx-edit-preview-link">Preview {{ $isPhoto ? 'image' : 'attachment' }}</a>@endif
                                         <label class="tx-edit-choice"><input type="radio" name="primary_image_id" value="{{ $image->id }}" @checked((int) $primaryId === $image->id) @disabled(in_array($image->id, $removedIds, true))> Set as Primary</label>
                                         <input type="hidden" name="image_order[]" value="{{ $image->id }}">

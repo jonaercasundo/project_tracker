@@ -1690,6 +1690,7 @@
                 button.closest('.tx-image-link-row');
 
             if (row) {
+                row.querySelector('select[name="image_labels[]"]')?.tomselect?.destroy();
                 row.remove();
             }
 
@@ -1700,6 +1701,8 @@
                 if (select.tomselect || !window.TomSelect) return;
 
                 new TomSelect(select, {
+                    onInitialize() { window.styleProductImageLabel(this); },
+                    hideSelected: false,
                     dropdownParent: 'body',
                     dropdownClass: 'ts-dropdown tx-image-label-dropdown',
                     maxOptions: 500,

@@ -65,6 +65,8 @@ if (form) {
         if (typeof window.TomSelect === 'function') {
             const normalizeOption = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
             new window.TomSelect(select, {
+                onInitialize() { window.styleProductImageLabel(this); },
+                hideSelected: false,
                 plugins: ['remove_button'],
                 create: (input) => {
                     const value = input.trim().replace(/\s+/g, ' ');

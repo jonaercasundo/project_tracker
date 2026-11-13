@@ -1293,6 +1293,45 @@
             grid-column: 1;
             grid-row: 2;
             min-width: 0;
+            align-self: stretch;
+        }
+
+        .tx-console .ts-wrapper.tx-image-label .ts-control {
+            display: flex;
+            align-items: center;
+            min-height: 78px;
+            height: 100%;
+            padding: 12px 38px 12px 14px;
+            cursor: pointer;
+        }
+
+        .tx-console .ts-wrapper.tx-image-label .ts-control::after {
+            content: '';
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            width: 7px;
+            height: 7px;
+            margin-top: -5px;
+            border: solid var(--tx-ink-faint);
+            border-width: 0 1.5px 1.5px 0;
+            transform: rotate(45deg);
+            pointer-events: none;
+        }
+
+        .tx-console .ts-wrapper.tx-image-label.dropdown-active .ts-control::after {
+            margin-top: -1px;
+            transform: rotate(225deg);
+        }
+
+        .tx-console .ts-wrapper.tx-image-label .ts-control > .item {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tx-console .ts-wrapper.tx-image-label .ts-control > input {
+            min-width: 0;
         }
 
         .tx-image-link-row > textarea {
@@ -1312,16 +1351,57 @@
 
         .ts-dropdown.tx-image-label-dropdown {
             z-index: 10000;
+            margin: 0;
+            padding: 5px;
+            border: 1px solid var(--tx-line);
+            border-radius: 12px;
+            background: var(--tx-surface);
+            box-shadow: var(--tx-shadow-lg);
+            color: var(--tx-ink);
+            font-family: var(--tx-font-body);
+            font-size: 12.5px;
+            line-height: 1.5;
+            box-sizing: border-box;
+        }
+
+        .ts-dropdown.tx-image-label-dropdown :is(.option, .create, .no-results) {
+            padding: 10px 12px;
+            border-radius: 7px;
+            overflow-wrap: anywhere;
+        }
+
+        .ts-dropdown.tx-image-label-dropdown :is(.option, .create).active {
+            background: var(--tx-bg);
+            color: var(--tx-ink);
+        }
+
+        .ts-dropdown.tx-image-label-dropdown .option.selected {
+            background: var(--tx-primary-soft);
+            color: var(--tx-primary);
+            font-weight: 600;
+        }
+
+        .ts-dropdown.tx-image-label-dropdown .option.selected::after {
+            content: '✓';
+            float: right;
+            margin-left: 12px;
+        }
+
+        .ts-dropdown.tx-image-label-dropdown .create {
+            color: var(--tx-primary);
         }
 
         .ts-dropdown.tx-image-label-dropdown .ts-dropdown-content {
-            max-height: min(24rem, calc(100vh - 2rem)) !important;
+            max-height: 24rem;
             overflow-x: hidden;
             overflow-y: auto;
             overscroll-behavior: contain;
         }
 
         @media (max-width: 640px) {
+            .tx-console .tx-image-link-row .ts-wrapper.tx-image-label .ts-control {
+                min-height: 44px;
+            }
             .tx-image-link-row {
                 grid-template-columns: minmax(0, 1fr);
                 row-gap: 12px;
@@ -1885,3 +1965,53 @@
         }
 
     </style>
+
+    <script>
+        window.styleProductImageLabel = function (select) {
+            select.wrapper.classList.add('tx-image-label');
+            select.control_input.setAttribute('aria-label', 'Image label');
+            const theme = getComputedStyle(select.wrapper);
+            for (const property of theme) {
+                if (property.startsWith('--tx-')) {
+                    select.dropdown.style.setProperty(property, theme.getPropertyValue(property));
+                }
+            }
+
+            select.positionDropdown = function () {
+                const bounds = this.control.getBoundingClientRect();
+                const viewport = window.visualViewport;
+                const viewportTop = viewport?.offsetTop ?? 0;
+                const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+                const below = Math.max(0, viewportBottom - bounds.bottom - 14);
+                const above = Math.max(0, bounds.top - viewportTop - 14);
+                const desiredHeight = Math.min(384, this.dropdown_content.scrollHeight);
+                const opensAbove = below < desiredHeight + 12 && above > below;
+                const available = opensAbove ? above : below;
+                this.dropdown_content.style.maxHeight = `${Math.max(0, Math.min(384, available - 12))}px`;
+                Object.assign(this.dropdown.style, {
+                    width: `${bounds.width}px`,
+                    left: `${bounds.left + window.scrollX}px`,
+                    top: `${(opensAbove ? bounds.top - this.dropdown.offsetHeight - 6 : bounds.bottom + 6) + window.scrollY}px`,
+                });
+            };
+
+            const reposition = () => {
+                if (select.isOpen) select.positionDropdown();
+            };
+            select.on('dropdown_open', reposition);
+            select.on('type', reposition);
+            const startTracking = () => {
+                window.addEventListener('scroll', reposition, true);
+                window.addEventListener('resize', reposition);
+                window.visualViewport?.addEventListener('resize', reposition);
+            };
+            const stopTracking = () => {
+                window.removeEventListener('scroll', reposition, true);
+                window.removeEventListener('resize', reposition);
+                window.visualViewport?.removeEventListener('resize', reposition);
+            };
+            select.on('dropdown_open', startTracking);
+            select.on('dropdown_close', stopTracking);
+            select.on('destroy', stopTracking);
+        };
+    </script>

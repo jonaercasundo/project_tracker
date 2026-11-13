@@ -1310,6 +1310,17 @@
             margin-top: 18px;
         }
 
+        .ts-dropdown.tx-image-label-dropdown {
+            z-index: 10000;
+        }
+
+        .ts-dropdown.tx-image-label-dropdown .ts-dropdown-content {
+            max-height: min(24rem, calc(100vh - 2rem)) !important;
+            overflow-x: hidden;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+
         @media (max-width: 640px) {
             .tx-image-link-row {
                 grid-template-columns: minmax(0, 1fr);

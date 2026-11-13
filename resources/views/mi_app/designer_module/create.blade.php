@@ -1700,6 +1700,9 @@
                 if (select.tomselect || !window.TomSelect) return;
 
                 new TomSelect(select, {
+                    dropdownParent: 'body',
+                    dropdownClass: 'tx-image-label-dropdown',
+                    maxOptions: null,
                     create: (input) => {
                         const value = input.trim().replace(/\s+/g, ' ');
                         return value ? { value, text: value } : false;

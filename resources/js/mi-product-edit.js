@@ -247,6 +247,9 @@ if (form) {
             if (select.tomselect || typeof window.TomSelect !== 'function') return;
             const normalize = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
             new window.TomSelect(select, {
+                dropdownParent: 'body',
+                dropdownClass: 'tx-image-label-dropdown',
+                maxOptions: null,
                 create: (input) => {
                     const value = input.trim().replace(/\s+/g, ' ');
                     return value ? { value, text: value } : false;

@@ -249,18 +249,19 @@ if (form) {
             new window.TomSelect(select, {
                 dropdownParent: 'body',
                 dropdownClass: 'tx-image-label-dropdown',
-                maxOptions: null,
+                maxOptions: 500,
                 create: (input) => {
                     const value = input.trim().replace(/\s+/g, ' ');
                     return value ? { value, text: value } : false;
                 },
-                createOnBlur: true,
+                createOnBlur: false,
                 persist: false,
                 maxItems: 1,
+                openOnFocus: true,
                 placeholder: 'Search or add an image label...',
                 createFilter: (input) => normalize(input) !== '' && !Array.from(select.options).some((option) => normalize(option.value) === normalize(input)),
                 render: {
-                    option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim())}"</div>`,
+                    option_create: (data, escape) => `<div class="create">+ Add option "${escape(data.input.trim())}"</div>`,
                 },
             });
         });

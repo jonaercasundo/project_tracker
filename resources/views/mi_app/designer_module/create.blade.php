@@ -1701,7 +1701,7 @@
 
                 new TomSelect(select, {
                     dropdownParent: 'body',
-                    dropdownClass: 'tx-image-label-dropdown',
+                    dropdownClass: 'ts-dropdown tx-image-label-dropdown',
                     maxOptions: 500,
                     create: (input) => {
                         const value = input.trim().replace(/\s+/g, ' ');

@@ -102,6 +102,24 @@ it('creates products with image labels descriptions and uploads and reuses the l
     $this->get(route('mi_app.create'))->assertOk()->assertSee('value="'.$label.'"', false);
 })->with(['standard' => 'Plate', 'custom' => 'Close-up Detail']);
 
+it('displays saved image labels as selected options when editing a product', function () {
+    Schema::create('warehouse', function (Blueprint $table): void {
+        $table->id('warehouse_id');
+        $table->string('warehouse_name');
+    });
+    DB::table('mi_product_image_labels')->insert(['label' => 'Detail View', 'created_at' => now(), 'updated_at' => now()]);
+    $product = MI_Product::factory()->create();
+    $product->images()->create(['image_type' => 'url', 'image_url' => 'https://example.com/detail.jpg', 'label' => 'Detail View', 'is_primary' => true]);
+    $product->images()->create(['image_type' => 'url', 'image_url' => 'https://example.com/legacy.jpg', 'label' => 'Legacy Angle', 'is_primary' => false]);
+    $this->signInMI($this->miUser());
+
+    $this->get(route('mi_app.edit', $product))->assertOk()
+        ->assertSee('value="Detail View" selected', false)
+        ->assertSee('value="Legacy Angle" selected', false)
+        ->assertSee('CAD Drawing')
+        ->assertSee('Actual Photo');
+});
+
 it('renders product 139 with saved values custom attributes and image identities', function () {
     $product = MI_Product::factory()->create(['product_id' => 139, 'materials' => ['Custom timber'], 'color' => ['Custom color']]);
     $image = $product->images()->create(['image_type' => 'url', 'image_url' => 'https://example.com/original.jpg', 'is_primary' => true]);

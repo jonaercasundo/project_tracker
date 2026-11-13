@@ -248,7 +248,9 @@
                 @include('mi_app.designer_module.partials._factory-costs')
 
                 <section id="section_images" class="tx-card lvl-3" aria-labelledby="images_heading">
-                    @php($imageLabelOptions = collect($imageLabelOptions)->merge(old('image_labels', []))->merge(old('existing_image_labels', []))->filter()->unique()->values())
+                    @php
+                        $imageLabelOptions = collect($imageLabelOptions)->merge($product->images->pluck('label'))->merge(old('image_labels', []))->merge(old('existing_image_labels', []))->filter()->unique()->values();
+                    @endphp
                     <div class="tx-card-head">
                         <span class="tx-card-icon">05</span>
                         <div><h2 id="images_heading">Product Media</h2><p>Manage existing photos, upload images, or add image links</p></div>

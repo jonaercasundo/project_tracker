@@ -575,9 +575,9 @@ class MIAppController extends Controller
         // Remove blank image link values before validation so optional empty inputs do not fail the URL rule.
         if ($request->has('image_links')) {
             $request->merge([
-                'image_links' => array_values(array_filter($request->input('image_links', []), function ($value) {
+                'image_links' => array_filter($request->input('image_links', []), function ($value) {
                     return trim((string) $value) !== '';
-                })),
+                }),
             ]);
         }
 
@@ -655,6 +655,10 @@ class MIAppController extends Controller
             'product_images.*' => 'file|mimes:jpeg,png,jpg,webp,pdf,obj,stl|max:20480',
             'image_links' => 'nullable|array',
             'image_links.*' => 'nullable|url|max:1000',
+            'image_labels' => 'nullable|array',
+            'image_labels.*' => 'nullable|string|max:255',
+            'image_descriptions' => 'nullable|array',
+            'image_descriptions.*' => 'nullable|string|max:2000',
             'price_comparisons' => 'nullable|array|max:20',
             'price_comparisons.*' => ['required', 'array:store_name,product_name,photo_url,price,currency,product_link'],
             'price_comparisons.*.store_name' => 'required|string|max:255',
@@ -708,6 +712,8 @@ class MIAppController extends Controller
                             'product_id' => $product->product_id,
                             'image_type' => 'url',
                             'image_url' => $url,
+                            'label' => $request->input("image_labels.{$index}"),
+                            'description' => $request->input("image_descriptions.{$index}"),
                             'is_primary' => $index == 0,
                             'sort_order' => $index,
                         ]);

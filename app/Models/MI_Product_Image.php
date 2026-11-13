@@ -14,6 +14,8 @@ class MI_Product_Image extends Model
         'image_type',
         'image_path',
         'image_url',
+        'label',
+        'description',
         'is_primary',
         'sort_order',
     ];

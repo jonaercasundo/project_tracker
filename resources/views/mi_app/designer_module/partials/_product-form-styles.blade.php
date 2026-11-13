@@ -1273,14 +1273,21 @@
         }
 
         .tx-image-link-row {
-            display: flex;
-            align-items: center;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr) auto;
+            align-items: start;
 
             gap: 8px;
         }
 
         .tx-image-link-row .tx-field {
-            flex: 1;
+            min-width: 0;
+        }
+
+        @media (max-width: 640px) {
+            .tx-image-link-row {
+                grid-template-columns: minmax(0, 1fr);
+            }
         }
 
         .tx-link-remove {

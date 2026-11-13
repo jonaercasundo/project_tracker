@@ -1279,6 +1279,11 @@
 
                                         @foreach($imageLinks as $index => $link)
 
+                                            @php
+                                                $imageLabel = old("image_labels.{$index}", '');
+                                                $imageDescription = old("image_descriptions.{$index}", '');
+                                            @endphp
+
                                             <div class="tx-image-link-row">
 
                                                 <input
@@ -1288,6 +1293,23 @@
                                                     placeholder="https://example.com/image.jpg"
                                                     class="tx-field"
                                                 >
+
+                                                <input
+                                                    type="text"
+                                                    name="image_labels[]"
+                                                    value="{{ $imageLabel }}"
+                                                    maxlength="255"
+                                                    placeholder="Image label (e.g. Front view)"
+                                                    class="tx-field"
+                                                >
+
+                                                <textarea
+                                                    name="image_descriptions[]"
+                                                    maxlength="2000"
+                                                    rows="2"
+                                                    placeholder="Image description"
+                                                    class="tx-field"
+                                                >{{ $imageDescription }}</textarea>
 
                                                 @if($index > 0)
 
@@ -1317,6 +1339,9 @@
                                                 placeholder="https://example.com/image.jpg"
                                                 class="tx-field"
                                             >
+
+                                            <input type="text" name="image_labels[]" value="{{ old('image_labels.0') }}" maxlength="255" placeholder="Image label (e.g. Front view)" class="tx-field">
+                                            <textarea name="image_descriptions[]" maxlength="2000" rows="2" placeholder="Image description" class="tx-field">{{ old('image_descriptions.0') }}</textarea>
 
                                         </div>
 
@@ -1618,6 +1643,22 @@
                     placeholder="https://example.com/image.jpg"
                     class="tx-field"
                 >
+
+                <input
+                    type="text"
+                    name="image_labels[]"
+                    maxlength="255"
+                    placeholder="Image label (e.g. Front view)"
+                    class="tx-field"
+                >
+
+                <textarea
+                    name="image_descriptions[]"
+                    maxlength="2000"
+                    rows="2"
+                    placeholder="Image description"
+                    class="tx-field"
+                ></textarea>
 
                 <button
                     type="button"

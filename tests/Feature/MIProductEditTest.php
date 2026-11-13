@@ -30,10 +30,14 @@ beforeEach(function () {
         '2026_07_31_020944_change_materials_and_color_to_json_in_mi_products_table.php',
         '2026_08_17_000000_add_price_to_products_table.php',
         '2026_10_06_040342_create_mi_product_images_table.php',
+        '2026_11_13_031621_add_label_and_description_to_mi_product_images_table.php',
+        '2026_11_13_032509_create_mi_product_image_labels_table.php',
         '2026_10_06_085134_add_unique_item_code_to_mi_products_table.php',
         '2026_10_12_055813_create_mi_product_factory_costs_table.php',
         '2026_11_03_093224_create_mi_product_price_comparisons_table.php',
         '2026_10_20_082229_add_country_of_production_to_mi_products_table.php',
+        '2026_11_03_055655_create_mi_product_variants_table.php',
+        '2026_11_03_092310_add_materials_and_colors_to_mi_product_variants_table.php',
     ] as $migration) {
         (require database_path('migrations/'.$migration))->up();
     }
@@ -46,6 +50,57 @@ function miProductEditPayload(MI_Product $product): array
         'country_of_production' => $product->country_of_production ?? 'Vietnam',
     ]);
 }
+
+it('renders create media fields with saved and submitted custom image labels', function (array $oldInput) {
+    DB::table('mi_product_image_labels')->insert(['label' => 'Detail View', 'created_at' => now(), 'updated_at' => now()]);
+    $this->signInMI($this->miUser());
+
+    $response = $this->withSession(['_old_input' => $oldInput])->get(route('mi_app.create'));
+
+    $response->assertOk()->assertSee('Media & Images', false)
+        ->assertSee('name="image_links[]"', false)
+        ->assertSee('name="image_labels[]"', false)
+        ->assertSee('name="image_descriptions[]"', false)
+        ->assertSee('name="product_images[]"', false)
+        ->assertSee('Detail View')->assertSee('Plate');
+    if ($oldInput !== []) {
+        $response->assertSee('https://example.com/detail.jpg')
+            ->assertSee('value="Unsaved Angle" selected', false)
+            ->assertSee('Keep this description');
+    }
+})->with([
+    'fresh form' => [[]],
+    'validation redisplay' => [[
+        'image_links' => ['https://example.com/detail.jpg'],
+        'image_labels' => ['Unsaved Angle'],
+        'image_descriptions' => ['Keep this description'],
+    ]],
+]);
+
+it('creates products with image labels descriptions and uploads and reuses the label', function (string $label) {
+    Storage::fake('public');
+    $fixture = MI_Product::factory()->create();
+    $this->signInMI($this->miUser());
+
+    $this->post(route('mi_app.store_1'), array_replace(miProductEditPayload($fixture), [
+        'item_name' => 'Media regression product',
+        'image_links' => ['https://example.com/detail.jpg'],
+        'image_labels' => [$label],
+        'image_descriptions' => ['Detail of the product'],
+        'product_images' => [UploadedFile::fake()->image('detail.png')],
+    ]))->assertRedirect(route('mi_app.index'))->assertSessionHasNoErrors();
+
+    $product = MI_Product::where('item_name', 'Media regression product')->sole();
+    $this->assertDatabaseHas('mi_product_images', [
+        'product_id' => $product->getKey(), 'image_url' => 'https://example.com/detail.jpg',
+        'label' => $label, 'description' => 'Detail of the product', 'is_primary' => true,
+    ]);
+    $upload = $product->images()->where('image_type', 'upload')->sole();
+    Storage::disk('public')->assertExists($upload->image_path);
+    expect($product->images()->count())->toBe(2);
+    $this->assertDatabaseHas('mi_product_image_labels', ['label' => $label]);
+    $this->get(route('mi_app.create'))->assertOk()->assertSee('value="'.$label.'"', false);
+})->with(['standard' => 'Plate', 'custom' => 'Close-up Detail']);
 
 it('renders product 139 with saved values custom attributes and image identities', function () {
     $product = MI_Product::factory()->create(['product_id' => 139, 'materials' => ['Custom timber'], 'color' => ['Custom color']]);

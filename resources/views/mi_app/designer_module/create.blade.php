@@ -1222,7 +1222,9 @@
                     SECTION 05 — MEDIA
                     ================================================= --}}
 
-                @php($imageLabelOptions = collect($imageLabelOptions)->merge(old('image_labels', []))->filter()->unique()->values())
+                @php
+                    $imageLabelOptions = collect($imageLabelOptions)->merge(old('image_labels', []))->filter()->unique()->values();
+                @endphp
 
                 <section class="tx-card lvl-3">
 

@@ -257,7 +257,6 @@ if (form) {
                 createOnBlur: true,
                 persist: false,
                 maxItems: 1,
-                allowEmptyOption: true,
                 placeholder: 'Search or add an image label...',
                 createFilter: (input) => normalize(input) !== '' && !Array.from(select.options).some((option) => normalize(option.value) === normalize(input)),
                 render: {

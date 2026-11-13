@@ -1710,7 +1710,6 @@
                     createOnBlur: true,
                     persist: false,
                     maxItems: 1,
-                    allowEmptyOption: true,
                     placeholder: 'Search or add an image label...',
                     createFilter: (input) => {
                         const normalize = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();

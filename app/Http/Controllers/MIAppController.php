@@ -656,7 +656,7 @@ class MIAppController extends Controller
             'image_links' => 'nullable|array',
             'image_links.*' => 'nullable|url|max:1000',
             'image_labels' => 'nullable|array',
-            'image_labels.*' => 'nullable|string|max:255',
+            'image_labels.*' => 'nullable|in:Plate,Render,CAD Drawing,Actual Photo',
             'image_descriptions' => 'nullable|array',
             'image_descriptions.*' => 'nullable|string|max:2000',
             'price_comparisons' => 'nullable|array|max:20',
@@ -865,7 +865,7 @@ class MIAppController extends Controller
         if (in_array((int) ($validated['primary_image_id'] ?? 0), $removeIds, true)) {
             throw ValidationException::withMessages(['primary_image_id' => 'Select an image that is not marked for removal.']);
         }
-        $controls = ['image_links', 'product_images', 'remove_image_ids', 'primary_image_id', 'image_order', 'factory_costs', 'remove_factory_cost_ids', 'variants', 'variants_present'];
+        $controls = ['image_links', 'image_labels', 'existing_image_labels', 'product_images', 'remove_image_ids', 'primary_image_id', 'image_order', 'factory_costs', 'remove_factory_cost_ids', 'variants', 'variants_present'];
         $attributes = Arr::except($validated, $controls);
         if (($attributes['country_of_production'] ?? null) === 'Other') {
             $attributes['country_of_production'] = trim($attributes['custom_country']);
@@ -915,12 +915,21 @@ class MIAppController extends Controller
                 }
                 $images = $images->reject(fn (MI_Product_Image $image): bool => in_array($image->getKey(), $removeIds, true))->values();
                 $nextOrder = (int) ($images->max('sort_order') ?? -1) + 1;
-                foreach ($validated['image_links'] ?? [] as $url) {
+                foreach ($validated['existing_image_labels'] ?? [] as $imageId => $label) {
+                    if (is_numeric($imageId) && $images->contains(fn (MI_Product_Image $image): bool => $image->getKey() === (int) $imageId)) {
+                        $images->firstWhere('id', (int) $imageId)?->update(['label' => $label]);
+                    }
+                }
+                foreach ($validated['image_links'] ?? [] as $index => $url) {
                     if (! $url || $images->contains('image_url', $url)) {
                         continue;
                     }
                     $images->push($lockedProduct->images()->create([
-                        'image_type' => 'url', 'image_url' => $url, 'is_primary' => false, 'sort_order' => $nextOrder++,
+                        'image_type' => 'url',
+                        'image_url' => $url,
+                        'label' => $validated['image_labels'][$index] ?? null,
+                        'is_primary' => false,
+                        'sort_order' => $nextOrder++,
                     ]));
                 }
                 foreach ($request->file('product_images', []) as $file) {

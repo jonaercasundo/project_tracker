@@ -9,6 +9,13 @@
     </select>
     <label for="image_url_{{ $index }}" data-url-label class="tx-label">Image URL</label>
     <input id="image_url_{{ $index }}" type="url" name="image_links[{{ $index }}]" value="{{ $url }}" maxlength="1000" placeholder="https://example.com/photo.jpg" data-image-url class="tx-field @error('image_links.'.$index) field-invalid @enderror" @error('image_links.'.$index) aria-invalid="true" aria-describedby="image_url_error_{{ $index }}" @enderror>
+    <label for="image_label_{{ $index }}" class="tx-label">Image label</label>
+    <select id="image_label_{{ $index }}" name="image_labels[{{ $index }}]" class="tx-field">
+        <option value="">Select image label</option>
+        @foreach(['Plate', 'Render', 'CAD Drawing', 'Actual Photo'] as $label)
+            <option value="{{ $label }}" @selected(old('image_labels.'.$index) === $label)>{{ $label }}</option>
+        @endforeach
+    </select>
     <label for="image_upload_{{ $index }}" data-upload-label hidden class="tx-label">Upload Image</label>
     <input id="image_upload_{{ $index }}" type="file" name="product_images[{{ $index }}]" accept="image/jpeg,image/png,image/webp" data-image-upload hidden disabled class="tx-field">
     <img data-new-preview hidden alt="New product image preview" referrerpolicy="no-referrer">

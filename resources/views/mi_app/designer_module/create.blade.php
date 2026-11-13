@@ -1294,14 +1294,12 @@
                                                     class="tx-field"
                                                 >
 
-                                                <input
-                                                    type="text"
-                                                    name="image_labels[]"
-                                                    value="{{ $imageLabel }}"
-                                                    maxlength="255"
-                                                    placeholder="Image label (e.g. Front view)"
-                                                    class="tx-field"
-                                                >
+                                                <select name="image_labels[]" class="tx-field">
+                                                    <option value="">Select image label</option>
+                                                    @foreach(['Plate', 'Render', 'CAD Drawing', 'Actual Photo'] as $label)
+                                                        <option value="{{ $label }}" @selected($imageLabel === $label)>{{ $label }}</option>
+                                                    @endforeach
+                                                </select>
 
                                                 <textarea
                                                     name="image_descriptions[]"
@@ -1340,7 +1338,12 @@
                                                 class="tx-field"
                                             >
 
-                                            <input type="text" name="image_labels[]" value="{{ old('image_labels.0') }}" maxlength="255" placeholder="Image label (e.g. Front view)" class="tx-field">
+                                            <select name="image_labels[]" class="tx-field">
+                                                <option value="">Select image label</option>
+                                                @foreach(['Plate', 'Render', 'CAD Drawing', 'Actual Photo'] as $label)
+                                                    <option value="{{ $label }}" @selected(old('image_labels.0') === $label)>{{ $label }}</option>
+                                                @endforeach
+                                            </select>
                                             <textarea name="image_descriptions[]" maxlength="2000" rows="2" placeholder="Image description" class="tx-field">{{ old('image_descriptions.0') }}</textarea>
 
                                         </div>
@@ -1644,13 +1647,13 @@
                     class="tx-field"
                 >
 
-                <input
-                    type="text"
-                    name="image_labels[]"
-                    maxlength="255"
-                    placeholder="Image label (e.g. Front view)"
-                    class="tx-field"
-                >
+                <select name="image_labels[]" class="tx-field">
+                    <option value="">Select image label</option>
+                    <option value="Plate">Plate</option>
+                    <option value="Render">Render</option>
+                    <option value="CAD Drawing">CAD Drawing</option>
+                    <option value="Actual Photo">Actual Photo</option>
+                </select>
 
                 <textarea
                     name="image_descriptions[]"

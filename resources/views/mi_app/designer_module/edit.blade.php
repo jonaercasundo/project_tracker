@@ -276,6 +276,18 @@
                                     </div>
                                     <div class="tx-edit-image-body">
                                         <span class="tx-edit-image-type">{{ $image->image_type === 'upload' ? 'Uploaded file' : 'Image URL' }}</span>
+                                        @php($imageLabelOptions = ['Plate', 'Render', 'CAD Drawing', 'Actual Photo'])
+                                        @if(in_array($image->label, $imageLabelOptions, true) || !$image->label)
+                                            <label class="tx-label" for="existing_image_label_{{ $image->id }}">Image label</label>
+                                            <select id="existing_image_label_{{ $image->id }}" name="existing_image_labels[{{ $image->id }}]" class="tx-field">
+                                                <option value="">Select image label</option>
+                                                @foreach($imageLabelOptions as $label)
+                                                    <option value="{{ $label }}" @selected(old('existing_image_labels.'.$image->id, $image->label) === $label)>{{ $label }}</option>
+                                                @endforeach
+                                            </select>
+                                        @else
+                                            <p class="tx-hint">Existing label: {{ $image->label }}</p>
+                                        @endif
                                         @if($safeUrl)<a href="{{ $source }}" target="_blank" rel="noopener noreferrer" class="tx-edit-preview-link">Preview {{ $isPhoto ? 'image' : 'attachment' }}</a>@endif
                                         <label class="tx-edit-choice"><input type="radio" name="primary_image_id" value="{{ $image->id }}" @checked((int) $primaryId === $image->id) @disabled(in_array($image->id, $removedIds, true))> Set as Primary</label>
                                         <input type="hidden" name="image_order[]" value="{{ $image->id }}">

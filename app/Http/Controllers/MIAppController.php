@@ -313,6 +313,7 @@ class MIAppController extends Controller
         $collections = MI_Collection::orderBy('name')->get();
         $materialOptions = MI_Material::where('is_active', true)->orderBy('material_name')->get();
         $colorOptions = MI_Color::where('is_active', true)->orderBy('color_name')->get();
+        $imageLabelOptions = $this->imageLabelOptions();
 
         return view('mi_app.designer_module.create', compact(
             'categories',
@@ -320,7 +321,8 @@ class MIAppController extends Controller
             'productTypes',
             'collections',
             'materialOptions',
-            'colorOptions'
+            'colorOptions',
+            'imageLabelOptions'
         ));
     }
 
@@ -571,6 +573,11 @@ class MIAppController extends Controller
                 $request->merge([$field => array_map(static fn ($value): string => trim((string) $value), $values)]);
             }
         }
+        if ($request->has('image_labels')) {
+            $request->merge([
+                'image_labels' => array_map(static fn ($label): string => trim((string) $label), $request->input('image_labels', [])),
+            ]);
+        }
 
         // Remove blank image link values before validation so optional empty inputs do not fail the URL rule.
         if ($request->has('image_links')) {
@@ -656,7 +663,7 @@ class MIAppController extends Controller
             'image_links' => 'nullable|array',
             'image_links.*' => 'nullable|url|max:1000',
             'image_labels' => 'nullable|array',
-            'image_labels.*' => 'nullable|in:Plate,Render,CAD Drawing,Actual Photo',
+            'image_labels.*' => 'nullable|string|max:255',
             'image_descriptions' => 'nullable|array',
             'image_descriptions.*' => 'nullable|string|max:2000',
             'price_comparisons' => 'nullable|array|max:20',
@@ -854,8 +861,26 @@ class MIAppController extends Controller
         $materialOptions = MI_Material::where('is_active', true)->orderBy('material_name')->get();
         $colorOptions = MI_Color::where('is_active', true)->orderBy('color_name')->get();
         $warehouses = Warehouse::query()->orderBy('warehouse_name')->get(['warehouse_id', 'warehouse_name']);
+        $imageLabelOptions = $this->imageLabelOptions();
 
-        return view('mi_app.designer_module.edit', compact('product', 'categories', 'subCategories', 'productTypes', 'collections', 'materialOptions', 'colorOptions', 'warehouses'));
+        return view('mi_app.designer_module.edit', compact('product', 'categories', 'subCategories', 'productTypes', 'collections', 'materialOptions', 'colorOptions', 'warehouses', 'imageLabelOptions'));
+    }
+
+    /** @return array<int, string> */
+    private function imageLabelOptions(): array
+    {
+        return collect(['Plate', 'Render', 'CAD Drawing', 'Actual Photo'])
+            ->concat(MI_Product_Image::query()
+                ->whereNotNull('label')
+                ->whereRaw("TRIM(label) <> ''")
+                ->distinct()
+                ->orderBy('label')
+                ->pluck('label'))
+            ->map(static fn (string $label): string => trim($label))
+            ->filter()
+            ->unique(fn (string $label): string => mb_strtolower($label))
+            ->values()
+            ->all();
     }
 
     public function update(UpdateMIProductRequest $request, MI_Product $product, MIProductFactoryCostService $factoryCosts, MIProductAttributeOptionService $attributeOptions): RedirectResponse

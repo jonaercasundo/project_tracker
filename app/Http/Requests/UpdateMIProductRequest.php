@@ -19,6 +19,12 @@ class UpdateMIProductRequest extends FormRequest
                 $this->merge([$field => array_map(static fn ($value): string => trim((string) $value), $values)]);
             }
         }
+        foreach (['image_labels', 'existing_image_labels'] as $field) {
+            $values = $this->input($field);
+            if (is_array($values)) {
+                $this->merge([$field => array_map(static fn ($value): string => trim((string) $value), $values)]);
+            }
+        }
     }
 
     /**
@@ -81,9 +87,9 @@ class UpdateMIProductRequest extends FormRequest
             'image_links' => 'nullable|array|max:30',
             'image_links.*' => 'nullable|url:http,https|max:1000',
             'image_labels' => 'nullable|array|max:100',
-            'image_labels.*' => ['nullable', Rule::in(['Plate', 'Render', 'CAD Drawing', 'Actual Photo'])],
+            'image_labels.*' => ['nullable', 'string', 'max:255'],
             'existing_image_labels' => 'nullable|array|max:100',
-            'existing_image_labels.*' => ['nullable', Rule::in(['Plate', 'Render', 'CAD Drawing', 'Actual Photo'])],
+            'existing_image_labels.*' => ['nullable', 'string', 'max:255'],
             'product_images' => 'nullable|array|max:30',
             'product_images.*' => 'file|image|mimes:jpeg,png,jpg,webp|max:20480',
             'remove_image_ids' => 'nullable|array|max:100',

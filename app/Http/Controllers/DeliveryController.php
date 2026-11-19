@@ -666,13 +666,6 @@ class DeliveryController extends Controller
                         $scope->where('project_id', $selectedDelivery->project_id)
                             ->where('school_id', $selectedDelivery->school_id)
                             ->where('dr_no', $selectedDelivery->dr_no);
-
-                        if ($selectedDelivery->keystage_id === null) {
-                            $scope->whereNull('keystage_id')
-                                ->where('lot_id', $selectedDelivery->lot_id);
-                        } else {
-                            $scope->where('keystage_id', $selectedDelivery->keystage_id);
-                        }
                     });
                 }
             })

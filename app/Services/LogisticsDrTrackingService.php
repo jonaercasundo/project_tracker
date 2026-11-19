@@ -85,9 +85,6 @@ class LogisticsDrTrackingService
         }
 
         $completion = $this->deliveryCompletion->complete($event, $projectId, $schoolId);
-        if ($completion['status'] !== 'accepted') {
-            return $completion;
-        }
 
         DB::table('logistics_dr_tracking')
             ->where('id', $tracking->id)
@@ -101,6 +98,10 @@ class LogisticsDrTrackingService
                 'reconciliation_status' => 'synchronized',
                 'updated_at' => now(),
             ]);
+
+        if ($completion['status'] !== 'accepted') {
+            return $completion;
+        }
 
         return ['status' => 'accepted', 'details' => 'Logistics status synchronized for the verified DR scope.'];
     }

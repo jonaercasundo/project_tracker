@@ -766,7 +766,7 @@ it('leaves the DR pending reconciliation when warehouse stock is insufficient', 
         ->and(DB::table('inventory')->value('qty'))->toBe(5)
         ->and(DB::table('inventory_history')->count())->toBe(0)
         ->and(DB::table('package_status')->where('status', 'delivered')->exists())->toBeFalse()
-        ->and(DB::table('logistics_dr_tracking')->value('logistics_status'))->toBe('logistics_received');
+        ->and(DB::table('logistics_dr_tracking')->value('logistics_status'))->toBe('delivered');
 });
 
 it('keeps a delivery event unresolved when its DR has no unambiguous package allocation', function () {

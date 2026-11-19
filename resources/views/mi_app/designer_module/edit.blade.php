@@ -27,10 +27,10 @@
         .tx-product-form .tx-edit-image-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
         .tx-product-form .tx-edit-image { min-width: 0; overflow: hidden; border: 1px solid var(--tx-line); border-radius: 14px; background: var(--tx-surface-soft); }
         .tx-product-form .tx-edit-image:has(input[type="checkbox"]:checked) { border-color: var(--tx-danger); }
-        .tx-product-form .tx-edit-image-preview { position: relative; border-bottom: 1px solid var(--tx-line); background: var(--tx-surface); }
-        .tx-product-form .tx-edit-image-preview img { width: 100%; height: 190px; padding: 12px; object-fit: contain; }
+        .tx-product-form .tx-edit-image-preview { position: relative; height: 220px; border-bottom: 1px solid var(--tx-line); background: var(--tx-surface); }
+        .tx-product-form .tx-edit-image-preview img { display: block; width: 100%; height: 100%; padding: 12px; object-fit: contain; }
         .tx-product-form .tx-edit-image:has(input[type="checkbox"]:checked) .tx-edit-image-preview img { opacity: .45; }
-        .tx-product-form .tx-edit-image-placeholder { display: flex; align-items: center; justify-content: center; min-height: 190px; font-size: 12px; color: var(--tx-ink-faint); }
+        .tx-product-form .tx-edit-image-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; padding: 24px; text-align: center; font-size: 12px; color: var(--tx-ink-faint); }
         .tx-product-form .tx-edit-primary { position: absolute; top: 12px; left: 12px; padding: 5px 9px; border-radius: 8px; background: var(--tx-primary); color: var(--tx-primary-ink); font-size: 10px; font-weight: 700; }
         .tx-product-form .tx-edit-image-body { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
         .tx-product-form .tx-edit-image-type { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--tx-ink-faint); }
@@ -107,7 +107,7 @@
                     <div>
                         <strong>Your changes were not saved.</strong>
                         <ul class="mt-2 list-inside list-disc">@foreach($errors->all() as $message)<li>{{ $message }}</li>@endforeach</ul>
-                        <p class="mt-2">Review the fields below. Please select any new upload files again.</p>
+                        <p class="mt-2">Review the fields below. Existing uploaded images and files are kept; you do not need to select them again. If you selected new files for this save, select only those new files again.</p>
                     </div>
                 </div>
             @endif
@@ -203,11 +203,11 @@
                                     <label for="{{ $field }}" class="tx-label">{{ $field === 'materials' ? 'Materials (legacy product-level)' : $label }}</label>
                                     <div class="tx-multi-select-wrap">
                                         <div class="tx-multi-toolbar">
-                                            <span class="tx-multi-hint">Search saved options or type to add a {{ rtrim(strtolower($label), 's') }}</span>
+                                            <span class="tx-multi-hint">Search saved options or type and press Enter to add a {{ rtrim(strtolower($label), 's') }}</span>
                                             <button type="button" class="tx-multi-clear" data-target="{{ $field }}" aria-label="Clear {{ strtolower($label) }}" hidden>Clear</button>
                                         </div>
                                         <input type="hidden" name="{{ $field }}" value="">
-                                        <select id="{{ $field }}" name="{{ $field }}[]" multiple size="{{ $field === 'materials' ? 12 : 8 }}" data-placeholder="Search or add {{ strtolower($label) }}..." class="tx-field tx-multi-select legacy-attribute-select {{ $errors->has($field) || $errors->has($field.'.*') ? 'field-invalid' : '' }}" @if($errors->has($field) || $errors->has($field.'.*')) aria-invalid="true" aria-describedby="{{ $field }}_error" @endif>
+                                        <select id="{{ $field }}" name="{{ $field }}[]" multiple data-placeholder="Search or add {{ strtolower($label) }}..." class="tx-field tx-multi-select legacy-attribute-select {{ $errors->has($field) || $errors->has($field.'.*') ? 'field-invalid' : '' }}" @if($errors->has($field) || $errors->has($field.'.*')) aria-invalid="true" aria-describedby="{{ $field }}_error" @endif>
                                             @include('mi_app.designer_module.partials._attribute-options', ['attribute' => $field, 'selectedValues' => $selectedValues])
                                         </select>
                                         <div id="{{ $field }}_chips" class="tx-multi-chips" aria-live="polite" hidden></div>
@@ -269,13 +269,22 @@
                                     $source = $image->image_type === 'upload' ? Storage::disk('public')->url($image->image_path) : $image->image_url;
                                     $safeUrl = in_array(strtolower(parse_url($source ?? '', PHP_URL_SCHEME) ?? ''), ['http', 'https'], true) || str_starts_with($source ?? '', '/');
                                     $isPhoto = $image->image_type === 'url' || in_array(strtolower(pathinfo($image->image_path ?? '', PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'], true);
+                                    $thumbnailSource = $source;
+                                    if ($safeUrl && strtolower(parse_url($source, PHP_URL_HOST) ?? '') === 'drive.google.com') {
+                                        parse_str(parse_url($source, PHP_URL_QUERY) ?? '', $driveQuery);
+                                        preg_match('#^/file/d/([a-zA-Z0-9_-]+)(?:/|$)#', parse_url($source, PHP_URL_PATH) ?? '', $drivePath);
+                                        $driveId = $drivePath[1] ?? ($driveQuery['id'] ?? null);
+                                        if (is_string($driveId) && preg_match('/^[a-zA-Z0-9_-]+$/', $driveId)) {
+                                            $thumbnailSource = 'https://drive.google.com/thumbnail?id='.$driveId.'&sz=w1600';
+                                        }
+                                    }
                                 @endphp
                                 <article data-image-id="{{ $image->id }}" class="tx-edit-image">
                                     <div class="tx-edit-image-preview">
-                                        @if($safeUrl && $isPhoto)<img src="{{ $source }}" alt="{{ $product->item_name }} image {{ $loop->iteration }}" loading="lazy" referrerpolicy="no-referrer" data-image-preview>
+                                        @if($safeUrl && $isPhoto)<img src="{{ $thumbnailSource }}" alt="{{ $product->item_name }} image {{ $loop->iteration }}" loading="lazy" referrerpolicy="no-referrer" data-image-preview>
                                         @else<div class="tx-edit-image-placeholder">{{ $isPhoto ? 'Preview unavailable' : 'Product attachment' }}</div>@endif
                                         <span data-primary-badge @if((int) $primaryId !== $image->id) hidden @endif class="tx-edit-primary">Primary</span>
-                                        <p data-preview-error hidden class="tx-hint p-3">Preview unavailable. The image record will be kept.</p>
+                                        <div data-preview-error hidden class="tx-edit-image-placeholder" role="status">Image unavailable. You can still edit this image’s details.</div>
                                     </div>
                                     <div class="tx-edit-image-body">
                                         <span class="tx-edit-image-type">{{ $image->image_type === 'upload' ? 'Uploaded file' : 'Image URL' }}</span>

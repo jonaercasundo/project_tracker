@@ -24,6 +24,7 @@ class MIProductFactoryCostSchemaTestCase extends MIWorkflowTestCase
             'database/migrations/2026_08_17_000000_add_price_to_products_table.php',
             'database/migrations/2026_10_06_085134_add_unique_item_code_to_mi_products_table.php',
             'database/migrations/2026_10_12_055813_create_mi_product_factory_costs_table.php',
+            'database/migrations/2026_11_13_093239_change_mi_factory_cost_currency_to_usd.php',
             'database/migrations/2026_10_20_082229_add_country_of_production_to_mi_products_table.php',
         ]]);
     }
@@ -42,10 +43,31 @@ it('stores factory costs against the real product key without changing product p
 
     expect($cost->product->getKey())->toBe($product->getKey());
     expect($cost->factory_cost)->toBe('1250.01');
-    expect($cost->currency)->toBe('PHP');
+    expect($cost->currency)->toBe('USD');
     expect($cost->is_primary)->toBeFalse();
     expect($cost->effective_date->toDateString())->toBe('2026-10-12');
     expect($product->fresh()->only(['purchase_cost', 'price']))->toBe(['purchase_cost' => '12.34', 'price' => '25.50']);
+});
+
+it('adds USD storage without converting existing PHP amounts', function () {
+    $migration = require database_path('migrations/2026_11_13_093239_change_mi_factory_cost_currency_to_usd.php');
+    $migration->down();
+    $product = MI_Product::factory()->create();
+    $existing = $product->factoryCosts()->create([
+        'factory_name' => 'Existing supplier', 'factory_cost' => '1250.01',
+    ])->refresh();
+    expect($existing->currency)->toBe('PHP');
+
+    $migration->up();
+
+    expect($existing->fresh()->only(['factory_cost', 'currency']))
+        ->toBe(['factory_cost' => '1250.01', 'currency' => 'PHP']);
+    $newCost = $product->factoryCosts()->create([
+        'factory_name' => 'USD supplier', 'factory_cost' => '1250.01',
+    ])->refresh();
+    expect($newCost->only(['factory_cost', 'currency']))
+        ->toBe(['factory_cost' => '1250.01', 'currency' => 'USD']);
+    expect(fn () => $migration->down())->toThrow(RuntimeException::class, 'Resolve their currency explicitly first.');
 });
 
 it('allows multiple secondary costs but rejects a second primary for the same product', function () {

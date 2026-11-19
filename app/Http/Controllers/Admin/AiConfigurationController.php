@@ -8,6 +8,7 @@ use App\Models\AiProviderSetting;
 use App\Models\User;
 use App\Services\AdminAuditLogger;
 use App\Services\AiProviderConfiguration;
+use App\Services\AnthropicResearchClient;
 use App\Services\OpenAiResponsesClient;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -38,6 +39,11 @@ class AiConfigurationController extends Controller
 
         return view('admin.ai-configuration', [
             'provider' => 'OpenAI',
+            'researchProvider' => $configuration->researchProvider(),
+            'anthropicModel' => $setting?->anthropic_model ?: config('services.anthropic.research_model', 'claude-sonnet-5-5'),
+            'anthropicModels' => $configuration->anthropicModels(),
+            'hasAnthropicKey' => (string) $setting?->getRawOriginal('anthropic_api_key') !== '',
+            'anthropicFallbackConfigured' => is_string(config('services.anthropic.key')) && trim(config('services.anthropic.key')) !== '',
             'model' => $configuration->model(),
             'supportedModels' => $configuration->supportedModels(),
             'enabled' => $configuration->isEnabled(),
@@ -65,6 +71,9 @@ class AiConfigurationController extends Controller
             'enabled' => ['required', 'boolean'],
             'per_user_requests_per_minute' => ['required', 'integer', 'between:1,120'],
             'monthly_token_limit' => ['nullable', 'integer', 'between:1,1000000000000'],
+            'research_provider' => ['sometimes', 'required', Rule::in(['openai', 'anthropic'])],
+            'anthropic_model' => ['sometimes', 'required', Rule::in($configuration->anthropicModels())],
+            'anthropic_api_key' => ['nullable', 'string', 'max:255'],
         ]);
 
         if ($validator->fails()) {
@@ -78,7 +87,7 @@ class AiConfigurationController extends Controller
         $existing = $configuration->setting();
         $before = $this->safeSnapshot($existing);
         $setting = $existing ?? new AiProviderSetting(['id' => 1]);
-        $keyWasReplaced = $submittedKey !== '';
+        $keyWasReplaced = $submittedKey !== '' || trim((string) ($data['anthropic_api_key'] ?? '')) !== '';
 
         DB::transaction(function () use ($setting, $data, $submittedKey, $keyWasReplaced, $user, $before, $audit): void {
             $setting->provider = 'openai';
@@ -89,7 +98,16 @@ class AiConfigurationController extends Controller
                 ? (int) $data['monthly_token_limit']
                 : null;
             $setting->configured_by = $user->getAuthIdentifier();
-            if ($keyWasReplaced) {
+            if (isset($data['research_provider'])) {
+                $setting->research_provider = $data['research_provider'];
+            }
+            if (isset($data['anthropic_model'])) {
+                $setting->anthropic_model = $data['anthropic_model'];
+            }
+            if (trim((string) ($data['anthropic_api_key'] ?? '')) !== '') {
+                $setting->anthropic_api_key = trim($data['anthropic_api_key']);
+            }
+            if ($submittedKey !== '') {
                 $setting->api_key = $submittedKey;
             }
             $setting->save();
@@ -98,14 +116,18 @@ class AiConfigurationController extends Controller
                 'before' => $before,
                 'after' => $this->safeSnapshot($setting),
             ]);
-            $audit->record($user, $keyWasReplaced ? 'ai.configuration_key_replaced' : 'ai.configuration_updated', 'ai_provider_setting', 1, 'Updated OpenAI assistant configuration.', $user->currentCompany()?->getKey(), [
+            $audit->record($user, $keyWasReplaced ? 'ai.configuration_key_replaced' : 'ai.configuration_updated', 'ai_provider_setting', 1, 'Updated AI provider configuration.', $user->currentCompany()?->getKey(), [
                 'model' => $data['model'],
                 'enabled' => (bool) $data['enabled'],
                 'credential_replaced' => $keyWasReplaced,
             ]);
         });
 
-        return response()->json(['message' => 'AI configuration saved. The API key is stored encrypted and will not be shown again.'])
+        return response()->json([
+            'message' => 'AI configuration saved. The API key is stored encrypted and will not be shown again.',
+            'configured_by' => $user->name,
+            'updated_at' => $setting->updated_at?->toIso8601String(),
+        ])
             ->header('Cache-Control', 'no-store');
     }
 
@@ -137,11 +159,14 @@ class AiConfigurationController extends Controller
             ->header('Cache-Control', 'no-store');
     }
 
-    public function testConnection(Request $request, AiProviderConfiguration $configuration, OpenAiResponsesClient $client, AdminAuditLogger $audit): JsonResponse
+    public function testConnection(Request $request, AiProviderConfiguration $configuration, OpenAiResponsesClient $client, AnthropicResearchClient $anthropic, AdminAuditLogger $audit): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'openai_api_key' => ['nullable', 'string', 'max:255'],
-            'model' => ['required', 'string', Rule::in($configuration->supportedModels())],
+            'anthropic_api_key' => ['nullable', 'string', 'max:255'],
+            'provider' => ['sometimes', 'required', Rule::in(['openai', 'anthropic'])],
+            'model' => ['required', 'string', Rule::in($request->input('provider') === 'anthropic' ? $configuration->anthropicModels() : $configuration->supportedModels())],
+            'web_search' => ['sometimes', 'boolean'],
         ]);
         if ($validator->fails()) {
             return response()->json(['message' => 'Please review the connection test fields.', 'errors' => $validator->errors()], 422)
@@ -149,25 +174,33 @@ class AiConfigurationController extends Controller
         }
 
         $data = $validator->validated();
-        $submittedKey = trim((string) ($data['openai_api_key'] ?? ''));
-        $apiKey = $submittedKey !== '' ? $submittedKey : $configuration->apiKey();
+        $provider = $data['provider'] ?? 'openai';
+        $submittedKey = trim((string) ($data[$provider === 'anthropic' ? 'anthropic_api_key' : 'openai_api_key'] ?? ''));
+        $apiKey = $submittedKey !== '' ? $submittedKey : $configuration->researchApiKey($provider);
         if ($apiKey === null) {
-            return response()->json(['status' => 'configuration_required', 'message' => 'Save an OpenAI API key or configure the environment fallback before testing.'], 422)
+            return response()->json(['status' => 'configuration_required', 'message' => 'Save an API key for the selected provider or configure its environment fallback before testing.'], 422)
                 ->header('Cache-Control', 'no-store');
         }
 
-        $result = $client->testConnection($apiKey, $data['model']);
+        $webSearch = (bool) ($data['web_search'] ?? false);
+        $result = ($provider === 'anthropic' ? $anthropic : $client)->testConnection($apiKey, $data['model'], $webSearch);
+        $credentialSource = $provider === 'openai' ? $configuration->credentialSource()
+            : ((string) $configuration->setting()?->getRawOriginal('anthropic_api_key') !== '' ? 'database' : 'environment');
         $testedAt = $result['status'] === 'success' ? now() : null;
         $this->audit($request->user()->getAuthIdentifier(), 'connection_test', [
             'status' => $result['status'],
             'message' => $result['message'],
             'model' => $data['model'],
-            'credential_source' => $submittedKey !== '' ? 'submitted' : $configuration->credentialSource(),
+            'capability' => $webSearch ? 'web_search' : 'responses',
+            'provider' => $provider,
+            'credential_source' => $submittedKey !== '' ? 'submitted' : $credentialSource,
         ]);
-        $audit->record($request->user(), 'ai.connection_tested', 'ai_provider_setting', 1, 'Tested the OpenAI connection: '.$result['status'].'.', $request->user()->currentCompany()?->getKey(), [
+        $audit->record($request->user(), 'ai.connection_tested', 'ai_provider_setting', 1, 'Tested the '.($provider === 'anthropic' ? 'Claude' : 'OpenAI').' connection: '.$result['status'].'.', $request->user()->currentCompany()?->getKey(), [
             'status' => $result['status'],
             'model' => $data['model'],
-            'credential_source' => $submittedKey !== '' ? 'submitted' : $configuration->credentialSource(),
+            'capability' => $webSearch ? 'web_search' : 'responses',
+            'provider' => $provider,
+            'credential_source' => $submittedKey !== '' ? 'submitted' : $credentialSource,
         ]);
 
         return response()->json([...$result, 'tested_at' => $testedAt?->toIso8601String()], $result['status'] === 'success' ? 200 : 422)
@@ -181,6 +214,9 @@ class AiConfigurationController extends Controller
             'provider' => 'openai',
             'has_database_key' => $setting !== null && (string) $setting->getRawOriginal('api_key') !== '',
             'model' => $setting?->model,
+            'research_provider' => $setting?->research_provider,
+            'anthropic_model' => $setting?->anthropic_model,
+            'has_anthropic_key' => (string) $setting?->getRawOriginal('anthropic_api_key') !== '',
             'enabled' => $setting?->enabled,
             'per_user_requests_per_minute' => $setting?->per_user_requests_per_minute,
             'monthly_token_limit' => $setting?->monthly_token_limit,

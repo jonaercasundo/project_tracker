@@ -16,6 +16,11 @@ return [
     'apify' => [
         'token' => env('APIFY_API_TOKEN'),
     ],
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'research_model' => env('ANTHROPIC_RESEARCH_MODEL', 'claude-sonnet-5-5'),
+        'research_models' => ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5'],
+    ],
     'openai' => [
         'key' => env('OPENAI_API_KEY'),
         'assistant_model' => env('OPENAI_ASSISTANT_MODEL', 'gpt-5.5'),

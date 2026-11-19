@@ -18,7 +18,7 @@ class MIProductFactoryCostFactory extends Factory
             'product_id' => MI_Product::factory(),
             'factory_name' => fake()->company(),
             'factory_cost' => number_format(fake()->numberBetween(0, 10000000) / 100, 2, '.', ''),
-            'currency' => 'PHP',
+            'currency' => MI_Product_Factory_Cost::DEFAULT_CURRENCY,
             'effective_date' => null,
             'remarks' => null,
             'is_primary' => false,

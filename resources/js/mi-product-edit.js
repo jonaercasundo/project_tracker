@@ -56,120 +56,6 @@ if (form) {
     taxonomy.forEach((select) => select.addEventListener('change', () => filterTaxonomy(true)));
     filterTaxonomy(false);
 
-    form.querySelectorAll('select.tx-multi-select').forEach((select) => {
-        const wrapper = select.closest('.tx-multi-select-wrap');
-        const chips = wrapper.querySelector('.tx-multi-chips');
-        const clearButton = wrapper.querySelector('.tx-multi-clear');
-        const selectionError = wrapper.querySelector('[data-multi-error]');
-
-        if (typeof window.TomSelect === 'function') {
-            const normalizeOption = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
-            new window.TomSelect(select, {
-                onInitialize() { window.styleProductImageLabel(this); },
-                hideSelected: false,
-                plugins: ['remove_button'],
-                create: (input) => {
-                    const value = input.trim().replace(/\s+/g, ' ');
-                    return value ? { value, text: value } : false;
-                },
-                maxItems: 100,
-                hideSelected: true,
-                closeAfterSelect: false,
-                copyClassesToDropdown: false,
-                placeholder: `Select one or more ${select.id === 'materials' ? 'materials' : 'colors'}...`,
-                searchField: ['text'],
-                createFilter: (input) => {
-                    const normalizedInput = normalizeOption(input);
-                    return normalizedInput.length > 0 && ![...select.options].some((option) => normalizeOption(option.value) === normalizedInput);
-                },
-                onInitialize: function () {
-                    const selectControl = this;
-                    this.dropdown_content.addEventListener('click', (event) => {
-                        const target = event.target;
-                        if (!(target instanceof Element) || !target.closest('.create')) return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        selectControl.createItem();
-                    });
-                },
-                render: {
-                    option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim().replace(/\s+/g, ' '))}" to this product</div>`,
-                    no_results: () => `<div class="no-results">No ${select.id === 'materials' ? 'material' : 'color'} found. Type a new value to add it.</div>`,
-                },
-            });
-            const nativeHint = wrapper.querySelector('.tx-multi-hint');
-            if (nativeHint) nativeHint.hidden = true;
-            if (select.hasAttribute('aria-describedby')) {
-                select.tomselect.control_input.setAttribute('aria-describedby', select.getAttribute('aria-describedby'));
-            }
-            if (select.hasAttribute('aria-invalid')) {
-                select.tomselect.control_input.setAttribute('aria-invalid', select.getAttribute('aria-invalid'));
-            }
-        }
-
-        const updateChips = () => {
-            chips.replaceChildren();
-            [...select.selectedOptions].filter((option) => option.value).forEach((option) => {
-                const chip = document.createElement('span');
-                chip.className = 'tx-multi-chip';
-                const label = document.createElement('span');
-                label.textContent = option.text;
-                const remove = document.createElement('button');
-                remove.type = 'button';
-                remove.textContent = '\u00d7';
-                remove.setAttribute('aria-label', `Remove ${option.text}`);
-                remove.addEventListener('click', () => {
-                    if (select.tomselect) {
-                        select.tomselect.removeItem(option.value);
-                    } else {
-                        option.selected = false;
-                        select.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                });
-                chip.append(label, remove);
-                chips.append(chip);
-            });
-            clearButton.hidden = chips.childElementCount === 0;
-        };
-
-        select.addEventListener('change', () => {
-            updateChips();
-            if (select.validity.valid) {
-                selectionError.hidden = true;
-                select.classList.remove('field-invalid');
-                select.removeAttribute('aria-invalid');
-                if (select.tomselect) {
-                    select.tomselect.wrapper.classList.remove('field-invalid');
-                    select.tomselect.control_input.removeAttribute('aria-invalid');
-                    if (select.hasAttribute('aria-describedby')) {
-                        select.tomselect.control_input.setAttribute('aria-describedby', select.getAttribute('aria-describedby'));
-                    } else {
-                        select.tomselect.control_input.removeAttribute('aria-describedby');
-                    }
-                }
-            }
-        });
-        select.addEventListener('invalid', (event) => {
-            if (!select.tomselect) return;
-            event.preventDefault();
-            selectionError.hidden = false;
-            select.tomselect.wrapper.classList.add('field-invalid');
-            select.tomselect.control_input.setAttribute('aria-invalid', 'true');
-            const descriptions = [select.getAttribute('aria-describedby'), selectionError.id].filter(Boolean);
-            select.tomselect.control_input.setAttribute('aria-describedby', descriptions.join(' '));
-            select.tomselect.focus();
-        });
-        clearButton.addEventListener('click', () => {
-            if (select.tomselect) {
-                select.tomselect.clear();
-            } else {
-                [...select.options].forEach((option) => { option.selected = false; });
-                select.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        });
-        updateChips();
-    });
-
     form.querySelectorAll('[data-add-value]').forEach((button) => {
         const input = form.querySelector(`[data-custom-value="${button.dataset.addValue}"]`);
         const addValue = () => {
@@ -251,6 +137,39 @@ if (form) {
             new window.TomSelect(select, {
                 dropdownParent: 'body',
                 dropdownClass: 'ts-dropdown tx-image-label-dropdown',
+                onInitialize() {
+                    window.styleProductImageLabel(this);
+                    const positionDropdown = this.positionDropdown;
+                    const spacing = document.createElement('div');
+                    spacing.setAttribute('aria-hidden', 'true');
+                    this.wrapper.after(spacing);
+                    let trackingFrame;
+                    const trackPosition = () => {
+                        if (!this.isOpen) return;
+                        positionDropdown.call(this);
+                        trackingFrame = requestAnimationFrame(trackPosition);
+                    };
+                    const stopTracking = () => cancelAnimationFrame(trackingFrame);
+                    this.on('dropdown_open', trackPosition);
+                    this.on('dropdown_close', stopTracking);
+                    this.on('destroy', stopTracking);
+                    this.positionDropdown = function () {
+                        positionDropdown.call(this);
+                        const control = this.control.getBoundingClientRect();
+                        const menu = this.dropdown.getBoundingClientRect();
+                        const height = this.isOpen && menu.top >= control.bottom
+                            ? `${menu.height + 6}px`
+                            : '0px';
+                        if (spacing.style.height !== height) {
+                            spacing.style.height = height;
+                            requestAnimationFrame(() => {
+                                if (this.isOpen) positionDropdown.call(this);
+                            });
+                        }
+                    };
+                    this.on('dropdown_close', () => { spacing.style.height = '0px'; });
+                    this.on('destroy', () => spacing.remove());
+                },
                 maxOptions: 500,
                 create: (input) => {
                     const value = input.trim().replace(/\s+/g, ' ');
@@ -338,6 +257,7 @@ if (form) {
         row.querySelector('[data-remove-new]').addEventListener('click', () => {
             clearTimeout(debounce);
             releaseUrl();
+            row.querySelector('[data-image-label]')?.tomselect?.destroy();
             row.remove();
             markDirty();
         });

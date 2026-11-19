@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\MI_Product;
+use App\Models\MI_Product_Factory_Cost;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
@@ -11,8 +12,8 @@ class MIProductFactoryCostService
     /**
      * Apply validated changes inside the product update transaction, with the product row locked.
      *
-     * @param array<array-key, array{id?: int|null, factory_name: string, factory_cost: string, currency?: string, effective_date?: string|null, remarks?: string|null, is_primary?: bool}> $rows
-     * @param list<int|string> $removeIds
+     * @param  array<array-key, array{id?: int|null, factory_name: string, factory_cost: string, currency?: string, effective_date?: string|null, remarks?: string|null, is_primary?: bool}>  $rows
+     * @param  list<int|string>  $removeIds
      */
     public function synchronize(MI_Product $product, array $rows, array $removeIds): void
     {
@@ -41,6 +42,9 @@ class MIProductFactoryCostService
         foreach ($rows as $row) {
             $cost = isset($row['id']) ? $costs->get((int) $row['id']) : $product->factoryCosts()->make();
             $cost->fill(Arr::only($row, ['factory_name', 'factory_cost', 'currency', 'effective_date', 'remarks']));
+            if (! array_key_exists('currency', $row)) {
+                $cost->currency = $cost->currency ?: MI_Product_Factory_Cost::DEFAULT_CURRENCY;
+            }
             $cost->is_primary = false;
             $cost->save();
             $costs->put($cost->getKey(), $cost);

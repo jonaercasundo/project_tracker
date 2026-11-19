@@ -55,6 +55,33 @@ class AiProviderConfiguration
         return config('ai_assistant.supported_models', ['gpt-5.5']);
     }
 
+    public function researchProvider(): string
+    {
+        return $this->setting()?->research_provider === 'anthropic' ? 'anthropic' : 'openai';
+    }
+
+    public function researchApiKey(?string $provider = null): ?string
+    {
+        if (($provider ?? $this->researchProvider()) === 'openai') {
+            return $this->apiKey();
+        }
+        $stored = $this->setting()?->anthropic_api_key;
+        $key = is_string($stored) && trim($stored) !== '' ? $stored : config('services.anthropic.key');
+
+        return is_string($key) && trim($key) !== '' ? trim($key) : null;
+    }
+
+    public function researchModel(): string
+    {
+        return $this->researchProvider() === 'openai' ? $this->model()
+            : ($this->setting()?->anthropic_model ?: (string) config('services.anthropic.research_model', 'claude-sonnet-5-5'));
+    }
+
+    public function anthropicModels(): array
+    {
+        return config('services.anthropic.research_models', ['claude-sonnet-5-5']);
+    }
+
     public function isEnabled(): bool
     {
         return $this->setting()?->enabled ?? (bool) config('ai_assistant.enabled', true);

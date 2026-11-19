@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\PublicImageUrl;
 use App\Http\Requests\UpdateMIProductRequest;
 use App\Models\MI_Category;
 use App\Models\MI_Collection;
 use App\Models\MI_Color;
 use App\Models\MI_Material;
 use App\Models\MI_Product;
+use App\Models\MI_Product_Factory_Cost;
 use App\Models\MI_Product_Image;
 use App\Models\MI_ProductType;
 use App\Models\MI_SubCategory;
@@ -652,7 +654,7 @@ class MIAppController extends Controller
             'factory_costs.*' => ['required', 'array:factory_name,factory_cost,currency,effective_date,remarks,is_primary'],
             'factory_costs.*.factory_name' => 'required|string|max:255',
             'factory_costs.*.factory_cost' => ['required', 'numeric', 'regex:/\A[0-9]{1,13}(?:\.[0-9]{1,2})?\z/'],
-            'factory_costs.*.currency' => 'sometimes|required|in:USD',
+            'factory_costs.*.currency' => ['sometimes', 'required', Rule::in(MI_Product_Factory_Cost::CURRENCIES)],
             'factory_costs.*.effective_date' => 'nullable|date_format:Y-m-d',
             'factory_costs.*.remarks' => 'nullable|string|max:2000',
             'factory_costs.*.is_primary' => 'sometimes|boolean',
@@ -670,7 +672,7 @@ class MIAppController extends Controller
             'price_comparisons.*' => ['required', 'array:store_name,product_name,photo_url,price,currency,product_link'],
             'price_comparisons.*.store_name' => 'required|string|max:255',
             'price_comparisons.*.product_name' => 'required|string|max:255',
-            'price_comparisons.*.photo_url' => 'nullable|url:http,https|max:2048',
+            'price_comparisons.*.photo_url' => ['nullable', 'string', 'max:2048', PublicImageUrl::rule()],
             'price_comparisons.*.price' => 'required|numeric|min:0|max:999999999999.99',
             'price_comparisons.*.currency' => 'required|in:USD',
             'price_comparisons.*.product_link' => 'required|url:http,https|max:2048',

@@ -9,6 +9,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\View;
+use Illuminate\View\View as BladeView;
 use Tests\TestCase;
 
 class DeliveryTrackingFilterTestCase extends TestCase
@@ -267,6 +269,62 @@ it('accepts a project without a year', function (): void {
     $response->assertOk()
         ->assertSee('DR #DR-A-01')
         ->assertDontSee('DR #DR-B-01');
+});
+
+it('renders each package once per receipt when statuses repeat and delivery scopes overlap', function (): void {
+    Schema::create('AR_settings', function (Blueprint $table): void {
+        $table->unsignedInteger('project_id');
+    });
+    Schema::table('package_status', function (Blueprint $table): void {
+        $table->string('remarks')->nullable();
+    });
+    DB::table('keystage')->insert(['keystage_id' => 7, 'keystage_num' => 'Stage 7']);
+    DB::table('deliveries')->where('delivery_id', 2)->update([
+        'dr_no' => 'DR-A-01',
+        'keystage_id' => 7,
+    ]);
+    DB::table('deliveries')->where('delivery_id', 3)->update([
+        'dr_no' => 'DR-A-01',
+        'school_id' => 'S-2',
+    ]);
+    DB::table('package')->insert([
+        ['package_id' => 21, 'lot_id' => 1, 'keystage_id' => 7],
+        ['package_id' => 22, 'lot_id' => 1, 'keystage_id' => 7],
+        ['package_id' => 23, 'lot_id' => 1, 'keystage_id' => null],
+    ]);
+    DB::table('item')->insert([
+        ['item_id' => 31, 'item_name' => 'Shared Workbook'],
+        ['item_id' => 32, 'item_name' => 'Lot Guide'],
+    ]);
+    DB::table('package_content')->insert([
+        ['package_id' => 21, 'item_id' => 31, 'qty' => 3],
+        ['package_id' => 22, 'item_id' => 31, 'qty' => 5],
+        ['package_id' => 23, 'item_id' => 32, 'qty' => 1],
+    ]);
+    DB::table('package_status')->insert([
+        ['delivery_id' => 2, 'package_id' => 21, 'status' => 'pending'],
+        ['delivery_id' => 2, 'package_id' => 21, 'status' => 'pending'],
+        ['delivery_id' => 1, 'package_id' => 21, 'status' => 'pending'],
+    ]);
+    $renderedReceipts = [];
+    View::composer('deliveries.ar-layout', function (BladeView $view) use (&$renderedReceipts): void {
+        $data = $view->getData();
+        $statuses = $data['deliveries']->flatMap->packageStatuses;
+        $renderedReceipts[] = $statuses->map(fn ($status): array => [
+            $status->package_id,
+            isset($data['qrCodes'][$status->package_status_id]),
+        ])->all();
+    });
+
+    $response = $this->get(route('deliveries.pdf', ['ids' => '2,1,2,3']));
+
+    $response->assertOk()->assertHeader('Content-Type', 'application/pdf');
+    expect($response->getContent())->toStartWith('%PDF-');
+    expect($renderedReceipts)->toBe([
+        [[21, true], [22, true], [23, true]],
+        [[21, true], [22, true], [23, true]],
+    ]);
+    expect(DB::table('package_status')->where('delivery_id', 2)->where('package_id', 21)->count())->toBe(2);
 });
 
 it('filters logistics status by the exact project school and delivery reference', function (string $status, array $expectedReferences): void {

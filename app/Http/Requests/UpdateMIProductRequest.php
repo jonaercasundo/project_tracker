@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\MI_Product;
+use App\Models\MI_Product_Factory_Cost;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -102,7 +103,7 @@ class UpdateMIProductRequest extends FormRequest
             'factory_costs.*.id' => ['nullable', 'integer', 'distinct', $ownedCost],
             'factory_costs.*.factory_name' => ['required', 'string', 'max:255'],
             'factory_costs.*.factory_cost' => ['required', 'numeric', 'regex:/\A[0-9]{1,13}(?:\.[0-9]{1,2})?\z/'],
-            'factory_costs.*.currency' => ['sometimes', 'required', Rule::in(['PHP'])],
+            'factory_costs.*.currency' => ['sometimes', 'required', Rule::in(MI_Product_Factory_Cost::CURRENCIES)],
             'factory_costs.*.effective_date' => ['nullable', 'date_format:Y-m-d'],
             'factory_costs.*.remarks' => ['nullable', 'string', 'max:2000'],
             'factory_costs.*.is_primary' => ['sometimes', 'boolean'],
@@ -112,6 +113,15 @@ class UpdateMIProductRequest extends FormRequest
         foreach (['product', 'carton'] as $prefix) {
             foreach (['height', 'width', 'length', 'depth'] as $dimension) {
                 $rules[$prefix.'_'.$dimension] = 'sometimes|nullable|numeric|min:0|max:99999999.99';
+            }
+        }
+        $submittedCosts = $this->input('factory_costs');
+        if (is_array($submittedCosts)) {
+            $legacyCosts = $product->factoryCosts()->where('currency', 'PHP')->pluck('id')->all();
+            foreach ($submittedCosts as $index => $cost) {
+                if (is_array($cost) && is_scalar($cost['id'] ?? null) && in_array((int) $cost['id'], $legacyCosts, true)) {
+                    $rules['factory_costs.'.$index.'.currency'] = ['sometimes', 'required', Rule::in([...MI_Product_Factory_Cost::CURRENCIES, 'PHP'])];
+                }
             }
         }
         foreach ($this->input('variants', []) as $index => $variant) {
@@ -153,6 +163,8 @@ class UpdateMIProductRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'factory_costs.*.currency.required' => 'Enter a currency for this factory cost.',
+            'factory_costs.*.currency.in' => 'Select a supported factory cost currency: '.implode(', ', MI_Product_Factory_Cost::CURRENCIES).'.',
             'factory_costs.max' => 'A product may have at most 100 factory costs.',
             'factory_costs.*.factory_cost.regex' => 'Enter a non-negative amount with no more than two decimal places.',
             'factory_costs.*.id.exists' => 'This factory cost is unavailable for this product. Reload and try again.',

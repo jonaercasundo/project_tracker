@@ -11,6 +11,10 @@ class MI_Product_Factory_Cost extends Model
 {
     use HasFactory;
 
+    public const CURRENCIES = ['USD'];
+
+    public const DEFAULT_CURRENCY = 'USD';
+
     protected $table = 'mi_product_factory_costs';
 
     protected $fillable = [

@@ -610,6 +610,12 @@
                         </div>
 
 
+                        <div class="col-span-2">
+                            <label for="description" class="tx-label">Product description</label>
+                            <textarea id="description" name="description" rows="3" maxlength="20000" class="tx-field" placeholder="Describe the product, materials, dimensions, or distinguishing features">{{ old('description') }}</textarea>
+                            @error('description')<p class="tx-error">{{ $message }}</p>@enderror
+                        </div>
+
                         {{-- Sample Type --}}
                         <div class="col-span-2">
 
@@ -826,7 +832,6 @@
                                         id="materials"
                                         name="materials[]"
                                         multiple
-                                        size="12"
                                         data-placeholder="Search or add materials..."
                                         class="tx-field tx-multi-select materials-select legacy-attribute-select"
                                         @error('materials') aria-invalid="true" aria-describedby="materials_error" @enderror
@@ -897,7 +902,6 @@
                                         id="color"
                                         name="color[]"
                                         multiple
-                                        size="8"
                                         data-placeholder="Search or add colors..."
                                         class="tx-field tx-multi-select legacy-attribute-select"
                                         @error('color') aria-invalid="true" aria-describedby="color_error" @enderror
@@ -1737,128 +1741,6 @@
 
                 initializeImageLabelSelect();
 
-                /* -------------------------------------------------
-                   TOM SELECT — COLOR
-                   ------------------------------------------------- */
-
-                const colorSelect =
-                    document.getElementById('color');
-
-                if (colorSelect && !colorSelect.tomselect) {
-
-                    new TomSelect(
-                        colorSelect,
-                        {
-                            plugins: ['remove_button'],
-
-                            maxItems: 100,
-
-                            createOnBlur: false,
-                            persist: false,
-                            dropdownParent: 'body',
-                            createFilter: (input, callback) => {
-                                const normalizedInput = input.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
-                                return normalizedInput.length > 0 && !Array.from(colorSelect.options).some((option) => option.value.trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedInput);
-                            },
-                            create: (input) => {
-                                const value = input.trim().replace(/\s+/g, ' ');
-                                return value ? { value, text: value } : false;
-                            },
-                            onInitialize: function () {
-                                const selectControl = this;
-                                this.dropdown_content.addEventListener('click', (event) => {
-                                    const target = event.target;
-                                    if (!(target instanceof Element) || !target.closest('.create')) return;
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    selectControl.createItem();
-                                });
-                            },
-
-                            closeAfterSelect: false,
-
-                            hideSelected: true,
-
-                            placeholder: 'Select or add colors...',
-                            render: {
-                                option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim().replace(/\s+/g, ' '))}" to this product</div>`,
-                                no_results: () => '<div class="no-results">No color found. Type a new value to add it.</div>',
-                            },
-                        }
-                    );
-
-                }
-
-
-                /* -------------------------------------------------
-                   TOM SELECT — MATERIALS
-                   ------------------------------------------------- */
-
-                const materialsSelect =
-                    document.getElementById('materials');
-
-                if (materialsSelect && !materialsSelect.tomselect) {
-
-                    new TomSelect(
-                        materialsSelect,
-                        {
-                            plugins: ['remove_button'],
-
-                            createOnBlur: false,
-                            persist: false,
-                            dropdownParent: 'body',
-                            createFilter: (input, callback) => {
-                                const normalizedInput = input.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
-                                return normalizedInput.length > 0 && !Array.from(materialsSelect.options).some((option) => option.value.trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedInput);
-                            },
-                            create: (input) => {
-                                const value = input.trim().replace(/\s+/g, ' ');
-                                return value ? { value, text: value } : false;
-                            },
-                            onInitialize: function () {
-                                const selectControl = this;
-                                this.dropdown_content.addEventListener('click', (event) => {
-                                    const target = event.target;
-                                    if (!(target instanceof Element) || !target.closest('.create')) return;
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    selectControl.createItem();
-                                });
-                            },
-
-                            maxItems: 100,
-
-                            hideSelected: true,
-
-                            closeAfterSelect: false,
-
-                            placeholder: 'Select or add materials...',
-
-                            searchField: ['text'],
-
-                            render: {
-
-                                option_create: function (data, escape) {
-                                    return `<div class="create">+ Add "${escape(data.input.trim().replace(/\s+/g, ' '))}" to this product</div>`;
-                                },
-
-                                no_results:
-                                    function (data, escape) {
-
-                                        return `
-                                            <div class="no-results">
-                                                No material found. Type a new value to add it.
-                                            </div>
-                                        `;
-
-                                    }
-
-                            }
-
-                        }
-                    );
-
-                }
 
             }
         );
@@ -2234,247 +2116,6 @@
 
 
             updateProgress();
-
-
-            /* =====================================================
-               MULTI SELECT CHIPS
-               ===================================================== */
-
-            document
-                .querySelectorAll(
-                    'select.tx-multi-select'
-                )
-                .forEach(function (select) {
-
-                    const wrapper =
-                        select.closest(
-                            '.tx-multi-select-wrap'
-                        );
-
-                    if (!wrapper) return;
-
-
-                    const chips =
-                        wrapper.querySelector(
-                            '.tx-multi-chips'
-                        );
-
-                    const clearButton =
-                        wrapper.querySelector(
-                            '.tx-multi-clear'
-                        );
-
-
-                    function updateChips() {
-
-                        if (!chips) return;
-
-
-                        const selectedValues =
-                            Array
-                                .from(
-                                    select.selectedOptions
-                                )
-                                .map(
-                                    option =>
-                                        option.value
-                                )
-                                .filter(Boolean);
-
-
-                        chips.innerHTML = '';
-
-
-                        selectedValues.forEach(
-                            function (value) {
-
-                                const chip =
-                                    document.createElement(
-                                        'span'
-                                    );
-
-                                chip.className =
-                                    'tx-multi-chip';
-
-
-                                const text =
-                                    document.createElement(
-                                        'span'
-                                    );
-
-                                text.textContent =
-                                    value;
-
-
-                                const remove =
-                                    document.createElement(
-                                        'button'
-                                    );
-
-                                remove.type =
-                                    'button';
-
-                                remove.setAttribute(
-                                    'aria-label',
-                                    'Remove ' + value
-                                );
-
-                                remove.innerHTML =
-                                    '&times;';
-
-
-                                remove.addEventListener(
-                                    'click',
-                                    function (event) {
-
-                                        event.preventDefault();
-
-                                        if (
-                                            select.tomselect
-                                        ) {
-
-                                            select.tomselect
-                                                .removeItem(
-                                                    value
-                                                );
-
-                                        } else {
-
-                                            Array
-                                                .from(
-                                                    select.options
-                                                )
-                                                .forEach(
-                                                    function (
-                                                        option
-                                                    ) {
-
-                                                        if (
-                                                            option.value ===
-                                                            value
-                                                        ) {
-
-                                                            option.selected =
-                                                                false;
-
-                                                        }
-
-                                                    }
-                                                );
-
-                                        }
-
-                                        window.setTimeout(
-                                            updateChips,
-                                            0
-                                        );
-
-                                    }
-                                );
-
-
-                                chip.appendChild(text);
-                                chip.appendChild(remove);
-
-                                chips.appendChild(chip);
-
-                            }
-                        );
-
-
-                        if (clearButton) {
-
-                            clearButton.style.display =
-                                selectedValues.length
-                                    ? 'inline-flex'
-                                    : 'none';
-
-                        }
-
-                    }
-
-
-                    select.addEventListener(
-                        'change',
-                        function () {
-
-                            window.setTimeout(
-                                updateChips,
-                                0
-                            );
-
-                            updateProgress();
-
-                        }
-                    );
-
-
-                    if (select.tomselect) {
-
-                        select.tomselect.on(
-                            'item_add item_remove',
-                            function () {
-
-                                window.setTimeout(
-                                    updateChips,
-                                    0
-                                );
-
-                                updateProgress();
-
-                            }
-                        );
-
-                    }
-
-
-                    if (clearButton) {
-
-                        clearButton.addEventListener(
-                            'click',
-                            function (event) {
-
-                                event.preventDefault();
-
-                                if (
-                                    select.tomselect
-                                ) {
-
-                                    select.tomselect.clear();
-
-                                } else {
-
-                                    Array
-                                        .from(
-                                            select.options
-                                        )
-                                        .forEach(
-                                            function (option) {
-
-                                                option.selected =
-                                                    false;
-
-                                            }
-                                        );
-
-                                }
-
-                                window.setTimeout(
-                                    updateChips,
-                                    0
-                                );
-
-                                updateProgress();
-
-                            }
-                        );
-
-                    }
-
-
-                    updateChips();
-
-                });
 
 
             /* =====================================================

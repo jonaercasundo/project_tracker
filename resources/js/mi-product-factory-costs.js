@@ -6,7 +6,7 @@ export function parseFactoryCost(value) {
 }
 
 export function summarizeFactoryCosts(entries) {
-    const costs = entries.map((entry) => ({ ...entry, cents: parseFactoryCost(entry.factory_cost) }));
+    const costs = entries.map((entry) => ({ ...entry, cents: entry.currency && entry.currency !== 'USD' ? null : parseFactoryCost(entry.factory_cost) }));
     const valid = costs.filter((entry) => entry.cents !== null);
     const primary = costs.find((entry) => entry.is_primary)?.cents ?? null;
     if (valid.length === 0) return { lowest: null, highest: null, average: null, primary };
@@ -55,6 +55,7 @@ export function initializeFactoryCosts(form, markDirty) {
         });
         const entries = active.map((row) => ({
             factory_cost: row.querySelector('[data-factory-amount]').value,
+            currency: row.querySelector('[data-factory-currency]').value,
             is_primary: row.querySelector('[data-factory-primary]').checked,
         }));
         const summary = summarizeFactoryCosts(entries);
@@ -62,15 +63,22 @@ export function initializeFactoryCosts(form, markDirty) {
             section.querySelector(`[data-factory-summary="${key}"]`).textContent = formatFactoryCost(cents);
         });
         const invalidCount = entries.filter((entry) => parseFactoryCost(entry.factory_cost) === null).length;
-        section.querySelector('[data-factory-summary-note]').textContent = invalidCount
+        const summaryNote = invalidCount
             ? `${invalidCount} ${invalidCount === 1 ? 'entry needs' : 'entries need'} a valid cost. Comparisons include only valid costs; average is rounded to the nearest cent.`
             : 'Comparisons use valid costs, including zero. Average is rounded to the nearest cent.';
+        section.querySelector('[data-factory-summary-note]').textContent = `${summaryNote} USD summaries exclude costs recorded in other currencies; no conversion is applied.`;
         section.querySelector('[data-factory-empty]').hidden = allRows().length > 0;
         addButton.disabled = active.length >= maxEntries;
     };
 
     const initializeRow = (row) => {
         const amount = row.querySelector('[data-factory-amount]');
+        const currency = row.querySelector('[data-factory-currency]');
+        currency.addEventListener('change', () => {
+            row.querySelector('[data-factory-currency-label]').textContent = currency.value;
+            refresh();
+            markDirty();
+        });
         const amountError = row.querySelector('[data-factory-amount-error]');
         const validateAmount = (showEmpty = false) => {
             const invalid = parseFactoryCost(amount.value) === null;

@@ -282,6 +282,7 @@ $colorGroups = [
     $optionName = $attribute === 'materials' ? 'material_name' : 'color_name';
     $normalizeOptionKey = fn ($value) => mb_strtolower(preg_replace('/\s+/u', ' ', trim((string) $value)) ?? trim((string) $value));
     $knownKeys = array_map($normalizeOptionKey, $knownValues);
+    $selectedKeys = array_map($normalizeOptionKey, $selectedValues);
     $customValues = $options->pluck($optionName)->all();
     $customValues = array_merge($customValues, array_diff($selectedValues, $knownValues));
     $customValues = collect($customValues)->unique($normalizeOptionKey)
@@ -290,12 +291,12 @@ $colorGroups = [
 @foreach($groups as $group => $choices)
     <optgroup label="{{ $group }}">
         @foreach($choices as $value)
-            <option value="{{ $value }}" @selected(in_array($value, $selectedValues, true))>{{ $value }}</option>
+            <option value="{{ $value }}" @selected(in_array($normalizeOptionKey($value), $selectedKeys, true))>{{ $value }}</option>
         @endforeach
     </optgroup>
 @endforeach
 @if($customValues->isNotEmpty())
     <optgroup label="Saved custom values">
-        @foreach($customValues as $value)<option value="{{ $value }}" @selected(in_array($value, $selectedValues, true))>{{ $value }}</option>@endforeach
+        @foreach($customValues as $value)<option value="{{ $value }}" @selected(in_array($normalizeOptionKey($value), $selectedKeys, true))>{{ $value }}</option>@endforeach
     </optgroup>
 @endif

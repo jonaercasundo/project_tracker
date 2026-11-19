@@ -21,6 +21,7 @@ class AiConfigurationTestCase extends MIWorkflowTestCase
         $migrationPaths = parent::migrateFreshUsing();
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_083437_create_ai_assistant_tables.php';
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_085724_create_ai_provider_settings_tables.php';
+        $migrationPaths['--path'][] = 'database/migrations/2026_11_13_063602_add_research_provider_to_ai_provider_settings.php';
         $migrationPaths['--path'][] = 'database/migrations/2026_10_26_095438_create_ai_quotation_workflow_tables.php';
 
         return $migrationPaths;
@@ -42,6 +43,40 @@ function aiAdmin(): User
 
     return $user;
 }
+
+it('switches research providers while retaining independent encrypted keys and matching models', function () {
+    aiAdmin();
+    $this->postJson(route('admin.ai-configuration.store'), aiConfigurationPayload(['openai_api_key' => 'sk-openai-retained', 'research_provider' => 'anthropic', 'anthropic_api_key' => 'sk-ant-secret', 'anthropic_model' => 'claude-sonnet-5-5']))->assertOk()->assertDontSee('sk-ant-secret');
+
+    $configuration = app(AiProviderConfiguration::class);
+    expect($configuration->researchProvider())->toBe('anthropic');
+    expect($configuration->researchApiKey())->toBe('sk-ant-secret');
+    expect($configuration->researchModel())->toBe('claude-sonnet-5-5');
+    expect(DB::table('ai_provider_settings')->value('anthropic_api_key'))->not->toBe('sk-ant-secret');
+    expect(AiProviderSetting::find(1)->toArray())->not->toHaveKeys(['api_key', 'anthropic_api_key']);
+    $page = $this->get(route('admin.ai-configuration.index'))->assertOk()->assertSee('Claude (Anthropic)')->assertDontSee('sk-ant-secret')->assertDontSee('sk-openai-retained');
+    if ($path = getenv('AI_CONFIGURATION_SHELL_HTML')) {
+        file_put_contents($path, $page->getContent());
+    }
+
+    $this->postJson(route('admin.ai-configuration.store'), aiConfigurationPayload(['research_provider' => 'openai']))->assertOk();
+    expect($configuration->researchApiKey())->toBe('sk-openai-retained');
+    expect($configuration->researchModel())->toBe('gpt-5.5');
+    expect(AiProviderSetting::find(1)->anthropic_api_key)->toBe('sk-ant-secret');
+    expect(DB::table('ai_provider_setting_audits')->pluck('metadata')->implode(' '))->not->toContain('sk-ant-secret')->not->toContain('sk-openai-retained');
+});
+
+it('tests Claude web search with its saved key instead of the OpenAI key', function () {
+    aiAdmin();
+    $this->postJson(route('admin.ai-configuration.store'), aiConfigurationPayload(['openai_api_key' => 'sk-openai', 'anthropic_api_key' => 'sk-claude', 'research_provider' => 'anthropic', 'anthropic_model' => 'claude-sonnet-5-5']))->assertOk();
+    Http::preventStrayRequests();
+    Http::fake(['https://api.anthropic.com/v1/messages' => Http::response(['stop_reason' => 'end_turn', 'content' => [['type' => 'web_search_tool_result', 'content' => [['type' => 'web_search_result', 'url' => 'https://platform.claude.com/docs']]]]])]);
+
+    $this->postJson(route('admin.ai-configuration.test-connection'), ['provider' => 'anthropic', 'model' => 'claude-sonnet-5-5', 'web_search' => true])
+        ->assertOk()->assertJsonPath('status', 'success')->assertDontSee('sk-claude');
+    Http::assertSent(fn ($request): bool => $request->header('x-api-key')[0] === 'sk-claude' && ! $request->hasHeader('Authorization') && $request['model'] === 'claude-sonnet-5-5' && $request['tools'][0]['name'] === 'web_search');
+    Http::assertSentCount(1);
+});
 
 function aiConfigurationPayload(array $overrides = []): array
 {
@@ -184,6 +219,27 @@ it('tests a submitted key without storing it and categorizes provider failures s
     $auditPayload = DB::table('ai_provider_setting_audits')->where('action', 'connection_test')->value('metadata');
     expect($auditPayload)->not->toContain($submittedKey);
 });
+
+it('tests web search with the saved credential and records the capability without exposing the key', function (array $providerResponse, int $providerStatus, string $expectedStatus) {
+    aiAdmin();
+    $this->postJson(route('admin.ai-configuration.store'), aiConfigurationPayload(['openai_api_key' => 'sk-research-test-secret']))->assertOk();
+    Http::preventStrayRequests();
+    Http::fake(['https://api.openai.com/v1/responses' => Http::response($providerResponse, $providerStatus)]);
+
+    $response = $this->postJson(route('admin.ai-configuration.test-connection'), ['model' => 'gpt-5.5', 'web_search' => true]);
+
+    $response->assertStatus($expectedStatus === 'success' ? 200 : 422)->assertJsonPath('status', $expectedStatus)->assertDontSee('sk-research-test-secret');
+    Http::assertSent(fn ($request): bool => $request->header('Authorization')[0] === 'Bearer sk-research-test-secret'
+        && $request['tools'][0]['type'] === 'web_search' && $request['tool_choice'] === 'required' && $request['store'] === false);
+    $metadata = DB::table('ai_provider_setting_audits')->where('action', 'connection_test')->value('metadata');
+    expect($metadata)->not->toContain('sk-research-test-secret');
+    expect(json_decode($metadata, true))->toMatchArray(['capability' => 'web_search', 'status' => $expectedStatus]);
+})->with([
+    'completed web search' => [['status' => 'completed', 'output' => [['type' => 'web_search_call', 'status' => 'completed']]], 200, 'success'],
+    'accepted without searching' => [['status' => 'completed', 'output' => []], 200, 'web_search_unverified'],
+    'unsupported tool' => [['error' => ['code' => 'unsupported_tool']], 400, 'web_search_unavailable'],
+    'exhausted credits' => [['error' => ['code' => 'credit_balance_exhausted']], 429, 'quota_or_billing'],
+]);
 
 it('classifies authentication, permission, rate, quota, model, and outage test responses', function () {
     Http::fakeSequence('https://api.openai.com/v1/responses')

@@ -647,7 +647,7 @@ class DeliveryController extends Controller
 
         $selectedDeliveries = Delivery::query()
             ->whereIn('delivery_id', $ids)
-            ->get(['delivery_id', 'project_id', 'school_id', 'dr_no', 'keystage_id']);
+            ->get(['delivery_id', 'project_id', 'school_id', 'dr_no', 'keystage_id', 'lot_id']);
 
         if ($selectedDeliveries->isEmpty()) {
             abort(404, 'No deliveries found.');
@@ -668,7 +668,8 @@ class DeliveryController extends Controller
                             ->where('dr_no', $selectedDelivery->dr_no);
 
                         if ($selectedDelivery->keystage_id === null) {
-                            $scope->whereNull('keystage_id');
+                            $scope->whereNull('keystage_id')
+                                ->where('lot_id', $selectedDelivery->lot_id);
                         } else {
                             $scope->where('keystage_id', $selectedDelivery->keystage_id);
                         }
@@ -676,12 +677,12 @@ class DeliveryController extends Controller
                 }
             })
             ->orderBy('delivery_id')
-            ->get(['delivery_id', 'project_id', 'school_id', 'dr_no', 'keystage_id'])
+            ->get(['delivery_id', 'project_id', 'school_id', 'dr_no', 'keystage_id', 'lot_id'])
             ->unique(fn (Delivery $delivery): string => implode(':', [
                 $delivery->project_id,
                 hash('sha256', (string) $delivery->school_id),
                 hash('sha256', (string) $delivery->dr_no),
-                $delivery->keystage_id ?? 'none',
+                $delivery->keystage_id ?? 'lot-'.$delivery->lot_id,
             ]))
             ->pluck('delivery_id')
             ->values();
@@ -710,11 +711,13 @@ class DeliveryController extends Controller
             'project.arSetting',
             'lot',
             'keystage',
-            'packageStatuses.package.packageContent.item',
         ])
             ->whereIn('delivery_id', $ids)
             ->orderBy('dr_no')
+            // Prefer the keystage section when its packages also match a lot-level row.
+            ->orderByRaw('CASE WHEN keystage_id IS NULL THEN 1 ELSE 0 END')
             ->orderBy('keystage_id')
+            ->orderBy('delivery_id')
             ->get();
 
         if ($deliveries->isEmpty()) {
@@ -722,6 +725,12 @@ class DeliveryController extends Controller
         }
 
         $qrCodes = [];
+        $renderedPackageIds = [];
+        $receiptKey = fn (Delivery $delivery): string => serialize([
+            $delivery->project_id,
+            $delivery->school_id,
+            $delivery->dr_no,
+        ]);
 
         /*
         |--------------------------------------------------------------------------
@@ -730,6 +739,7 @@ class DeliveryController extends Controller
         */
 
         foreach ($deliveries as $delivery) {
+            $receipt = $receiptKey($delivery);
 
             /*
             |--------------------------------------------------------------------------
@@ -755,7 +765,8 @@ class DeliveryController extends Controller
             }
 
             $packageIds = $packageQuery
-                ->pluck('package_id');
+                ->pluck('package_id')
+                ->reject(fn ($packageId): bool => isset($renderedPackageIds[$receipt][$packageId]));
 
             /*
             |--------------------------------------------------------------------------
@@ -795,37 +806,21 @@ class DeliveryController extends Controller
                 'package.packageContent.item',
             ])
                 ->where('delivery_id', $delivery->delivery_id)
-                ->get();
+                ->whereIn('package_id', $packageIds)
+                ->orderBy('package_status_id')
+                ->get()
+                ->filter(fn (PackageStatus $status): bool => $status->package !== null)
+                ->unique('package_id')
+                ->values();
 
             /*
             |--------------------------------------------------------------------------
-            | Remove package_status rows belonging to another keystage
+            | Keep each package in one section of its receipt
             |--------------------------------------------------------------------------
             */
 
-            if (! empty($delivery->keystage_id)) {
-
-                $statuses = $statuses
-                    ->filter(function ($status) use ($delivery) {
-
-                        return $status->package
-                            && (int) $status->package->keystage_id
-                                === (int) $delivery->keystage_id;
-
-                    })
-                    ->values();
-
-            } else {
-
-                $statuses = $statuses
-                    ->filter(function ($status) use ($delivery) {
-
-                        return $status->package
-                            && (int) $status->package->lot_id
-                                === (int) $delivery->lot_id;
-
-                    })
-                    ->values();
+            foreach ($statuses as $status) {
+                $renderedPackageIds[$receipt][$status->package_id] = true;
             }
 
             /*
@@ -927,9 +922,7 @@ class DeliveryController extends Controller
         |
         */
 
-        $drGroups = $deliveries->groupBy(
-            fn ($delivery) => $delivery->dr_no
-        );
+        $drGroups = $deliveries->groupBy($receiptKey);
 
         $tempFiles = [];
 
@@ -939,7 +932,8 @@ class DeliveryController extends Controller
 
         try {
 
-            foreach ($drGroups as $drNo => $drDeliveries) {
+            foreach ($drGroups as $drDeliveries) {
+                $drNo = $drDeliveries->first()->dr_no;
 
                 /*
                 |----------------------------------------------------------------

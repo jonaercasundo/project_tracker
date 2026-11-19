@@ -50,6 +50,7 @@
             const normalize = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
             new TomSelect(select, {
                 plugins: ['remove_button'],
+                openOnFocus: true,
                 createOnBlur: false,
                 persist: false,
                 create: (input) => {
@@ -65,18 +66,52 @@
                 hideSelected: true,
                 closeAfterSelect: false,
                 dropdownParent: 'body',
+                dropdownClass: 'ts-dropdown tx-attribute-dropdown',
+                copyClassesToDropdown: false,
                 placeholder: select.dataset.placeholder,
                 searchField: ['text'],
                 onInitialize: function () {
-                    const selectControl = this;
-                    this.dropdown_content.addEventListener('click', (event) => {
-                        const target = event.target;
-                        if (!(target instanceof Element) || !target.closest('.create')) return;
-
-                        event.preventDefault();
-                        event.stopPropagation();
-                        selectControl.createItem();
+                    this.wrapper.classList.add('tx-attribute-select');
+                    const hint = select.closest('.tx-multi-select-wrap')?.querySelector('.tx-multi-hint');
+                    if (hint) {
+                        hint.id ||= `${select.id}_hint`;
+                        this.control_input.setAttribute('aria-describedby', [hint.id, select.getAttribute('aria-describedby')].filter(Boolean).join(' '));
+                    }
+                    if (select.hasAttribute('aria-invalid')) this.control_input.setAttribute('aria-invalid', 'true');
+                    const theme = getComputedStyle(this.wrapper);
+                    for (const property of theme) {
+                        if (property.startsWith('--tx-')) this.dropdown.style.setProperty(property, theme.getPropertyValue(property));
+                    }
+                    this.positionDropdown = function () {
+                        const bounds = this.control.getBoundingClientRect();
+                        const viewport = window.visualViewport;
+                        const top = viewport?.offsetTop ?? 0;
+                        const bottom = top + (viewport?.height ?? window.innerHeight);
+                        const below = Math.max(0, bottom - bounds.bottom - 12);
+                        const above = Math.max(0, bounds.top - top - 12);
+                        const opensAbove = below < 240 && above > below;
+                        this.dropdown_content.style.maxHeight = `${Math.min(280, opensAbove ? above : below)}px`;
+                        Object.assign(this.dropdown.style, {
+                            width: `${bounds.width}px`,
+                            left: `${bounds.left + window.scrollX}px`,
+                            top: `${(opensAbove ? bounds.top - this.dropdown.offsetHeight - 6 : bounds.bottom + 6) + window.scrollY}px`,
+                        });
+                    };
+                    const reposition = () => { if (this.isOpen) this.positionDropdown(); };
+                    const stopTracking = () => {
+                        window.removeEventListener('scroll', reposition, true);
+                        window.removeEventListener('resize', reposition);
+                        window.visualViewport?.removeEventListener('resize', reposition);
+                    };
+                    this.on('dropdown_open', () => {
+                        reposition();
+                        window.addEventListener('scroll', reposition, true);
+                        window.addEventListener('resize', reposition);
+                        window.visualViewport?.addEventListener('resize', reposition);
                     });
+                    this.on('type', reposition);
+                    this.on('dropdown_close', stopTracking);
+                    this.on('destroy', stopTracking);
                 },
                 render: {
                     option_create: (data, escape) => `<div class="create">+ Add "${escape(data.input.trim().replace(/\s+/g, ' '))}"</div>`,
@@ -94,14 +129,19 @@
                 select.tomselect.wrapper.classList.add('field-invalid');
                 select.tomselect.control_input.setAttribute('aria-invalid', 'true');
                 select.tomselect.focus();
+                const error = select.closest('.tx-multi-select-wrap')?.querySelector('[data-multi-error]');
+                if (error) error.hidden = false;
             });
             select.tomselect?.on('item_add', () => {
                 select.tomselect.wrapper.classList.remove('field-invalid');
                 select.tomselect.control_input.removeAttribute('aria-invalid');
+                const error = select.closest('.tx-multi-select-wrap')?.querySelector('[data-multi-error]');
+                if (error) error.hidden = true;
             });
             clearButton?.addEventListener('click', (event) => {
                 event.preventDefault();
                 select.tomselect?.clear();
+                select.tomselect?.close();
             });
             syncClearButton();
         });

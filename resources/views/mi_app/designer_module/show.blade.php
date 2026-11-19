@@ -1663,7 +1663,7 @@
                                                 <div>
                                                     <span class="pd-factory-field-label">Currency</span>
                                                     <div class="pd-factory-field-value {{ $factoryCost->currency ? '' : 'empty' }}">
-                                                        USD
+                                                        {{ $factoryCost->currency ?: 'Not set' }}
                                                     </div>
                                                 </div>
                                                 <div>

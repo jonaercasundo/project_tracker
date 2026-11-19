@@ -33,6 +33,7 @@ class AiQuotationAssistantTestCase extends MIWorkflowTestCase
             'database/migrations/2026_10_06_040342_create_mi_product_images_table.php',
             'database/migrations/2026_10_06_085134_add_unique_item_code_to_mi_products_table.php',
             'database/migrations/2026_10_12_055813_create_mi_product_factory_costs_table.php',
+            'database/migrations/2026_11_13_093239_change_mi_factory_cost_currency_to_usd.php',
             'database/migrations/2026_10_20_082229_add_country_of_production_to_mi_products_table.php',
             'database/migrations/2026_10_26_083437_create_ai_assistant_tables.php',
             'database/migrations/2026_10_26_085724_create_ai_provider_settings_tables.php',

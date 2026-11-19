@@ -806,6 +806,8 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         Route::post('/mi/setting_store', [MIAppController::class, 'setting_store'])->name('mi_app.store');
         Route::post('/mi/store', [MIAppController::class, 'store'])->name('mi_app.store_1');
         Route::post('/mi/price-comparisons/search', [MIProductPriceComparisonController::class, 'search'])->middleware('throttle:10,1')->name('mi_app.price-comparisons.search');
+        Route::post('/mi/price-comparisons/from-link', [MIProductPriceComparisonController::class, 'addByLink'])->middleware('throttle:10,1')->name('mi_app.price-comparisons.from-link');
+        Route::post('/mi/price-comparisons/manual', [MIProductPriceComparisonController::class, 'confirmManual'])->middleware('throttle:10,1')->name('mi_app.price-comparisons.manual');
         Route::post('/mi/{product}/price-comparisons', [MIProductPriceComparisonController::class, 'store'])->name('mi_app.price-comparisons.store');
         Route::post('/mi/variants/{variant}/stock-movements', [MIProductVariantInventoryController::class, 'store'])->whereNumber('variant')->name('mi_app.variants.stock-movements.store');
         Route::get('/mi/{product}', [MIAppController::class, 'show'])->name('mi_app.show');

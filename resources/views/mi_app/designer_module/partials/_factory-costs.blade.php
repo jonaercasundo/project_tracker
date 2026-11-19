@@ -4,7 +4,7 @@
         'id' => $cost->id,
         'factory_name' => $cost->factory_name,
         'factory_cost' => $cost->factory_cost,
-        'currency' => $cost->currency,
+        'currency' => $cost->currency ?: \App\Models\MI_Product_Factory_Cost::DEFAULT_CURRENCY,
         'effective_date' => $cost->effective_date?->format('Y-m-d'),
         'remarks' => $cost->remarks,
         'is_primary' => $cost->is_primary,
@@ -64,7 +64,7 @@
     </div>
     <div class="tx-card-body">
         <input type="hidden" name="factory_costs_present" value="1">
-        <p class="tx-hint">All costs are in USD. @if(isset($product))Changes and removals apply when you save the product.@else Factory costs will be saved with the new product.@endif Add up to 100 factory costs.</p>
+        <p class="tx-hint">New costs are in {{ implode(', ', \App\Models\MI_Product_Factory_Cost::CURRENCIES) }}. Existing PHP costs retain their recorded currency unless you explicitly confirm they were entered in USD. USD summaries exclude PHP costs; no exchange-rate conversion is applied. @if(isset($product))Changes and removals apply when you save the product.@else Factory costs will be saved with the new product.@endif Add up to 100 factory costs.</p>
         @foreach(['factory_costs', 'remove_factory_cost_ids', 'remove_factory_cost_ids.*'] as $field)
             @foreach($errors->get($field) as $messages)
                 @foreach((array) $messages as $message)<p class="tx-error">{{ $message }}</p>@endforeach

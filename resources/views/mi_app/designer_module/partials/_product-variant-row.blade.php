@@ -26,8 +26,8 @@
             <label for="{{ $fieldId }}_materials" class="tx-label">Materials <span class="tx-required">*</span></label>
             <div class="tx-multi-select-wrap">
                 <div class="tx-multi-toolbar">
-                    <span class="tx-multi-hint">Select multiple or type to add a material</span>
-                    <button type="button" class="tx-multi-clear" hidden>Clear</button>
+                    <span class="tx-multi-hint">Search saved materials or type and press Enter to add a new one.</span>
+                    <button type="button" class="tx-multi-clear" aria-label="Clear this field" hidden>Clear</button>
                 </div>
                 <select id="{{ $fieldId }}_materials" required multiple name="variants[{{ $index }}][materials][]" class="tx-field variant-dropdown" data-placeholder="Search or add materials...">
                     @include('mi_app.designer_module.partials._attribute-options', ['attribute' => 'materials', 'selectedValues' => $materials])
@@ -39,8 +39,8 @@
             <label for="{{ $fieldId }}_colors" class="tx-label">Colors</label>
             <div class="tx-multi-select-wrap">
                 <div class="tx-multi-toolbar">
-                    <span class="tx-multi-hint">Select multiple or type to add a color</span>
-                    <button type="button" class="tx-multi-clear" hidden>Clear</button>
+                    <span class="tx-multi-hint">Search saved colors or type and press Enter to add a new one.</span>
+                    <button type="button" class="tx-multi-clear" aria-label="Clear this field" hidden>Clear</button>
                 </div>
                 <select id="{{ $fieldId }}_colors" multiple name="variants[{{ $index }}][colors][]" class="tx-field variant-dropdown" data-placeholder="Search or add colors...">
                     @include('mi_app.designer_module.partials._attribute-options', ['attribute' => 'color', 'selectedValues' => $colors])

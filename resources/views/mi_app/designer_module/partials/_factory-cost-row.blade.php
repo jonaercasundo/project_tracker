@@ -1,6 +1,8 @@
 @php
     $fieldPrefix = 'factory_costs.'.$index;
     $idPrefix = 'factory_cost_'.$index;
+    $currency = array_key_exists('currency', $cost) ? $cost['currency'] : \App\Models\MI_Product_Factory_Cost::DEFAULT_CURRENCY;
+    $hasLegacyCurrency = isset($product) && !empty($cost['id']) && $product->factoryCosts->firstWhere('id', $cost['id'])?->currency === 'PHP';
     $isPrimary = !$removed && in_array($cost['is_primary'] ?? false, [true, 1, '1'], true);
 @endphp
 <article class="tx-factory-row" data-factory-cost-row data-factory-cost-index="{{ $index }}" data-factory-cost-id="{{ $cost['id'] ?? '' }}" data-primary="{{ $isPrimary ? 'true' : 'false' }}" data-removed="{{ $removed ? 'true' : 'false' }}">
@@ -14,7 +16,18 @@
     </div>
     <div class="tx-factory-fields">
         @if(!empty($cost['id']))<input type="hidden" name="factory_costs[{{ $index }}][id]" value="{{ $cost['id'] }}" data-factory-field @disabled($removed)>@endif
-        <input type="hidden" name="factory_costs[{{ $index }}][currency]" value="USD" data-factory-field @disabled($removed)>
+        @if($hasLegacyCurrency)
+            <div>
+                <label for="{{ $idPrefix }}_currency" class="tx-label">Recorded Currency</label>
+                <select id="{{ $idPrefix }}_currency" name="factory_costs[{{ $index }}][currency]" data-factory-currency data-factory-field @disabled($removed) class="tx-field" aria-describedby="{{ $idPrefix }}_currency_hint">
+                    <option value="PHP" @selected($currency === 'PHP')>PHP — keep recorded currency</option>
+                    <option value="USD" @selected($currency === 'USD')>USD — I confirm this amount was entered in US dollars</option>
+                </select>
+                <p id="{{ $idPrefix }}_currency_hint" class="tx-hint">Selecting USD changes the currency code only and keeps the number unchanged. For a genuinely PHP quote, keep PHP; obtain a dollar quote before entering a USD amount.</p>
+            </div>
+        @else
+            <input type="hidden" name="factory_costs[{{ $index }}][currency]" value="{{ $currency }}" data-factory-currency data-factory-field @disabled($removed)>
+        @endif
         <input type="hidden" name="factory_costs[{{ $index }}][is_primary]" value="{{ $isPrimary ? '1' : '0' }}" data-factory-primary-value data-factory-field @disabled($removed)>
         <div>
             <label for="{{ $idPrefix }}_name" class="tx-label">Factory / Supplier Name <span class="tx-required">*</span></label>
@@ -22,10 +35,10 @@
             @error($fieldPrefix.'.factory_name')<p id="{{ $idPrefix }}_name_error" class="tx-error">{{ $message }}</p>@enderror
         </div>
         <div>
-            <label for="{{ $idPrefix }}_amount" class="tx-label">Factory Cost (USD) <span class="tx-required">*</span></label>
+            <label for="{{ $idPrefix }}_amount" class="tx-label">Factory Cost (<span data-factory-currency-label>{{ $currency }}</span>) <span class="tx-required">*</span></label>
             <input id="{{ $idPrefix }}_amount" type="text" inputmode="decimal" name="factory_costs[{{ $index }}][factory_cost]" value="{{ $cost['factory_cost'] ?? '' }}" required maxlength="16" pattern="[0-9]{1,13}(\.[0-9]{1,2})?" placeholder="0.00" data-factory-amount data-factory-field @disabled($removed) class="tx-field tx-mono @error($fieldPrefix.'.factory_cost') field-invalid @enderror" aria-describedby="{{ $idPrefix }}_amount_hint {{ $idPrefix }}_amount_validation @error($fieldPrefix.'.factory_cost') {{ $idPrefix }}_amount_error @enderror" @error($fieldPrefix.'.factory_cost') aria-invalid="true" @enderror>
             <p id="{{ $idPrefix }}_amount_hint" class="tx-hint">Enter a non-negative amount with up to 2 decimal places, without commas.</p>
-            <p id="{{ $idPrefix }}_amount_validation" data-factory-amount-error class="tx-error" hidden>Enter a valid USD amount from 0 to 9,999,999,999,999.99, with up to 2 decimal places.</p>
+            <p id="{{ $idPrefix }}_amount_validation" data-factory-amount-error class="tx-error" hidden>Enter a valid amount from 0 to 9,999,999,999,999.99, with up to 2 decimal places.</p>
             @error($fieldPrefix.'.factory_cost')<p id="{{ $idPrefix }}_amount_error" class="tx-error">{{ $message }}</p>@enderror
         </div>
         <div>

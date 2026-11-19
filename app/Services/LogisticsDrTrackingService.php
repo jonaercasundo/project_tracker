@@ -19,7 +19,7 @@ class LogisticsDrTrackingService
      *
      * @return array{status: string, details: string}
      */
-    public function synchronize(object $event, int $projectId, string $schoolId): array
+    public function synchronize(object $event, int $projectId, string $schoolId, bool $projectionOnly = false): array
     {
         $scope = [
             'integration_id' => $event->integration_id,
@@ -82,6 +82,10 @@ class LogisticsDrTrackingService
                 'status' => 'out_of_order',
                 'details' => 'Only logistics_received may progress to delivered.',
             ];
+        }
+
+        if ($projectionOnly) {
+            return ['status' => 'accepted', 'details' => 'Accepted for Logistics tracking.'];
         }
 
         $completion = $this->deliveryCompletion->complete($event, $projectId, $schoolId);

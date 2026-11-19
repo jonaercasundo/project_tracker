@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Services\DeliveryAuditTrailService;
+use App\Services\LogisticsDeliveredProjection;
 use App\Services\LogisticsDrResolver;
 use App\Services\LogisticsDrTrackingService;
 use App\Services\TrackerUpdateBroadcaster;
@@ -27,8 +28,10 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
 
     public function __construct(public int $eventRowId) {}
 
-    public function handle(LogisticsDrResolver $drResolver, LogisticsDrTrackingService $trackingService): void
+    public function handle(LogisticsDrResolver $drResolver, LogisticsDrTrackingService $trackingService, ?LogisticsDeliveredProjection $deliveredProjection = null): void
     {
+        $deliveredProjection ??= app(LogisticsDeliveredProjection::class);
+
         $event = DB::transaction(function (): ?object {
             $event = DB::table('logistics_webhook_events')
                 ->where('id', $this->eventRowId)
@@ -64,7 +67,7 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
         }
 
         try {
-            DB::transaction(function () use ($event, $drResolver, $trackingService): void {
+            DB::transaction(function () use ($event, $drResolver, $trackingService, $deliveredProjection): void {
                 $event = DB::table('logistics_webhook_events')
                     ->where('id', $this->eventRowId)
                     ->lockForUpdate()
@@ -85,6 +88,8 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
                     throw new RuntimeException('Stored event validation failed.');
                 }
 
+                $projectionOnly = $event->event_type === 'delivery.delivered'
+                    && in_array($event->integration_id, LogisticsDeliveredProjection::INTEGRATIONS, true);
                 $resolution = $drResolver->resolve($event->integration_id, $event->dr_reference);
                 $reconciliationStatus = $resolution['status'];
                 $details = $resolution['reason'];
@@ -135,7 +140,8 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
                             $trackingResult = $trackingService->synchronize(
                                 $event,
                                 (int) $resolution['project_id'],
-                                (string) $resolution['school_id']
+                                (string) $resolution['school_id'],
+                                projectionOnly: $projectionOnly,
                             );
                             $reconciliationStatus = $trackingResult['status'];
                             $details = $trackingResult['details'];
@@ -157,6 +163,10 @@ class ProcessLogisticsWebhookEvent implements ShouldQueue
                         'processed_at' => now(),
                         'updated_at' => now(),
                     ]);
+                if ($projectionOnly && $resolution['status'] === 'resolved') {
+                    $deliveredProjection->reconcile($this->eventRowId, 'Logistics Integration', apply: true);
+                }
+
                 app(DeliveryAuditTrailService::class)->recordWebhookEventByRowId($this->eventRowId);
             }, 3);
 

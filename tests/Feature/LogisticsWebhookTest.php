@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\ReconcileMmcDelivery;
 use App\Jobs\ProcessLogisticsWebhookEvent;
 use App\Services\LogisticsDrResolver;
 use App\Services\LogisticsDrTrackingService;
@@ -46,6 +47,7 @@ class LogisticsWebhookTestCase extends TestCase
                 database_path('migrations/2026_10_13_064633_add_dr_scope_reconciliation_to_logistics_webhook_events_table.php'),
                 database_path('migrations/2026_10_13_064633_create_logistics_webhook_dr_mappings_table.php'),
                 database_path('migrations/2026_10_13_070536_create_logistics_dr_tracking_table.php'),
+                database_path('migrations/2026_10_29_095151_create_delivery_audit_events_table.php'),
             ],
             '--realpath' => true,
             '--force' => true,
@@ -171,7 +173,8 @@ function logisticsWebhookRequest(
     string $body,
     ?string $timestamp = null,
     ?string $signature = null,
-    bool $withAuthentication = true
+    bool $withAuthentication = true,
+    string $integration = 'logistics-test'
 ): TestResponse {
     $timestamp ??= (string) time();
     $headers = [
@@ -180,11 +183,11 @@ function logisticsWebhookRequest(
     ];
 
     if ($withAuthentication) {
-        $headers['HTTP_X_INTEGRATION_KEY_ID'] = 'logistics-test';
+        $headers['HTTP_X_INTEGRATION_KEY_ID'] = $integration;
         $headers['HTTP_X_WEBHOOK_TIMESTAMP'] = $timestamp;
         $headers['HTTP_X_WEBHOOK_SIGNATURE'] = 'v1='.($signature ?? hash_hmac(
             'sha256',
-            "logistics-test\n".$timestamp."\n".$body,
+            $integration."\n".$timestamp."\n".$body,
             'test-secret'
         ));
     }
@@ -806,4 +809,95 @@ it('rolls back inventory and delivery changes if history recording fails', funct
         ->and(DB::table('package_status')->where('status', 'delivered')->exists())->toBeFalse()
         ->and(DB::table('logistics_dr_tracking')->value('logistics_status'))->toBe('logistics_received')
         ->and(DB::table('logistics_webhook_events')->where('external_event_id', $delivered['event_id'])->value('processing_status'))->toBe('received');
+});
+
+it('projects resolved Airspeed delivery events without rewriting the webhook result or completing MMC delivery', function (string $integration, ?int $receivedSequence, string $expectedResult) {
+    config([
+        'logistics-webhooks.keys' => [$integration => 'test-secret'],
+        'logistics-webhooks.integration_scopes' => [$integration => ['project_ids' => [10], 'school_ids' => []]],
+    ]);
+    $deliveryId = insertDeliveryFixture(10, 'school-A', '000123-DR', 'warehouse');
+    prepareLogisticsStockOut($deliveryId);
+
+    if ($receivedSequence !== null) {
+        $received = logisticsWebhookPayload(['sequence' => $receivedSequence]);
+        logisticsWebhookRequest($this, json_encode($received, JSON_THROW_ON_ERROR), integration: $integration)->assertAccepted();
+        processLogisticsWebhookEvent($received['event_id']);
+    }
+
+    $before = collect(['deliveries', 'package_status', 'inventory', 'inventory_history'])
+        ->mapWithKeys(fn (string $table): array => [$table => DB::table($table)->get()->toJson()]);
+
+    $delivered = logisticsWebhookPayload([
+        'event_id' => 'airspeed-delivered',
+        'event_type' => 'delivery.delivered',
+        'occurred_at' => '2026-10-13T14:31:00+08:00',
+    ]);
+    logisticsWebhookRequest($this, json_encode($delivered, JSON_THROW_ON_ERROR), integration: $integration)->assertAccepted();
+    $event = processLogisticsWebhookEvent($delivered['event_id']);
+
+    expect($event->reconciliation_status)->toBe($expectedResult)
+        ->and((int) $event->event_sequence)->toBe(42);
+
+    $this->assertDatabaseHas('logistics_dr_tracking', [
+        'integration_id' => $integration,
+        'project_id' => 10,
+        'school_id' => 'school-A',
+        'dr_reference' => '000123-DR',
+        'logistics_status' => 'delivered',
+        'latest_webhook_event_row_id' => $event->id,
+        'latest_sequence' => 42,
+    ]);
+    $this->assertDatabaseHas('delivery_audit_events', [
+        'event_type' => 'logistics_projection_reconciled',
+        'related_id' => $event->external_event_id,
+    ]);
+
+    foreach ($before as $table => $snapshot) {
+        expect(DB::table($table)->get()->toJson())->toBe($snapshot);
+    }
+})->with([
+    'duplicate sequence' => ['Airspeed', 42, 'duplicate_sequence'],
+    'no received milestone' => ['Airspeed_logistic', null, 'out_of_order'],
+    'valid progression' => ['Airspeed', 41, 'accepted'],
+]);
+
+it('dry runs and reconciles MMC package delivery exactly once without inventory writes', function () {
+    $integration = 'Airspeed';
+    config([
+        'logistics-webhooks.keys' => [$integration => 'test-secret'],
+        'logistics-webhooks.integration_scopes' => [$integration => ['project_ids' => [10], 'school_ids' => []]],
+    ]);
+    $deliveryId = insertDeliveryFixture(10, 'school-A', '000123-DR', 'warehouse');
+    prepareLogisticsStockOut($deliveryId);
+    DB::table('package_status')->where('delivery_id', $deliveryId)->update(['status' => 'released']);
+    $eventId = 'airspeed-repair-event';
+    $payload = logisticsWebhookPayload(['event_id' => $eventId, 'event_type' => 'delivery.delivered']);
+    logisticsWebhookRequest($this, json_encode($payload, JSON_THROW_ON_ERROR), integration: $integration)->assertAccepted();
+    $event = processLogisticsWebhookEvent($eventId);
+    $this->app[Kernel::class]->registerCommand($this->app->make(ReconcileMmcDelivery::class));
+    $arguments = ['integration' => $integration, 'event' => $eventId, 'project' => '10', 'school' => 'school-A', 'dr' => '000123-DR'];
+    $inventory = DB::table('inventory')->get()->toJson();
+    $inventoryHistory = DB::table('inventory_history')->get()->toJson();
+
+    expect(Artisan::call('logistics:reconcile-mmc-delivery', array_replace($arguments, ['school' => 'other'])))->toBe(1);
+    expect(Artisan::call('logistics:reconcile-mmc-delivery', $arguments))->toBe(0);
+    expect(Artisan::call('logistics:reconcile-mmc-delivery', ['--all' => true]))->toBe(0);
+    $this->assertDatabaseMissing('package_status', ['status' => 'delivered']);
+
+    expect(Artisan::call('logistics:reconcile-mmc-delivery', ['--all' => true, '--through-event' => (string) $event->id, '--apply' => true]))->toBe(0);
+    expect(Artisan::call('logistics:reconcile-mmc-delivery', $arguments + ['--apply' => true]))->toBe(0);
+
+    $this->assertDatabaseHas('deliveries', ['delivery_id' => $deliveryId, 'status' => 'delivered', 'delivered_date' => '2026-10-13']);
+    $this->assertDatabaseHas('package_status', ['delivery_id' => $deliveryId, 'status' => 'released']);
+    $this->assertDatabaseHas('delivery_history', [
+        'status' => 'delivered',
+        'previous_status' => 'released',
+        'remarks' => 'MMC package delivery reconciled from confirmed Logistics webhook; event '.$eventId,
+    ]);
+    $this->assertDatabaseCount('delivery_history', 1);
+    expect(DB::table('package_status')->where('status', 'delivered')->count())->toBe(1);
+    expect(DB::table('inventory')->get()->toJson())->toBe($inventory);
+    expect(DB::table('inventory_history')->get()->toJson())->toBe($inventoryHistory);
+    expect((array) DB::table('logistics_webhook_events')->where('id', $event->id)->first())->toBe((array) $event);
 });

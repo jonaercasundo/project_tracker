@@ -150,23 +150,35 @@ class LogisticsDeliveryCompletionService
             if ($packageStatus['status'] !== 'released') {
                 DB::table('package_status')->where('package_status_id', $packageStatus['status_id'])->update(['status' => 'released', 'remarks' => 'Stock Out bypassed by Logistics integration.']);
             }
-            $newStatusId = DB::table('package_status')->insertGetId([
-                'delivery_id' => $packageStatus['delivery']->delivery_id, 'package_id' => $packageStatus['package_id'],
-                'status' => 'delivered', 'remarks' => 'Delivered via authorized Logistics integration.',
-                'delivered_at' => $now, 'delivered_by' => null, 'receiver_name' => 'Logistics Integration',
-            ], 'package_status_id');
-            $deliveryHistoryId = DB::table('delivery_history')->insertGetId([
-                'package_status_id' => $newStatusId, 'user_id' => null, 'status' => 'delivered',
-                'previous_status' => $packageStatus['status'],
-                'remarks' => 'Delivered via authorized Logistics integration; event '.$event->external_event_id,
-                'created_at' => $now, 'updated_at' => $now,
-            ]);
-            app(DeliveryAuditTrailService::class)->recordDeliveryHistoryById((int) $deliveryHistoryId);
+            $this->recordDeliveredPackage(
+                $event,
+                (int) $packageStatus['delivery']->delivery_id,
+                $packageStatus['package_id'],
+                $packageStatus['status'],
+            );
             DB::table('deliveries')->where('delivery_id', $packageStatus['delivery']->delivery_id)->update([
                 'status' => 'delivered', 'delivered_date' => Carbon::parse($now)->toDateString(),
             ]);
         }
 
         return ['status' => 'accepted', 'details' => 'Delivery, Stock Out, inventory history, and package statuses synchronized from the authenticated Logistics event.'];
+    }
+
+    public function recordDeliveredPackage(object $event, int $deliveryId, int $packageId, ?string $previousStatus, bool $manual = false): void
+    {
+        $remarks = $manual ? 'MMC package delivery reconciled from confirmed Logistics webhook' : 'Delivered via authorized Logistics integration';
+        $newStatusId = DB::table('package_status')->insertGetId([
+            'delivery_id' => $deliveryId, 'package_id' => $packageId,
+            'status' => 'delivered',
+            'remarks' => $manual ? $remarks.'; event '.$event->external_event_id : $remarks.'.',
+            'delivered_at' => $event->event_occurred_at, 'delivered_by' => null, 'receiver_name' => 'Logistics Integration',
+        ], 'package_status_id');
+        $deliveryHistoryId = DB::table('delivery_history')->insertGetId([
+            'package_status_id' => $newStatusId, 'user_id' => null, 'status' => 'delivered',
+            'previous_status' => $previousStatus,
+            'remarks' => $remarks.'; event '.$event->external_event_id,
+            'created_at' => $event->event_occurred_at, 'updated_at' => $event->event_occurred_at,
+        ]);
+        app(DeliveryAuditTrailService::class)->recordDeliveryHistoryById((int) $deliveryHistoryId);
     }
 }

@@ -645,12 +645,11 @@ class DeliveryController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $drNos = Delivery::whereIn('delivery_id', $ids)
-            ->pluck('dr_no')
-            ->unique()
-            ->values();
+        $selectedDeliveries = Delivery::query()
+            ->whereIn('delivery_id', $ids)
+            ->get(['delivery_id', 'project_id', 'school_id', 'dr_no', 'keystage_id']);
 
-        if ($drNos->isEmpty()) {
+        if ($selectedDeliveries->isEmpty()) {
             abort(404, 'No deliveries found.');
         }
 
@@ -660,9 +659,31 @@ class DeliveryController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $ids = Delivery::whereIn('dr_no', $drNos)
+        $ids = Delivery::query()
+            ->where(function ($query) use ($selectedDeliveries): void {
+                foreach ($selectedDeliveries as $selectedDelivery) {
+                    $query->orWhere(function ($scope) use ($selectedDelivery): void {
+                        $scope->where('project_id', $selectedDelivery->project_id)
+                            ->where('school_id', $selectedDelivery->school_id)
+                            ->where('dr_no', $selectedDelivery->dr_no);
+
+                        if ($selectedDelivery->keystage_id === null) {
+                            $scope->whereNull('keystage_id');
+                        } else {
+                            $scope->where('keystage_id', $selectedDelivery->keystage_id);
+                        }
+                    });
+                }
+            })
+            ->orderBy('delivery_id')
+            ->get(['delivery_id', 'project_id', 'school_id', 'dr_no', 'keystage_id'])
+            ->unique(fn (Delivery $delivery): string => implode(':', [
+                $delivery->project_id,
+                hash('sha256', (string) $delivery->school_id),
+                hash('sha256', (string) $delivery->dr_no),
+                $delivery->keystage_id ?? 'none',
+            ]))
             ->pluck('delivery_id')
-            ->unique()
             ->values();
 
         /*

@@ -768,7 +768,8 @@ it('leaves the DR pending reconciliation when warehouse stock is insufficient', 
         ->and($event->reconciliation_details)->toContain('Required: 6; available: 5')
         ->and(DB::table('inventory')->value('qty'))->toBe(5)
         ->and(DB::table('inventory_history')->count())->toBe(0)
-        ->and(DB::table('package_status')->where('status', 'delivered')->exists())->toBeFalse()
+        ->and(DB::table('package_status')->where('delivery_id', $deliveryId)->orderByDesc('package_status_id')->value('status'))->toBe('delivered')
+        ->and(DB::table('deliveries')->where('delivery_id', $deliveryId)->value('status'))->toBe('delivered')
         ->and(DB::table('logistics_dr_tracking')->value('logistics_status'))->toBe('delivered');
 });
 

@@ -48,10 +48,36 @@ class LogisticsDeliveryCompletionService
                 ->where('delivery_id', $allocation['delivery']->delivery_id)
                 ->where('package_id', $allocation['package_id'])
                 ->orderByDesc('package_status_id')->lockForUpdate()->first();
-            if ($status === null) {
-                return ['status' => 'ambiguous', 'details' => "Package {$allocation['package_id']} has no status row for this DR."];
+            $packageStatuses[] = [...$allocation, 'status' => strtolower((string) ($status->status ?? '')), 'status_id' => $status === null ? null : (int) $status->package_status_id];
+        }
+
+        $now = $event->event_occurred_at;
+        foreach ($packageStatuses as $packageStatus) {
+            if (in_array($packageStatus['status'], ['delivered', 'accepted'], true)) {
+                continue;
             }
-            $packageStatuses[] = [...$allocation, 'status' => strtolower((string) $status->status), 'status_id' => (int) $status->package_status_id];
+
+            if ($packageStatus['status_id'] === null) {
+                $this->recordDeliveredPackage(
+                    $event,
+                    (int) $packageStatus['delivery']->delivery_id,
+                    $packageStatus['package_id'],
+                    null,
+                );
+            } else {
+                $this->recordDeliveredPackage(
+                    $event,
+                    (int) $packageStatus['delivery']->delivery_id,
+                    $packageStatus['package_id'],
+                    $packageStatus['status'],
+                );
+            }
+        }
+
+        foreach ($deliveries as $delivery) {
+            DB::table('deliveries')->where('delivery_id', $delivery->delivery_id)->update([
+                'status' => 'delivered', 'delivered_date' => Carbon::parse($now)->toDateString(),
+            ]);
         }
 
         $lines = [];
@@ -109,7 +135,6 @@ class LogisticsDeliveryCompletionService
             $inventory[$key] = $row;
         }
 
-        $now = $event->event_occurred_at;
         $batchNo = 'LOGISTICS-'.hash('sha256', $event->external_event_id);
         $running = [];
         foreach ($required as $key => $requirement) {
@@ -141,24 +166,6 @@ class LogisticsDeliveryCompletionService
             if ($quantity !== (int) $inventory[$key]->qty) {
                 DB::table('inventory')->where('inventory_id', $inventory[$key]->inventory_id)->update(['qty' => $quantity, 'inventory_status' => 'Approved']);
             }
-        }
-
-        foreach ($packageStatuses as $packageStatus) {
-            if (in_array($packageStatus['status'], ['delivered', 'accepted'], true)) {
-                continue;
-            }
-            if ($packageStatus['status'] !== 'released') {
-                DB::table('package_status')->where('package_status_id', $packageStatus['status_id'])->update(['status' => 'released', 'remarks' => 'Stock Out bypassed by Logistics integration.']);
-            }
-            $this->recordDeliveredPackage(
-                $event,
-                (int) $packageStatus['delivery']->delivery_id,
-                $packageStatus['package_id'],
-                $packageStatus['status'],
-            );
-            DB::table('deliveries')->where('delivery_id', $packageStatus['delivery']->delivery_id)->update([
-                'status' => 'delivered', 'delivered_date' => Carbon::parse($now)->toDateString(),
-            ]);
         }
 
         return ['status' => 'accepted', 'details' => 'Delivery, Stock Out, inventory history, and package statuses synchronized from the authenticated Logistics event.'];

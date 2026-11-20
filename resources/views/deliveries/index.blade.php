@@ -51,10 +51,6 @@
                 <input type="hidden" name="{{ $filter }}" value="{{ request($filter) }}">
             @endif
         @endforeach
-        <label class="flex items-center gap-2 py-2 font-semibold">
-            <input type="checkbox" id="select-all-drs">
-            Select All
-        </label>
         <label class="grid gap-1 font-semibold">
             Report Type
             <select name="report_type" class="rounded-lg border-slate-200 bg-slate-50 text-sm">
@@ -178,6 +174,12 @@
         </div>
     @else
 
+        <div class="mb-3 flex items-center">
+            <label class="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                <input type="checkbox" id="select-all-drs" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                Select All
+            </label>
+        </div>
         <div class="space-y-5">
             @foreach($grouped_deliveries as $dr_group)
                 @php

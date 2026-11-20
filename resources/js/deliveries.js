@@ -119,25 +119,52 @@
             fillSelect(municipality, municipalities, 'municipality', 'municipality', 'All Municipalities');
         });
 
-        // =========================
-        // SELECT ALL DRs
-        // =========================
-        selectAll?.addEventListener('change', function () {
+        const exportForm = document.getElementById('delivery-export');
+        const exportScope = document.getElementById('delivery-export-scope');
+        const recordSelector = '.delivery-record-checkbox';
 
-            document.querySelectorAll('.dr-checkbox').forEach(cb => {
-                cb.checked = this.checked;
+        function updateCheckbox(checkbox, records) {
+            const checked = Array.from(records).filter(record => record.checked).length;
+            checkbox.checked = checked > 0 && checked === records.length;
+            checkbox.indeterminate = checked > 0 && checked < records.length;
+        }
+
+        function updateSelection() {
+            if (!selectAll || !exportScope) return;
+            const records = document.querySelectorAll(recordSelector);
+            updateCheckbox(selectAll, records);
+
+            const selectedOption = exportScope.querySelector('option[value="selected"]');
+            selectedOption.disabled = !document.querySelector(`${recordSelector}:checked`);
+            if (selectedOption.disabled) exportScope.value = 'filtered';
+        }
+
+        selectAll?.addEventListener('change', () => {
+            document.querySelectorAll(`.dr-checkbox, ${recordSelector}`).forEach(checkbox => {
+                checkbox.checked = selectAll.checked;
+                checkbox.indeterminate = false;
             });
-
+            updateSelection();
         });
 
         document.addEventListener('change', event => {
-            if (!event.target.matches('.dr-checkbox')) return;
-            const all = document.querySelectorAll('.dr-checkbox').length;
-            const checked = document.querySelectorAll('.dr-checkbox:checked').length;
-            if (selectAll) {
-                selectAll.checked = all === checked;
-                selectAll.indeterminate = checked > 0 && checked < all;
+            const checkbox = event.target;
+            if (!checkbox.matches(`.dr-checkbox, ${recordSelector}`)) return;
+            const group = checkbox.closest('[data-delivery-group]');
+            const records = group.querySelectorAll(recordSelector);
+            if (checkbox.matches('.dr-checkbox')) {
+                records.forEach(record => { record.checked = checkbox.checked; });
+            } else {
+                updateCheckbox(group.querySelector('.dr-checkbox'), records);
             }
+            updateSelection();
+        });
+
+        exportForm?.addEventListener('formdata', event => {
+            if (exportScope.value !== 'selected') return;
+            document.querySelectorAll(`${recordSelector}:checked`).forEach(record => {
+                event.formData.append('delivery_ids[]', record.value);
+            });
         });
 
         // =========================
@@ -238,12 +265,14 @@
                 const renderedRecords = renderedPage.getElementById('delivery-records');
                 if (!renderedRecords) throw new Error('Delivery records could not be displayed. Refresh the page and try again.');
                 document.getElementById('delivery-records').innerHTML = renderedRecords.innerHTML;
+                updateSelection();
                 status.textContent = 'Delivery records loaded.';
             } catch (exception) {
                 status.textContent = exception.message;
             }
         }
 
+        updateSelection();
         loadDeliveryPhases();
 
     });

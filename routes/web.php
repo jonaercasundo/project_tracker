@@ -423,6 +423,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         Route::get('/deliveries/tracking', [DeliveryController::class, 'index'])
             ->name('deliveries.tracking');
 
+        Route::post('/deliveries/tracking/export', [DeliveryController::class, 'exportTracking'])
+            ->name('deliveries.tracking.export');
+
         Route::get('/deliveries/pdf', [DeliveryController::class, 'generate'])
             ->name('deliveries.pdf');
 

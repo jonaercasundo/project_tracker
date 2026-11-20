@@ -44,10 +44,36 @@
     @include('deliveries.partials._filters')
     @if(request()->filled('project'))
     <p id="delivery-loading-status" role="status" class="text-xs text-slate-500">Loading delivery summary…</p>
-    <label class="flex items-center gap-2 px-3 py-2 bg-white border rounded-xl text-xs font-semibold">
-        <input type="checkbox" id="select-all-drs">
-        Select All
-    </label>
+    <form id="delivery-export" method="POST" action="{{ route('deliveries.tracking.export') }}" class="flex flex-wrap items-end gap-3 rounded-xl border bg-white p-3 text-xs">
+        @csrf
+        @foreach(['project', 'lot', 'search', 'status', 'region', 'division', 'municipality', 'logistics_status', 'assigned_logistics'] as $filter)
+            @if(request()->filled($filter) && is_scalar(request($filter)))
+                <input type="hidden" name="{{ $filter }}" value="{{ request($filter) }}">
+            @endif
+        @endforeach
+        <label class="flex items-center gap-2 py-2 font-semibold">
+            <input type="checkbox" id="select-all-drs">
+            Select All
+        </label>
+        <label class="grid gap-1 font-semibold">
+            Report Type
+            <select name="report_type" class="rounded-lg border-slate-200 bg-slate-50 text-sm">
+                @foreach(\App\Services\DeliveryTrackingReport::TYPES as $type => $label)
+                    <option value="{{ $type }}">{{ $label }}</option>
+                @endforeach
+            </select>
+        </label>
+        <label class="grid gap-1 font-semibold">
+            Export Scope
+            <select name="scope" id="delivery-export-scope" class="rounded-lg border-slate-200 bg-slate-50 text-sm">
+                <option value="filtered">All filtered records</option>
+                <option value="selected" disabled>Selected records only</option>
+            </select>
+        </label>
+        <button type="submit" class="rounded-lg bg-emerald-700 px-4 py-2 font-bold text-white hover:bg-emerald-800">
+            Export Excel
+        </button>
+    </form>
 
     {{-- SUMMARY CARDS (scoped to the selected project and delivery filters) --}}
     <div id="delivery-summary-cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -169,7 +195,7 @@
                 @endphp
 
                 {{-- DR CARD --}}
-                <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden transition hover:shadow-md">
+                <div data-delivery-group class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden transition hover:shadow-md">
 
                     {{-- DR HEADER --}}
                     <div class="px-5 py-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 bg-slate-50/70 border-b border-slate-100">
@@ -178,7 +204,8 @@
                             <input type="checkbox"
                                 class="w-4 h-4 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dr-checkbox cursor-pointer shrink-0"
                                 value="{{ $dr_group['delivery_id'] }}"
-                                data-school-id="{{ $dr_group['school_id'] }}">
+                                data-school-id="{{ $dr_group['school_id'] }}"
+                                aria-label="Select DR {{ $dr_group['dr_no'] }}">
 
                             <div class="min-w-0">
                                 <div class="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
@@ -279,6 +306,10 @@
                                 {{-- LEFT DETAILS --}}
                                 <div class="space-y-2.5 max-w-3xl min-w-0">
                                     <div class="text-sm font-semibold text-slate-700 flex items-center flex-wrap gap-2">
+                                        <input type="checkbox"
+                                            class="delivery-record-checkbox rounded border-slate-300 text-blue-600"
+                                            value="{{ $d->delivery_id }}"
+                                            aria-label="Select delivery record {{ $d->delivery_id }} for Excel export">
                                         <span class="text-slate-500 font-bold text-xs tracking-wide">
                                             LOT {{ $d->lot_name }}
                                         </span>
@@ -290,6 +321,8 @@
                                             </span>
                                         @endif
                                     </div>
+
+                                    <p class="text-xs text-slate-600">Assigned Logistics: {{ $d->assigned_logistics ?? 'Unassigned' }}</p>
 
                                     <div class="text-xs text-slate-500 leading-relaxed space-y-3">
                                         @forelse($d->packages ?? [] as $pkg)

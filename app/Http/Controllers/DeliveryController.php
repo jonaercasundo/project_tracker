@@ -6,6 +6,7 @@ use App\Models\ARSetting;
 use App\Models\Delivery;
 use App\Models\PackageStatus;
 use App\Services\DeliveryBillingQrCodeService;
+use App\Services\DeliveryTrackingReport;
 use App\Services\ProjectDeliveryProgressService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Dompdf;
@@ -19,7 +20,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use setasign\Fpdi\Fpdi;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DeliveryController extends Controller
 {
@@ -187,10 +191,17 @@ class DeliveryController extends Controller
                 ->header('Cache-Control', 'private, no-store');
         }
 
+        $assignedProviders = DB::table('logistics as provider')
+            ->whereExists(fn (Builder $query) => $query->selectRaw('1')->from('logistics_location')
+                ->whereColumn('logistics_location.logistics_id', 'provider.logistic_id'))
+            ->orderBy('provider.logistic_name')
+            ->get(['provider.logistic_id', 'provider.logistic_name']);
+
         if (! $request->filled('project')) {
             return view('deliveries.index', [
                 'grouped_deliveries' => [],
                 'projects' => $projects,
+                'assignedProviders' => $assignedProviders,
                 'lots' => collect(),
                 'page' => 1,
                 'total_pages' => 0,
@@ -205,6 +216,7 @@ class DeliveryController extends Controller
             return view('deliveries.index', [
                 'grouped_deliveries' => [],
                 'projects' => $projects,
+                'assignedProviders' => $assignedProviders,
                 'lots' => $lots,
                 'page' => 1,
                 'total_pages' => 0,
@@ -222,79 +234,7 @@ class DeliveryController extends Controller
         $page = max(1, (int) $request->get('page', 1));
         $offset = ($page - 1) * $limit;
 
-        // =========================
-        // BASE QUERY (no item joins)
-        // =========================
-        $baseQuery = DB::table('deliveries as d')
-            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
-            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
-            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
-            ->join('school as s', 's.school_id', '=', 'd.school_id');
-
-        // =========================
-        // SEARCH
-        // =========================
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $baseQuery->where(function ($q) use ($search) {
-                $q->where('d.dr_no', 'like', "%{$search}%")
-                    ->orWhere('p.project_name', 'like', "%{$search}%")
-                    ->orWhere('s.school_name', 'like', "%{$search}%")
-                    ->orWhere('l.lot_name', 'like', "%{$search}%");
-            });
-        }
-
-        // =========================
-        // FILTERS
-        // =========================
-        if ($request->filled('status')) {
-            $baseQuery->where('d.status', $request->status);
-        }
-        if ($request->filled('project')) {
-            $baseQuery->where('d.project_id', $request->project);
-        }
-        if ($request->filled('lot')) {
-            $baseQuery->where('d.lot_id', $request->lot);
-        }
-        if ($request->filled('region')) {
-            $baseQuery->where('s.region', $request->region);
-        }
-        if ($request->filled('division')) {
-            $baseQuery->where('s.division', $request->division);
-        }
-        if ($request->filled('municipality')) {
-            $baseQuery->where('s.municipality', $request->municipality);
-        }
-        if (in_array($request->input('logistics_status'), ['pending', 'logistics_received', 'delivered'], true)) {
-            $status = $request->input('logistics_status');
-            $trackingMatch = function (Builder $trackingQuery): void {
-                $trackingQuery->selectRaw('1')
-                    ->from('logistics_dr_tracking as tracking')
-                    ->whereColumn('tracking.project_id', 'd.project_id');
-                if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
-                    $trackingQuery->whereRaw('tracking.school_scope_hash = SHA2(CAST(d.school_id AS BINARY), 256)')
-                        ->whereRaw('tracking.dr_reference_hash = SHA2(CAST(d.dr_no AS BINARY), 256)')
-                        ->whereRaw('BINARY tracking.school_id = BINARY d.school_id')
-                        ->whereRaw('BINARY tracking.dr_reference = BINARY d.dr_no');
-                } else {
-                    $trackingQuery->whereRaw('tracking.school_id = d.school_id COLLATE BINARY')
-                        ->whereRaw('tracking.dr_reference = d.dr_no COLLATE BINARY');
-                }
-            };
-
-            if ($status === 'pending') {
-                if (Schema::hasTable('logistics_dr_tracking')) {
-                    $baseQuery->whereNotExists($trackingMatch);
-                }
-            } elseif (Schema::hasTable('logistics_dr_tracking')) {
-                $baseQuery->whereExists(function (Builder $trackingQuery) use ($trackingMatch, $status): void {
-                    $trackingMatch($trackingQuery);
-                    $trackingQuery->where('tracking.logistics_status', $status);
-                });
-            } else {
-                $baseQuery->whereRaw('1 = 0');
-            }
-        }
+        $baseQuery = $this->trackingQuery($request);
 
         // =========================
         // TOTAL (DISTINCT DR NUMBERS, not delivery rows)
@@ -332,30 +272,7 @@ class DeliveryController extends Controller
         // FULL DATA WITH ITEMS
         // only for paginated DR numbers
         // =========================
-        $rows = DB::table('deliveries as d')
-            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
-            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
-            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
-            ->join('school as s', 's.school_id', '=', 'd.school_id')
-            ->leftJoin('package as pk', function ($join) {
-                $join->where(function ($j) {
-                    $j->whereNotNull('d.keystage_id')
-                        ->whereColumn('pk.keystage_id', '=', 'd.keystage_id');
-                })->orWhere(function ($j) {
-                    $j->whereNull('d.keystage_id')
-                        ->whereColumn('pk.lot_id', '=', 'd.lot_id');
-                });
-            })
-            ->leftJoin('package_content as pc', 'pc.package_id', '=', 'pk.package_id')
-            ->leftJoin('item as i', 'i.item_id', '=', 'pc.item_id')
-            ->leftJoin('package_status as ps', function ($join) {
-                $join->on('ps.delivery_id', '=', 'd.delivery_id')
-                    ->on('ps.package_id', '=', 'pk.package_id')
-                    ->where('ps.package_status_id', '=', DB::table('package_status as history')
-                        ->selectRaw('MAX(history.package_status_id)')
-                        ->whereColumn('history.delivery_id', 'd.delivery_id')
-                        ->whereColumn('history.package_id', 'pk.package_id'));
-            })
+        $rows = $this->trackingPackages(clone $baseQuery)
             ->where(function ($query) use ($drScopes): void {
                 if ($drScopes->isEmpty()) {
                     $query->whereRaw('1 = 0');
@@ -379,6 +296,7 @@ class DeliveryController extends Controller
                 'd.school_id',
                 'd.project_id',
                 'd.package_qty',
+                'provider.logistic_name as assigned_logistics',
                 'p.project_name',
                 's.school_name',
                 's.address',
@@ -530,6 +448,7 @@ class DeliveryController extends Controller
         $viewData = [
             'grouped_deliveries' => $grouped,
             'projects' => $projects,
+            'assignedProviders' => $assignedProviders,
             'lots' => $lots,
             'page' => $page,
             'total_pages' => $total_pages,
@@ -543,6 +462,164 @@ class DeliveryController extends Controller
         }
 
         return view('deliveries.index', $viewData);
+    }
+
+    public function exportTracking(Request $request, DeliveryTrackingReport $report): StreamedResponse
+    {
+        $validated = $request->validate([
+            'project' => ['required', 'integer', 'exists:projects,project_id'],
+            'lot' => ['nullable', 'integer'],
+            'search' => ['nullable', 'string'],
+            'status' => ['nullable', 'string'],
+            'region' => ['nullable', 'string'],
+            'division' => ['nullable', 'string'],
+            'municipality' => ['nullable', 'string'],
+            'logistics_status' => ['nullable', Rule::in(['pending', 'logistics_received', 'delivered'])],
+            'assigned_logistics' => ['nullable', 'regex:/^(unassigned|[1-9][0-9]*)$/D'],
+            'report_type' => ['required', Rule::in(array_keys(DeliveryTrackingReport::TYPES))],
+            'scope' => ['required', Rule::in(['filtered', 'selected'])],
+            'delivery_ids' => ['required_if:scope,selected', 'array', 'min:1'],
+            'delivery_ids.*' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $filters = array_intersect_key($validated, array_flip([
+            'project', 'lot', 'search', 'status', 'region', 'division', 'municipality', 'logistics_status', 'assigned_logistics',
+        ]));
+        $project = DB::table('projects')->where('project_id', $validated['project'])->value('project_name');
+        $filters['project'] = $project;
+        if ($request->filled('lot')) {
+            $filters['lot'] = DB::table('lot')->where('project_id', $validated['project'])
+                ->where('lot_id', $validated['lot'])->value('lot_name') ?? (string) $validated['lot'];
+        }
+        if ($request->filled('assigned_logistics') && $validated['assigned_logistics'] !== 'unassigned') {
+            $filters['assigned_logistics'] = DB::table('logistics')
+                ->where('logistic_id', $validated['assigned_logistics'])->value('logistic_name') ?? (string) $validated['assigned_logistics'];
+        }
+
+        $query = $this->trackingQuery($request);
+        if ($validated['scope'] === 'selected') {
+            $query->whereIntegerInRaw('d.delivery_id', $validated['delivery_ids']);
+        }
+        $generatedAt = now();
+        $type = $validated['report_type'];
+        $name = Str::limit(Str::slug($project), 100, '') ?: 'project-'.$validated['project'];
+        $filename = "Delivery_Report_{$type}_{$name}_".$generatedAt->format('Ymd_His').'.xlsx';
+
+        return response()->streamDownload(function () use ($report, $query, $type, $validated, $filters, $request, $generatedAt): void {
+            $report->write(
+                $query,
+                fn (Builder $deliveries, bool $includeItems) => $this->trackingPackages($deliveries, $includeItems),
+                $type,
+                $validated['scope'],
+                $filters,
+                $request->user()->name,
+                $generatedAt,
+            );
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    private function trackingQuery(Request $request): Builder
+    {
+        $baseQuery = DB::table('deliveries as d')
+            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
+            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
+            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
+            ->join('school as s', 's.school_id', '=', 'd.school_id')
+            ->leftJoin('logistics_location as ll', 'll.logistics_location_id', '=', 'd.logistics_location_id')
+            ->leftJoin('logistics as provider', 'provider.logistic_id', '=', 'll.logistics_id');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $baseQuery->where(function ($q) use ($search) {
+                $q->where('d.dr_no', 'like', "%{$search}%")
+                    ->orWhere('p.project_name', 'like', "%{$search}%")
+                    ->orWhere('s.school_name', 'like', "%{$search}%")
+                    ->orWhere('l.lot_name', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $baseQuery->where('d.status', $request->status);
+        }
+        if ($request->filled('project')) {
+            $baseQuery->where('d.project_id', $request->project);
+        }
+        if ($request->filled('lot')) {
+            $baseQuery->where('d.lot_id', $request->lot);
+        }
+        if ($request->filled('region')) {
+            $baseQuery->where('s.region', $request->region);
+        }
+        if ($request->filled('division')) {
+            $baseQuery->where('s.division', $request->division);
+        }
+        if ($request->filled('municipality')) {
+            $baseQuery->where('s.municipality', $request->municipality);
+        }
+        if (in_array($request->input('logistics_status'), ['pending', 'logistics_received', 'delivered'], true)) {
+            $status = $request->input('logistics_status');
+            $trackingMatch = function (Builder $trackingQuery): void {
+                $trackingQuery->selectRaw('1')
+                    ->from('logistics_dr_tracking as tracking')
+                    ->whereColumn('tracking.project_id', 'd.project_id');
+                if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+                    $trackingQuery->whereRaw('tracking.school_scope_hash = SHA2(CAST(d.school_id AS BINARY), 256)')
+                        ->whereRaw('tracking.dr_reference_hash = SHA2(CAST(d.dr_no AS BINARY), 256)')
+                        ->whereRaw('BINARY tracking.school_id = BINARY d.school_id')
+                        ->whereRaw('BINARY tracking.dr_reference = BINARY d.dr_no');
+                } else {
+                    $trackingQuery->whereRaw('tracking.school_id = d.school_id COLLATE BINARY')
+                        ->whereRaw('tracking.dr_reference = d.dr_no COLLATE BINARY');
+                }
+            };
+
+            if ($status === 'pending') {
+                if (Schema::hasTable('logistics_dr_tracking')) {
+                    $baseQuery->whereNotExists($trackingMatch);
+                }
+            } elseif (Schema::hasTable('logistics_dr_tracking')) {
+                $baseQuery->whereExists(function (Builder $trackingQuery) use ($trackingMatch, $status): void {
+                    $trackingMatch($trackingQuery);
+                    $trackingQuery->where('tracking.logistics_status', $status);
+                });
+            } else {
+                $baseQuery->whereRaw('1 = 0');
+            }
+        }
+
+        if ($request->input('assigned_logistics') === 'unassigned') {
+            $baseQuery->whereNull('provider.logistic_id');
+        } elseif ($request->filled('assigned_logistics')) {
+            $providerId = filter_var($request->input('assigned_logistics'), FILTER_VALIDATE_INT);
+            $baseQuery->where('provider.logistic_id', $providerId === false ? 0 : $providerId);
+        }
+
+        return $baseQuery;
+    }
+
+    private function trackingPackages(Builder $query, bool $includeItems = true): Builder
+    {
+        return $query
+            ->leftJoin('package as pk', function ($join) {
+                $join->where(function ($j) {
+                    $j->whereNotNull('d.keystage_id')
+                        ->whereColumn('pk.keystage_id', '=', 'd.keystage_id');
+                })->orWhere(function ($j) {
+                    $j->whereNull('d.keystage_id')
+                        ->whereColumn('pk.lot_id', '=', 'd.lot_id');
+                });
+            })
+            ->when($includeItems, fn (Builder $query) => $query
+                ->leftJoin('package_content as pc', 'pc.package_id', '=', 'pk.package_id')
+                ->leftJoin('item as i', 'i.item_id', '=', 'pc.item_id'))
+            ->leftJoin('package_status as ps', function ($join) {
+                $join->on('ps.delivery_id', '=', 'd.delivery_id')
+                    ->on('ps.package_id', '=', 'pk.package_id')
+                    ->where('ps.package_status_id', '=', DB::table('package_status as history')
+                        ->selectRaw('MAX(history.package_status_id)')
+                        ->whereColumn('history.delivery_id', 'd.delivery_id')
+                        ->whereColumn('history.package_id', 'pk.package_id'));
+            });
     }
 
     /** @param array<string, mixed> $filters @return array{total_pending: int, total_stock_out: int, total_delivered: int, total_collection: int, total_billed: int} */

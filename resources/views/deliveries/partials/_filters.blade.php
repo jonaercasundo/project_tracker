@@ -275,6 +275,21 @@
             </select>
         </div>
 
+        <div>
+            <label for="assigned-logistics" class="block text-xs font-semibold text-slate-600 mb-1">
+                Assigned Logistics
+            </label>
+            <select id="assigned-logistics" name="assigned_logistics" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+                <option value="">All Assigned Logistics</option>
+                <option value="unassigned" @selected(request('assigned_logistics') === 'unassigned')>Unassigned</option>
+                @foreach($assignedProviders as $provider)
+                    <option value="{{ $provider->logistic_id }}" @selected(request('assigned_logistics') == $provider->logistic_id)>
+                        {{ $provider->logistic_name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
         {{-- Logistics Status --}}
         <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">

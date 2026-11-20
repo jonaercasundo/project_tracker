@@ -15,9 +15,6 @@
         const municipality = container.querySelector('#municipality');
         let previousProjectValue = project?.value || '';
         
-        // This checkbox is OUTSIDE #filter-container
-        const selectAll = document.getElementById('select-all-drs');
-
         function fillSelect(select, data, valueField, textField, placeholder) {
             if (!select) return;
             const options = [`<option value="">${placeholder}</option>`];
@@ -130,6 +127,7 @@
         }
 
         function updateSelection() {
+            const selectAll = document.getElementById('select-all-drs');
             if (!selectAll || !exportScope) return;
             const records = document.querySelectorAll(recordSelector);
             updateCheckbox(selectAll, records);
@@ -139,9 +137,10 @@
             if (selectedOption.disabled) exportScope.value = 'filtered';
         }
 
-        selectAll?.addEventListener('change', () => {
+        document.addEventListener('change', event => {
+            if (event.target.id !== 'select-all-drs') return;
             document.querySelectorAll(`.dr-checkbox, ${recordSelector}`).forEach(checkbox => {
-                checkbox.checked = selectAll.checked;
+                checkbox.checked = event.target.checked;
                 checkbox.indeterminate = false;
             });
             updateSelection();

@@ -155,21 +155,7 @@
         <div class="space-y-5">
             @foreach($grouped_deliveries as $dr_group)
                 @php
-                    // Determine this DR's overall status
-                    $drStatuses = [];
-                    foreach ($dr_group['deliveries'] as $delivery) {
-                        foreach ($delivery->packages ?? [] as $pkg) {
-                            $drStatuses[] = strtolower($pkg['status']);
-                        }
-                    }
-
-                    if (empty($drStatuses)) {
-                        $drOverallStatus = null;
-                    } elseif (count(array_unique($drStatuses)) === 1) {
-                        $drOverallStatus = $drStatuses[0];
-                    } else {
-                        $drOverallStatus = 'mixed';
-                    }
+                    $drOverallStatus = $dr_group['overall_status'];
 
                     // Badge styles now include a dot color + richer states
                     $drStatusStyles = [
@@ -231,7 +217,8 @@
                             @endif
 
                             @php
-                                $logisticsStatus = $dr_group['logistics']['status'] ?? null;
+                                $logisticsStatus = $dr_group['logistics']['status']
+                                    ?? ($drOverallStatus === 'delivered' ? 'delivered' : null);
                                 $logisticsStyles = [
                                     'logistics_received' => 'border-blue-200 bg-blue-50 text-blue-700',
                                     'delivered' => 'border-emerald-200 bg-emerald-50 text-emerald-700',

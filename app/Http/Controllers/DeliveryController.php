@@ -350,7 +350,11 @@ class DeliveryController extends Controller
             ->leftJoin('item as i', 'i.item_id', '=', 'pc.item_id')
             ->leftJoin('package_status as ps', function ($join) {
                 $join->on('ps.delivery_id', '=', 'd.delivery_id')
-                    ->on('ps.package_id', '=', 'pk.package_id');
+                    ->on('ps.package_id', '=', 'pk.package_id')
+                    ->where('ps.package_status_id', '=', DB::table('package_status as history')
+                        ->selectRaw('MAX(history.package_status_id)')
+                        ->whereColumn('history.delivery_id', 'd.delivery_id')
+                        ->whereColumn('history.package_id', 'pk.package_id'));
             })
             ->where(function ($query) use ($drScopes): void {
                 if ($drScopes->isEmpty()) {

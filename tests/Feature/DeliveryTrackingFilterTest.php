@@ -271,6 +271,34 @@ it('accepts a project without a year', function (): void {
         ->assertDontSee('DR #DR-B-01');
 });
 
+it('shows the latest status on tracked delivery package items', function (): void {
+    DB::table('package')->insert([
+        ['package_id' => 21, 'lot_id' => 1],
+        ['package_id' => 22, 'lot_id' => 1],
+        ['package_id' => 23, 'lot_id' => 1],
+    ]);
+    DB::table('item')->insert(['item_id' => 31, 'item_name' => 'Workbook']);
+    DB::table('package_content')->insert(['package_id' => 21, 'item_id' => 31, 'qty' => 3]);
+    DB::table('package_status')->insert([
+        ['delivery_id' => 1, 'package_id' => 21, 'status' => 'released'],
+        ['delivery_id' => 1, 'package_id' => 21, 'status' => 'delivered'],
+        ['delivery_id' => 2, 'package_id' => 21, 'status' => 'released'],
+        ['delivery_id' => 1, 'package_id' => 22, 'status' => 'released'],
+    ]);
+
+    $packages = [];
+    View::composer('deliveries.index', function (BladeView $view) use (&$packages): void {
+        $receipt = array_values($view->getData()['grouped_deliveries'])[0];
+        $packages = array_values($receipt['deliveries'])[0]->packages;
+    });
+
+    $response = $this->getJson('/deliveries/tracking?project=1&search=DR-A-01&phase=records');
+
+    $response->assertOk();
+    expect($response->json('html'))->toContain('Workbook (3)');
+    expect(array_column($packages, 'status'))->toBe(['delivered', 'released', 'pending']);
+});
+
 it('renders each package once per receipt when statuses repeat and delivery scopes overlap', function (): void {
     Schema::create('AR_settings', function (Blueprint $table): void {
         $table->unsignedInteger('project_id');
@@ -327,7 +355,28 @@ it('renders each package once per receipt when statuses repeat and delivery scop
     expect(DB::table('package_status')->where('delivery_id', 2)->where('package_id', 21)->count())->toBe(2);
 });
 
-it('filters logistics status by the exact project school and delivery reference', function (string $status, array $expectedReferences): void {
+it('shows logistics delivered when every package is delivered without partner tracking', function (): void {
+    DB::table('package')->insert([
+        ['package_id' => 21, 'lot_id' => 1],
+        ['package_id' => 22, 'lot_id' => 1],
+    ]);
+    DB::table('package_status')->insert([
+        ['delivery_id' => 1, 'package_id' => 21, 'status' => 'delivered'],
+        ['delivery_id' => 1, 'package_id' => 22, 'status' => 'delivered'],
+    ]);
+
+    $response = $this->getJson('/deliveries/tracking?'.http_build_query([
+        'project' => 1,
+        'search' => 'DR-A-01',
+        'phase' => 'records',
+    ]));
+
+    $response->assertOk();
+    expect($response->json('html'))->toContain('DR #DR-A-01', 'LOGISTICS DELIVERED')
+        ->not->toContain('PENDING LOGISTICS');
+});
+
+it('filters logistics status by the exact project school and delivery reference', function (string $status, array $expectedReferences, string $expectedBadge): void {
     Schema::create('logistics_integrations', function (Blueprint $table): void {
         $table->string('integration_id')->primary();
         $table->string('name');
@@ -362,16 +411,23 @@ it('filters logistics status by the exact project school and delivery reference'
         ]);
     }
 
-    $response = $this->get('/deliveries/tracking?'.http_build_query([
+    $references = [];
+    View::composer('deliveries.index', function (BladeView $view) use (&$references): void {
+        $references = array_column($view->getData()['grouped_deliveries'], 'dr_no');
+    });
+
+    $response = $this->getJson('/deliveries/tracking?'.http_build_query([
         'project' => 1,
         'logistics_status' => $status,
         'per_page' => 20,
+        'phase' => 'records',
     ]));
 
     $response->assertOk();
-    expect(array_column($response->viewData('grouped_deliveries'), 'dr_no'))->toBe($expectedReferences);
+    expect($references)->toBe($expectedReferences);
+    expect($response->json('html'))->toContain($expectedBadge);
 })->with([
-    'received' => ['logistics_received', ['DR-A-01']],
-    'delivered' => ['delivered', ['DR-A-02']],
-    'pending' => ['pending', ['DR-A-03', 'DR-A-04', 'DR-A-05', 'DR-A-06', 'DR-A-07', 'DR-A-08', 'DR-A-09', 'DR-A-10', 'DR-A-11']],
+    'received' => ['logistics_received', ['DR-A-01'], 'LOGISTICS RECEIVED'],
+    'delivered' => ['delivered', ['DR-A-02'], 'LOGISTICS DELIVERED'],
+    'pending' => ['pending', ['DR-A-03', 'DR-A-04', 'DR-A-05', 'DR-A-06', 'DR-A-07', 'DR-A-08', 'DR-A-09', 'DR-A-10', 'DR-A-11'], 'PENDING LOGISTICS'],
 ]);

@@ -92,7 +92,7 @@
                 input-id="dashboard-project-input"
                 all-label="All Projects"
                 rounded="rounded-xl"
-                wrapper-class="min-w-0 space-y-1 text-xs font-semibold text-slate-600"
+                wrapper-class="min-w-0 space-y-1 text-xs font-semibold text-slate-600 lg:col-span-3"
                 label-class="mb-1 block text-xs font-semibold text-slate-600"
             />
         </div>

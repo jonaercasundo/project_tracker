@@ -247,6 +247,18 @@
                                 <p class="text-4xl font-black tabular-nums text-slate-900">{{ number_format($widgetValues[$widgetKey] ?? 0) }}</p>
                                 <p class="mt-1 text-xs text-slate-500">Current system total</p>
                             </div>
+                        @elseif($widget['kind'] === 'summary')
+                            <div class="grid min-h-40 grid-cols-2 gap-3 px-4 py-5">
+                                @foreach($widgetValues[$widgetKey] ?? [] as $summaryRow)
+                                    <div class="rounded-lg bg-slate-50 px-3 py-2.5">
+                                        <p class="text-[11px] font-medium text-slate-500">{{ $summaryRow['label'] }}</p>
+                                        <p class="mt-1 text-xl font-black tabular-nums text-slate-900">{{ $summaryRow['value'] === null ? '—' : number_format((int) $summaryRow['value']) }}</p>
+                                    </div>
+                                @endforeach
+                                @if($widgetKey === 'billing_document_status' && ! empty($widgetValues['billing_document_status_notice']))
+                                    <p class="col-span-2 self-center text-center text-xs text-amber-700">Billing source is currently unavailable.</p>
+                                @endif
+                            </div>
                         @elseif(($widgetSettings['chart'] ?? 'bar') === 'doughnut')
                             <div class="flex min-h-40 items-center gap-6 px-5 py-5">
                                 <div class="relative h-28 w-28 shrink-0 rounded-full" style="background: {{ $chartBackground }}">
@@ -290,6 +302,9 @@
                                 @endforelse
                             </div>
                         @endif
+                        <footer class="border-t border-slate-100 px-4 py-2">
+                            <a href="{{ route($widget['route']) }}" class="text-xs font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900">Open module</a>
+                        </footer>
                     </article>
                 @endforeach
             </div>
@@ -312,7 +327,12 @@
                     <div>
                         <h3 class="mb-1 text-sm font-bold text-slate-700">Available widgets</h3>
                         <div class="h-64 space-y-2 overflow-y-auto rounded-lg border border-slate-300 p-2">
-                            @foreach(['Projects' => ['project_status'], 'Deliveries' => ['delivery_status', 'delivered_assets']] as $category => $widgetKeys)
+                            @foreach([
+                                'Projects' => ['project_status', 'project_monitoring', 'lifecycle_monitoring'],
+                                'Deliveries' => ['delivery_status', 'delivered_assets', 'tracking_deliveries', 'delivery_monitoring'],
+                                'Billing' => ['billing_document_status'],
+                                'Inventory' => ['inventory_monitoring'],
+                            ] as $category => $widgetKeys)
                                 <details open class="rounded-md">
                                     <summary class="cursor-pointer px-1 py-1 text-sm font-bold text-slate-800">{{ $category }}</summary>
                                     <div class="space-y-1 border-l border-blue-200 pl-3">

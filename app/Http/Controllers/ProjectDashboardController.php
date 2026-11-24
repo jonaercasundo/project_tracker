@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\ProjectLifecycleTask;
+use App\Models\ProjectLifecycleTrack;
 use App\Models\UserDashboard;
 use App\Services\BillingDocumentStatusService;
+use App\Services\ProjectDeliveryProgressService;
 use App\Services\ProjectDrProgressReportService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
@@ -20,9 +23,15 @@ use Illuminate\Validation\Rule;
 class ProjectDashboardController extends Controller
 {
     private const WIDGETS = [
-        'delivered_assets' => ['label' => 'Delivered assets', 'kind' => 'metric'],
-        'project_status' => ['label' => 'Project status', 'kind' => 'chart'],
-        'delivery_status' => ['label' => 'Delivery status', 'kind' => 'chart'],
+        'project_status' => ['label' => 'Project status', 'kind' => 'chart', 'route' => 'projects.index'],
+        'project_monitoring' => ['label' => 'Project monitoring', 'kind' => 'summary', 'route' => 'projects.index'],
+        'lifecycle_monitoring' => ['label' => 'Lifecycle monitoring', 'kind' => 'summary', 'route' => 'operations.lifecycle.index'],
+        'delivery_status' => ['label' => 'Delivery status', 'kind' => 'chart', 'route' => 'deliveries.tracking'],
+        'delivered_assets' => ['label' => 'Delivered assets', 'kind' => 'metric', 'route' => 'deliveries.tracking'],
+        'tracking_deliveries' => ['label' => 'Tracking deliveries', 'kind' => 'summary', 'route' => 'deliveries.tracking'],
+        'delivery_monitoring' => ['label' => 'Delivery monitoring', 'kind' => 'summary', 'route' => 'deliveries.monitoring'],
+        'billing_document_status' => ['label' => 'Billing document status', 'kind' => 'summary', 'route' => 'projects.reports.analytics'],
+        'inventory_monitoring' => ['label' => 'Inventory monitoring', 'kind' => 'summary', 'route' => 'inventory.balances'],
     ];
 
     public function reportsAnalytics(Request $request, BillingDocumentStatusService $billingDocumentStatus, ProjectDrProgressReportService $drProgressReport): View
@@ -115,8 +124,11 @@ class ProjectDashboardController extends Controller
         ])->header('Cache-Control', 'no-store, private');
     }
 
-    public function index(Request $request): View
-    {
+    public function index(
+        Request $request,
+        ProjectDeliveryProgressService $deliveryProgress,
+        BillingDocumentStatusService $billingDocumentStatus,
+    ): View {
         $filters = $request->validate([
             'dashboard_id' => ['nullable', 'integer'],
             'search' => ['nullable', 'string', 'max:255'],
@@ -180,6 +192,14 @@ class ProjectDashboardController extends Controller
                 ->map(fn ($row): array => ['label' => (string) ($row->status ?: 'Unassigned'), 'value' => (int) $row->total])
                 ->all();
         }
+        if (isset($selectedWidgets['project_monitoring'])) {
+            $widgetValues['project_monitoring'] = [
+                ['label' => 'Projects in scope', 'value' => $totalProjects],
+                ['label' => 'Pending projects', 'value' => $pendingProjects],
+                ['label' => 'Implementation / ongoing', 'value' => (clone $projectQuery)->whereIn('status', ['Implementation', 'Ongoing'])->count()],
+                ['label' => 'Completed projects', 'value' => (clone $projectQuery)->where('status', 'Completed')->count()],
+            ];
+        }
         if (isset($selectedWidgets['delivery_status'])) {
             $widgetValues['delivery_status'] = (clone $deliveryQuery)
                 ->select('d.status as status', DB::raw('COUNT(*) AS total'))
@@ -188,6 +208,99 @@ class ProjectDashboardController extends Controller
                 ->get()
                 ->map(fn ($row): array => ['label' => (string) ($row->status ?: 'Unassigned'), 'value' => (int) $row->total])
                 ->all();
+        }
+        if (isset($selectedWidgets['tracking_deliveries'])) {
+            $trackingSummary = (clone $deliveryQuery)
+                ->selectRaw('COUNT(DISTINCT d.delivery_id) as total')
+                ->selectRaw("COUNT(DISTINCT CASE WHEN d.status = 'delivered' THEN d.delivery_id END) as delivered")
+                ->selectRaw("COUNT(DISTINCT CASE WHEN d.status = 'pending' THEN d.delivery_id END) as pending")
+                ->first();
+            $widgetValues['tracking_deliveries'] = [
+                ['label' => 'Delivery records', 'value' => (int) ($trackingSummary->total ?? 0)],
+                ['label' => 'Delivered', 'value' => (int) ($trackingSummary->delivered ?? 0)],
+                ['label' => 'Pending', 'value' => (int) ($trackingSummary->pending ?? 0)],
+            ];
+        }
+        if (isset($selectedWidgets['delivery_monitoring'])) {
+            $progressFilters = ['active_only' => false, 'compact' => true, 'defer_lot_billing' => true];
+            foreach (['lot' => 'lot_id', 'region' => 'region', 'division' => 'division', 'municipality' => 'municipality'] as $filter => $progressFilter) {
+                if (! empty($filters[$filter])) {
+                    $progressFilters[$progressFilter] = $filters[$filter];
+                }
+            }
+            if (! empty($filters['project']) || $deliveryScopedFilters !== []) {
+                $progressFilters['project_ids'] = (clone $projectQuery)->select('project_id')->pluck('project_id')->map(fn ($projectId): int => (int) $projectId)->all();
+            }
+            $progressSummary = $deliveryProgress->report($progressFilters)['summary'];
+            $widgetValues['delivery_monitoring'] = [
+                ['label' => 'Projects', 'value' => (int) ($progressSummary['projects_count'] ?? 0)],
+                ['label' => 'Pending deliveries', 'value' => (int) ($progressSummary['pending_deliveries_count'] ?? 0)],
+                ['label' => 'Completed deliveries', 'value' => (int) ($progressSummary['completed_deliveries_count'] ?? 0)],
+            ];
+        }
+        if (isset($selectedWidgets['lifecycle_monitoring'])) {
+            $company = $request->user()->currentCompany();
+            $tracks = ProjectLifecycleTrack::query();
+            if ($company === null) {
+                $tracks->whereRaw('1 = 0');
+            } else {
+                $tracks->where('company_id', $company->company_id);
+            }
+            if (! empty($filters['project'])) {
+                $tracks->where('project_id', $filters['project']);
+            }
+            $openTasks = ProjectLifecycleTask::query()
+                ->where('status', 'open')
+                ->whereHas('track', function ($query) use ($company, $filters): void {
+                    if ($company === null) {
+                        $query->whereRaw('1 = 0');
+                    } else {
+                        $query->where('company_id', $company->company_id);
+                    }
+
+                    if (! empty($filters['project'])) {
+                        $query->where('project_id', $filters['project']);
+                    }
+                });
+            $widgetValues['lifecycle_monitoring'] = [
+                ['label' => 'Tracked records', 'value' => (clone $tracks)->count()],
+                ['label' => 'Open actions', 'value' => (clone $openTasks)->count()],
+                ['label' => 'Overdue actions', 'value' => (clone $tracks)->whereNull('outcome')->whereNotNull('next_action_due_at')->where('next_action_due_at', '<', now())->count()
+                    + (clone $openTasks)->whereNotNull('due_at')->where('due_at', '<', now())->count()],
+            ];
+        }
+        if (isset($selectedWidgets['billing_document_status'])) {
+            $billingProjectId = $filters['project']
+                ?? DB::table('projects')->where('project_name', 'Billing Documentation')->value('project_id')
+                ?? DB::table('projects')->orderBy('project_id')->value('project_id');
+            $billingSummary = $billingProjectId === null
+                ? ['total' => 0, 'processed' => 0, 'remaining' => 0, 'processed_today' => 0, 'source_error' => null]
+                : $billingDocumentStatus->summarize((int) $billingProjectId);
+            $widgetValues['billing_document_status'] = [
+                ['label' => 'Applicable schools', 'value' => $billingSummary['total']],
+                ['label' => 'Processed', 'value' => $billingSummary['processed']],
+                ['label' => 'Remaining', 'value' => $billingSummary['remaining']],
+            ];
+            $widgetValues['billing_document_status_notice'] = $billingSummary['source_error'];
+        }
+        if (isset($selectedWidgets['inventory_monitoring'])) {
+            $inventoryQuery = DB::table('inventory as inventory')
+                ->join('item as items', 'items.item_id', '=', 'inventory.item_id');
+            $historyQuery = DB::table('inventory_history as history')
+                ->join('item as items', 'items.item_id', '=', 'history.item_id');
+            if (! empty($filters['project'])) {
+                $inventoryQuery->where('items.project_id', $filters['project']);
+                $historyQuery->where('items.project_id', $filters['project']);
+            }
+            if (! empty($filters['search'])) {
+                $inventoryQuery->where('items.item_name', 'like', '%'.$filters['search'].'%');
+                $historyQuery->where('items.item_name', 'like', '%'.$filters['search'].'%');
+            }
+            $widgetValues['inventory_monitoring'] = [
+                ['label' => 'Inventory records', 'value' => (clone $inventoryQuery)->count('inventory.inventory_id')],
+                ['label' => 'Stock-in movements', 'value' => (clone $historyQuery)->where('history.change_type', 'stock_in')->count()],
+                ['label' => 'Stock-out movements', 'value' => (clone $historyQuery)->where('history.change_type', 'stock_out')->count()],
+            ];
         }
 
         $projects = DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']);
@@ -226,7 +339,6 @@ class ProjectDashboardController extends Controller
     private function dashboardDeliveriesQuery(array $filters): Builder
     {
         $query = DB::table('deliveries as d')
-            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
             ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
             ->join('projects as p', 'p.project_id', '=', 'd.project_id')
             ->join('school as s', 's.school_id', '=', 'd.school_id')
@@ -359,7 +471,7 @@ class ProjectDashboardController extends Controller
                 'max:80',
                 Rule::unique('user_dashboards', 'name')->where('user_id', $userId)->ignore($dashboardId, 'dashboard_id'),
             ],
-            'widgets' => ['required', 'array', 'min:1', 'max:3'],
+            'widgets' => ['required', 'array', 'min:1', 'max:9'],
             'widgets.*' => ['required', 'string', Rule::in(array_keys(self::WIDGETS))],
             'charts' => ['nullable', 'array'],
             'charts.*' => ['nullable', Rule::in(['doughnut', 'bar', 'column'])],
@@ -376,9 +488,7 @@ class ProjectDashboardController extends Controller
         foreach (array_unique($validated['widgets']) as $widgetKey) {
             $kind = self::WIDGETS[$widgetKey]['kind'];
             $widgets[$widgetKey] = [
-                'chart' => $kind === 'metric'
-                    ? 'number'
-                    : ($validated['charts'][$widgetKey] ?? 'bar'),
+                'chart' => $kind === 'chart' ? ($validated['charts'][$widgetKey] ?? 'bar') : 'number',
             ];
         }
 

@@ -20,6 +20,7 @@
         </div>
     </div>
 
+    @if($dashboardFiltersApplied)
     {{-- STATS MATRIX CARDS --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
@@ -72,10 +73,12 @@
         </div>
 
     </div>
+    @endif
 
     {{-- DASHBOARD DATA FILTERS --}}
     <form method="GET" action="{{ route('projects.dashboard') }}" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <input type="hidden" name="dashboard_id" value="{{ $dashboard->dashboard_id }}">
+        <input type="hidden" name="filters_applied" value="1">
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
             <div class="lg:col-span-3">
                 <label for="dashboard-search" class="mb-1 block text-xs font-semibold text-slate-600">Search</label>
@@ -151,7 +154,11 @@
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-            <p class="text-xs text-slate-500">{{ number_format($filteredDeliveryCount) }} delivery records match these filters.</p>
+            @if($dashboardFiltersApplied)
+                <p class="text-xs text-slate-500">{{ number_format($filteredDeliveryCount) }} delivery records match these filters.</p>
+            @else
+                <p class="text-xs text-slate-500">Choose at least one filter, then apply to display dashboard data.</p>
+            @endif
             <div class="flex items-center gap-2">
                 <a href="{{ route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]) }}" class="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Reset</a>
                 <button type="submit" class="rounded-lg bg-blue-700 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800">Apply Filters</button>
@@ -202,7 +209,7 @@
                 <p class="mt-0.5 text-xs text-slate-500">Choose the metrics and charts shown on each of your dashboards.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <a href="{{ route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">Refresh</a>
+                <a href="{{ route('projects.dashboard', array_merge(request()->query(), ['dashboard_id' => $dashboard->dashboard_id])) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">Refresh</a>
                 <button type="button" @click="openEditor(false)" class="rounded-lg bg-blue-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-800">Choose widgets</button>
             </div>
         </header>
@@ -214,12 +221,13 @@
         <nav class="flex items-center gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 pt-3" aria-label="Your dashboards">
             @foreach($dashboards as $dashboardTab)
                 <div class="flex shrink-0 items-center rounded-t-lg border border-b-0 {{ $dashboardTab->dashboard_id === $dashboard->dashboard_id ? 'border-blue-900 bg-blue-900 text-white' : 'border-slate-200 bg-white text-slate-700' }}">
-                    <a href="{{ route('projects.dashboard', ['dashboard_id' => $dashboardTab->dashboard_id]) }}" @if($dashboardTab->dashboard_id === $dashboard->dashboard_id) aria-current="page" @endif class="px-3 py-2 text-xs font-bold">{{ $dashboardTab->name }}</a>
+                    <a href="{{ route('projects.dashboard', array_merge(request()->query(), ['dashboard_id' => $dashboardTab->dashboard_id])) }}" @if($dashboardTab->dashboard_id === $dashboard->dashboard_id) aria-current="page" @endif class="px-3 py-2 text-xs font-bold">{{ $dashboardTab->name }}</a>
                 </div>
             @endforeach
             <button type="button" @click="openEditor(true)" aria-label="Add dashboard" class="flex h-8 w-9 shrink-0 items-center justify-center rounded-t-lg border border-b-0 border-slate-200 bg-white text-lg font-semibold text-blue-800 transition hover:bg-blue-50">+</button>
         </nav>
 
+        @if($dashboardFiltersApplied)
         <div>
             <div class="grid grid-cols-1 gap-4 bg-blue-50/70 p-4 lg:grid-cols-2">
                 @foreach($dashboardWidgets as $widgetKey => $widgetSettings)
@@ -310,6 +318,12 @@
             </div>
 
         </div>
+        @else
+            <div class="border-b border-slate-200 bg-blue-50/70 px-5 py-12 text-center">
+                <p class="text-sm font-bold text-slate-700">Your dashboard is ready</p>
+                <p class="mt-1 text-xs text-slate-500">Choose one or more filters above and select Apply Filters to load dashboard totals and widgets.</p>
+            </div>
+        @endif
 
         <dialog x-ref="dialog" @click.self="$refs.dialog.close()" aria-labelledby="dashboard-editor-title" class="w-[min(920px,calc(100%-2rem))] max-w-none overflow-hidden rounded-xl border border-slate-200 p-0 shadow-2xl backdrop:bg-slate-950/50">
             <header class="bg-blue-800 px-5 py-3 text-white">

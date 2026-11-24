@@ -131,6 +131,7 @@ class ProjectDashboardController extends Controller
     ): View {
         $filters = $request->validate([
             'dashboard_id' => ['nullable', 'integer'],
+            'filters_applied' => ['nullable', 'in:1'],
             'search' => ['nullable', 'string', 'max:255'],
             'project' => ['nullable', 'integer', 'exists:projects,project_id'],
             'lot' => ['nullable', 'integer', 'exists:lot,lot_id'],
@@ -162,6 +163,11 @@ class ProjectDashboardController extends Controller
         $dashboard = $dashboards->firstWhere('dashboard_id', $request->integer('dashboard_id')) ?? $dashboards->first();
         $selectedWidgets = array_intersect_key($dashboard->widgets ?? [], self::WIDGETS);
         $widgetValues = [];
+        $filterCriteria = array_filter(
+            array_intersect_key($filters, array_flip(['search', 'project', 'lot', 'region', 'division', 'municipality', 'assigned_logistics', 'logistics_status'])),
+            fn ($value): bool => $value !== null && $value !== '',
+        );
+        $filtersApplied = isset($filters['filters_applied']) && $filterCriteria !== [];
         $deliveryScopedFilters = array_filter(
             array_intersect_key($filters, array_flip(['search', 'lot', 'region', 'division', 'municipality', 'assigned_logistics', 'logistics_status'])),
             fn ($value): bool => $value !== null && $value !== '',
@@ -176,14 +182,14 @@ class ProjectDashboardController extends Controller
             $projectQuery->whereIn('project_id', (clone $deliveryQuery)->select('d.project_id')->distinct());
         }
 
-        $totalProjects = (clone $projectQuery)->count();
-        $pendingProjects = (clone $projectQuery)->where('status', 'Pending')->count();
-        $deliveredProjects = (clone $deliveryQuery)->where('d.status', 'delivered')->count();
+        $totalProjects = $filtersApplied ? (clone $projectQuery)->count() : 0;
+        $pendingProjects = $filtersApplied ? (clone $projectQuery)->where('status', 'Pending')->count() : 0;
+        $deliveredProjects = $filtersApplied ? (clone $deliveryQuery)->where('d.status', 'delivered')->count() : 0;
 
-        if (isset($selectedWidgets['delivered_assets'])) {
+        if ($filtersApplied && isset($selectedWidgets['delivered_assets'])) {
             $widgetValues['delivered_assets'] = $deliveredProjects;
         }
-        if (isset($selectedWidgets['project_status'])) {
+        if ($filtersApplied && isset($selectedWidgets['project_status'])) {
             $widgetValues['project_status'] = (clone $projectQuery)
                 ->select('status', DB::raw('COUNT(*) AS total'))
                 ->groupBy('status')
@@ -192,7 +198,7 @@ class ProjectDashboardController extends Controller
                 ->map(fn ($row): array => ['label' => (string) ($row->status ?: 'Unassigned'), 'value' => (int) $row->total])
                 ->all();
         }
-        if (isset($selectedWidgets['project_monitoring'])) {
+        if ($filtersApplied && isset($selectedWidgets['project_monitoring'])) {
             $widgetValues['project_monitoring'] = [
                 ['label' => 'Projects in scope', 'value' => $totalProjects],
                 ['label' => 'Pending projects', 'value' => $pendingProjects],
@@ -200,7 +206,7 @@ class ProjectDashboardController extends Controller
                 ['label' => 'Completed projects', 'value' => (clone $projectQuery)->where('status', 'Completed')->count()],
             ];
         }
-        if (isset($selectedWidgets['delivery_status'])) {
+        if ($filtersApplied && isset($selectedWidgets['delivery_status'])) {
             $widgetValues['delivery_status'] = (clone $deliveryQuery)
                 ->select('d.status as status', DB::raw('COUNT(*) AS total'))
                 ->groupBy('d.status')
@@ -209,7 +215,7 @@ class ProjectDashboardController extends Controller
                 ->map(fn ($row): array => ['label' => (string) ($row->status ?: 'Unassigned'), 'value' => (int) $row->total])
                 ->all();
         }
-        if (isset($selectedWidgets['tracking_deliveries'])) {
+        if ($filtersApplied && isset($selectedWidgets['tracking_deliveries'])) {
             $trackingSummary = (clone $deliveryQuery)
                 ->selectRaw('COUNT(DISTINCT d.delivery_id) as total')
                 ->selectRaw("COUNT(DISTINCT CASE WHEN d.status = 'delivered' THEN d.delivery_id END) as delivered")
@@ -221,7 +227,7 @@ class ProjectDashboardController extends Controller
                 ['label' => 'Pending', 'value' => (int) ($trackingSummary->pending ?? 0)],
             ];
         }
-        if (isset($selectedWidgets['delivery_monitoring'])) {
+        if ($filtersApplied && isset($selectedWidgets['delivery_monitoring'])) {
             $progressFilters = ['active_only' => false, 'compact' => true, 'defer_lot_billing' => true];
             foreach (['lot' => 'lot_id', 'region' => 'region', 'division' => 'division', 'municipality' => 'municipality'] as $filter => $progressFilter) {
                 if (! empty($filters[$filter])) {
@@ -238,7 +244,7 @@ class ProjectDashboardController extends Controller
                 ['label' => 'Completed deliveries', 'value' => (int) ($progressSummary['completed_deliveries_count'] ?? 0)],
             ];
         }
-        if (isset($selectedWidgets['lifecycle_monitoring'])) {
+        if ($filtersApplied && isset($selectedWidgets['lifecycle_monitoring'])) {
             $company = $request->user()->currentCompany();
             $tracks = ProjectLifecycleTrack::query();
             if ($company === null) {
@@ -269,7 +275,7 @@ class ProjectDashboardController extends Controller
                     + (clone $openTasks)->whereNotNull('due_at')->where('due_at', '<', now())->count()],
             ];
         }
-        if (isset($selectedWidgets['billing_document_status'])) {
+        if ($filtersApplied && isset($selectedWidgets['billing_document_status'])) {
             $billingProjectId = $filters['project']
                 ?? DB::table('projects')->where('project_name', 'Billing Documentation')->value('project_id')
                 ?? DB::table('projects')->orderBy('project_id')->value('project_id');
@@ -283,7 +289,7 @@ class ProjectDashboardController extends Controller
             ];
             $widgetValues['billing_document_status_notice'] = $billingSummary['source_error'];
         }
-        if (isset($selectedWidgets['inventory_monitoring'])) {
+        if ($filtersApplied && isset($selectedWidgets['inventory_monitoring'])) {
             $inventoryQuery = DB::table('inventory as inventory')
                 ->join('item as items', 'items.item_id', '=', 'inventory.item_id');
             $historyQuery = DB::table('inventory_history as history')
@@ -322,6 +328,7 @@ class ProjectDashboardController extends Controller
             'dashboards' => $dashboards,
             'dashboard' => $dashboard,
             'dashboardWidgets' => $selectedWidgets,
+            'dashboardFiltersApplied' => $filtersApplied,
             'widgetCatalog' => self::WIDGETS,
             'widgetValues' => $widgetValues,
             'filters' => $filters,
@@ -331,7 +338,7 @@ class ProjectDashboardController extends Controller
             'divisions' => $divisions,
             'municipalities' => $municipalities,
             'assignedProviders' => $assignedProviders,
-            'filteredDeliveryCount' => (clone $deliveryQuery)->count(),
+            'filteredDeliveryCount' => $filtersApplied ? (clone $deliveryQuery)->count() : null,
         ]);
     }
 

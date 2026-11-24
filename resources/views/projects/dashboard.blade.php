@@ -621,19 +621,6 @@
             return { root, url: activeLink?.href || url, initialized: root.isConnected, scroll: null, scrolledElements: [] };
         }
 
-        function clearTabs() {
-            for (const request of requests.values()) {
-                request.controller.abort();
-            }
-            requests.clear();
-            for (const tab of tabs.values()) {
-                if (tab !== activeTab && tab.initialized) {
-                    window.Alpine?.destroyTree(tab.root);
-                }
-            }
-            tabs.clear();
-        }
-
         function displayTab(tab, url, pushHistory, replacing = false) {
             if (tab !== activeTab) {
                 const previous = activeTab;
@@ -751,6 +738,9 @@
                 mode = 'tab';
             }
             const cached = tabs.get(key);
+            if (mode === 'context' && options.method !== 'POST' && cached) {
+                mode = 'tab';
+            }
             const current = navigation;
             if (current?.key === key && current.mode === mode && !current.request.controller.signal.aborted) {
                 return;
@@ -784,7 +774,6 @@
                 }
 
                 if (mode === 'context') {
-                    clearTabs();
                     tabs.set(cacheKey(tab.url), tab);
                 }
                 next.stopLoading?.();

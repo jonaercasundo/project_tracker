@@ -248,7 +248,7 @@
                         }
                         $chartBackground = $chartStops === [] ? '#e2e8f0' : 'conic-gradient('.implode(', ', $chartStops).')';
                     @endphp
-                    <article class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <article class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm {{ $widget['kind'] === 'billing_status' ? 'lg:col-span-2' : '' }}">
                         <header class="flex flex-wrap items-center justify-between gap-3 bg-blue-100/70 px-4 py-3">
                             <h3 class="text-sm font-bold text-slate-800">{{ $widget['label'] }}</h3>
                         </header>
@@ -660,6 +660,8 @@
             if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
                 return;
             }
+
+            form.closest('dialog')?.close();
 
             const submitter = event.submitter;
             if (submitter) {

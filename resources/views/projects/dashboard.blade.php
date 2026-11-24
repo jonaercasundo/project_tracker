@@ -673,7 +673,7 @@
         function showLoading(root, controller, loadingMessage) {
             const loadingOverlay = document.createElement('div');
             loadingOverlay.dataset.dashboardLoading = '';
-            loadingOverlay.className = 'pointer-events-none absolute inset-0 z-[200] flex items-start justify-center rounded-2xl bg-white/65 px-4 pt-24 backdrop-blur-[2px]';
+            loadingOverlay.className = 'absolute inset-0 z-[200] flex items-start justify-center rounded-2xl bg-white/65 px-4 pt-24 backdrop-blur-[2px]';
             loadingOverlay.innerHTML = `<div class="w-full max-w-sm rounded-xl border border-blue-100 bg-white p-5 text-center shadow-xl" role="status" aria-live="polite">
                 <span class="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-700">
                     <svg class="h-6 w-6 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" transform="translate(0 0)"></path></svg>
@@ -684,11 +684,18 @@
                 <button type="button" data-cancel-dashboard-request class="pointer-events-auto mt-4 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
             </div>`;
             loadingOverlay.querySelector('[data-cancel-dashboard-request]').addEventListener('click', () => controller.abort());
+            const backgroundElements = Array.from(root.children);
+            backgroundElements.forEach(element => {
+                element.inert = true;
+            });
             root.append(loadingOverlay);
             root.setAttribute('aria-busy', 'true');
 
             return () => {
                 loadingOverlay.remove();
+                backgroundElements.forEach(element => {
+                    element.inert = false;
+                });
                 root.removeAttribute('aria-busy');
             };
         }

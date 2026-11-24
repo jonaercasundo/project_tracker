@@ -231,7 +231,7 @@
 
         @if($dashboardFiltersApplied)
         <div>
-            <div class="grid grid-cols-1 gap-4 bg-blue-50/70 p-4 lg:grid-cols-2">
+            <div class="grid grid-cols-1 gap-4 bg-blue-50/70 p-4">
                 @foreach($dashboardWidgets as $widgetKey => $widgetSettings)
                     @php
                         $widget = $widgetCatalog[$widgetKey];
@@ -248,7 +248,7 @@
                         }
                         $chartBackground = $chartStops === [] ? '#e2e8f0' : 'conic-gradient('.implode(', ', $chartStops).')';
                     @endphp
-                    <article class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm {{ $widget['kind'] === 'billing_status' ? 'lg:col-span-2' : '' }}">
+                    <article class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                         <header class="flex flex-wrap items-center justify-between gap-3 bg-blue-100/70 px-4 py-3">
                             <h3 class="text-sm font-bold text-slate-800">{{ $widget['label'] }}</h3>
                         </header>

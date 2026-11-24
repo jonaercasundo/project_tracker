@@ -30,6 +30,7 @@ class ProjectDashboardController extends Controller
         'delivered_assets' => ['label' => 'Delivered assets', 'kind' => 'metric', 'route' => 'deliveries.tracking'],
         'tracking_deliveries' => ['label' => 'Tracking deliveries', 'kind' => 'summary', 'route' => 'deliveries.tracking'],
         'delivery_monitoring' => ['label' => 'Delivery monitoring', 'kind' => 'summary', 'route' => 'deliveries.monitoring'],
+        'operational_workflow' => ['label' => 'Operational workflow status', 'kind' => 'pipeline', 'route' => 'deliveries.monitoring'],
         'billing_document_status' => ['label' => 'Billing document status', 'kind' => 'summary', 'route' => 'projects.reports.analytics'],
         'inventory_monitoring' => ['label' => 'Inventory monitoring', 'kind' => 'summary', 'route' => 'inventory.balances'],
     ];
@@ -242,6 +243,27 @@ class ProjectDashboardController extends Controller
                 ['label' => 'Projects', 'value' => (int) ($progressSummary['projects_count'] ?? 0)],
                 ['label' => 'Pending deliveries', 'value' => (int) ($progressSummary['pending_deliveries_count'] ?? 0)],
                 ['label' => 'Completed deliveries', 'value' => (int) ($progressSummary['completed_deliveries_count'] ?? 0)],
+            ];
+        }
+        if ($filtersApplied && isset($selectedWidgets['operational_workflow'])) {
+            $progressFilters = ['active_only' => false, 'defer_lot_billing' => true];
+            foreach (['lot' => 'lot_id', 'region' => 'region', 'division' => 'division', 'municipality' => 'municipality'] as $filter => $progressFilter) {
+                if (! empty($filters[$filter])) {
+                    $progressFilters[$progressFilter] = $filters[$filter];
+                }
+            }
+            if (! empty($filters['project']) || $deliveryScopedFilters !== []) {
+                $progressFilters['project_ids'] = (clone $projectQuery)->select('project_id')->pluck('project_id')->map(fn ($projectId): int => (int) $projectId)->all();
+            }
+            $progressSummary = $deliveryProgress->report($progressFilters)['summary'];
+            $widgetValues['operational_workflow'] = [
+                'project_name' => 'Filtered dashboard scope',
+                'operational_pipeline' => $progressSummary['operational_pipeline'],
+                'overall_progress' => $progressSummary['overall_progress'],
+                'delivered_schools_count' => $progressSummary['delivered_schools_count'],
+                'billing_schools_count' => $progressSummary['billing_schools_count'],
+                'billed_schools_count' => $progressSummary['billed_schools_count'],
+                'data_integrity_flags' => [],
             ];
         }
         if ($filtersApplied && isset($selectedWidgets['lifecycle_monitoring'])) {
@@ -478,7 +500,7 @@ class ProjectDashboardController extends Controller
                 'max:80',
                 Rule::unique('user_dashboards', 'name')->where('user_id', $userId)->ignore($dashboardId, 'dashboard_id'),
             ],
-            'widgets' => ['required', 'array', 'min:1', 'max:9'],
+            'widgets' => ['required', 'array', 'min:1', 'max:10'],
             'widgets.*' => ['required', 'string', Rule::in(array_keys(self::WIDGETS))],
             'charts' => ['nullable', 'array'],
             'charts.*' => ['nullable', Rule::in(['doughnut', 'bar', 'column'])],

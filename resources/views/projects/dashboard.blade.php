@@ -257,6 +257,10 @@
                                 <p class="text-4xl font-black tabular-nums text-slate-900">{{ number_format($widgetValues[$widgetKey] ?? 0) }}</p>
                                 <p class="mt-1 text-xs text-slate-500">Current system total</p>
                             </div>
+                        @elseif($widget['kind'] === 'pipeline')
+                            <div class="px-4 py-5">
+                                @include('operation.delivery.partials.monitoring-pipeline', ['project' => $widgetValues[$widgetKey]])
+                            </div>
                         @elseif($widget['kind'] === 'summary')
                             <div class="grid min-h-40 grid-cols-2 gap-3 px-4 py-5">
                                 @foreach($widgetValues[$widgetKey] ?? [] as $summaryRow)
@@ -345,7 +349,7 @@
                         <div class="h-64 space-y-2 overflow-y-auto rounded-lg border border-slate-300 p-2">
                             @foreach([
                                 'Projects' => ['project_status', 'project_monitoring', 'lifecycle_monitoring'],
-                                'Deliveries' => ['delivery_status', 'delivered_assets', 'tracking_deliveries', 'delivery_monitoring'],
+                                'Deliveries' => ['delivery_status', 'delivered_assets', 'tracking_deliveries', 'delivery_monitoring', 'operational_workflow'],
                                 'Billing' => ['billing_document_status'],
                                 'Inventory' => ['inventory_monitoring'],
                             ] as $category => $widgetKeys)

@@ -136,24 +136,24 @@
                 </div>
             </a>
 
-            {{-- Fixed: this was a dead "#" link styled as fully interactive/clickable.
-                 Now rendered as a clearly disabled card with a "Coming soon" badge
-                 instead of misleading hover affordances. --}}
-            <div class="p-5 bg-slate-50 border border-slate-200/60 rounded-2xl flex flex-col justify-between h-full min-h-[150px] relative overflow-hidden cursor-not-allowed"
-                 aria-disabled="true">
+            <a href="{{ route('logistics-channel.index') }}"
+               class="group p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:border-cyan-500 hover:shadow-md hover:shadow-cyan-500/5 transition-all duration-200 flex flex-col justify-between h-full min-h-[150px] relative overflow-hidden">
+                <div class="absolute top-0 left-0 right-0 h-[3px] bg-cyan-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
                 <div class="flex items-start justify-between">
-                    <div class="w-9 h-9 bg-slate-200 text-slate-400 rounded-xl flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M16.5 18.75a1.5 1.5 0 000-3 1.5 1.5 0 000 3zm0 0h1.5m-13.5-4.5h16.5M5.625 4.5h11.114a1.13 1.13 0 01.8.326l2.091 2.092a1.13 1.13 0 01.326.8v3.207a1.13 1.13 0 01-.326.8l-2.092 2.091a1.13 1.13 0 01-.8.326H5.625a1.125 1.125 0 01-1.125-1.125V5.625A1.125 1.125 0 015.625 4.5z"></path>
+                    <div class="w-9 h-9 bg-cyan-50 text-cyan-700 rounded-xl flex items-center justify-center transition-colors group-hover:bg-cyan-600 group-hover:text-white">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5h11.25v10.125H3zM14.25 10.5h3.3l3.45 3.75v3.375h-6.75zM7.125 20.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5zm10.5 0a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5zM14.25 14.25h6.75"></path>
                         </svg>
                     </div>
-                    <span class="text-[10px] font-bold text-slate-400 bg-slate-200/70 px-2 py-0.5 rounded-full">Coming soon</span>
+                    <svg class="w-4 h-4 text-slate-300 transform group-hover:translate-x-1 group-hover:text-cyan-600 transition-all" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"></path>
+                    </svg>
                 </div>
                 <div class="mt-4">
-                    <h4 class="font-bold text-slate-500 text-sm">Logistics & Fleet</h4>
-                    <p class="text-[11px] text-slate-400 font-normal mt-0.5">Coordinate freight dispatching, route chains, and transit telemetry.</p>
+                    <h4 class="font-bold text-slate-800 text-sm group-hover:text-cyan-700 transition-colors">Logistics &amp; Fleet</h4>
+                    <p class="text-[11px] text-slate-400 font-normal mt-0.5">Manage delivery partners, assigned regions, and shipment tracking.</p>
                 </div>
-            </div>
+            </a>
 
         </div>
     </div>

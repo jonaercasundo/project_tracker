@@ -105,6 +105,8 @@
         </script>
        @stack('scripts')
         <x-ai-assistant />
-        @include('shared.live-updates')
+        @unless (isset($disableLiveUpdates))
+            @include('shared.live-updates')
+        @endunless
     </body>
 </html>

@@ -121,7 +121,7 @@
                     @php
                         $widget = $widgetCatalog[$widgetKey];
                         $widgetRows = $widget['kind'] === 'chart' ? ($widgetValues[$widgetKey] ?? []) : [];
-                        $chartMaximum = max(1, ...array_column($widgetRows, 'value'));
+                        $chartMaximum = max([1, ...array_column($widgetRows, 'value')]);
                         $chartTotal = array_sum(array_column($widgetRows, 'value'));
                         $chartPalette = ['#2563eb', '#059669', '#7c3aed', '#d97706', '#db2777', '#0891b2', '#4f46e5'];
                         $chartStops = [];

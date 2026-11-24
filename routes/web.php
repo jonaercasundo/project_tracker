@@ -219,19 +219,19 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         Route::post('/integrations/mmc-platform', [MmcPlatformIntegrationController::class, 'store'])
             ->name('integrations.mmc-platform.store');
         Route::post('/integrations/mmc-platform/test-connection', [MmcPlatformIntegrationController::class, 'testConnection'])
-            ->middleware('throttle:5,1')
+            ->middleware('throttle:5,1,mmc-platform-test-connection:')
             ->name('integrations.mmc-platform.test-connection');
         Route::get('/integrations/mmc-platform/programs', [MmcPlatformIntegrationController::class, 'programs'])
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,mmc-platform-programs:')
             ->name('integrations.mmc-platform.programs');
         Route::get('/integrations/mmc-platform/connection-check', [MmcPlatformIntegrationController::class, 'checkConfiguredConnection'])
-            ->middleware('throttle:5,1')
+            ->middleware('throttle:5,1,mmc-platform-connection-check:')
             ->name('integrations.mmc-platform.connection-check');
         Route::post('/integrations/mmc-platform/preview-data', [MmcPlatformIntegrationController::class, 'previewData'])
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,mmc-platform-preview:')
             ->name('integrations.mmc-platform.preview-data');
         Route::post('/integrations/mmc-platform/sync', [MmcPlatformIntegrationController::class, 'syncProject'])
-            ->middleware('throttle:3,1')
+            ->middleware('throttle:3,1,mmc-platform-sync:')
             ->name('integrations.mmc-platform.sync');
     });
 

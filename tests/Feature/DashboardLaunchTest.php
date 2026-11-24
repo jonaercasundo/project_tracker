@@ -29,6 +29,18 @@ it('selects the only active company and launches its dashboard', function (strin
         ->assertRedirect(route($destination))->assertSessionHas('company_id', $companyId);
 })->with(['MI' => ['MI', 'mi_app.dashboard'], 'MMC' => ['MMC', 'projects.dashboard']]);
 
+it('renders the MMC dashboard when there are no projects or deliveries', function () {
+    require base_path('tests/Fixtures/jarvis_schema.php');
+    (require database_path('migrations/2026_11_24_033859_create_user_dashboards_table.php'))->up();
+    $user = $this->miUser('user', 'MMC');
+
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->sole()->getKey()])
+        ->get(route('projects.dashboard'))
+        ->assertOk()
+        ->assertSee('Total projects')
+        ->assertSee('No status data is available yet.');
+});
+
 it('restores valid company context from the surviving login session on subsequent requests', function (string $code, string $destination) {
     $user = $this->miUser('user', $code);
     $other = $this->miUser('user', $code === 'MI' ? 'MMC' : 'MI')->companies()->sole();

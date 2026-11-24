@@ -1,4 +1,7 @@
 <x-project_app-layout>
+    @if ($tab === 'api-webhooks')
+        <x-slot name="disableLiveUpdates">true</x-slot>
+    @endif
     <x-slot name="header">
         <div>
             <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Operations / Integrations</p>
@@ -6,7 +9,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" x-data="{ showApiKey: false, previewBusy: false, syncBusy: false, programs: [], selectedProgram: '', sampleLimit: 25, result: null, syncResult: null, connectionState: '', connectionMessage: '' }" x-init="if ({{ $tab === 'api-webhooks' ? 'true' : 'false' }}) $nextTick(() => $refs.testConnection.click())">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" x-data="{ showApiKey: false, previewBusy: false, syncBusy: false, programs: [], selectedProgram: '', sampleLimit: 25, result: null, syncResult: null, connectionState: '', connectionMessage: '' }">
         @if (session('success'))
             <div role="status" aria-live="polite" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('success') }}</div>
         @endif
@@ -107,7 +110,39 @@
                         <p class="mt-1 text-sm text-slate-600">Read-only sample from MMC Platform. Previewed records are not saved to Tracker.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
-                        <button x-ref="testConnection" type="button" @click="previewBusy = true; connectionState = 'loading'; connectionMessage = 'Checking GET /api/v1/programs…'; fetch('{{ route('integrations.mmc-platform.connection-check') }}', {headers:{'Accept':'application/json'}}).then(r => r.json()).then(async d => { if (d.status !== 'success') { connectionState = 'error'; connectionMessage = d.message; return; } connectionState = 'success'; connectionMessage = 'Connection successful. Loading programs…'; const p = await fetch('{{ route('integrations.mmc-platform.programs') }}', {headers:{'Accept':'application/json'}}).then(r => r.json()); if (p.status !== 'success') { connectionMessage = `Connection successful. Programs could not be loaded: ${p.message}`; return; } programs = p.programs; if (!programs.length) { connectionMessage = 'Connection successful, but the endpoint returned no programs.'; } else { selectedProgram = String(programs[0].id); connectionMessage = 'Connection successful. Select a program to preview its data.'; } }).catch(() => { connectionState = 'error'; connectionMessage = 'Could not contact Tracker preview service. Please try again.'; }).finally(() => previewBusy = false)" :disabled="previewBusy" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60">Test Connection</button>
+                        <button type="button" @click="
+                            previewBusy = true;
+                            connectionState = 'loading';
+                            connectionMessage = 'Checking GET /api/v1/programs…';
+                            fetch('{{ route('integrations.mmc-platform.programs') }}', { headers: { Accept: 'application/json' } })
+                                .then(async response => {
+                                    if (response.status === 429) {
+                                        const seconds = Number(response.headers.get('Retry-After'));
+                                        connectionState = 'error';
+                                        connectionMessage = seconds > 0
+                                            ? `Please wait ${seconds} seconds before testing the connection again.`
+                                            : 'Please wait a moment before testing the connection again.';
+                                        return;
+                                    }
+                                    const data = await response.json();
+                                    if (!response.ok || data.status !== 'success') {
+                                        connectionState = 'error';
+                                        connectionMessage = data.message || 'Could not test the connection. Please try again.';
+                                        return;
+                                    }
+                                    programs = data.programs;
+                                    selectedProgram = programs.length ? String(programs[0].id) : '';
+                                    connectionState = 'success';
+                                    connectionMessage = programs.length
+                                        ? 'Connection successful. Select a program to preview its data.'
+                                        : 'Connection successful, but the endpoint returned no programs.';
+                                })
+                                .catch(() => {
+                                    connectionState = 'error';
+                                    connectionMessage = 'Could not contact Tracker preview service. Please try again.';
+                                })
+                                .finally(() => previewBusy = false)
+                        " :disabled="previewBusy" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60">Test Connection</button>
                         <span x-show="connectionState" :role="connectionState === 'error' ? 'alert' : 'status'" class="text-sm" :class="connectionState === 'error' ? 'text-rose-700' : (connectionState === 'success' ? 'font-semibold text-emerald-700' : 'text-slate-600')" x-text="connectionMessage"></span>
                     </div>
                     <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto_auto] sm:items-end">

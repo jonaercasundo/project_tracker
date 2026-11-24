@@ -45,6 +45,8 @@ it('shows the configuration screen in the MMC user workspace only', function () 
     $this->get(route('integrations.mmc-platform.index', ['tab' => 'api-webhooks']))
         ->assertOk()
         ->assertSee('Data Preview')
+        ->assertDontSee('data-live-update-status', false)
+        ->assertDontSee('$refs.testConnection.click()', false)
         ->assertSee('HTTP status · requested endpoint')
         ->assertSee('max="2000"', false);
 
@@ -55,6 +57,21 @@ it('shows the configuration screen in the MMC user workspace only', function () 
     $miMember = $this->miUser('user', 'MI');
     $this->actingAs($miMember)->withSession(['company_id' => $miMember->companies()->sole()->getKey()]);
     $this->get(route('integrations.mmc-platform.index'))->assertForbidden();
+});
+
+it('limits connection checks without blocking the preview endpoint', function () {
+    Http::fake(['*' => Http::response(['data' => []])]);
+    mmcPlatformUser();
+
+    $connectionCheck = route('integrations.mmc-platform.connection-check');
+    for ($attempt = 0; $attempt < 5; $attempt++) {
+        $this->getJson($connectionCheck)->assertOk();
+    }
+
+    $this->getJson($connectionCheck)->assertTooManyRequests();
+    $this->postJson(route('integrations.mmc-platform.preview-data'))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('program_id');
 });
 
 it('stores the API key encrypted and never renders it back to the page', function () {

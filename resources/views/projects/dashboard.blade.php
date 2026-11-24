@@ -160,7 +160,42 @@
     </form>
 
     {{-- PERSONAL DASHBOARDS --}}
-    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="personal-dashboard-title">
+    <section x-data="{
+        creating: false,
+        activeIndex: 0,
+        selected: @js(array_keys($dashboardWidgets)),
+        selectedCharts: @js(collect($dashboardWidgets)->map(fn ($settings) => $settings['chart'] ?? 'bar')->all()),
+        widgetDefinitions: @js($widgetCatalog),
+        createAction: @js(route('projects.dashboards.store')),
+        updateAction: @js(route('projects.dashboards.update', $dashboard->dashboard_id)),
+        deleteAction: @js(route('projects.dashboards.destroy', $dashboard->dashboard_id)),
+        canDelete: @js(! $dashboard->is_default),
+        tabName: @js($dashboard->name),
+        openEditor(create) {
+            this.creating = create;
+            this.tabName = create ? '' : @js($dashboard->name);
+            this.selected = create ? ['project_status'] : @js(array_keys($dashboardWidgets));
+            this.activeIndex = 0;
+            this.selectedCharts = create ? { project_status: 'bar' } : @js(collect($dashboardWidgets)->map(fn ($settings) => $settings['chart'] ?? 'bar')->all());
+            this.$refs.form.action = create ? this.createAction : this.updateAction;
+            this.$refs.method.disabled = create;
+            this.$refs.dialog.showModal();
+        },
+        toggleWidget(key, checked) {
+            this.selected = checked ? [...this.selected, key] : this.selected.filter((selectedKey) => selectedKey !== key);
+            this.activeIndex = Math.max(0, Math.min(this.activeIndex, this.selected.length - 1));
+            if (checked && this.widgetDefinitions[key].kind === 'chart' && ! this.selectedCharts[key]) {
+                this.selectedCharts[key] = 'bar';
+            }
+        },
+        moveWidget(index, direction) {
+            const target = index + direction;
+            if (target < 0 || target >= this.selected.length) return;
+            const [widget] = this.selected.splice(index, 1);
+            this.selected.splice(target, 0, widget);
+            this.activeIndex = target;
+        }
+    }" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="personal-dashboard-title">
         <header class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h2 id="personal-dashboard-title" class="text-lg font-extrabold text-slate-900">{{ $dashboard->name }}</h2>
@@ -168,15 +203,7 @@
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">Refresh</a>
-                <details class="relative">
-                    <summary class="cursor-pointer list-none rounded-lg bg-blue-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-800">＋ New dashboard</summary>
-                    <form method="POST" action="{{ route('projects.dashboards.store') }}" class="absolute right-0 z-20 mt-2 flex w-72 gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                        @csrf
-                        <label class="sr-only" for="new-dashboard-name">Dashboard name</label>
-                        <input id="new-dashboard-name" name="name" required maxlength="80" placeholder="Dashboard name" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600">
-                        <button class="rounded-lg bg-blue-900 px-3 py-2 text-xs font-bold text-white hover:bg-blue-800">Add</button>
-                    </form>
-                </details>
+                <button type="button" @click="openEditor(false)" class="rounded-lg bg-blue-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-800">Choose widgets</button>
             </div>
         </header>
 
@@ -188,20 +215,12 @@
             @foreach($dashboards as $dashboardTab)
                 <div class="flex shrink-0 items-center rounded-t-lg border border-b-0 {{ $dashboardTab->dashboard_id === $dashboard->dashboard_id ? 'border-blue-900 bg-blue-900 text-white' : 'border-slate-200 bg-white text-slate-700' }}">
                     <a href="{{ route('projects.dashboard', ['dashboard_id' => $dashboardTab->dashboard_id]) }}" @if($dashboardTab->dashboard_id === $dashboard->dashboard_id) aria-current="page" @endif class="px-3 py-2 text-xs font-bold">{{ $dashboardTab->name }}</a>
-                    @if(! $dashboardTab->is_default)
-                        <form method="POST" action="{{ route('projects.dashboards.destroy', $dashboardTab->dashboard_id) }}" onsubmit="return confirm('Delete this dashboard?')" class="pr-2">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="rounded px-1 text-sm leading-none {{ $dashboardTab->dashboard_id === $dashboard->dashboard_id ? 'text-blue-100 hover:text-white' : 'text-slate-400 hover:text-rose-600' }}" aria-label="Delete {{ $dashboardTab->name }}">×</button>
-                        </form>
-                    @endif
                 </div>
             @endforeach
+            <button type="button" @click="openEditor(true)" aria-label="Add dashboard" class="flex h-8 w-9 shrink-0 items-center justify-center rounded-t-lg border border-b-0 border-slate-200 bg-white text-lg font-semibold text-blue-800 transition hover:bg-blue-50">+</button>
         </nav>
 
-        <form id="dashboard-widget-layout" method="POST" action="{{ route('projects.dashboards.update', $dashboard->dashboard_id) }}">
-            @csrf
-            @method('PATCH')
+        <div>
             <div class="grid grid-cols-1 gap-4 bg-blue-50/70 p-4 lg:grid-cols-2">
                 @foreach($dashboardWidgets as $widgetKey => $widgetSettings)
                     @php
@@ -222,14 +241,6 @@
                     <article class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                         <header class="flex flex-wrap items-center justify-between gap-3 bg-blue-100/70 px-4 py-3">
                             <h3 class="text-sm font-bold text-slate-800">{{ $widget['label'] }}</h3>
-                            @if($widget['kind'] === 'chart')
-                                <label class="sr-only" for="chart-{{ $widgetKey }}">Chart type for {{ $widget['label'] }}</label>
-                                <select id="chart-{{ $widgetKey }}" name="charts[{{ $widgetKey }}]" form="dashboard-widget-layout" onchange="this.form.requestSubmit()" class="rounded-lg border-slate-300 py-1.5 pl-2 pr-7 text-xs text-slate-700 focus:border-blue-600 focus:ring-blue-600">
-                                    @foreach(['doughnut' => 'Doughnut', 'bar' => 'Bar', 'column' => 'Column'] as $chartValue => $chartLabel)
-                                        <option value="{{ $chartValue }}" @selected(($widgetSettings['chart'] ?? 'bar') === $chartValue)>{{ $chartLabel }}</option>
-                                    @endforeach
-                                </select>
-                            @endif
                         </header>
                         @if($widget['kind'] === 'metric')
                             <div class="flex min-h-40 flex-col justify-center px-5 py-6">
@@ -283,21 +294,87 @@
                 @endforeach
             </div>
 
-            <details class="border-t border-slate-200 px-4 py-3" @if(empty($dashboardWidgets)) open @endif>
-                <summary class="cursor-pointer text-xs font-bold text-blue-800">Choose widgets</summary>
-                <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    @foreach($widgetCatalog as $widgetKey => $widget)
-                        <label class="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs hover:bg-slate-50">
-                            <input type="checkbox" name="widgets[]" value="{{ $widgetKey }}" form="dashboard-widget-layout" @checked(isset($dashboardWidgets[$widgetKey])) class="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600">
-                            <span><span class="block font-bold text-slate-700">{{ $widget['label'] }}</span><span class="mt-0.5 block text-slate-500">{{ $widget['kind'] === 'metric' ? 'Current total' : 'Status breakdown chart' }}</span></span>
-                        </label>
-                    @endforeach
+        </div>
+
+        <dialog x-ref="dialog" @click.self="$refs.dialog.close()" aria-labelledby="dashboard-editor-title" class="w-[min(920px,calc(100%-2rem))] max-w-none overflow-hidden rounded-xl border border-slate-200 p-0 shadow-2xl backdrop:bg-slate-950/50">
+            <header class="bg-blue-800 px-5 py-3 text-white">
+                <h2 id="dashboard-editor-title" class="text-base font-extrabold">Choose dashboard widgets</h2>
+            </header>
+            <form x-ref="form" method="POST" action="{{ route('projects.dashboards.update', $dashboard->dashboard_id) }}" class="space-y-4 p-5">
+                @csrf
+                <input x-ref="method" type="hidden" name="_method" value="PATCH">
+                <div>
+                    <label for="dashboard-tab-name" class="mb-1 block text-sm font-bold text-slate-700">Tab name</label>
+                    <input id="dashboard-tab-name" x-model="tabName" name="name" required maxlength="80" class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600">
                 </div>
-                <div class="mt-3 flex justify-end">
-                    <button type="submit" form="dashboard-widget-layout" class="rounded-lg bg-blue-900 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800">Save widgets</button>
+
+                <div class="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                    <div>
+                        <h3 class="mb-1 text-sm font-bold text-slate-700">Available widgets</h3>
+                        <div class="h-64 space-y-2 overflow-y-auto rounded-lg border border-slate-300 p-2">
+                            @foreach(['Projects' => ['project_status'], 'Deliveries' => ['delivery_status', 'delivered_assets']] as $category => $widgetKeys)
+                                <details open class="rounded-md">
+                                    <summary class="cursor-pointer px-1 py-1 text-sm font-bold text-slate-800">{{ $category }}</summary>
+                                    <div class="space-y-1 border-l border-blue-200 pl-3">
+                                        @foreach($widgetKeys as $widgetKey)
+                                            <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-700 hover:bg-blue-50">
+                                                <input type="checkbox" :checked="selected.includes('{{ $widgetKey }}')" @change="toggleWidget('{{ $widgetKey }}', $event.target.checked)" class="rounded border-slate-300 text-blue-700 focus:ring-blue-600">
+                                                <span>{{ $widgetCatalog[$widgetKey]['label'] }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </details>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="mb-1 text-sm font-bold text-slate-700">Selected widgets</h3>
+                        <div class="h-64 overflow-y-auto rounded-lg border border-slate-300 p-2">
+                            <template x-for="(widgetKey, index) in selected" :key="widgetKey">
+                                <div @click="activeIndex = index" role="option" :aria-selected="activeIndex === index" :class="activeIndex === index ? 'bg-slate-300' : 'bg-slate-100'" class="mb-1 flex cursor-pointer items-center gap-2 rounded px-2 py-2">
+                                    <input type="hidden" name="widgets[]" :value="widgetKey">
+                                    <span class="min-w-0 flex-1 truncate text-sm text-slate-800" x-text="widgetDefinitions[widgetKey].label"></span>
+                                    <select x-show="widgetDefinitions[widgetKey].kind === 'chart'" :name="'charts[' + widgetKey + ']'" x-model="selectedCharts[widgetKey]" class="rounded border-slate-300 py-1 pl-2 pr-6 text-xs focus:border-blue-600 focus:ring-blue-600" :aria-label="'Chart type for ' + widgetDefinitions[widgetKey].label">
+                                        <option value="doughnut">Doughnut</option>
+                                        <option value="bar">Bar</option>
+                                        <option value="column">Column</option>
+                                    </select>
+                                </div>
+                            </template>
+                            <p x-show="selected.length === 0" class="p-3 text-sm text-slate-500">Choose at least one widget.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-row justify-center gap-2 md:flex-col md:pt-7">
+                        <button type="button" @click="moveWidget(activeIndex, -1)" :disabled="activeIndex === 0 || selected.length === 0" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-blue-800 hover:bg-blue-50 disabled:opacity-40" aria-label="Move selected widget up">&uarr;</button>
+                        <button type="button" @click="moveWidget(activeIndex, 1)" :disabled="activeIndex >= selected.length - 1" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-blue-800 hover:bg-blue-50 disabled:opacity-40" aria-label="Move selected widget down">&darr;</button>
+                    </div>
                 </div>
-            </details>
-        </form>
+                @if($errors->any())
+                    <p role="alert" class="text-xs font-semibold text-rose-700">{{ $errors->first() }}</p>
+                @endif
+            </form>
+
+            @if(! $dashboard->is_default)
+                <form id="delete-dashboard-tab" method="POST" action="{{ route('projects.dashboards.destroy', $dashboard->dashboard_id) }}" onsubmit="return confirm('Delete this dashboard tab?')">
+                    @csrf
+                    @method('DELETE')
+                </form>
+            @endif
+
+            <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-blue-50 px-5 py-3">
+                <div>
+                    @if(! $dashboard->is_default)
+                        <button type="submit" form="delete-dashboard-tab" x-show="!creating && canDelete" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">Delete tab</button>
+                    @endif
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" @click="$refs.dialog.close()" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">Cancel</button>
+                    <button type="button" @click="$refs.form.requestSubmit()" :disabled="selected.length === 0" class="rounded-lg bg-blue-800 px-4 py-2 text-xs font-bold text-white hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-50">Apply</button>
+                </div>
+            </footer>
+        </dialog>
     </section>
 
     {{-- INTERACTIVE NAVIGATION ENGINE DRIVERS --}}

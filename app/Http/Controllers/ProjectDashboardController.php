@@ -319,17 +319,12 @@ class ProjectDashboardController extends Controller
 
     public function storeDashboard(Request $request): RedirectResponse
     {
-        $request->merge(['name' => trim((string) $request->input('name'))]);
         $userId = (int) $request->user()->getAuthIdentifier();
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:80', Rule::unique('user_dashboards', 'name')->where('user_id', $userId)],
-        ]);
+        $validated = $this->validateDashboardLayout($request, $userId);
         $dashboard = UserDashboard::query()->create([
             'user_id' => $userId,
-            'name' => trim($validated['name']),
-            'widgets' => [
-                'project_status' => ['chart' => 'bar'],
-            ],
+            'name' => $validated['name'],
+            'widgets' => $this->formatDashboardWidgets($validated),
             'sort_order' => (int) UserDashboard::query()->where('user_id', $userId)->max('sort_order') + 1,
         ]);
 
@@ -338,16 +333,44 @@ class ProjectDashboardController extends Controller
 
     public function updateDashboard(Request $request, int $dashboard): RedirectResponse
     {
+        $userId = (int) $request->user()->getAuthIdentifier();
         $dashboardLayout = UserDashboard::query()
-            ->where('user_id', $request->user()->getAuthIdentifier())
+            ->where('user_id', $userId)
             ->where('dashboard_id', $dashboard)
             ->firstOrFail();
-        $validated = $request->validate([
+        $validated = $this->validateDashboardLayout($request, $userId, $dashboardLayout->dashboard_id);
+        $dashboardLayout->update([
+            'name' => $validated['name'],
+            'widgets' => $this->formatDashboardWidgets($validated),
+        ]);
+
+        return redirect()->route('projects.dashboard', ['dashboard_id' => $dashboardLayout->dashboard_id]);
+    }
+
+    /** @return array{name: string, widgets: list<string>, charts?: array<string, string>} */
+    private function validateDashboardLayout(Request $request, int $userId, ?int $dashboardId = null): array
+    {
+        $request->merge(['name' => trim((string) $request->input('name'))]);
+
+        return $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:80',
+                Rule::unique('user_dashboards', 'name')->where('user_id', $userId)->ignore($dashboardId, 'dashboard_id'),
+            ],
             'widgets' => ['required', 'array', 'min:1', 'max:3'],
             'widgets.*' => ['required', 'string', Rule::in(array_keys(self::WIDGETS))],
             'charts' => ['nullable', 'array'],
             'charts.*' => ['nullable', Rule::in(['doughnut', 'bar', 'column'])],
         ]);
+    }
+
+    /** @param array{name: string, widgets: list<string>, charts?: array<string, string>} $validated
+     * @return array<string, array{chart: string}>
+     */
+    private function formatDashboardWidgets(array $validated): array
+    {
         $widgets = [];
 
         foreach (array_unique($validated['widgets']) as $widgetKey) {
@@ -359,9 +382,7 @@ class ProjectDashboardController extends Controller
             ];
         }
 
-        $dashboardLayout->update(['widgets' => $widgets]);
-
-        return redirect()->route('projects.dashboard', ['dashboard_id' => $dashboardLayout->dashboard_id]);
+        return $widgets;
     }
 
     public function destroyDashboard(Request $request, int $dashboard): RedirectResponse

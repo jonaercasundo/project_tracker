@@ -278,12 +278,12 @@
                                 @endif
                                 <div class="grid grid-cols-2 gap-2 xl:grid-cols-4">
                                     @foreach($billingMetrics as $metric)
-                                        <section class="flex min-h-28 flex-col justify-between rounded-xl border border-slate-200 bg-white p-3 {{ $metric['key'] === 'processed' ? 'border-slate-800 bg-slate-950 text-white' : '' }}">
+                                        <section class="flex min-h-28 flex-col justify-between rounded-xl border border-slate-200 bg-white p-3 {{ $metric['key'] === 'processed' ? '!border-slate-800 !bg-slate-950' : '' }}">
                                             <div>
-                                                <p class="text-[9px] font-bold uppercase tracking-wide {{ $metric['key'] === 'processed' ? 'text-slate-300' : 'text-slate-500' }}">{{ $metric['label'] }}</p>
-                                                <p class="mt-2 font-mono text-2xl font-black tabular-nums {{ $metric['key'] === 'processed' ? 'text-white' : 'text-slate-950' }}">{{ $metric['value'] === null ? '—' : number_format($metric['value']) }}</p>
+                                                <p class="text-[9px] font-bold uppercase tracking-wide {{ $metric['key'] === 'processed' ? '!text-slate-300' : 'text-slate-500' }}">{{ $metric['label'] }}</p>
+                                                <p class="mt-2 font-mono text-2xl font-black tabular-nums {{ $metric['key'] === 'processed' ? '!text-white' : 'text-slate-950' }}">{{ $metric['value'] === null ? '—' : number_format($metric['value']) }}</p>
                                             </div>
-                                            <p class="mt-2 text-[9px] leading-3 {{ $metric['key'] === 'processed' ? 'text-slate-300' : 'text-slate-500' }}">{{ $metric['description'] }}</p>
+                                            <p class="mt-2 text-[9px] leading-3 {{ $metric['key'] === 'processed' ? '!text-slate-300' : 'text-slate-500' }}">{{ $metric['description'] }}</p>
                                         </section>
                                     @endforeach
                                 </div>

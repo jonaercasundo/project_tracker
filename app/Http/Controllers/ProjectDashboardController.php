@@ -447,7 +447,7 @@ class ProjectDashboardController extends Controller
             'sort_order' => (int) UserDashboard::query()->where('user_id', $userId)->max('sort_order') + 1,
         ]);
 
-        return redirect()->route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]);
+        return redirect()->route('projects.dashboard', array_merge($request->query(), ['dashboard_id' => $dashboard->dashboard_id]));
     }
 
     public function updateDashboard(Request $request, int $dashboard): RedirectResponse
@@ -463,7 +463,7 @@ class ProjectDashboardController extends Controller
             'widgets' => $this->formatDashboardWidgets($validated),
         ]);
 
-        return redirect()->route('projects.dashboard', ['dashboard_id' => $dashboardLayout->dashboard_id]);
+        return redirect()->route('projects.dashboard', array_merge($request->query(), ['dashboard_id' => $dashboardLayout->dashboard_id]));
     }
 
     /** @return array{name: string, widgets: list<string>, charts?: array<string, string>} */
@@ -517,6 +517,6 @@ class ProjectDashboardController extends Controller
             ->orderBy('dashboard_id')
             ->first();
 
-        return redirect()->route('projects.dashboard', $nextDashboard ? ['dashboard_id' => $nextDashboard->dashboard_id] : []);
+        return redirect()->route('projects.dashboard', array_merge($request->query(), $nextDashboard ? ['dashboard_id' => $nextDashboard->dashboard_id] : []));
     }
 }

@@ -1,5 +1,5 @@
 <x-project_app-layout>
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+<div id="project-dashboard" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
     {{-- HEADER BLOCK --}}
     <div class="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -76,7 +76,7 @@
     @endif
 
     {{-- DASHBOARD DATA FILTERS --}}
-    <form method="GET" action="{{ route('projects.dashboard') }}" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <form method="GET" action="{{ route('projects.dashboard') }}" data-dashboard-async class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <input type="hidden" name="dashboard_id" value="{{ $dashboard->dashboard_id }}">
         <input type="hidden" name="filters_applied" value="1">
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
@@ -162,7 +162,7 @@
                 <p class="text-xs text-slate-500">Choose at least one filter, then apply to display dashboard data.</p>
             @endif
             <div class="flex items-center gap-2">
-                <a href="{{ route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]) }}" class="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Reset</a>
+                <a data-dashboard-nav href="{{ route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]) }}" class="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Reset</a>
                 <button type="submit" class="rounded-lg bg-blue-700 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800">Apply Filters</button>
             </div>
         </div>
@@ -175,8 +175,8 @@
         selected: @js(array_keys($dashboardWidgets)),
         selectedCharts: @js(collect($dashboardWidgets)->map(fn ($settings) => $settings['chart'] ?? 'bar')->all()),
         widgetDefinitions: @js($widgetCatalog),
-        createAction: @js(route('projects.dashboards.store')),
-        updateAction: @js(route('projects.dashboards.update', $dashboard->dashboard_id)),
+        createAction: @js(route('projects.dashboards.store', request()->query())),
+        updateAction: @js(route('projects.dashboards.update', array_merge([$dashboard->dashboard_id], request()->query()))),
         deleteAction: @js(route('projects.dashboards.destroy', $dashboard->dashboard_id)),
         canDelete: @js(! $dashboard->is_default),
         tabName: @js($dashboard->name),
@@ -211,7 +211,7 @@
                 <p class="mt-0.5 text-xs text-slate-500">Choose the metrics and charts shown on each of your dashboards.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <a href="{{ route('projects.dashboard', array_merge(request()->query(), ['dashboard_id' => $dashboard->dashboard_id])) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">Refresh</a>
+                <a data-dashboard-nav href="{{ route('projects.dashboard', array_merge(request()->query(), ['dashboard_id' => $dashboard->dashboard_id])) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">Refresh</a>
                 <button type="button" @click="openEditor(false)" class="rounded-lg bg-blue-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-800">Choose widgets</button>
             </div>
         </header>
@@ -223,7 +223,7 @@
         <nav class="flex items-center gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 pt-3" aria-label="Your dashboards">
             @foreach($dashboards as $dashboardTab)
                 <div class="flex shrink-0 items-center rounded-t-lg border border-b-0 {{ $dashboardTab->dashboard_id === $dashboard->dashboard_id ? 'border-blue-900 bg-blue-900 text-white' : 'border-slate-200 bg-white text-slate-700' }}">
-                    <a href="{{ route('projects.dashboard', array_merge(request()->query(), ['dashboard_id' => $dashboardTab->dashboard_id])) }}" @if($dashboardTab->dashboard_id === $dashboard->dashboard_id) aria-current="page" @endif class="px-3 py-2 text-xs font-bold">{{ $dashboardTab->name }}</a>
+                    <a data-dashboard-nav href="{{ route('projects.dashboard', array_merge(request()->query(), ['dashboard_id' => $dashboardTab->dashboard_id])) }}" @if($dashboardTab->dashboard_id === $dashboard->dashboard_id) aria-current="page" @endif class="px-3 py-2 text-xs font-bold">{{ $dashboardTab->name }}</a>
                 </div>
             @endforeach
             <button type="button" @click="openEditor(true)" aria-label="Add dashboard" class="flex h-8 w-9 shrink-0 items-center justify-center rounded-t-lg border border-b-0 border-slate-200 bg-white text-lg font-semibold text-blue-800 transition hover:bg-blue-50">+</button>
@@ -331,7 +331,7 @@
             <header class="bg-blue-800 px-5 py-3 text-white">
                 <h2 id="dashboard-editor-title" class="text-base font-extrabold">Choose dashboard widgets</h2>
             </header>
-            <form x-ref="form" method="POST" action="{{ route('projects.dashboards.update', $dashboard->dashboard_id) }}" class="space-y-4 p-5">
+            <form x-ref="form" method="POST" action="{{ route('projects.dashboards.update', array_merge([$dashboard->dashboard_id], request()->query())) }}" data-dashboard-async class="space-y-4 p-5">
                 @csrf
                 <input x-ref="method" type="hidden" name="_method" value="PATCH">
                 <div>
@@ -393,7 +393,7 @@
             </form>
 
             @if(! $dashboard->is_default)
-                <form id="delete-dashboard-tab" method="POST" action="{{ route('projects.dashboards.destroy', $dashboard->dashboard_id) }}" onsubmit="return confirm('Delete this dashboard tab?')">
+                <form id="delete-dashboard-tab" method="POST" action="{{ route('projects.dashboards.destroy', array_merge([$dashboard->dashboard_id], request()->query())) }}" data-dashboard-async data-confirm="Delete this dashboard tab?">
                     @csrf
                     @method('DELETE')
                 </form>
@@ -498,4 +498,102 @@
         </div>
     </div>
 </div>
+<script>
+    (() => {
+        const rootSelector = '#project-dashboard';
+
+        async function replaceDashboard(url, options = {}, pushHistory = true) {
+            const root = document.querySelector(rootSelector);
+            if (!root) {
+                return;
+            }
+
+            root.setAttribute('aria-busy', 'true');
+
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    credentials: 'same-origin',
+                    headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest', ...(options.headers ?? {}) },
+                });
+                const html = await response.text();
+                const nextRoot = new DOMParser().parseFromString(html, 'text/html').querySelector(rootSelector);
+
+                if (!response.ok || !nextRoot) {
+                    throw new Error('The dashboard could not be updated. Please try again.');
+                }
+
+                window.Alpine?.destroyTree(root);
+                root.replaceWith(nextRoot);
+                window.Alpine?.initTree(nextRoot);
+
+                if (pushHistory) {
+                    window.history.pushState({}, '', response.url);
+                }
+            } catch (error) {
+                const currentRoot = document.querySelector(rootSelector);
+                if (currentRoot) {
+                    currentRoot.removeAttribute('aria-busy');
+                    let message = currentRoot.querySelector('[data-dashboard-request-error]');
+                    if (!message) {
+                        message = document.createElement('p');
+                        message.dataset.dashboardRequestError = '';
+                        message.setAttribute('role', 'alert');
+                        message.className = 'mx-auto max-w-7xl px-4 pt-3 text-sm font-semibold text-rose-700';
+                        currentRoot.prepend(message);
+                    }
+                    message.textContent = error.message || 'The dashboard could not be updated. Please try again.';
+                }
+            }
+        }
+
+        document.addEventListener('submit', (event) => {
+            const form = event.target.closest('form[data-dashboard-async]');
+            if (!form) {
+                return;
+            }
+
+            event.preventDefault();
+            if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
+                return;
+            }
+
+            const submitter = event.submitter;
+            if (submitter) {
+                submitter.disabled = true;
+            }
+
+            const method = (form.method || 'GET').toUpperCase();
+            const formData = new FormData(form);
+            const url = new URL(form.action, window.location.href);
+            const options = { method };
+
+            if (method === 'GET') {
+                for (const [key, value] of formData.entries()) {
+                    url.searchParams.set(key, value.toString());
+                }
+            } else {
+                options.body = formData;
+            }
+
+            replaceDashboard(url, options).finally(() => {
+                if (submitter?.isConnected) {
+                    submitter.disabled = false;
+                }
+            });
+        });
+
+        document.addEventListener('click', (event) => {
+            const link = event.target.closest('a[data-dashboard-nav]');
+            if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                return;
+            }
+
+            event.preventDefault();
+            replaceDashboard(link.href);
+        });
+
+        window.addEventListener('popstate', () => replaceDashboard(window.location.href, {}, false));
+    })();
+</script>
 </x-project_app-layout>

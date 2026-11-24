@@ -179,7 +179,7 @@ class ProjectDashboardController extends Controller
         $deliveredProjects = $filtersApplied ? (clone $deliveryQuery)->where('d.status', 'delivered')->count() : 0;
 
         if ($filtersApplied && isset($selectedWidgets['operational_workflow'])) {
-            $progressFilters = ['active_only' => false, 'defer_lot_billing' => true];
+            $progressFilters = ['active_only' => false];
             foreach (['lot' => 'lot_id', 'region' => 'region', 'division' => 'division', 'municipality' => 'municipality'] as $filter => $progressFilter) {
                 if (! empty($filters[$filter])) {
                     $progressFilters[$progressFilter] = $filters[$filter];
@@ -188,14 +188,9 @@ class ProjectDashboardController extends Controller
             if (! empty($filters['project']) || $deliveryScopedFilters !== []) {
                 $progressFilters['project_ids'] = (clone $projectQuery)->select('project_id')->pluck('project_id')->map(fn ($projectId): int => (int) $projectId)->all();
             }
-            $progressSummary = $deliveryProgress->report($progressFilters)['summary'];
             $widgetValues['operational_workflow'] = [
                 'project_name' => 'Filtered dashboard scope',
-                'operational_pipeline' => $progressSummary['operational_pipeline'],
-                'overall_progress' => $progressSummary['overall_progress'],
-                'delivered_schools_count' => $progressSummary['delivered_schools_count'],
-                'billing_schools_count' => $progressSummary['billing_schools_count'],
-                'billed_schools_count' => $progressSummary['billed_schools_count'],
+                ...$deliveryProgress->operationalWorkflow($progressFilters),
                 'data_integrity_flags' => [],
             ];
         }

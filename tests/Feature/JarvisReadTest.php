@@ -1072,6 +1072,23 @@ it('exposes the operational pipeline with compatible denominators and exact bill
         ->assertJsonPath('data.summary.pipeline.billing.percent', 75);
 });
 
+it('shows scoped operational counts on the filtered project dashboard', function () {
+    jarvisOperations();
+    (require database_path('migrations/2026_11_24_033859_create_user_dashboards_table.php'))->up();
+    DB::table('delivery_billing_records')->insert(['delivery_id' => 2, 'status' => 'for_billing']);
+    $user = jarvisReader(administrator: false);
+    $this->withoutVite();
+
+    $this->actingAs($user)->withSession(['company_id' => $user->companies()->sole()->company_id])
+        ->get(route('projects.dashboard', ['filters_applied' => 1, 'project' => 1]))
+        ->assertOk()
+        ->assertViewHas('widgetValues', fn (array $widgets): bool => $widgets['operational_workflow']['operational_pipeline']['dr']['total'] === 1
+            && $widgets['operational_workflow']['delivered_schools_count'] === 1
+            && $widgets['operational_workflow']['billing_schools_count'] === 1
+            && $widgets['operational_workflow']['billed_schools_count'] === 0
+            && $widgets['operational_workflow']['operational_pipeline']['delivery_billing']['for_billing'] === 1);
+});
+
 it('shows distinct DR gaps between delivered billing stages in the monitoring flow', function () {
     jarvisOperations();
     DB::table('inventory_history')->insert([

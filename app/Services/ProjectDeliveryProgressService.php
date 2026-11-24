@@ -897,6 +897,35 @@ class ProjectDeliveryProgressService
         ]);
     }
 
+    /** @param array<string, mixed> $filters */
+    public function operationalWorkflow(array $filters): array
+    {
+        $schoolCounts = $this->schoolPipelineStats($filters)->get();
+        $billingQuery = $this->deliveryBillingStats($filters);
+        if (array_intersect(array_keys($filters), ['lot_id', 'region', 'division', 'municipality'])) {
+            $eligibleProjects = DB::query()->fromSub($this->validReceiptKeys($filters), 'eligible_receipt')
+                ->select('eligible_receipt.project_id');
+            $billingQuery->whereIn('d.project_id', $eligibleProjects);
+        }
+        $billingCounts = $billingQuery->get();
+        $counts = [];
+        foreach (['total_operational_schools_count', 'stock_out_schools_count', 'delivered_schools_count', 'billing_schools_count', 'billed_schools_count'] as $column) {
+            $counts[$column] = (int) $schoolCounts->sum($column);
+        }
+        foreach (['delivery_billing_records_count', 'pending_billing_deliveries_count', 'for_billing_deliveries_count', 'billed_deliveries_count', 'on_hold_deliveries_count'] as $column) {
+            $counts[$column] = (int) $billingCounts->sum($column);
+        }
+        $pipeline = $this->pipeline($counts);
+
+        return [
+            'operational_pipeline' => $pipeline,
+            'overall_progress' => $this->operationalProgress($pipeline),
+            'delivered_schools_count' => $counts['delivered_schools_count'],
+            'billing_schools_count' => $counts['billing_schools_count'],
+            'billed_schools_count' => $counts['billed_schools_count'],
+        ];
+    }
+
     /**
      * One project set and a fixed number of grouped queries; never query per project.
      * Billing receipts are deduplicated before joining, so multiple delivery rows
@@ -940,7 +969,7 @@ class ProjectDeliveryProgressService
             $project['logistics_delivery_performance'] = $this->logisticsPerformance($logisticsRows->get($project['project_id'], collect()));
             $project['unassigned_logistics_drs'] = $project['logistics_delivery_performance']['unassigned_drs'];
             $project['last_inventory_date'] = $warehouseRows->get($project['project_id'], collect())->max('last_inventory_date');
-            $project['operational_pipeline'] = $this->pipeline($project, $project['warehouse_readiness']);
+            $project['operational_pipeline'] = $this->pipeline($project);
             $project['pipeline'] = $project['operational_pipeline'];
             $project['overall_progress'] = $this->operationalProgress($project['pipeline']);
             $project['last_activity'] = $this->lastActivity($project);
@@ -966,7 +995,7 @@ class ProjectDeliveryProgressService
         }
         $selectedWarehouseRows = $warehouseRows->only($projects->pluck('project_id')->all())->flatten(1);
         $summary['warehouse_readiness'] = $this->warehouseReadiness($selectedWarehouseRows);
-        $summary['pipeline'] = $this->pipeline($summary, $summary['warehouse_readiness']);
+        $summary['pipeline'] = $this->pipeline($summary);
         $summary['operational_pipeline'] = $summary['pipeline'];
         $summary['overall_progress'] = $this->operationalProgress($summary['pipeline']);
 
@@ -1185,7 +1214,7 @@ class ProjectDeliveryProgressService
     }
 
     /** @param array<string, mixed> $counts @return array<string, array<string, mixed>> */
-    private function pipeline(array $counts, array $warehouse): array
+    private function pipeline(array $counts): array
     {
         $totalSchools = (int) $counts['total_operational_schools_count'];
         $stockOutSchools = (int) $counts['stock_out_schools_count'];

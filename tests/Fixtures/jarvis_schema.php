@@ -13,6 +13,8 @@ Schema::create('projects', function (Blueprint $table): void {
     $table->decimal('contract_amount')->nullable();
     $table->date('start_date')->nullable();
     $table->date('end_date')->nullable();
+    $table->date('report_delivery_start_date')->nullable();
+    $table->date('report_cutoff_date')->nullable();
     $table->string('status')->nullable();
     $table->dateTime('created_at')->nullable();
     $table->string('keystage')->nullable();
@@ -82,6 +84,11 @@ Schema::create('school', function (Blueprint $table): void {
     $table->string('region')->nullable();
     $table->decimal('latitude')->nullable();
     $table->decimal('longitude')->nullable();
+});
+
+Schema::create('logistics', function (Blueprint $table): void {
+    $table->increments('logistic_id');
+    $table->string('logistic_name');
 });
 
 Schema::create('logistics_location', function (Blueprint $table): void {

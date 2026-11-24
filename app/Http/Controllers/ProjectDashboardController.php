@@ -17,8 +17,6 @@ use Illuminate\Validation\Rule;
 class ProjectDashboardController extends Controller
 {
     private const WIDGETS = [
-        'total_projects' => ['label' => 'Total projects', 'kind' => 'metric'],
-        'pending_projects' => ['label' => 'Pending projects', 'kind' => 'metric'],
         'delivered_assets' => ['label' => 'Delivered assets', 'kind' => 'metric'],
         'project_status' => ['label' => 'Project status', 'kind' => 'chart'],
         'delivery_status' => ['label' => 'Delivery status', 'kind' => 'chart'],
@@ -128,8 +126,6 @@ class ProjectDashboardController extends Controller
                 'user_id' => $userId,
                 'name' => 'Overview',
                 'widgets' => [
-                    'total_projects' => ['chart' => 'number'],
-                    'pending_projects' => ['chart' => 'number'],
                     'delivered_assets' => ['chart' => 'number'],
                     'project_status' => ['chart' => 'doughnut'],
                 ],
@@ -138,15 +134,9 @@ class ProjectDashboardController extends Controller
         }
 
         $dashboard = $dashboards->firstWhere('dashboard_id', $request->integer('dashboard_id')) ?? $dashboards->first();
-        $selectedWidgets = $dashboard->widgets ?? [];
+        $selectedWidgets = array_intersect_key($dashboard->widgets ?? [], self::WIDGETS);
         $widgetValues = [];
 
-        if (isset($selectedWidgets['total_projects'])) {
-            $widgetValues['total_projects'] = Project::query()->count();
-        }
-        if (isset($selectedWidgets['pending_projects'])) {
-            $widgetValues['pending_projects'] = Project::query()->where('status', 'Pending')->count();
-        }
         if (isset($selectedWidgets['delivered_assets'])) {
             $widgetValues['delivered_assets'] = DB::table('deliveries')->where('status', 'delivered')->count();
         }
@@ -194,8 +184,6 @@ class ProjectDashboardController extends Controller
             'user_id' => $userId,
             'name' => trim($validated['name']),
             'widgets' => [
-                'total_projects' => ['chart' => 'number'],
-                'pending_projects' => ['chart' => 'number'],
                 'project_status' => ['chart' => 'bar'],
             ],
             'sort_order' => (int) UserDashboard::query()->where('user_id', $userId)->max('sort_order') + 1,
@@ -211,7 +199,7 @@ class ProjectDashboardController extends Controller
             ->where('dashboard_id', $dashboard)
             ->firstOrFail();
         $validated = $request->validate([
-            'widgets' => ['required', 'array', 'min:1', 'max:5'],
+            'widgets' => ['required', 'array', 'min:1', 'max:3'],
             'widgets.*' => ['required', 'string', Rule::in(array_keys(self::WIDGETS))],
             'charts' => ['nullable', 'array'],
             'charts.*' => ['nullable', Rule::in(['doughnut', 'bar', 'column'])],

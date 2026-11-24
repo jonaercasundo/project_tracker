@@ -197,7 +197,7 @@
                 @endforeach
             </div>
 
-            <details class="border-t border-slate-200 px-4 py-3">
+            <details class="border-t border-slate-200 px-4 py-3" @if(empty($dashboardWidgets)) open @endif>
                 <summary class="cursor-pointer text-xs font-bold text-blue-800">Choose widgets</summary>
                 <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach($widgetCatalog as $widgetKey => $widget)

@@ -162,7 +162,7 @@
                 <p class="text-xs text-slate-500">Choose at least one filter, then apply to display dashboard data.</p>
             @endif
             <div class="flex items-center gap-2">
-                <a data-dashboard-nav href="{{ route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]) }}" class="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Reset</a>
+                <a data-dashboard-nav="context" href="{{ route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]) }}" class="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Reset</a>
                 <button type="submit" class="rounded-lg bg-blue-700 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800">Apply Filters</button>
             </div>
         </div>
@@ -211,7 +211,7 @@
                 <p class="mt-0.5 text-xs text-slate-500">Choose the metrics and charts shown on each of your dashboards.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <a data-dashboard-nav href="{{ route('projects.dashboard', array_merge(request()->query(), ['dashboard_id' => $dashboard->dashboard_id])) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">Refresh</a>
+                <a data-dashboard-nav="refresh" href="{{ route('projects.dashboard', array_merge(request()->query(), ['dashboard_id' => $dashboard->dashboard_id])) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">Refresh</a>
                 <button type="button" @click="openEditor(false)" class="rounded-lg bg-blue-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-800">Choose widgets</button>
             </div>
         </header>
@@ -223,7 +223,7 @@
         <nav class="flex items-center gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 pt-3" aria-label="Your dashboards">
             @foreach($dashboards as $dashboardTab)
                 <div class="flex shrink-0 items-center rounded-t-lg border border-b-0 {{ $dashboardTab->dashboard_id === $dashboard->dashboard_id ? 'border-blue-900 bg-blue-900 text-white' : 'border-slate-200 bg-white text-slate-700' }}">
-                    <a data-dashboard-nav href="{{ route('projects.dashboard', array_merge(request()->query(), ['dashboard_id' => $dashboardTab->dashboard_id])) }}" @if($dashboardTab->dashboard_id === $dashboard->dashboard_id) aria-current="page" @endif class="px-3 py-2 text-xs font-bold">{{ $dashboardTab->name }}</a>
+                    <a data-dashboard-nav="tab" href="{{ route('projects.dashboard', array_merge(request()->query(), ['dashboard_id' => $dashboardTab->dashboard_id])) }}" @if($dashboardTab->dashboard_id === $dashboard->dashboard_id) aria-current="page" @endif class="px-3 py-2 text-xs font-bold">{{ $dashboardTab->name }}</a>
                 </div>
             @endforeach
             <button type="button" @click="openEditor(true)" aria-label="Add dashboard" class="flex h-8 w-9 shrink-0 items-center justify-center rounded-t-lg border border-b-0 border-slate-200 bg-white text-lg font-semibold text-blue-800 transition hover:bg-blue-50">+</button>
@@ -584,16 +584,96 @@
     (() => {
         const rootSelector = '#project-dashboard';
 
-        async function replaceDashboard(url, options = {}, pushHistory = true, loadingMessage = 'Updating dashboard...') {
-            const root = document.querySelector(rootSelector);
-            if (!root) {
-                return;
+        const tabs = new Map();
+        const requests = new Map();
+        let navigation;
+        let mutation;
+        let activeTab = createTab(document.querySelector(rootSelector), window.location.href);
+        tabs.set(cacheKey(activeTab.url), activeTab);
+        window.history.replaceState({ ...window.history.state, projectDashboardUrl: activeTab.url }, '');
+
+        window.history.scrollRestoration = 'manual';
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+
+        function cacheKey(url) {
+            const target = new URL(url);
+            for (const [name, value] of [...target.searchParams]) {
+                if (value === '') {
+                    target.searchParams.delete(name, value);
+                }
+            }
+            target.searchParams.sort();
+            return target.pathname + target.search;
+        }
+
+        function filterKey(url) {
+            const target = new URL(url);
+            target.searchParams.delete('dashboard_id');
+            return cacheKey(target);
+        }
+
+        function createTab(root, url) {
+            const activeLink = root.querySelector('[data-dashboard-nav="tab"][aria-current="page"]');
+            return { root, url: activeLink?.href || url, initialized: root.isConnected, scroll: null, scrolledElements: [] };
+        }
+
+        function clearTabs() {
+            for (const request of requests.values()) {
+                request.controller.abort();
+            }
+            requests.clear();
+            for (const tab of tabs.values()) {
+                if (tab !== activeTab && tab.initialized) {
+                    window.Alpine?.destroyTree(tab.root);
+                }
+            }
+            tabs.clear();
+        }
+
+        function displayTab(tab, url, pushHistory, replacing = false) {
+            if (tab !== activeTab) {
+                const previous = activeTab;
+                previous.scroll = [window.scrollX, window.scrollY];
+                previous.scrolledElements = [...previous.root.querySelectorAll('*')]
+                    .filter(element => element.scrollLeft || element.scrollTop)
+                    .map(element => [element, element.scrollLeft, element.scrollTop]);
+                const scroll = cacheKey(tab.url) === cacheKey(previous.url) ? previous.scroll : (tab.scroll ?? previous.scroll);
+                const swap = () => {
+                    if (tabs.get(cacheKey(previous.url)) !== previous) {
+                        window.Alpine?.destroyTree(previous.root);
+                    }
+                    previous.root.replaceWith(tab.root);
+                    for (const [element, left, top] of tab.scrolledElements) {
+                        element.scrollLeft = left;
+                        element.scrollTop = top;
+                    }
+                    if (!tab.initialized) {
+                        window.Alpine?.initTree(tab.root);
+                        tab.initialized = true;
+                    }
+                };
+                if (window.Alpine) {
+                    window.Alpine.mutateDom(swap);
+                } else {
+                    swap();
+                }
+                activeTab = tab;
+                window.scrollTo(...scroll);
             }
 
-            const controller = new AbortController();
+            if (pushHistory && window.location.href !== url) {
+                window.history[replacing ? 'replaceState' : 'pushState']({ projectDashboardUrl: tab.url }, '', url);
+            }
+        }
+
+        function showLoading(root, controller, loadingMessage) {
             const loadingOverlay = document.createElement('div');
             loadingOverlay.dataset.dashboardLoading = '';
-            loadingOverlay.className = 'absolute inset-0 z-[200] flex items-start justify-center rounded-2xl bg-white/65 px-4 pt-24 backdrop-blur-[2px]';
+            loadingOverlay.className = 'pointer-events-none absolute inset-0 z-[200] flex items-start justify-center rounded-2xl bg-white/65 px-4 pt-24 backdrop-blur-[2px]';
             loadingOverlay.innerHTML = `<div class="w-full max-w-sm rounded-xl border border-blue-100 bg-white p-5 text-center shadow-xl" role="status" aria-live="polite">
                 <span class="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-700">
                     <svg class="h-6 w-6 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" transform="translate(0 0)"></path></svg>
@@ -601,51 +681,120 @@
                 <p class="mt-3 text-sm font-bold text-slate-800">${loadingMessage}</p>
                 <p class="mt-1 text-xs text-slate-500">Your dashboard is updating with the selected data.</p>
                 <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-blue-100"><div class="h-full w-1/3 animate-pulse rounded-full bg-blue-600"></div></div>
-                <button type="button" data-cancel-dashboard-request class="mt-4 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                <button type="button" data-cancel-dashboard-request class="pointer-events-auto mt-4 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
             </div>`;
             loadingOverlay.querySelector('[data-cancel-dashboard-request]').addEventListener('click', () => controller.abort());
             root.append(loadingOverlay);
             root.setAttribute('aria-busy', 'true');
 
+            return () => {
+                loadingOverlay.remove();
+                root.removeAttribute('aria-busy');
+            };
+        }
+
+        async function fetchTab(url, options, controller) {
+            const response = await fetch(url, {
+                ...options,
+                cache: 'no-store',
+                signal: controller.signal,
+                credentials: 'same-origin',
+                headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const html = await response.text();
+            const root = new DOMParser().parseFromString(html, 'text/html').querySelector(rootSelector);
+            if (!response.ok || !root) {
+                throw new Error('The dashboard could not be updated. Please try again.');
+            }
+            return createTab(document.adoptNode(root), response.url);
+        }
+
+        function requestTab(url, key, options, mode) {
+            const controller = new AbortController();
+            const request = { controller, promise: fetchTab(url, options, controller) };
+            if (mode !== 'context') {
+                requests.set(key, request);
+                const finish = () => {
+                    if (requests.get(key) === request) {
+                        requests.delete(key);
+                    }
+                };
+                request.promise.then(tab => {
+                    if (requests.get(key) === request && !controller.signal.aborted) {
+                        const resolvedKey = cacheKey(tab.url);
+                        const previous = tabs.get(resolvedKey);
+                        if (previous && previous !== activeTab && previous.initialized) {
+                            window.Alpine?.destroyTree(previous.root);
+                        }
+                        tab.scroll = previous?.scroll ?? null;
+                        tabs.set(resolvedKey, tab);
+                    }
+                    finish();
+                }, finish);
+            }
+            return request;
+        }
+
+        async function navigateDashboard(url, { mode = 'tab', options = {}, pushHistory = true, loadingMessage = 'Loading dashboard...' } = {}) {
+            const key = cacheKey(url);
+            if (mode === 'context' && options.method !== 'POST' && filterKey(url) === filterKey(activeTab.url)) {
+                mode = 'tab';
+            }
+            const cached = tabs.get(key);
+            const current = navigation;
+            if (current?.key === key && current.mode === mode && !current.request.controller.signal.aborted) {
+                return;
+            }
+            current?.stopLoading?.();
+            if (current?.mode === 'context') {
+                current.request.controller.abort();
+            }
+            navigation = null;
+            activeTab.root.querySelector('[data-dashboard-request-error]')?.remove();
+
+            if (mode === 'tab' && cached) {
+                displayTab(cached, url, pushHistory);
+            }
+            const pending = mode === 'context' ? null : requests.get(key);
+            if (mode === 'tab' && cached && !pending) {
+                return;
+            }
+
+            const request = pending && !pending.controller.signal.aborted ? pending : requestTab(url, key, options, mode);
+            const next = { key, mode, request };
+            navigation = next;
+            if (mode !== 'tab' || !cached) {
+                next.stopLoading = showLoading(activeTab.root, request.controller, loadingMessage);
+            }
+
             try {
-                const response = await fetch(url, {
-                    ...options,
-                    signal: controller.signal,
-                    credentials: 'same-origin',
-                    headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest', ...(options.headers ?? {}) },
-                });
-                const html = await response.text();
-                const nextRoot = new DOMParser().parseFromString(html, 'text/html').querySelector(rootSelector);
-
-                if (!response.ok || !nextRoot) {
-                    throw new Error('The dashboard could not be updated. Please try again.');
+                const tab = await request.promise;
+                if (navigation !== next || request.controller.signal.aborted) {
+                    return;
                 }
 
-                window.Alpine?.destroyTree(root);
-                root.replaceWith(nextRoot);
-                window.Alpine?.initTree(nextRoot);
-
-                if (pushHistory) {
-                    window.history.pushState({}, '', response.url);
+                if (mode === 'context') {
+                    clearTabs();
+                    tabs.set(cacheKey(tab.url), tab);
                 }
+                next.stopLoading?.();
+                next.stopLoading = null;
+                displayTab(tab, tab.url, pushHistory, mode === 'refresh');
             } catch (error) {
-                const currentRoot = document.querySelector(rootSelector);
-                if (currentRoot) {
-                    currentRoot.removeAttribute('aria-busy');
-                    currentRoot.querySelector('[data-dashboard-loading]')?.remove();
-                    loadingOverlay.remove();
-                    if (error.name === 'AbortError') {
-                        return;
-                    }
-                    let message = currentRoot.querySelector('[data-dashboard-request-error]');
-                    if (!message) {
-                        message = document.createElement('p');
-                        message.dataset.dashboardRequestError = '';
-                        message.setAttribute('role', 'alert');
-                        message.className = 'mx-auto max-w-7xl px-4 pt-3 text-sm font-semibold text-rose-700';
-                        currentRoot.prepend(message);
-                    }
-                    message.textContent = error.message || 'The dashboard could not be updated. Please try again.';
+                if (navigation !== next || request.controller.signal.aborted || error.name === 'AbortError') {
+                    return;
+                }
+
+                const message = document.createElement('p');
+                message.dataset.dashboardRequestError = '';
+                message.setAttribute('role', 'alert');
+                message.className = 'mx-auto max-w-7xl px-4 pt-3 text-sm font-semibold text-rose-700';
+                message.textContent = error.message || 'The dashboard could not be updated. Please try again.';
+                activeTab.root.prepend(message);
+            } finally {
+                if (navigation === next) {
+                    next.stopLoading?.();
+                    navigation = null;
                 }
             }
         }
@@ -657,7 +806,7 @@
             }
 
             event.preventDefault();
-            if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
+            if (mutation || (form.dataset.confirm && !window.confirm(form.dataset.confirm))) {
                 return;
             }
 
@@ -682,8 +831,15 @@
                 options.body = formData;
             }
 
-            replaceDashboard(url, options, true, loadingMessage).finally(() => {
-                if (submitter?.isConnected) {
+            const update = navigateDashboard(url.href, { mode: 'context', options, loadingMessage });
+            if (method !== 'GET') {
+                mutation = update;
+            }
+            update.finally(() => {
+                if (mutation === update) {
+                    mutation = null;
+                }
+                if (submitter) {
                     submitter.disabled = false;
                 }
             });
@@ -696,10 +852,22 @@
             }
 
             event.preventDefault();
-            replaceDashboard(link.href, {}, true, 'Loading dashboard...');
+            if (!mutation) {
+                navigateDashboard(link.href, { mode: link.dataset.dashboardNav });
+            }
         });
 
-        window.addEventListener('popstate', () => replaceDashboard(window.location.href, {}, false));
+        window.addEventListener('popstate', async (event) => {
+            const location = window.location.href;
+            const url = event.state?.projectDashboardUrl || location;
+            if (mutation) {
+                await mutation;
+            }
+            if (window.location.href === location) {
+                const mode = filterKey(url) === filterKey(activeTab.url) ? 'tab' : 'context';
+                navigateDashboard(url, { mode, pushHistory: false });
+            }
+        });
     })();
 </script>
 </x-project_app-layout>

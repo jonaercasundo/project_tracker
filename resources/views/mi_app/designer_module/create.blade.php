@@ -125,6 +125,38 @@
                     $saveError = $errors->first('error') ?: session('error');
                 @endphp
 
+                <section id="product-entry-choice" class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div class="mb-4">
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Choose how to start</p>
+                        <h2 class="mt-1 text-xl font-bold text-slate-900">Create a product record</h2>
+                        <p class="mt-1 text-sm text-slate-500">Enter details yourself or let AI draft details from a product photo.</p>
+                    </div>
+                    <div id="product-entry-options" class="grid gap-4 md:grid-cols-2">
+                        <button type="button" data-entry-mode="manual" class="rounded-xl border border-slate-200 p-5 text-left transition hover:border-blue-400 hover:bg-blue-50">
+                            <span class="block text-base font-bold text-slate-900">Manual encoding</span>
+                            <span class="mt-1 block text-sm text-slate-500">Fill in the product form yourself.</span>
+                        </button>
+                        <button type="button" data-entry-mode="photo" class="rounded-xl border border-blue-200 bg-blue-50 p-5 text-left transition hover:border-blue-400">
+                            <span class="block text-base font-bold text-slate-900">Upload a photo with AI</span>
+                            <span class="mt-1 block text-sm text-slate-500">AI suggests product details for you to review.</span>
+                        </button>
+                    </div>
+                    <div id="photo-entry-panel" class="mt-5 hidden rounded-xl border border-dashed border-blue-300 bg-slate-50 p-5">
+                        <label for="ai_product_photo" class="block text-sm font-semibold text-slate-800">Product photo</label>
+                        <p class="mt-1 text-sm text-slate-500">Choose a clear JPG, PNG, or WebP image (up to 10 MB).</p>
+                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                            <input id="ai_product_photo" type="file" accept="image/jpeg,image/png,image/webp" class="block w-full max-w-md text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:font-semibold file:text-white">
+                            <button id="ai_fill_product" type="button" class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Analyze photo</button>
+                            <button id="manual_entry_back" type="button" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-white">Use manual entry</button>
+                        </div>
+                        <p id="ai_product_status" class="mt-3 text-sm text-slate-600" role="status" aria-live="polite"></p>
+                        <p class="mt-2 text-xs text-slate-500">AI suggestions may be inaccurate. Review every field before saving. Price, country of production, SKU, and taxonomy are not inferred from the photo.</p>
+                    </div>
+                    <div id="ai_draft_notice" class="mt-4 hidden rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status"></div>
+                </section>
+
+                <div id="product-form-content" @if(!$errors->any()) hidden @endif>
+
 
                 {{-- =================================================
                     SAVE ERROR
@@ -1614,7 +1646,98 @@
 
                 </div>
 
+                </div>
+
             </form>
+
+            <script>
+                (() => {
+                    const formContent = document.getElementById('product-form-content');
+                    const photoPanel = document.getElementById('photo-entry-panel');
+                    const choice = document.getElementById('product-entry-choice');
+                    const status = document.getElementById('ai_product_status');
+                    const notice = document.getElementById('ai_draft_notice');
+                    const fileInput = document.getElementById('ai_product_photo');
+                    const errorsPresent = @json($errors->any());
+
+                    const showManualForm = () => {
+                        formContent.hidden = false;
+                        photoPanel.classList.add('hidden');
+                        notice.classList.add('hidden');
+                        formContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    };
+
+                    document.querySelectorAll('[data-entry-mode]').forEach((button) => {
+                        button.addEventListener('click', () => {
+                            if (button.dataset.entryMode === 'manual') {
+                                showManualForm();
+                                return;
+                            }
+                            formContent.hidden = true;
+                            photoPanel.classList.remove('hidden');
+                            status.textContent = '';
+                        });
+                    });
+                    document.getElementById('manual_entry_back').addEventListener('click', showManualForm);
+                    if (errorsPresent) {
+                        choice.classList.add('hidden');
+                        formContent.hidden = false;
+                    }
+
+                    document.getElementById('ai_fill_product').addEventListener('click', async (event) => {
+                        const file = fileInput.files?.[0];
+                        if (!file) {
+                            status.textContent = 'Choose a product photo first.';
+                            return;
+                        }
+                        const button = event.currentTarget;
+                        button.disabled = true;
+                        button.textContent = 'Analyzing photo…';
+                        status.textContent = 'AI is reviewing the image. This may take a moment.';
+                        try {
+                            const payload = new FormData();
+                            payload.append('image', file);
+                            const response = await fetch(@json(route('mi_app.create.image-draft')), {
+                                method: 'POST',
+                                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value },
+                                body: payload,
+                            });
+                            const result = await response.json();
+                            if (!response.ok) throw new Error(result.message || 'The photo could not be analyzed.');
+                            const draft = result.draft || {};
+                            ['item_name', 'description', 'type_of_sample', 'designed_by'].forEach((name) => {
+                                const field = document.querySelector(`[name="${name}"]`);
+                                const value = draft[name];
+                                if (field && typeof value === 'string' && value.trim() !== '') {
+                                    field.value = value.trim();
+                                    field.dispatchEvent(new Event('input', { bubbles: true }));
+                                    field.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            });
+                            [['materials[]', draft.materials], ['color[]', draft.colors]].forEach(([name, value]) => {
+                                if (typeof value !== 'string' || value.trim() === '') return;
+                                const select = document.querySelector(`[name="${name}"]`);
+                                if (!select) return;
+                                const values = value.split(',').map((item) => item.trim()).filter(Boolean);
+                                if (select.tomselect) values.forEach((item) => select.tomselect.addOption({ value: item, text: item }));
+                                if (select.tomselect) select.tomselect.setValue(values, true);
+                                else Array.from(select.options).forEach((option) => { option.selected = values.includes(option.value); });
+                            });
+                            formContent.hidden = false;
+                            photoPanel.classList.add('hidden');
+                            notice.textContent = result.message || 'Review the AI suggestions below. Please correct anything that is not accurate.';
+                            notice.classList.remove('hidden');
+                            status.textContent = '';
+                            formContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        } catch (error) {
+                            status.textContent = error.message || 'The photo could not be analyzed. Try again.';
+                        } finally {
+                            button.disabled = false;
+                            button.textContent = 'Analyze photo';
+                        }
+                    });
+                })();
+            </script>
 
         </div>
 

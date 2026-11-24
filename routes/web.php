@@ -40,6 +40,7 @@ use App\Http\Controllers\LogisticsChannelController;
 use App\Http\Controllers\MIAppController;
 use App\Http\Controllers\MIApprovalController;
 use App\Http\Controllers\MIForexRateController;
+use App\Http\Controllers\MIProductImageDraftController;
 use App\Http\Controllers\MIProductPriceComparisonController;
 use App\Http\Controllers\MIProductVariantInventoryController;
 use App\Http\Controllers\MmcPlatformIntegrationController;
@@ -811,6 +812,7 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::middleware(['company.context:MI', 'role:user,Accounting,accounting,Executive,executive'])->group(function () {
 
         Route::get('/mi/create', [MIAppController::class, 'create'])->name('mi_app.create');
+        Route::post('/mi/create/image-draft', [MIProductImageDraftController::class, 'store'])->middleware('throttle:10,1')->name('mi_app.create.image-draft');
         Route::get('/mi/settings', [MIAppController::class, 'settings'])->name('mi_app.settings');
         Route::get('/mi/designer', [MIAppController::class, 'index'])->name('mi_app.index');
         Route::get('/mi/dashboard', [MIAppController::class, 'dashboard'])->name('mi_app.dashboard');

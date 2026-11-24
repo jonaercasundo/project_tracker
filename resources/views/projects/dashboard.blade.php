@@ -84,15 +84,17 @@
                 <label for="dashboard-search" class="mb-1 block text-xs font-semibold text-slate-600">Search</label>
                 <input id="dashboard-search" type="search" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Search DR No., School, Project..." class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
             </div>
-            <div>
-                <label for="dashboard-project" class="mb-1 block text-xs font-semibold text-slate-600">Project</label>
-                <select id="dashboard-project" name="project" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
-                    <option value="">All Projects</option>
-                    @foreach($projects as $projectOption)
-                        <option value="{{ $projectOption->project_id }}" @selected(($filters['project'] ?? '') == $projectOption->project_id)>{{ $projectOption->project_name }}</option>
-                    @endforeach
-                </select>
-            </div>
+            <x-searchable-project-filter
+                :projects="$projects"
+                :selected="$filters['project'] ?? ''"
+                name="project"
+                id="dashboard-project"
+                input-id="dashboard-project-input"
+                all-label="All Projects"
+                rounded="rounded-xl"
+                wrapper-class="min-w-0 space-y-1 text-xs font-semibold text-slate-600"
+                label-class="mb-1 block text-xs font-semibold text-slate-600"
+            />
         </div>
 
         <div class="grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 sm:grid-cols-2 xl:grid-cols-5">

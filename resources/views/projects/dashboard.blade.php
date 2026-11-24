@@ -722,6 +722,7 @@
                         const previous = tabs.get(resolvedKey);
                         if (previous && previous !== activeTab && previous.initialized) {
                             window.Alpine?.destroyTree(previous.root);
+                            previous.initialized = false;
                         }
                         tab.scroll = previous?.scroll ?? null;
                         tabs.set(resolvedKey, tab);
@@ -756,14 +757,14 @@
                 displayTab(cached, url, pushHistory);
             }
             const pending = mode === 'context' ? null : requests.get(key);
-            if (mode === 'tab' && cached && !pending) {
+            if (mode === 'tab' && cached && !pending && key === cacheKey(activeTab.url)) {
                 return;
             }
 
             const request = pending && !pending.controller.signal.aborted ? pending : requestTab(url, key, options, mode);
             const next = { key, mode, request };
             navigation = next;
-            if (mode !== 'tab' || !cached) {
+            if (!cached) {
                 next.stopLoading = showLoading(activeTab.root, request.controller, loadingMessage);
             }
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Middleware\ProfileProjectDashboard;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -33,6 +34,7 @@ class ProjectDrProgressReportService
                 'delivery_id', 'dr_no', 'status', 'created_at', 'delivered_date', 'accepted_date',
                 'keystage_id', 'lot_id',
             ]);
+        ProfileProjectDashboard::current()?->loaded((int) ($project !== null) + $missingCreationDateRows->count() + $deliveryRows->count());
 
         $receipts = [];
         foreach ($deliveryRows as $row) {
@@ -240,6 +242,7 @@ class ProjectDrProgressReportService
 
         $packagesByStage = $stageIds === [] ? collect() : DB::table('package')->whereIn('keystage_id', array_unique($stageIds))->get(['keystage_id', 'package_id'])->groupBy('keystage_id');
         $packagesByLot = $lotIds === [] ? collect() : DB::table('package')->whereIn('lot_id', array_unique($lotIds))->get(['lot_id', 'package_id'])->groupBy('lot_id');
+        ProfileProjectDashboard::current()?->loaded($packagesByStage->sum->count() + $packagesByLot->sum->count());
         $allocations = [];
         foreach ($rows as $row) {
             if (! in_array((int) $row->delivery_id, $deliveryIds, true)) {
@@ -290,6 +293,7 @@ class ProjectDrProgressReportService
             ->whereRaw('current_status.package_status_id = (SELECT MAX(latest.package_status_id) FROM package_status as latest WHERE latest.delivery_id = current_status.delivery_id AND latest.package_id = current_status.package_id)')
             ->whereIn(DB::raw('LOWER(TRIM(current_status.status))'), ['delivered', 'accepted'])
             ->get(['current_status.delivery_id', 'current_status.package_id']);
+        ProfileProjectDashboard::current()?->loaded($histories->count() + $datedStatuses->count() + $latestStatuses->count());
         $undated = [];
         foreach ($latestStatuses as $status) {
             $key = (int) $status->delivery_id.':'.(int) $status->package_id;

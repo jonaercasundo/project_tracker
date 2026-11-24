@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\GoogleSheetsApiException;
+use App\Http\Middleware\ProfileProjectDashboard;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ class BillingDocumentStatusService
             ->whereNotNull('d.dr_no')
             ->select(['d.dr_no', 'd.school_id', 'd.status', 'l.lot_name'])
             ->get();
+        ProfileProjectDashboard::current()?->loaded($deliveries->count());
 
         $projectDrsByLot = array_fill_keys(self::LOTS, []);
         $projectSchoolsByLot = array_fill_keys(self::LOTS, []);
@@ -140,31 +142,43 @@ class BillingDocumentStatusService
     /** @return array<int, array{school_id: string, dr: string, package: string, encoded_date: string}> */
     private function lotSheetRows(string $lotNumber): array
     {
-        $settings = $this->configuration->current();
-        $cacheKey = 'billing-document-status:v3:'.hash('sha256', $settings['spreadsheet_id'].'|'.$settings['sheet_tab'].'|'.$lotNumber);
+        $profiler = ProfileProjectDashboard::current();
+        $profiler?->start('google_sheets_lookup');
+        $cacheHit = null;
+        try {
+            $settings = $this->configuration->current();
+            $cacheKey = 'billing-document-status:v3:'.hash('sha256', $settings['spreadsheet_id'].'|'.$settings['sheet_tab'].'|'.$lotNumber);
 
-        return Cache::remember($cacheKey, now()->addSeconds(10), function () use ($settings, $lotNumber): array {
-            $tab = "'".str_replace("'", "''", $settings['sheet_tab'])."'!";
-            $headers = $this->sheets->values($tab.'A1:CU20', $settings['spreadsheet_id']);
-            $headerMap = $this->findLotColumns($headers, $lotNumber);
-            $schoolIdValues = $this->sheets->values($tab.$headerMap['school_id_column'].'2:'.$headerMap['school_id_column'], $settings['spreadsheet_id']);
-            $drValues = $this->sheets->values($tab.$headerMap['dr_column'].'2:'.$headerMap['dr_column'], $settings['spreadsheet_id']);
-            $packageValues = $this->sheets->values($tab.$headerMap['package_column'].'2:'.$headerMap['package_column'], $settings['spreadsheet_id']);
-            $encodedDateValues = $this->sheets->values($tab.$headerMap['encoded_date_column'].'2:'.$headerMap['encoded_date_column'], $settings['spreadsheet_id']);
-            $rows = [];
-            $rowCount = max(count($schoolIdValues), count($drValues), count($packageValues), count($encodedDateValues));
+            $cacheHit = true;
+            $rows = Cache::remember($cacheKey, now()->addSeconds(10), function () use ($settings, $lotNumber, &$cacheHit): array {
+                $cacheHit = false;
+                $tab = "'".str_replace("'", "''", $settings['sheet_tab'])."'!";
+                $headers = $this->sheets->values($tab.'A1:CU20', $settings['spreadsheet_id']);
+                $headerMap = $this->findLotColumns($headers, $lotNumber);
+                $schoolIdValues = $this->sheets->values($tab.$headerMap['school_id_column'].'2:'.$headerMap['school_id_column'], $settings['spreadsheet_id']);
+                $drValues = $this->sheets->values($tab.$headerMap['dr_column'].'2:'.$headerMap['dr_column'], $settings['spreadsheet_id']);
+                $packageValues = $this->sheets->values($tab.$headerMap['package_column'].'2:'.$headerMap['package_column'], $settings['spreadsheet_id']);
+                $encodedDateValues = $this->sheets->values($tab.$headerMap['encoded_date_column'].'2:'.$headerMap['encoded_date_column'], $settings['spreadsheet_id']);
+                $rows = [];
+                $rowCount = max(count($schoolIdValues), count($drValues), count($packageValues), count($encodedDateValues));
 
-            for ($index = 0; $index < $rowCount; $index++) {
-                $rows[] = [
-                    'school_id' => (string) ($schoolIdValues[$index][0] ?? ''),
-                    'dr' => (string) ($drValues[$index][0] ?? ''),
-                    'package' => (string) ($packageValues[$index][0] ?? ''),
-                    'encoded_date' => (string) ($encodedDateValues[$index][0] ?? ''),
-                ];
-            }
+                for ($index = 0; $index < $rowCount; $index++) {
+                    $rows[] = [
+                        'school_id' => (string) ($schoolIdValues[$index][0] ?? ''),
+                        'dr' => (string) ($drValues[$index][0] ?? ''),
+                        'package' => (string) ($packageValues[$index][0] ?? ''),
+                        'encoded_date' => (string) ($encodedDateValues[$index][0] ?? ''),
+                    ];
+                }
+
+                return $rows;
+            });
+            $profiler?->loaded(count($rows));
 
             return $rows;
-        });
+        } finally {
+            $profiler?->finish('google_sheets_lookup', ['cache_hit' => $cacheHit]);
+        }
     }
 
     /** @param array<int, array<int, mixed>> $headerRows

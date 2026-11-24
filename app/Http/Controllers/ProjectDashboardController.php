@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\ProfileProjectDashboard;
 use App\Models\Project;
 use App\Models\UserDashboard;
 use App\Services\BillingDocumentStatusService;
@@ -122,6 +123,8 @@ class ProjectDashboardController extends Controller
         BillingDocumentStatusService $billingDocumentStatus,
         ProjectDrProgressReportService $drProgressReport,
     ): View {
+        $profiler = ProfileProjectDashboard::current();
+        $profiler?->start('dashboard_setup_and_totals');
         $filters = $request->validate([
             'dashboard_id' => ['nullable', 'integer'],
             'filters_applied' => ['nullable', 'in:1'],
@@ -176,9 +179,15 @@ class ProjectDashboardController extends Controller
 
         $totalProjects = $filtersApplied ? (clone $projectQuery)->count() : 0;
         $pendingProjects = $filtersApplied ? (clone $projectQuery)->where('status', 'Pending')->count() : 0;
-        $deliveredProjects = $filtersApplied ? (clone $deliveryQuery)->where('d.status', 'delivered')->count() : 0;
+        $deliveryCounts = $filtersApplied
+            ? (clone $deliveryQuery)->selectRaw('COUNT(*) as total, COUNT(CASE WHEN d.status = ? THEN 1 END) as delivered', ['delivered'])->first()
+            : null;
+
+        $profiler?->loaded($dashboards->count() + (int) ($deliveryCounts !== null) + ($filtersApplied ? 2 : 0));
+        $profiler?->finish('dashboard_setup_and_totals');
 
         if ($filtersApplied && isset($selectedWidgets['operational_workflow'])) {
+            $profiler?->start('operational_workflow');
             $progressFilters = ['active_only' => false];
             foreach (['lot' => 'lot_id', 'region' => 'region', 'division' => 'division', 'municipality' => 'municipality'] as $filter => $progressFilter) {
                 if (! empty($filters[$filter])) {
@@ -187,14 +196,17 @@ class ProjectDashboardController extends Controller
             }
             if (! empty($filters['project']) || $deliveryScopedFilters !== []) {
                 $progressFilters['project_ids'] = (clone $projectQuery)->select('project_id')->pluck('project_id')->map(fn ($projectId): int => (int) $projectId)->all();
+                $profiler?->loaded(count($progressFilters['project_ids']));
             }
             $widgetValues['operational_workflow'] = [
                 'project_name' => 'Filtered dashboard scope',
                 ...$deliveryProgress->operationalWorkflow($progressFilters),
                 'data_integrity_flags' => [],
             ];
+            $profiler?->finish('operational_workflow');
         }
         if ($filtersApplied && isset($selectedWidgets['billing_document_status'])) {
+            $profiler?->start('billing_document_widget');
             $billingProjectId = $filters['project']
                 ?? DB::table('projects')->where('project_name', 'Billing Documentation')->value('project_id')
                 ?? DB::table('projects')->orderBy('project_id')->value('project_id');
@@ -213,16 +225,21 @@ class ProjectDashboardController extends Controller
             $deliveryStartDate = $billingProject?->report_delivery_start_date
                 ? CarbonImmutable::parse($billingProject->report_delivery_start_date, config('app.timezone'))
                 : null;
+            $profiler?->start('dr_progress_report');
+            $progress = $billingProjectId === null
+                ? null
+                : $drProgressReport->summarize((int) $billingProjectId, $cutoffDate, $deliveryStartDate);
+            $profiler?->finish('dr_progress_report');
             $widgetValues['billing_document_status'] = [
                 'summary' => $billingSummary,
-                'progress' => $billingProjectId === null
-                    ? null
-                    : $drProgressReport->summarize((int) $billingProjectId, $cutoffDate, $deliveryStartDate),
+                'progress' => $progress,
                 'project_name' => $billingProject?->project_name,
             ];
             $widgetValues['billing_document_status_notice'] = $billingSummary['source_error'];
+            $profiler?->finish('billing_document_widget');
         }
         if ($filtersApplied && isset($selectedWidgets['inventory_monitoring'])) {
+            $profiler?->start('inventory_widget');
             $inventoryQuery = DB::table('inventory as inventory')
                 ->join('item as items', 'items.item_id', '=', 'inventory.item_id');
             $historyQuery = DB::table('inventory_history as history')
@@ -240,8 +257,11 @@ class ProjectDashboardController extends Controller
                 ['label' => 'Stock-in movements', 'value' => (clone $historyQuery)->where('history.change_type', 'stock_in')->count()],
                 ['label' => 'Stock-out movements', 'value' => (clone $historyQuery)->where('history.change_type', 'stock_out')->count()],
             ];
+            $profiler?->loaded(3);
+            $profiler?->finish('inventory_widget');
         }
 
+        $profiler?->start('filter_options');
         $projects = DB::table('projects')->orderBy('project_name')->get([
             'project_id', 'project_name', 'report_delivery_start_date', 'report_cutoff_date',
         ]);
@@ -256,10 +276,14 @@ class ProjectDashboardController extends Controller
             ->orderBy('provider.logistic_name')
             ->get(['provider.logistic_id', 'provider.logistic_name']);
 
+        $profiler?->loaded($projects->count() + $lots->count() + $regions->count() + $divisions->count() + $municipalities->count() + $assignedProviders->count());
+        $profiler?->finish('filter_options');
+        $profiler?->start('blade_rendering');
+
         return view('projects.dashboard', [
             'totalProjects' => $totalProjects,
             'pendingProjects' => $pendingProjects,
-            'deliveredProjects' => $deliveredProjects,
+            'deliveredProjects' => (int) ($deliveryCounts->delivered ?? 0),
             'dashboards' => $dashboards,
             'dashboard' => $dashboard,
             'dashboardWidgets' => $selectedWidgets,
@@ -273,7 +297,7 @@ class ProjectDashboardController extends Controller
             'divisions' => $divisions,
             'municipalities' => $municipalities,
             'assignedProviders' => $assignedProviders,
-            'filteredDeliveryCount' => $filtersApplied ? (clone $deliveryQuery)->count() : null,
+            'filteredDeliveryCount' => $deliveryCounts === null ? null : (int) $deliveryCounts->total,
         ]);
     }
 

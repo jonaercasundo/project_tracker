@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Middleware\ProfileProjectDashboard;
 use App\Models\DeliveryBillingRecord;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
@@ -441,10 +442,12 @@ class ProjectDeliveryProgressService
     }
 
     /** @param array<string, mixed> $filters */
-    private function stockOutDrRows(array $filters): Builder
+    private function stockOutDrRows(array $filters, bool $includeCompleted = true): Builder
     {
+        $projectIds = $this->projects($filters)->select('p.project_id');
         $historyItems = DB::table('inventory_history as history')
             ->join('item as history_item', 'history_item.item_id', '=', 'history.item_id')
+            ->whereIn('history_item.project_id', $projectIds)
             ->where('history.change_type', 'stock_out')
             ->whereColumn('history.old_qty', '>', 'history.new_qty')
             ->select(['history_item.project_id', 'history.item_id'])
@@ -469,7 +472,7 @@ class ProjectDeliveryProgressService
 
         $syncedDrs = DB::table('inventory_history as history')
             ->whereIn('history.change_type', ['stock_out', 'stock_out_verified'])
-            ->whereNotNull('history.project_id')
+            ->whereIn('history.project_id', $projectIds)
             ->whereNotNull('history.dr_no')
             ->select('history.project_id')
             ->selectRaw($this->receiptExpression('history').' as dr_no')
@@ -481,11 +484,15 @@ class ProjectDeliveryProgressService
             ->select(['receipt.project_id', 'receipt.dr_no']);
         $this->groupReceipts($matchedSyncedReceipts, 'receipt');
 
-        $completedReceipts = DB::query()->fromSub($this->receipts($filters), 'completed_receipt')
-            ->where('completed_receipt.is_completed', 1)
-            ->select(['completed_receipt.project_id', 'completed_receipt.dr_no']);
+        $matchedReceipts->unionAll($matchedSyncedReceipts);
+        if ($includeCompleted) {
+            $completedReceipts = DB::query()->fromSub($this->receipts($filters), 'completed_receipt')
+                ->where('completed_receipt.is_completed', 1)
+                ->select(['completed_receipt.project_id', 'completed_receipt.dr_no']);
+            $matchedReceipts->unionAll($completedReceipts);
+        }
 
-        return DB::query()->fromSub($matchedReceipts->unionAll($matchedSyncedReceipts)->unionAll($completedReceipts), 'stock_out_rows')
+        return DB::query()->fromSub($matchedReceipts, 'stock_out_rows')
             ->select('stock_out_rows.project_id', 'stock_out_rows.dr_no')
             ->distinct();
     }
@@ -516,7 +523,7 @@ class ProjectDeliveryProgressService
             ->select(['d.project_id', 'd.school_id', 'valid_receipt.dr_no'])
             ->distinct();
 
-        $stockOutDrs = $this->stockOutDrRows($filters);
+        $stockOutDrs = $this->stockOutDrRows($filters, includeCompleted: false);
         $deliveredDrs = DB::query()->fromSub($this->receipts($filters), 'completed_receipt')
             ->where('completed_receipt.is_completed', 1)
             ->select(['completed_receipt.project_id', 'completed_receipt.dr_no'])->distinct();
@@ -537,7 +544,7 @@ class ProjectDeliveryProgressService
                 $this->matchReceipt($join, 'billed_dr', 'school_dr');
             })
             ->select(['school_dr.project_id', 'school_dr.school_id'])
-            ->selectRaw('MAX(CASE WHEN stock_out_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_stock_out')
+            ->selectRaw('MAX(CASE WHEN stock_out_dr.dr_no IS NOT NULL OR delivered_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_stock_out')
             ->selectRaw('MAX(CASE WHEN delivered_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_delivered')
             ->selectRaw('MAX(CASE WHEN billing_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_billing')
             ->selectRaw('MAX(CASE WHEN billed_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_billed')
@@ -577,7 +584,7 @@ class ProjectDeliveryProgressService
             ->select(['d.project_id', 'valid_receipt.dr_no'])
             ->distinct();
 
-        $stockOutDrs = $this->stockOutDrRows($filters);
+        $stockOutDrs = $this->stockOutDrRows($filters, includeCompleted: false);
         $deliveredDrs = DB::query()->fromSub($this->receipts($filters), 'completed_receipt')
             ->where('completed_receipt.is_completed', 1)
             ->select(['completed_receipt.project_id', 'completed_receipt.dr_no'])->distinct();
@@ -598,7 +605,7 @@ class ProjectDeliveryProgressService
                 $this->matchReceipt($join, 'billed_dr', 'dr_scope');
             })
             ->select(['dr_scope.project_id', 'dr_scope.dr_no'])
-            ->selectRaw('MAX(CASE WHEN stock_out_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_stock_out')
+            ->selectRaw('MAX(CASE WHEN stock_out_dr.dr_no IS NOT NULL OR delivered_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_stock_out')
             ->selectRaw('MAX(CASE WHEN delivered_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_delivered')
             ->selectRaw('MAX(CASE WHEN billing_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_billing')
             ->selectRaw('MAX(CASE WHEN billed_dr.dr_no IS NOT NULL THEN 1 ELSE 0 END) as has_billed')
@@ -900,7 +907,12 @@ class ProjectDeliveryProgressService
     /** @param array<string, mixed> $filters */
     public function operationalWorkflow(array $filters): array
     {
+        $profiler = ProfileProjectDashboard::current();
+        $profiler?->start('school_pipeline_with_receipt_and_inventory_history_aggregation');
         $schoolCounts = $this->schoolPipelineStats($filters)->get();
+        $profiler?->loaded($schoolCounts->count());
+        $profiler?->finish('school_pipeline_with_receipt_and_inventory_history_aggregation');
+        $profiler?->start('delivery_billing_aggregation');
         $billingQuery = $this->deliveryBillingStats($filters);
         if (array_intersect(array_keys($filters), ['lot_id', 'region', 'division', 'municipality'])) {
             $eligibleProjects = DB::query()->fromSub($this->validReceiptKeys($filters), 'eligible_receipt')
@@ -908,6 +920,8 @@ class ProjectDeliveryProgressService
             $billingQuery->whereIn('d.project_id', $eligibleProjects);
         }
         $billingCounts = $billingQuery->get();
+        $profiler?->loaded($billingCounts->count());
+        $profiler?->finish('delivery_billing_aggregation');
         $counts = [];
         foreach (['total_operational_schools_count', 'stock_out_schools_count', 'delivered_schools_count', 'billing_schools_count', 'billed_schools_count'] as $column) {
             $counts[$column] = (int) $schoolCounts->sum($column);

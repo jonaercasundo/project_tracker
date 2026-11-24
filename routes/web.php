@@ -66,6 +66,7 @@ use App\Http\Controllers\TikTokController;
 use App\Http\Controllers\TravelLiquidationController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Warehouse\WarehouseInventoryController;
+use App\Http\Middleware\ProfileProjectDashboard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -311,6 +312,7 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     ])->group(function () {
 
         Route::get('/projects/dashboard', [ProjectDashboardController::class, 'index'])
+            ->middleware(ProfileProjectDashboard::class)
             ->name('projects.dashboard');
         Route::post('/projects/dashboards', [ProjectDashboardController::class, 'storeDashboard'])
             ->name('projects.dashboards.store');

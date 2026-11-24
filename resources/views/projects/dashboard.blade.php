@@ -1,5 +1,5 @@
 <x-project_app-layout>
-<div id="project-dashboard" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+<div id="project-dashboard" class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
     {{-- HEADER BLOCK --}}
     <div class="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-100/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -506,17 +506,33 @@
     (() => {
         const rootSelector = '#project-dashboard';
 
-        async function replaceDashboard(url, options = {}, pushHistory = true) {
+        async function replaceDashboard(url, options = {}, pushHistory = true, loadingMessage = 'Updating dashboard...') {
             const root = document.querySelector(rootSelector);
             if (!root) {
                 return;
             }
 
+            const controller = new AbortController();
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.dataset.dashboardLoading = '';
+            loadingOverlay.className = 'absolute inset-0 z-[200] flex items-start justify-center rounded-2xl bg-white/65 px-4 pt-24 backdrop-blur-[2px]';
+            loadingOverlay.innerHTML = `<div class="w-full max-w-sm rounded-xl border border-blue-100 bg-white p-5 text-center shadow-xl" role="status" aria-live="polite">
+                <span class="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-700">
+                    <svg class="h-6 w-6 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" transform="translate(0 0)"></path></svg>
+                </span>
+                <p class="mt-3 text-sm font-bold text-slate-800">${loadingMessage}</p>
+                <p class="mt-1 text-xs text-slate-500">Your dashboard is updating with the selected data.</p>
+                <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-blue-100"><div class="h-full w-1/3 animate-pulse rounded-full bg-blue-600"></div></div>
+                <button type="button" data-cancel-dashboard-request class="mt-4 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+            </div>`;
+            loadingOverlay.querySelector('[data-cancel-dashboard-request]').addEventListener('click', () => controller.abort());
+            root.append(loadingOverlay);
             root.setAttribute('aria-busy', 'true');
 
             try {
                 const response = await fetch(url, {
                     ...options,
+                    signal: controller.signal,
                     credentials: 'same-origin',
                     headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest', ...(options.headers ?? {}) },
                 });
@@ -538,6 +554,11 @@
                 const currentRoot = document.querySelector(rootSelector);
                 if (currentRoot) {
                     currentRoot.removeAttribute('aria-busy');
+                    currentRoot.querySelector('[data-dashboard-loading]')?.remove();
+                    loadingOverlay.remove();
+                    if (error.name === 'AbortError') {
+                        return;
+                    }
                     let message = currentRoot.querySelector('[data-dashboard-request-error]');
                     if (!message) {
                         message = document.createElement('p');
@@ -571,6 +592,7 @@
             const formData = new FormData(form);
             const url = new URL(form.action, window.location.href);
             const options = { method };
+            const loadingMessage = method === 'GET' ? 'Applying filters...' : (form.id === 'delete-dashboard-tab' ? 'Deleting dashboard...' : 'Saving dashboard widgets...');
 
             if (method === 'GET') {
                 for (const [key, value] of formData.entries()) {
@@ -580,7 +602,7 @@
                 options.body = formData;
             }
 
-            replaceDashboard(url, options).finally(() => {
+            replaceDashboard(url, options, true, loadingMessage).finally(() => {
                 if (submitter?.isConnected) {
                     submitter.disabled = false;
                 }
@@ -594,7 +616,7 @@
             }
 
             event.preventDefault();
-            replaceDashboard(link.href);
+            replaceDashboard(link.href, {}, true, 'Loading dashboard...');
         });
 
         window.addEventListener('popstate', () => replaceDashboard(window.location.href, {}, false));

@@ -73,6 +73,147 @@
 
     </div>
 
+    {{-- PERSONAL DASHBOARDS --}}
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="personal-dashboard-title">
+        <header class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 id="personal-dashboard-title" class="text-lg font-extrabold text-slate-900">{{ $dashboard->name }}</h2>
+                <p class="mt-0.5 text-xs text-slate-500">Choose the metrics and charts shown on each of your dashboards.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">Refresh</a>
+                <details class="relative">
+                    <summary class="cursor-pointer list-none rounded-lg bg-blue-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-800">＋ New dashboard</summary>
+                    <form method="POST" action="{{ route('projects.dashboards.store') }}" class="absolute right-0 z-20 mt-2 flex w-72 gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                        @csrf
+                        <label class="sr-only" for="new-dashboard-name">Dashboard name</label>
+                        <input id="new-dashboard-name" name="name" required maxlength="80" placeholder="Dashboard name" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600">
+                        <button class="rounded-lg bg-blue-900 px-3 py-2 text-xs font-bold text-white hover:bg-blue-800">Add</button>
+                    </form>
+                </details>
+            </div>
+        </header>
+
+        @if($errors->any())
+            <div role="alert" class="border-b border-rose-200 bg-rose-50 px-5 py-3 text-xs font-semibold text-rose-800">{{ $errors->first() }}</div>
+        @endif
+
+        <nav class="flex items-center gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 pt-3" aria-label="Your dashboards">
+            @foreach($dashboards as $dashboardTab)
+                <div class="flex shrink-0 items-center rounded-t-lg border border-b-0 {{ $dashboardTab->dashboard_id === $dashboard->dashboard_id ? 'border-blue-900 bg-blue-900 text-white' : 'border-slate-200 bg-white text-slate-700' }}">
+                    <a href="{{ route('projects.dashboard', ['dashboard_id' => $dashboardTab->dashboard_id]) }}" @if($dashboardTab->dashboard_id === $dashboard->dashboard_id) aria-current="page" @endif class="px-3 py-2 text-xs font-bold">{{ $dashboardTab->name }}</a>
+                    @if(! $dashboardTab->is_default)
+                        <form method="POST" action="{{ route('projects.dashboards.destroy', $dashboardTab->dashboard_id) }}" onsubmit="return confirm('Delete this dashboard?')" class="pr-2">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="rounded px-1 text-sm leading-none {{ $dashboardTab->dashboard_id === $dashboard->dashboard_id ? 'text-blue-100 hover:text-white' : 'text-slate-400 hover:text-rose-600' }}" aria-label="Delete {{ $dashboardTab->name }}">×</button>
+                        </form>
+                    @endif
+                </div>
+            @endforeach
+        </nav>
+
+        <form id="dashboard-widget-layout" method="POST" action="{{ route('projects.dashboards.update', $dashboard->dashboard_id) }}">
+            @csrf
+            @method('PATCH')
+            <div class="grid grid-cols-1 gap-4 bg-blue-50/70 p-4 lg:grid-cols-2">
+                @foreach($dashboardWidgets as $widgetKey => $widgetSettings)
+                    @php
+                        $widget = $widgetCatalog[$widgetKey];
+                        $widgetRows = $widget['kind'] === 'chart' ? ($widgetValues[$widgetKey] ?? []) : [];
+                        $chartMaximum = max(1, ...array_column($widgetRows, 'value'));
+                        $chartTotal = array_sum(array_column($widgetRows, 'value'));
+                        $chartPalette = ['#2563eb', '#059669', '#7c3aed', '#d97706', '#db2777', '#0891b2', '#4f46e5'];
+                        $chartStops = [];
+                        $chartCursor = 0;
+                        foreach ($widgetRows as $rowIndex => $row) {
+                            $chartStart = $chartCursor;
+                            $chartCursor += $chartTotal > 0 ? ($row['value'] / $chartTotal) * 100 : 0;
+                            $chartStops[] = $chartPalette[$rowIndex % count($chartPalette)].' '.$chartStart.'% '.$chartCursor.'%';
+                        }
+                        $chartBackground = $chartStops === [] ? '#e2e8f0' : 'conic-gradient('.implode(', ', $chartStops).')';
+                    @endphp
+                    <article class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <header class="flex flex-wrap items-center justify-between gap-3 bg-blue-100/70 px-4 py-3">
+                            <h3 class="text-sm font-bold text-slate-800">{{ $widget['label'] }}</h3>
+                            @if($widget['kind'] === 'chart')
+                                <label class="sr-only" for="chart-{{ $widgetKey }}">Chart type for {{ $widget['label'] }}</label>
+                                <select id="chart-{{ $widgetKey }}" name="charts[{{ $widgetKey }}]" form="dashboard-widget-layout" onchange="this.form.requestSubmit()" class="rounded-lg border-slate-300 py-1.5 pl-2 pr-7 text-xs text-slate-700 focus:border-blue-600 focus:ring-blue-600">
+                                    @foreach(['doughnut' => 'Doughnut', 'bar' => 'Bar', 'column' => 'Column'] as $chartValue => $chartLabel)
+                                        <option value="{{ $chartValue }}" @selected(($widgetSettings['chart'] ?? 'bar') === $chartValue)>{{ $chartLabel }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
+                        </header>
+                        @if($widget['kind'] === 'metric')
+                            <div class="flex min-h-40 flex-col justify-center px-5 py-6">
+                                <p class="text-4xl font-black tabular-nums text-slate-900">{{ number_format($widgetValues[$widgetKey] ?? 0) }}</p>
+                                <p class="mt-1 text-xs text-slate-500">Current system total</p>
+                            </div>
+                        @elseif(($widgetSettings['chart'] ?? 'bar') === 'doughnut')
+                            <div class="flex min-h-40 items-center gap-6 px-5 py-5">
+                                <div class="relative h-28 w-28 shrink-0 rounded-full" style="background: {{ $chartBackground }}">
+                                    <div class="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-white text-center">
+                                        <span class="text-lg font-black tabular-nums text-slate-900">{{ number_format($chartTotal) }}</span>
+                                        <span class="text-[10px] text-slate-500">Total</span>
+                                    </div>
+                                </div>
+                                <div class="min-w-0 flex-1 space-y-2">
+                                    @forelse($widgetRows as $rowIndex => $row)
+                                        <div class="flex items-center gap-2 text-xs">
+                                            <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background: {{ $chartPalette[$rowIndex % count($chartPalette)] }}"></span>
+                                            <span class="min-w-0 flex-1 truncate text-slate-600">{{ $row['label'] }}</span>
+                                            <span class="font-bold tabular-nums text-slate-800">{{ number_format($row['value']) }}</span>
+                                        </div>
+                                    @empty
+                                        <p class="text-xs text-slate-500">No status data is available yet.</p>
+                                    @endforelse
+                                </div>
+                            </div>
+                        @else
+                            <div class="min-h-40 px-5 py-5 {{ ($widgetSettings['chart'] ?? 'bar') === 'column' ? 'flex items-end justify-around gap-4' : 'space-y-3' }}">
+                                @forelse($widgetRows as $rowIndex => $row)
+                                    @if(($widgetSettings['chart'] ?? 'bar') === 'column')
+                                        <div class="flex h-28 min-w-16 flex-col items-center justify-end gap-1 border-b border-slate-200 px-1 text-center">
+                                            <span class="text-[11px] font-bold tabular-nums text-slate-700">{{ number_format($row['value']) }}</span>
+                                            <div class="w-8 rounded-t-md" style="height: {{ max(3, ($row['value'] / $chartMaximum) * 66) }}%; background: {{ $chartPalette[$rowIndex % count($chartPalette)] }}"></div>
+                                            <span class="w-full truncate text-[10px] text-slate-500" title="{{ $row['label'] }}">{{ $row['label'] }}</span>
+                                        </div>
+                                    @else
+                                        <div>
+                                            <div class="mb-1 flex justify-between gap-3 text-xs">
+                                                <span class="truncate text-slate-600">{{ $row['label'] }}</span>
+                                                <span class="font-bold tabular-nums text-slate-800">{{ number_format($row['value']) }}</span>
+                                            </div>
+                                            <div class="h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full" style="width: {{ ($row['value'] / $chartMaximum) * 100 }}%; background: {{ $chartPalette[$rowIndex % count($chartPalette)] }}"></div></div>
+                                        </div>
+                                    @endif
+                                @empty
+                                    <p class="py-10 text-center text-xs text-slate-500">No status data is available yet.</p>
+                                @endforelse
+                            </div>
+                        @endif
+                    </article>
+                @endforeach
+            </div>
+
+            <details class="border-t border-slate-200 px-4 py-3">
+                <summary class="cursor-pointer text-xs font-bold text-blue-800">Choose widgets</summary>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    @foreach($widgetCatalog as $widgetKey => $widget)
+                        <label class="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs hover:bg-slate-50">
+                            <input type="checkbox" name="widgets[]" value="{{ $widgetKey }}" form="dashboard-widget-layout" @checked(isset($dashboardWidgets[$widgetKey])) class="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600">
+                            <span><span class="block font-bold text-slate-700">{{ $widget['label'] }}</span><span class="mt-0.5 block text-slate-500">{{ $widget['kind'] === 'metric' ? 'Current total' : 'Status breakdown chart' }}</span></span>
+                        </label>
+                    @endforeach
+                </div>
+                <div class="mt-3 flex justify-end">
+                    <button type="submit" form="dashboard-widget-layout" class="rounded-lg bg-blue-900 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800">Save widgets</button>
+                </div>
+            </details>
+        </form>
+    </section>
+
     {{-- INTERACTIVE NAVIGATION ENGINE DRIVERS --}}
     <div>
         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1 select-none">Application Core Control Gateways</h3>

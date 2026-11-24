@@ -3,16 +3,27 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\UserDashboard;
 use App\Services\BillingDocumentStatusService;
 use App\Services\ProjectDrProgressReportService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ProjectDashboardController extends Controller
 {
+    private const WIDGETS = [
+        'total_projects' => ['label' => 'Total projects', 'kind' => 'metric'],
+        'pending_projects' => ['label' => 'Pending projects', 'kind' => 'metric'],
+        'delivered_assets' => ['label' => 'Delivered assets', 'kind' => 'metric'],
+        'project_status' => ['label' => 'Project status', 'kind' => 'chart'],
+        'delivery_status' => ['label' => 'Delivery status', 'kind' => 'chart'],
+    ];
+
     public function reportsAnalytics(Request $request, BillingDocumentStatusService $billingDocumentStatus, ProjectDrProgressReportService $drProgressReport): View
     {
         $projects = Project::query()->orderBy('project_name')->get([
@@ -103,14 +114,139 @@ class ProjectDashboardController extends Controller
         ])->header('Cache-Control', 'no-store, private');
     }
 
-    public function index()
+    public function index(Request $request): View
     {
+        $userId = (int) $request->user()->getAuthIdentifier();
+        $dashboards = UserDashboard::query()
+            ->where('user_id', $userId)
+            ->orderBy('sort_order')
+            ->orderBy('dashboard_id')
+            ->get();
+
+        if ($dashboards->isEmpty()) {
+            $dashboards = collect([UserDashboard::query()->create([
+                'user_id' => $userId,
+                'name' => 'Overview',
+                'widgets' => [
+                    'total_projects' => ['chart' => 'number'],
+                    'pending_projects' => ['chart' => 'number'],
+                    'delivered_assets' => ['chart' => 'number'],
+                    'project_status' => ['chart' => 'doughnut'],
+                ],
+                'is_default' => true,
+            ])]);
+        }
+
+        $dashboard = $dashboards->firstWhere('dashboard_id', $request->integer('dashboard_id')) ?? $dashboards->first();
+        $selectedWidgets = $dashboard->widgets ?? [];
+        $widgetValues = [];
+
+        if (isset($selectedWidgets['total_projects'])) {
+            $widgetValues['total_projects'] = Project::query()->count();
+        }
+        if (isset($selectedWidgets['pending_projects'])) {
+            $widgetValues['pending_projects'] = Project::query()->where('status', 'Pending')->count();
+        }
+        if (isset($selectedWidgets['delivered_assets'])) {
+            $widgetValues['delivered_assets'] = DB::table('deliveries')->where('status', 'delivered')->count();
+        }
+        if (isset($selectedWidgets['project_status'])) {
+            $widgetValues['project_status'] = Project::query()
+                ->select('status', DB::raw('COUNT(*) AS total'))
+                ->groupBy('status')
+                ->orderBy('status')
+                ->get()
+                ->map(fn ($row): array => ['label' => (string) ($row->status ?: 'Unassigned'), 'value' => (int) $row->total])
+                ->all();
+        }
+        if (isset($selectedWidgets['delivery_status'])) {
+            $widgetValues['delivery_status'] = DB::table('deliveries')
+                ->select('status', DB::raw('COUNT(*) AS total'))
+                ->groupBy('status')
+                ->orderBy('status')
+                ->get()
+                ->map(fn ($row): array => ['label' => (string) ($row->status ?: 'Unassigned'), 'value' => (int) $row->total])
+                ->all();
+        }
+
         return view('projects.dashboard', [
             'totalProjects' => Project::count(),
             'pendingProjects' => Project::where('status', 'Pending')->count(),
             'deliveredProjects' => DB::table('deliveries')
                 ->where('status', 'delivered')
                 ->count(),
+            'dashboards' => $dashboards,
+            'dashboard' => $dashboard,
+            'dashboardWidgets' => $selectedWidgets,
+            'widgetCatalog' => self::WIDGETS,
+            'widgetValues' => $widgetValues,
         ]);
+    }
+
+    public function storeDashboard(Request $request): RedirectResponse
+    {
+        $request->merge(['name' => trim((string) $request->input('name'))]);
+        $userId = (int) $request->user()->getAuthIdentifier();
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:80', Rule::unique('user_dashboards', 'name')->where('user_id', $userId)],
+        ]);
+        $dashboard = UserDashboard::query()->create([
+            'user_id' => $userId,
+            'name' => trim($validated['name']),
+            'widgets' => [
+                'total_projects' => ['chart' => 'number'],
+                'pending_projects' => ['chart' => 'number'],
+                'project_status' => ['chart' => 'bar'],
+            ],
+            'sort_order' => (int) UserDashboard::query()->where('user_id', $userId)->max('sort_order') + 1,
+        ]);
+
+        return redirect()->route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]);
+    }
+
+    public function updateDashboard(Request $request, int $dashboard): RedirectResponse
+    {
+        $dashboardLayout = UserDashboard::query()
+            ->where('user_id', $request->user()->getAuthIdentifier())
+            ->where('dashboard_id', $dashboard)
+            ->firstOrFail();
+        $validated = $request->validate([
+            'widgets' => ['required', 'array', 'min:1', 'max:5'],
+            'widgets.*' => ['required', 'string', Rule::in(array_keys(self::WIDGETS))],
+            'charts' => ['nullable', 'array'],
+            'charts.*' => ['nullable', Rule::in(['doughnut', 'bar', 'column'])],
+        ]);
+        $widgets = [];
+
+        foreach (array_unique($validated['widgets']) as $widgetKey) {
+            $kind = self::WIDGETS[$widgetKey]['kind'];
+            $widgets[$widgetKey] = [
+                'chart' => $kind === 'metric'
+                    ? 'number'
+                    : ($validated['charts'][$widgetKey] ?? 'bar'),
+            ];
+        }
+
+        $dashboardLayout->update(['widgets' => $widgets]);
+
+        return redirect()->route('projects.dashboard', ['dashboard_id' => $dashboardLayout->dashboard_id]);
+    }
+
+    public function destroyDashboard(Request $request, int $dashboard): RedirectResponse
+    {
+        $dashboardLayout = UserDashboard::query()
+            ->where('user_id', $request->user()->getAuthIdentifier())
+            ->where('dashboard_id', $dashboard)
+            ->where('is_default', false)
+            ->firstOrFail();
+        $dashboardLayout->delete();
+
+        $nextDashboard = UserDashboard::query()
+            ->where('user_id', $request->user()->getAuthIdentifier())
+            ->orderBy('sort_order')
+            ->orderBy('dashboard_id')
+            ->first();
+
+        return redirect()->route('projects.dashboard', $nextDashboard ? ['dashboard_id' => $nextDashboard->dashboard_id] : []);
     }
 }

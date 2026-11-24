@@ -312,6 +312,12 @@ Route::middleware(['auth', 'active.user'])->group(function () {
 
         Route::get('/projects/dashboard', [ProjectDashboardController::class, 'index'])
             ->name('projects.dashboard');
+        Route::post('/projects/dashboards', [ProjectDashboardController::class, 'storeDashboard'])
+            ->name('projects.dashboards.store');
+        Route::patch('/projects/dashboards/{dashboard}', [ProjectDashboardController::class, 'updateDashboard'])
+            ->whereNumber('dashboard')->name('projects.dashboards.update');
+        Route::delete('/projects/dashboards/{dashboard}', [ProjectDashboardController::class, 'destroyDashboard'])
+            ->whereNumber('dashboard')->name('projects.dashboards.destroy');
 
         Route::get('/projects/reports-analytics', [ProjectDashboardController::class, 'reportsAnalytics'])
             ->name('projects.reports.analytics');

@@ -183,9 +183,9 @@
         openEditor(create) {
             this.creating = create;
             this.tabName = create ? '' : @js($dashboard->name);
-            this.selected = create ? ['project_status'] : @js(array_keys($dashboardWidgets));
+            this.selected = create ? ['operational_workflow'] : @js(array_keys($dashboardWidgets));
             this.activeIndex = 0;
-            this.selectedCharts = create ? { project_status: 'bar' } : @js(collect($dashboardWidgets)->map(fn ($settings) => $settings['chart'] ?? 'bar')->all());
+            this.selectedCharts = create ? {} : @js(collect($dashboardWidgets)->map(fn ($settings) => $settings['chart'] ?? 'bar')->all());
             this.$refs.form.action = create ? this.createAction : this.updateAction;
             this.$refs.method.disabled = create;
             this.$refs.dialog.showModal();
@@ -261,6 +261,88 @@
                             <div class="px-4 py-5">
                                 @include('operation.delivery.partials.monitoring-pipeline', ['project' => $widgetValues[$widgetKey]])
                             </div>
+                        @elseif($widget['kind'] === 'billing_status')
+                            @php
+                                $billingWidget = $widgetValues[$widgetKey];
+                                $billingMetrics = [
+                                    ['key' => 'total', 'label' => 'Total schools', 'value' => $billingWidget['summary']['total'], 'description' => 'Unique schools with applicable DRs'],
+                                    ['key' => 'processed', 'label' => 'Processed', 'value' => $billingWidget['summary']['processed'], 'description' => 'Encoded for every applicable lot'],
+                                    ['key' => 'remaining', 'label' => 'Remaining', 'value' => $billingWidget['summary']['remaining'], 'description' => 'Missing a date for an applicable lot'],
+                                    ['key' => 'processed_today', 'label' => 'Processed today', 'value' => $billingWidget['summary']['processed_today'], 'description' => 'Schools with an SAP date today'],
+                                ];
+                                $billingProgress = $billingWidget['progress'];
+                            @endphp
+                            <div class="space-y-3 p-3 sm:p-4">
+                                @if(! empty($widgetValues['billing_document_status_notice']))
+                                    <p role="status" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Billing sheet data is unavailable: {{ $widgetValues['billing_document_status_notice'] }}</p>
+                                @endif
+                                <div class="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                                    @foreach($billingMetrics as $metric)
+                                        <section class="flex min-h-28 flex-col justify-between rounded-xl border border-slate-200 bg-white p-3 {{ $metric['key'] === 'processed' ? 'border-slate-800 bg-slate-950 text-white' : '' }}">
+                                            <div>
+                                                <p class="text-[9px] font-bold uppercase tracking-wide {{ $metric['key'] === 'processed' ? 'text-slate-300' : 'text-slate-500' }}">{{ $metric['label'] }}</p>
+                                                <p class="mt-2 font-mono text-2xl font-black tabular-nums {{ $metric['key'] === 'processed' ? 'text-white' : 'text-slate-950' }}">{{ $metric['value'] === null ? '—' : number_format($metric['value']) }}</p>
+                                            </div>
+                                            <p class="mt-2 text-[9px] leading-3 {{ $metric['key'] === 'processed' ? 'text-slate-300' : 'text-slate-500' }}">{{ $metric['description'] }}</p>
+                                        </section>
+                                    @endforeach
+                                </div>
+
+                                @if($billingProgress)
+                                    @php
+                                        $todayPosition = min(100, max(0, $billingProgress['elapsed_percentage']));
+                                        $todayLabelTransform = $todayPosition <= 10 ? 'translateX(0)' : ($todayPosition >= 90 ? 'translateX(-100%)' : 'translateX(-50%)');
+                                        $cutoffDate = \Carbon\CarbonImmutable::parse($billingProgress['cutoff_date']);
+                                        $startDate = \Carbon\CarbonImmutable::parse($billingProgress['start_date']);
+                                        $timelineSpanDays = max(0, (int) $startDate->diffInDays($cutoffDate));
+                                        $timelineFirstThird = $startDate->addDays(intdiv($timelineSpanDays, 3));
+                                        $timelineSecondThird = $startDate->addDays(intdiv($timelineSpanDays * 2, 3));
+                                        $forecastTone = in_array($billingProgress['pace_status'], ['On track', 'Target met'], true) ? 'text-emerald-700' : 'text-rose-600';
+                                        $progressStatus = match ($billingProgress['pace_status']) {
+                                            'On track' => 'ON TRACK',
+                                            'Target met' => 'TARGET MET',
+                                            'Cutoff passed' => 'CUTOFF PASSED',
+                                            'Cutoff is today' => 'CUTOFF TODAY',
+                                            default => 'DELAYED',
+                                        };
+                                        $historicalForecastLabel = $billingProgress['remaining'] === 0
+                                            ? 'COMPLETED'
+                                            : ($billingProgress['historical_forecast_finish_date']
+                                                ? strtoupper(\Carbon\CarbonImmutable::parse($billingProgress['historical_forecast_finish_date'])->format('M d, Y'))
+                                                : 'NOT ENOUGH HISTORY');
+                                    @endphp
+                                    <section class="space-y-3 rounded-xl border border-slate-200 bg-white p-4" aria-label="Billing document cutoff progress">
+                                        <header class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                            <h4 class="text-xs font-black uppercase tracking-wide text-slate-700">
+                                                {{ strtoupper($cutoffDate->format('M d')) }} cutoff
+                                                @if($billingProgress['days_remaining'] > 0)<span class="px-1 text-slate-400">·</span>{{ $billingProgress['days_remaining'] }} days left
+                                                @elseif($billingProgress['pace_status'] === 'Cutoff is today')<span class="px-1 text-slate-400">·</span>Cutoff today
+                                                @else<span class="px-1 text-slate-400">·</span>Cutoff passed @endif
+                                            </h4>
+                                            <p class="text-[10px] font-black uppercase tracking-wide {{ $forecastTone }} sm:text-right">{{ $billingProgress['pace_assessment'] }}</p>
+                                        </header>
+                                        <div aria-label="Cutoff progress timeline">
+                                            <div class="relative mb-1 h-4">
+                                                <span class="absolute top-0 whitespace-nowrap text-[8px] font-extrabold tracking-wide text-slate-700" style="left: {{ $todayPosition }}%; transform: {{ $todayLabelTransform }}">TODAY · {{ strtoupper(\Carbon\CarbonImmutable::parse($billingProgress['today'])->format('M d')) }}</span>
+                                            </div>
+                                            <div class="relative h-3 overflow-visible border border-slate-400 bg-slate-200" role="img" aria-label="{{ number_format($billingProgress['percentage'], 1) }} percent completed by cutoff">
+                                                <div class="absolute inset-y-0 left-0 bg-emerald-500" style="width: {{ min(100, max(0, $billingProgress['percentage'])) }}%"></div>
+                                                @if($todayPosition > $billingProgress['percentage'])<div class="absolute inset-y-0 bg-rose-600" style="left: {{ $billingProgress['percentage'] }}%; width: {{ $todayPosition - $billingProgress['percentage'] }}%"></div>@endif
+                                                <span class="absolute inset-y-[-3px] z-10 border-l-[3px] border-slate-800" style="left: {{ $todayPosition }}%" aria-hidden="true"></span>
+                                                <span class="absolute inset-y-[-2px] right-0 border-l-2 border-rose-500" aria-hidden="true"></span>
+                                            </div>
+                                            <div class="flex justify-between gap-2 text-[8px] font-semibold text-slate-500"><span>{{ $startDate->format('M d') }}</span><span>{{ $timelineFirstThird->format('M d') }}</span><span>{{ $timelineSecondThird->format('M d') }}</span><span>{{ $cutoffDate->format('M d') }}</span></div>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-3 border-t border-slate-200 pt-3 sm:grid-cols-4">
+                                            <div><p class="text-[8px] font-bold uppercase text-slate-500">Progress</p><p class="font-mono text-sm font-black tabular-nums">{{ number_format($billingProgress['percentage'], 1) }}%</p></div>
+                                            <div><p class="text-[8px] font-bold uppercase text-slate-500">Needed per day</p><p class="font-mono text-sm font-black tabular-nums">{{ $billingProgress['required_per_day'] === null ? 'N/A' : number_format($billingProgress['required_per_day'], 0) }}</p></div>
+                                            <div><p class="text-[8px] font-bold uppercase text-slate-500">Progress status</p><p class="text-xs font-black {{ $forecastTone }}">{{ $progressStatus }}</p></div>
+                                            <div><p class="text-[8px] font-bold uppercase text-slate-500">Estimated completion</p><p class="text-xs font-black">{{ $historicalForecastLabel }}</p><p class="text-[8px] text-slate-500">At historical pace</p></div>
+                                        </div>
+                                        @if($billingProgress['data_limitation'])<p class="text-[9px] leading-4 text-amber-800">{{ $billingProgress['data_limitation'] }}</p>@endif
+                                    </section>
+                                @endif
+                            </div>
                         @elseif($widget['kind'] === 'summary')
                             <div class="grid min-h-40 grid-cols-2 gap-3 px-4 py-5">
                                 @foreach($widgetValues[$widgetKey] ?? [] as $summaryRow)
@@ -269,9 +351,6 @@
                                         <p class="mt-1 text-xl font-black tabular-nums text-slate-900">{{ $summaryRow['value'] === null ? '—' : number_format((int) $summaryRow['value']) }}</p>
                                     </div>
                                 @endforeach
-                                @if($widgetKey === 'billing_document_status' && ! empty($widgetValues['billing_document_status_notice']))
-                                    <p class="col-span-2 self-center text-center text-xs text-amber-700">Billing source is currently unavailable.</p>
-                                @endif
                             </div>
                         @elseif(($widgetSettings['chart'] ?? 'bar') === 'doughnut')
                             <div class="flex min-h-40 items-center gap-6 px-5 py-5">
@@ -348,8 +427,7 @@
                         <h3 class="mb-1 text-sm font-bold text-slate-700">Available widgets</h3>
                         <div class="h-64 space-y-2 overflow-y-auto rounded-lg border border-slate-300 p-2">
                             @foreach([
-                                'Projects' => ['project_status', 'project_monitoring', 'lifecycle_monitoring'],
-                                'Deliveries' => ['delivery_status', 'delivered_assets', 'tracking_deliveries', 'delivery_monitoring', 'operational_workflow'],
+                                'Deliveries' => ['operational_workflow'],
                                 'Billing' => ['billing_document_status'],
                                 'Inventory' => ['inventory_monitoring'],
                             ] as $category => $widgetKeys)

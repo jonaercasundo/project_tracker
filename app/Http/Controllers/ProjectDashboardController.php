@@ -8,10 +8,13 @@ use App\Services\BillingDocumentStatusService;
 use App\Services\ProjectDrProgressReportService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class ProjectDashboardController extends Controller
@@ -114,6 +117,17 @@ class ProjectDashboardController extends Controller
 
     public function index(Request $request): View
     {
+        $filters = $request->validate([
+            'dashboard_id' => ['nullable', 'integer'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'project' => ['nullable', 'integer', 'exists:projects,project_id'],
+            'lot' => ['nullable', 'integer', 'exists:lot,lot_id'],
+            'region' => ['nullable', 'string', 'max:120'],
+            'division' => ['nullable', 'string', 'max:120'],
+            'municipality' => ['nullable', 'string', 'max:120'],
+            'assigned_logistics' => ['nullable', 'regex:/^(unassigned|[1-9][0-9]*)$/D'],
+            'logistics_status' => ['nullable', Rule::in(['pending', 'logistics_received', 'delivered'])],
+        ]);
         $userId = (int) $request->user()->getAuthIdentifier();
         $dashboards = UserDashboard::query()
             ->where('user_id', $userId)
@@ -136,12 +150,29 @@ class ProjectDashboardController extends Controller
         $dashboard = $dashboards->firstWhere('dashboard_id', $request->integer('dashboard_id')) ?? $dashboards->first();
         $selectedWidgets = array_intersect_key($dashboard->widgets ?? [], self::WIDGETS);
         $widgetValues = [];
+        $deliveryScopedFilters = array_filter(
+            array_intersect_key($filters, array_flip(['search', 'lot', 'region', 'division', 'municipality', 'assigned_logistics', 'logistics_status'])),
+            fn ($value): bool => $value !== null && $value !== '',
+        );
+        $deliveryQuery = $this->dashboardDeliveriesQuery($filters);
+        $projectQuery = Project::query();
+
+        if (! empty($filters['project'])) {
+            $projectQuery->where('project_id', $filters['project']);
+        }
+        if ($deliveryScopedFilters !== []) {
+            $projectQuery->whereIn('project_id', (clone $deliveryQuery)->select('d.project_id')->distinct());
+        }
+
+        $totalProjects = (clone $projectQuery)->count();
+        $pendingProjects = (clone $projectQuery)->where('status', 'Pending')->count();
+        $deliveredProjects = (clone $deliveryQuery)->where('d.status', 'delivered')->count();
 
         if (isset($selectedWidgets['delivered_assets'])) {
-            $widgetValues['delivered_assets'] = DB::table('deliveries')->where('status', 'delivered')->count();
+            $widgetValues['delivered_assets'] = $deliveredProjects;
         }
         if (isset($selectedWidgets['project_status'])) {
-            $widgetValues['project_status'] = Project::query()
+            $widgetValues['project_status'] = (clone $projectQuery)
                 ->select('status', DB::raw('COUNT(*) AS total'))
                 ->groupBy('status')
                 ->orderBy('status')
@@ -150,27 +181,140 @@ class ProjectDashboardController extends Controller
                 ->all();
         }
         if (isset($selectedWidgets['delivery_status'])) {
-            $widgetValues['delivery_status'] = DB::table('deliveries')
-                ->select('status', DB::raw('COUNT(*) AS total'))
-                ->groupBy('status')
-                ->orderBy('status')
+            $widgetValues['delivery_status'] = (clone $deliveryQuery)
+                ->select('d.status as status', DB::raw('COUNT(*) AS total'))
+                ->groupBy('d.status')
+                ->orderBy('d.status')
                 ->get()
                 ->map(fn ($row): array => ['label' => (string) ($row->status ?: 'Unassigned'), 'value' => (int) $row->total])
                 ->all();
         }
 
+        $projects = DB::table('projects')->orderBy('project_name')->get(['project_id', 'project_name']);
+        $lots = DB::table('lot')->when(! empty($filters['project']), fn (Builder $query) => $query->where('project_id', $filters['project']))
+            ->orderBy('lot_name')->get(['lot_id', 'lot_name']);
+        $regions = $this->dashboardLocationOptions($filters, ['project', 'lot'], 'region');
+        $divisions = $this->dashboardLocationOptions($filters, ['project', 'lot', 'region'], 'division');
+        $municipalities = $this->dashboardLocationOptions($filters, ['project', 'lot', 'region', 'division'], 'municipality');
+        $assignedProviders = DB::table('logistics as provider')
+            ->whereExists(fn (Builder $query) => $query->selectRaw('1')->from('logistics_location')
+                ->whereColumn('logistics_location.logistics_id', 'provider.logistic_id'))
+            ->orderBy('provider.logistic_name')
+            ->get(['provider.logistic_id', 'provider.logistic_name']);
+
         return view('projects.dashboard', [
-            'totalProjects' => Project::count(),
-            'pendingProjects' => Project::where('status', 'Pending')->count(),
-            'deliveredProjects' => DB::table('deliveries')
-                ->where('status', 'delivered')
-                ->count(),
+            'totalProjects' => $totalProjects,
+            'pendingProjects' => $pendingProjects,
+            'deliveredProjects' => $deliveredProjects,
             'dashboards' => $dashboards,
             'dashboard' => $dashboard,
             'dashboardWidgets' => $selectedWidgets,
             'widgetCatalog' => self::WIDGETS,
             'widgetValues' => $widgetValues,
+            'filters' => $filters,
+            'projects' => $projects,
+            'lots' => $lots,
+            'regions' => $regions,
+            'divisions' => $divisions,
+            'municipalities' => $municipalities,
+            'assignedProviders' => $assignedProviders,
+            'filteredDeliveryCount' => (clone $deliveryQuery)->count(),
         ]);
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function dashboardDeliveriesQuery(array $filters): Builder
+    {
+        $query = DB::table('deliveries as d')
+            ->leftJoin('keystage as k', 'k.keystage_id', '=', 'd.keystage_id')
+            ->join('lot as l', 'l.lot_id', '=', 'd.lot_id')
+            ->join('projects as p', 'p.project_id', '=', 'd.project_id')
+            ->join('school as s', 's.school_id', '=', 'd.school_id')
+            ->leftJoin('logistics_location as ll', 'll.logistics_location_id', '=', 'd.logistics_location_id')
+            ->leftJoin('logistics as provider', 'provider.logistic_id', '=', 'll.logistics_id');
+
+        if (! empty($filters['search'])) {
+            $term = '%'.$filters['search'].'%';
+            $query->where(fn (Builder $searchQuery) => $searchQuery
+                ->where('d.dr_no', 'like', $term)
+                ->orWhere('p.project_name', 'like', $term)
+                ->orWhere('s.school_name', 'like', $term)
+                ->orWhere('l.lot_name', 'like', $term));
+        }
+        if (! empty($filters['project'])) {
+            $query->where('d.project_id', $filters['project']);
+        }
+        if (! empty($filters['lot'])) {
+            $query->where('d.lot_id', $filters['lot']);
+        }
+        if (! empty($filters['region'])) {
+            $query->where('s.region', $filters['region']);
+        }
+        if (! empty($filters['division'])) {
+            $query->where('s.division', $filters['division']);
+        }
+        if (! empty($filters['municipality'])) {
+            $query->where('s.municipality', $filters['municipality']);
+        }
+        if (($filters['assigned_logistics'] ?? null) === 'unassigned') {
+            $query->whereNull('provider.logistic_id');
+        } elseif (! empty($filters['assigned_logistics'])) {
+            $query->where('provider.logistic_id', (int) $filters['assigned_logistics']);
+        }
+
+        $logisticsStatus = $filters['logistics_status'] ?? null;
+        if ($logisticsStatus !== null) {
+            if (! Schema::hasTable('logistics_dr_tracking')) {
+                if ($logisticsStatus !== 'pending') {
+                    $query->whereRaw('1 = 0');
+                }
+            } else {
+                $trackingMatch = function (Builder $trackingQuery): void {
+                    $trackingQuery->selectRaw('1')
+                        ->from('logistics_dr_tracking as tracking')
+                        ->whereColumn('tracking.project_id', 'd.project_id');
+
+                    if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+                        $trackingQuery->whereRaw('tracking.school_scope_hash = SHA2(CAST(d.school_id AS BINARY), 256)')
+                            ->whereRaw('tracking.dr_reference_hash = SHA2(CAST(d.dr_no AS BINARY), 256)')
+                            ->whereRaw('BINARY tracking.school_id = BINARY d.school_id')
+                            ->whereRaw('BINARY tracking.dr_reference = BINARY d.dr_no');
+                    } else {
+                        $trackingQuery->whereRaw('tracking.school_id = d.school_id COLLATE BINARY')
+                            ->whereRaw('tracking.dr_reference = d.dr_no COLLATE BINARY');
+                    }
+                };
+
+                if ($logisticsStatus === 'pending') {
+                    $query->whereNotExists($trackingMatch);
+                } else {
+                    $query->whereExists(function (Builder $trackingQuery) use ($trackingMatch, $logisticsStatus): void {
+                        $trackingMatch($trackingQuery);
+                        $trackingQuery->where('tracking.logistics_status', $logisticsStatus);
+                    });
+                }
+            }
+        }
+
+        return $query;
+    }
+
+    /** @param array<string, mixed> $filters
+     * @param  list<string>  $parentFilters
+     */
+    private function dashboardLocationOptions(array $filters, array $parentFilters, string $column): Collection
+    {
+        $query = DB::table('deliveries as d')
+            ->join('school as s', 's.school_id', '=', 'd.school_id')
+            ->whereNotNull('s.'.$column);
+
+        foreach ($parentFilters as $filter) {
+            if (! empty($filters[$filter])) {
+                $query->where($filter === 'project' ? 'd.project_id' : ($filter === 'lot' ? 'd.lot_id' : 's.'.$filter), $filters[$filter]);
+            }
+        }
+
+        return $query->select('s.'.$column.' as value')->distinct()->orderBy('s.'.$column)->pluck('value');
     }
 
     public function storeDashboard(Request $request): RedirectResponse

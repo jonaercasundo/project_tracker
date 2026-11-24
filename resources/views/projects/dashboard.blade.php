@@ -73,6 +73,92 @@
 
     </div>
 
+    {{-- DASHBOARD DATA FILTERS --}}
+    <form method="GET" action="{{ route('projects.dashboard') }}" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <input type="hidden" name="dashboard_id" value="{{ $dashboard->dashboard_id }}">
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
+            <div class="lg:col-span-3">
+                <label for="dashboard-search" class="mb-1 block text-xs font-semibold text-slate-600">Search</label>
+                <input id="dashboard-search" type="search" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Search DR No., School, Project..." class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+            </div>
+            <div>
+                <label for="dashboard-project" class="mb-1 block text-xs font-semibold text-slate-600">Project</label>
+                <select id="dashboard-project" name="project" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">All Projects</option>
+                    @foreach($projects as $projectOption)
+                        <option value="{{ $projectOption->project_id }}" @selected(($filters['project'] ?? '') == $projectOption->project_id)>{{ $projectOption->project_name }}</option>
+                    @endforeach
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div>
+                <label for="dashboard-lot" class="mb-1 block text-xs font-semibold text-slate-600">Lot</label>
+                <select id="dashboard-lot" name="lot" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">All Lots</option>
+                    @foreach($lots as $lotOption)
+                        <option value="{{ $lotOption->lot_id }}" @selected(($filters['lot'] ?? '') == $lotOption->lot_id)>{{ $lotOption->lot_name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="dashboard-region" class="mb-1 block text-xs font-semibold text-slate-600">Region</label>
+                <select id="dashboard-region" name="region" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">All Regions</option>
+                    @foreach($regions as $regionOption)
+                        <option value="{{ $regionOption }}" @selected(($filters['region'] ?? '') === $regionOption)>{{ $regionOption }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="dashboard-division" class="mb-1 block text-xs font-semibold text-slate-600">Division</label>
+                <select id="dashboard-division" name="division" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">All Divisions</option>
+                    @foreach($divisions as $divisionOption)
+                        <option value="{{ $divisionOption }}" @selected(($filters['division'] ?? '') === $divisionOption)>{{ $divisionOption }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="dashboard-municipality" class="mb-1 block text-xs font-semibold text-slate-600">Municipality</label>
+                <select id="dashboard-municipality" name="municipality" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">All Municipalities</option>
+                    @foreach($municipalities as $municipalityOption)
+                        <option value="{{ $municipalityOption }}" @selected(($filters['municipality'] ?? '') === $municipalityOption)>{{ $municipalityOption }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="dashboard-provider" class="mb-1 block text-xs font-semibold text-slate-600">Assigned Logistics</label>
+                <select id="dashboard-provider" name="assigned_logistics" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">All Assigned Logistics</option>
+                    <option value="unassigned" @selected(($filters['assigned_logistics'] ?? '') === 'unassigned')>Unassigned</option>
+                    @foreach($assignedProviders as $providerOption)
+                        <option value="{{ $providerOption->logistic_id }}" @selected(($filters['assigned_logistics'] ?? '') == $providerOption->logistic_id)>{{ $providerOption->logistic_name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="dashboard-logistics-status" class="mb-1 block text-xs font-semibold text-slate-600">Logistics Status</label>
+                <select id="dashboard-logistics-status" name="logistics_status" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">All Logistics Statuses</option>
+                    <option value="pending" @selected(($filters['logistics_status'] ?? '') === 'pending')>Pending Logistics</option>
+                    <option value="logistics_received" @selected(($filters['logistics_status'] ?? '') === 'logistics_received')>Logistics Received</option>
+                    <option value="delivered" @selected(($filters['logistics_status'] ?? '') === 'delivered')>Logistics Delivered</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+            <p class="text-xs text-slate-500">{{ number_format($filteredDeliveryCount) }} delivery records match these filters.</p>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('projects.dashboard', ['dashboard_id' => $dashboard->dashboard_id]) }}" class="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Reset</a>
+                <button type="submit" class="rounded-lg bg-blue-700 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800">Apply Filters</button>
+            </div>
+        </div>
+    </form>
+
     {{-- PERSONAL DASHBOARDS --}}
     <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="personal-dashboard-title">
         <header class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">

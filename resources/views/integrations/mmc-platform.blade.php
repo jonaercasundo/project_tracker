@@ -158,7 +158,37 @@
                             <input id="preview-limit" type="number" min="1" max="2000" x-model.number="sampleLimit" class="w-full rounded-lg border-slate-300 text-sm">
                         </div>
                         <button type="button" @click="previewBusy = true; result = null; fetch('{{ route('integrations.mmc-platform.preview-data') }}', {method:'POST', headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]')?.content || ''}, body:JSON.stringify({program_id:selectedProgram, program_name:programs.find(program => String(program.id) === selectedProgram)?.name || '', limit:sampleLimit})}).then(r => r.json()).then(d => result = d).catch(() => result = {status:'failed',message:'Could not contact Tracker preview service. Please try again.',records:[],raw:null,retrieved_at:null,diagnostics:null}).finally(() => previewBusy = false)" :disabled="previewBusy || !selectedProgram || sampleLimit < 1 || sampleLimit > 2000" class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-blue-500 hover:text-blue-700 disabled:opacity-50">Preview Data</button>
-                        <button type="button" @click="syncBusy = true; syncResult = null; const program = programs.find(program => String(program.id) === selectedProgram); const programInfo = Object.fromEntries(['id','name','project_title','fiscal_year','status'].filter(key => program?.[key] !== undefined).map(key => [key, program[key]])); fetch('{{ route('integrations.mmc-platform.sync') }}', {method:'POST', headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]')?.content || ''}, body:JSON.stringify({program_id:selectedProgram, program_name:program?.name || '', program_info:programInfo})}).then(async r => { const d = await r.json(); syncResult = {...d, status:r.ok ? d.status : 'failed'}; }).catch(() => syncResult = {status:'failed',message:'Could not contact Tracker sync service. Please try again.'}).finally(() => syncBusy = false)" :disabled="syncBusy || previewBusy || !selectedProgram" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" x-text="syncBusy ? 'Syncing…' : 'Sync to Tracker'"></button>
+                        <button type="button" @click="
+                            syncBusy = true;
+                            syncResult = null;
+                            try {
+                                const program = programs.find(program => String(program.id) === selectedProgram);
+                                const programInfo = Object.fromEntries(['id', 'name', 'project_title', 'fiscal_year', 'status']
+                                    .filter(key => program?.[key] !== undefined)
+                                    .map(key => [key, key === 'id' ? String(program[key]) : program[key]]));
+                                const response = await fetch('{{ route('integrations.mmc-platform.sync') }}', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Accept': 'application/json',
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                                    },
+                                    body: JSON.stringify({program_id: selectedProgram, program_name: program?.name || '', program_info: programInfo}),
+                                });
+                                let data = await response.json();
+                                const statusUrl = data.status_url;
+                                while (data.status === 'pending') {
+                                    await new Promise(resolve => setTimeout(resolve, 5000));
+                                    const statusResponse = await fetch(statusUrl, {headers: {'Accept': 'application/json'}});
+                                    data = await statusResponse.json();
+                                }
+                                syncResult = {...data, status: data.status || 'failed'};
+                            } catch {
+                                syncResult = {status: 'failed', message: 'Could not retrieve the Tracker sync result.'};
+                            } finally {
+                                syncBusy = false;
+                            }
+                        " :disabled="syncBusy || previewBusy || !selectedProgram" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" x-text="syncBusy ? 'Syncing…' : 'Sync to Tracker'"></button>
                     </div>
                     <div x-show="syncResult" role="status" class="rounded-lg border p-3 text-sm" :class="syncResult?.status === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'">
                         <p class="font-semibold" x-text="syncResult?.message"></p>

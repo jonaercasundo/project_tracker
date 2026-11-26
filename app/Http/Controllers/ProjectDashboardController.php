@@ -59,6 +59,7 @@ class ProjectDashboardController extends Controller
             'summary' => $summary,
             'snapshotAt' => now(),
             'cutoffDate' => $cutoffDate,
+            'mmcPlatformSync' => $this->mmcPlatformReportSync($request, (int) $selectedProjectId),
             'drProgressReport' => $selectedProjectId !== null
                 ? $drProgressReport->summarize(
                     (int) $selectedProjectId,
@@ -114,7 +115,31 @@ class ProjectDashboardController extends Controller
                 $deliveryStartDate,
             ),
             'updated_at' => now()->format('M d, Y · g:i A'),
+            'mmc_platform_sync' => $this->mmcPlatformReportSync($request, (int) $validated['project_id']),
         ])->header('Cache-Control', 'no-store, private');
+    }
+
+    /** @return array{program_name: ?string, record_count: int, entity_counts: array<string, int>, synced_at: ?string}|null */
+    private function mmcPlatformReportSync(Request $request, int $projectId): ?array
+    {
+        $programId = config("services.mmc_platform.report_programs.{$projectId}");
+        if ($programId === null) {
+            return null;
+        }
+
+        $snapshot = Schema::hasTable('mmc_platform_project_syncs')
+            ? DB::table('mmc_platform_project_syncs')
+                ->where('company_id', $request->user()->currentCompany()->getKey())
+                ->where('program_id', $programId)
+                ->first(['program_name', 'record_count', 'entity_counts', 'synced_at'])
+            : null;
+
+        return [
+            'program_name' => $snapshot?->program_name,
+            'record_count' => (int) ($snapshot?->record_count ?? 0),
+            'entity_counts' => json_decode($snapshot?->entity_counts ?? '{}', true) ?? [],
+            'synced_at' => $snapshot?->synced_at,
+        ];
     }
 
     public function index(

@@ -42,6 +42,29 @@
             </div>
         </form>
 
+        @if ($mmcPlatformSync !== null)
+            <section class="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-labelledby="mmc-platform-sync-title">
+                <header class="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 id="mmc-platform-sync-title" class="text-sm font-bold text-slate-900">MMC Platform Master List</h2>
+                    @if ($mmcPlatformSync['synced_at'])
+                        <p class="text-xs text-slate-600">Last synced {{ \Carbon\CarbonImmutable::parse($mmcPlatformSync['synced_at'])->format('M d, Y · g:i A') }}</p>
+                    @endif
+                </header>
+                @if ($mmcPlatformSync['synced_at'])
+                    <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                        @foreach (['records' => 'Master-list records', 'schools' => 'Schools', 'lots' => 'Lots', 'keystages' => 'Key stages', 'items' => 'Items', 'packages' => 'Packages'] as $key => $label)
+                            <div>
+                                <dt class="text-xs text-slate-600">{{ $label }}</dt>
+                                <dd class="font-mono text-lg font-bold tabular-nums text-slate-950">{{ number_format($key === 'records' ? $mmcPlatformSync['record_count'] : ($mmcPlatformSync['entity_counts'][$key] ?? 0)) }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                @else
+                    <p class="text-sm text-slate-600">MMC Platform data will appear here after the first successful sync.</p>
+                @endif
+            </section>
+        @endif
+
         <div id="billing-status-refresh-error" role="alert" @if (! $summary['source_error']) hidden @endif class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
             <p class="font-black">Billing sheet data is unavailable</p>
             <p id="billing-status-refresh-error-message" class="mt-1">{{ $summary['source_error'] }}</p>

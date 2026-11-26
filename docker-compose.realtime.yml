@@ -33,6 +33,12 @@ services:
     command: [php, artisan, "queue:work", billing_sync, "--queue=billing_sync", "--sleep=3", "--tries=1", "--timeout=1800", --no-interaction]
     stop_grace_period: 1900s
 
+  mmc-platform-worker:
+    <<: *runtime
+    container_name: project_tracker_mmc_platform_worker
+    command: [php, -d, memory_limit=256M, artisan, "queue:work", mmc_platform_sync, "--sleep=3", "--tries=1", "--timeout=1800", --no-interaction]
+    stop_grace_period: 1900s
+
 networks:
   laravel:
     external: true

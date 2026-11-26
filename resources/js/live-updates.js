@@ -11,6 +11,7 @@ if (config && badge) {
     const modulesForPath = () => {
         const path = window.location.pathname.toLowerCase();
 
+        if (path === '/projects/reports-analytics') return ['projects', 'deliveries', 'billing', 'mmc-platform-report'];
         if (path.includes('return')) return ['deliveries', 'returns'];
         if (path.startsWith('/billing')) return ['billing'];
         if (path.includes('inventory') || path.includes('warehouse') || path.includes('asset') || path.includes('it_dashboard')) return ['inventory'];

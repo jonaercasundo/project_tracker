@@ -1326,4 +1326,53 @@ describe('project DR progress report', function () {
             ->assertRedirect(route('projects.reports.analytics'))
             ->assertSessionHasErrors('cutoff_date');
     });
+
+    it('shows only the linked MMC snapshot for the active company in reports and analytics', function () {
+        $user = projectDetailsUser();
+        $companyId = $user->companies()->sole()->getKey();
+        $otherCompany = Company::create(['code' => 'OTHER', 'name' => 'Other company', 'is_active' => true]);
+        $programId = config('services.mmc_platform.report_programs.502698');
+        DB::table('projects')->insert([
+            ['project_id' => 502698, 'project_name' => 'SME2'],
+            ['project_id' => 95, 'project_name' => 'Unlinked project'],
+        ]);
+        (require database_path('migrations/2026_11_11_095147_create_mmc_platform_project_syncs_table.php'))->up();
+        $billingStatus = Mockery::mock(BillingDocumentStatusService::class);
+        $billingStatus->shouldReceive('summarize')->andReturn([
+            'total' => 0, 'processed' => 0, 'remaining' => 0, 'processed_today' => 0, 'source_error' => null,
+        ]);
+        $this->app->instance(BillingDocumentStatusService::class, $billingStatus);
+
+        $reportUrl = route('projects.reports.analytics', ['project_id' => 502698]);
+        $snapshot = [
+            'company_id' => $companyId,
+            'program_id' => $programId,
+            'records' => '{}',
+            'record_count' => 1234,
+            'entity_counts' => '{"schools":432,"lots":3}',
+            'synced_at' => '2026-11-26 12:00:00',
+        ];
+        DB::table('mmc_platform_project_syncs')->insert([
+            ...$snapshot, 'company_id' => $otherCompany->getKey(),
+        ]);
+        DB::table('mmc_platform_project_syncs')->insert([
+            ...$snapshot, 'program_id' => 'unlinked-program',
+        ]);
+        $this->get($reportUrl)->assertOk()->assertSee('after the first successful sync');
+
+        DB::table('mmc_platform_project_syncs')->insert($snapshot);
+
+        $this->get($reportUrl)
+            ->assertOk()
+            ->assertSee('MMC Platform Master List')
+            ->assertSee('Last synced')
+            ->assertSee('1,234');
+        $this->getJson(route('projects.reports.analytics.data', ['project_id' => 502698]))
+            ->assertOk()
+            ->assertJsonPath('mmc_platform_sync.record_count', 1234)
+            ->assertJsonPath('mmc_platform_sync.entity_counts.schools', 432);
+        $this->get(route('projects.reports.analytics', ['project_id' => 95]))
+            ->assertOk()
+            ->assertDontSee('MMC Platform Master List');
+    });
 });

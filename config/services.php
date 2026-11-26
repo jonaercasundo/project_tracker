@@ -29,6 +29,9 @@ return [
     'mmc_platform' => [
         'base_url' => env('MMC_PLATFORM_API_BASE_URL'),
         'read_key' => env('MMC_PLATFORM_READ_KEY'),
+        'report_programs' => [
+            502698 => '989d848b-20b5-4074-b315-ced79af14c91',
+        ],
     ],
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),

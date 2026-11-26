@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SyncMmcPlatformProject;
 use App\Models\MmcPlatformSetting;
 use App\Services\AdminAuditLogger;
 use App\Services\MmcPlatformApiClient;
@@ -10,9 +11,12 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Validator as ValidatorContract;
 
 class MmcPlatformIntegrationController extends Controller
@@ -149,7 +153,7 @@ class MmcPlatformIntegrationController extends Controller
         return response()->json($client->previewMasterList($data['program_id'], $data['program_name'] ?? '', (int) $data['limit']));
     }
 
-    public function syncProject(Request $request, MmcPlatformApiClient $client): JsonResponse
+    public function syncProject(Request $request): JsonResponse
     {
         $data = $request->validate([
             'program_id' => ['required', 'string', 'max:255'],
@@ -162,110 +166,45 @@ class MmcPlatformIntegrationController extends Controller
             'program_info.status' => ['nullable', 'string', 'max:100'],
         ]);
 
-        if (! Schema::hasTable('mmc_platform_project_syncs')) {
+        if (! Schema::hasTable('mmc_platform_project_syncs') || ! Schema::hasTable('mmc_platform_project_sync_pages')) {
             return response()->json(['status' => 'failed', 'message' => 'Run the MMC Platform project sync migration before syncing data.'], 503);
         }
 
+        $companyId = (int) $request->user()->currentCompany()->getKey();
+        $userId = (int) $request->user()->getKey();
+        $syncId = (string) Str::uuid();
+        $statusKey = SyncMmcPlatformProject::statusKey($companyId, $userId, $syncId);
+
+        Cache::put($statusKey, ['status' => 'pending'], now()->addHours(2));
+
         try {
-            $result = $client->fetchProjectMasterList($data['program_id']);
-            $records = $result['records'];
-            $entities = $this->groupSyncedEntities($records);
-            $companyId = (int) $request->user()->currentCompany()->getKey();
-            $syncedAt = now();
-
-            DB::transaction(function () use ($companyId, $data, $records, $entities, $syncedAt): void {
-                DB::table('mmc_platform_project_syncs')->updateOrInsert(
-                    ['company_id' => $companyId, 'program_id' => $data['program_id']],
-                    [
-                        'program_name' => $data['program_name'] ?? null,
-                        'program_info' => json_encode($data['program_info'] ?? [], JSON_THROW_ON_ERROR),
-                        'records' => json_encode(['master_list' => $records, 'entities' => $entities], JSON_THROW_ON_ERROR),
-                        'entity_counts' => json_encode(array_map('count', $entities), JSON_THROW_ON_ERROR),
-                        'record_count' => count($records),
-                        'synced_at' => $syncedAt,
-                        'updated_at' => $syncedAt,
-                        'created_at' => $syncedAt,
-                    ],
-                );
-            });
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'MMC project data saved to Tracker.',
-                'record_count' => count($records),
-                'entity_counts' => array_map('count', $entities),
-                'pages' => $result['pages'],
-                'synced_at' => $syncedAt->toIso8601String(),
-            ]);
+            Bus::dispatch(new SyncMmcPlatformProject($statusKey, $companyId, $data));
         } catch (\Throwable $exception) {
+            Cache::forget($statusKey);
             report($exception);
 
-            return response()->json([
-                'status' => 'failed',
-                'message' => $exception instanceof \RuntimeException || $exception instanceof \UnexpectedValueException
-                    ? $exception->getMessage()
-                    : 'The project data could not be saved. Please try again.',
-            ], 502);
+            return response()->json(['status' => 'failed', 'message' => 'Tracker could not queue the sync. Please try again.'], 503);
         }
+
+        return response()->json([
+            'status' => 'pending',
+            'status_url' => route('integrations.mmc-platform.sync-status', ['syncId' => $syncId]),
+        ], 202);
     }
 
-    /** @param array<int, array<string, mixed>> $records
-     * @return array<string, array<int, mixed>>
-     */
-    private function groupSyncedEntities(array $records): array
+    public function syncStatus(Request $request, string $syncId): JsonResponse
     {
-        $entities = ['schools' => [], 'lots' => [], 'keystages' => [], 'items' => [], 'packages' => []];
-        $seen = ['schools' => [], 'lots' => [], 'keystages' => [], 'items' => [], 'packages' => []];
+        $statusKey = SyncMmcPlatformProject::statusKey(
+            (int) $request->user()->currentCompany()->getKey(),
+            (int) $request->user()->getKey(),
+            $syncId,
+        );
+        $result = Cache::get($statusKey);
 
-        foreach ($records as $record) {
-            if (isset($record['school_id'])) {
-                $entities['schools'][] = $record;
-            }
-            if (isset($record['lot_id'])) {
-                $entities['lots'][] = $record;
-            }
-            foreach (['keystages', 'key_stages', 'key_stages_data', 'grade_levels'] as $key) {
-                foreach ((array) ($record[$key] ?? []) as $stage) {
-                    if (is_array($stage)) {
-                        $entities['keystages'][] = $stage;
-                    }
-                }
-            }
-            foreach ((array) ($record['lines'] ?? []) as $item) {
-                if (is_array($item)) {
-                    $entities['items'][] = $item;
-                    foreach ((array) ($item['packages'] ?? $item['package'] ?? []) as $package) {
-                        if (is_array($package)) {
-                            $entities['packages'][] = $package;
-                        }
-                    }
-                }
-            }
-            foreach ((array) ($record['packages'] ?? $record['package'] ?? []) as $package) {
-                if (is_array($package)) {
-                    $entities['packages'][] = $package;
-                }
-            }
-        }
-
-        foreach ($entities as $type => $rows) {
-            foreach ($rows as $row) {
-                $key = match ($type) {
-                    'schools' => $row['school_id'] ?? $row['id'] ?? null,
-                    'lots' => $row['lot_id'] ?? $row['id'] ?? null,
-                    'items' => $row['item_id'] ?? $row['item_code'] ?? $row['id'] ?? null,
-                    'packages' => $row['package_id'] ?? $row['id'] ?? null,
-                    default => $row['id'] ?? $row['key_stage_id'] ?? $row['name'] ?? null,
-                };
-                if ($key !== null) {
-                    $seen[$type][(string) $key] = $row;
-                }
-            }
-            if ($seen[$type] !== []) {
-                $entities[$type] = array_values($seen[$type]);
-            }
-        }
-
-        return $entities;
+        return response()->json(
+            $result ?? ['status' => 'failed', 'message' => 'This sync status is no longer available.'],
+            $result === null ? 404 : 200,
+            ['Cache-Control' => 'no-store'],
+        );
     }
 }

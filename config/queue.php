@@ -52,6 +52,15 @@ return [
             'after_commit' => true,
         ],
 
+        'mmc_platform_sync' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION', null),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'mmc_platform_sync',
+            'retry_after' => 1860,
+            'after_commit' => false,
+        ],
+
         'logistics_webhooks' => [
             'driver' => 'database',
             'connection' => env('LOGISTICS_WEBHOOK_DB_CONNECTION'),

@@ -227,26 +227,25 @@ class MmcPlatformApiClient
         return ['status' => $status, 'message' => $message, 'records' => $records, 'raw' => $raw, 'retrieved_at' => $timestamp, 'diagnostics' => $diagnostics];
     }
 
-    /** @return array{records: array<int, array<string, mixed>>, pages: int} */
-    public function fetchProjectMasterList(string $programId): array
+    /** @return \Generator<int, list<array<string, mixed>>> */
+    public function projectMasterListPages(string $programId): \Generator
     {
-        $records = [];
         $page = 1;
-        $pageLimit = 2000;
+        $pageLimit = 500;
 
         do {
-            if ($page > 100) {
-                throw new \RuntimeException('The project master list exceeded the 100-page safety limit. No data was saved.');
+            if ($page > 400) {
+                throw new \UnexpectedValueException('The project master list exceeded the 400-page safety limit. No data was saved.');
             }
 
             $result = $this->getReadResponse('/programs/'.rawurlencode($programId).'/master-list', [
                 'page' => $page,
                 'limit' => $pageLimit,
                 'include' => 'lines',
-            ]);
+            ], includeRaw: false);
 
             if ($result['error'] !== null) {
-                throw new \RuntimeException($result['error']);
+                throw new \UnexpectedValueException($result['error']);
             }
 
             $payload = $result['payload'];
@@ -255,17 +254,19 @@ class MmcPlatformApiClient
                 throw new \UnexpectedValueException('The master-list endpoint returned an unexpected response shape. No data was saved.');
             }
 
-            $records = array_merge($records, $pageRecords);
             $hasMore = $this->responseValue($payload, 'has_more');
             $continue = $hasMore === null ? count($pageRecords) === $pageLimit : filter_var($hasMore, FILTER_VALIDATE_BOOLEAN);
+            yield $page => $pageRecords;
+
+            unset($result, $payload, $pageRecords);
+            gc_collect_cycles();
             $page++;
         } while ($continue);
 
-        return ['records' => $records, 'pages' => $page - 1];
     }
 
     /** @return array{error: ?string, payload: mixed, raw: mixed, http_status: ?int, requested_endpoint: ?string} */
-    private function getReadResponse(string $path, array $query): array
+    private function getReadResponse(string $path, array $query, bool $includeRaw = true): array
     {
         $configuration = $this->configuration->current();
         if ($this->baseUrlError($configuration['base_url']) !== null || ! str_starts_with($configuration['read_key'], 'mmc_')) {
@@ -290,15 +291,15 @@ class MmcPlatformApiClient
                 default => 'The MMC Platform returned HTTP '.$response->status().'. Check service availability and try again.',
             };
 
-            return ['error' => $message, 'payload' => null, 'raw' => $this->safeRaw($raw), 'http_status' => $response->status(), 'requested_endpoint' => $requestedEndpoint];
+            return ['error' => $message, 'payload' => null, 'raw' => $includeRaw ? $this->safeRaw($raw, $configuration['read_key']) : null, 'http_status' => $response->status(), 'requested_endpoint' => $requestedEndpoint];
         }
 
         $payload = $response->json();
         if (! is_array($payload)) {
-            return ['error' => 'The MMC Platform returned malformed JSON. Ask the API owner to verify the response.', 'payload' => null, 'raw' => $this->safeRaw($raw), 'http_status' => $response->status(), 'requested_endpoint' => $requestedEndpoint];
+            return ['error' => 'The MMC Platform returned malformed JSON. Ask the API owner to verify the response.', 'payload' => null, 'raw' => $includeRaw ? $this->safeRaw($raw, $configuration['read_key']) : null, 'http_status' => $response->status(), 'requested_endpoint' => $requestedEndpoint];
         }
 
-        return ['error' => null, 'payload' => $payload, 'raw' => $this->safeRaw($payload), 'http_status' => $response->status(), 'requested_endpoint' => $requestedEndpoint];
+        return ['error' => null, 'payload' => $payload, 'raw' => $includeRaw ? $this->safeRaw($payload, $configuration['read_key']) : null, 'http_status' => $response->status(), 'requested_endpoint' => $requestedEndpoint];
     }
 
     private function responseValue(array $payload, string $key): mixed
@@ -314,9 +315,9 @@ class MmcPlatformApiClient
         return null;
     }
 
-    private function safeRaw(mixed $payload): mixed
+    private function safeRaw(mixed $payload, ?string $readKey = null): mixed
     {
-        $secret = trim($this->configuration->current()['read_key']);
+        $secret = trim($readKey ?? $this->configuration->current()['read_key']);
         if (is_string($payload)) {
             $decoded = json_decode($payload, true);
             if (json_last_error() !== JSON_ERROR_NONE) {
@@ -330,7 +331,7 @@ class MmcPlatformApiClient
                 if (preg_match('/authorization|bearer|token|secret|api.?key/i', (string) $key)) {
                     $safe[$key] = '[REDACTED]';
                 } else {
-                    $safe[$key] = is_array($value) ? $this->safeRaw($value) : (is_string($value) ? mb_substr($secret === '' ? $value : str_replace($secret, '[REDACTED]', $value), 0, 2000) : $value);
+                    $safe[$key] = is_array($value) ? $this->safeRaw($value, $secret) : (is_string($value) ? mb_substr($secret === '' ? $value : str_replace($secret, '[REDACTED]', $value), 0, 2000) : $value);
                 }
             }
 

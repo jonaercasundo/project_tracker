@@ -16,6 +16,14 @@ if (key) {
             forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
             enabledTransports: ['ws', 'wss'],
         });
+
+        const pusher = window.Echo.connector.pusher;
+        window.addEventListener('pagehide', () => pusher.disconnect());
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                pusher.connect();
+            }
+        });
     } catch (error) {
         console.error('Live update connection could not be initialized.', error);
     }

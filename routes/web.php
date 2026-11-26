@@ -235,6 +235,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         Route::post('/integrations/mmc-platform/sync', [MmcPlatformIntegrationController::class, 'syncProject'])
             ->middleware('throttle:3,1,mmc-platform-sync:')
             ->name('integrations.mmc-platform.sync');
+        Route::get('/integrations/mmc-platform/sync/{syncId}', [MmcPlatformIntegrationController::class, 'syncStatus'])
+            ->whereUuid('syncId')
+            ->name('integrations.mmc-platform.sync-status');
     });
 
     Route::middleware(['role:Administrator'])->group(function () {

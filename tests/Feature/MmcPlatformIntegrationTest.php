@@ -1,9 +1,12 @@
 <?php
 
+use App\Jobs\SyncMmcPlatformProject;
+use App\Services\MmcPlatformApiClient;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\MIWorkflowTestCase;
 
 class MmcPlatformIntegrationTestCase extends MIWorkflowTestCase
@@ -17,6 +20,8 @@ class MmcPlatformIntegrationTestCase extends MIWorkflowTestCase
             'database/migrations/2026_09_02_024448_create_company_user_table.php',
             'database/migrations/2026_10_26_115437_add_description_to_roles_and_create_admin_activity_logs_table.php',
             'database/migrations/2026_11_06_054151_create_mmc_platform_settings_table.php',
+            'database/migrations/2026_11_11_095147_create_mmc_platform_project_syncs_table.php',
+            'database/migrations/2026_11_26_053259_create_mmc_platform_project_sync_pages_table.php',
         ]];
     }
 }
@@ -224,4 +229,69 @@ it('rejects non-local HTTP URLs without making a request', function () {
     ])->assertRedirect()->assertSessionHasErrors('base_url');
 
     Http::assertNothingSent();
+});
+
+it('queues project sync and returns the saved results only to its requester', function () {
+    Queue::fake();
+    config([
+        'services.mmc_platform.base_url' => 'https://platform.example.test/api/v1',
+        'services.mmc_platform.read_key' => 'mmc_test_read_key',
+    ]);
+    Http::fakeSequence()
+        ->push(['data' => [['school_id' => '1', 'grade_levels' => 'G1toG3, G4toG6']], 'has_more' => true])
+        ->push(['data' => [['school_id' => '2', 'grade_levels' => ['G4toG6'], 'lines' => [['item_id' => 'kit']]]], 'has_more' => false]);
+    mmcPlatformUser();
+
+    $statusUrl = $this->postJson(route('integrations.mmc-platform.sync'), [
+        'program_id' => 'program-123',
+        'program_info' => ['id' => 'program-123'],
+    ])->assertAccepted()->assertJsonPath('status', 'pending')->json('status_url');
+
+    Http::assertNothingSent();
+    $this->getJson($statusUrl)->assertOk()->assertJsonPath('status', 'pending');
+    Queue::assertPushed(SyncMmcPlatformProject::class, 1);
+    $job = Queue::pushed(SyncMmcPlatformProject::class)->sole();
+    expect($job->connection)->toBe('mmc_platform_sync');
+    $job->handle(app(MmcPlatformApiClient::class));
+
+    $this->getJson($statusUrl)
+        ->assertOk()
+        ->assertJsonPath('status', 'success')
+        ->assertJsonPath('pages', 2)
+        ->assertJsonPath('record_count', 2)
+        ->assertJsonPath('entity_counts.schools', 2)
+        ->assertJsonPath('entity_counts.keystages', 2)
+        ->assertJsonPath('entity_counts.items', 1);
+    $this->assertDatabaseHas('mmc_platform_project_syncs', ['program_id' => 'program-123', 'record_count' => 2]);
+    $this->assertDatabaseCount('mmc_platform_project_sync_pages', 2);
+
+    mmcPlatformUser();
+    $this->getJson($statusUrl)->assertNotFound();
+});
+
+it('preserves a saved project when a later sync page fails', function () {
+    Queue::fake();
+    config([
+        'services.mmc_platform.base_url' => 'https://platform.example.test/api/v1',
+        'services.mmc_platform.read_key' => 'mmc_test_read_key',
+    ]);
+    Http::fakeSequence()
+        ->push(['data' => [['school_id' => '1']], 'has_more' => false])
+        ->push(['data' => [['school_id' => '2'], ['school_id' => '3']], 'has_more' => true])
+        ->pushStatus(404);
+    mmcPlatformUser();
+
+    $sync = route('integrations.mmc-platform.sync');
+    $this->postJson($sync, ['program_id' => 'program-123'])->assertAccepted();
+    Queue::pushed(SyncMmcPlatformProject::class)->sole()->handle(app(MmcPlatformApiClient::class));
+
+    $statusUrl = $this->postJson($sync, ['program_id' => 'program-123'])->assertAccepted()->json('status_url');
+    Queue::pushed(SyncMmcPlatformProject::class)->last()->handle(app(MmcPlatformApiClient::class));
+
+    $this->getJson($statusUrl)->assertOk()->assertJsonPath('status', 'failed');
+    $this->assertDatabaseCount('mmc_platform_project_syncs', 1);
+    $this->assertDatabaseHas('mmc_platform_project_syncs', ['program_id' => 'program-123', 'record_count' => 1]);
+    $this->assertDatabaseCount('mmc_platform_project_sync_pages', 1);
+    expect(json_decode(DB::table('mmc_platform_project_sync_pages')->value('records'), true))
+        ->toBe([['school_id' => '1']]);
 });

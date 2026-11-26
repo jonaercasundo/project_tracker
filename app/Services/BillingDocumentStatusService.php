@@ -26,7 +26,7 @@ class BillingDocumentStatusService
             ->where('school_id', '<>', '')
             ->whereNotNull('dr_no')
             ->where('dr_no', '<>', '')
-            ->get(['school_id', 'dr_no', 'lot_no', 'status', 'sap_encoded_at']);
+            ->get(['school_id', 'dr_no', 'lot_no', 'status', 'date_received', 'delivered_at']);
         ProfileProjectDashboard::current()?->loaded($records->count());
 
         if ($records->isEmpty()) {
@@ -46,23 +46,24 @@ class BillingDocumentStatusService
                 continue;
             }
 
-            $schools[$schoolId][$lotNumber] ??= ['encoded' => false];
-            $encodedDate = trim((string) $record->sap_encoded_at);
-            $parsedDate = $encodedDate === '' ? null : $this->dateInApplicationTimezone($encodedDate);
-            if ($parsedDate !== null) {
-                $schools[$schoolId][$lotNumber]['encoded'] = true;
-                $schools[$schoolId]['processed_today'] = ($schools[$schoolId]['processed_today'] ?? false) || $parsedDate === $today;
-            }
+            $schools[$schoolId][] = [
+                'date_received' => trim((string) $record->date_received),
+                'delivered_at' => trim((string) $record->delivered_at),
+            ];
         }
 
         $total = count($schools);
         $processed = 0;
         $processedToday = 0;
-        foreach ($schools as $school) {
-            $processedToday += (int) ($school['processed_today'] ?? false);
-            $lots = array_filter($school, 'is_array');
-            if ($lots !== [] && collect($lots)->every(fn (array $lot): bool => $lot['encoded'])) {
+        foreach ($schools as $schoolRecords) {
+            $isProcessed = collect($schoolRecords)->every(fn (array $record): bool => $record['date_received'] !== '' && $record['delivered_at'] !== '');
+            if ($isProcessed) {
                 $processed++;
+                $hasDeliveredToday = collect($schoolRecords)->contains(fn (array $record): bool => $record['date_received'] !== ''
+                    && $record['delivered_at'] !== ''
+                    && $this->dateInApplicationTimezone($record['delivered_at']) === $today,
+                );
+                $processedToday += (int) $hasDeliveredToday;
             }
         }
 

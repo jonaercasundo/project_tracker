@@ -17,13 +17,16 @@
             </section>
         @else
             <section class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                @if ($snapshot && $snapshot->tracker_project_id === null)
+                    <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">This saved snapshot has not been assigned to a Tracker project. Choose a project and sync this program again from <a class="font-semibold underline" href="{{ route('integrations.mmc-platform.index', ['tab' => 'api-webhooks']) }}">API &amp; Webhooks</a>.</p>
+                @endif
                 <form method="GET" action="{{ route('integrations.mmc-platform.masterlist') }}" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_150px_auto] lg:items-end">
                     <div>
                         <label for="masterlist-program" class="mb-1 block text-sm font-semibold text-slate-700">Synced program</label>
                         <select id="masterlist-program" name="program_id" class="w-full rounded-lg border-slate-300 text-sm">
                             @foreach ($snapshots as $availableSnapshot)
                                 <option value="{{ $availableSnapshot->program_id }}" @selected($snapshot->program_id === $availableSnapshot->program_id)>
-                                    {{ $availableSnapshot->program_name ?: 'Program '.$availableSnapshot->program_id }} · Project ID: {{ $availableSnapshot->program_id }} · {{ number_format($availableSnapshot->record_count) }} records
+                                    {{ $availableSnapshot->program_name ?: 'Program '.$availableSnapshot->program_id }} · MMC ID: {{ $availableSnapshot->program_id }} · Tracker project: {{ $availableSnapshot->tracker_project_name ?: 'Not assigned' }} · {{ number_format($availableSnapshot->record_count) }} records
                                 </option>
                             @endforeach
                         </select>

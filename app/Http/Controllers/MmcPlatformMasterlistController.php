@@ -59,6 +59,7 @@ class MmcPlatformMasterlistController extends Controller
         $currentPage = max(1, $request->integer('page', 1));
         $snapshots = collect();
         $snapshot = null;
+        $trackerProjectName = null;
         $rows = new LengthAwarePaginator([], 0, $perPage, $currentPage, [
             'path' => $request->url(),
             'query' => $request->query(),
@@ -71,6 +72,12 @@ class MmcPlatformMasterlistController extends Controller
                 ->orderBy('program_name')
                 ->orderBy('program_id')
                 ->get(['program_id', 'program_name', 'tracker_project_id', 'record_count', 'synced_at']);
+            $trackerProjectNames = DB::table('projects')
+                ->whereIn('project_id', $snapshots->pluck('tracker_project_id')->filter()->unique())
+                ->pluck('project_name', 'project_id');
+            $snapshots->each(function (object $availableSnapshot) use ($trackerProjectNames): void {
+                $availableSnapshot->tracker_project_name = $trackerProjectNames[$availableSnapshot->tracker_project_id] ?? null;
+            });
 
             if ($snapshots->isNotEmpty()) {
                 if (filled($filters['program_id'] ?? null)) {
@@ -88,14 +95,37 @@ class MmcPlatformMasterlistController extends Controller
                     ? null
                     : DB::table('projects')->where('project_id', $snapshot->tracker_project_id)->value('project_name');
 
-                $rows = $this->recordsPage(
-                    (int) $snapshot->id,
-                    max(0, (int) $snapshot->record_count),
-                    trim((string) ($filters['search'] ?? '')),
-                    $perPage,
-                    $currentPage,
-                    $request,
-                );
+                if (Schema::hasTable('mmc_platform_masterlist_records')) {
+                    $masterlistQuery = DB::table('mmc_platform_masterlist_records')
+                        ->where('company_id', $companyId)
+                        ->where('source_program_id', $snapshot->program_id);
+                    if ($snapshot->tracker_project_id !== null) {
+                        $masterlistQuery->where('tracker_project_id', $snapshot->tracker_project_id);
+                    } else {
+                        $masterlistQuery->whereRaw('1 = 0');
+                    }
+
+                    $search = trim((string) ($filters['search'] ?? ''));
+                    if ($search !== '') {
+                        $masterlistQuery->where(function ($query) use ($search): void {
+                            foreach (array_keys(self::COLUMNS) as $column) {
+                                $query->orWhere($column === 'updated_at' ? 'source_updated_at' : $column, 'like', '%'.$search.'%');
+                            }
+                        });
+                    }
+
+                    $rows = $masterlistQuery
+                        ->orderBy('school_name')
+                        ->orderBy('dr_no')
+                        ->paginate($perPage)
+                        ->withQueryString();
+                    $rows->setCollection($rows->getCollection()->map(function (object $record): array {
+                        $row = (array) $record;
+                        $row['updated_at'] = $row['source_updated_at'];
+
+                        return $row;
+                    }));
+                }
             }
         }
 
@@ -108,84 +138,5 @@ class MmcPlatformMasterlistController extends Controller
             'columns' => self::COLUMNS,
             'trackerProjectName' => $trackerProjectName ?? null,
         ]);
-    }
-
-    private function recordsPage(
-        int $syncId,
-        int $recordCount,
-        string $search,
-        int $perPage,
-        int $currentPage,
-        Request $request,
-    ): LengthAwarePaginator {
-        $offset = ($currentPage - 1) * $perPage;
-        $matchedCount = 0;
-        $pageRecords = [];
-        $searchTerm = mb_strtolower($search);
-
-        foreach (DB::table('mmc_platform_project_sync_pages')
-            ->where('sync_id', $syncId)
-            ->orderBy('page')
-            ->cursor() as $storedPage) {
-            $records = json_decode($storedPage->records, true);
-            if (! is_array($records)) {
-                continue;
-            }
-
-            foreach ($records as $record) {
-                if (! is_array($record)) {
-                    continue;
-                }
-
-                if ($searchTerm !== '' && ! str_contains(mb_strtolower(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: ''), $searchTerm)) {
-                    continue;
-                }
-
-                if ($matchedCount >= $offset && count($pageRecords) < $perPage) {
-                    $pageRecords[] = $this->presentRecord($record);
-                }
-                $matchedCount++;
-            }
-
-            if ($searchTerm === '' && count($pageRecords) >= $perPage) {
-                break;
-            }
-        }
-
-        return new LengthAwarePaginator(
-            $pageRecords,
-            $searchTerm === '' ? $recordCount : $matchedCount,
-            $perPage,
-            $currentPage,
-            ['path' => $request->url(), 'query' => $request->query()],
-        );
-    }
-
-    /** @param array<string, mixed> $record
-     * @return array<string, mixed>
-     */
-    private function presentRecord(array $record): array
-    {
-        return collect(self::COLUMNS)
-            ->mapWithKeys(fn (string $label, string $key): array => [
-                $key => is_array($record[$key] ?? null) ? $this->displayValue($record[$key]) : ($record[$key] ?? null),
-            ])
-            ->all();
-    }
-
-    private function displayValue(mixed $value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (is_array($value)) {
-            return implode(', ', array_filter(array_map(
-                fn (mixed $item): ?string => is_scalar($item) ? (string) $item : (is_array($item) ? (string) ($item['name'] ?? $item['label'] ?? $item['id'] ?? '') : null),
-                $value,
-            )));
-        }
-
-        return is_scalar($value) ? (string) $value : null;
     }
 }

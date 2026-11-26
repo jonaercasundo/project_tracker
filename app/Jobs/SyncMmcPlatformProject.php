@@ -6,6 +6,7 @@ use App\Services\MmcPlatformApiClient;
 use App\Services\TrackerUpdateBroadcaster;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -14,6 +15,15 @@ use UnexpectedValueException;
 class SyncMmcPlatformProject implements ShouldQueue
 {
     use Queueable;
+
+    private const MASTERLIST_COLUMNS = [
+        'delivery_id', 'lot_id', 'lot_no', 'contract_no', 'dr_no', 'school_id', 'school_name',
+        'region', 'division', 'municipality', 'address', 'contact_person', 'contact_phone',
+        'grade_levels', 'value', 'status', 'sap_dr_no', 'sap_encoded_at', 'dr_printed_at',
+        'iar_no', 'itr_no', 'ar_no', 'received_by', 'receiver_designation', 'inspected_by',
+        'inspector_designation', 'date_received', 'returned_to_office_at', 'delivered_at',
+        'pouch_completed_at', 'billing_no', 'sequence_no',
+    ];
 
     public int $tries = 1;
 
@@ -79,6 +89,7 @@ class SyncMmcPlatformProject implements ShouldQueue
 
         $recordCount = 0;
         $pageCount = 0;
+        $seenDeliveryIds = [];
         $entityKeys = array_fill_keys(['schools', 'lots', 'keystages', 'items', 'packages'], []);
         $unkeyedCounts = array_fill_keys(array_keys($entityKeys), 0);
         foreach ($client->projectMasterListPages($this->data['program_id']) as $page => $records) {
@@ -90,6 +101,45 @@ class SyncMmcPlatformProject implements ShouldQueue
             $pageCount = $page;
             $recordCount += count($records);
             $this->collectEntityKeys($records, $entityKeys, $unkeyedCounts);
+
+            $masterlistRows = [];
+            foreach ($records as $record) {
+                if (! is_scalar($record['delivery_id'] ?? null) || trim((string) $record['delivery_id']) === '') {
+                    throw new UnexpectedValueException('A master-list record is missing its delivery ID. No data was saved.');
+                }
+
+                $deliveryId = (string) $record['delivery_id'];
+                $seenDeliveryIds[$deliveryId] = true;
+                $masterlistRows[$deliveryId] = $this->masterlistRow($record, $startedAt);
+            }
+
+            if ($masterlistRows !== []) {
+                DB::table('mmc_platform_masterlist_records')->upsert(
+                    array_values($masterlistRows),
+                    ['company_id', 'source_program_id', 'delivery_id'],
+                    ['tracker_project_id', ...self::MASTERLIST_COLUMNS, 'source_updated_at', 'updated_at'],
+                );
+            }
+        }
+
+        if ($seenDeliveryIds !== [] || $recordCount === 0) {
+            $staleDeliveryIds = [];
+            foreach (DB::table('mmc_platform_masterlist_records')
+                ->where('company_id', $this->companyId)
+                ->where('source_program_id', $this->data['program_id'])
+                ->pluck('delivery_id') as $existingDeliveryId) {
+                if (! isset($seenDeliveryIds[(string) $existingDeliveryId])) {
+                    $staleDeliveryIds[] = $existingDeliveryId;
+                }
+            }
+
+            foreach (array_chunk($staleDeliveryIds, 500) as $deliveryIds) {
+                DB::table('mmc_platform_masterlist_records')
+                    ->where('company_id', $this->companyId)
+                    ->where('source_program_id', $this->data['program_id'])
+                    ->whereIn('delivery_id', $deliveryIds)
+                    ->delete();
+            }
         }
 
         $counts = [];
@@ -177,5 +227,40 @@ class SyncMmcPlatformProject implements ShouldQueue
             }
             $collectPackages($record);
         }
+    }
+
+    /** @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    private function masterlistRow(array $record, Carbon $syncedAt): array
+    {
+        $row = [
+            'company_id' => $this->companyId,
+            'tracker_project_id' => $this->data['tracker_project_id'],
+            'source_program_id' => $this->data['program_id'],
+            'created_at' => $syncedAt,
+            'updated_at' => $syncedAt,
+        ];
+
+        foreach (self::MASTERLIST_COLUMNS as $column) {
+            $value = $record[$column] ?? null;
+            $row[$column] = $this->databaseValue($value);
+        }
+        $row['source_updated_at'] = $this->databaseValue($record['updated_at'] ?? null);
+
+        return $row;
+    }
+
+    private function databaseValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }

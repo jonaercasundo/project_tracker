@@ -186,8 +186,11 @@ class MmcPlatformIntegrationController extends Controller
             'program_info.status' => ['nullable', 'string', 'max:100'],
         ]);
 
-        if (! Schema::hasTable('mmc_platform_project_syncs') || ! Schema::hasTable('mmc_platform_project_sync_pages')) {
-            return response()->json(['status' => 'failed', 'message' => 'Run the MMC Platform project sync migration before syncing data.'], 503);
+        if (! Schema::hasTable('mmc_platform_project_syncs')
+            || ! Schema::hasTable('mmc_platform_project_sync_pages')
+            || ! Schema::hasTable('mmc_platform_masterlist_records')
+            || ! Schema::hasColumn('mmc_platform_project_syncs', 'tracker_project_id')) {
+            return response()->json(['status' => 'failed', 'message' => 'Run the MMC Platform masterlist sync migrations before syncing data.'], 503);
         }
 
         $userId = (int) $request->user()->getKey();

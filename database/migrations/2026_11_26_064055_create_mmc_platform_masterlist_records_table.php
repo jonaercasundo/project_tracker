@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('mmc_platform_masterlist_records', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('company_id');
-            $table->unsignedInteger('tracker_project_id');
+            $table->integer('tracker_project_id');
             $table->string('source_program_id', 255);
             $table->string('delivery_id', 255);
             $table->string('lot_id', 255)->nullable();

@@ -125,7 +125,7 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
                     <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
-                    <p class="mt-2 text-sm text-slate-600">Enter the School ID and billing details, including Position and Telephone 1, then preview the DR/package matches and target cells before syncing. You can enter a tracker School ID or a configured mapped sheet SchoolID. The selected encode updates mapped billing fields. Contact Person is copied from Received by. Contact/Email and DATE RECEIVED (FROM 3PL) are left unchanged. Each Lot total is calculated from its DR.</p>
+                    <p class="mt-2 text-sm text-slate-600">Enter the School ID and receiving details, then preview the DR/package matches and target cells before syncing. You can enter a tracker School ID or a configured mapped sheet SchoolID. Contact Person is copied from Received by. Contact/Email and DATE RECEIVED (FROM 3PL) are left unchanged. Each Lot total is calculated from its DR.</p>
                 </div>
                 <div>
                     <label for="spreadsheet-school-id" class="mb-1 block text-xs font-semibold text-slate-600">School ID</label>
@@ -134,23 +134,6 @@
                 </div>
                 <div id="spreadsheet-school-fields" class="grid grid-cols-1 gap-4 sm:grid-cols-2" hidden>
                     <div>
-                        <label for="spreadsheet-billing-status" class="mb-1 block text-xs font-semibold text-slate-600">Billing status (Lot X)</label>
-                        <select id="spreadsheet-billing-status" name="billing_status" required disabled class="w-full rounded-lg border-slate-200 text-sm">
-                            <option value="">Choose a billing status</option>
-                            <option value="1st Billing" selected>1st Billing</option>
-                            <option value="2nd Billing">2nd Billing</option>
-                            <option value="3rd Billing">3rd Billing</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="spreadsheet-compliance-status" class="mb-1 block text-xs font-semibold text-slate-600">Status (Compliant / Non-Compliant) (Lot X)</label>
-                        <select id="spreadsheet-compliance-status" name="compliance_status" required disabled class="w-full rounded-lg border-slate-200 text-sm">
-                            <option value="">Choose a compliance status</option>
-                            <option value="COMPLIANT" selected>COMPLIANT</option>
-                            <option value="NON-COMPLIANT">NON-COMPLIANT</option>
-                        </select>
-                    </div>
-                    <div>
                         <label for="spreadsheet-date-received" class="mb-1 block text-xs font-semibold text-slate-600">Date received (Lot X)</label>
                         <div class="relative flex gap-2"><input id="spreadsheet-date-received" name="date_received" type="text" inputmode="numeric" autocomplete="off" placeholder="MM/DD/YYYY" pattern="(?:0[1-9]|1[0-2])/(?:0[1-9]|[12][0-9]|3[01])/[0-9]{4}" required disabled class="w-full rounded-lg border-slate-200 text-sm" aria-describedby="spreadsheet-date-received-error"><button type="button" data-open-date-picker="spreadsheet-date-received" aria-label="Select date received" disabled class="rounded-lg border border-slate-200 px-3 text-sm">📅</button><input type="date" data-date-picker-for="spreadsheet-date-received" aria-label="Select date received" disabled class="pointer-events-none absolute right-0 top-0 h-px w-px opacity-0"></div>
                         <p id="spreadsheet-date-received-error" class="mt-1 text-xs text-rose-700" hidden></p>
@@ -158,35 +141,6 @@
                     <div>
                         <label for="spreadsheet-received-by" class="mb-1 block text-xs font-semibold text-slate-600">Received by (Lot X)</label>
                         <input id="spreadsheet-received-by" name="received_by" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
-                    </div>
-                    <div>
-                        <label for="spreadsheet-position" class="mb-1 block text-xs font-semibold text-slate-600">Position</label>
-                        <select id="spreadsheet-position" name="position" required disabled class="w-full rounded-lg border-slate-200 text-sm">
-                            <option value="" selected disabled>Choose a position</option>
-                            <option value="Administrative Officer">Administrative Officer</option>
-                            <option value="Administrative Officer I">Administrative Officer I</option>
-                            <option value="Administrative Officer II">Administrative Officer II</option>
-                            <option value="Administrative Officer III">Administrative Officer III</option>
-                            <option value="Property Custodian">Property Custodian</option>
-                            <option value="School Property Custodian">School Property Custodian</option>
-                            <option value="__other__">Other (type position)</option>
-                        </select>
-                    </div>
-                    <div id="spreadsheet-position-other-field" hidden>
-                        <label for="spreadsheet-position-other" class="mb-1 block text-xs font-semibold text-slate-600">Type position</label>
-                        <input id="spreadsheet-position-other" name="position_other" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
-                    </div>
-                    <div>
-                        <label for="spreadsheet-telephone-1" class="mb-1 block text-xs font-semibold text-slate-600">Telephone 1</label>
-                        <input id="spreadsheet-telephone-1" name="telephone_1" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
-                    </div>
-                    <div>
-                        <label for="spreadsheet-inspection-1" class="mb-1 block text-xs font-semibold text-slate-600">Inspection 1 (Lot X)</label>
-                        <input id="spreadsheet-inspection-1" name="inspection_1" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
-                    </div>
-                    <div>
-                        <label for="spreadsheet-inspection-2" class="mb-1 block text-xs font-semibold text-slate-600">Inspection 2 (Lot X)</label>
-                        <input id="spreadsheet-inspection-2" name="inspection_2" type="text" maxlength="255" required disabled class="w-full rounded-lg border-slate-200 text-sm">
                     </div>
                     <div>
                         <label for="spreadsheet-date-checking" class="mb-1 block text-xs font-semibold text-slate-600">Date checking (Lot X)</label>

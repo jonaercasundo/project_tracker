@@ -7,9 +7,6 @@ if (monitoring) {
     const syncSpreadsheetForm = document.getElementById('sync-spreadsheet-form');
     const spreadsheetSchoolIdInput = document.getElementById('spreadsheet-school-id');
     const spreadsheetSchoolFields = document.getElementById('spreadsheet-school-fields');
-    const spreadsheetPositionSelect = document.getElementById('spreadsheet-position');
-    const spreadsheetPositionOtherField = document.getElementById('spreadsheet-position-other-field');
-    const spreadsheetPositionOtherInput = document.getElementById('spreadsheet-position-other');
     const spreadsheetSchoolRowCount = document.getElementById('spreadsheet-school-row-count');
     const spreadsheetModalFeedback = syncSpreadsheetForm.querySelector('[data-spreadsheet-modal-feedback]');
     const spreadsheetSubmitButton = syncSpreadsheetForm.querySelector('[data-submit-spreadsheet]');
@@ -693,8 +690,6 @@ if (monitoring) {
             const valueRow = document.createElement('tr');
             [
                 ['Contact Person', row.contact_person],
-                ['Position', row.position],
-                ['Telephone 1', row.telephone_1],
             ].forEach(([label, value]) => {
                 const heading = document.createElement('th');
                 heading.className = 'border border-slate-200 bg-white px-2 py-1 font-semibold';
@@ -770,8 +765,6 @@ if (monitoring) {
     function resetSpreadsheetFields(enabled) {
         const today = localTodayDate();
         const defaultValues = {
-            billing_status: '1st Billing',
-            compliance_status: 'COMPLIANT',
             date_checking: displayDate(today),
             date_encoding: displayDate(today),
         };
@@ -782,17 +775,6 @@ if (monitoring) {
         spreadsheetSchoolFields.querySelectorAll('[data-open-date-picker]').forEach(button => {
             button.disabled = !enabled;
         });
-        updatePositionOtherField(enabled);
-    }
-
-    function updatePositionOtherField(enabled = !spreadsheetSchoolFields.hidden) {
-        const isOther = spreadsheetPositionSelect.value === '__other__';
-        spreadsheetPositionOtherField.hidden = !isOther;
-        spreadsheetPositionOtherInput.disabled = !enabled || !isOther;
-        spreadsheetPositionOtherInput.required = isOther;
-        if (!isOther) {
-            spreadsheetPositionOtherInput.value = '';
-        }
     }
 
     spreadsheetSchoolIdInput.addEventListener('input', () => {
@@ -843,9 +825,7 @@ if (monitoring) {
         });
     });
 
-    spreadsheetPositionSelect.addEventListener('change', () => updatePositionOtherField());
-
-    ['received_by', 'position_other', 'telephone_1', 'inspection_1', 'inspection_2'].forEach(name => {
+    ['received_by'].forEach(name => {
         const control = syncSpreadsheetForm.elements[name];
         control.addEventListener('input', () => {
             const cursorStart = control.selectionStart;

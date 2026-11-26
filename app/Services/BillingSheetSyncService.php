@@ -145,7 +145,7 @@ class BillingSheetSyncService
     /**
      * Fill missing billing details for project rows with a recorded 3PL received date.
      *
-     * @param  array{billing_status: string, compliance_status: string, date_received: string, received_by: string, inspection_1: string, inspection_2: string, date_checking: string, date_encoding: string}  $fields
+     * @param  array{date_received: string, received_by: string, date_checking: string, date_encoding: string}  $fields
      * @return array{status: string, message: string, synced_count: int, skipped_count: int, issues: array<int, string>}
      */
     public function syncProjectSpreadsheet(
@@ -297,16 +297,10 @@ class BillingSheetSyncService
         $checkedByForSheet = mb_strtoupper(trim($checkedBy));
         foreach ($plansByRow as $plan) {
             $fieldsForRow = [
-                'status' => mb_strtoupper(trim($fields['billing_status'])),
-                'compliance_status' => mb_strtoupper(trim($fields['compliance_status'])),
                 'checked_by' => $checkedByForSheet,
                 'date_received' => $fields['date_received'],
                 'received_by' => mb_strtoupper(trim($fields['received_by'])),
                 'contact_person' => mb_strtoupper(trim($fields['received_by'])),
-                'position' => mb_strtoupper(trim($fields['position'])),
-                'telephone_1' => mb_strtoupper(trim($fields['telephone_1'])),
-                'inspection_1' => mb_strtoupper(trim($fields['inspection_1'])),
-                'inspection_2' => mb_strtoupper(trim($fields['inspection_2'])),
                 'date_checking' => $fields['date_checking'],
                 'date_encoding' => $fields['date_encoding'],
                 'total_amount' => $this->formatCents(collect($plan['delivery_ids'])
@@ -336,10 +330,6 @@ class BillingSheetSyncService
             'package_code' => $plan['package_code'],
             'sheet_package_code' => $plan['sheet_package_code'],
             'contact_person' => mb_strtoupper(trim($fields['received_by'])),
-            'position' => mb_strtoupper(trim($fields['position'])),
-            'telephone_1' => mb_strtoupper(trim($fields['telephone_1'])),
-            'billing_status' => mb_strtoupper(trim($fields['billing_status'])),
-            'compliance_status' => mb_strtoupper(trim($fields['compliance_status'])),
             'lot' => $plan['lot_number'],
             'sheet_row' => $plan['row'],
             'mapping' => $plan['mapping'] === null ? null : [

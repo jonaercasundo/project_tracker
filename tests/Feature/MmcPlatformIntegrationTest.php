@@ -557,6 +557,7 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         ->assertSee('MMC Masterlist')
         ->assertSee('Tracker project: Local Tracker Project')
         ->assertSee('Project ID')
+        ->assertSee('aria-sort="ascending"', false)
         ->assertSee((string) $trackerProjectId)
         ->assertSee('Alpha Elementary')
         ->assertSee('Beta Elementary')
@@ -582,6 +583,13 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         ->assertOk()
         ->assertSee('Beta Elementary')
         ->assertDontSee('Alpha Elementary');
+
+    $sortedRows = $this->get(route('integrations.mmc-platform.masterlist', [
+        'sort_by' => 'school_name',
+        'sort_direction' => 'desc',
+    ]))->viewData('rows')->getCollection()->pluck('school_name')->all();
+
+    expect($sortedRows)->toBe(['Beta Elementary', 'Alpha Elementary']);
 });
 
 it('preserves a saved project when a later sync page fails', function () {

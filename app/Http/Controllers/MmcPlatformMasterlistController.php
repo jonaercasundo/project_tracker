@@ -112,9 +112,13 @@ class MmcPlatformMasterlistController extends Controller
             'program_id' => ['nullable', 'string', 'max:255'],
             'search' => ['nullable', 'string', 'max:255'],
             'per_page' => ['nullable', Rule::in(['25', '50', '100'])],
+            'sort_by' => ['nullable', Rule::in(array_keys(self::COLUMNS))],
+            'sort_direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
         $companyId = (int) $request->user()->currentCompany()->getKey();
         $perPage = (int) ($filters['per_page'] ?? 50);
+        $sortBy = $filters['sort_by'] ?? 'school_name';
+        $sortDirection = $filters['sort_direction'] ?? 'asc';
         $currentPage = max(1, $request->integer('page', 1));
         $snapshots = collect();
         $snapshot = null;
@@ -177,7 +181,13 @@ class MmcPlatformMasterlistController extends Controller
                         });
                     }
 
+                    $sortColumn = match ($sortBy) {
+                        'project_id' => 'tracker_project_id',
+                        'updated_at' => 'source_updated_at',
+                        default => $sortBy,
+                    };
                     $rows = $masterlistQuery
+                        ->orderBy($sortColumn, $sortDirection)
                         ->orderBy('school_name')
                         ->orderBy('dr_no')
                         ->paginate($perPage)
@@ -200,6 +210,8 @@ class MmcPlatformMasterlistController extends Controller
             'filters' => $filters,
             'perPage' => $perPage,
             'columns' => self::COLUMNS,
+            'sortBy' => $sortBy,
+            'sortDirection' => $sortDirection,
             'trackerProjectName' => $trackerProjectName ?? null,
         ]);
     }

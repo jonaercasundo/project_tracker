@@ -93,8 +93,32 @@
                         <table class="min-w-max divide-y divide-slate-200 text-left text-sm">
                             <thead class="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
                                 <tr>
-                                    @foreach ($columns as $label)
-                                        <th scope="col" class="whitespace-nowrap px-4 py-3">{{ $label }}</th>
+                                    @foreach ($columns as $columnKey => $label)
+                                        @php
+                                            $isSorted = $sortBy === $columnKey;
+                                            $nextDirection = $isSorted && $sortDirection === 'asc' ? 'desc' : 'asc';
+                                            $sortUrl = request()->fullUrlWithQuery([
+                                                'sort_by' => $columnKey,
+                                                'sort_direction' => $nextDirection,
+                                                'page' => null,
+                                            ]);
+                                        @endphp
+                                        <th scope="col" aria-sort="{{ $isSorted ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none' }}" class="whitespace-nowrap px-4 py-3">
+                                            <a href="{{ $sortUrl }}" aria-label="Sort by {{ $label }} {{ $nextDirection === 'asc' ? 'ascending' : 'descending' }}" class="inline-flex items-center gap-1.5 rounded text-left transition hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <span>{{ $label }}</span>
+                                                <svg class="h-3.5 w-3.5 shrink-0 {{ $isSorted ? 'text-blue-600' : 'text-slate-400' }}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                    @if ($isSorted)
+                                                        @if ($sortDirection === 'asc')
+                                                            <path fill-rule="evenodd" d="M10 3a.75.75 0 0 1 .55.24l4.25 4.5a.75.75 0 0 1-.55 1.26h-8.5a.75.75 0 0 1-.55-1.26l4.25-4.5A.75.75 0 0 1 10 3Z" clip-rule="evenodd" />
+                                                        @else
+                                                            <path fill-rule="evenodd" d="M10 17a.75.75 0 0 1-.55-.24l-4.25-4.5A.75.75 0 0 1 5.75 11h8.5a.75.75 0 0 1 .55 1.26l-4.25 4.5A.75.75 0 0 1 10 17Z" clip-rule="evenodd" />
+                                                        @endif
+                                                    @else
+                                                        <path d="M6.5 3a.75.75 0 0 1 .75.75v8.69l1.72-1.72a.75.75 0 1 1 1.06 1.06l-3 3a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 0 1 1.06-1.06l1.72 1.72V3.75A.75.75 0 0 1 6.5 3Zm7 14a.75.75 0 0 1-.75-.75V7.56l-1.72 1.72a.75.75 0 0 1-1.06-1.06l3-3a.75.75 0 0 1 1.06 0l3 3a.75.75 0 1 1-1.06 1.06l-1.72-1.72v8.69a.75.75 0 0 1-.75.75Z" />
+                                                    @endif
+                                                </svg>
+                                            </a>
+                                        </th>
                                     @endforeach
                                 </tr>
                             </thead>

@@ -11,6 +11,7 @@ return new class extends Migration
     {
         Schema::create('projects', function (Blueprint $table): void {
             $table->increments('project_id');
+            $table->unsignedInteger('company_id')->nullable();
             $table->string('project_code')->nullable();
             $table->string('ref_no', 50)->unique();
             $table->text('project_name');

@@ -21,7 +21,7 @@ class SyncMmcPlatformProject implements ShouldQueue
 
     public bool $failOnTimeout = true;
 
-    /** @param array{program_id: string, program_name?: ?string, program_info?: ?array} $data */
+    /** @param array{program_id: string, tracker_project_id: int, program_name?: ?string, program_info?: ?array} $data */
     public function __construct(
         private string $statusKey,
         private int $companyId,
@@ -65,12 +65,13 @@ class SyncMmcPlatformProject implements ShouldQueue
         $startedAt = now();
         $snapshots->upsert([[
             ...$identity,
+            'tracker_project_id' => $this->data['tracker_project_id'],
             'records' => '{}',
             'entity_counts' => '{}',
             'synced_at' => $startedAt,
             'created_at' => $startedAt,
             'updated_at' => $startedAt,
-        ]], ['company_id', 'program_id'], ['updated_at']);
+        ]], ['company_id', 'program_id'], ['tracker_project_id', 'updated_at']);
 
         $syncId = (clone $snapshots)->where($identity)->value('id');
         $storedPages = DB::table('mmc_platform_project_sync_pages');

@@ -9,7 +9,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" x-data="{ showApiKey: false, previewBusy: false, syncBusy: false, programs: [], selectedProgram: '', sampleLimit: 25, result: null, syncResult: null, connectionState: '', connectionMessage: '' }">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" x-data="{ showApiKey: false, previewBusy: false, syncBusy: false, programs: [], selectedProgram: '', selectedTrackerProject: '', sampleLimit: 25, result: null, syncResult: null, connectionState: '', connectionMessage: '' }">
         @if (session('success'))
             <div role="status" aria-live="polite" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('success') }}</div>
         @endif
@@ -145,13 +145,25 @@
                         " :disabled="previewBusy" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60">Test Connection</button>
                         <span x-show="connectionState" :role="connectionState === 'error' ? 'alert' : 'status'" class="text-sm" :class="connectionState === 'error' ? 'text-rose-700' : (connectionState === 'success' ? 'font-semibold text-emerald-700' : 'text-slate-600')" x-text="connectionMessage"></span>
                     </div>
-                    <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto_auto] sm:items-end">
+                    <div class="grid gap-3 sm:grid-cols-2 sm:items-end lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_150px_auto_auto]">
                         <div>
                             <label for="preview-program" class="mb-1 block text-sm font-medium text-slate-700">Program</label>
                             <select id="preview-program" x-model="selectedProgram" :disabled="!programs.length || previewBusy" class="w-full rounded-lg border-slate-300 text-sm">
                                 <option value="">Choose a program</option>
                                 <template x-for="program in programs" :key="program.id"><option :value="String(program.id)" x-text="`${program.name || 'Program'} (ID: ${program.id})`"></option></template>
                             </select>
+                        </div>
+                        <div>
+                            <label for="tracker-project" class="mb-1 block text-sm font-medium text-slate-700">Save under Tracker project</label>
+                            <select id="tracker-project" x-model="selectedTrackerProject" :disabled="syncBusy || {{ $projects->isEmpty() ? 'true' : 'false' }}" class="w-full rounded-lg border-slate-300 text-sm">
+                                <option value="">Choose a Tracker project</option>
+                                @foreach ($projects as $project)
+                                    <option value="{{ $project->project_id }}">{{ $project->project_name }} (ID: {{ $project->project_id }})</option>
+                                @endforeach
+                            </select>
+                            @if ($projects->isEmpty())
+                                <p class="mt-1 text-xs text-amber-700">No Tracker projects are available for this company.</p>
+                            @endif
                         </div>
                         <div>
                             <label for="preview-limit" class="mb-1 block text-sm font-medium text-slate-700">Sample records</label>
@@ -173,7 +185,7 @@
                                         'Content-Type': 'application/json',
                                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
                                     },
-                                    body: JSON.stringify({program_id: selectedProgram, program_name: program?.name || '', program_info: programInfo}),
+                                    body: JSON.stringify({program_id: selectedProgram, tracker_project_id: Number(selectedTrackerProject), program_name: program?.name || '', program_info: programInfo}),
                                 });
                                 let data = await response.json();
                                 const statusUrl = data.status_url;
@@ -188,7 +200,7 @@
                             } finally {
                                 syncBusy = false;
                             }
-                        " :disabled="syncBusy || previewBusy || !selectedProgram" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" x-text="syncBusy ? 'Syncing…' : 'Sync to Tracker'"></button>
+                        " :disabled="syncBusy || previewBusy || !selectedProgram || !selectedTrackerProject" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" x-text="syncBusy ? 'Syncing…' : 'Sync to Tracker'"></button>
                     </div>
                     <div x-show="syncResult" role="status" class="rounded-lg border p-3 text-sm" :class="syncResult?.status === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'">
                         <p class="font-semibold" x-text="syncResult?.message"></p>

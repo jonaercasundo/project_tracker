@@ -44,7 +44,7 @@
                 </form>
 
                 <div class="flex flex-wrap items-center justify-between gap-2 border-y border-slate-100 py-3 text-sm text-slate-600">
-                    <p><span class="font-semibold text-slate-900">{{ $snapshot->program_name ?: 'Program '.$snapshot->program_id }}</span> · {{ number_format($rows->total()) }} records{{ filled($filters['search'] ?? null) ? ' matching search' : '' }}</p>
+                    <p><span class="font-semibold text-slate-900">{{ $snapshot->program_name ?: 'Program '.$snapshot->program_id }}</span> · Tracker project: {{ $trackerProjectName ?: 'Not assigned' }} · {{ number_format($rows->total()) }} records{{ filled($filters['search'] ?? null) ? ' matching search' : '' }}</p>
                     <p>Last synced {{ \Illuminate\Support\Carbon::parse($snapshot->synced_at)->format('M j, Y g:i A') }}</p>
                 </div>
 

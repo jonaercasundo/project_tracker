@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator as ValidatorContract;
 
 class MmcPlatformIntegrationController extends Controller
@@ -37,6 +38,16 @@ class MmcPlatformIntegrationController extends Controller
                 ->withQueryString();
         }
 
+        $companyId = (int) $request->user()->currentCompany()->getKey();
+        $projects = Schema::hasTable('projects')
+            ? DB::table('projects')
+                ->when(Schema::hasColumn('projects', 'company_id'), function ($query) use ($companyId): void {
+                    $query->whereNull('company_id')->orWhere('company_id', $companyId);
+                })
+                ->orderBy('project_name')
+                ->get(['project_id', 'project_name', 'project_code', 'ref_no'])
+            : collect();
+
         return view('integrations.mmc-platform', [
             'connection' => $client->configurationStatus(),
             'testResult' => session('mmc_platform_test'),
@@ -51,6 +62,7 @@ class MmcPlatformIntegrationController extends Controller
             ],
             'auditRows' => $auditRows,
             'auditStorageAvailable' => Schema::hasTable('admin_activity_logs'),
+            'projects' => $projects,
         ]);
     }
 
@@ -155,8 +167,16 @@ class MmcPlatformIntegrationController extends Controller
 
     public function syncProject(Request $request): JsonResponse
     {
+        $companyId = (int) $request->user()->currentCompany()->getKey();
+        abort_unless(Schema::hasTable('projects'), 503, 'The Tracker projects table is unavailable.');
+        $trackerProjectRule = Rule::exists('projects', 'project_id');
+        if (Schema::hasColumn('projects', 'company_id')) {
+            $trackerProjectRule->where(fn ($query) => $query->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $companyId)));
+        }
+
         $data = $request->validate([
             'program_id' => ['required', 'string', 'max:255'],
+            'tracker_project_id' => ['required', 'integer', $trackerProjectRule],
             'program_name' => ['nullable', 'string', 'max:255'],
             'program_info' => ['nullable', 'array:id,name,project_title,fiscal_year,status'],
             'program_info.id' => ['nullable', 'string', 'max:255'],
@@ -170,7 +190,6 @@ class MmcPlatformIntegrationController extends Controller
             return response()->json(['status' => 'failed', 'message' => 'Run the MMC Platform project sync migration before syncing data.'], 503);
         }
 
-        $companyId = (int) $request->user()->currentCompany()->getKey();
         $userId = (int) $request->user()->getKey();
         $syncId = (string) Str::uuid();
         $statusKey = SyncMmcPlatformProject::statusKey($companyId, $userId, $syncId);

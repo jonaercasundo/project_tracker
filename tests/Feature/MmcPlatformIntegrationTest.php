@@ -18,10 +18,12 @@ class MmcPlatformIntegrationTestCase extends MIWorkflowTestCase
             'database/migrations/2026_06_15_081615_create_permission_tables.php',
             'database/migrations/2026_09_02_024221_create_companies_table.php',
             'database/migrations/2026_09_02_024448_create_company_user_table.php',
+            'tests/Fixtures/migrations/2026_10_16_000001_create_legacy_projects_table.php',
             'database/migrations/2026_10_26_115437_add_description_to_roles_and_create_admin_activity_logs_table.php',
             'database/migrations/2026_11_06_054151_create_mmc_platform_settings_table.php',
             'database/migrations/2026_11_11_095147_create_mmc_platform_project_syncs_table.php',
             'database/migrations/2026_11_26_053259_create_mmc_platform_project_sync_pages_table.php',
+            'database/migrations/2026_11_26_062033_add_tracker_project_id_to_mmc_platform_project_syncs_table.php',
         ]];
     }
 }
@@ -34,8 +36,23 @@ function mmcPlatformUser(): void
     test()->signInMI($user);
 }
 
+function mmcTrackerProject(?int $companyId = null): int
+{
+    return (int) DB::table('projects')->insertGetId([
+        'company_id' => $companyId ?? auth()->user()->currentCompany()->getKey(),
+        'project_code' => 'MMC-TEST',
+        'ref_no' => 'MMC-TEST-'.uniqid(),
+        'project_name' => 'Local Tracker Project',
+        'agency' => 'Department of Education',
+        'contract_amount' => 0,
+        'status' => 'Active',
+        'ABC' => 0,
+    ]);
+}
+
 it('shows the configuration screen in the MMC user workspace only', function () {
     mmcPlatformUser();
+    mmcTrackerProject();
     $this->get(route('integrations.mmc-platform.index', ['tab' => 'integration']))
         ->assertOk()
         ->assertSee('Third Party API Key Management')
@@ -54,6 +71,9 @@ it('shows the configuration screen in the MMC user workspace only', function () 
         ->assertDontSee('$refs.testConnection.click()', false)
         ->assertSee('HTTP status · requested endpoint')
         ->assertSee('max="2000"', false);
+    $this->get(route('integrations.mmc-platform.index', ['tab' => 'api-webhooks']))
+        ->assertOk()
+        ->assertSee('Local Tracker Project');
 
     $administrator = $this->miUser('Administrator', 'MMC');
     $this->actingAs($administrator)->withSession(['company_id' => $administrator->companies()->sole()->getKey()]);
@@ -77,6 +97,30 @@ it('limits connection checks without blocking the preview endpoint', function ()
     $this->postJson(route('integrations.mmc-platform.preview-data'))
         ->assertUnprocessable()
         ->assertJsonValidationErrors('program_id');
+});
+
+it('requires a Tracker project before queueing an MMC masterlist sync', function () {
+    Queue::fake();
+    mmcPlatformUser();
+
+    $this->postJson(route('integrations.mmc-platform.sync'), [
+        'program_id' => 'program-123',
+    ])->assertUnprocessable()->assertJsonValidationErrors('tracker_project_id');
+
+    Queue::assertNothingPushed();
+});
+
+it('rejects a Tracker project owned by another company', function () {
+    Queue::fake();
+    mmcPlatformUser();
+    $foreignProjectId = mmcTrackerProject(999999);
+
+    $this->postJson(route('integrations.mmc-platform.sync'), [
+        'program_id' => 'program-123',
+        'tracker_project_id' => $foreignProjectId,
+    ])->assertUnprocessable()->assertJsonValidationErrors('tracker_project_id');
+
+    Queue::assertNothingPushed();
 });
 
 it('stores the API key encrypted and never renders it back to the page', function () {
@@ -241,9 +285,11 @@ it('queues project sync and returns the saved results only to its requester', fu
         ->push(['data' => [['school_id' => '1', 'grade_levels' => 'G1toG3, G4toG6']], 'has_more' => true])
         ->push(['data' => [['school_id' => '2', 'grade_levels' => ['G4toG6'], 'lines' => [['item_id' => 'kit']]]], 'has_more' => false]);
     mmcPlatformUser();
+    $trackerProjectId = mmcTrackerProject();
 
     $statusUrl = $this->postJson(route('integrations.mmc-platform.sync'), [
         'program_id' => 'program-123',
+        'tracker_project_id' => $trackerProjectId,
         'program_info' => ['id' => 'program-123'],
     ])->assertAccepted()->assertJsonPath('status', 'pending')->json('status_url');
 
@@ -262,20 +308,52 @@ it('queues project sync and returns the saved results only to its requester', fu
         ->assertJsonPath('entity_counts.schools', 2)
         ->assertJsonPath('entity_counts.keystages', 2)
         ->assertJsonPath('entity_counts.items', 1);
-    $this->assertDatabaseHas('mmc_platform_project_syncs', ['program_id' => 'program-123', 'record_count' => 2]);
+    $this->assertDatabaseHas('mmc_platform_project_syncs', ['program_id' => 'program-123', 'tracker_project_id' => $trackerProjectId, 'record_count' => 2]);
     $this->assertDatabaseCount('mmc_platform_project_sync_pages', 2);
 
     mmcPlatformUser();
     $this->getJson($statusUrl)->assertNotFound();
 });
 
+it('replaces the saved program snapshot on a successful resync without duplicating it', function () {
+    Queue::fake();
+    config([
+        'services.mmc_platform.base_url' => 'https://platform.example.test/api/v1',
+        'services.mmc_platform.read_key' => 'mmc_test_read_key',
+    ]);
+    Http::fakeSequence()
+        ->push(['data' => [['school_id' => 'old-school', 'school_name' => 'Old Name']], 'has_more' => false])
+        ->push(['data' => [['school_id' => 'updated-school', 'school_name' => 'Updated Name']], 'has_more' => false]);
+    mmcPlatformUser();
+    $trackerProjectId = mmcTrackerProject();
+    $syncUrl = route('integrations.mmc-platform.sync');
+    $syncData = ['program_id' => 'program-123', 'tracker_project_id' => $trackerProjectId];
+
+    $this->postJson($syncUrl, $syncData)->assertAccepted();
+    Queue::pushed(SyncMmcPlatformProject::class)->last()->handle(app(MmcPlatformApiClient::class));
+    $this->postJson($syncUrl, $syncData)->assertAccepted();
+    Queue::pushed(SyncMmcPlatformProject::class)->last()->handle(app(MmcPlatformApiClient::class));
+
+    $this->assertDatabaseCount('mmc_platform_project_syncs', 1);
+    $this->assertDatabaseHas('mmc_platform_project_syncs', [
+        'program_id' => 'program-123',
+        'tracker_project_id' => $trackerProjectId,
+        'record_count' => 1,
+    ]);
+    $this->assertDatabaseCount('mmc_platform_project_sync_pages', 1);
+    expect(json_decode(DB::table('mmc_platform_project_sync_pages')->value('records'), true))
+        ->toBe([['school_id' => 'updated-school', 'school_name' => 'Updated Name']]);
+});
+
 it('displays saved MMC masterlist records from the selected company snapshot', function () {
     mmcPlatformUser();
     $companyId = auth()->user()->currentCompany()->getKey();
+    $trackerProjectId = mmcTrackerProject();
     $syncedAt = now();
     DB::table('mmc_platform_project_syncs')->insert([
         'company_id' => $companyId,
         'program_id' => 'program-123',
+        'tracker_project_id' => $trackerProjectId,
         'program_name' => 'SME 2',
         'program_info' => '{}',
         'records' => json_encode(['storage' => 'pages', 'pages' => 1]),
@@ -298,6 +376,7 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
     $this->get(route('integrations.mmc-platform.masterlist'))
         ->assertOk()
         ->assertSee('MMC Masterlist')
+        ->assertSee('Tracker project: Local Tracker Project')
         ->assertSee('Alpha Elementary')
         ->assertSee('Beta Elementary')
         ->assertSee('Project ID: program-123')
@@ -329,12 +408,13 @@ it('preserves a saved project when a later sync page fails', function () {
         ->push(['data' => [['school_id' => '2'], ['school_id' => '3']], 'has_more' => true])
         ->pushStatus(404);
     mmcPlatformUser();
+    $trackerProjectId = mmcTrackerProject();
 
     $sync = route('integrations.mmc-platform.sync');
-    $this->postJson($sync, ['program_id' => 'program-123'])->assertAccepted();
+    $this->postJson($sync, ['program_id' => 'program-123', 'tracker_project_id' => $trackerProjectId])->assertAccepted();
     Queue::pushed(SyncMmcPlatformProject::class)->sole()->handle(app(MmcPlatformApiClient::class));
 
-    $statusUrl = $this->postJson($sync, ['program_id' => 'program-123'])->assertAccepted()->json('status_url');
+    $statusUrl = $this->postJson($sync, ['program_id' => 'program-123', 'tracker_project_id' => $trackerProjectId])->assertAccepted()->json('status_url');
     Queue::pushed(SyncMmcPlatformProject::class)->last()->handle(app(MmcPlatformApiClient::class));
 
     $this->getJson($statusUrl)->assertOk()->assertJsonPath('status', 'failed');

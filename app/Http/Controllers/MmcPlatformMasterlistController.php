@@ -70,19 +70,23 @@ class MmcPlatformMasterlistController extends Controller
             $snapshots = (clone $snapshotQuery)
                 ->orderBy('program_name')
                 ->orderBy('program_id')
-                ->get(['program_id', 'program_name', 'record_count', 'synced_at']);
+                ->get(['program_id', 'program_name', 'tracker_project_id', 'record_count', 'synced_at']);
 
             if ($snapshots->isNotEmpty()) {
                 if (filled($filters['program_id'] ?? null)) {
                     $snapshot = (clone $snapshotQuery)
                         ->where('program_id', $filters['program_id'])
-                        ->first(['id', 'program_id', 'program_name', 'record_count', 'synced_at']);
+                        ->first(['id', 'program_id', 'program_name', 'tracker_project_id', 'record_count', 'synced_at']);
                     abort_if($snapshot === null, 404);
                 } else {
                     $snapshot = (clone $snapshotQuery)
                         ->orderByDesc('synced_at')
-                        ->first(['id', 'program_id', 'program_name', 'record_count', 'synced_at']);
+                        ->first(['id', 'program_id', 'program_name', 'tracker_project_id', 'record_count', 'synced_at']);
                 }
+
+                $trackerProjectName = $snapshot->tracker_project_id === null
+                    ? null
+                    : DB::table('projects')->where('project_id', $snapshot->tracker_project_id)->value('project_name');
 
                 $rows = $this->recordsPage(
                     (int) $snapshot->id,
@@ -102,6 +106,7 @@ class MmcPlatformMasterlistController extends Controller
             'filters' => $filters,
             'perPage' => $perPage,
             'columns' => self::COLUMNS,
+            'trackerProjectName' => $trackerProjectName ?? null,
         ]);
     }
 

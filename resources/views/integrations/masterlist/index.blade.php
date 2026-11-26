@@ -52,54 +52,20 @@
                     <div class="rounded-xl border border-dashed border-slate-300 px-5 py-12 text-center text-sm text-slate-500">No masterlist records match this search.</div>
                 @else
                     <div class="overflow-x-auto rounded-xl border border-slate-200">
-                        <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+                        <table class="min-w-max divide-y divide-slate-200 text-left text-sm">
                             <thead class="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
                                 <tr>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">DR No.</th>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Lot No.</th>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Contract No.</th>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">School ID</th>
-                                    <th scope="col" class="min-w-56 px-4 py-3">School</th>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Region</th>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Division</th>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Municipality</th>
-                                    <th scope="col" class="min-w-56 px-4 py-3">Address</th>
-                                    <th scope="col" class="min-w-48 px-4 py-3">Contact Person</th>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Contact Phone</th>
-                                    <th scope="col" class="min-w-48 px-4 py-3">Grade Levels</th>
-                                    <th scope="col" class="min-w-64 px-4 py-3">Items</th>
+                                    @foreach ($columns as $label)
+                                        <th scope="col" class="whitespace-nowrap px-4 py-3">{{ $label }}</th>
+                                    @endforeach
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 text-slate-700">
                                 @foreach ($rows as $row)
                                     <tr class="align-top hover:bg-slate-50/70">
-                                        <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">{{ $row['dr_number'] ?? '—' }}</td>
-                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['lot_number'] ?? '—' }}</td>
-                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['contract_number'] ?? '—' }}</td>
-                                        <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">{{ $row['school_id'] ?? '—' }}</td>
-                                        <td class="px-4 py-3 font-semibold text-slate-900">{{ $row['school_name'] ?? '—' }}</td>
-                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['region'] ?? '—' }}</td>
-                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['division'] ?? '—' }}</td>
-                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['municipality'] ?? '—' }}</td>
-                                        <td class="px-4 py-3">{{ $row['address'] ?? '—' }}</td>
-                                        <td class="px-4 py-3">{{ $row['contact_person'] ?? '—' }}</td>
-                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['contact_phone'] ?? '—' }}</td>
-                                        <td class="px-4 py-3">{{ $row['grade_levels'] ?: '—' }}</td>
-                                        <td class="px-4 py-3">
-                                            @if ($row['items'] === [])
-                                                —
-                                            @else
-                                                <ul class="space-y-1">
-                                                    @foreach ($row['items'] as $item)
-                                                        <li class="leading-5">
-                                                            <span class="font-medium text-slate-900">{{ $item['name'] ?? $item['code'] ?? 'Item' }}</span>
-                                                            @if (! empty($item['name']) && ! empty($item['code']))<span class="text-slate-500"> · {{ $item['code'] }}</span>@endif
-                                                            @if (! empty($item['quantity']))<span class="text-slate-500"> × {{ $item['quantity'] }}</span>@endif
-                                                        </li>
-                                                    @endforeach
-                                                </ul>
-                                            @endif
-                                        </td>
+                                        @foreach ($columns as $key => $label)
+                                            <td class="whitespace-nowrap px-4 py-3 {{ in_array($key, ['delivery_id', 'lot_id', 'school_id'], true) ? 'font-mono text-xs' : '' }}">{{ filled($row[$key] ?? null) ? $row[$key] : '—' }}</td>
+                                        @endforeach
                                     </tr>
                                 @endforeach
                             </tbody>

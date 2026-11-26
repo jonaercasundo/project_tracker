@@ -11,6 +11,42 @@ use Illuminate\Validation\Rule;
 
 class MmcPlatformMasterlistController extends Controller
 {
+    private const COLUMNS = [
+        'delivery_id' => 'Delivery ID',
+        'lot_id' => 'Lot ID',
+        'lot_no' => 'Lot No.',
+        'contract_no' => 'Contract No.',
+        'dr_no' => 'DR No.',
+        'school_id' => 'School ID',
+        'school_name' => 'School Name',
+        'region' => 'Region',
+        'division' => 'Division',
+        'municipality' => 'Municipality',
+        'address' => 'Address',
+        'contact_person' => 'Contact Person',
+        'contact_phone' => 'Contact Phone',
+        'grade_levels' => 'Grade Levels',
+        'value' => 'Value',
+        'status' => 'Status',
+        'sap_dr_no' => 'SAP DR No.',
+        'sap_encoded_at' => 'SAP Encoded At',
+        'dr_printed_at' => 'DR Printed At',
+        'iar_no' => 'IAR No.',
+        'itr_no' => 'ITR No.',
+        'ar_no' => 'AR No.',
+        'received_by' => 'Received By',
+        'receiver_designation' => 'Receiver Designation',
+        'inspected_by' => 'Inspected By',
+        'inspector_designation' => 'Inspector Designation',
+        'date_received' => 'Date Received',
+        'returned_to_office_at' => 'Returned to Office At',
+        'delivered_at' => 'Delivered At',
+        'pouch_completed_at' => 'Pouch Completed At',
+        'billing_no' => 'Billing No.',
+        'sequence_no' => 'Sequence No.',
+        'updated_at' => 'Updated At',
+    ];
+
     public function index(Request $request): View
     {
         $filters = $request->validate([
@@ -65,6 +101,7 @@ class MmcPlatformMasterlistController extends Controller
             'rows' => $rows,
             'filters' => $filters,
             'perPage' => $perPage,
+            'columns' => self::COLUMNS,
         ]);
     }
 
@@ -124,30 +161,11 @@ class MmcPlatformMasterlistController extends Controller
      */
     private function presentRecord(array $record): array
     {
-        $items = $record['lines'] ?? $record['items'] ?? [];
-        $items = is_array($items) ? array_values(array_filter($items, 'is_array')) : [];
-
-        return [
-            'delivery_id' => $this->displayValue($record['delivery_id'] ?? $record['deliveryId'] ?? null),
-            'lot_id' => $this->displayValue($record['lot_id'] ?? $record['lotId'] ?? null),
-            'lot_number' => $this->displayValue($record['lot_no'] ?? $record['lot_number'] ?? null),
-            'contract_number' => $this->displayValue($record['contract_no'] ?? $record['contract_number'] ?? null),
-            'dr_number' => $this->displayValue($record['dr_no'] ?? $record['dr_number'] ?? null),
-            'school_id' => $record['school_id'] ?? $record['schoolId'] ?? $record['id'] ?? null,
-            'school_name' => $this->displayValue($record['school_name'] ?? data_get($record, 'school.name') ?? $record['school'] ?? $record['name'] ?? null),
-            'region' => $this->displayValue($record['region'] ?? data_get($record, 'school.region')),
-            'division' => $this->displayValue($record['division'] ?? data_get($record, 'school.division')),
-            'municipality' => $this->displayValue($record['municipality'] ?? $record['city_municipality'] ?? data_get($record, 'school.municipality')),
-            'address' => $this->displayValue($record['address'] ?? data_get($record, 'school.address')),
-            'contact_person' => $this->displayValue($record['contact_person'] ?? data_get($record, 'contact.person')),
-            'contact_phone' => $this->displayValue($record['contact_phone'] ?? $record['contact_number'] ?? data_get($record, 'contact.phone')),
-            'grade_levels' => $this->displayValue($record['grade_levels'] ?? $record['key_stages'] ?? $record['keystages'] ?? null),
-            'items' => array_map(fn (array $item): array => [
-                'name' => $this->displayValue($item['item_name'] ?? $item['name'] ?? $item['description'] ?? $item['item_description'] ?? null),
-                'code' => $this->displayValue($item['item_code'] ?? $item['code'] ?? $item['item_id'] ?? null),
-                'quantity' => $this->displayValue($item['quantity'] ?? $item['qty'] ?? $item['total_quantity'] ?? null),
-            ], $items),
-        ];
+        return collect(self::COLUMNS)
+            ->mapWithKeys(fn (string $label, string $key): array => [
+                $key => is_array($record[$key] ?? null) ? $this->displayValue($record[$key]) : ($record[$key] ?? null),
+            ])
+            ->all();
     }
 
     private function displayValue(mixed $value): ?string

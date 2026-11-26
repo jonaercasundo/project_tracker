@@ -290,7 +290,7 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         'sync_id' => $syncId,
         'page' => 1,
         'records' => json_encode([
-            ['dr_no' => 'DR-100', 'lot_no' => 2, 'contract_no' => 'CON-1', 'school_id' => '1001', 'school_name' => 'Alpha Elementary', 'region' => 'Region I', 'grade_levels' => 'G1toG3', 'lines' => [['item_name' => 'Learning Kit', 'item_code' => 'KIT-1', 'quantity' => 8]]],
+            ['delivery_id' => 'delivery-100', 'lot_id' => 'lot-2', 'lot_no' => 2, 'contract_no' => 'CON-1', 'dr_no' => 'DR-100', 'school_id' => '1001', 'school_name' => 'Alpha Elementary', 'region' => 'Region I', 'grade_levels' => 'G1toG3', 'value' => 1250.5, 'status' => 'delivered', 'sap_dr_no' => 'SAP-100', 'contact_person' => 'Alex Example', 'date_received' => '2026-11-26', 'updated_at' => '2026-11-26 09:00:00', 'lines' => [['item_name' => 'Learning Kit', 'item_code' => 'KIT-1', 'quantity' => 8]]],
             ['school_id' => '1002', 'school_name' => 'Beta Elementary', 'region' => 'Region II', 'grade_levels' => 'G4toG6'],
         ]),
     ]);
@@ -302,10 +302,15 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         ->assertSee('Beta Elementary')
         ->assertSee('Project ID: program-123')
         ->assertSee('DR No.')
+        ->assertSee('SAP DR No.')
+        ->assertSee('Updated At')
+        ->assertSee('DR-100')
         ->assertSee('CON-1')
-        ->assertSee('Learning Kit')
+        ->assertSee('SAP-100')
+        ->assertSee('Alex Example')
         ->assertSee('G1toG3')
-        ->assertDontSee('View data');
+        ->assertDontSee('View data')
+        ->assertDontSee('Learning Kit');
 
     $this->get(route('integrations.mmc-platform.masterlist', ['search' => '1002']))
         ->assertOk()

@@ -26,7 +26,7 @@ class BillingDocumentStatusService
             ->where('school_id', '<>', '')
             ->whereNotNull('dr_no')
             ->where('dr_no', '<>', '')
-            ->get(['school_id', 'dr_no', 'lot_no', 'status', 'date_received', 'delivered_at']);
+            ->get(['school_id', 'dr_no', 'lot_no', 'status', 'date_received', 'received_by']);
         ProfileProjectDashboard::current()?->loaded($records->count());
 
         if ($records->isEmpty()) {
@@ -48,7 +48,7 @@ class BillingDocumentStatusService
 
             $schools[$schoolId][] = [
                 'date_received' => trim((string) $record->date_received),
-                'delivered_at' => trim((string) $record->delivered_at),
+                'received_by' => trim((string) $record->received_by),
             ];
         }
 
@@ -56,14 +56,14 @@ class BillingDocumentStatusService
         $processed = 0;
         $processedToday = 0;
         foreach ($schools as $schoolRecords) {
-            $isProcessed = collect($schoolRecords)->every(fn (array $record): bool => $record['date_received'] !== '' && $record['delivered_at'] !== '');
+            $isProcessed = collect($schoolRecords)->every(fn (array $record): bool => $record['date_received'] !== '' && $record['received_by'] !== '');
             if ($isProcessed) {
                 $processed++;
-                $hasDeliveredToday = collect($schoolRecords)->contains(fn (array $record): bool => $record['date_received'] !== ''
-                    && $record['delivered_at'] !== ''
-                    && $this->dateInApplicationTimezone($record['delivered_at']) === $today,
+                $wasReceivedToday = collect($schoolRecords)->contains(fn (array $record): bool => $record['date_received'] !== ''
+                    && $record['received_by'] !== ''
+                    && $this->dateInApplicationTimezone($record['date_received']) === $today,
                 );
-                $processedToday += (int) $hasDeliveredToday;
+                $processedToday += (int) $wasReceivedToday;
             }
         }
 

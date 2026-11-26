@@ -459,7 +459,7 @@ it('rejects an invalid Delivered At date before changing masterlist records', fu
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-1', 'delivered_at' => null]);
 });
 
-it('counts schools as processed only when every delivery has Date Received and Delivered At', function () {
+it('counts schools as processed only when every delivery has Date Received and Received By', function () {
     $this->travelTo('2026-11-26 09:00:00');
     Http::preventStrayRequests();
     mmcPlatformUser();
@@ -468,13 +468,13 @@ it('counts schools as processed only when every delivery has Date Received and D
     $otherTrackerProjectId = mmcTrackerProject();
     $syncedAt = now();
     $records = [
-        ['delivery_id' => 'school-a-lot-2', 'school_id' => 'school-a', 'lot_no' => '2', 'dr_no' => 'DR-A2', 'date_received' => '2026-11-20', 'delivered_at' => '2026-11-25'],
-        ['delivery_id' => 'school-a-lot-9', 'school_id' => 'school-a', 'lot_no' => 'LOT 9', 'dr_no' => 'DR-A9', 'date_received' => '2026-11-26', 'delivered_at' => '2026-11-26'],
-        ['delivery_id' => 'school-b-lot-11', 'school_id' => 'school-b', 'lot_no' => '11', 'dr_no' => 'DR-B11', 'date_received' => '2026-11-26', 'delivered_at' => null],
-        ['delivery_id' => 'school-c-lot-2', 'school_id' => 'school-c', 'lot_no' => '2', 'dr_no' => 'DR-C2', 'date_received' => '2026-11-26', 'delivered_at' => '2026-11-26'],
-        ['delivery_id' => 'school-c-lot-11', 'school_id' => 'school-c', 'lot_no' => '11', 'dr_no' => 'DR-C11', 'date_received' => null, 'delivered_at' => '2026-11-26'],
-        ['delivery_id' => 'excluded-school', 'school_id' => 'school-excluded', 'lot_no' => '2', 'dr_no' => 'DR-X', 'status' => 'cancelled', 'date_received' => null, 'delivered_at' => null],
-        ['delivery_id' => 'other-project-school', 'tracker_project_id' => $otherTrackerProjectId, 'school_id' => 'school-other', 'lot_no' => '2', 'dr_no' => 'DR-OTHER', 'date_received' => null, 'delivered_at' => null],
+        ['delivery_id' => 'school-a-lot-2', 'school_id' => 'school-a', 'lot_no' => '2', 'dr_no' => 'DR-A2', 'date_received' => '2026-11-20', 'received_by' => 'RECIPIENT A'],
+        ['delivery_id' => 'school-a-lot-9', 'school_id' => 'school-a', 'lot_no' => 'LOT 9', 'dr_no' => 'DR-A9', 'date_received' => '2026-11-26', 'received_by' => 'RECIPIENT A'],
+        ['delivery_id' => 'school-b-lot-11', 'school_id' => 'school-b', 'lot_no' => '11', 'dr_no' => 'DR-B11', 'date_received' => '2026-11-26', 'received_by' => null, 'delivered_at' => '2026-11-26'],
+        ['delivery_id' => 'school-c-lot-2', 'school_id' => 'school-c', 'lot_no' => '2', 'dr_no' => 'DR-C2', 'date_received' => '2026-11-26', 'received_by' => 'RECIPIENT C'],
+        ['delivery_id' => 'school-c-lot-11', 'school_id' => 'school-c', 'lot_no' => '11', 'dr_no' => 'DR-C11', 'date_received' => null, 'received_by' => 'RECIPIENT C', 'delivered_at' => '2026-11-26'],
+        ['delivery_id' => 'excluded-school', 'school_id' => 'school-excluded', 'lot_no' => '2', 'dr_no' => 'DR-X', 'status' => 'cancelled', 'date_received' => null, 'received_by' => null, 'delivered_at' => '2026-11-26'],
+        ['delivery_id' => 'other-project-school', 'tracker_project_id' => $otherTrackerProjectId, 'school_id' => 'school-other', 'lot_no' => '2', 'dr_no' => 'DR-OTHER', 'date_received' => null, 'received_by' => null],
     ];
     foreach ($records as $record) {
         DB::table('mmc_platform_masterlist_records')->insert([

@@ -310,7 +310,7 @@ it('queues project sync and returns the saved results only to its requester', fu
         ->assertJsonPath('entity_counts.keystages', 2)
         ->assertJsonPath('entity_counts.items', 1);
     $this->assertDatabaseHas('mmc_platform_project_syncs', ['program_id' => 'program-123', 'tracker_project_id' => $trackerProjectId, 'record_count' => 2]);
-    $this->assertDatabaseCount('mmc_platform_project_sync_pages', 2);
+    $this->assertDatabaseCount('mmc_platform_project_sync_pages', 0);
     $this->assertDatabaseCount('mmc_platform_masterlist_records', 2);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-1', 'tracker_project_id' => $trackerProjectId]);
 
@@ -318,36 +318,55 @@ it('queues project sync and returns the saved results only to its requester', fu
     $this->getJson($statusUrl)->assertNotFound();
 });
 
-it('replaces the saved program snapshot on a successful resync without duplicating it', function () {
+it('syncs only new and changed rows and skips unchanged records on resync', function () {
     Queue::fake();
     config([
         'services.mmc_platform.base_url' => 'https://platform.example.test/api/v1',
         'services.mmc_platform.read_key' => 'mmc_test_read_key',
     ]);
     Http::fakeSequence()
-        ->push(['data' => [['delivery_id' => 'delivery-1', 'school_id' => 'old-school', 'school_name' => 'Old Name']], 'has_more' => false])
-        ->push(['data' => [['delivery_id' => 'delivery-1', 'school_id' => 'updated-school', 'school_name' => 'Updated Name']], 'has_more' => false]);
+        ->push(['data' => [
+            ['delivery_id' => 'delivery-unchanged', 'school_id' => 'school-1', 'school_name' => 'Same Name'],
+            ['delivery_id' => 'delivery-changed', 'school_id' => 'school-2', 'school_name' => 'Old Name'],
+            ['delivery_id' => 'delivery-removed', 'school_id' => 'school-3', 'school_name' => 'Removed Name'],
+        ], 'has_more' => false])
+        ->push(['data' => [
+            ['delivery_id' => 'delivery-unchanged', 'school_id' => 'school-1', 'school_name' => 'Same Name'],
+            ['delivery_id' => 'delivery-changed', 'school_id' => 'school-2', 'school_name' => 'Updated Name'],
+            ['delivery_id' => 'delivery-new', 'school_id' => 'school-4', 'school_name' => 'New Name'],
+        ], 'has_more' => false]);
     mmcPlatformUser();
     $trackerProjectId = mmcTrackerProject();
     $syncUrl = route('integrations.mmc-platform.sync');
     $syncData = ['program_id' => 'program-123', 'tracker_project_id' => $trackerProjectId];
 
-    $this->postJson($syncUrl, $syncData)->assertAccepted();
+    $firstStatusUrl = $this->postJson($syncUrl, $syncData)->assertAccepted()->json('status_url');
     Queue::pushed(SyncMmcPlatformProject::class)->last()->handle(app(MmcPlatformApiClient::class));
-    $this->postJson($syncUrl, $syncData)->assertAccepted();
+    $this->getJson($firstStatusUrl)
+        ->assertOk()
+        ->assertJsonPath('created_count', 3)
+        ->assertJsonPath('updated_count', 0)
+        ->assertJsonPath('unchanged_count', 0);
+    $secondStatusUrl = $this->postJson($syncUrl, $syncData)->assertAccepted()->json('status_url');
     Queue::pushed(SyncMmcPlatformProject::class)->last()->handle(app(MmcPlatformApiClient::class));
 
+    $this->getJson($secondStatusUrl)
+        ->assertOk()
+        ->assertJsonPath('created_count', 1)
+        ->assertJsonPath('updated_count', 1)
+        ->assertJsonPath('unchanged_count', 1)
+        ->assertJsonPath('deleted_count', 1);
     $this->assertDatabaseCount('mmc_platform_project_syncs', 1);
     $this->assertDatabaseHas('mmc_platform_project_syncs', [
         'program_id' => 'program-123',
         'tracker_project_id' => $trackerProjectId,
-        'record_count' => 1,
+        'record_count' => 3,
     ]);
-    $this->assertDatabaseCount('mmc_platform_project_sync_pages', 1);
-    $this->assertDatabaseCount('mmc_platform_masterlist_records', 1);
-    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-1', 'school_name' => 'Updated Name']);
-    expect(json_decode(DB::table('mmc_platform_project_sync_pages')->value('records'), true))
-        ->toBe([['delivery_id' => 'delivery-1', 'school_id' => 'updated-school', 'school_name' => 'Updated Name']]);
+    $this->assertDatabaseCount('mmc_platform_project_sync_pages', 0);
+    $this->assertDatabaseCount('mmc_platform_masterlist_records', 3);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-changed', 'school_name' => 'Updated Name']);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-new', 'school_name' => 'New Name']);
+    $this->assertDatabaseMissing('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-removed']);
 });
 
 it('displays saved MMC masterlist records from the selected company snapshot', function () {
@@ -361,14 +380,13 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         'tracker_project_id' => $trackerProjectId,
         'program_name' => 'SME 2',
         'program_info' => '{}',
-        'records' => json_encode(['storage' => 'pages', 'pages' => 1]),
+        'records' => json_encode(['storage' => 'masterlist_table', 'pages' => 1]),
         'entity_counts' => json_encode(['schools' => 2]),
         'record_count' => 2,
         'synced_at' => $syncedAt,
         'created_at' => $syncedAt,
         'updated_at' => $syncedAt,
     ]);
-    $syncId = DB::table('mmc_platform_project_syncs')->where('program_id', 'program-123')->value('id');
     DB::table('mmc_platform_masterlist_records')->insert([
         'company_id' => $companyId,
         'tracker_project_id' => $trackerProjectId,
@@ -403,15 +421,6 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         'created_at' => $syncedAt,
         'updated_at' => $syncedAt,
     ]);
-    DB::table('mmc_platform_project_sync_pages')->insert([
-        'sync_id' => $syncId,
-        'page' => 1,
-        'records' => json_encode([
-            ['delivery_id' => 'delivery-100', 'lot_id' => 'lot-2', 'lot_no' => 2, 'contract_no' => 'CON-1', 'dr_no' => 'DR-100', 'school_id' => '1001', 'school_name' => 'Alpha Elementary', 'region' => 'Region I', 'grade_levels' => 'G1toG3', 'value' => 1250.5, 'status' => 'delivered', 'sap_dr_no' => 'SAP-100', 'contact_person' => 'Alex Example', 'date_received' => '2026-11-26', 'updated_at' => '2026-11-26 09:00:00', 'lines' => [['item_name' => 'Learning Kit', 'item_code' => 'KIT-1', 'quantity' => 8]]],
-            ['school_id' => '1002', 'school_name' => 'Beta Elementary', 'region' => 'Region II', 'grade_levels' => 'G4toG6'],
-        ]),
-    ]);
-
     $this->get(route('integrations.mmc-platform.masterlist'))
         ->assertOk()
         ->assertSee('MMC Masterlist')
@@ -459,9 +468,7 @@ it('preserves a saved project when a later sync page fails', function () {
     $this->getJson($statusUrl)->assertOk()->assertJsonPath('status', 'failed');
     $this->assertDatabaseCount('mmc_platform_project_syncs', 1);
     $this->assertDatabaseHas('mmc_platform_project_syncs', ['program_id' => 'program-123', 'record_count' => 1]);
-    $this->assertDatabaseCount('mmc_platform_project_sync_pages', 1);
+    $this->assertDatabaseCount('mmc_platform_project_sync_pages', 0);
     $this->assertDatabaseCount('mmc_platform_masterlist_records', 1);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-old']);
-    expect(json_decode(DB::table('mmc_platform_project_sync_pages')->value('records'), true))
-        ->toBe([['delivery_id' => 'delivery-old', 'school_id' => '1']]);
 });

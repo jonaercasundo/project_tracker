@@ -108,6 +108,7 @@
                     <div>
                         <h3 id="data-preview-title" class="text-base font-semibold text-slate-900">Data Preview</h3>
                         <p class="mt-1 text-sm text-slate-600">Read-only sample from MMC Platform. Previewed records are not saved to Tracker.</p>
+                        <p class="mt-1 text-sm text-slate-600">Sync checks the selected program and writes only new or changed records. Unchanged records are skipped.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <button type="button" @click="
@@ -200,11 +201,11 @@
                             } finally {
                                 syncBusy = false;
                             }
-                        " :disabled="syncBusy || previewBusy || !selectedProgram || !selectedTrackerProject" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" x-text="syncBusy ? 'Syncing…' : 'Sync to Tracker'"></button>
+                        " :disabled="syncBusy || previewBusy || !selectedProgram || !selectedTrackerProject" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" x-text="syncBusy ? 'Checking for updates…' : 'Sync Updates to Tracker'"></button>
                     </div>
                     <div x-show="syncResult" role="status" class="rounded-lg border p-3 text-sm" :class="syncResult?.status === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'">
                         <p class="font-semibold" x-text="syncResult?.message"></p>
-                        <p x-show="syncResult?.status === 'success'" class="mt-1" x-text="`Saved ${syncResult?.record_count ?? 0} master-list records over ${syncResult?.pages ?? 0} page(s). Schools: ${syncResult?.entity_counts?.schools ?? 0}; lots: ${syncResult?.entity_counts?.lots ?? 0}; keystages: ${syncResult?.entity_counts?.keystages ?? 0}; items: ${syncResult?.entity_counts?.items ?? 0}; packages: ${syncResult?.entity_counts?.packages ?? 0}.`"></p>
+                        <p x-show="syncResult?.status === 'success'" class="mt-1" x-text="`Checked ${syncResult?.record_count ?? 0} records. ${syncResult?.created_count ?? 0} new, ${syncResult?.updated_count ?? 0} updated, ${syncResult?.unchanged_count ?? 0} unchanged and skipped, ${syncResult?.deleted_count ?? 0} removed.`"></p>
                     </div>
                     <p x-show="previewBusy" role="status" class="text-sm text-slate-600">Retrieving preview…</p>
                     <template x-if="result">

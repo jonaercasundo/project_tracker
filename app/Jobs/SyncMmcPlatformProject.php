@@ -67,7 +67,7 @@ class SyncMmcPlatformProject implements ShouldQueue
         }
     }
 
-    /** @return array{record_count: int, entity_counts: array<string, int>, pages: int, synced_at: string} */
+    /** @return array{record_count: int, entity_counts: array<string, int>, pages: int, created_count: int, updated_count: int, unchanged_count: int, deleted_count: int, synced_at: string} */
     private function saveSnapshot(MmcPlatformApiClient $client): array
     {
         $snapshots = DB::table('mmc_platform_project_syncs');
@@ -84,20 +84,17 @@ class SyncMmcPlatformProject implements ShouldQueue
         ]], ['company_id', 'program_id'], ['tracker_project_id', 'updated_at']);
 
         $syncId = (clone $snapshots)->where($identity)->value('id');
-        $storedPages = DB::table('mmc_platform_project_sync_pages');
-        (clone $storedPages)->where('sync_id', $syncId)->delete();
 
         $recordCount = 0;
         $pageCount = 0;
         $seenDeliveryIds = [];
+        $createdCount = 0;
+        $updatedCount = 0;
+        $unchangedCount = 0;
+        $deletedCount = 0;
         $entityKeys = array_fill_keys(['schools', 'lots', 'keystages', 'items', 'packages'], []);
         $unkeyedCounts = array_fill_keys(array_keys($entityKeys), 0);
         foreach ($client->projectMasterListPages($this->data['program_id']) as $page => $records) {
-            $storedPages->insert([
-                'sync_id' => $syncId,
-                'page' => $page,
-                'records' => json_encode($records, JSON_THROW_ON_ERROR),
-            ]);
             $pageCount = $page;
             $recordCount += count($records);
             $this->collectEntityKeys($records, $entityKeys, $unkeyedCounts);
@@ -114,11 +111,34 @@ class SyncMmcPlatformProject implements ShouldQueue
             }
 
             if ($masterlistRows !== []) {
-                DB::table('mmc_platform_masterlist_records')->upsert(
-                    array_values($masterlistRows),
-                    ['company_id', 'source_program_id', 'delivery_id'],
-                    ['tracker_project_id', ...self::MASTERLIST_COLUMNS, 'source_updated_at', 'updated_at'],
-                );
+                $existingRows = DB::table('mmc_platform_masterlist_records')
+                    ->where('company_id', $this->companyId)
+                    ->where('source_program_id', $this->data['program_id'])
+                    ->whereIn('delivery_id', array_keys($masterlistRows))
+                    ->get()
+                    ->keyBy('delivery_id');
+                $rowsToUpsert = [];
+
+                foreach ($masterlistRows as $deliveryId => $row) {
+                    $existingRow = $existingRows->get($deliveryId);
+                    if ($existingRow === null) {
+                        $createdCount++;
+                        $rowsToUpsert[] = $row;
+                    } elseif ($this->masterlistRowHasChanges($existingRow, $row)) {
+                        $updatedCount++;
+                        $rowsToUpsert[] = $row;
+                    } else {
+                        $unchangedCount++;
+                    }
+                }
+
+                foreach (array_chunk($rowsToUpsert, 100) as $rowsChunk) {
+                    DB::table('mmc_platform_masterlist_records')->upsert(
+                        $rowsChunk,
+                        ['company_id', 'source_program_id', 'delivery_id'],
+                        ['tracker_project_id', ...self::MASTERLIST_COLUMNS, 'source_updated_at', 'updated_at'],
+                    );
+                }
             }
         }
 
@@ -134,7 +154,7 @@ class SyncMmcPlatformProject implements ShouldQueue
             }
 
             foreach (array_chunk($staleDeliveryIds, 500) as $deliveryIds) {
-                DB::table('mmc_platform_masterlist_records')
+                $deletedCount += DB::table('mmc_platform_masterlist_records')
                     ->where('company_id', $this->companyId)
                     ->where('source_program_id', $this->data['program_id'])
                     ->whereIn('delivery_id', $deliveryIds)
@@ -151,7 +171,7 @@ class SyncMmcPlatformProject implements ShouldQueue
         $snapshots->where('id', $syncId)->update([
             'program_name' => $this->data['program_name'] ?? null,
             'program_info' => json_encode($this->data['program_info'] ?? [], JSON_THROW_ON_ERROR),
-            'records' => json_encode(['storage' => 'pages', 'pages' => $pageCount], JSON_THROW_ON_ERROR),
+            'records' => json_encode(['storage' => 'masterlist_table', 'pages' => $pageCount], JSON_THROW_ON_ERROR),
             'entity_counts' => json_encode($counts, JSON_THROW_ON_ERROR),
             'record_count' => $recordCount,
             'synced_at' => $syncedAt,
@@ -162,6 +182,10 @@ class SyncMmcPlatformProject implements ShouldQueue
             'record_count' => $recordCount,
             'entity_counts' => $counts,
             'pages' => $pageCount,
+            'created_count' => $createdCount,
+            'updated_count' => $updatedCount,
+            'unchanged_count' => $unchangedCount,
+            'deleted_count' => $deletedCount,
             'synced_at' => $syncedAt->toIso8601String(),
         ];
     }
@@ -262,5 +286,27 @@ class SyncMmcPlatformProject implements ShouldQueue
         }
 
         return json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /** @param array<string, mixed> $newRow */
+    private function masterlistRowHasChanges(object $existingRow, array $newRow): bool
+    {
+        foreach (['tracker_project_id', ...self::MASTERLIST_COLUMNS, 'source_updated_at'] as $column) {
+            $existingValue = $existingRow->{$column} ?? null;
+            $newValue = $newRow[$column] ?? null;
+            if ($existingValue === null || $newValue === null) {
+                if ($existingValue !== $newValue) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if ((string) $existingValue !== (string) $newValue) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

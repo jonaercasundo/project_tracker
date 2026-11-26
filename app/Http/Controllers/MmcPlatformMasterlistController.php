@@ -65,7 +65,7 @@ class MmcPlatformMasterlistController extends Controller
             'query' => $request->query(),
         ]);
 
-        if (Schema::hasTable('mmc_platform_project_syncs') && Schema::hasTable('mmc_platform_project_sync_pages')) {
+        if (Schema::hasTable('mmc_platform_project_syncs')) {
             $snapshotQuery = DB::table('mmc_platform_project_syncs')
                 ->where('company_id', $companyId);
             $snapshots = (clone $snapshotQuery)

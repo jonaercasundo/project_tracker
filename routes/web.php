@@ -120,6 +120,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/integrations/mmc-platform/masterlist', [MmcPlatformMasterlistController::class, 'index'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('integrations.mmc-platform.masterlist');
+    Route::post('/integrations/mmc-platform/masterlist/delivered-at', [MmcPlatformMasterlistController::class, 'updateDeliveredAt'])
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('integrations.mmc-platform.masterlist.delivered-at');
     Route::get('/deliveries/audit-trail', [DeliveryAuditTrailController::class, 'index'])
         ->middleware(['company.context:MMC', 'permission:delivery.audit.view'])
         ->name('delivery-audit-trail.index');

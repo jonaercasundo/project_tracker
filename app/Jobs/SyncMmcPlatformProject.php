@@ -124,11 +124,17 @@ class SyncMmcPlatformProject implements ShouldQueue
                     if ($existingRow === null) {
                         $createdCount++;
                         $rowsToUpsert[] = $row;
-                    } elseif ($this->masterlistRowHasChanges($existingRow, $row)) {
-                        $updatedCount++;
-                        $rowsToUpsert[] = $row;
                     } else {
-                        $unchangedCount++;
+                        if (! filled($row['delivered_at']) && filled($existingRow->delivered_at)) {
+                            $row['delivered_at'] = $existingRow->delivered_at;
+                        }
+
+                        if ($this->masterlistRowHasChanges($existingRow, $row)) {
+                            $updatedCount++;
+                            $rowsToUpsert[] = $row;
+                        } else {
+                            $unchangedCount++;
+                        }
                     }
                 }
 

@@ -347,6 +347,9 @@ it('syncs only new and changed rows and skips unchanged records on resync', func
         ->assertJsonPath('created_count', 3)
         ->assertJsonPath('updated_count', 0)
         ->assertJsonPath('unchanged_count', 0);
+    DB::table('mmc_platform_masterlist_records')
+        ->where('delivery_id', 'delivery-unchanged')
+        ->update(['delivered_at' => '2026-11-20']);
     $secondStatusUrl = $this->postJson($syncUrl, $syncData)->assertAccepted()->json('status_url');
     Queue::pushed(SyncMmcPlatformProject::class)->last()->handle(app(MmcPlatformApiClient::class));
 
@@ -365,8 +368,94 @@ it('syncs only new and changed rows and skips unchanged records on resync', func
     $this->assertDatabaseCount('mmc_platform_project_sync_pages', 0);
     $this->assertDatabaseCount('mmc_platform_masterlist_records', 3);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-changed', 'school_name' => 'Updated Name']);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-unchanged', 'delivered_at' => '2026-11-20']);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-new', 'school_name' => 'New Name']);
     $this->assertDatabaseMissing('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-removed']);
+});
+
+it('sets Delivered At for records matching multiple School IDs in the selected program', function () {
+    mmcPlatformUser();
+    $companyId = (int) auth()->user()->currentCompany()->getKey();
+    $trackerProjectId = mmcTrackerProject();
+    $syncedAt = now();
+    DB::table('mmc_platform_project_syncs')->insert([
+        'company_id' => $companyId,
+        'program_id' => 'program-123',
+        'tracker_project_id' => $trackerProjectId,
+        'program_name' => 'SME 2',
+        'program_info' => '{}',
+        'records' => '{}',
+        'entity_counts' => '{}',
+        'record_count' => 3,
+        'synced_at' => $syncedAt,
+        'created_at' => $syncedAt,
+        'updated_at' => $syncedAt,
+    ]);
+    foreach ([
+        ['delivery_id' => 'delivery-school-1-lot-1', 'source_program_id' => 'program-123', 'school_id' => '121700'],
+        ['delivery_id' => 'delivery-school-1-lot-2', 'source_program_id' => 'program-123', 'school_id' => '121700'],
+        ['delivery_id' => 'delivery-school-2', 'source_program_id' => 'program-123', 'school_id' => '121701'],
+        ['delivery_id' => 'delivery-other-program', 'source_program_id' => 'program-456', 'school_id' => '121700'],
+    ] as $record) {
+        DB::table('mmc_platform_masterlist_records')->insert([
+            ...$record,
+            'company_id' => $companyId,
+            'tracker_project_id' => $trackerProjectId,
+            'created_at' => $syncedAt,
+            'updated_at' => $syncedAt,
+        ]);
+    }
+
+    $this->post(route('integrations.mmc-platform.masterlist.delivered-at'), [
+        'program_id' => 'program-123',
+        'school_ids' => "121700,\n121701\nmissing-school",
+        'delivered_at' => '2026-11-26',
+    ])->assertRedirect(route('integrations.mmc-platform.masterlist', ['program_id' => 'program-123']))
+        ->assertSessionHas('deliveredAtUpdate', 'Set Delivered At to 2026-11-26 for 3 record(s). No records matched 1 School ID(s).');
+
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-1-lot-1', 'delivered_at' => '2026-11-26']);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-1-lot-2', 'delivered_at' => '2026-11-26']);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-2', 'delivered_at' => '2026-11-26']);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-other-program', 'delivered_at' => null]);
+});
+
+it('rejects an invalid Delivered At date before changing masterlist records', function () {
+    mmcPlatformUser();
+    $companyId = (int) auth()->user()->currentCompany()->getKey();
+    $trackerProjectId = mmcTrackerProject();
+    $syncedAt = now();
+    DB::table('mmc_platform_project_syncs')->insert([
+        'company_id' => $companyId,
+        'program_id' => 'program-123',
+        'tracker_project_id' => $trackerProjectId,
+        'program_name' => 'SME 2',
+        'program_info' => '{}',
+        'records' => '{}',
+        'entity_counts' => '{}',
+        'record_count' => 1,
+        'synced_at' => $syncedAt,
+        'created_at' => $syncedAt,
+        'updated_at' => $syncedAt,
+    ]);
+    DB::table('mmc_platform_masterlist_records')->insert([
+        'company_id' => $companyId,
+        'tracker_project_id' => $trackerProjectId,
+        'source_program_id' => 'program-123',
+        'delivery_id' => 'delivery-1',
+        'school_id' => '121700',
+        'created_at' => $syncedAt,
+        'updated_at' => $syncedAt,
+    ]);
+
+    $this->from(route('integrations.mmc-platform.masterlist'))
+        ->post(route('integrations.mmc-platform.masterlist.delivered-at'), [
+            'program_id' => 'program-123',
+            'school_ids' => '121700',
+            'delivered_at' => 'not-a-date',
+        ])
+        ->assertSessionHasErrors('delivered_at');
+
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-1', 'delivered_at' => null]);
 });
 
 it('displays saved MMC masterlist records from the selected company snapshot', function () {
@@ -433,6 +522,10 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         ->assertSee('DR No.')
         ->assertSee('SAP DR No.')
         ->assertSee('Updated At')
+        ->assertSee('Bulk set Delivered At')
+        ->assertSee('School IDs')
+        ->assertSee('Delivered At date')
+        ->assertSee(route('integrations.mmc-platform.masterlist.delivered-at'), false)
         ->assertSee('DR-100')
         ->assertSee('CON-1')
         ->assertSee('SAP-100')

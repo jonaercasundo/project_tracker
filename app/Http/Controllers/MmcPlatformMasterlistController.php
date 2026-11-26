@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class MmcPlatformMasterlistController extends Controller
 {
@@ -45,6 +47,64 @@ class MmcPlatformMasterlistController extends Controller
         'sequence_no' => 'Sequence No.',
         'updated_at' => 'Updated At',
     ];
+
+    public function updateDeliveredAt(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'program_id' => ['required', 'string', 'max:255'],
+            'school_ids' => ['required', 'string', 'max:20000'],
+            'delivered_at' => ['required', 'date_format:Y-m-d'],
+        ]);
+        $schoolIds = collect(preg_split('/[,;\s]+/u', trim($validated['school_ids']), -1, PREG_SPLIT_NO_EMPTY) ?: [])
+            ->map(fn (string $schoolId): string => trim($schoolId))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($schoolIds->isEmpty()) {
+            throw ValidationException::withMessages(['school_ids' => 'Enter at least one School ID.']);
+        }
+        if ($schoolIds->count() > 500) {
+            throw ValidationException::withMessages(['school_ids' => 'Enter no more than 500 School IDs at a time.']);
+        }
+
+        $companyId = (int) $request->user()->currentCompany()->getKey();
+        $snapshot = DB::table('mmc_platform_project_syncs')
+            ->where('company_id', $companyId)
+            ->where('program_id', $validated['program_id'])
+            ->first(['program_id', 'tracker_project_id']);
+        abort_if($snapshot === null, 404);
+        abort_if($snapshot->tracker_project_id === null, 422, 'Assign this program to a Tracker project before updating Delivered At.');
+
+        $records = DB::table('mmc_platform_masterlist_records')
+            ->where('company_id', $companyId)
+            ->where('tracker_project_id', $snapshot->tracker_project_id)
+            ->where('source_program_id', $snapshot->program_id)
+            ->whereIn('school_id', $schoolIds);
+        $matchedCount = (clone $records)->count();
+        $updatedCount = (clone $records)
+            ->where(function ($query) use ($validated): void {
+                $query->whereNull('delivered_at')
+                    ->orWhere('delivered_at', '<>', $validated['delivered_at']);
+            })
+            ->update([
+                'delivered_at' => $validated['delivered_at'],
+                'updated_at' => now(),
+            ]);
+        $matchedSchoolIds = (clone $records)->distinct()->pluck('school_id')->filter()->all();
+        $missingSchoolIds = $schoolIds->diff($matchedSchoolIds)->values();
+
+        $message = "Set Delivered At to {$validated['delivered_at']} for {$updatedCount} record(s).";
+        if ($matchedCount === 0) {
+            $message = 'No records matched the School IDs in the selected synced program.';
+        } elseif ($missingSchoolIds->isNotEmpty()) {
+            $message .= ' No records matched '.number_format($missingSchoolIds->count()).' School ID(s).';
+        }
+
+        return redirect()
+            ->route('integrations.mmc-platform.masterlist', ['program_id' => $snapshot->program_id])
+            ->with('deliveredAtUpdate', $message);
+    }
 
     public function index(Request $request): View
     {

@@ -155,13 +155,19 @@
                             </select>
                         </div>
                         <div>
-                            <label for="tracker-project" class="mb-1 block text-sm font-medium text-slate-700">Save under Tracker project</label>
-                            <select id="tracker-project" x-model="selectedTrackerProject" :disabled="syncBusy || {{ $projects->isEmpty() ? 'true' : 'false' }}" class="w-full rounded-lg border-slate-300 text-sm">
-                                <option value="">Choose a Tracker project</option>
-                                @foreach ($projects as $project)
-                                    <option value="{{ $project->project_id }}">{{ $project->project_name }} (ID: {{ $project->project_id }})</option>
-                                @endforeach
-                            </select>
+                            <x-searchable-project-filter
+                                :projects="$projects"
+                                name="tracker_project_id"
+                                id="mmc-tracker-project"
+                                label="Save under Tracker project"
+                                all-label="Choose a Tracker project"
+                                :truncate-selected="true"
+                                :enabled="! $projects->isEmpty()"
+                                :required="true"
+                                model="selectedTrackerProject"
+                                wrapper-class="min-w-0 space-y-1 text-sm font-medium text-slate-700"
+                                label-class="mb-1 block text-sm font-medium text-slate-700"
+                            />
                             @if ($projects->isEmpty())
                                 <p class="mt-1 text-xs text-amber-700">No Tracker projects are available for this company.</p>
                             @endif

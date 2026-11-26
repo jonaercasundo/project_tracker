@@ -46,6 +46,41 @@
                     <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Apply</button>
                 </form>
 
+                <section x-data="{ open: @js($errors->has('school_ids') || $errors->has('delivered_at') || session()->has('deliveredAtUpdate')) }" class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-sm font-semibold text-slate-900">Bulk set Delivered At</h2>
+                            <p class="mt-1 text-sm text-slate-600">Set one delivery date for records matching multiple School IDs in this synced program.</p>
+                        </div>
+                        <button type="button" @click="open = !open" :aria-expanded="open.toString()" aria-controls="delivered-at-form" class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-500 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.5 2a.75.75 0 0 1 .75.75V4h5.5V2.75a.75.75 0 0 1 1.5 0V4h1A1.75 1.75 0 0 1 17 5.75v10.5A1.75 1.75 0 0 1 15.25 18h-10.5A1.75 1.75 0 0 1 3 16.25V5.75A1.75 1.75 0 0 1 4.75 4h1V2.75A.75.75 0 0 1 6.5 2ZM4.5 8v8.25c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V8h-11Z"/></svg>
+                            <span x-text="open ? 'Close' : 'Set Delivered At'"></span>
+                        </button>
+                    </div>
+
+                    <div x-cloak x-show="open" x-transition.opacity id="delivered-at-form" class="mt-4 border-t border-slate-200 pt-4">
+                        @if (session('deliveredAtUpdate'))
+                            <p role="status" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ session('deliveredAtUpdate') }}</p>
+                        @endif
+                        <form method="POST" action="{{ route('integrations.mmc-platform.masterlist.delivered-at') }}" class="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
+                            @csrf
+                            <input type="hidden" name="program_id" value="{{ $snapshot->program_id }}">
+                            <div>
+                                <label for="delivered-at-school-ids" class="mb-1 block text-sm font-semibold text-slate-700">School IDs</label>
+                                <textarea id="delivered-at-school-ids" name="school_ids" rows="3" required maxlength="20000" placeholder="Enter IDs separated by commas or new lines" class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('school_ids') }}</textarea>
+                                <p class="mt-1 text-xs text-slate-500">Up to 500 IDs. Every matching delivery record for each ID will be updated.</p>
+                                @error('school_ids')<p class="mt-1 text-xs font-medium text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="delivered-at-date" class="mb-1 block text-sm font-semibold text-slate-700">Delivered At date</label>
+                                <input id="delivered-at-date" name="delivered_at" type="date" value="{{ old('delivered_at') }}" required class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                @error('delivered_at')<p class="mt-1 text-xs font-medium text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Apply date</button>
+                        </form>
+                    </div>
+                </section>
+
                 <div class="flex flex-wrap items-center justify-between gap-2 border-y border-slate-100 py-3 text-sm text-slate-600">
                     <p><span class="font-semibold text-slate-900">{{ $snapshot->program_name ?: 'Program '.$snapshot->program_id }}</span> · Tracker project: {{ $trackerProjectName ?: 'Not assigned' }} · {{ number_format($rows->total()) }} records{{ filled($filters['search'] ?? null) ? ' matching search' : '' }}</p>
                     <p>Last synced {{ \Illuminate\Support\Carbon::parse($snapshot->synced_at)->format('M j, Y g:i A') }}</p>

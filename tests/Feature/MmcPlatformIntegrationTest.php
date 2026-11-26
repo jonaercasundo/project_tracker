@@ -269,6 +269,46 @@ it('queues project sync and returns the saved results only to its requester', fu
     $this->getJson($statusUrl)->assertNotFound();
 });
 
+it('displays saved MMC masterlist records from the selected company snapshot', function () {
+    mmcPlatformUser();
+    $companyId = auth()->user()->currentCompany()->getKey();
+    $syncedAt = now();
+    DB::table('mmc_platform_project_syncs')->insert([
+        'company_id' => $companyId,
+        'program_id' => 'program-123',
+        'program_name' => 'SME 2',
+        'program_info' => '{}',
+        'records' => json_encode(['storage' => 'pages', 'pages' => 1]),
+        'entity_counts' => json_encode(['schools' => 2]),
+        'record_count' => 2,
+        'synced_at' => $syncedAt,
+        'created_at' => $syncedAt,
+        'updated_at' => $syncedAt,
+    ]);
+    $syncId = DB::table('mmc_platform_project_syncs')->where('program_id', 'program-123')->value('id');
+    DB::table('mmc_platform_project_sync_pages')->insert([
+        'sync_id' => $syncId,
+        'page' => 1,
+        'records' => json_encode([
+            ['school_id' => '1001', 'school_name' => 'Alpha Elementary', 'region' => 'Region I', 'grade_levels' => 'G1toG3'],
+            ['school_id' => '1002', 'school_name' => 'Beta Elementary', 'region' => 'Region II', 'grade_levels' => 'G4toG6'],
+        ]),
+    ]);
+
+    $this->get(route('integrations.mmc-platform.masterlist'))
+        ->assertOk()
+        ->assertSee('MMC Masterlist')
+        ->assertSee('Alpha Elementary')
+        ->assertSee('Beta Elementary')
+        ->assertSee('G1toG3')
+        ->assertSee('View data');
+
+    $this->get(route('integrations.mmc-platform.masterlist', ['search' => '1002']))
+        ->assertOk()
+        ->assertSee('Beta Elementary')
+        ->assertDontSee('Alpha Elementary');
+});
+
 it('preserves a saved project when a later sync page fails', function () {
     Queue::fake();
     config([

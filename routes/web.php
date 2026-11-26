@@ -44,6 +44,7 @@ use App\Http\Controllers\MIProductImageDraftController;
 use App\Http\Controllers\MIProductPriceComparisonController;
 use App\Http\Controllers\MIProductVariantInventoryController;
 use App\Http\Controllers\MmcPlatformIntegrationController;
+use App\Http\Controllers\MmcPlatformMasterlistController;
 use App\Http\Controllers\MmcPplManagementController;
 use App\Http\Controllers\MmcPplWorkbookImportController;
 use App\Http\Controllers\OperationsLifecycleController;
@@ -116,6 +117,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/deliveries/returns', [DeliveryReturnController::class, 'page'])
         ->middleware(['company.context:MMC', 'role:user,Administrator'])
         ->name('deliveries.return-monitoring');
+    Route::get('/integrations/mmc-platform/masterlist', [MmcPlatformMasterlistController::class, 'index'])
+        ->middleware(['company.context:MMC', 'role:user,Administrator'])
+        ->name('integrations.mmc-platform.masterlist');
     Route::get('/deliveries/audit-trail', [DeliveryAuditTrailController::class, 'index'])
         ->middleware(['company.context:MMC', 'permission:delivery.audit.view'])
         ->name('delivery-audit-trail.index');

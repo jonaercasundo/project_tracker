@@ -124,7 +124,7 @@
             <form id="sync-spreadsheet-form" class="max-h-[90vh] space-y-5 overflow-y-auto p-6">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Spreadsheet update</p>
-                    <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Spreadsheet</h2>
+                    <h2 class="mt-1 text-lg font-bold text-slate-900">Sync Masterlist</h2>
                     <p class="mt-2 text-sm text-slate-600">Enter the School ID and receiving details, then preview the DR/package matches and target cells before syncing. You can enter a tracker School ID or a configured mapped sheet SchoolID. Contact Person is copied from Received by. Contact/Email and DATE RECEIVED (FROM 3PL) are left unchanged. Each Lot total is calculated from its DR.</p>
                 </div>
                 <div>

@@ -183,6 +183,17 @@
                 </svg>
                 <span>Return Monitoring</span>
             </a>
+            <a href="{{ route('integrations.mmc-platform.masterlist') }}"
+               @if(request()->routeIs('integrations.mmc-platform.masterlist')) aria-current="page" @endif
+               class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('integrations.mmc-platform.masterlist') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50' }}">
+                @if(request()->routeIs('integrations.mmc-platform.masterlist'))
+                    <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
+                @endif
+                <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('integrations.mmc-platform.masterlist') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 5.75A1.75 1.75 0 015.75 4h12.5A1.75 1.75 0 0120 5.75v12.5A1.75 1.75 0 0118.25 20H5.75A1.75 1.75 0 014 18.25zM4.5 9h15M9 4.5v15m5-10.5h3m-3 3h3m-3 3h3" />
+                </svg>
+                <span>MMC Masterlist</span>
+            </a>
         @endif
 
         @if($currentCompany?->code === 'MMC' && $currentCompany?->is_active)

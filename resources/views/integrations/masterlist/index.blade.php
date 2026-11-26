@@ -67,7 +67,7 @@
                                 @foreach ($rows as $row)
                                     <tr class="align-top hover:bg-slate-50/70">
                                         @foreach ($columns as $key => $label)
-                                            <td class="whitespace-nowrap px-4 py-3 {{ in_array($key, ['delivery_id', 'lot_id', 'school_id'], true) ? 'font-mono text-xs' : '' }}">{{ filled($row[$key] ?? null) ? $row[$key] : '—' }}</td>
+                                            <td class="whitespace-nowrap px-4 py-3 {{ in_array($key, ['project_id', 'school_id'], true) ? 'font-mono text-xs' : '' }}">{{ filled($row[$key] ?? null) ? $row[$key] : '—' }}</td>
                                         @endforeach
                                     </tr>
                                 @endforeach

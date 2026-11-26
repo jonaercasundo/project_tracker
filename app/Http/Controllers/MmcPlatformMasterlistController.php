@@ -12,8 +12,7 @@ use Illuminate\Validation\Rule;
 class MmcPlatformMasterlistController extends Controller
 {
     private const COLUMNS = [
-        'delivery_id' => 'Delivery ID',
-        'lot_id' => 'Lot ID',
+        'project_id' => 'Project ID',
         'lot_no' => 'Lot No.',
         'contract_no' => 'Contract No.',
         'dr_no' => 'DR No.',
@@ -109,7 +108,11 @@ class MmcPlatformMasterlistController extends Controller
                     if ($search !== '') {
                         $masterlistQuery->where(function ($query) use ($search): void {
                             foreach (array_keys(self::COLUMNS) as $column) {
-                                $query->orWhere($column === 'updated_at' ? 'source_updated_at' : $column, 'like', '%'.$search.'%');
+                                $query->orWhere(match ($column) {
+                                    'updated_at' => 'source_updated_at',
+                                    'project_id' => 'tracker_project_id',
+                                    default => $column,
+                                }, 'like', '%'.$search.'%');
                             }
                         });
                     }
@@ -119,8 +122,9 @@ class MmcPlatformMasterlistController extends Controller
                         ->orderBy('dr_no')
                         ->paginate($perPage)
                         ->withQueryString();
-                    $rows->setCollection($rows->getCollection()->map(function (object $record): array {
+                    $rows->setCollection($rows->getCollection()->map(function (object $record) use ($snapshot): array {
                         $row = (array) $record;
+                        $row['project_id'] = $snapshot->tracker_project_id;
                         $row['updated_at'] = $row['source_updated_at'];
 
                         return $row;

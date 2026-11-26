@@ -3,9 +3,9 @@
         <header class="flex flex-col items-start justify-between gap-4 rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm shadow-slate-100/60 sm:flex-row sm:items-center sm:p-6">
             <div>
                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Project Module / Reports &amp; Analytics</p>
-                <h1 class="mt-1 text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">Billing Document Status</h1>
+                <h1 class="mt-1 text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">MMC Masterlist Delivery Status</h1>
                 <p class="mt-1 text-sm font-medium text-slate-500">
-                    School-based billing document processing for {{ $selectedProject?->project_name ?? 'the selected project' }}, across LOT 2, LOT 9, and LOT 11.
+                    School delivery and SAP encoding progress from the MMC Masterlist for {{ $selectedProject?->project_name ?? 'the selected project' }}, across LOT 2, LOT 9, and LOT 11.
                 </p>
             </div>
             <div class="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
@@ -13,7 +13,7 @@
                     <span class="h-1.5 w-1.5 rounded-full bg-blue-600" aria-hidden="true"></span>
                     <time id="billing-status-updated">Updated {{ $snapshotAt->format('M d, Y · g:i A') }}</time>
                 </p>
-                <p class="mt-0.5 text-[10px] font-medium text-slate-400">Updates live when billing data changes</p>
+                <p class="mt-0.5 text-[10px] font-medium text-slate-400">Based on the latest MMC Masterlist sync</p>
             </div>
         </header>
 
@@ -66,17 +66,17 @@
         @endif
 
         <div id="billing-status-refresh-error" role="alert" @if (! $summary['source_error']) hidden @endif class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            <p class="font-black">Billing sheet data is unavailable</p>
+            <p class="font-black">MMC Masterlist data is unavailable</p>
             <p id="billing-status-refresh-error-message" class="mt-1">{{ $summary['source_error'] }}</p>
         </div>
 
-        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Billing document processing metrics">
+        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="MMC Masterlist SAP encoding metrics">
             @php
                 $summaryCards = [
-                    ['key' => 'total', 'label' => 'Total Schools', 'value' => $summary['total'], 'description' => 'Unique schools with applicable DRs across supported lots', 'color' => 'blue', 'icon' => 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01'],
-                    ['key' => 'processed', 'label' => 'Processed', 'value' => $summary['processed'], 'description' => 'Schools encoded for every applicable lot', 'color' => 'cyan', 'icon' => 'M9 12l2 2 4-4m5-3v6a8 8 0 1 1-3-6'],
-                    ['key' => 'remaining', 'label' => 'Remaining', 'value' => $summary['remaining'], 'description' => 'Schools missing a date for an applicable lot', 'color' => 'amber', 'icon' => 'M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
-                    ['key' => 'processed_today', 'label' => 'Processed Today', 'value' => $summary['processed_today'], 'description' => 'Schools with an applicable SAP date today · '.config('app.timezone'), 'color' => 'blue', 'icon' => 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Zm3 11 2 2 4-4'],
+                    ['key' => 'total', 'label' => 'Total Schools', 'value' => $summary['total'], 'description' => 'Unique schools with delivery records in the MMC Masterlist', 'color' => 'blue', 'icon' => 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01'],
+                    ['key' => 'processed', 'label' => 'Processed', 'value' => $summary['processed'], 'description' => 'Schools with an SAP encoded date for every applicable lot', 'color' => 'cyan', 'icon' => 'M9 12l2 2 4-4m5-3v6a8 8 0 1 1-3-6'],
+                    ['key' => 'remaining', 'label' => 'Remaining', 'value' => $summary['remaining'], 'description' => 'Schools missing an SAP encoded date for an applicable lot', 'color' => 'amber', 'icon' => 'M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
+                    ['key' => 'processed_today', 'label' => 'Processed Today', 'value' => $summary['processed_today'], 'description' => 'Schools with an SAP encoded date today · '.config('app.timezone'), 'color' => 'blue', 'icon' => 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Zm3 11 2 2 4-4'],
                 ];
                 $toneClasses = [
                     'blue' => 'bg-blue-50 text-blue-700 ring-blue-100',

@@ -1335,8 +1335,10 @@ describe('project DR progress report', function () {
         DB::table('projects')->insert([
             ['project_id' => 502698, 'project_name' => 'SME2'],
             ['project_id' => 95, 'project_name' => 'Unlinked project'],
+            ['project_id' => 96, 'project_name' => 'Unassigned MMC project'],
         ]);
         (require database_path('migrations/2026_11_11_095147_create_mmc_platform_project_syncs_table.php'))->up();
+        (require database_path('migrations/2026_11_26_062033_add_tracker_project_id_to_mmc_platform_project_syncs_table.php'))->up();
         $billingStatus = Mockery::mock(BillingDocumentStatusService::class);
         $billingStatus->shouldReceive('summarize')->andReturn([
             'total' => 0, 'processed' => 0, 'remaining' => 0, 'processed_today' => 0, 'source_error' => null,
@@ -1347,6 +1349,7 @@ describe('project DR progress report', function () {
         $snapshot = [
             'company_id' => $companyId,
             'program_id' => $programId,
+            'tracker_project_id' => 502698,
             'records' => '{}',
             'record_count' => 1234,
             'entity_counts' => '{"schools":432,"lots":3}',
@@ -1356,9 +1359,9 @@ describe('project DR progress report', function () {
             ...$snapshot, 'company_id' => $otherCompany->getKey(),
         ]);
         DB::table('mmc_platform_project_syncs')->insert([
-            ...$snapshot, 'program_id' => 'unlinked-program',
+            ...$snapshot, 'program_id' => 'unlinked-program', 'tracker_project_id' => 96,
         ]);
-        $this->get($reportUrl)->assertOk()->assertSee('after the first successful sync');
+        $this->get($reportUrl)->assertOk()->assertDontSee('MMC Platform Master List');
 
         DB::table('mmc_platform_project_syncs')->insert($snapshot);
 

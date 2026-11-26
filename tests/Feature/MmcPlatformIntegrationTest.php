@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\SyncMmcPlatformProject;
+use App\Services\BillingDocumentStatusService;
 use App\Services\MmcPlatformApiClient;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Crypt;
@@ -456,6 +457,47 @@ it('rejects an invalid Delivered At date before changing masterlist records', fu
         ->assertSessionHasErrors('delivered_at');
 
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-1', 'delivered_at' => null]);
+});
+
+it('summarizes SAP encoding progress from the selected Tracker project MMC masterlist', function () {
+    $this->travelTo('2026-11-26 09:00:00');
+    Http::preventStrayRequests();
+    mmcPlatformUser();
+    $companyId = (int) auth()->user()->currentCompany()->getKey();
+    $trackerProjectId = mmcTrackerProject();
+    $otherTrackerProjectId = mmcTrackerProject();
+    $syncedAt = now();
+    $records = [
+        ['delivery_id' => 'school-a-lot-2', 'school_id' => 'school-a', 'lot_no' => '2', 'dr_no' => 'DR-A2', 'sap_encoded_at' => '2026-11-25'],
+        ['delivery_id' => 'school-a-lot-9', 'school_id' => 'school-a', 'lot_no' => 'LOT 9', 'dr_no' => 'DR-A9', 'sap_encoded_at' => '2026-11-26'],
+        ['delivery_id' => 'school-b-lot-11', 'school_id' => 'school-b', 'lot_no' => '11', 'dr_no' => 'DR-B11', 'sap_encoded_at' => null],
+        ['delivery_id' => 'school-c-lot-2', 'school_id' => 'school-c', 'lot_no' => '2', 'dr_no' => 'DR-C2', 'sap_encoded_at' => '2026-11-26'],
+        ['delivery_id' => 'school-c-lot-11', 'school_id' => 'school-c', 'lot_no' => '11', 'dr_no' => 'DR-C11', 'sap_encoded_at' => null],
+        ['delivery_id' => 'excluded-school', 'school_id' => 'school-excluded', 'lot_no' => '2', 'dr_no' => 'DR-X', 'status' => 'cancelled', 'sap_encoded_at' => null],
+        ['delivery_id' => 'other-project-school', 'tracker_project_id' => $otherTrackerProjectId, 'school_id' => 'school-other', 'lot_no' => '2', 'dr_no' => 'DR-OTHER', 'sap_encoded_at' => null],
+    ];
+    foreach ($records as $record) {
+        DB::table('mmc_platform_masterlist_records')->insert([
+            'company_id' => $companyId,
+            'tracker_project_id' => $record['tracker_project_id'] ?? $trackerProjectId,
+            'source_program_id' => 'program-123',
+            'status' => $record['status'] ?? 'pending',
+            'created_at' => $syncedAt,
+            'updated_at' => $syncedAt,
+            ...$record,
+        ]);
+    }
+
+    $summary = app(BillingDocumentStatusService::class)->summarize($trackerProjectId);
+
+    expect($summary)->toMatchArray([
+        'total' => 3,
+        'processed' => 1,
+        'remaining' => 2,
+        'processed_today' => 2,
+        'source_error' => null,
+    ]);
+    Http::assertNothingSent();
 });
 
 it('displays saved MMC masterlist records from the selected company snapshot', function () {

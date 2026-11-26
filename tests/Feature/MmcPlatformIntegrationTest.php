@@ -290,7 +290,7 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         'sync_id' => $syncId,
         'page' => 1,
         'records' => json_encode([
-            ['school_id' => '1001', 'school_name' => 'Alpha Elementary', 'region' => 'Region I', 'grade_levels' => 'G1toG3'],
+            ['dr_no' => 'DR-100', 'lot_no' => 2, 'contract_no' => 'CON-1', 'school_id' => '1001', 'school_name' => 'Alpha Elementary', 'region' => 'Region I', 'grade_levels' => 'G1toG3', 'lines' => [['item_name' => 'Learning Kit', 'item_code' => 'KIT-1', 'quantity' => 8]]],
             ['school_id' => '1002', 'school_name' => 'Beta Elementary', 'region' => 'Region II', 'grade_levels' => 'G4toG6'],
         ]),
     ]);
@@ -300,8 +300,12 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         ->assertSee('MMC Masterlist')
         ->assertSee('Alpha Elementary')
         ->assertSee('Beta Elementary')
+        ->assertSee('Project ID: program-123')
+        ->assertSee('DR No.')
+        ->assertSee('CON-1')
+        ->assertSee('Learning Kit')
         ->assertSee('G1toG3')
-        ->assertSee('View data');
+        ->assertDontSee('View data');
 
     $this->get(route('integrations.mmc-platform.masterlist', ['search' => '1002']))
         ->assertOk()

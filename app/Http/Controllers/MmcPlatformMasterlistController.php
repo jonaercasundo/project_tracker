@@ -124,18 +124,29 @@ class MmcPlatformMasterlistController extends Controller
      */
     private function presentRecord(array $record): array
     {
-        $lines = $record['lines'] ?? [];
+        $items = $record['lines'] ?? $record['items'] ?? [];
+        $items = is_array($items) ? array_values(array_filter($items, 'is_array')) : [];
 
         return [
+            'delivery_id' => $this->displayValue($record['delivery_id'] ?? $record['deliveryId'] ?? null),
+            'lot_id' => $this->displayValue($record['lot_id'] ?? $record['lotId'] ?? null),
+            'lot_number' => $this->displayValue($record['lot_no'] ?? $record['lot_number'] ?? null),
+            'contract_number' => $this->displayValue($record['contract_no'] ?? $record['contract_number'] ?? null),
+            'dr_number' => $this->displayValue($record['dr_no'] ?? $record['dr_number'] ?? null),
             'school_id' => $record['school_id'] ?? $record['schoolId'] ?? $record['id'] ?? null,
             'school_name' => $this->displayValue($record['school_name'] ?? data_get($record, 'school.name') ?? $record['school'] ?? $record['name'] ?? null),
             'region' => $this->displayValue($record['region'] ?? data_get($record, 'school.region')),
             'division' => $this->displayValue($record['division'] ?? data_get($record, 'school.division')),
             'municipality' => $this->displayValue($record['municipality'] ?? $record['city_municipality'] ?? data_get($record, 'school.municipality')),
-            'lot' => $this->displayValue($record['lot_number'] ?? $record['lot_id'] ?? $record['lot'] ?? null),
+            'address' => $this->displayValue($record['address'] ?? data_get($record, 'school.address')),
+            'contact_person' => $this->displayValue($record['contact_person'] ?? data_get($record, 'contact.person')),
+            'contact_phone' => $this->displayValue($record['contact_phone'] ?? $record['contact_number'] ?? data_get($record, 'contact.phone')),
             'grade_levels' => $this->displayValue($record['grade_levels'] ?? $record['key_stages'] ?? $record['keystages'] ?? null),
-            'item_count' => is_array($lines) ? count($lines) : null,
-            'record' => $record,
+            'items' => array_map(fn (array $item): array => [
+                'name' => $this->displayValue($item['item_name'] ?? $item['name'] ?? $item['description'] ?? $item['item_description'] ?? null),
+                'code' => $this->displayValue($item['item_code'] ?? $item['code'] ?? $item['item_id'] ?? null),
+                'quantity' => $this->displayValue($item['quantity'] ?? $item['qty'] ?? $item['total_quantity'] ?? null),
+            ], $items),
         ];
     }
 

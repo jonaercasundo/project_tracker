@@ -23,7 +23,7 @@
                         <select id="masterlist-program" name="program_id" class="w-full rounded-lg border-slate-300 text-sm">
                             @foreach ($snapshots as $availableSnapshot)
                                 <option value="{{ $availableSnapshot->program_id }}" @selected($snapshot->program_id === $availableSnapshot->program_id)>
-                                    {{ $availableSnapshot->program_name ?: 'Program '.$availableSnapshot->program_id }} · {{ number_format($availableSnapshot->record_count) }} records
+                                    {{ $availableSnapshot->program_name ?: 'Program '.$availableSnapshot->program_id }} · Project ID: {{ $availableSnapshot->program_id }} · {{ number_format($availableSnapshot->record_count) }} records
                                 </option>
                             @endforeach
                         </select>
@@ -55,33 +55,50 @@
                         <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
                             <thead class="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
                                 <tr>
+                                    <th scope="col" class="whitespace-nowrap px-4 py-3">DR No.</th>
+                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Lot No.</th>
+                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Contract No.</th>
                                     <th scope="col" class="whitespace-nowrap px-4 py-3">School ID</th>
                                     <th scope="col" class="min-w-56 px-4 py-3">School</th>
                                     <th scope="col" class="whitespace-nowrap px-4 py-3">Region</th>
                                     <th scope="col" class="whitespace-nowrap px-4 py-3">Division</th>
                                     <th scope="col" class="whitespace-nowrap px-4 py-3">Municipality</th>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Lot</th>
-                                    <th scope="col" class="min-w-48 px-4 py-3">Grade levels</th>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Items</th>
-                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Record</th>
+                                    <th scope="col" class="min-w-56 px-4 py-3">Address</th>
+                                    <th scope="col" class="min-w-48 px-4 py-3">Contact Person</th>
+                                    <th scope="col" class="whitespace-nowrap px-4 py-3">Contact Phone</th>
+                                    <th scope="col" class="min-w-48 px-4 py-3">Grade Levels</th>
+                                    <th scope="col" class="min-w-64 px-4 py-3">Items</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 text-slate-700">
                                 @foreach ($rows as $row)
                                     <tr class="align-top hover:bg-slate-50/70">
+                                        <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">{{ $row['dr_number'] ?? '—' }}</td>
+                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['lot_number'] ?? '—' }}</td>
+                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['contract_number'] ?? '—' }}</td>
                                         <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">{{ $row['school_id'] ?? '—' }}</td>
                                         <td class="px-4 py-3 font-semibold text-slate-900">{{ $row['school_name'] ?? '—' }}</td>
                                         <td class="whitespace-nowrap px-4 py-3">{{ $row['region'] ?? '—' }}</td>
                                         <td class="whitespace-nowrap px-4 py-3">{{ $row['division'] ?? '—' }}</td>
                                         <td class="whitespace-nowrap px-4 py-3">{{ $row['municipality'] ?? '—' }}</td>
-                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['lot'] ?? '—' }}</td>
+                                        <td class="px-4 py-3">{{ $row['address'] ?? '—' }}</td>
+                                        <td class="px-4 py-3">{{ $row['contact_person'] ?? '—' }}</td>
+                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['contact_phone'] ?? '—' }}</td>
                                         <td class="px-4 py-3">{{ $row['grade_levels'] ?: '—' }}</td>
-                                        <td class="whitespace-nowrap px-4 py-3">{{ $row['item_count'] ?? '—' }}</td>
                                         <td class="px-4 py-3">
-                                            <details>
-                                                <summary class="cursor-pointer font-semibold text-blue-700 hover:text-blue-900">View data</summary>
-                                                <pre class="mt-2 max-h-80 min-w-72 overflow-auto rounded-lg bg-slate-950 p-3 text-xs leading-5 text-slate-100">{{ json_encode($row['record'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
-                                            </details>
+                                            @if ($row['items'] === [])
+                                                —
+                                            @else
+                                                <ul class="space-y-1">
+                                                    @foreach ($row['items'] as $item)
+                                                        <li class="leading-5">
+                                                            <span class="font-medium text-slate-900">{{ $item['name'] ?? $item['code'] ?? 'Item' }}</span>
+                                                            @if (! empty($item['name']) && ! empty($item['code']))<span class="text-slate-500"> · {{ $item['code'] }}</span>@endif
+                                                            @if (! empty($item['quantity']))<span class="text-slate-500"> × {{ $item['quantity'] }}</span>@endif
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach

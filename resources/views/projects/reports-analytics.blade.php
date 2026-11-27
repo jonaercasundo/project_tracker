@@ -208,39 +208,42 @@
             <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="logistics-pouch-progress-title">
                 <header>
                     <h2 id="logistics-pouch-progress-title" class="text-sm font-black uppercase tracking-[0.12em] text-slate-800">Pouches Returned by Logistics</h2>
-                    <p class="mt-1 text-xs font-semibold text-slate-500">Unique schools assigned to each partner. Returned status uses Returned to Office At; compliance uses masterlist Status. Blank or unrecognized statuses are counted as For checking.</p>
-                    <ul class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-600" aria-label="Pouch return status legend">
+                    <p class="mt-1 text-xs text-slate-500">Unique schools by partner region. Returned means Returned to Office At is filled.</p>
+                    <ul class="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] font-semibold text-slate-600" aria-label="Pouch return status legend">
                         <li class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-emerald-600" aria-hidden="true"></span>Compliant</li>
                         <li class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-rose-600" aria-hidden="true"></span>Non-compliant</li>
                         <li class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-amber-500" aria-hidden="true"></span>For checking</li>
                         <li class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-stone-300" aria-hidden="true"></span>Still to return</li>
                     </ul>
+                    <p class="mt-2 text-[10px] leading-4 text-slate-400">Compliance uses masterlist Status. Blank or unrecognized values count as For checking.</p>
                 </header>
                 @if ($logisticsPouchSummaries !== [])
-                    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div class="mt-3 grid grid-cols-1">
                         @foreach ($logisticsPouchSummaries as $partnerSummary)
                             @php
                                 $compliantPercentage = $partnerSummary['total'] > 0 ? ($partnerSummary['compliant'] / $partnerSummary['total']) * 100 : 0;
                                 $nonCompliantPercentage = $partnerSummary['total'] > 0 ? ($partnerSummary['non_compliant'] / $partnerSummary['total']) * 100 : 0;
                                 $checkingPercentage = $partnerSummary['total'] > 0 ? ($partnerSummary['checking'] / $partnerSummary['total']) * 100 : 0;
                             @endphp
-                            <div class="flex items-center gap-3 border-t border-slate-100 pt-4">
+                            <div class="flex items-center gap-4 border-t border-slate-100 py-4 first:border-t-0">
                                 <div class="grid h-16 w-16 shrink-0 place-items-center rounded-full" style="background: conic-gradient(#059669 0 {{ $compliantPercentage }}%, #e11d48 {{ $compliantPercentage }}% {{ $compliantPercentage + $nonCompliantPercentage }}%, #f59e0b {{ $compliantPercentage + $nonCompliantPercentage }}% {{ $compliantPercentage + $nonCompliantPercentage + $checkingPercentage }}%, #d6d3d1 {{ $compliantPercentage + $nonCompliantPercentage + $checkingPercentage }}% 100%)" role="img" aria-label="{{ $partnerSummary['name'] }}: {{ number_format($partnerSummary['percentage'], 1) }} percent returned">
                                     <div class="grid h-12 w-12 place-content-center rounded-full bg-white">
                                         <span class="font-mono text-sm font-black tabular-nums text-slate-950">{{ number_format($partnerSummary['percentage'], 1) }}%</span>
                                         <span class="text-[8px] font-bold uppercase text-slate-500">returned</span>
                                     </div>
                                 </div>
-                                <div class="min-w-0">
-                                    <h3 class="truncate text-sm font-black text-slate-950">{{ $partnerSummary['name'] }}</h3>
-                                    <p class="mt-1 text-[10px] leading-4 text-slate-500">Scope: {{ $partnerSummary['scope'] }}</p>
-                                    <p class="mt-1 font-mono text-xs font-bold tabular-nums text-slate-600">{{ number_format($partnerSummary['returned']) }} of {{ number_format($partnerSummary['total']) }} schools</p>
-                                    <div class="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] leading-4 text-slate-500">
-                                        <span>Compliant {{ number_format($partnerSummary['compliant']) }} · {{ number_format($compliantPercentage, 1) }}%</span>
-                                        <span>Non-compliant {{ number_format($partnerSummary['non_compliant']) }} · {{ number_format($nonCompliantPercentage, 1) }}%</span>
-                                        <span>For checking {{ number_format($partnerSummary['checking']) }} · {{ number_format($checkingPercentage, 1) }}%</span>
-                                        <span>Still to return {{ number_format($partnerSummary['remaining']) }} · {{ number_format($partnerSummary['total'] > 0 ? ($partnerSummary['remaining'] / $partnerSummary['total']) * 100 : 0, 1) }}%</span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                                        <h3 class="text-sm font-black text-slate-950">{{ $partnerSummary['name'] }}</h3>
+                                        <p class="font-mono text-sm font-bold tabular-nums text-slate-700">{{ number_format($partnerSummary['returned']) }} <span class="font-sans text-xs font-medium text-slate-500">of {{ number_format($partnerSummary['total']) }} schools returned</span></p>
                                     </div>
+                                    <p class="mt-0.5 text-[11px] leading-4 text-slate-500">{{ $partnerSummary['scope'] === 'All project schools' ? 'All project schools' : 'Regions: '.$partnerSummary['scope'] }}</p>
+                                    <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] leading-4">
+                                        <div class="flex min-w-0 items-center gap-1.5"><span class="h-2 w-2 shrink-0 rounded-sm bg-emerald-600" aria-hidden="true"></span><dt class="truncate text-slate-600">Compliant</dt><dd class="ml-auto whitespace-nowrap font-semibold tabular-nums text-slate-800">{{ number_format($partnerSummary['compliant']) }} · {{ number_format($compliantPercentage, 1) }}%</dd></div>
+                                        <div class="flex min-w-0 items-center gap-1.5"><span class="h-2 w-2 shrink-0 rounded-sm bg-rose-600" aria-hidden="true"></span><dt class="truncate text-slate-600">Non-compliant</dt><dd class="ml-auto whitespace-nowrap font-semibold tabular-nums text-slate-800">{{ number_format($partnerSummary['non_compliant']) }} · {{ number_format($nonCompliantPercentage, 1) }}%</dd></div>
+                                        <div class="flex min-w-0 items-center gap-1.5"><span class="h-2 w-2 shrink-0 rounded-sm bg-amber-500" aria-hidden="true"></span><dt class="truncate text-slate-600">For checking</dt><dd class="ml-auto whitespace-nowrap font-semibold tabular-nums text-slate-800">{{ number_format($partnerSummary['checking']) }} · {{ number_format($checkingPercentage, 1) }}%</dd></div>
+                                        <div class="flex min-w-0 items-center gap-1.5"><span class="h-2 w-2 shrink-0 rounded-sm bg-stone-300" aria-hidden="true"></span><dt class="truncate text-slate-600">Still to return</dt><dd class="ml-auto whitespace-nowrap font-semibold tabular-nums text-slate-800">{{ number_format($partnerSummary['remaining']) }} · {{ number_format($partnerSummary['total'] > 0 ? ($partnerSummary['remaining'] / $partnerSummary['total']) * 100 : 0, 1) }}%</dd></div>
+                                    </dl>
                                 </div>
                             </div>
                         @endforeach

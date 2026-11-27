@@ -208,13 +208,24 @@
             <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="logistics-pouch-progress-title">
                 <header>
                     <h2 id="logistics-pouch-progress-title" class="text-sm font-black uppercase tracking-[0.12em] text-slate-800">Pouches Returned by Logistics</h2>
-                    <p class="mt-1 text-xs font-semibold text-slate-500">Partner assignments and pouch counts for {{ $selectedProject?->project_name ?? 'this project' }}.</p>
+                    <p class="mt-1 text-xs font-semibold text-slate-500">Unique schools assigned to each partner. Returned status uses Returned to Office At; compliance uses masterlist Status. Blank or unrecognized statuses are counted as For checking.</p>
+                    <ul class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-600" aria-label="Pouch return status legend">
+                        <li class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-emerald-600" aria-hidden="true"></span>Compliant</li>
+                        <li class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-rose-600" aria-hidden="true"></span>Non-compliant</li>
+                        <li class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-amber-500" aria-hidden="true"></span>For checking</li>
+                        <li class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-stone-300" aria-hidden="true"></span>Still to return</li>
+                    </ul>
                 </header>
                 @if ($logisticsPouchSummaries !== [])
                     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         @foreach ($logisticsPouchSummaries as $partnerSummary)
+                            @php
+                                $compliantPercentage = $partnerSummary['total'] > 0 ? ($partnerSummary['compliant'] / $partnerSummary['total']) * 100 : 0;
+                                $nonCompliantPercentage = $partnerSummary['total'] > 0 ? ($partnerSummary['non_compliant'] / $partnerSummary['total']) * 100 : 0;
+                                $checkingPercentage = $partnerSummary['total'] > 0 ? ($partnerSummary['checking'] / $partnerSummary['total']) * 100 : 0;
+                            @endphp
                             <div class="flex items-center gap-3 border-t border-slate-100 pt-4">
-                                <div class="grid h-16 w-16 shrink-0 place-items-center rounded-full" style="background: conic-gradient(#168b62 {{ $partnerSummary['percentage'] }}%, #e9e4dc {{ $partnerSummary['percentage'] }}% 100%)" role="img" aria-label="{{ $partnerSummary['name'] }}: {{ number_format($partnerSummary['percentage'], 1) }} percent returned">
+                                <div class="grid h-16 w-16 shrink-0 place-items-center rounded-full" style="background: conic-gradient(#059669 0 {{ $compliantPercentage }}%, #e11d48 {{ $compliantPercentage }}% {{ $compliantPercentage + $nonCompliantPercentage }}%, #f59e0b {{ $compliantPercentage + $nonCompliantPercentage }}% {{ $compliantPercentage + $nonCompliantPercentage + $checkingPercentage }}%, #d6d3d1 {{ $compliantPercentage + $nonCompliantPercentage + $checkingPercentage }}% 100%)" role="img" aria-label="{{ $partnerSummary['name'] }}: {{ number_format($partnerSummary['percentage'], 1) }} percent returned">
                                     <div class="grid h-12 w-12 place-content-center rounded-full bg-white">
                                         <span class="font-mono text-sm font-black tabular-nums text-slate-950">{{ number_format($partnerSummary['percentage'], 1) }}%</span>
                                         <span class="text-[8px] font-bold uppercase text-slate-500">returned</span>
@@ -224,7 +235,12 @@
                                     <h3 class="truncate text-sm font-black text-slate-950">{{ $partnerSummary['name'] }}</h3>
                                     <p class="mt-1 text-[10px] leading-4 text-slate-500">Scope: {{ $partnerSummary['scope'] }}</p>
                                     <p class="mt-1 font-mono text-xs font-bold tabular-nums text-slate-600">{{ number_format($partnerSummary['returned']) }} of {{ number_format($partnerSummary['total']) }} schools</p>
-                                    <p class="mt-1 text-[11px] text-slate-500">{{ number_format($partnerSummary['remaining']) }} schools still to return</p>
+                                    <div class="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] leading-4 text-slate-500">
+                                        <span>Compliant {{ number_format($partnerSummary['compliant']) }} · {{ number_format($compliantPercentage, 1) }}%</span>
+                                        <span>Non-compliant {{ number_format($partnerSummary['non_compliant']) }} · {{ number_format($nonCompliantPercentage, 1) }}%</span>
+                                        <span>For checking {{ number_format($partnerSummary['checking']) }} · {{ number_format($checkingPercentage, 1) }}%</span>
+                                        <span>Still to return {{ number_format($partnerSummary['remaining']) }} · {{ number_format($partnerSummary['total'] > 0 ? ($partnerSummary['remaining'] / $partnerSummary['total']) * 100 : 0, 1) }}%</span>
+                                    </div>
                                 </div>
                             </div>
                         @endforeach

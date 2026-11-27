@@ -77,7 +77,7 @@ class ProjectDashboardController extends Controller
         ]);
     }
 
-    /** @return list<array{name: string, scope: string, total: int, returned: int, remaining: int, percentage: float}> */
+    /** @return list<array{name: string, scope: string, total: int, returned: int, remaining: int, compliant: int, non_compliant: int, checking: int, percentage: float}> */
     private function logisticsPouchSummaries(int $projectId): array
     {
         if (! Schema::hasTable('logistics_integration_projects')
@@ -126,7 +126,7 @@ class ProjectDashboardController extends Controller
             ->whereNotNull('school_id')
             ->where('school_id', '<>', '')
             ->whereRaw("TRIM(school_id) <> ''")
-            ->get(['school_id', 'region', 'pouch_completed_at']);
+            ->get(['school_id', 'region', 'returned_to_office_at', 'status']);
 
         return $partners->map(function (object $partner) use ($schoolAssignments, $regionAssignments, $records): array {
             $assignedSchools = collect($schoolAssignments->get($partner->id, []))
@@ -147,9 +147,14 @@ class ProjectDashboardController extends Controller
             });
             $schools = $partnerRecords->groupBy(fn (object $record): string => mb_strtolower(trim((string) $record->school_id)));
             $total = $schools->count();
-            $returned = $schools->filter(fn (Collection $schoolRecords): bool => $schoolRecords->contains(
-                fn (object $record): bool => trim((string) $record->pouch_completed_at) !== '',
-            ))->count();
+            $returnedSchools = $schools->filter(fn (Collection $schoolRecords): bool => $schoolRecords->contains(
+                fn (object $record): bool => trim((string) $record->returned_to_office_at) !== '',
+            ));
+            $complianceCounts = ['compliant' => 0, 'non_compliant' => 0, 'checking' => 0];
+            foreach ($returnedSchools as $schoolRecords) {
+                $complianceCounts[$this->pouchComplianceCategory($schoolRecords)]++;
+            }
+            $returned = $returnedSchools->count();
             $scope = $assignedSchools->isNotEmpty()
                 ? 'Assigned schools'
                 : ($assignedRegions->isNotEmpty()
@@ -163,8 +168,25 @@ class ProjectDashboardController extends Controller
                 'returned' => $returned,
                 'remaining' => max(0, $total - $returned),
                 'percentage' => $total > 0 ? round(($returned / $total) * 100, 1) : 0.0,
+                ...$complianceCounts,
             ];
         })->values()->all();
+    }
+
+    private function pouchComplianceCategory(Collection $schoolRecords): string
+    {
+        $statuses = $schoolRecords
+            ->map(fn (object $record): string => preg_replace('/[\s_-]+/u', '', mb_strtolower(trim((string) $record->status))) ?? '')
+            ->filter();
+
+        if ($statuses->contains(fn (string $status): bool => str_contains($status, 'noncompliant'))) {
+            return 'non_compliant';
+        }
+        if ($statuses->contains(fn (string $status): bool => str_contains($status, 'compliant'))) {
+            return 'compliant';
+        }
+
+        return 'checking';
     }
 
     public function updateReportDate(Request $request): JsonResponse

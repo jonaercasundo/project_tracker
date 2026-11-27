@@ -19,14 +19,18 @@
         @if (session('error'))
             <div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{{ session('error') }}</div>
         @endif
+        @if (is_array(session('connection_test')))
+            <div role="{{ session('connection_test.status') === 'success' ? 'status' : 'alert' }}" aria-live="polite" class="rounded-xl border px-4 py-3 text-sm font-medium {{ session('connection_test.status') === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800' }}">
+                <p class="font-bold">{{ session('connection_test.status') === 'success' ? 'Connection test passed' : 'Connection test failed' }}</p>
+                <p class="mt-1">{{ session('connection_test.message') }}</p>
+            </div>
+        @endif
         @if (! $storageAvailable)
             <div role="status" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Connection storage is not ready yet. Apply the pending database migrations to save device details.</div>
         @endif
 
         <form method="POST" action="{{ route('hr.biometric.update') }}" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             @csrf
-            @method('PUT')
-            <fieldset @disabled(! $storageAvailable)>
                 <section class="border-b border-slate-100 p-5 sm:p-7" aria-labelledby="terminal-heading">
                     <div class="mb-5 flex items-start gap-3">
                         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
@@ -58,9 +62,9 @@
                             @error('device_serial')<span class="mt-1 block text-xs font-medium text-rose-700">{{ $message }}</span>@enderror
                         </label>
                         <label class="text-xs font-semibold text-slate-700 sm:col-span-2">Comm Key <span class="font-normal text-slate-400">(optional)</span>
-                            <input type="password" name="comm_key" maxlength="255" autocomplete="new-password" class="mt-1.5 w-full rounded-xl border-slate-200 bg-white text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="{{ $connection?->comm_key ? 'Saved securely · leave blank to keep current key' : 'Enter the Comm Key set on the terminal' }}">
+                            <input type="password" name="password" maxlength="255" autocomplete="new-password" class="mt-1.5 w-full rounded-xl border-slate-200 bg-white text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="{{ $connection?->comm_key ? 'Saved securely · leave blank to keep current key' : 'Enter the Comm Key set on the terminal' }}">
                             <span class="mt-1 block font-normal text-slate-500">The key must match the G1’s PC Connection Comm Key. Saved keys are encrypted.</span>
-                            @error('comm_key')<span class="mt-1 block text-xs font-medium text-rose-700">{{ $message }}</span>@enderror
+                            @error('password')<span class="mt-1 block text-xs font-medium text-rose-700">{{ $message }}</span>@enderror
                         </label>
                     </div>
                 </section>
@@ -71,10 +75,12 @@
                 </aside>
 
                 <div class="flex flex-col gap-3 bg-slate-50/70 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-                    <p class="max-w-xl text-xs leading-5 text-slate-500">This saves the G1 connection settings. Live device testing and attendance syncing are not enabled yet.</p>
-                    <button type="submit" class="inline-flex shrink-0 items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" @disabled(! $storageAvailable)>Save settings</button>
+                    <p class="max-w-xl text-xs leading-5 text-slate-500">Test checks whether the Tracker server can reach the G1’s TCP port. Save settings stores the connection details for later use.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="submit" formaction="{{ route('hr.biometric.test') }}" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-white px-5 py-2.5 text-xs font-bold text-blue-800 transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Test connection</button>
+                        <button type="submit" class="inline-flex shrink-0 items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" @disabled(! $storageAvailable)>Save settings</button>
+                    </div>
                 </div>
-            </fieldset>
         </form>
     </div>
 </x-project_app-layout>

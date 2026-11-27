@@ -30,12 +30,45 @@ class MmcBiometricConnectionController extends Controller
         }
 
         $details = $request->validated();
-        if (blank($details['comm_key'] ?? null)) {
-            unset($details['comm_key']);
+        if (filled($details['password'] ?? null)) {
+            $details['comm_key'] = $details['password'];
         }
+        unset($details['password']);
 
         MmcBiometricConnection::query()->updateOrCreate(['id' => 'MMC'], $details);
 
         return redirect()->route('hr.biometric.index')->with('success', 'Biometric connection details saved.');
+    }
+
+    public function test(UpdateMmcBiometricConnectionRequest $request): RedirectResponse
+    {
+        $details = $request->validated();
+        $errorCode = 0;
+        $errorMessage = '';
+        $socket = @fsockopen(
+            $details['device_ip'],
+            (int) $details['tcp_port'],
+            $errorCode,
+            $errorMessage,
+            3,
+        );
+
+        if ($socket === false) {
+            return redirect()->route('hr.biometric.index')
+                ->withInput($request->safe()->except('password')->all())
+                ->with('connection_test', [
+                    'status' => 'failure',
+                    'message' => "The Tracker server could not reach {$details['device_ip']}:{$details['tcp_port']}. Check the G1 network settings, power, and firewall.",
+                ]);
+        }
+
+        fclose($socket);
+
+        return redirect()->route('hr.biometric.index')
+            ->withInput($request->safe()->except('password')->all())
+            ->with('connection_test', [
+                'status' => 'success',
+                'message' => "TCP port {$details['tcp_port']} on {$details['device_ip']} is reachable from the Tracker server. The Comm Key and device protocol were not checked.",
+            ]);
     }
 }

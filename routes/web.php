@@ -557,7 +557,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         ->name('hr.biometric.')
         ->group(function (): void {
             Route::get('/', [MmcBiometricConnectionController::class, 'index'])->name('index');
-            Route::put('/', [MmcBiometricConnectionController::class, 'update'])->name('update');
+            Route::post('/', [MmcBiometricConnectionController::class, 'update'])->name('update');
+            Route::post('/test', [MmcBiometricConnectionController::class, 'test'])
+                ->middleware('throttle:5,1')
+                ->name('test');
         });
 
     /*

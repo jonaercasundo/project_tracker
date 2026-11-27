@@ -407,20 +407,20 @@ it('sets Delivered At for records matching multiple School IDs in the selected p
         ]);
     }
 
-    $this->post(route('integrations.mmc-platform.masterlist.delivered-at'), [
+    $this->post(route('integrations.mmc-platform.masterlist.returned-to-office-at'), [
         'program_id' => 'program-123',
         'school_ids' => "121700,\n121701\nmissing-school",
-        'delivered_at' => '2026-11-26',
+        'returned_to_office_at' => '2026-11-26',
     ])->assertRedirect(route('integrations.mmc-platform.masterlist', ['program_id' => 'program-123']))
-        ->assertSessionHas('deliveredAtUpdate', 'Set Delivered At to 2026-11-26 for 3 record(s). No records matched 1 School ID(s).');
+        ->assertSessionHas('returnedToOfficeAtUpdate', 'Set Returned to Office At to 2026-11-26 for 3 record(s). No records matched 1 School ID(s).');
 
-    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-1-lot-1', 'delivered_at' => '2026-11-26']);
-    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-1-lot-2', 'delivered_at' => '2026-11-26']);
-    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-2', 'delivered_at' => '2026-11-26']);
-    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-other-program', 'delivered_at' => null]);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-1-lot-1', 'returned_to_office_at' => '2026-11-26', 'delivered_at' => null]);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-1-lot-2', 'returned_to_office_at' => '2026-11-26', 'delivered_at' => null]);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-2', 'returned_to_office_at' => '2026-11-26', 'delivered_at' => null]);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-other-program', 'returned_to_office_at' => null]);
 });
 
-it('rejects an invalid Delivered At date before changing masterlist records', function () {
+it('rejects an invalid Returned to Office At date before changing masterlist records', function () {
     mmcPlatformUser();
     $companyId = (int) auth()->user()->currentCompany()->getKey();
     $trackerProjectId = mmcTrackerProject();
@@ -449,14 +449,14 @@ it('rejects an invalid Delivered At date before changing masterlist records', fu
     ]);
 
     $this->from(route('integrations.mmc-platform.masterlist'))
-        ->post(route('integrations.mmc-platform.masterlist.delivered-at'), [
+        ->post(route('integrations.mmc-platform.masterlist.returned-to-office-at'), [
             'program_id' => 'program-123',
             'school_ids' => '121700',
-            'delivered_at' => 'not-a-date',
+            'returned_to_office_at' => 'not-a-date',
         ])
-        ->assertSessionHasErrors('delivered_at');
+        ->assertSessionHasErrors('returned_to_office_at');
 
-    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-1', 'delivered_at' => null]);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-1', 'returned_to_office_at' => null]);
 });
 
 it('counts schools as processed only when every delivery has Date Received and Received By', function () {
@@ -565,10 +565,10 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         ->assertSee('DR No.')
         ->assertSee('SAP DR No.')
         ->assertSee('Updated At')
-        ->assertSee('Bulk set Delivered At')
+        ->assertSee('Bulk set Returned to Office At')
         ->assertSee('School IDs')
-        ->assertSee('Delivered At date')
-        ->assertSee(route('integrations.mmc-platform.masterlist.delivered-at'), false)
+        ->assertSee('Returned to Office At date')
+        ->assertSee(route('integrations.mmc-platform.masterlist.returned-to-office-at'), false)
         ->assertSee('DR-100')
         ->assertSee('CON-1')
         ->assertSee('SAP-100')

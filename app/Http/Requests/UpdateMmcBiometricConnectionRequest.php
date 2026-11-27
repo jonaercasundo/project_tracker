@@ -7,6 +7,15 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateMmcBiometricConnectionRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $deviceIp = $this->input('device_ip');
+
+        if (is_string($deviceIp)) {
+            $this->merge(['device_ip' => trim($deviceIp)]);
+        }
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */

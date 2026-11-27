@@ -54,7 +54,7 @@ class OpenAiResponsesClient
         $payload = [
             'model' => $model,
             'input' => $webSearch ? 'Use web search to find the official OpenAI API documentation. Reply with its URL only.' : 'Reply with OK.',
-            'max_output_tokens' => $webSearch ? 1000 : 10,
+            'max_output_tokens' => $webSearch ? 1000 : 16,
             'store' => false,
         ];
         if ($webSearch) {

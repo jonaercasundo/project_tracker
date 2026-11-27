@@ -237,8 +237,7 @@ if (monitoring) {
         }
     }
     document.getElementById('monitoring-options-retry').addEventListener('click', loadOptions);
-    // Wait until Alpine has initialized the shared project dropdown.
-    queueMicrotask(loadOptions);
+    document.addEventListener('alpine:initialized', loadOptions, { once: true });
     if (region.value || division.value || municipality.value) updateLocations();
 
     retry.addEventListener('click', () => loadReport(lastReportUrl, lastReportUpdatesHistory));

@@ -19,7 +19,6 @@ test('monitoring renders before reports, scopes cached results, ignores late res
         await page.route('**/*', route => route.fulfill({ contentType: 'text/html', body: shell }));
         await page.goto('http://monitoring.test/deliveries/monitoring?project_id=1');
         await page.addScriptTag({ content: dropdown.replaceAll('export function ', 'function ') });
-        await page.addScriptTag({ path: new URL('../node_modules/alpinejs/dist/cdn.min.js', import.meta.url).pathname });
         await page.evaluate(() => {
             const root = document.getElementById('delivery-monitoring');
             root.dataset.endpoint = `${location.origin}/deliveries/monitoring`;
@@ -30,12 +29,16 @@ test('monitoring renders before reports, scopes cached results, ignores late res
                 const target = new URL(url);
                 if (target.pathname.endsWith('/options')) return Promise.resolve(new Response(JSON.stringify({ projects: [{ project_id: 1, project_name: 'Science Kits' }, { project_id: 2, project_name: 'Furniture' }], regions: ['Region I'], years: [2026] }), { headers: { 'Content-Type': 'application/json' } }));
                 if (target.pathname.endsWith('/locations')) return Promise.resolve(new Response('{"options":[]}', { headers: { 'Content-Type': 'application/json' } }));
+                if (target.searchParams.get('phase') === 'overview' && target.searchParams.get('search') !== 'Different search') {
+                    return Promise.resolve(new Response('{"projects":[]}', { headers: { 'Content-Type': 'application/json' } }));
+                }
                 // Deliberately ignore abort to exercise the late-response guard.
                 return new Promise(resolve => window.pendingReports.push({ url: target.href, resolve }));
             };
             window.resolveReport = (index, text, status = 200) => window.pendingReports[index].resolve(new Response(JSON.stringify({ summary_html: '', projects_html: `<p>${text}</p>`, summary: { projects_count: 1 } }), { status, headers: { 'Content-Type': 'application/json' } }));
         });
         await page.addScriptTag({ content: source });
+        await page.addScriptTag({ path: new URL('../node_modules/alpinejs/dist/cdn.min.js', import.meta.url).pathname });
         const submit = async (project, search = '') => page.evaluate(({ project, search }) => {
             const form = document.getElementById('monitoring-filters');
             form.elements.project_id.value = project;
@@ -46,6 +49,7 @@ test('monitoring renders before reports, scopes cached results, ignores late res
         assert.equal(await page.locator('h1').textContent(), 'Project Delivery Monitoring');
         assert.match(await page.locator('#monitoring-loading-status').textContent(), /Loading/);
         await page.waitForFunction(() => document.getElementById('monitoring-options-status').textContent === 'Filter choices loaded.');
+        assert.equal(await page.locator('#monitoring-project-trigger span').innerText(), 'Science Kits');
         await page.evaluate(() => window.resolveReport(0, 'Project one'));
         await page.waitForFunction(() => document.getElementById('monitoring-loading-status').textContent === 'Operational progress updated.');
         await submit('1');
@@ -55,7 +59,7 @@ test('monitoring renders before reports, scopes cached results, ignores late res
         // Exact-filter cache is visible immediately while the next request is pending.
         await submit('1');
         assert.match(await page.locator('#monitoring-table').textContent(), /Project one refreshed/);
-        assert.match(await page.locator('#monitoring-loading-status').textContent(), /Refreshing/);
+        assert.equal(await page.locator('#monitoring-table').getAttribute('aria-busy'), 'true');
         await submit('1');
         assert.equal(await page.evaluate(() => window.pendingReports.length), 3);
         await submit('2', 'Furniture');
@@ -79,7 +83,9 @@ test('monitoring renders before reports, scopes cached results, ignores late res
         assert.doesNotMatch(await page.locator('#monitoring-table').textContent(), /Retry succeeded|Project two/);
         assert.match(await page.locator('#monitoring-table').textContent(), /No progress is available/);
         await page.locator('#monitoring-retry').click();
-        await page.evaluate(() => window.resolveReport(7, 'Search retry succeeded'));
+        await page.evaluate(() => window.resolveReport(7, 'Search retry overview'));
+        await page.waitForFunction(() => window.pendingReports.length === 9);
+        await page.evaluate(() => window.resolveReport(8, 'Search retry succeeded'));
         await page.waitForFunction(() => document.getElementById('monitoring-loading-status').textContent === 'Operational progress updated.');
         assert.equal(new URL(page.url()).searchParams.get('search'), 'Different search');
         assert.deepEqual(errors, []);

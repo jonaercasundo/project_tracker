@@ -2,7 +2,7 @@
 
 return [
     'enabled' => (bool) env('AI_ASSISTANT_ENABLED', true),
-    'supported_models' => ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'],
+    'supported_models' => ['gpt-6.2-sol', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'],
     'default_per_user_requests_per_minute' => (int) env('AI_ASSISTANT_REQUESTS_PER_USER_PER_MINUTE', 12),
     'default_monthly_token_limit' => env('AI_ASSISTANT_MONTHLY_TOKEN_LIMIT') ? (int) env('AI_ASSISTANT_MONTHLY_TOKEN_LIMIT') : null,
     'retention_days' => (int) env('AI_ASSISTANT_RETENTION_DAYS', 90),

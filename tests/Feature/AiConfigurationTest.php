@@ -195,14 +195,17 @@ it('tests a saved credential and records a sanitized success result', function (
     aiAdmin();
     config(['services.openai.key' => null]);
     $key = 'sk-test-connection-secret';
-    $this->postJson(route('admin.ai-configuration.store'), aiConfigurationPayload(['openai_api_key' => $key]))->assertOk();
+    $model = 'gpt-6.2-sol';
+    $this->postJson(route('admin.ai-configuration.store'), aiConfigurationPayload(['openai_api_key' => $key, 'model' => $model]))->assertOk();
+    expect(app(AiProviderConfiguration::class)->model())->toBe($model);
     Http::fake(['https://api.openai.com/v1/responses' => Http::response(['id' => 'resp_test', 'output' => []], 200)]);
 
-    $response = $this->postJson(route('admin.ai-configuration.test-connection'), ['model' => 'gpt-5.5']);
+    $response = $this->postJson(route('admin.ai-configuration.test-connection'), ['model' => $model]);
     $response->assertOk()->assertJsonPath('status', 'success')->assertJsonMissing(['api_key' => $key]);
     Http::assertSent(fn ($request): bool => $request->url() === 'https://api.openai.com/v1/responses'
         && $request->header('Authorization')[0] === 'Bearer '.$key
-        && $request['store'] === false && $request['max_output_tokens'] === 10);
+        && $request['model'] === $model
+        && $request['store'] === false && $request['max_output_tokens'] === 16);
     $auditPayload = DB::table('ai_provider_setting_audits')->where('action', 'connection_test')->value('metadata');
     expect($auditPayload)->not->toContain($key)->and(json_decode($auditPayload, true)['status'])->toBe('success');
 });

@@ -30,8 +30,9 @@
                     ['Time and attendance', 'Attendance and timekeeping', 'M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z', 'Timekeeping'],
                     ['Leave and benefits', 'Leave requests and employee benefits', 'M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 0 1 1 1v13H4V6a1 1 0 0 1 1-1Z', 'Employee services'],
                     ['Recruitment', 'Hiring and candidate coordination', 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m6-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm12-3v6m3-3h-6', 'Talent'],
+                    ['Biometric connection', 'Connection details for MMC attendance devices', 'M12 18h.01M8 21h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2Zm-2-4h12', 'Timekeeping'],
                 ] as [$title, $description, $icon, $category])
-                    <article class="flex min-h-48 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-100/60">
+                    <article @if($title === 'Biometric connection') id="biometric-connection" @endif class="flex min-h-48 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-100/60">
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
                                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon }}" /></svg>

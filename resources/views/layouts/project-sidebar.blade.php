@@ -96,6 +96,16 @@
             <span>{{ $currentUser?->hasRole('HR') ? 'HR Workspace' : 'Dashboard Overview' }}</span>
         </a>
 
+        @if($currentUser?->hasRole('HR') && $currentCompany?->code === 'MMC')
+            <a href="{{ route('hr.index') }}#biometric-connection"
+               class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                <svg class="h-4 w-4 shrink-0 text-slate-400 group-hover:text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h8m-8 5h8m-8 5h5m-8 4h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2Z" />
+                </svg>
+                <span>Biometric Connection</span>
+            </a>
+        @endif
+
         @unless($currentUser?->hasRole('HR'))
 
         <!-- Billing Document Status -->

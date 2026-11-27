@@ -96,6 +96,20 @@
             <span>Dashboard Overview</span>
         </a>
 
+        @if($currentCompany?->code === 'MMC' && $currentUser?->hasRole('user'))
+            <a href="{{ route('hr.index') }}"
+               @if(request()->routeIs('hr.*')) aria-current="page" @endif
+               class="group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 relative overflow-hidden {{ request()->routeIs('hr.*') ? 'bg-blue-50/80 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100/80' }}">
+                @if(request()->routeIs('hr.*'))
+                    <div class="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-600 rounded-r-md"></div>
+                @endif
+                <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('hr.*') ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 19h6v-1a4 4 0 0 0-6.5-3.1M16 19H8m8 0v-1a6 6 0 0 0-12 0v1h4m8-11a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm5 2a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z" />
+                </svg>
+                <span>HR</span>
+            </a>
+        @endif
+
         <!-- Billing Document Status -->
         <a href="{{ route('projects.reports.analytics') }}"
            @if(request()->routeIs('projects.reports.analytics')) aria-current="page" @endif

@@ -43,6 +43,7 @@ use App\Http\Controllers\MIForexRateController;
 use App\Http\Controllers\MIProductImageDraftController;
 use App\Http\Controllers\MIProductPriceComparisonController;
 use App\Http\Controllers\MIProductVariantInventoryController;
+use App\Http\Controllers\MmcHrController;
 use App\Http\Controllers\MmcPlatformIntegrationController;
 use App\Http\Controllers\MmcPlatformMasterlistController;
 use App\Http\Controllers\MmcPplManagementController;
@@ -324,6 +325,8 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         'company.context:MMC',
         'role:user',
     ])->group(function () {
+
+        Route::get('/hr', [MmcHrController::class, 'index'])->name('hr.index');
 
         Route::get('/projects/dashboard', [ProjectDashboardController::class, 'index'])
             ->middleware(ProfileProjectDashboard::class)

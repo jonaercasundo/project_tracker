@@ -353,6 +353,9 @@ it('syncs only new and changed rows and skips unchanged records on resync', func
     DB::table('mmc_platform_masterlist_records')
         ->where('delivery_id', 'delivery-unchanged')
         ->update(['delivered_at' => '2026-11-20', 'returned_to_office_at' => '2026-11-26']);
+    DB::table('mmc_platform_masterlist_records')
+        ->where('delivery_id', 'delivery-changed')
+        ->update(['returned_to_office_at' => '2026-11-25']);
     $secondStatusUrl = $this->postJson($syncUrl, $syncData)->assertAccepted()->json('status_url');
     Queue::pushed(SyncMmcPlatformProject::class)->last()->handle(app(MmcPlatformApiClient::class));
 
@@ -370,7 +373,11 @@ it('syncs only new and changed rows and skips unchanged records on resync', func
     ]);
     $this->assertDatabaseCount('mmc_platform_project_sync_pages', 0);
     $this->assertDatabaseCount('mmc_platform_masterlist_records', 3);
-    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-changed', 'school_name' => 'Updated Name']);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', [
+        'delivery_id' => 'delivery-changed',
+        'school_name' => 'Updated Name',
+        'returned_to_office_at' => '2026-11-25',
+    ]);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-unchanged', 'delivered_at' => '2026-11-20']);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-unchanged', 'returned_to_office_at' => '2026-11-26']);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-new', 'school_name' => 'New Name']);

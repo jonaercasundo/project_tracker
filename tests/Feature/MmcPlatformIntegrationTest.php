@@ -456,7 +456,7 @@ it('sets Delivered At for records matching multiple School IDs in the selected p
         'updated_at' => $syncedAt,
     ]);
     foreach ([
-        ['delivery_id' => 'delivery-school-1-lot-1', 'source_program_id' => 'program-123', 'school_id' => '121700'],
+        ['delivery_id' => 'delivery-school-1-lot-1', 'source_program_id' => 'program-123', 'school_id' => '121700', 'returned_to_office_at' => '2026-11-20'],
         ['delivery_id' => 'delivery-school-1-lot-2', 'source_program_id' => 'program-123', 'school_id' => '121700'],
         ['delivery_id' => 'delivery-school-2', 'source_program_id' => 'program-123', 'school_id' => '121701'],
         ['delivery_id' => 'delivery-other-program', 'source_program_id' => 'program-456', 'school_id' => '121700'],

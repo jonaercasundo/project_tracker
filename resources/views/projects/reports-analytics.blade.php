@@ -222,8 +222,9 @@
                                 </div>
                                 <div class="min-w-0">
                                     <h3 class="truncate text-sm font-black text-slate-950">{{ $partnerSummary['name'] }}</h3>
-                                    <p class="mt-1 font-mono text-xs font-bold tabular-nums text-slate-600">{{ number_format($partnerSummary['returned']) }} of {{ number_format($partnerSummary['total']) }} pouches</p>
-                                    <p class="mt-1 text-[11px] text-slate-500">{{ number_format($partnerSummary['remaining']) }} still to return</p>
+                                    <p class="mt-1 text-[10px] leading-4 text-slate-500">Scope: {{ $partnerSummary['scope'] }}</p>
+                                    <p class="mt-1 font-mono text-xs font-bold tabular-nums text-slate-600">{{ number_format($partnerSummary['returned']) }} of {{ number_format($partnerSummary['total']) }} schools</p>
+                                    <p class="mt-1 text-[11px] text-slate-500">{{ number_format($partnerSummary['remaining']) }} schools still to return</p>
                                 </div>
                             </div>
                         @endforeach

@@ -77,7 +77,7 @@ class ProjectDashboardController extends Controller
         ]);
     }
 
-    /** @return list<array{name: string, total: int, returned: int, remaining: int, percentage: float}> */
+    /** @return list<array{name: string, scope: string, total: int, returned: int, remaining: int, percentage: float}> */
     private function logisticsPouchSummaries(int $projectId): array
     {
         if (! Schema::hasTable('logistics_integration_projects')
@@ -114,27 +114,51 @@ class ProjectDashboardController extends Controller
                 ->get(['integration_id', 'school_id'])
                 ->groupBy('integration_id')
             : collect();
+        $regionAssignments = Schema::hasTable('logistics_integration_regions')
+            ? DB::table('logistics_integration_regions')
+                ->where('project_id', $projectId)
+                ->whereIn('integration_id', $partners->pluck('id'))
+                ->get(['integration_id', 'region'])
+                ->groupBy('integration_id')
+            : collect();
         $records = DB::table('mmc_platform_masterlist_records')
             ->where('tracker_project_id', $projectId)
-            ->whereNotNull('delivery_id')
-            ->where('delivery_id', '<>', '')
             ->whereNotNull('school_id')
             ->where('school_id', '<>', '')
-            ->get(['delivery_id', 'school_id', 'pouch_completed_at']);
+            ->whereRaw("TRIM(school_id) <> ''")
+            ->get(['school_id', 'region', 'pouch_completed_at']);
 
-        return $partners->map(function (object $partner) use ($schoolAssignments, $records): array {
+        return $partners->map(function (object $partner) use ($schoolAssignments, $regionAssignments, $records): array {
             $assignedSchools = collect($schoolAssignments->get($partner->id, []))
                 ->map(fn (object $assignment): string => mb_strtolower(trim((string) $assignment->school_id)))
                 ->filter()
                 ->flip();
-            $partnerRecords = $records->filter(fn (object $record): bool => $assignedSchools->isEmpty()
-                || $assignedSchools->has(mb_strtolower(trim((string) $record->school_id))))
-                ->unique('delivery_id');
-            $total = $partnerRecords->count();
-            $returned = $partnerRecords->filter(fn (object $record): bool => trim((string) $record->pouch_completed_at) !== '')->count();
+            $assignedRegions = collect($regionAssignments->get($partner->id, []))
+                ->map(fn (object $assignment): string => mb_strtolower(trim((string) $assignment->region)))
+                ->filter()
+                ->flip();
+            $partnerRecords = $records->filter(function (object $record) use ($assignedSchools, $assignedRegions): bool {
+                if ($assignedSchools->isNotEmpty()) {
+                    return $assignedSchools->has(mb_strtolower(trim((string) $record->school_id)));
+                }
+
+                return $assignedRegions->isEmpty()
+                    || $assignedRegions->has(mb_strtolower(trim((string) $record->region)));
+            });
+            $schools = $partnerRecords->groupBy(fn (object $record): string => mb_strtolower(trim((string) $record->school_id)));
+            $total = $schools->count();
+            $returned = $schools->filter(fn (Collection $schoolRecords): bool => $schoolRecords->contains(
+                fn (object $record): bool => trim((string) $record->pouch_completed_at) !== '',
+            ))->count();
+            $scope = $assignedSchools->isNotEmpty()
+                ? 'Assigned schools'
+                : ($assignedRegions->isNotEmpty()
+                    ? $regionAssignments->get($partner->id)->pluck('region')->implode(', ')
+                    : 'All project schools');
 
             return [
                 'name' => (string) $partner->name,
+                'scope' => $scope,
                 'total' => $total,
                 'returned' => $returned,
                 'remaining' => max(0, $total - $returned),

@@ -43,6 +43,7 @@ use App\Http\Controllers\MIForexRateController;
 use App\Http\Controllers\MIProductImageDraftController;
 use App\Http\Controllers\MIProductPriceComparisonController;
 use App\Http\Controllers\MIProductVariantInventoryController;
+use App\Http\Controllers\MmcBiometricConnectionController;
 use App\Http\Controllers\MmcHrController;
 use App\Http\Controllers\MmcPlatformIntegrationController;
 use App\Http\Controllers\MmcPlatformMasterlistController;
@@ -551,6 +552,13 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/hr', [MmcHrController::class, 'index'])
         ->middleware(['company.context:MMC', 'role:HR'])
         ->name('hr.index');
+    Route::middleware(['company.context:MMC', 'role:HR'])
+        ->prefix('/hr/biometric-connection')
+        ->name('hr.biometric.')
+        ->group(function (): void {
+            Route::get('/', [MmcBiometricConnectionController::class, 'index'])->name('index');
+            Route::put('/', [MmcBiometricConnectionController::class, 'update'])->name('update');
+        });
 
     /*
         |--------------------------------------------------------------------------

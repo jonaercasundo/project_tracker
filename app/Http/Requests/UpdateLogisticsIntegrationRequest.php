@@ -40,6 +40,7 @@ class UpdateLogisticsIntegrationRequest extends FormRequest
             'enabled_event_types' => $isApiIntegration ? ['required', 'array', 'min:1'] : ['exclude'],
             'enabled_event_types.*' => ['required', 'string', 'distinct', Rule::in(config('logistics-webhooks.allowed_event_types', []))],
             'status' => ['required', Rule::in(['active', 'disabled'])],
+            'return_project_id' => ['nullable', 'integer', 'exists:projects,project_id'],
         ];
     }
 }

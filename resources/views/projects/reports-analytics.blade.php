@@ -183,6 +183,57 @@
 
             </section>
         @endif
+        <section class="grid grid-cols-1 gap-4 xl:grid-cols-[1.55fr_1fr]" aria-label="Billing and logistics return progress">
+            <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="billing-lot-progress-title">
+                <header>
+                    <h2 id="billing-lot-progress-title" class="text-sm font-black uppercase tracking-[0.12em] text-slate-800">1st Billing · Share Processed</h2>
+                    <p class="mt-1 text-xs font-semibold text-slate-500">Progress is calculated as processed ÷ (processed + remaining).</p>
+                </header>
+                <div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+                    @foreach ($billingLotSummaries as $lotSummary)
+                        <div class="flex flex-col items-center text-center">
+                            <div class="grid h-32 w-32 place-items-center rounded-full" style="background: conic-gradient(#151515 {{ $lotSummary['percentage'] }}%, #e9e4dc {{ $lotSummary['percentage'] }}% 100%)" role="img" aria-label="{{ $lotSummary['lot'] }}: {{ number_format($lotSummary['percentage'], 1) }} percent processed">
+                                <div class="grid h-[6.4rem] w-[6.4rem] place-content-center rounded-full bg-white">
+                                    <span class="font-mono text-2xl font-black tabular-nums text-slate-950">{{ number_format($lotSummary['percentage'], 1) }}%</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-wide text-slate-500">of records</span>
+                                </div>
+                            </div>
+                            <h3 class="mt-3 text-base font-black text-slate-950">{{ $lotSummary['lot'] }}</h3>
+                            <p class="mt-1 font-mono text-xs font-bold tabular-nums text-slate-500">{{ number_format($lotSummary['processed']) }} processed · {{ number_format($lotSummary['remaining']) }} remaining</p>
+                        </div>
+                    @endforeach
+                </div>
+            </article>
+
+            <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="logistics-pouch-progress-title">
+                <header>
+                    <h2 id="logistics-pouch-progress-title" class="text-sm font-black uppercase tracking-[0.12em] text-slate-800">Pouches Returned by Logistics</h2>
+                    <p class="mt-1 text-xs font-semibold text-slate-500">Partner assignments and pouch counts for {{ $selectedProject?->project_name ?? 'this project' }}.</p>
+                </header>
+                @if ($logisticsPouchSummaries !== [])
+                    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        @foreach ($logisticsPouchSummaries as $partnerSummary)
+                            <div class="flex items-center gap-3 border-t border-slate-100 pt-4">
+                                <div class="grid h-16 w-16 shrink-0 place-items-center rounded-full" style="background: conic-gradient(#168b62 {{ $partnerSummary['percentage'] }}%, #e9e4dc {{ $partnerSummary['percentage'] }}% 100%)" role="img" aria-label="{{ $partnerSummary['name'] }}: {{ number_format($partnerSummary['percentage'], 1) }} percent returned">
+                                    <div class="grid h-12 w-12 place-content-center rounded-full bg-white">
+                                        <span class="font-mono text-sm font-black tabular-nums text-slate-950">{{ number_format($partnerSummary['percentage'], 1) }}%</span>
+                                        <span class="text-[8px] font-bold uppercase text-slate-500">returned</span>
+                                    </div>
+                                </div>
+                                <div class="min-w-0">
+                                    <h3 class="truncate text-sm font-black text-slate-950">{{ $partnerSummary['name'] }}</h3>
+                                    <p class="mt-1 font-mono text-xs font-bold tabular-nums text-slate-600">{{ number_format($partnerSummary['returned']) }} of {{ number_format($partnerSummary['total']) }} pouches</p>
+                                    <p class="mt-1 text-[11px] text-slate-500">{{ number_format($partnerSummary['remaining']) }} still to return</p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="mt-5 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">No logistics partners are assigned to this project yet.</p>
+                @endif
+            </article>
+        </section>
+
         @if ($selectedProjectId === null)
             <p class="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">No projects are available for this report.</p>
         @endif

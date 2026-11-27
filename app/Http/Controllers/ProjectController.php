@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Keystage;
+use App\Models\LogisticsIntegration;
 use App\Models\Project;
 use App\Services\ProjectAwardSynchronizationService;
 use App\Services\ProjectBiddingEvidenceService;
@@ -389,6 +390,17 @@ class ProjectController extends Controller
         $lots = $structureIsSmall ? $details->lotRecords($project)->limit(100)->get() : collect();
         $keystages = $structureIsSmall ? $details->keystageRecords($project)->limit(100)->get() : collect();
         $details->attachKeystages($lots, $keystages);
+        $canViewLogisticsPartners = auth()->user()?->currentCompany()?->code === 'MMC'
+            && Gate::allows('viewAny', LogisticsIntegration::class)
+            && Schema::hasTable('logistics_integrations')
+            && Schema::hasTable('logistics_integration_projects');
+        $logisticsPartners = $canViewLogisticsPartners
+            ? LogisticsIntegration::query()
+                ->whereHas('projects', fn ($query) => $query->where('projects.project_id', $project->project_id))
+                ->withCount('credentials')
+                ->orderBy('name')
+                ->get(['id', 'integration_id', 'name', 'authentication_method', 'status'])
+            : collect();
 
         /*
         |--------------------------------------------------------------------------
@@ -407,6 +419,9 @@ class ProjectController extends Controller
             'biddingEvidence' => $biddingEvidence,
             'lotContractAmount' => $lotContractAmount,
             'canUpdateLotContractPrice' => $this->canUpdateLotContractPrice($project),
+            'canViewLogisticsPartners' => $canViewLogisticsPartners,
+            'canManageLogisticsPartners' => Gate::allows('create', LogisticsIntegration::class),
+            'logisticsPartners' => $logisticsPartners,
         ] + $summary);
     }
 

@@ -38,6 +38,7 @@ class StoreLogisticsIntegrationRequest extends FormRequest
             'enabled_event_types' => ['exclude_unless:connection_type,api', 'required', 'array', 'min:1'],
             'enabled_event_types.*' => ['required', 'string', 'distinct', Rule::in(config('logistics-webhooks.allowed_event_types', []))],
             'status' => ['required', Rule::in(['active', 'disabled'])],
+            'return_project_id' => ['nullable', 'integer', 'exists:projects,project_id'],
         ];
     }
 }

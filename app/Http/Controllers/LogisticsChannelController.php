@@ -48,7 +48,9 @@ class LogisticsChannelController extends Controller
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+            'return_project_id' => ['nullable', 'integer', 'exists:projects,project_id'],
         ]);
+        $returnProjectId = isset($filters['return_project_id']) ? (int) $filters['return_project_id'] : null;
         $tab = $filters['tab'] ?? 'management';
         $perPage = (int) ($filters['per_page'] ?? 25);
         $editing = $request->filled('edit')
@@ -133,7 +135,7 @@ class LogisticsChannelController extends Controller
 
         return view('logistics-channel.index', compact(
             'tab', 'filters', 'partnerIntegrations', 'partnerProjectId', 'partnerProjectName', 'integrationRegions', 'metrics', 'partnerStatuses', 'projects', 'schools', 'regions',
-            'selectedProjects', 'editing', 'editingSchoolTokens', 'editingRegionTokens', 'allSchools', 'eventRows', 'auditRows', 'trackingRows', 'webhookUrl'
+            'selectedProjects', 'editing', 'editingSchoolTokens', 'editingRegionTokens', 'allSchools', 'eventRows', 'auditRows', 'trackingRows', 'webhookUrl', 'returnProjectId'
         ));
     }
 
@@ -141,11 +143,17 @@ class LogisticsChannelController extends Controller
     {
         Gate::authorize('create', LogisticsIntegration::class);
         abort_unless($this->managementSchemaReady(), 503, 'Logistics Channel management storage is not ready.');
-        $credential = $this->channel->create($request->validated(), (int) $request->user()->user_id, $request->ip());
+        $validated = $request->validated();
+        $returnProjectId = isset($validated['return_project_id']) ? (int) $validated['return_project_id'] : null;
+        unset($validated['return_project_id']);
+        $credential = $this->channel->create($validated, (int) $request->user()->user_id, $request->ip());
 
         if ($credential['key_id'] === null || $credential['secret'] === null) {
-            return to_route('logistics-channel.index', ['tab' => 'integrations'])
-                ->with('status', 'Manual logistics partner added with its project and region assignments.');
+            return $returnProjectId !== null
+                ? to_route('projects.show', ['project' => $returnProjectId, 'tab' => 'logistics-partner'])
+                    ->with('success', 'Manual logistics partner added with its project and region assignments.')
+                : to_route('logistics-channel.index', ['tab' => 'integrations'])
+                    ->with('status', 'Manual logistics partner added with its project and region assignments.');
         }
 
         return response()->view('logistics-channel.credential', [
@@ -154,6 +162,7 @@ class LogisticsChannelController extends Controller
             'secret' => $credential['secret'],
             'message' => 'Save this signing secret in the Logistics App now. MMC will not show it again.',
             'overlapDays' => null,
+            'returnProjectId' => $returnProjectId,
         ])->header('Cache-Control', 'private, no-store, max-age=0');
     }
 
@@ -161,7 +170,15 @@ class LogisticsChannelController extends Controller
     {
         Gate::authorize('update', $integration);
         abort_unless($this->managementSchemaReady(), 503, 'Logistics Channel management storage is not ready.');
-        $this->channel->update($integration, $request->validated(), (int) $request->user()->user_id, $request->ip());
+        $validated = $request->validated();
+        $returnProjectId = isset($validated['return_project_id']) ? (int) $validated['return_project_id'] : null;
+        unset($validated['return_project_id']);
+        $this->channel->update($integration, $validated, (int) $request->user()->user_id, $request->ip());
+
+        if ($returnProjectId !== null) {
+            return to_route('projects.show', ['project' => $returnProjectId, 'tab' => 'logistics-partner'])
+                ->with('success', 'Logistics partner settings saved.');
+        }
 
         return to_route('logistics-channel.index', ['tab' => 'integrations'])->with('status', 'Integration settings saved.');
     }
@@ -179,6 +196,7 @@ class LogisticsChannelController extends Controller
             'secret' => $credential['secret'],
             'message' => 'Configure this new key in Logistics before the overlap ends. Previous active keys remain valid for the displayed period.',
             'overlapDays' => $credential['overlap_days'],
+            'returnProjectId' => null,
         ])->header('Cache-Control', 'private, no-store, max-age=0');
     }
 

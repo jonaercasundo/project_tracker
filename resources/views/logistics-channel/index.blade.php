@@ -240,6 +240,7 @@
                     <form method="POST" action="{{ $editing ? route('logistics-channel.integrations.update', $editing) : route('logistics-channel.integrations.store') }}" class="mt-5 space-y-4" id="integration-form" data-connection-type="{{ $connectionType }}" data-schools-url="{{ route('logistics-channel.schools') }}" data-regions-url="{{ route('logistics-channel.regions') }}" data-selected-schools="{{ json_encode($editingSchoolTokens) }}" data-selected-regions="{{ json_encode($editingRegionTokens) }}">
                         @csrf
                         @if($editing) @method('PATCH') @endif
+                        @if($returnProjectId !== null)<input type="hidden" name="return_project_id" value="{{ $returnProjectId }}">@endif
 
                         @if($editing)
                             <div class="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">Connection: <strong>{{ $connectionType === 'manual' ? 'No API (manual tracking)' : 'With API' }}</strong></div>
@@ -342,7 +343,7 @@
 
                         <div class="flex flex-wrap gap-2 pt-2">
                             <button type="submit" id="integration-submit" class="{{ $btnPrimary }} disabled:cursor-not-allowed disabled:opacity-60">{{ $editing ? 'Save partner' : ($connectionType === 'api' ? 'Create partner and API key' : 'Add manual partner') }}</button>
-                            @if($editing)<a href="{{ route('logistics-channel.index', ['tab' => 'integrations']) }}" class="{{ $btnGhost }}">Cancel</a>@endif
+                            @if($editing)<a href="{{ $returnProjectId !== null ? route('projects.show', ['project' => $returnProjectId, 'tab' => 'logistics-partner']) : route('logistics-channel.index', ['tab' => 'integrations']) }}" class="{{ $btnGhost }}">Cancel</a>@endif
                         </div>
                     </form>
 

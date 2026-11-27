@@ -46,6 +46,9 @@ class ProjectDashboardController extends Controller
         $summary = $selectedProjectId !== null
             ? $billingDocumentStatus->summarize((int) $selectedProjectId)
             : ['total' => 0, 'processed' => 0, 'remaining' => 0, 'processed_today' => 0, 'source_error' => null];
+        $billingLotSummaries = $selectedProjectId !== null
+            ? $billingDocumentStatus->summarizeByLot((int) $selectedProjectId)
+            : [];
         $deliveryStartDate = isset($validated['delivery_start_date'])
             ? CarbonImmutable::parse($validated['delivery_start_date'], config('app.timezone'))
             : ($selectedProject?->report_delivery_start_date
@@ -57,6 +60,10 @@ class ProjectDashboardController extends Controller
             'selectedProject' => $selectedProject,
             'selectedProjectId' => $selectedProjectId,
             'summary' => $summary,
+            'billingLotSummaries' => $billingLotSummaries,
+            'logisticsPouchSummaries' => $selectedProjectId !== null
+                ? $this->logisticsPouchSummaries((int) $selectedProjectId)
+                : [],
             'snapshotAt' => now(),
             'cutoffDate' => $cutoffDate,
             'mmcPlatformSync' => $this->mmcPlatformReportSync($request, (int) $selectedProjectId),
@@ -68,6 +75,61 @@ class ProjectDashboardController extends Controller
                 )
                 : null,
         ]);
+    }
+
+    /** @return list<array{name: string, total: int, returned: int, remaining: int, percentage: float}> */
+    private function logisticsPouchSummaries(int $projectId): array
+    {
+        if (! Schema::hasTable('logistics_integration_projects')
+            || ! Schema::hasTable('logistics_integrations')
+            || ! Schema::hasTable('mmc_platform_masterlist_records')) {
+            return [];
+        }
+
+        $partners = DB::table('logistics_integrations as partner')
+            ->join('logistics_integration_projects as assignment', 'assignment.integration_id', '=', 'partner.id')
+            ->where('assignment.project_id', $projectId)
+            ->where('partner.status', 'active')
+            ->orderBy('partner.name')
+            ->get(['partner.id', 'partner.name']);
+        if ($partners->isEmpty()) {
+            return [];
+        }
+
+        $schoolAssignments = Schema::hasTable('logistics_integration_schools')
+            ? DB::table('logistics_integration_schools')
+                ->where('project_id', $projectId)
+                ->whereIn('integration_id', $partners->pluck('id'))
+                ->get(['integration_id', 'school_id'])
+                ->groupBy('integration_id')
+            : collect();
+        $records = DB::table('mmc_platform_masterlist_records')
+            ->where('tracker_project_id', $projectId)
+            ->whereNotNull('delivery_id')
+            ->where('delivery_id', '<>', '')
+            ->whereNotNull('school_id')
+            ->where('school_id', '<>', '')
+            ->get(['delivery_id', 'school_id', 'pouch_completed_at']);
+
+        return $partners->map(function (object $partner) use ($schoolAssignments, $records): array {
+            $assignedSchools = collect($schoolAssignments->get($partner->id, []))
+                ->map(fn (object $assignment): string => mb_strtolower(trim((string) $assignment->school_id)))
+                ->filter()
+                ->flip();
+            $partnerRecords = $records->filter(fn (object $record): bool => $assignedSchools->isEmpty()
+                || $assignedSchools->has(mb_strtolower(trim((string) $record->school_id))))
+                ->unique('delivery_id');
+            $total = $partnerRecords->count();
+            $returned = $partnerRecords->filter(fn (object $record): bool => trim((string) $record->pouch_completed_at) !== '')->count();
+
+            return [
+                'name' => (string) $partner->name,
+                'total' => $total,
+                'returned' => $returned,
+                'remaining' => max(0, $total - $returned),
+                'percentage' => $total > 0 ? round(($returned / $total) * 100, 1) : 0.0,
+            ];
+        })->values()->all();
     }
 
     public function updateReportDate(Request $request): JsonResponse

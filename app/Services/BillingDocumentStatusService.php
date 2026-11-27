@@ -76,6 +76,62 @@ class BillingDocumentStatusService
         ];
     }
 
+    /** @return list<array{lot: string, total: int, processed: int, remaining: int, percentage: float}> */
+    public function summarizeByLot(int $projectId): array
+    {
+        if (! Schema::hasTable('mmc_platform_masterlist_records')) {
+            return [];
+        }
+
+        $records = DB::table('mmc_platform_masterlist_records')
+            ->where('tracker_project_id', $projectId)
+            ->whereNotNull('school_id')
+            ->where('school_id', '<>', '')
+            ->whereNotNull('dr_no')
+            ->where('dr_no', '<>', '')
+            ->get(['school_id', 'lot_no', 'status', 'date_received', 'received_by']);
+
+        $schoolsByLot = [];
+        foreach ($records as $record) {
+            if (in_array(mb_strtolower(trim((string) $record->status)), self::EXCLUDED_DELIVERY_STATUSES, true)) {
+                continue;
+            }
+
+            $lotNumber = $this->lotNumber((string) $record->lot_no);
+            $schoolId = $this->normalizeSchoolId((string) $record->school_id);
+            if ($lotNumber === null || $schoolId === '') {
+                continue;
+            }
+
+            $schoolsByLot[$lotNumber][$schoolId][] = [
+                'date_received' => trim((string) $record->date_received),
+                'received_by' => trim((string) $record->received_by),
+            ];
+        }
+
+        $summaries = [];
+        foreach (self::LOTS as $lotNumber) {
+            $schools = $schoolsByLot[$lotNumber] ?? [];
+            $total = count($schools);
+            $processed = count(array_filter($schools, fn (array $schoolRecords): bool => collect($schoolRecords)->every(
+                fn (array $record): bool => $record['date_received'] !== '' && $record['received_by'] !== '',
+            )));
+            $remaining = max(0, $total - $processed);
+
+            $summaries[] = [
+                'lot' => 'Lot '.$lotNumber,
+                'total' => $total,
+                'processed' => $processed,
+                'remaining' => $remaining,
+                'percentage' => $total > 0 ? round(($processed / ($processed + $remaining)) * 100, 1) : 0.0,
+            ];
+        }
+
+        ProfileProjectDashboard::current()?->loaded($records->count());
+
+        return $summaries;
+    }
+
     /** @return array{total: null, processed: null, remaining: null, processed_today: null, source_error: string} */
     private function unavailableSummary(string $message): array
     {

@@ -131,6 +131,9 @@
                     'items'    => 'Items',
                     'packages' => 'Packages',
                 ];
+                if ($canViewLogisticsPartners) {
+                    $tabs['logistics-partner'] = 'Logistics Partner';
+                }
                 if (! auth()->user()->hasRole('finance')) {
                     $tabs['setting'] = 'Project Setting';
                 }
@@ -172,6 +175,9 @@
             @include('projects.partials.keystages')
             @include('projects.partials.items')
             @include('projects.partials.packages')
+            @if ($canViewLogisticsPartners)
+                @include('projects.partials.logistics-partner')
+            @endif
             @if(! auth()->user()->hasRole('finance'))
                 @include('projects.partials.ar-settings')
             @endif

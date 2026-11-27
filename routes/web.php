@@ -326,8 +326,6 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         'role:user',
     ])->group(function () {
 
-        Route::get('/hr', [MmcHrController::class, 'index'])->name('hr.index');
-
         Route::get('/projects/dashboard', [ProjectDashboardController::class, 'index'])
             ->middleware(ProfileProjectDashboard::class)
             ->name('projects.dashboard');
@@ -550,6 +548,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
             Route::get('documents/{document}/versions/{version}/download', [BiddingDocumentController::class, 'downloadVersion'])->name('documents.versions.download');
         });
     });
+    Route::get('/hr', [MmcHrController::class, 'index'])
+        ->middleware(['company.context:MMC', 'role:HR'])
+        ->name('hr.index');
+
     /*
         |--------------------------------------------------------------------------
         | ADMIN ROUTES

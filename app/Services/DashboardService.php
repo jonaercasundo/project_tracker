@@ -92,6 +92,7 @@ class DashboardService
         $map = match ($company->code) {
             'MMC' => [
                 'Administrator' => 'admin.dashboard',
+                'HR' => 'hr.index',
                 'user' => 'projects.dashboard',
                 'finance' => 'finance.dashboard',
                 'IT' => 'it.dashboard',

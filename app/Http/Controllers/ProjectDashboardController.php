@@ -82,6 +82,7 @@ class ProjectDashboardController extends Controller
     {
         if (! Schema::hasTable('logistics_integration_projects')
             || ! Schema::hasTable('logistics_integrations')
+            || ! Schema::hasTable('logistics_integration_credentials')
             || ! Schema::hasTable('mmc_platform_masterlist_records')) {
             return [];
         }
@@ -90,6 +91,16 @@ class ProjectDashboardController extends Controller
             ->join('logistics_integration_projects as assignment', 'assignment.integration_id', '=', 'partner.id')
             ->where('assignment.project_id', $projectId)
             ->where('partner.status', 'active')
+            ->where(function (Builder $query): void {
+                $query->where('partner.authentication_method', 'manual')
+                    ->orWhereExists(function (Builder $credentials): void {
+                        $credentials->selectRaw('1')
+                            ->from('logistics_integration_credentials as credential')
+                            ->whereColumn('credential.integration_id', 'partner.id')
+                            ->where('credential.status', 'active')
+                            ->where(fn (Builder $expiry): Builder => $expiry->whereNull('credential.expires_at')->orWhere('credential.expires_at', '>', now()));
+                    });
+            })
             ->orderBy('partner.name')
             ->get(['partner.id', 'partner.name']);
         if ($partners->isEmpty()) {

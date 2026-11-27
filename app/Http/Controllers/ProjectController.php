@@ -393,10 +393,17 @@ class ProjectController extends Controller
         $canViewLogisticsPartners = auth()->user()?->currentCompany()?->code === 'MMC'
             && Gate::allows('viewAny', LogisticsIntegration::class)
             && Schema::hasTable('logistics_integrations')
-            && Schema::hasTable('logistics_integration_projects');
+            && Schema::hasTable('logistics_integration_projects')
+            && Schema::hasTable('logistics_integration_credentials');
         $logisticsPartners = $canViewLogisticsPartners
             ? LogisticsIntegration::query()
                 ->whereHas('projects', fn ($query) => $query->where('projects.project_id', $project->project_id))
+                ->where('status', 'active')
+                ->where(function ($query): void {
+                    $query->where('authentication_method', 'manual')
+                        ->orWhereHas('credentials', fn ($credentials) => $credentials->where('status', 'active')
+                            ->where(fn ($expires) => $expires->whereNull('expires_at')->orWhere('expires_at', '>', now())));
+                })
                 ->withCount('credentials')
                 ->orderBy('name')
                 ->get(['id', 'integration_id', 'name', 'authentication_method', 'status'])

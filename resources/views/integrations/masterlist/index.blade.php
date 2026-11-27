@@ -115,7 +115,10 @@
                                 <input id="returned-to-office-at-date" name="returned_to_office_at" type="date" value="{{ old('returned_to_office_at') }}" required class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
                                 @error('returned_to_office_at')<p class="mt-1 text-xs font-medium text-rose-700">{{ $message }}</p>@enderror
                             </div>
-                            <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Apply date</button>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="submit" name="action" value="set" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Apply date</button>
+                                <button type="submit" name="action" value="remove" formnovalidate class="rounded-lg border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-700 shadow-sm transition hover:border-rose-400 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2">Remove Returned to Office At date</button>
+                            </div>
                         </form>
                     </div>
                 </section>

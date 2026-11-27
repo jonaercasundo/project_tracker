@@ -437,7 +437,7 @@ it('queues nightly refreshes for linked masterlist programs only', function () {
     expect($programIds->all())->toBe(['linked-first', 'linked-second']);
 });
 
-it('sets Delivered At for records matching multiple School IDs in the selected program', function () {
+it('sets or removes Returned to Office At for records matching School IDs in the selected program', function () {
     mmcPlatformUser();
     $companyId = (int) auth()->user()->currentCompany()->getKey();
     $trackerProjectId = mmcTrackerProject();
@@ -481,6 +481,17 @@ it('sets Delivered At for records matching multiple School IDs in the selected p
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-1-lot-2', 'returned_to_office_at' => '2026-11-26', 'delivered_at' => null]);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-2', 'returned_to_office_at' => '2026-11-26', 'delivered_at' => null]);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-other-program', 'returned_to_office_at' => null]);
+
+    $this->post(route('integrations.mmc-platform.masterlist.returned-to-office-at'), [
+        'program_id' => 'program-123',
+        'school_ids' => '121700',
+        'action' => 'remove',
+    ])->assertRedirect(route('integrations.mmc-platform.masterlist', ['program_id' => 'program-123']))
+        ->assertSessionHas('returnedToOfficeAtUpdate', 'Removed Returned to Office At for 2 record(s).');
+
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-1-lot-1', 'returned_to_office_at' => null]);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-1-lot-2', 'returned_to_office_at' => null]);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-school-2', 'returned_to_office_at' => '2026-11-26']);
 });
 
 it('rejects an invalid Returned to Office At date before changing masterlist records', function () {
@@ -633,6 +644,7 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         ->assertSee('Bulk set Returned to Office At')
         ->assertSee('School IDs')
         ->assertSee('Returned to Office At date')
+        ->assertSee('Remove Returned to Office At date')
         ->assertSee(route('integrations.mmc-platform.masterlist.returned-to-office-at'), false)
         ->assertSee('DR-100')
         ->assertSee('CON-1')

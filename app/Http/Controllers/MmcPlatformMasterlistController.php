@@ -99,10 +99,16 @@ class MmcPlatformMasterlistController extends Controller
 
     public function updateReturnedToOfficeAt(Request $request): RedirectResponse
     {
+        $action = $request->input('action', 'set');
         $validated = $request->validate([
             'program_id' => ['required', 'string', 'max:255'],
             'school_ids' => ['required', 'string', 'max:20000'],
-            'returned_to_office_at' => ['required', 'date_format:Y-m-d'],
+            'action' => ['sometimes', 'string', Rule::in(['set', 'remove'])],
+            'returned_to_office_at' => [
+                Rule::requiredIf($action === 'set'),
+                'nullable',
+                Rule::when($action === 'set', ['date_format:Y-m-d']),
+            ],
         ]);
         $schoolIds = collect(preg_split('/[,;\s]+/u', trim($validated['school_ids']), -1, PREG_SPLIT_NO_EMPTY) ?: [])
             ->map(fn (string $schoolId): string => trim($schoolId))
@@ -131,19 +137,25 @@ class MmcPlatformMasterlistController extends Controller
             ->where('source_program_id', $snapshot->program_id)
             ->whereIn('school_id', $schoolIds);
         $matchedCount = (clone $records)->count();
-        $updatedCount = (clone $records)
-            ->where(function ($query) use ($validated): void {
+        $recordsToUpdate = clone $records;
+        if ($action === 'remove') {
+            $recordsToUpdate->whereNotNull('returned_to_office_at');
+        } else {
+            $recordsToUpdate->where(function ($query) use ($validated): void {
                 $query->whereNull('returned_to_office_at')
                     ->orWhere('returned_to_office_at', '<>', $validated['returned_to_office_at']);
-            })
-            ->update([
-                'returned_to_office_at' => $validated['returned_to_office_at'],
-                'updated_at' => now(),
-            ]);
+            });
+        }
+        $updatedCount = $recordsToUpdate->update([
+            'returned_to_office_at' => $action === 'remove' ? null : $validated['returned_to_office_at'],
+            'updated_at' => now(),
+        ]);
         $matchedSchoolIds = (clone $records)->distinct()->pluck('school_id')->filter()->all();
         $missingSchoolIds = $schoolIds->diff($matchedSchoolIds)->values();
 
-        $message = "Set Returned to Office At to {$validated['returned_to_office_at']} for {$updatedCount} record(s).";
+        $message = $action === 'remove'
+            ? "Removed Returned to Office At for {$updatedCount} record(s)."
+            : "Set Returned to Office At to {$validated['returned_to_office_at']} for {$updatedCount} record(s).";
         if ($matchedCount === 0) {
             $message = 'No records matched the School IDs in the selected synced program.';
         } elseif ($missingSchoolIds->isNotEmpty()) {

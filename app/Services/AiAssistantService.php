@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\AiProviderCreditsExhausted;
 use App\Exceptions\AiRequiredToolUnavailable;
 use App\Exceptions\AiToolExecutionException;
 use App\Models\Company;
@@ -89,6 +90,10 @@ class AiAssistantService
             $request = $this->client->stream($key, $requestBody);
 
             if (! $request->successful()) {
+                if ($request->json('error.code') === 'credit_balance_exhausted') {
+                    throw new AiProviderCreditsExhausted('OpenAI API credits are exhausted.');
+                }
+
                 throw new RuntimeException('The AI provider request failed.');
             }
 
@@ -99,7 +104,8 @@ class AiAssistantService
             $toolCalls = [];
             $responseOutput = [];
             $completed = false;
-            $handleEvent = function (array $event) use (&$toolCalls, &$responseOutput, &$completed, &$usage, &$emitted, $onDelta, $round, $requiredReadCalls): void {
+            $providerError = false;
+            $handleEvent = function (array $event) use (&$toolCalls, &$responseOutput, &$completed, &$usage, &$emitted, &$providerError, $onDelta, $round, $requiredReadCalls): void {
                 $type = $event['type'] ?? '';
                 if ($type === 'response.output_text.delta' && isset($event['delta'])) {
                     $delta = (string) $event['delta'];
@@ -114,8 +120,15 @@ class AiAssistantService
                     $responseOutput = $event['response']['output'] ?? [];
                     $usage['input_tokens'] = $event['response']['usage']['input_tokens'] ?? null;
                     $usage['output_tokens'] = $event['response']['usage']['output_tokens'] ?? null;
-                } elseif ($type === 'error') {
-                    throw new RuntimeException('The AI provider reported an error.');
+                } elseif (in_array($type, ['error', 'response.failed'], true)) {
+                    $code = $event['response']['error']['code'] ?? $event['error']['code'] ?? $event['code'] ?? null;
+                    if ($code === 'credit_balance_exhausted') {
+                        throw new AiProviderCreditsExhausted('OpenAI API credits are exhausted.');
+                    }
+                    if ($type === 'response.failed') {
+                        throw new RuntimeException('The AI provider reported an error.');
+                    }
+                    $providerError = true;
                 }
             };
             while (! $body->eof()) {
@@ -143,6 +156,9 @@ class AiAssistantService
                 }
             }
 
+            if ($providerError) {
+                throw new RuntimeException('The AI provider reported an error.');
+            }
             if (! $completed) {
                 throw new RuntimeException('The AI provider response ended unexpectedly.');
             }

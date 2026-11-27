@@ -256,6 +256,27 @@ it('reuses the saved user message when retrying a failed assistant stream', func
     $this->assertDatabaseHas('ai_messages', ['conversation_id' => $conversation['id'], 'role' => 'assistant', 'content' => 'Recovered']);
 });
 
+it('explains exhausted API credits and keeps the user message when the provider stream fails', function () {
+    $user = $this->miUser('user');
+    $this->signInMI($user);
+    config(['services.openai.key' => 'test-key', 'services.openai.assistant_model' => 'gpt-test']);
+    Http::preventStrayRequests();
+    Http::fake(['https://api.openai.com/v1/responses' => Http::response(
+        "data: {\"type\":\"error\",\"code\":null}\n\n".
+        "data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"credit_balance_exhausted\"}}}\n\n",
+        200,
+        ['Content-Type' => 'text/event-stream'],
+    )]);
+    $conversation = $this->postJson(route('assistant.conversations.store'))->assertCreated()->json('conversation');
+
+    $response = $this->post(route('assistant.messages.stream', $conversation['id']), ['message' => 'Hello'])->assertOk();
+
+    expect($response->streamedContent())->toContain('event: error', 'The assistant is out of OpenAI API credits. Your message is saved.');
+    $this->assertDatabaseCount('ai_messages', 1);
+    $this->assertDatabaseHas('ai_messages', ['conversation_id' => $conversation['id'], 'role' => 'user', 'content' => 'Hello']);
+    Http::assertSentCount(1);
+});
+
 it('replays a completed answer on retry without calling OpenAI or duplicating messages', function () {
     $user = $this->miUser('user');
     $this->signInMI($user);

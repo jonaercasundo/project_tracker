@@ -160,8 +160,10 @@ window.aiAssistant = (settings) => ({
                 : null;
             this.quote = null;
             this.quotePreview = null;
-            const quoteResponse = await fetch(this.endpoint(this.routes.quoteShow, id), { headers: { Accept: 'application/json' } });
-            if (quoteResponse.ok) {
+            const quoteResponse = this.quoteAllowed
+                ? await fetch(this.endpoint(this.routes.quoteShow, id), { headers: { Accept: 'application/json' } })
+                : null;
+            if (quoteResponse?.ok) {
                 const payload = await quoteResponse.json();
                 this.quote = payload.workflow;
                 if (this.quote) {

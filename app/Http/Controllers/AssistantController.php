@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AiProviderCreditsExhausted;
 use App\Exceptions\AiRequiredToolUnavailable;
 use App\Exceptions\AiToolExecutionException;
 use App\Models\AiActivity;
@@ -265,7 +266,11 @@ class AssistantController extends Controller
                 AiActivity::create(['user_id' => $user->getKey(), 'company_id' => $company->getKey(), 'conversation_id' => $conversation->getKey(), 'status' => 'failed']);
                 $latestUserMessage = collect($history)->last(fn (array $message): bool => $message['role'] === 'user')['content'] ?? '';
                 $isFilipino = preg_match('/\b(?:magkano|itong|ito|akin|ko|mo|paki|salamat|sige|hindi|paano|ano|pwede|po|naman)\b/i', $latestUserMessage) === 1;
-                if ($exception instanceof AiRequiredToolUnavailable) {
+                if ($exception instanceof AiProviderCreditsExhausted) {
+                    $message = $isFilipino
+                        ? 'Naubos na ang OpenAI API credits ng assistant. Naka-save ang mensahe mo. Makipag-ugnayan sa administrator para maibalik ang serbisyo.'
+                        : 'The assistant is out of OpenAI API credits. Your message is saved. Contact your administrator to restore service.';
+                } elseif ($exception instanceof AiRequiredToolUnavailable) {
                     $message = $isFilipino
                         ? 'Hindi available ang kinakailangang project data lookup sa assistant tool registry. Makipag-ugnayan sa administrator.'
                         : 'A required project data lookup is missing from the active assistant tool registry. Contact your administrator.';

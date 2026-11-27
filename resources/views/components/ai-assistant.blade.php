@@ -6,7 +6,8 @@
         $assistantCompany = $assistantUser?->currentCompany();
         $assistantContext = $assistantCompany ? app(\App\Services\AiModuleRegistry::class)->pageContext($assistantUser, $assistantCompany, request()->route()?->getName()) : null;
         $assistantAuthorized = $assistantUser?->can('ai.assistant.use') ?? false;
-        $assistantQuoteAllowed = $assistantUser?->can('mi.quotation.create') ?? false;
+        $assistantQuoteAllowed = $assistantAuthorized && $assistantCompany?->code === 'MI'
+            && app(\App\Services\AiCapabilityRegistry::class)->allows('mi.quotation.draft', $assistantUser, $assistantCompany);
         $assistantCanManageSettings = $assistantUser?->can('ai.settings.manage') ?? false;
         $assistantCanUploadDocuments = ($assistantUser?->can('ai.attachments.upload') ?? false)
             && ($assistantUser?->can('ai.attachments.read') ?? false)

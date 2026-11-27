@@ -1,8 +1,10 @@
 <?php
 
+use App\Console\Commands\SyncMmcPlatformMasterlist;
 use App\Jobs\SyncMmcPlatformProject;
 use App\Services\BillingDocumentStatusService;
 use App\Services\MmcPlatformApiClient;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -401,6 +403,31 @@ it('queues a refresh for the selected saved masterlist program', function () {
 
     $this->getJson($statusUrl)->assertOk()->assertJsonPath('status', 'pending');
     Queue::assertPushed(SyncMmcPlatformProject::class, 1);
+});
+
+it('queues nightly refreshes for linked masterlist programs only', function () {
+    mmcPlatformUser();
+    $companyId = (int) auth()->user()->currentCompany()->getKey();
+    $trackerProjectId = mmcTrackerProject();
+    $snapshot = [
+        'company_id' => $companyId,
+        'records' => '{}',
+        'entity_counts' => '{}',
+        'synced_at' => now(),
+    ];
+    DB::table('mmc_platform_project_syncs')->insert([
+        [...$snapshot, 'program_id' => 'linked-first', 'tracker_project_id' => $trackerProjectId],
+        [...$snapshot, 'program_id' => 'unlinked', 'tracker_project_id' => null],
+        [...$snapshot, 'program_id' => 'linked-second', 'tracker_project_id' => $trackerProjectId],
+    ]);
+    Queue::fake([SyncMmcPlatformProject::class]);
+
+    app(Kernel::class)->registerCommand(app(SyncMmcPlatformMasterlist::class));
+    $this->artisan('mmc-platform:sync-masterlist')->assertSuccessful();
+
+    $programIds = Queue::pushed(SyncMmcPlatformProject::class)
+        ->map(fn (SyncMmcPlatformProject $job): string => (new ReflectionProperty($job, 'data'))->getValue($job)['program_id']);
+    expect($programIds->all())->toBe(['linked-first', 'linked-second']);
 });
 
 it('sets Delivered At for records matching multiple School IDs in the selected program', function () {

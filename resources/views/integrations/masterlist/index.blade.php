@@ -46,6 +46,45 @@
                     <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Apply</button>
                 </form>
 
+                <section x-data="{ busy: false, result: null, async sync() {
+                    this.busy = true;
+                    this.result = null;
+                    try {
+                        const response = await fetch('{{ route('integrations.mmc-platform.masterlist.sync') }}', {
+                            method: 'POST',
+                            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '' },
+                            body: JSON.stringify({ program_id: @js($snapshot->program_id) }),
+                        });
+                        let data = await response.json();
+                        if (!response.ok) throw new Error(data.message || 'Could not start the masterlist sync.');
+                        while (data.status === 'pending') {
+                            await new Promise(resolve => setTimeout(resolve, 3000));
+                            const statusResponse = await fetch(data.status_url, { headers: { 'Accept': 'application/json' } });
+                            data = await statusResponse.json();
+                            if (!statusResponse.ok) throw new Error(data.message || 'Could not retrieve the sync result.');
+                        }
+                        this.result = data;
+                        if (data.status === 'success') setTimeout(() => window.location.reload(), 1500);
+                    } catch (error) {
+                        this.result = { status: 'failed', message: error.message || 'Could not retrieve the sync result.' };
+                    } finally {
+                        this.busy = false;
+                    }
+                } }" class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+                    <div>
+                        <h2 class="text-sm font-semibold text-slate-900">Refresh from MMC Platform</h2>
+                        <p class="mt-1 text-sm text-slate-600">Update changed records and add or remove records to match the latest API data. Returned to Office At dates are kept.</p>
+                    </div>
+                    <button type="button" @click="sync()" :disabled="busy || {{ $snapshot->tracker_project_id === null ? 'true' : 'false' }}" class="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.312 11.424a.75.75 0 0 1 .862.617 6.75 6.75 0 0 1-11.498 3.752.75.75 0 0 1 1.06-1.06 5.25 5.25 0 0 0 8.96-2.447.75.75 0 0 1 .616-.862ZM4.688 8.576a.75.75 0 0 1-.862-.617A6.75 6.75 0 0 1 15.324 4.207a.75.75 0 1 1-1.06 1.06 5.25 5.25 0 0 0-8.96 2.447.75.75 0 0 1-.616.862Z" clip-rule="evenodd"/><path d="M15.28 1.97a.75.75 0 0 1 .75.75v2.56a.75.75 0 0 1-.75.75h-2.56a.75.75 0 1 1 0-1.5h1.81V2.72a.75.75 0 0 1 .75-.75ZM4.72 18.03a.75.75 0 0 1-.75-.75v-2.56a.75.75 0 0 1 .75-.75h2.56a.75.75 0 1 1 0 1.5H5.47v1.81a.75.75 0 0 1-.75.75Z"/></svg>
+                        <span x-text="busy ? 'Syncing updates…' : 'Sync updates'"></span>
+                    </button>
+                    <p x-show="result" x-cloak :role="result?.status === 'failed' ? 'alert' : 'status'" class="w-full rounded-lg border px-4 py-3 text-sm" :class="result?.status === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'">
+                        <span class="font-semibold" x-text="result?.message"></span>
+                        <span x-show="result?.status === 'success'" x-text="` Checked ${result?.record_count ?? 0} records: ${result?.created_count ?? 0} new, ${result?.updated_count ?? 0} updated, ${result?.unchanged_count ?? 0} unchanged, ${result?.deleted_count ?? 0} removed. Refreshing…`"></span>
+                    </p>
+                </section>
+
                 <section x-data="{ open: @js($errors->has('school_ids') || $errors->has('returned_to_office_at') || session()->has('returnedToOfficeAtUpdate')) }" class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>

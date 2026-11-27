@@ -332,8 +332,8 @@ it('syncs only new and changed rows and skips unchanged records on resync', func
             ['delivery_id' => 'delivery-removed', 'school_id' => 'school-3', 'school_name' => 'Removed Name'],
         ], 'has_more' => false])
         ->push(['data' => [
-            ['delivery_id' => 'delivery-unchanged', 'school_id' => 'school-1', 'school_name' => 'Same Name'],
-            ['delivery_id' => 'delivery-changed', 'school_id' => 'school-2', 'school_name' => 'Updated Name'],
+            ['delivery_id' => 'delivery-unchanged', 'school_id' => 'school-1', 'school_name' => 'Same Name', 'returned_to_office_at' => '1900-01-01'],
+            ['delivery_id' => 'delivery-changed', 'school_id' => 'school-2', 'school_name' => 'Updated Name', 'returned_to_office_at' => '1900-01-01'],
             ['delivery_id' => 'delivery-new', 'school_id' => 'school-4', 'school_name' => 'New Name'],
         ], 'has_more' => false]);
     mmcPlatformUser();
@@ -350,7 +350,7 @@ it('syncs only new and changed rows and skips unchanged records on resync', func
         ->assertJsonPath('unchanged_count', 0);
     DB::table('mmc_platform_masterlist_records')
         ->where('delivery_id', 'delivery-unchanged')
-        ->update(['delivered_at' => '2026-11-20']);
+        ->update(['delivered_at' => '2026-11-20', 'returned_to_office_at' => '2026-11-26']);
     $secondStatusUrl = $this->postJson($syncUrl, $syncData)->assertAccepted()->json('status_url');
     Queue::pushed(SyncMmcPlatformProject::class)->last()->handle(app(MmcPlatformApiClient::class));
 
@@ -370,8 +370,37 @@ it('syncs only new and changed rows and skips unchanged records on resync', func
     $this->assertDatabaseCount('mmc_platform_masterlist_records', 3);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-changed', 'school_name' => 'Updated Name']);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-unchanged', 'delivered_at' => '2026-11-20']);
+    $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-unchanged', 'returned_to_office_at' => '2026-11-26']);
     $this->assertDatabaseHas('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-new', 'school_name' => 'New Name']);
     $this->assertDatabaseMissing('mmc_platform_masterlist_records', ['delivery_id' => 'delivery-removed']);
+});
+
+it('queues a refresh for the selected saved masterlist program', function () {
+    Queue::fake([SyncMmcPlatformProject::class]);
+    mmcPlatformUser();
+    $companyId = (int) auth()->user()->currentCompany()->getKey();
+    $trackerProjectId = mmcTrackerProject();
+    $syncedAt = now();
+    DB::table('mmc_platform_project_syncs')->insert([
+        'company_id' => $companyId,
+        'program_id' => 'program-123',
+        'program_name' => 'SME 2',
+        'program_info' => json_encode(['id' => 'program-123', 'name' => 'SME 2'], JSON_THROW_ON_ERROR),
+        'records' => '{}',
+        'entity_counts' => '{}',
+        'record_count' => 1,
+        'synced_at' => $syncedAt,
+        'created_at' => $syncedAt,
+        'updated_at' => $syncedAt,
+        'tracker_project_id' => $trackerProjectId,
+    ]);
+
+    $statusUrl = $this->postJson(route('integrations.mmc-platform.masterlist.sync'), [
+        'program_id' => 'program-123',
+    ])->assertAccepted()->assertJsonPath('status', 'pending')->json('status_url');
+
+    $this->getJson($statusUrl)->assertOk()->assertJsonPath('status', 'pending');
+    Queue::assertPushed(SyncMmcPlatformProject::class, 1);
 });
 
 it('sets Delivered At for records matching multiple School IDs in the selected program', function () {
@@ -565,6 +594,8 @@ it('displays saved MMC masterlist records from the selected company snapshot', f
         ->assertSee('DR No.')
         ->assertSee('SAP DR No.')
         ->assertSee('Updated At')
+        ->assertSee('Refresh from MMC Platform')
+        ->assertSee(route('integrations.mmc-platform.masterlist.sync'), false)
         ->assertSee('Bulk set Returned to Office At')
         ->assertSee('School IDs')
         ->assertSee('Returned to Office At date')

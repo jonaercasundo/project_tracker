@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SyncMmcPlatformProject;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -47,6 +52,50 @@ class MmcPlatformMasterlistController extends Controller
         'sequence_no' => 'Sequence No.',
         'updated_at' => 'Updated At',
     ];
+
+    public function sync(Request $request): JsonResponse
+    {
+        if (! Schema::hasTable('mmc_platform_project_syncs')
+            || ! Schema::hasColumn('mmc_platform_project_syncs', 'tracker_project_id')
+            || ! Schema::hasTable('mmc_platform_masterlist_records')) {
+            return response()->json(['status' => 'failed', 'message' => 'Run the MMC Platform masterlist sync migrations before syncing data.'], 503);
+        }
+
+        $validated = $request->validate([
+            'program_id' => ['required', 'string', 'max:255'],
+        ]);
+        $companyId = (int) $request->user()->currentCompany()->getKey();
+        $snapshot = DB::table('mmc_platform_project_syncs')
+            ->where('company_id', $companyId)
+            ->where('program_id', $validated['program_id'])
+            ->first(['program_id', 'program_name', 'program_info', 'tracker_project_id']);
+        abort_if($snapshot === null, 404);
+        abort_if($snapshot->tracker_project_id === null, 422, 'Assign this program to a Tracker project before syncing updates.');
+
+        $userId = (int) $request->user()->getKey();
+        $syncId = (string) Str::uuid();
+        $statusKey = SyncMmcPlatformProject::statusKey($companyId, $userId, $syncId);
+        Cache::put($statusKey, ['status' => 'pending'], now()->addHours(2));
+
+        try {
+            Bus::dispatch(new SyncMmcPlatformProject($statusKey, $companyId, [
+                'program_id' => $snapshot->program_id,
+                'tracker_project_id' => (int) $snapshot->tracker_project_id,
+                'program_name' => $snapshot->program_name,
+                'program_info' => json_decode($snapshot->program_info ?: '{}', true) ?: [],
+            ]));
+        } catch (\Throwable $exception) {
+            Cache::forget($statusKey);
+            report($exception);
+
+            return response()->json(['status' => 'failed', 'message' => 'Tracker could not queue the sync. Please try again.'], 503);
+        }
+
+        return response()->json([
+            'status' => 'pending',
+            'status_url' => route('integrations.mmc-platform.sync-status', ['syncId' => $syncId]),
+        ], 202);
+    }
 
     public function updateReturnedToOfficeAt(Request $request): RedirectResponse
     {

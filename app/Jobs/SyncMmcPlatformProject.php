@@ -21,7 +21,7 @@ class SyncMmcPlatformProject implements ShouldQueue
         'region', 'division', 'municipality', 'address', 'contact_person', 'contact_phone',
         'grade_levels', 'value', 'status', 'sap_dr_no', 'sap_encoded_at', 'dr_printed_at',
         'iar_no', 'itr_no', 'ar_no', 'received_by', 'receiver_designation', 'inspected_by',
-        'inspector_designation', 'date_received', 'returned_to_office_at', 'delivered_at',
+        'inspector_designation', 'date_received', 'delivered_at',
         'pouch_completed_at', 'billing_no', 'sequence_no',
     ];
 
